@@ -1,0 +1,4 @@
+packages:
+  - 'admin-portal'
+  - 'tenant-portal'
+  - 'partner-portal'

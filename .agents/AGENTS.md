@@ -1,0 +1,15 @@
+# Global Workspace Rules
+
+- **Code Base Modification Permission**: Only read from codebase files when requested; do not modify or edit files unless explicitly instructed by the user.
+- **Styling Standards**: Always use Tailwind CSS first for styling components and layouts whenever possible.
+- **Backend Source Roots**: Backend applications are in `../backend/mutakamel-apps/`: `core-app`, `api-gateway-app`, `worker-app`, `crm-app`, and `trade-app`. Workspace shortcuts may be used for navigation, but verify files in the actual backend source tree.
+- **UI Layout & Density**: Design professional, sleek, and space-efficient user interfaces. Maximize screen real estate effectively and avoid leaving large, empty, or sparse white spaces.
+- **Next.js Routing**: Always use `Link` from `next/link` for client-side navigation instead of plain `<a href="...">` tags.
+- **Continuous AGENTS.md Updates**: Update `AGENTS.md` (both workspace root and project-specific) with every major update, new feature, or rule change so instructions are always up-to-date.
+- **Bilingual & Dual Theme Standards (ar/en & dark/light)**: Every page, layout, and component built MUST seamlessly support Arabic (RTL) and English (LTR) language switching as well as Dark Mode and Light Mode switching with full layout mirroring, proper font pairing, and color token support.
+- **Frontend Design Skill**: Utilize the [`frontend-design`](file:///c:/mutakamel.ai/frontend/.agents/skills/frontend-design/SKILL.md) skill guidelines for UI components, layouts, typography, and visual density.
+- **Separation of Logic and HTML View (Custom Hooks Pattern)**: Always separate component logic (state, effects, event handlers, API data fetching) from the TSX/HTML view. Create a custom hook `hooks/use<ComponentName>.ts` for the logic and keep the `.tsx` view component focused strictly on rendering markup and Tailwind CSS classes.
+- **Strict Fixed Port Binding**: NEVER run any application on an alternate port or change port assignments even for testing. `admin-portal` MUST strictly use port `5001`, `tenant-portal` MUST strictly use port `5002`, and `partner-portal` MUST strictly use port `5003`.
+- **API Documentation**: Always maintain up-to-date `.md` API documentation for port-specific frontend applications (for example, `admin-portal/docs` and `tenant-portal/docs`). Record the last verification date, owning backend app, public gateway path, DTO validation, enum wire values, permissions, response shape, error behavior, and frontend live/mock status.
+- **Admin API Routing**: Admin Portal browser calls use canonical API Gateway paths: `/api/admin/core/v1/<route>` for Core and `/api/admin/worker/v1/<route>` for Worker. Do not copy unversioned controller paths such as `/admin/*` into frontend request code.
+- **Contract Verification Order**: Use the API Gateway route contract for the public method/path, then the owning controller and DTO/service types for guards, permissions, validation, enums, and response shapes. Frontend mocks and comments are never contract evidence.
