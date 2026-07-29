@@ -3,7 +3,7 @@
 Frontend-facing reference for building `admin-portal` against the current
 Mutakamel backend applications.
 
-Last source verification: **2026-07-24**
+Last source verification: **2026-07-28**
 
 ## Start here
 
@@ -58,6 +58,7 @@ Never copy the unversioned controller-relative path into frontend request code.
 | Invoices | [invoices.md](api/invoices.md) | Core |
 | Wallet and ledger | [wallet.md](api/wallet.md) | Core |
 | Database servers | [database-servers.md](api/database-servers.md) | Core |
+| Storage Servers | [storage-servers.md](api/storage-servers.md) | Core |
 | Reports | [reports.md](api/reports.md) | Core |
 | System and SMTP settings | [system-settings.md](api/system-settings.md) | Core |
 | Notifications | [notifications.md](api/notifications.md) | Core |
@@ -87,6 +88,7 @@ gateway route contracts remain authoritative if a markdown page is stale.
 - [Audit log viewer](components/audit-log-viewer.md)
 - [Operation timeline](components/operation-timeline.md)
 - [Floating WebPhone](components/floating-webphone.md)
+- [Storage Server modal and edit mode](components/storage-server-modal.md)
 
 These component files describe intended UI behavior. They do not prove that
 the corresponding frontend screen is server-backed; check the integration

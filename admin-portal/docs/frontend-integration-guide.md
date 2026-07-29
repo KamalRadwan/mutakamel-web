@@ -5,7 +5,7 @@ This is the starting point for UI developers and AI coding agents working in
 is mocked, how browser routes map to backend applications, and where to find
 the validated DTO and enum details.
 
-Last source verification: **2026-07-24**
+Last source verification: **2026-07-28**
 
 ## Backend ownership
 
@@ -13,7 +13,7 @@ The Admin Portal is a control-plane application:
 
 | Backend app | Admin Portal responsibility |
 |:---|:---|
-| `core-app` | Primary backend: auth, dashboard, admin users and roles, tenants, provisioning, database servers, catalogue, subscriptions, invoices, wallets, reports, settings, logging, and notifications |
+| `core-app` | Primary backend: auth, dashboard, admin users and roles, tenants, provisioning, database servers, Storage Servers and tenant storage placement, catalogue, subscriptions, invoices, wallets, reports, settings, logging, and notifications |
 | `api-gateway-app` | The only public routing contract the browser should use; it maps canonical public paths to upstream applications |
 | `worker-app` | Admin backup and restore APIs |
 | `crm-app` | Tenant product API; not a direct Admin Portal API source today |
@@ -80,24 +80,26 @@ Backend paths in this guide are written relative to
 |:---|:---|:---|:---|
 | `/` | Redirect | Redirects to `/dashboard` | — |
 | `/login` | Admin login | Live login, refresh, `/me`, and logout calls; forgot-password modal is simulated | [Auth](api/auth.md) |
-| `/dashboard` | Control-plane dashboard | **Mock** in `useDashboard.ts` | [Dashboard](api/dashboard.md) |
+| `/dashboard` | Control-plane dashboard | **Live** through `GET /api/admin/core/v1/dashboard`; unsupported telemetry is rendered as unavailable | [Dashboard](api/dashboard.md) |
 | `/database-servers` | Server list and actions | **Mock** | [Database servers](api/database-servers.md) |
 | `/database-servers/new` | Server registration | **Mock submit/connectivity** | [Database servers](api/database-servers.md) |
 | `/database-servers/[id]` | Server detail, tenants, history | **Mock** | [Database servers](api/database-servers.md) |
+| `/storage-servers` | Planned bounded Storage Server catalogue and add modal | **Not implemented; no page route exists** | [Storage Servers](api/storage-servers.md) |
+| `/storage-servers/[id]` | Planned Storage Server detail, embedded edit mode, history, verification, and lifecycle | **Not implemented; no page route exists** | [Storage Servers](api/storage-servers.md) |
 | `/tenants` | Tenant list and lifecycle actions | **Mock** | [Tenants](api/tenants.md) |
 | `/tenants/new` | Tenant registration/provisioning wizard | **Mock** | [Tenants](api/tenants.md) |
 | `/tenants/[id]` | Tenant, subscription, wallet, FQDN, users, operations | **Mock** | [Tenants](api/tenants.md), [Tenant users](api/tenant-users.md), [Operations](api/tenant-operations.md), [Wallet](api/wallet.md) |
 | `/modules` | Module catalogue | **Mock** | [Catalogue](api/catalog.md) |
 | `/modules/[id]` | Module tiers, features, grants, pricing | **Mock** | [Catalogue](api/catalog.md) |
 | `/users` | Admin staff list | **Mock** | [Admin users](api/users.md) |
-| `/users/[id]` | Admin staff detail and roles | **Mock** | [Admin users](api/users.md), [Roles](api/roles-permissions.md) |
+| `/users/[id]` | Admin staff detail, roles, lifecycle, and WebPhone settings | **Live** through canonical Core APIs | [Admin users](api/users.md), [Roles](api/roles-permissions.md) |
 | `/roles` | Admin role list | **Mock** | [Roles](api/roles-permissions.md) |
 | `/roles/[id]` | Role permissions | **Mock** | [Roles](api/roles-permissions.md) |
 | `/settings` | Settings index | Static navigation | [System settings](api/system-settings.md) |
 | `/settings/platform` | Platform and tenant defaults | Backend attempt with local fallback | [System settings](api/system-settings.md) |
 | `/settings/auth` | Auth TTL settings | Backend attempt with local fallback | [System settings](api/system-settings.md) |
 | `/settings/billing` | Billing settings | Backend attempt with local fallback | [System settings](api/system-settings.md) |
-| `/settings/asterisk` | Asterisk/WebRTC settings | Backend attempt with local fallback | [System settings](api/system-settings.md) |
+| `/settings/asterisk` | Asterisk/WebRTC settings | **Live** through the shared authenticated client with JSON/URL validation and real error states | [System settings](api/system-settings.md) |
 | `/settings/notifications` | Notification channel settings | Backend attempt with local fallback | [System settings](api/system-settings.md), [Notifications](api/notifications.md) |
 | `/settings/smtp` | Platform SMTP config and audit | Backend attempt with simulated success fallback | [System settings](api/system-settings.md) |
 
@@ -114,22 +116,28 @@ Legacy compatibility routes:
 
 These are current-code facts that a UI developer must know before wiring APIs:
 
-1. Only authentication uses the shared `axiosClient` and canonical gateway
-   paths today.
-2. Dashboard, tenants, database servers, modules, admin users, and roles are
-   client-side mock implementations even where comments name real endpoints.
-3. General settings and SMTP hooks call `/admin/system-settings...` instead of
-   `/api/admin/core/v1/system-settings...`.
-4. Those settings hooks use raw `fetch`, do not share the coordinated 401
-   refresh behavior, and currently fall back to preview data or simulated
-   success when requests fail.
-5. The settings fallback base URL is `http://localhost:5001`, which points back
-   to the frontend rather than the gateway when `NEXT_PUBLIC_API_URL` is absent.
+1. Authentication, dashboard, generic settings, SMTP, admin-user detail, and
+   the floating WebPhone use the shared `axiosClient`, canonical Gateway paths,
+   and Core response envelopes.
+2. Tenants, database servers, modules, the admin-user list, and role-management
+   screens still contain client-side mocks or contract-breaking partial calls
+   even where comments name real endpoints. Storage Servers has no frontend
+   route yet.
+3. Generic settings and Asterisk JSON validation are live, but settings controls
+   still rely on backend `403` responses rather than proactively disabling from
+   `/auth/me` permissions.
+4. The shared client automatically adds UUIDv7 idempotency headers to mutations.
+   Any future exact-retry UI must retain the same key for the same user intent
+   rather than generating a fresh intent.
+5. The floating WebPhone additionally requires `admin.settings.read` to load
+   shared Asterisk settings even though the self-service SIP-profile route is
+   available to every authenticated admin.
 6. Several links still target non-existent frontend paths:
    `/admin/users/me/profile`, `/admin/roles`, `/admin/tenants`, and
    `/admin/reports`.
-7. The notification dropdown and WebRTC phone UI are presentation fixtures;
-   do not assume they are hydrated by their documented APIs.
+7. The notification dropdown remains a presentation fixture. The floating
+   WebRTC phone is live through JsSIP, current-admin SIP configuration,
+   Asterisk system settings, and persisted call logs.
 8. Frontend mock status values are not always backend enum values. Examples
    include tenant `"FAILED"` instead of `PROVISIONING_FAILED`, operation
    `"COMPLETED"` instead of `SUCCEEDED`, and subscription `"CANCELED"` instead
@@ -146,6 +154,15 @@ These are current-code facts that a UI developer must know before wiring APIs:
     provisioning completion must be polled from the operation API. Use
     [Tenants](api/tenants.md), [Tenant Users](api/tenant-users.md), and
     [Tenant Operations](api/tenant-operations.md).
+11. Tenant creation now requires an explicit `storageServerId` from
+    `GET /api/admin/core/v1/tenants/storage-placement-options`. The current
+    wizard has neither the selector nor the request field. Existing tenant
+    detail exposes a safe read-only storage summary; profile edit has no direct
+    storage-move API.
+12. Storage Server create/edit/routing/verification/lifecycle APIs are
+    available through Gateway, but the safe detail projection omits credential
+    references, bucket bindings, attestation selections, topology-member
+    encryption evidence, and recovery evidence. Do not infer or cache them.
 
 Do not hide these failures behind permanent mock fallbacks when converting a
 screen to production data. Use explicit loading, empty, permission-denied, and
@@ -153,17 +170,22 @@ error states.
 
 ## Authentication and request behavior
 
-The current auth flow is intentionally cookie-and-token based:
+The current browser auth flow is intentionally cookie-based:
 
 - Send `credentials: "include"` so the HttpOnly refresh cookie is available.
 - Send `x-auth-cookie-mode: 1` to admin auth endpoints.
 - Login may send `x-auth-remember: 1` or `0`.
-- Store the access token only in `sessionStorage`; the refresh token remains in
-  the HttpOnly cookie.
-- Protected calls send `Authorization: Bearer <accessToken>`.
+- Keep access and refresh tokens in HttpOnly cookies; store only non-secret
+  timing and validated profile metadata in `sessionStorage`.
+- The Gateway converts the admin access-token cookie into the upstream
+  `Authorization` header for protected calls.
 - On a protected `401`, the shared client coordinates one refresh attempt
   across callers and retries the original request once.
-- If refresh fails, clear local auth state and redirect to `/login`.
+- Proactively refresh 60 seconds before access expiry, then re-arm the
+  scheduler from the rotated session metadata.
+- Retry transient refresh failures without discarding the session. Only a
+  definitive refresh `401` or `403` clears local auth state and redirects to
+  `/login`.
 - Core’s global response interceptor wraps successful handler payloads in
   `{ success, data, correlationId, timestamp }`; paginated responses also have
   `meta`. The Gateway streams that envelope unchanged. The current auth client
@@ -244,8 +266,10 @@ when each module becomes server-backed.
 
 ## Backend capability snapshot
 
-At the verification date, the API Gateway contains **202** Core admin route
-contracts and **16** Worker admin route contracts.
+At the verification date, the Gateway Core contract table contains **426**
+routes across all masters and capabilities. The domain rows below are a
+documentation coverage aid rather than an exhaustive total. Worker still owns
+the separately documented backup/restore route family.
 
 Core route groups:
 
@@ -255,10 +279,11 @@ Core route groups:
 | Dashboard | 1 | [dashboard.md](api/dashboard.md) |
 | Admin users | 15 | [users.md](api/users.md) |
 | Roles and permissions | 7 | [roles-permissions.md](api/roles-permissions.md) |
-| Tenants and nested tenant resources | 58 | [tenants.md](api/tenants.md), [tenant-users.md](api/tenant-users.md), [tenant-operations.md](api/tenant-operations.md) |
+| Tenants and nested tenant resources | 61 | [tenants.md](api/tenants.md), [tenant-users.md](api/tenant-users.md), [tenant-operations.md](api/tenant-operations.md) |
 | Provisioning control plane | 32 | [tenants.md](api/tenants.md), [tenant-operations.md](api/tenant-operations.md) |
 | Database servers | 10 | [database-servers.md](api/database-servers.md) |
-| Catalogue: modules, tiers, features, grants, pricing | 18 | [catalog.md](api/catalog.md) |
+| Storage Servers and attestation keys | 17 | [storage-servers.md](api/storage-servers.md) |
+| Catalogue: modules, tiers, features, grants, pricing, managed currencies | 21 | [catalog.md](api/catalog.md) |
 | Subscriptions | 5 | [subscriptions.md](api/subscriptions.md) |
 | Invoices | 7 | [invoices.md](api/invoices.md) |
 | Wallet and ledger | 2 direct groups plus nested tenant routes | [wallet.md](api/wallet.md) |
@@ -283,10 +308,11 @@ inventory when backend contracts change.
 2. Replace the dashboard mock using the adapter notes in
    [api/dashboard.md](api/dashboard.md).
 3. Wire permission-gated navigation from `/auth/me`.
-4. Integrate database servers, tenants, catalogue, admin users, and roles.
+4. Integrate database servers, Storage Servers, tenants, catalogue, admin
+   users, and roles.
 5. Replace settings fail-open/simulated-success behavior with real error states.
-6. Add notifications and WebPhone only after their session and secret-handling
-   contracts are implemented.
+6. Add production notification transport; WebPhone session and frontend
+   secret-handling contracts are now implemented.
 7. Add Worker backup/restore screens when they enter the Admin Portal
    navigation.
 

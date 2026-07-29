@@ -3,7 +3,7 @@
 Verified against the current API Gateway route contracts, Core controllers,
 DTOs, services, repositories, entities, subscription quoting, provisioning
 contracts, error catalogue, and active Admin Portal screens on
-**2026-07-24**.
+**2026-07-29**.
 
 This is the implementation contract for `/tenants`, `/tenants/new`, and the
 tenant-detail shell. It covers identity validation, creation, list/detail,
@@ -22,33 +22,34 @@ permissioned nested resources.
 | Entity identifiers | UUIDv7 |
 | Active frontend routes | `/tenants`, `/tenants/new`, `/tenants/[id]` |
 | Legacy frontend routes | `/tenant` and `/tenant/new` redirect to the plural family; `/tenant/[id]` currently loses the id and redirects to `/tenants` |
-| Current integration | Fully mocked local state and simulated saves |
+| Current integration | Partial reads with contract-breaking mock/simulated mutations; creation remains fully simulated |
 
-The Gateway currently exposes exactly **58** routes whose browser paths start
+The Gateway currently exposes exactly **61** routes whose browser paths start
 with `/api/admin/core/v1/tenants`. They are divided as follows:
 
 | Family | Count | Detailed reference |
 |:---|---:|:---|
-| Tenant creation, registry, lifecycle, and FQDNs | 17 | This document |
-| Operation history and tenant-scoped provisioning | 15 | [Tenant Operations and Provisioning](tenant-operations.md) |
+| Tenant creation, registry, lifecycle, and FQDNs | 18 | This document |
+| Operation history and tenant-scoped provisioning | 16 | [Tenant Operations and Provisioning](tenant-operations.md) |
 | Tenant users and access catalogues | 18 | [Tenant Users](tenant-users.md) |
-| Subscription and billing summary | 3 | [Subscriptions](subscriptions.md), [Invoices](invoices.md) |
+| Subscription and billing summary | 4 | [Subscriptions](subscriptions.md), [Invoices](invoices.md) |
 | Wallet, ledger, adjustments, and payments | 5 | [Wallet and Ledger](wallet.md) |
 
-The creation wizard also needs two Core routes outside that 58-route prefix:
+The creation wizard also needs two Core routes outside that 61-route prefix:
 the FQDN preflight and subscription quote documented below.
 
 Browser code must use the canonical Gateway paths. Controller-relative
 `/admin/tenants/...` paths are not frontend URLs.
 
-### Other nested tenant routes in the 58-route inventory
+### Other nested tenant routes in the 61-route inventory
 
-These eight routes complete the accounting above. Their detailed DTOs and
+These nine routes complete the accounting above. Their detailed DTOs and
 response models live in the linked domain documents.
 
 | Method and browser path | Permission | Success | Idempotency key | Detailed reference |
 |:---|:---|:---:|:---:|:---|
 | `GET /api/admin/core/v1/tenants/:tenantId/subscription` | `admin.subscriptions.read` | `200` | No | [Subscriptions](subscriptions.md) |
+| `GET /api/admin/core/v1/tenants/:tenantId/subscription/items` | `admin.subscriptions.read` | `200` | No | [Subscriptions](subscriptions.md) |
 | `GET /api/admin/core/v1/tenants/:tenantId/billing-summary` | `admin.invoices.read` | `200` | No | [Invoices](invoices.md) |
 | `POST /api/admin/core/v1/tenants/:tenantId/subscription` | `admin.subscriptions.create` | `201` | Yes | [Subscriptions](subscriptions.md) |
 | `GET /api/admin/core/v1/tenants/:tenantId/wallet` | `admin.wallet.read` | `200` | No | [Wallet and Ledger](wallet.md) |
@@ -68,6 +69,7 @@ generated for one mutation intent.
 |:---|:---|:---:|:---:|:---|
 | `POST /api/admin/core/v1/tenants/validate-identity` | `admin.tenants.create` | `200` | No | Check name and company-name availability |
 | `GET /api/admin/core/v1/tenants/database-placement-options` | `admin.tenants.create` | `200` | No | List currently eligible manual-placement servers |
+| `GET /api/admin/core/v1/tenants/storage-placement-options` | `admin.tenants.create` | `200` | No | List the safe, production-ready Storage Servers eligible for explicit placement |
 | `POST /api/admin/core/v1/tenants/reverse-geocode` | `admin.tenants.create` | `200` | No | Convert coordinates to a canonical address suggestion |
 | `POST /api/admin/core/v1/tenants/provisioning-plans` | `admin.tenants.create` | `200` | No | Preview the dependency-expanded provisioning DAG |
 | `POST /api/admin/core/v1/tenants` | `admin.tenants.create` | `201` | Yes | Atomically register and enqueue tenant provisioning |
@@ -168,7 +170,9 @@ For every tenant-shell endpoint marked `Yes`:
 
 Tenant creation and provisioning commands also have durable Core replay
 semantics. An exact tenant-create retry can return the originally created
-tenant even after its single-use quote was consumed.
+tenant even after its single-use quote was consumed. `storageServerId` is part
+of the durable create-command fingerprint. Changing the selected Storage
+Server is a new intent and requires a new UUIDv7 idempotency key.
 
 ## Transport enums
 
@@ -239,6 +243,15 @@ interface TenantDatabaseServerSummary {
   status: string;
 }
 
+interface TenantStorageServerSummary {
+  id: string;
+  name: string;
+  provider: "GARAGE";
+  region: string;
+  status: string;
+  availabilityClass: string;
+}
+
 interface TenantView {
   id: string;
   name: string;
@@ -268,6 +281,8 @@ interface TenantView {
   fqdns: TenantFqdnView[];
   subscription?: TenantSubscriptionSummary;
   databaseServer?: TenantDatabaseServerSummary;
+  storageServerId?: string | null;
+  storageServer?: TenantStorageServerSummary;
 }
 
 interface TenantAddress {
@@ -289,13 +304,17 @@ The view does **not** return:
 - a plan name, subscription id, subscription items, or seat label;
 - a nested `owner` object;
 - database credentials or connection configuration;
+- Storage Server endpoints, buckets, credential references, access keys,
+  topology-member evidence, or recovery evidence;
 - a provisioning percentage or latest operation.
 
 Derive the primary FQDN with `fqdns.find(item => item.isPrimary)`, derive the
 secondary count from the remainder, and use
 `subscription.effectiveAllowedUsers` for the current allowed-user value. Load
 full subscription items and operations from their separately permissioned
-endpoints.
+endpoints. Use `storageServer` only as the safe placement summary. Do not call
+the Storage Servers admin registry to enrich a tenant row with endpoints or
+other operational configuration.
 
 ## Creation workflow
 
@@ -303,10 +322,11 @@ The wizard is a server-priced, asynchronous provisioning workflow:
 
 ```text
 catalogue selections
-  -> identity/FQDN/placement checks
+  -> identity/FQDN/database-placement checks
+  -> explicit Storage Server selection
   -> provisioning-plan preview
   -> subscription quote
-  -> POST tenant with quoteId + UUIDv7 command key
+  -> POST tenant with quoteId + storageServerId + UUIDv7 command key
   -> tenant returned as PROVISIONING
   -> poll operation/detail until terminal state
 ```
@@ -423,7 +443,93 @@ For automatic placement, omit `databaseServerId`. Core selects an eligible
 server in the chosen country with the most spare capacity. For manual
 placement, send the selected UUIDv7. Do not send `placementMode`.
 
-### 4. Reverse-geocode an optional map selection
+### 4. Load and select Storage Server placement
+
+`GET /api/admin/core/v1/tenants/storage-placement-options`
+
+Permission: `admin.tenants.create`.
+
+```ts
+interface TenantCreateStoragePlacementOptionsView {
+  items: Array<{
+    id: string;
+    name: string;
+    provider: "GARAGE";
+    region: string;
+    status: "ACTIVE";
+    availabilityClass: "HA_PRODUCTION_READY";
+    currentTenants: number;
+    retainedTenants: number;
+    reservedTenants: number;
+    maxTenants: number;
+    capacityPercent: number;
+    allocatableCapacityBytes: string;
+    availableReservationBytes: string;
+  }>;
+  total: number;
+}
+```
+
+The response carries `Cache-Control: private, no-store` and is a bounded object
+under `data`, not a paginated envelope. It
+contains at most 200 eligible rows sorted by name. It deliberately omits:
+
+- internal and public endpoints;
+- bucket names and class bindings;
+- credential references and credential material;
+- topology-member and encrypted-volume details;
+- recovery-destination details.
+
+Every returned row is currently `ACTIVE`, `GENERAL`,
+`HA_PRODUCTION_READY`, healthy, below the critical capacity threshold, and
+backed by current topology, encrypted-volume, bucket,
+principal-verification, and recovery evidence. Capacity observations and
+topology snapshots must be no older than 15 minutes, and the independent
+isolated-restore evidence must be no older than 180 days. Core re-locks and
+revalidates the selected row during creation, so a listed row can still become
+ineligible before submission.
+
+The admin must explicitly select exactly one item and submit its UUIDv7 as
+`storageServerId`. There is no automatic Storage Server placement, hidden
+default, fallback, or client-side substitution. An empty list is a blocking
+state: keep the form draft, explain that no production-ready storage target is
+available, and do not enable tenant creation.
+
+Byte counters are decimal strings and require `BigInt`-safe formatting. The
+numeric `capacityPercent` is display evidence only; do not use it to re-create
+Core's eligibility rules.
+
+Example response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "019f0000-0000-7000-8000-000000000030",
+        "name": "Primary Garage Cluster",
+        "provider": "GARAGE",
+        "region": "garage",
+        "status": "ACTIVE",
+        "availabilityClass": "HA_PRODUCTION_READY",
+        "currentTenants": 12,
+        "retainedTenants": 1,
+        "reservedTenants": 0,
+        "maxTenants": 100,
+        "capacityPercent": 28.5,
+        "allocatableCapacityBytes": "1099511627776",
+        "availableReservationBytes": "824633720832"
+      }
+    ],
+    "total": 1
+  },
+  "correlationId": "019f0000-0000-7000-8000-000000000090",
+  "timestamp": "2026-07-28T08:00:00.000Z"
+}
+```
+
+### 5. Reverse-geocode an optional map selection
 
 `POST /api/admin/core/v1/tenants/reverse-geocode`
 
@@ -453,7 +559,7 @@ Treat this as an editable suggestion, not an irreversible selection. Core
 caches coordinate results and serializes outbound provider calls. A missing or
 incomplete address is `422`; provider failure is `502` or `503`.
 
-### 5. Preview provisioning
+### 6. Preview provisioning
 
 `POST /api/admin/core/v1/tenants/provisioning-plans`
 
@@ -481,7 +587,7 @@ Render component and step arrays from the response. The current frontend’s
 three-field `components: string[]`/`stepsCount` mock loses important dependency,
 release, checksum, seed, and activation evidence.
 
-### 6. Obtain the subscription quote
+### 7. Obtain the subscription quote
 
 Tenant creation requires a short-lived quote from a route outside the tenant
 prefix:
@@ -531,7 +637,7 @@ The creation page therefore needs both `admin.tenants.create` and
 `admin.catalog.read`. A user lacking catalogue read cannot complete the
 server-priced wizard.
 
-### 7. Create the tenant
+### 8. Create the tenant
 
 `POST /api/admin/core/v1/tenants`
 
@@ -553,6 +659,7 @@ interface CreateTenantDto {
   taxNumber?: string;
   commercialRegistrationNumber?: string;
   databaseServerId?: string;
+  storageServerId: string;
   ownerEmail: string;
   ownerFirstName: string;
   ownerLastName: string;
@@ -597,6 +704,7 @@ Detailed validation:
 | `address` | Required nested object; each property optional and trimmed |
 | `taxNumber`, `commercialRegistrationNumber` | Optional, max 64 |
 | `databaseServerId` | Optional UUIDv7; omission means automatic placement |
+| `storageServerId` | Required UUIDv7 selected from the safe Storage Server placement options; no default/failover |
 | `ownerEmail` | Email, max 255, trim/lowercase |
 | `ownerFirstName`, `ownerLastName` | Required trimmed string, 1–80 |
 | `ownerPhoneCountryCode` | Required country calling code pattern |
@@ -612,6 +720,46 @@ Detailed validation:
 | `moduleKey`, `tierKey` | Required non-empty strings, max 64 |
 | `seats` | Integer 1–1,000,000 in create DTO, but use 1–100,000 because the required quote is stricter |
 
+Representative create request:
+
+```json
+{
+  "quoteId": "019f0000-0000-7000-8000-000000000020",
+  "name": "acme-retail",
+  "companyName": "Acme Retail LLC",
+  "countryName": "Egypt",
+  "countryIsoCode": "EG",
+  "industry": "Retail",
+  "timezone": "Africa/Cairo",
+  "phoneCountryCode": "+20",
+  "phone": "1001234567",
+  "address": {
+    "city": "Cairo",
+    "street1": "Nile Street"
+  },
+  "databaseServerId": "019f0000-0000-7000-8000-000000000029",
+  "storageServerId": "019f0000-0000-7000-8000-000000000030",
+  "ownerEmail": "owner@example.com",
+  "ownerFirstName": "Mona",
+  "ownerLastName": "Ali",
+  "ownerPhoneCountryCode": "+20",
+  "ownerPhone": "1001234567",
+  "ownerJobTitle": "Chief Executive Officer",
+  "sendInvitation": true,
+  "ownerActive": true,
+  "billingCycle": "MONTHLY",
+  "currencyCode": "USD",
+  "trialDays": 14,
+  "modules": [
+    {
+      "moduleKey": "core",
+      "tierKey": "business",
+      "seats": 25
+    }
+  ]
+}
+```
+
 `TenantAddress` bounds:
 
 | Property | Maximum |
@@ -623,8 +771,11 @@ Detailed validation:
 The operation is transactional. Core:
 
 - consumes the exact quote;
-- selects and capacity-locks the database server;
+- selects and capacity-locks the database server, then locks the exact selected
+  Storage Server in that fixed order;
 - creates the tenant in `PROVISIONING`;
+- persists the immutable initial Storage Server assignment, placement history,
+  quota snapshot, and capacity reservation atomically with the tenant;
 - generates a unique database name and immutable platform primary FQDN;
 - stores secondary FQDNs as pending;
 - creates the subscription, wallet, access-policy snapshot, operation, and
@@ -633,7 +784,9 @@ The operation is transactional. Core:
 
 Physical database creation, migrations, seeds, owner creation/invitation, and
 the final transition to `ACTIVE` are asynchronous. Do not optimistically mark
-the returned tenant active.
+the returned tenant active. Core creates no S3 folder marker: tenant storage
+namespaces are virtual and are derived by the Storage V2 runtime from the
+persisted assignment.
 
 ## Tenant directory
 
@@ -676,6 +829,7 @@ List-field mapping:
 | `primaryFqdn` | `fqdns.find(f => f.isPrimary)?.fqdn` |
 | `secondaryFqdnsCount` | `fqdns.filter(f => !f.isPrimary).length` |
 | hosting server | Optional `databaseServer` summary |
+| storage placement | Optional safe `storageServer` summary; use `storageServerId` as its stable identity |
 | subscription seats | Optional `subscription.effectiveAllowedUsers` |
 | plan name | Not available from tenant list |
 | owner email | Optional `ownerEmail` |
@@ -688,8 +842,30 @@ List-field mapping:
 
 The id is UUIDv7. The response is `SuccessResponse<TenantView>`. FQDNs are
 loaded primary-first, then creation order. The subscription and database
-server are optional; every tab must handle absence or independent permission
-failure.
+server are optional. `storageServerId` can be `null` only for legacy or
+incompletely migrated rows; the nested `storageServer` summary is absent when
+the assignment cannot be safely resolved. Render those as explicit
+unavailable/legacy placement states. Do not substitute the first Storage
+Server from the catalogue.
+
+Storage placement fragment in a normal detail response:
+
+```json
+{
+  "storageServerId": "019f0000-0000-7000-8000-000000000030",
+  "storageServer": {
+    "id": "019f0000-0000-7000-8000-000000000030",
+    "name": "Primary Garage Cluster",
+    "provider": "GARAGE",
+    "region": "garage",
+    "status": "ACTIVE",
+    "availabilityClass": "HA_PRODUCTION_READY"
+  }
+}
+```
+
+This fragment intentionally has no endpoint, bucket, credential, topology
+member, or recovery fields.
 
 ### Update profile
 
@@ -711,6 +887,26 @@ interface UpdateTenantDto {
 }
 ```
 
+Example save request:
+
+```json
+{
+  "expectedUpdatedAt": "2026-07-28T08:00:00.000Z",
+  "companyName": "Acme Retail Group",
+  "industry": "Retail and Distribution",
+  "address": {
+    "city": "Cairo",
+    "street1": "Nile Street",
+    "postalCode": "11511"
+  }
+}
+```
+
+The success response is `SuccessResponse<TenantView>` and includes the same
+read-only `storageServerId` and safe `storageServer` summary returned by
+detail. Replace the detail query cache with the returned view; do not merge the
+request body into stale local state.
+
 Use the exact `updatedAt` from the last detail response as
 `expectedUpdatedAt`. A conflicting edit returns `TENANT_UPDATE_STALE`; reload
 and let the admin review the new values. An exact transport replay is accepted
@@ -719,7 +915,8 @@ when every requested field is already stored.
 Rules:
 
 - `name`, owner identity/contact, database placement, status, FQDNs,
-  subscription, and database name are not mutable here;
+  subscription, database name, `storageServerId`, and storage placement are
+  not mutable here;
 - `companyName` remains non-empty, max 160;
 - changing country requires `countryIsoCode`; sending `countryName` without it
   is `TENANT_COUNTRY_INVALID`;
@@ -729,6 +926,21 @@ Rules:
 - empty strings normalize to omitted values and therefore do not clear them;
 - `address: null` clears the whole address; a supplied address object replaces
   the stored JSON value rather than deep-merging it.
+
+### Storage placement on view and edit
+
+Tenant detail and edit mode must show the safe `storageServer` summary and
+stable `storageServerId` as read-only placement evidence. The current
+`PATCH /tenants/:id` DTO does not accept `storageServerId`, and there is no
+Admin Gateway route for a direct storage move.
+
+Do not put a Storage Server selector in existing-tenant profile edit, do not
+send `storageServerId` as an unknown field, and do not mutate the displayed
+assignment optimistically. A future move requires a dedicated, fenced Storage
+V2 migration workflow with retained historical assignment and rollback
+evidence. Until that contract exists, the UI may link read-permitted admins to
+`/storage-servers/[storageServerId]`, but must not offer a “change storage”
+action.
 
 ## Lifecycle
 
@@ -844,6 +1056,7 @@ so the UI should not show a “set primary” action.
 | UI capability | Permission |
 |:---|:---|
 | Register wizard shell | `admin.tenants.create` |
+| Load/select database and Storage Server placement options | `admin.tenants.create` |
 | Read selectable modules/tiers and obtain quote | `admin.catalog.read` |
 | Read directory/detail/operations | `admin.tenants.read` |
 | Edit profile | `admin.tenants.update` |
@@ -888,11 +1101,14 @@ provisioning permissions.
 | `409` | `TENANT_BILLING_HOLD` | Wait for collection/refund reconciliation before soft delete |
 | `409` | `TENANT_FINANCIAL_HISTORY_EXISTS` | Permanent destruction is forbidden |
 | `409` | `NO_CAPACITY` | Refresh placement options or use automatic placement |
+| `409` | `TENANT_CREATE_STORAGE_PLACEMENT_INCOMPLETE` | Storage catalogue exceeded its bounded safe projection; block creation and escalate |
 | `409` | `SUBSCRIPTION_QUOTE_EXPIRED` | Re-quote |
 | `409` | `SUBSCRIPTION_QUOTE_ALREADY_CONSUMED` | Refetch tenant for an exact create retry; otherwise re-quote |
 | `409` | `SUBSCRIPTION_QUOTE_MISMATCH` | Re-quote the exact current plan |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | Client reused a durable key for another request |
 | `422` | `TENANT_COUNTRY_INVALID` | Select a recognized country/ISO pair |
+| `422` | `TENANT_STORAGE_PLACEMENT_INELIGIBLE` | Refresh Storage Server options and require a new explicit selection |
+| `422` | `TENANT_STORAGE_ENTITLEMENT_INVALID` | Re-quote; the quote-derived storage quota/reservation is invalid |
 | `422` | `SUBSCRIPTION_SEED_REQUIRED` | Supply cycle and non-empty module lines |
 | `422` | `TENANT_PROVISIONING_MODULE_SELECTION_INVALID` | Refresh active module selection |
 | `422` | `MODULE_NOT_FOUND` / `TIER_NOT_FOUND` | Selected catalogue row is inactive/missing |
@@ -902,6 +1118,7 @@ provisioning permissions.
 | `503` | `CORE.REVERSE_GEOCODING_UNAVAILABLE` | Provider/configuration unavailable |
 | `503` | `TENANT_PROVISIONING_CONTROL_PLANE_UNAVAILABLE` | Provisioning catalogue is unavailable |
 | `503` | `TENANT_PROVISIONING_CATALOG_INVALID` | Published provisioning catalogue is incomplete |
+| `503` | `TENANT_STORAGE_PLACEMENT_UNAVAILABLE` | Keep the wizard draft and block creation until the catalogue is available |
 
 The current shared error catalogue maps `FQDN_NOT_VERIFIED` to HTTP `503`
 even though the FQDN service constructs a conflict. Handle the stable code and
@@ -912,19 +1129,23 @@ Operation-command errors are detailed in
 
 ## Current frontend gaps
 
-The active implementation under `src/app/tenants/` is a prototype:
+The active implementation under `src/app/tenants/` is a partial,
+contract-breaking prototype:
 
-1. No tenant hook performs an API request.
-2. List filtering, pagination, lifecycle, retry, and delete mutate four local
-   mock rows.
-3. The list uses invalid `FAILED`; the transport value is
+1. The directory and detail hooks perform some real requests, but they use
+   loose/invented response types, suppress errors to the console, and do not
+   implement permission, forbidden, conflict, or independent error states.
+2. List lifecycle, retry, and delete issue incorrect or incomplete operations
+   and still apply optimistic local assumptions.
+3. The list type uses invalid `FAILED`; the transport value is
    `PROVISIONING_FAILED`.
 4. The list invents `code`, `primaryFqdn`, `planName`, and direct `seats`
    fields.
 5. Summary cards count local mock/page rows; no tenant aggregate endpoint
    exists.
 6. Mock database-server ids such as `srv-eg-01` fail UUIDv7 validation.
-7. The creation wizard has no `quoteId` or subscription quote call.
+7. The creation wizard has no `quoteId`, subscription quote call,
+   `storageServerId`, or Storage Server placement-options call.
 8. It sends flattened address fields instead of required nested `address`.
 9. It invents `placementMode`, `selectedModules`, and `YEARLY`.
 10. It selects currency `EGP`, although subscription pricing/settlement is
@@ -934,7 +1155,9 @@ The active implementation under `src/app/tenants/` is a prototype:
 12. Identity and plan preview handlers are delays with fabricated success.
 13. The mocked plan loses release, dependency, checksum, seed, prerequisite,
     and activation evidence.
-14. Detail/profile/lifecycle/destruction actions are simulated.
+14. Detail reads are partial, while profile/lifecycle/destruction actions are
+    simulated or use wrong methods. Profile save currently sends `PUT` instead
+    of `PATCH` and omits `expectedUpdatedAt`.
 15. FQDN rows use invented `domain`, `type`, and `VERIFIED` fields instead of
     `fqdn`, `isPrimary`, and `validationStatus`.
 16. The detail page offers primary changes that are locked for normal generated
@@ -948,6 +1171,10 @@ The active implementation under `src/app/tenants/` is a prototype:
 20. No mutation supplies the required UUIDv7 idempotency header.
 21. Loading, empty, independent forbidden-tab, validation, stale-update,
     conflict, in-flight, replay, and terminal provisioning states are absent.
+22. List and detail types omit the safe `storageServerId` and `storageServer`
+    placement summary.
+23. Existing-tenant edit has no read-only storage placement treatment and must
+    not invent a direct selector/move API.
 
 ## Recommended implementation sequence
 
@@ -957,8 +1184,9 @@ The active implementation under `src/app/tenants/` is a prototype:
    filters.
 3. Implement detail loading and derive only fields supported by `TenantView`.
 4. Implement optimistic profile update and lifecycle permissions/states.
-5. Rebuild the creation wizard around catalogue IDs/keys, placement options,
-   plan preview, server quote, and one durable create command.
+5. Rebuild the creation wizard around catalogue IDs/keys, database placement,
+   required explicit Storage Server placement, plan preview, server quote, and
+   one durable create command.
 6. Poll/open the returned provisioning operation instead of marking the tenant
    active.
 7. Implement FQDN preflight and add/remove; hide primary promotion for normal
@@ -969,6 +1197,8 @@ The active implementation under `src/app/tenants/` is a prototype:
    constraints.
 10. Remove mock datasets only after loading, empty, forbidden, conflict,
     retry/replay, stale, and terminal states exist.
+11. Keep existing-tenant Storage Server placement read-only until a dedicated
+    fenced migration API exists.
 
 ## Backend source map
 
@@ -978,6 +1208,9 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 - `../backend/mutakamel-apps/api-gateway-app/src/idempotency/gateway-idempotency.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/tenants.controller.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/tenants.service.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/tenants/tenant-storage-placement.service.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/tenants/dto/create-tenant.dto.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/tenants/dto/update-tenant.dto.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/tenant-identity-validation.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/tenant-address-geocoding.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/fqdn-validation.controller.ts`

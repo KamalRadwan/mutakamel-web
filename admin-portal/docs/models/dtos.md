@@ -246,6 +246,31 @@ normalization table and cross-field validation rules.
 
 ---
 
+## Storage Server DTOs
+
+Storage Server registration, base update, full routing-profile replacement,
+principal-reference rotation, verification, lifecycle, and attestation-key
+DTOs are documented in the verified
+[Storage Servers Frontend Contract](../api/storage-servers.md).
+
+Important shared constraints:
+
+- all Storage Server and attestation-key mutations require UUIDv7
+  `x-idempotency-key`;
+- create/update endpoint URLs are absolute and credential-free, and the public
+  endpoint is HTTPS;
+- routing profile is a full replacement with an
+  `expectedBindingRevision`, four distinct mandatory class buckets, nine
+  principal references, and six attestation key IDs;
+- principal references match exact `env:S3_<PREFIX>_<PRINCIPAL>_<ROLE>`
+  suffixes and are never secret material;
+- rotation, verification, lifecycle, key promotion, and delete requests have
+  no body where the API contract says none;
+- no DTO accepts an access key, secret key, Ed25519 private key, raw
+  fingerprint, or force-activation flag.
+
+---
+
 ## Tenant DTOs
 
 Tenant registration, identity/FQDN preflight, placement, provisioning preview,
@@ -269,8 +294,13 @@ Important shared constraints:
   idempotency identifiers that explicitly require UUIDv7 cannot use mock UUIDs.
 - Tenant creation requires a current server-issued `quoteId`; do not submit
   invented plan labels, `placementMode`, or frontend-computed totals.
+- Tenant creation requires an explicit UUIDv7 `storageServerId` loaded from
+  the safe placement-options endpoint; it is part of the durable command
+  fingerprint.
 - `UpdateTenantDto.expectedUpdatedAt` is an exact ISO timestamp used for
   optimistic concurrency.
+- `UpdateTenantDto` does not accept `storageServerId`; existing placement is
+  read-only until a dedicated fenced migration contract exists.
 - Tenant-user `DELETED` is a visibility value, not `UserStatusEnum`.
 - Branch-role updates are full replacement sets, not add/remove deltas.
 - Gateway tenant mutations require an `x-idempotency-key` UUIDv7 even where an

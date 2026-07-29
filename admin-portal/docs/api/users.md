@@ -6,6 +6,8 @@ controller-relative paths, not browser request URLs.
 Base Path: `admin/users`
 Guard: `AdminGuard` (all endpoints)
 
+Last source verification: **2026-07-25**
+
 ---
 
 ## POST `/admin/users` — Invite Admin User
@@ -95,6 +97,24 @@ Guard: `AdminGuard` (all endpoints)
 **Permission**: Any authenticated admin
 **HTTP Status**: 200
 
+```typescript
+{
+  enabled: boolean;
+  extension: string | null;
+  sipUsername: string | null;
+  sipPassword: string | null; // returned only by this self-service route
+  displayName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  outboundCallerId: string | null;
+  transport: 'ws' | 'wss';
+  passwordConfigured: boolean;
+}
+```
+
+The floating phone keeps `sipPassword` in component memory only. It must not be
+persisted in browser storage, logs, diagnostics, or analytics.
+
 ---
 
 ## GET `/admin/users/me/webphone/call-logs` — List My Call Logs
@@ -157,9 +177,13 @@ Guard: `AdminGuard` (all endpoints)
 **Permission**: `admin.users.read`
 **HTTP Status**: 200
 
+This administrative projection omits the SIP password and exposes only
+`passwordConfigured`. The edit form must always initialize its password field
+to an empty string.
+
 ---
 
-## PUT `/admin/users/:id/webphone` — Update Admin WebPhone Config
+## PATCH `/admin/users/:id/webphone` — Update Admin WebPhone Config
 
 **Permission**: `admin.users.update`
 **HTTP Status**: 200
@@ -228,3 +252,24 @@ Guard: `AdminGuard` (all endpoints)
 - Full replacement (submit complete desired role set)
 - Empty array removes all roles
 - Invalidates target user sessions
+
+---
+
+## Current Admin Portal integration
+
+- `/users/[id]` loads the admin record, role catalogue, assigned roles, and
+  WebPhone configuration from the canonical Gateway APIs.
+- Identity changes use `PATCH /api/admin/core/v1/users/:id`.
+- Role replacement uses `PUT /api/admin/core/v1/users/:id/roles`.
+- Suspend/activate actions use their dedicated `POST` routes.
+- WebPhone changes use
+  `PATCH /api/admin/core/v1/users/:id/webphone`; the shared client supplies the
+  Gateway-required UUIDv7 idempotency header.
+- Enabling WebPhone is validated client-side for extension, SIP username, and
+  an existing or newly entered SIP password.
+- The password field remains blank after every load/save. Leaving it blank
+  preserves an already configured password.
+- Backend security boundary still requiring remediation: the current
+  control-plane `AdminUserEntity` stores `webphone_sip_password` as a hidden
+  plaintext column (`select: false` is not encryption). The frontend does not
+  cache the secret, but that does not provide encryption at rest.

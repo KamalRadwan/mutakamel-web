@@ -16,6 +16,7 @@ To enforce visual consistency, high information density, RTL/LTR support, and pr
 | `FloatingWebPhone` | [floating-webphone.md](floating-webphone.md) | Admin shell floating WebRTC phone widget, call controls, call logs |
 | `ConfirmActionModal` | [confirm-action-modal.md](confirm-action-modal.md) | Destructive/lifecycle actions (Suspend, Delete, Void, Cancel, Reprovision) |
 | `FormDrawer` | [form-drawer.md](form-drawer.md) | Slide-over panels for Create User, Edit Role, Add FQDN, System Setting overrides |
+| Storage Server modal/edit flows | [storage-server-modal.md](storage-server-modal.md) | Add Storage Server, embedded detail edit mode, and critical storage confirmations |
 
 ---
 

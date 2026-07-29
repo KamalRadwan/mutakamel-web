@@ -17,9 +17,11 @@ Complete inventory of NestJS Guards, Custom Decorators, and RBAC Permission Keys
 
 ---
 
-## 🔑 Complete RBAC Permission Matrix
+## 🔑 Admin Portal RBAC Permission Matrix
 
-Total Permission Keys: **44 Keys** grouped into 15 domain modules.
+This is a frontend-focused domain inventory. The backend seed contains
+additional internal and newer capability keys; each API document remains
+authoritative for its exact route permissions.
 
 ### 1. Auth (`admin/auth`)
 - **Guards**: `@Public()` for login/refresh/reset/invite; `AdminGuard` for `/me` and `/logout-all`.
@@ -106,31 +108,68 @@ Total Permission Keys: **44 Keys** grouped into 15 domain modules.
 - `admin.database_servers.update` — Update capacity/connection, drain, activate, set offline
 - `admin.database_servers.delete` — Delete database server host
 
-### 13. Backups & Restores (`admin.backups.*`)
+### 13. Storage Servers (`admin.storage_servers.*`)
+- **Guard**: `AdminGuard`
+- `admin.storage_servers.read` — List/view Storage Servers, history, exact verification runs, and public attestation-key registry
+- `admin.storage_servers.create` — Register a DRAFT Storage Server; every create route also requires `.critical`
+- `admin.storage_servers.update` — Update empty DRAFT/OFFLINE configuration, replace routing, rotate principal evidence, verify, lifecycle, and manage attestation keys; every route also requires `.critical`
+- `admin.storage_servers.delete` — Soft-delete an eligible empty DRAFT/OFFLINE Storage Server; the route also requires `.critical`
+- `admin.storage_servers.critical` — Required together with create, update, lifecycle, verification, routing, key-management, rotation, and delete permissions
+
+See [Storage Servers](../api/storage-servers.md) for the exact permission pair
+beside every endpoint.
+
+### 14. Backups & Restores (`admin.backups.*`)
 - **Guard**: `AdminGuard`
 - `admin.backups.read` — View policies, backup runs, artifacts, restore runs
 - `admin.backups.manage` — Upsert backup policy, database overrides, start backup run
 - `admin.backups.delete` — Delete backup run or artifact
 - `admin.backups.restore` — Start database restore run, promote restore
 
-### 14. System Settings (`admin.settings.*`)
+### 15. System Settings (`admin.settings.*`)
 - **Guard**: `AdminGuard`
-- `admin.settings.read` — View platform settings, SMTP configuration, email audit
-- `admin.settings.update` — Upsert setting override, patch SMTP config, verify SMTP connection
+- `admin.settings.read` — List/get the 31-key platform registry, read the SMTP singleton, and view its latest 25 audit entries
+- `admin.settings.update` — Upsert generic setting overrides, patch the SMTP singleton, and verify its saved connection
 
-### 15. Catalogue & Billing Currency (`admin.catalog.*` & `admin.billing.*`)
+All three settings mutations are also Gateway `WRITE_SENSITIVE` routes and
+require an `x-idempotency-key` UUIDv7.
+
+### 16. Catalogue & Billing Currency (`admin.catalog.*` & `admin.billing.*`)
 - **Guard**: `AdminGuard`
 - `admin.catalog.read` — View modules, tiers, features, price brackets, currency rates
 - `admin.catalog.manage` — Create/update/reorder modules, tiers, features, tier-feature grants, price tiers
 - `admin.catalog.destroy` — Delete catalogue modules
 - `admin.billing.currency.manage` — Update currency exchange rates
 
-### 16. Notifications (`admin.notifications.*`)
+### 17. Notifications (`admin.notifications.*`)
 - **Guard**: `AdminGuard`
 - `admin.notifications.read` — View notification config, inbox, unread count, preferences
 - `admin.notifications.manage` — Upsert preferences, register/revoke device tokens, mark read, acknowledge, dismiss
 
-### 17. Logging Overrides (`admin.logging.*`)
+### 18. Logging Overrides (`admin.logging.*`)
 - **Guard**: `AdminGuard`
 - `admin.logging.read` — View runtime log-level overrides, change history, effective level, SSE live stream
 - `admin.logging.update` — Upsert or delete runtime log-level override
+
+---
+
+## 🌍 Bilingual API Payload & Critical Semantics
+
+Starting with the Admin Portal v2 refactor, permissions are distributed as a bilingual catalogue item via `/api/admin/core/v1/permissions`:
+```typescript
+type AdminPermission = {
+  id: string;
+  key: string;              // e.g. "admin.database_servers.update"
+  nameAr: string;           // Localized name (Arabic)
+  nameEn: string;           // Localized name (English)
+  group: string;            // Categorical UI grouping
+  description?: string;     // Legacy fallback
+};
+```
+
+### Authorization Rules:
+1. **Never authorize by localized names**: Component guards (`RequirePermission`, `adminCan`) MUST strictly authorize using the immutable `key`.
+2. **Critical Action Pairs**: Destructive and highly sensitive operations require a `.critical` pair.
+   - E.g., deleting a database server requires **both** `["admin.database_servers.delete", "admin.database_servers.critical"]`.
+   - Storage registration requires **both** `["admin.storage_servers.create", "admin.storage_servers.critical"]`; storage update/lifecycle/verification requires **both** `["admin.storage_servers.update", "admin.storage_servers.critical"]`; deletion requires **both** `["admin.storage_servers.delete", "admin.storage_servers.critical"]`.
+   - A super admin (`isSuperAdmin: true`) bypasses all frontend `adminCan`/`adminCanAll` checks automatically.

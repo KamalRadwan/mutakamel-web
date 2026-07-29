@@ -120,6 +120,80 @@ and deletion preconditions.
 
 ---
 
+## Storage Server Enums
+
+```typescript
+enum StorageServerProvider {
+  GARAGE = 'GARAGE',
+}
+
+enum StorageServerPlacementRole {
+  GENERAL = 'GENERAL',
+  BACKUP_ONLY = 'BACKUP_ONLY',
+}
+
+enum StorageServerStatus {
+  DRAFT = 'DRAFT',
+  ACTIVE = 'ACTIVE',
+  DRAINING = 'DRAINING',
+  OFFLINE = 'OFFLINE',
+}
+
+enum StorageServerAvailabilityClass {
+  DEGRADED_SINGLE_NODE = 'DEGRADED_SINGLE_NODE',
+  SINGLE_NODE_OPERATIONAL = 'SINGLE_NODE_OPERATIONAL',
+  BACKUP_TARGET_OPERATIONAL = 'BACKUP_TARGET_OPERATIONAL',
+  HA_PRODUCTION_READY = 'HA_PRODUCTION_READY',
+}
+
+enum StorageServerHealthStatus {
+  UNKNOWN = 'UNKNOWN',
+  HEALTHY = 'HEALTHY',
+  UNHEALTHY = 'UNHEALTHY',
+}
+
+enum StoragePrincipal {
+  CORE = 'CORE',
+  CRM = 'CRM',
+  TRADE = 'TRADE',
+  WORKER = 'WORKER',
+  BACKUP = 'BACKUP',
+  PROBE = 'PROBE',
+}
+
+enum StorageCredentialRole {
+  OPERATION = 'OPERATION',
+  SIGNING = 'SIGNING',
+}
+
+enum StorageVerificationRunStatus {
+  PENDING = 'PENDING',
+  PASS = 'PASS',
+  FAIL = 'FAIL',
+  EXPIRED = 'EXPIRED',
+}
+
+enum StorageServerHistoryAction {
+  BOOTSTRAPPED = 'BOOTSTRAPPED',
+  CREATED = 'CREATED',
+  UPDATED = 'UPDATED',
+  BINDINGS_CHANGED = 'BINDINGS_CHANGED',
+  PRINCIPAL_ROTATED = 'PRINCIPAL_ROTATED',
+  VERIFIED = 'VERIFIED',
+  ACTIVATED = 'ACTIVATED',
+  DRAINED = 'DRAINED',
+  OFFLINED = 'OFFLINED',
+  DELETED = 'DELETED',
+}
+```
+
+`DELETED` is a history action, not a Storage Server status. The full
+principal-role matrix, attestation-key statuses, and lifecycle preconditions
+are in the
+[Storage Servers Frontend Contract](../api/storage-servers.md).
+
+---
+
 ## Subscription & Billing Enums
 
 ### `BillingCycleEnum`

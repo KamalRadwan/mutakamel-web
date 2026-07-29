@@ -1,7 +1,7 @@
 # Admin Authentication API
 
 Verified against the current Core controller, DTOs, cookie helpers, and gateway
-route contracts on **2026-07-24**.
+route contracts on **2026-07-27**.
 
 Browser prefix: `/api/admin/core/v1/auth`
 
@@ -16,27 +16,28 @@ x-auth-cookie-mode: 1
 credentials: include
 ```
 
-- Core returns the access token in JSON.
-- Core stores the rotating refresh token in an HttpOnly cookie.
-- The browser stores the access token in tab-scoped `sessionStorage` and sends
-  it as `Authorization: Bearer <accessToken>` on protected calls.
-- `x-auth-remember: 1` gives the refresh and marker cookies persistent
-  `maxAge`; `0` uses session cookies.
+- Core returns only non-secret expiry and token-type metadata in JSON.
+- Core stores both the short-lived access token and rotating refresh token in
+  HttpOnly cookies.
+- Browser JavaScript stores only non-secret session timing and validated
+  profile metadata. The Gateway promotes the access-token cookie to the
+  upstream `Authorization` header for authenticated admin routes.
+- `x-auth-remember: 1` gives all three auth cookies persistent `maxAge`; `0`
+  uses session cookies.
 - Do not read, copy, or persist the refresh token in frontend JavaScript.
 
 Cookie-mode token response:
 
 ```ts
 interface AdminAuthCookieResponse {
-  accessToken: string;
   tokenType: string;
   expiresIn: number;
   refreshExpiresIn: number;
 }
 ```
 
-Without cookie mode, Core returns the full token pair, including
-`refreshToken`. That mode is not the Admin Portal browser contract.
+Without cookie mode, Core returns the full token pair. That mode is for
+non-browser clients and is not the Admin Portal contract.
 
 ## POST `/api/admin/core/v1/auth/login`
 
@@ -69,7 +70,10 @@ clears rejected auth cookies; transient server failures retain them so a safe
 retry remains possible.
 
 The shared client coordinates refresh and retries a protected request at most
-once. Feature hooks must not implement independent refresh loops.
+once. The proactive scheduler refreshes 60 seconds before access expiry and
+re-arms itself after every successful rotation. Transient failures retry after
+30 seconds; only definitive `401` or `403` refresh rejection ends the session.
+Feature hooks must not implement independent refresh loops.
 
 ## POST `/api/admin/core/v1/auth/accept-invite`
 
@@ -162,6 +166,7 @@ Implemented in `src/context/AuthContext.tsx` and
 - login;
 - `/me` hydration;
 - proactive refresh;
+- recurring proactive scheduling after every successful rotation;
 - one coordinated refresh retry after protected `401`;
 - logout;
 - cross-tab login-generation and logout events.

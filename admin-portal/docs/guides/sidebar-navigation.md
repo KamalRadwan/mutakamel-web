@@ -1,7 +1,7 @@
 # Admin Portal Navigation and Permission Mapping
 
 Last verified against the current frontend routes and Core permission
-decorators on **2026-07-24**.
+decorators on **2026-07-28**.
 
 Frontend page paths and API paths are different namespaces. Navigation must use
 paths such as `/tenants`; data requests must use paths such as
@@ -13,6 +13,7 @@ paths such as `/tenants`; data requests must use paths such as
 |:---|:---|:---|:---|
 | Dashboard | `/dashboard` | `admin.reports.read` | Mock |
 | Database Servers | `/database-servers` | `admin.database_servers.read` | Mock |
+| Storage Servers | `/storage-servers` | `admin.storage_servers.read` | Planned; no page route exists |
 | Tenants | `/tenants` | `admin.tenants.read` | Mock |
 | Modules | `/modules` | `admin.catalog.read` | Mock |
 | Admin → Users | `/users` | `admin.users.read` | Mock |
@@ -31,6 +32,9 @@ derive visibility from the `permissions` array returned by
 /database-servers
 ├─ /database-servers/new
 └─ /database-servers/[id]
+
+/storage-servers
+└─ /storage-servers/[id]
 
 /tenants
 ├─ /tenants/new
@@ -75,6 +79,11 @@ Wallet, tenant users, and provisioning operations are naturally nested under
 
 Notifications currently appear as a navbar dropdown. It should use
 `admin.notifications.read` when it becomes server-backed.
+
+The planned Storage Servers module uses an add modal on `/storage-servers` and
+one `/storage-servers/[id]` route for both view and embedded edit mode. It does
+not require `/storage-servers/new` or `/storage-servers/[id]/edit`. See
+[Storage Servers](../api/storage-servers.md).
 
 ## Permission-gating rules
 

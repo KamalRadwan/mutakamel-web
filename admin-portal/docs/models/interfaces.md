@@ -140,11 +140,21 @@ interface TenantView {
     currentTenants?: number;
     status: string;
   };
+  storageServerId?: string | null;
+  storageServer?: {
+    id: string;
+    name: string;
+    provider: 'GARAGE';
+    region: string;
+    status: string;
+    availabilityClass: string;
+  };
 }
 ```
 
 The tenant response has no `code`, `primaryFqdn`, plan name, subscription id,
-subscription items, database credentials, or provisioning percentage. See the
+subscription items, database credentials, Storage Server endpoints/buckets/
+credential references, or provisioning percentage. See the
 [Admin Tenants Frontend Contract](../api/tenants.md) for derivation and
 lifecycle rules.
 
@@ -263,6 +273,71 @@ interface DatabaseServerHistoryItem {
 The history endpoint returns this as a newest-first array under the canonical
 success envelope’s `data` property. It does not return actor profile data or
 pagination `meta`.
+
+---
+
+## Storage Server Types
+
+```typescript
+interface StorageServerAdminView {
+  id: string;
+  code: string;
+  name: string;
+  provider: 'GARAGE';
+  placementRole: 'GENERAL' | 'BACKUP_ONLY';
+  internalEndpoint: string;
+  publicEndpoint: string;
+  region: string;
+  forcePathStyle: true;
+  configRevision: number;
+  bindingRevision: number;
+  readinessRevision: number;
+  status: StorageServerStatus;
+  availabilityClass: StorageServerAvailabilityClass;
+  healthStatus: StorageServerHealthStatus;
+  maxTenants: number;
+  currentTenants: number;
+  retainedTenants: number;
+  reservedTenants: number;
+  desiredNodeCount: number;
+  desiredZoneCount: number;
+  requiredReplicationFactor: number;
+  observedNodeCount: number | null;
+  observedZoneCount: number | null;
+  observedReplicationFactor: number | null;
+  usableCapacityBytes: string | null;
+  usedCapacityBytes: string | null;
+  allocatableCapacityBytes: string | null;
+  activeReservedCapacityBytes: string;
+  warningPercent: number;
+  criticalPercent: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TenantCreateStoragePlacementOptionView {
+  id: string;
+  name: string;
+  provider: 'GARAGE';
+  region: string;
+  status: 'ACTIVE';
+  availabilityClass: 'HA_PRODUCTION_READY';
+  currentTenants: number;
+  retainedTenants: number;
+  reservedTenants: number;
+  maxTenants: number;
+  capacityPercent: number;
+  allocatableCapacityBytes: string;
+  availableReservationBytes: string;
+}
+```
+
+The registry view exposes administrative endpoints but never credentials,
+credential references, bucket bindings, topology-member encryption evidence,
+or recovery evidence. The tenant-create placement view is narrower and omits
+endpoints too. Byte counters are decimal strings and require `BigInt`-safe
+formatting. See the
+[Storage Servers Frontend Contract](../api/storage-servers.md).
 
 ---
 

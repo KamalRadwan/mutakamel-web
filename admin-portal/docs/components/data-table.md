@@ -12,6 +12,7 @@ The `DataTable` component is the standard grid component for all admin directory
 - **Invoices Directory** (`/admin/invoices`)
 - **Subscriptions Directory** (`/admin/subscriptions`)
 - **Database Servers List** (`/admin/database-servers`)
+- **Storage Servers List** (`/storage-servers`, planned bounded client-filtered catalogue)
 - **Backup & Restore Runs** (`/admin/backups/runs`)
 
 ---

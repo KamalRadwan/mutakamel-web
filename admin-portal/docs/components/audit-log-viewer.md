@@ -9,6 +9,7 @@ The `AuditLogViewer` component provides a unified, reusable timeline and table v
 | Module / Page | Backend Endpoint | Log Item Structure |
 |:---|:---|:---|
 | **Database Server Audit** | `GET /api/admin/core/v1/database-servers/:id/history` | Success envelope whose `data` is a direct array of field changes (`field`, `label`, `previousValue`, `newValue`), exact action (`CREATE`, `UPDATE`, `ACTIVATE`, `DRAIN`, `OFFLINE`, `DELETE`), and `actorId` |
+| **Storage Server Audit** | `GET /api/admin/core/v1/storage-servers/:id/history` | Success envelope whose `data` is `{ items, total }`; each item has exact action, revision triplet, `changes[]` with `previousValue`/`nextValue`, `actorId`, optional `correlationId`, and `createdAt` |
 | **System SMTP Audit** | `GET /admin/system-settings/email/audit` | SMTP configuration modifications, testing logs |
 | **Logging Level Overrides** | `GET /admin/logging/level-overrides/history` | Scope change, level adjustment (`previousLevel`, `level`), `reason`, `actorId` |
 | **Tenant Operations Timeline** | `GET /admin/tenants/:tenantId/operations/:operationId/timeline` | Operation step messages, status transitions, phase updates |
