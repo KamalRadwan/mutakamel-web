@@ -14,9 +14,9 @@ export interface ApiDocItem {
 }
 
 const mockApiDocs: ApiDocItem[] = [
-  { id: "api-crm-01", title: "جلب قائمة العملاء المحتملين (Leads)", methodPath: "GET /api/tenant/crm/v1/leads", owningBackendApp: "crm-app", dtoValidation: "LeadQueryDto", verificationDate: "2026-07-24", status: "verified" },
-  { id: "api-crm-02", title: "إنشاء صفقة تجارية جديدة (Deal)", methodPath: "POST /api/tenant/crm/v1/deals", owningBackendApp: "crm-app", dtoValidation: "CreateDealDto", verificationDate: "2026-07-24", status: "verified" },
-  { id: "api-crm-03", title: "تحديث مرحلة قمع المبيعات (Pipeline Stage)", methodPath: "PATCH /api/tenant/crm/v1/pipelines/stage", owningBackendApp: "crm-app", dtoValidation: "UpdateStageDto", verificationDate: "2026-07-25", status: "verified" },
+  { id: "api-crm-01", title: "I18N_FALLBACK", methodPath: "GET /api/tenant/crm/v1/leads", owningBackendApp: "crm-app", dtoValidation: "LeadQueryDto", verificationDate: "2026-07-24", status: "verified" },
+  { id: "api-crm-02", title: "I18N_FALLBACK", methodPath: "POST /api/tenant/crm/v1/deals", owningBackendApp: "crm-app", dtoValidation: "CreateDealDto", verificationDate: "2026-07-24", status: "verified" },
+  { id: "api-crm-03", title: "I18N_FALLBACK", methodPath: "PATCH /api/tenant/crm/v1/pipelines/stage", owningBackendApp: "crm-app", dtoValidation: "UpdateStageDto", verificationDate: "2026-07-25", status: "verified" },
 ];
 
 export function useCrmApiDocs() {

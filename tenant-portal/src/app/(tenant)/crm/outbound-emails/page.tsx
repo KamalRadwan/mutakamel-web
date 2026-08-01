@@ -10,8 +10,10 @@ import { Eye, Trash2, Mail, Send, CheckCircle2 } from "lucide-react";
 import { useOutboundEmails, OutboundEmailItem } from "./hooks/useOutboundEmails";
 import { CreateOutboundEmailsModal } from "./components/CreateOutboundEmailsModal";
 import { DeleteOutboundEmailsConfirmModal } from "./components/DeleteOutboundEmailsConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function OutboundEmailsPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function OutboundEmailsPage() {
 
   const columns = [
     {
-      header: "المستقبل والبريد",
+      header: t.crm.futureAndMail,
       cell: (item: OutboundEmailItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
@@ -40,18 +42,18 @@ export default function OutboundEmailsPage() {
         </div>
       ),
     },
-    { header: "عنوان الرسالة", accessorKey: "subject" as keyof OutboundEmailItem },
-    { header: "تاريخ الإرسال", accessorKey: "sentAt" as keyof OutboundEmailItem },
+    { header: t.crm.messageTitle, accessorKey: "subject" as keyof OutboundEmailItem },
+    { header: t.crm.postingDate, accessorKey: "sentAt" as keyof OutboundEmailItem },
     {
-      header: "حالة التسليم",
+      header: t.crm.deliveryStatus,
       cell: (item: OutboundEmailItem) => (
         <Badge variant={item.deliveryStatus === "opened" ? "success" : item.deliveryStatus === "delivered" ? "info" : "warning"}>
-          {item.deliveryStatus === "opened" ? "تم التفتيح" : item.deliveryStatus === "delivered" ? "تم التسليم" : "قيد الإرسال"}
+          {item.deliveryStatus === "opened" ? t.crm.itHasBeenLightened : item.deliveryStatus === "delivered" ? t.crm.delivered : t.crm.beingSent}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: OutboundEmailItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/outbound-emails/${item.id}/general`}>
@@ -70,16 +72,16 @@ export default function OutboundEmailsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="رسائل البريد الصادرة (Outbound Emails Tracking)"
-        subtitle="متابعة حالة الرسائل الصادرة للعملاء وتتبع فتح البريد والنقر على الروابط"
-        actionLabel="إرسال رسالة بريد جديدة"
+        title={t.crm.outboundEmailsTracking}
+        subtitle={t.crm.followTheStatusOfOutgoing}
+        actionLabel={t.crm.sendANewMailMessage}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث بالعنوان أو البريد..."
+        placeholder={t.crm.searchByAddressOrEmail}
       />
 
       <Table columns={columns} data={items} />

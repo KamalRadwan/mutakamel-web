@@ -65,3 +65,21 @@ body {
   color: var(--color-text-primary);
   font-family: var(--font-sans, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif);
 }
+
+@keyframes bellRing {
+  0% { transform: rotate(0deg); }
+  10% { transform: rotate(25deg); }
+  20% { transform: rotate(-25deg); }
+  30% { transform: rotate(20deg); }
+  40% { transform: rotate(-20deg); }
+  50% { transform: rotate(12deg); }
+  60% { transform: rotate(-12deg); }
+  70% { transform: rotate(6deg); }
+  80% { transform: rotate(-6deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.animate-bell-ring {
+  animation: bellRing 1.4s ease-in-out infinite;
+  transform-origin: top center;
+}

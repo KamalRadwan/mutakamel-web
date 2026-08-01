@@ -2,6 +2,7 @@
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { CrmTaskItem } from "../hooks/useCrmActivitiesTasks";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -11,14 +12,15 @@ interface DeleteModalProps {
 }
 
 export function DeleteCrmActivitiesTasksConfirmModal({ isOpen, item, onClose, onConfirm }: DeleteModalProps) {
+    const { t } = useI18n();
   return (
     <ConfirmModal
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
-      title="حذف المهمة والتذكير"
+      title={t.crm.deleteTaskAndReminder}
       message={`هل أنت تأكد من إلغاء المهمة "${item?.subject || ""}"؟`}
-      confirmText="حذف المهمة"
+      confirmText={t.crm.deleteTheTask}
       isDanger
     />
   );

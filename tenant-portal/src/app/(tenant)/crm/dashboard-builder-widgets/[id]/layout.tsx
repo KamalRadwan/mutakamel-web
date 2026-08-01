@@ -2,6 +2,7 @@
 
 import { use } from "react";
 import { DetailTabsLayout } from "@/components/ui/DetailTabsLayout";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function WidgetDetailLayout({
   children,
@@ -10,12 +11,13 @@ export default function WidgetDetailLayout({
   children: React.ReactNode;
   params: Promise<{ id: string }>;
 }) {
+    const { t } = useI18n();
   const resolvedParams = use(params);
 
   return (
     <DetailTabsLayout
       title={`عنصر التحليل: ${resolvedParams.id}`}
-      subtitle="تعديل أبعاد الـ Widget والتحديث المباشر"
+      subtitle={t.crm.modifyingWidgetDimensionsAn}
       basePath={`/crm/dashboard-builder-widgets/${resolvedParams.id}`}
     >
       {children}

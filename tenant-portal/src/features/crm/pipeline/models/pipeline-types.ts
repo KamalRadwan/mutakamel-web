@@ -89,3 +89,10 @@ export interface OpportunityBoard {
   pipeline: OpportunityPipeline;
   stages: OpportunityBoardLane[];
 }
+
+export interface SearchFilterToken {
+  id: string;
+  field: "sales_person" | "opportunity" | "phone" | "customer" | "all";
+  fieldLabel: string;
+  value: string;
+}

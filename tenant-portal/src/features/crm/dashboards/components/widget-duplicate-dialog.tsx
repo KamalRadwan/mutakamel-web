@@ -31,7 +31,7 @@ export function WidgetDuplicateDialog({ open, onOpenChange, widget, onConfirm }:
     }
   };
 
-  const title = isRtl ? "نسخ التطبيق المصغر" : "Duplicate Widget";
+  const title = isRtl ? "Copy the widget" : "Duplicate Widget";
 
   return (
     <Modal isOpen={open} onClose={() => onOpenChange(false)} title={title}>
@@ -49,10 +49,10 @@ export function WidgetDuplicateDialog({ open, onOpenChange, widget, onConfirm }:
 
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={isDuplicating}>
-            {isRtl ? "إلغاء" : "Cancel"}
+            {isRtl ? "cancellation" : "Cancel"}
           </Button>
           <Button type="button" onClick={handleDuplicate} disabled={isDuplicating} className="bg-blue-600 hover:bg-blue-700 text-white">
-            {isDuplicating ? (isRtl ? "جاري النسخ..." : "Duplicating...") : (isRtl ? "تأكيد النسخ" : "Yes, Duplicate")}
+            {isDuplicating ? (isRtl ? "Copying..." : "Duplicating...") : (isRtl ? "Confirm copying" : "Yes, Duplicate")}
           </Button>
         </div>
       </div>

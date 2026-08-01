@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface CreateModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface CreateModalProps {
 }
 
 export function CreateAcquisitionSourcesModal({ isOpen, onClose, onSubmit }: CreateModalProps) {
+    const { t } = useI18n();
   const [name, setName] = useState("");
   const [channelType, setChannelType] = useState<"digital" | "referral" | "event" | "cold_call">("digital");
 
@@ -24,23 +26,23 @@ export function CreateAcquisitionSourcesModal({ isOpen, onClose, onSubmit }: Cre
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="إضافة مصدر استقطاب عملاء جديد" maxWidth="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.crm.addingANewCustomerAttracti} maxWidth="md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input label="اسم مصدر الاستقطاب" placeholder="مثال: حملة لينكدإن Q3" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Input label={t.crm.nameOfThePolarizationSourc} placeholder={t.crm.exampleLinkedInQ3Campaign} value={name} onChange={(e) => setName(e.target.value)} required />
         <Select
-          label="نوع القناة"
+          label={t.crm.channelType}
           value={channelType}
           onChange={(e) => setChannelType(e.target.value as any)}
           options={[
-            { label: "تسويق رقمي (Digital)", value: "digital" },
-            { label: "توصية / ترشيح (Referral)", value: "referral" },
-            { label: "معرض / مؤتمر (Event)", value: "event" },
-            { label: "اتصال بارد (Cold Call)", value: "cold_call" },
+            { label: t.crm.digitalMarketing, value: "digital" },
+            { label: t.crm.recommendationNominationRef, value: "referral" },
+            { label: t.crm.exhibitionConferenceEvent, value: "event" },
+            { label: t.crm.coldCall, value: "cold_call" },
           ]}
         />
         <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-          <Button type="button" variant="ghost" onClick={onClose}>إلغاء</Button>
-          <Button type="submit" variant="primary">حفظ المصدر</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t.crm.cancellation}</Button>
+          <Button type="submit" variant="primary">{t.crm.saveTheSource}</Button>
         </div>
       </form>
     </Modal>

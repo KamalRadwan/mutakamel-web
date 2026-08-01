@@ -37,7 +37,7 @@ export function ProgressCardRenderer({ widget, result }: ProgressCardRendererPro
         </div>
         <div className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400 bg-slate-100/50 dark:bg-slate-800/50 px-2 py-1 rounded-md border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-sm">
           <span className="text-slate-400 dark:text-slate-500 me-1.5 opacity-80 uppercase text-[10px] tracking-wider">
-            {isRtl ? "الهدف:" : "Target:"}
+            {isRtl ? "the goal:" : "Target:"}
           </span>
           {formattedTarget}
         </div>
@@ -52,7 +52,7 @@ export function ProgressCardRenderer({ widget, result }: ProgressCardRendererPro
 
       <div className="mt-3 flex items-center justify-between text-xs font-semibold z-10">
         <span className="text-slate-500 dark:text-slate-400 uppercase tracking-widest text-[10px]">
-          {isRtl ? "معدل الإنجاز" : "Completion Rate"}
+          {isRtl ? "Completion rate" : "Completion Rate"}
         </span>
         <span
           className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border backdrop-blur-md ${

@@ -10,8 +10,10 @@ import { Eye, Trash2, FileText, Paperclip, Download } from "lucide-react";
 import { useCrmNotesAttachments, NoteAttachmentItem } from "./hooks/useCrmNotesAttachments";
 import { CreateCrmNotesAttachmentsModal } from "./components/CreateCrmNotesAttachmentsModal";
 import { DeleteCrmNotesAttachmentsConfirmModal } from "./components/DeleteCrmNotesAttachmentsConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmNotesAttachmentsPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function CrmNotesAttachmentsPage() {
 
   const columns = [
     {
-      header: "عنوان الملاحظة والكيان",
+      header: t.crm.noteTitleAndEntity,
       cell: (item: NoteAttachmentItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
@@ -41,7 +43,7 @@ export default function CrmNotesAttachmentsPage() {
       ),
     },
     {
-      header: "الملف المرفق",
+      header: t.crm.attachedFile,
       cell: (item: NoteAttachmentItem) => (
         <div className="flex items-center gap-1.5 font-mono text-xs text-blue-600 dark:text-blue-400">
           <Paperclip className="w-3.5 h-3.5" />
@@ -50,10 +52,10 @@ export default function CrmNotesAttachmentsPage() {
         </div>
       ),
     },
-    { header: "المُنشئ", accessorKey: "createdBy" as keyof NoteAttachmentItem },
-    { header: "التاريخ", accessorKey: "createdAt" as keyof NoteAttachmentItem },
+    { header: t.crm.constructor, accessorKey: "createdBy" as keyof NoteAttachmentItem },
+    { header: t.crm.theDate, accessorKey: "createdAt" as keyof NoteAttachmentItem },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: NoteAttachmentItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/notes-attachments/${item.id}/general`}>
@@ -72,16 +74,16 @@ export default function CrmNotesAttachmentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="ملاحظات ومرفقات الـ CRM (Notes & Attachments)"
-        subtitle="سجل الملاحظات الفنية المرفقة والملفات والمستندات التابعة للصفقات والعملاء"
-        actionLabel="إضافة ملاحظة جديدة"
+        title={t.crm.cRMNotesAttachments}
+        subtitle={t.crm.recordAttachedTechnicalNote}
+        actionLabel={t.crm.addANewNote}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث بالحجم، العنوان، أو اسم الملف..."
+        placeholder={t.crm.searchBySizeTitleOrFile}
       />
 
       <Table columns={columns} data={items} />

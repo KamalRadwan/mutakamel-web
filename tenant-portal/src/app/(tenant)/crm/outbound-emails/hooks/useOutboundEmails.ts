@@ -14,8 +14,8 @@ export interface OutboundEmailItem {
 }
 
 const mockEmails: OutboundEmailItem[] = [
-  { id: "eml-101", recipientEmail: "info@alamal-med.com", recipientName: "د. فهد عبد العزيز", subject: "تأكيد موعد العرض الفني وحزمة التراخيص", templateUsed: "tmpl-102 (الترحيب والمواعيد)", sentAt: "2026-07-25 09:30", deliveryStatus: "opened" },
-  { id: "eml-102", recipientEmail: "muneer@alofok.com", recipientName: "المهندس منير الشمري", subject: "مسودة العقد النهائي والاشتراك السنوي", templateUsed: "tmpl-101 (الفاتورة والعقد)", sentAt: "2026-07-24 14:15", deliveryStatus: "delivered" },
+  { id: "eml-101", recipientEmail: "info@alamal-med.com", recipientName: "I18N_FALLBACK", subject: "I18N_FALLBACK", templateUsed: "I18N_FALLBACK", sentAt: "2026-07-25 09:30", deliveryStatus: "opened" },
+  { id: "eml-102", recipientEmail: "muneer@alofok.com", recipientName: "I18N_FALLBACK", subject: "I18N_FALLBACK", templateUsed: "I18N_FALLBACK", sentAt: "2026-07-24 14:15", deliveryStatus: "delivered" },
 ];
 
 export function useOutboundEmails() {
@@ -36,7 +36,7 @@ export function useOutboundEmails() {
     const created: OutboundEmailItem = {
       ...newItem,
       id: `eml-${Date.now().toString().slice(-4)}`,
-      sentAt: "الآن",
+      sentAt: t.crm.now,
       deliveryStatus: "queued",
     };
     setItems((prev) => [created, ...prev]);

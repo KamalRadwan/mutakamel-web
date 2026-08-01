@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface CreateModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface CreateModalProps {
 }
 
 export function CreateCrmModuleSettingsModal({ isOpen, onClose, onSubmit }: CreateModalProps) {
+    const { t } = useI18n();
   const [settingName, setSettingName] = useState("");
   const [key, setKey] = useState("");
   const [value, setValue] = useState("");
@@ -28,25 +30,25 @@ export function CreateCrmModuleSettingsModal({ isOpen, onClose, onSubmit }: Crea
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="إضافة إعداد موديول CRM جديد" maxWidth="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.crm.addANewCRMModuleSetting} maxWidth="md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input label="اسم الإعداد" placeholder="مثال: مهلة إلغاء الصفقة التلقائي" value={settingName} onChange={(e) => setSettingName(e.target.value)} required />
-        <Input label="مفتاح الإعداد البرمجي Key" placeholder="crm.auto_cancel_days" value={key} onChange={(e) => setKey(e.target.value)} required />
-        <Input label="القيمة المعينة Value" placeholder="30" value={value} onChange={(e) => setValue(e.target.value)} required />
+        <Input label={t.crm.settingName} placeholder={t.crm.exampleAutomaticDealCancel} value={settingName} onChange={(e) => setSettingName(e.target.value)} required />
+        <Input label={t.crm.softwareSetupKey} placeholder="crm.auto_cancel_days" value={key} onChange={(e) => setKey(e.target.value)} required />
+        <Input label={t.crm.theAssignedValueValue} placeholder="30" value={value} onChange={(e) => setValue(e.target.value)} required />
         <Select
-          label="المجموعة"
+          label={t.crm.group}
           value={group}
           onChange={(e) => setGroup(e.target.value as any)}
           options={[
-            { label: "توزيع العملاء (Lead Routing)", value: "lead_routing" },
-            { label: "حدود الصفقات (Deal Limits)", value: "deal_limits" },
-            { label: "ربط البريد (Email Integration)", value: "email_integration" },
-            { label: "الأمان والسرية (Security)", value: "security" },
+            { label: t.crm.leadRouting, value: "lead_routing" },
+            { label: t.crm.dealLimits, value: "deal_limits" },
+            { label: t.crm.emailIntegration, value: "email_integration" },
+            { label: t.crm.security, value: "security" },
           ]}
         />
         <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-          <Button type="button" variant="ghost" onClick={onClose}>إلغاء</Button>
-          <Button type="submit" variant="primary">حفظ الإعداد</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t.crm.cancellation}</Button>
+          <Button type="submit" variant="primary">{t.crm.saveTheSetting}</Button>
         </div>
       </form>
     </Modal>

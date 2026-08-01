@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -49,15 +49,23 @@ import {
   FileCode2,
   Puzzle,
   GitBranch,
+  Layers,
   Webhook,
   Sparkles,
   Compass
 } from "lucide-react";
 
+export interface NavSubItem {
+  label: string;
+  href: string;
+  icon?: React.ElementType;
+}
+
 export interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
+  children?: NavSubItem[];
 }
 
 export function useSidebar() {
@@ -84,11 +92,28 @@ export function useSidebar() {
   const isTrade = pathname.startsWith("/trade");
 
   // 1. Core / Workspace Center Navigation Items
-  const coreNavItems: NavItem[] = [
+  const coreNavItems: NavItem[] = useMemo(() => [
     { label: t.nav.dashboard, href: "/", icon: LayoutDashboard },
-    { label: t.nav.users, href: "/core/users", icon: Users },
-    { label: t.nav.organization, href: "/core/organization", icon: Building2 },
-    { label: t.nav.roles, href: "/core/roles-role-assignments", icon: ShieldCheck },
+    { 
+      label: t.nav.staff, 
+      href: "/core/users", 
+      icon: Users,
+      children: [
+        { label: t.nav.users, href: "/core/users", icon: Users },
+        { label: t.nav.roles, href: "/core/roles-role-assignments", icon: ShieldCheck },
+      ]
+    },
+    { 
+      label: t.nav.organization, 
+      href: "/core/organization", 
+      icon: Building2,
+      children: [
+        { label: t.nav.companies, href: "/core/organization/companies", icon: Building2 },
+        { label: t.nav.branches, href: "/core/organization/branches", icon: GitBranch },
+        { label: t.nav.departments, href: "/core/organization/departments", icon: Layers },
+        { label: t.nav.teams, href: "/core/organization/teams", icon: Users },
+      ]
+    },
     { label: t.nav.billing, href: "/core/billing-invoices-subscription", icon: CreditCard },
     { label: t.nav.wallet, href: "/core/wallet-payments", icon: Wallet },
     { label: t.nav.activities, href: "/core/activities", icon: Activity },
@@ -102,32 +127,48 @@ export function useSidebar() {
     { label: t.nav.provisioningUpdates, href: "/core/provisioning-updates", icon: RefreshCw },
     { label: t.nav.signedDownloads, href: "/core/core-signed-file-downloads", icon: Download },
     { label: t.nav.hostStatus, href: "/core/host-status", icon: Server },
-    { label: t.nav.workspaceSettings, href: "/core/workspace-settings-branding", icon: Settings },
-  ];
+    { 
+      label: t.nav.workspaceSettings, 
+      href: "/core/workspace-settings-branding", 
+      icon: Settings,
+      children: [
+        { label: "إعدادات الهوية والتخصيص", href: "/core/workspace-settings-branding", icon: Settings },
+        { label: "المصادقة والأمان", href: "/core/authentication", icon: Lock },
+        { label: "تكوين البريد والتنبيهات", href: "/core/notifications-email-configuration", icon: Mail },
+        { label: "العملات والضرائب والترقيم", href: "/core/currencies-taxes-numbering", icon: DollarSign },
+        { label: "تعيينات الوحدات للمستخدمين", href: "/core/user-module-assignments", icon: UserCheck },
+        { label: "تحديثات التجهيز والنظام", href: "/core/provisioning-updates", icon: RefreshCw },
+        { label: "حالة خوادم الاستضافة", href: "/core/host-status", icon: Server },
+      ]
+    },
+  ], [t]);
 
   // 2. CRM Navigation Items
-  const crmNavItems: NavItem[] = [
+  const crmNavItems: NavItem[] = useMemo(() => [
     { label: t.nav.crmDashboard, href: "/crm/dashboard", icon: LayoutDashboard },
     { label: t.nav.leads, href: "/crm/leads", icon: FolderGit2 },
     { label: t.nav.customerProfiles, href: "/crm/customer-profiles", icon: UserCircle },
-    { label: t.nav.pipelines, href: "/crm/pipelines-boards-opportunity-stages", icon: Kanban },
-    { label: t.nav.leadStages, href: "/crm/lead-stages", icon: GitCommit },
+    { label: t.nav.salesPipelineWorkspace, href: "/crm/pipeline", icon: Kanban },
     { label: t.nav.opportunitiesHistory, href: "/crm/opportunities-stage-history", icon: History },
-    { label: t.nav.customFields, href: "/crm/custom-fields", icon: Sliders },
-    { label: t.nav.acquisitionSources, href: "/crm/acquisition-sources", icon: Share2 },
-    { label: t.nav.crmActivities, href: "/crm/activities-tasks-calendar-reminders", icon: Calendar },
-    { label: t.nav.notesAttachments, href: "/crm/notes-attachments", icon: Paperclip },
-    { label: t.nav.outboundEmails, href: "/crm/outbound-emails", icon: Send },
-    { label: t.nav.crmDashboardBuilder, href: "/crm/dashboard-builder-widgets", icon: Layout },
     { label: t.nav.staticData, href: "/crm/static-data-catalogue", icon: Database },
-    { label: t.nav.crmSettings, href: "/crm/settings", icon: Settings },
-    { label: t.nav.apiDocs, href: "/crm/api-documentation", icon: Code },
-    { label: t.nav.browserContracts, href: "/crm/common-browser-contract", icon: FileSpreadsheet },
-    { label: t.nav.browserExamples, href: "/crm/browser-examples", icon: FileCode2 },
-  ];
+    { 
+      label: t.nav.crmSettings, 
+      href: "/crm/settings", 
+      icon: Settings,
+      children: [
+        { label: t.nav.pipelines, href: "/crm/pipelines-boards-opportunity-stages", icon: Kanban },
+        { label: t.nav.leadStages, href: "/crm/lead-stages", icon: GitCommit },
+        { label: t.nav.acquisitionSources, href: "/crm/acquisition-sources", icon: Share2 },
+        { label: t.nav.customFields, href: "/crm/custom-fields", icon: Sliders },
+        { label: t.nav.crmDashboardBuilder, href: "/crm/dashboard-builder-widgets", icon: Layout },
+        { label: t.nav.apiDocs, href: "/crm/api-documentation", icon: Code },
+        { label: t.nav.crmSettings, href: "/crm/settings", icon: Settings },
+      ]
+    },
+  ], [t]);
 
   // 3. Trade Navigation Items
-  const tradeNavItems: NavItem[] = [
+  const tradeNavItems: NavItem[] = useMemo(() => [
     { label: t.nav.tradeDashboard, href: "/trade/dashboard-builder", icon: LayoutDashboard },
     { label: t.nav.controlTower, href: "/trade/control-tower", icon: Compass },
     { label: t.nav.inventory, href: "/trade/inventory", icon: Package },
@@ -147,9 +188,11 @@ export function useSidebar() {
     { label: t.nav.workflowVersions, href: "/trade/workflow-versions", icon: GitBranch },
     { label: t.nav.importsWebhooks, href: "/trade/imports-webhooks", icon: Webhook },
     { label: t.nav.aiGuide, href: "/trade/ai-implementation-guide-for-portal-trade", icon: Sparkles },
-  ];
+  ], [t]);
 
-  const activeNavItems = isCRM ? crmNavItems : isTrade ? tradeNavItems : coreNavItems;
+  const activeNavItems = useMemo(() => {
+    return isCRM ? crmNavItems : isTrade ? tradeNavItems : coreNavItems;
+  }, [isCRM, isTrade, crmNavItems, tradeNavItems, coreNavItems]);
   const currentAppTitle = isCRM ? "CRM" : isTrade ? "Trade" : t.nav.workspaceCenter;
 
   const isItemActive = (href: string) => {

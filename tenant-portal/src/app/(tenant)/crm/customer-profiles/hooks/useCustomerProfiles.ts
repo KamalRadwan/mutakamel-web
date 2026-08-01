@@ -15,9 +15,9 @@ export interface CustomerProfileItem {
 }
 
 const mockCustomerProfiles: CustomerProfileItem[] = [
-  { id: "cust-101", name: "شركة الأمل للتوريدات الطبية", category: "Enterprise", contactPerson: "د. فهد بن عبد العزيز", phone: "+966 50 123 4567", email: "info@alamal-med.com", totalDealsValue: "450,000.00 SAR", status: "active" },
-  { id: "cust-102", name: "مجموعة الأفق التقنية", category: "VIP", contactPerson: "المهندس منير الشمري", phone: "+966 55 987 6543", email: "muneer@alofok.com", totalDealsValue: "820,000.00 SAR", status: "active" },
-  { id: "cust-103", name: "مؤسسة الرواد اللوجستية", category: "SME", contactPerson: "سارة العلي", phone: "+966 54 222 3333", email: "sara@alruwad.sa", totalDealsValue: "120,000.00 SAR", status: "active" },
+  { id: "cust-101", name: "شركة الأمل الطبية", category: "Enterprise", contactPerson: "د. سامي المالك", phone: "+966 50 123 4567", email: "info@alamal-med.com", totalDealsValue: "450,000.00 SAR", status: "active" },
+  { id: "cust-102", name: "مؤسسة الأفق للتجارة", category: "VIP", contactPerson: "منير سعد", phone: "+966 55 987 6543", email: "muneer@alofok.com", totalDealsValue: "820,000.00 SAR", status: "active" },
+  { id: "cust-103", name: "مدارس الرواد الأهلية", category: "SME", contactPerson: "سارة عبدالكريم", phone: "+966 54 222 3333", email: "sara@alruwad.sa", totalDealsValue: "120,000.00 SAR", status: "active" },
 ];
 
 export function useCustomerProfiles() {

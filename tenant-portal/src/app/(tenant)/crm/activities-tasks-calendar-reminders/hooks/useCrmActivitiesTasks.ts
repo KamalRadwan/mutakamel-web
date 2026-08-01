@@ -14,9 +14,9 @@ export interface CrmTaskItem {
 }
 
 const mockCrmTasks: CrmTaskItem[] = [
-  { id: "task-101", subject: "جلسة عرض تقديمي (Demo) لنظام إدارة المخزون", leadOrCustomer: "شركة الأمل للتوريدات الطبية", taskType: "demo", dueDate: "2026-07-28 11:00", reminderStatus: "scheduled", status: "pending" },
-  { id: "task-102", subject: "تذكير الهاتفي لمتابعة مسودة العقد", leadOrCustomer: "الدكتور خالد بن عبد العزيز", taskType: "call", dueDate: "2026-07-26 15:30", reminderStatus: "scheduled", status: "pending" },
-  { id: "task-103", subject: "اجتماع مفاوضة الأسعار النهائي", leadOrCustomer: "مؤسسة الأفق", taskType: "meeting", dueDate: "2026-07-24 10:00", reminderStatus: "sent", status: "done" },
+  { id: "task-101", subject: "I18N_FALLBACK", leadOrCustomer: "I18N_FALLBACK", taskType: "demo", dueDate: "2026-07-28 11:00", reminderStatus: "scheduled", status: "pending" },
+  { id: "task-102", subject: "I18N_FALLBACK", leadOrCustomer: "I18N_FALLBACK", taskType: "call", dueDate: "2026-07-26 15:30", reminderStatus: "scheduled", status: "pending" },
+  { id: "task-103", subject: "I18N_FALLBACK", leadOrCustomer: "I18N_FALLBACK", taskType: "meeting", dueDate: "2026-07-24 10:00", reminderStatus: "sent", status: "done" },
 ];
 
 export function useCrmActivitiesTasks() {

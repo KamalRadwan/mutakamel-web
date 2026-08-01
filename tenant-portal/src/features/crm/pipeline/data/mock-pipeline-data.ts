@@ -5,6 +5,7 @@ import type {
   OpportunityCardRecord, 
   OpportunityBoard 
 } from "../models/pipeline-types";
+import { useI18n } from "@/i18n/I18nContext";
 
 export const mockStages: OpportunityStage[] = [
   {
@@ -39,7 +40,7 @@ export const mockStages: OpportunityStage[] = [
     id: "stg-prop",
     pipelineId: "pipe-1",
     opportunityStageId: "mstg-3",
-    nameAr: "تقديم عرض",
+    nameAr: "عرض سعر",
     nameEn: "Proposal",
     flag: "OPEN",
     category: "OPEN",
@@ -67,7 +68,7 @@ export const mockStages: OpportunityStage[] = [
     id: "stg-won",
     pipelineId: "pipe-1",
     opportunityStageId: "mstg-5",
-    nameAr: "فوز (مغلق)",
+    nameAr: "مغلق ناجح",
     nameEn: "Closed Won",
     flag: "WON",
     category: "CLOSED",
@@ -81,7 +82,7 @@ export const mockStages: OpportunityStage[] = [
     id: "stg-lost",
     pipelineId: "pipe-1",
     opportunityStageId: "mstg-6",
-    nameAr: "خسارة (مغلق)",
+    nameAr: "مغلق خاسر",
     nameEn: "Closed Lost",
     flag: "LOST",
     category: "CLOSED",
@@ -96,7 +97,7 @@ export const mockStages: OpportunityStage[] = [
 export const mockPipeline: OpportunityPipeline = {
   id: "pipe-1",
   code: "STD_SALES",
-  nameAr: "مبيعات قياسية",
+  nameAr: "المبيعات القياسية",
   nameEn: "Standard Sales",
   isDefault: true,
   isActive: true,
@@ -112,7 +113,7 @@ export const mockOpportunities: OpportunityCardRecord[] = [
     stageId: "stg-new",
     stageFlag: "NEW",
     status: "IN_PROGRESS",
-    title: "تحديث البنية التحتية لتقنية المعلومات",
+    title: "تحديث أجهزة الشركة",
     importance: 2,
     amount: 150000,
     currencyCode: "SAR",
@@ -122,8 +123,8 @@ export const mockOpportunities: OpportunityCardRecord[] = [
     createdAt: "2026-07-20T10:00:00Z",
     updatedAt: "2026-07-25T14:30:00Z",
     activityState: "TODAY",
-    customerCompanyName: "شركة التقنية المتقدمة",
-    ownerDisplayName: "أحمد عبدالله",
+    customerCompanyName: "شركة الحياة الطبية",
+    ownerDisplayName: "أحمد المبيعات",
     openActivityCount: 1,
   },
   {
@@ -134,7 +135,7 @@ export const mockOpportunities: OpportunityCardRecord[] = [
     stageId: "stg-qual",
     stageFlag: "OPEN",
     status: "IN_PROGRESS",
-    title: "رخصة نظام نقاط البيع 50 فرع",
+    title: "عقد صيانة سنوي",
     importance: 3,
     amount: 250000,
     currencyCode: "SAR",
@@ -144,8 +145,8 @@ export const mockOpportunities: OpportunityCardRecord[] = [
     createdAt: "2026-07-15T09:00:00Z",
     updatedAt: "2026-07-22T11:20:00Z",
     activityState: "OVERDUE",
-    customerCompanyName: "مجموعة مطاعم الذواقة",
-    ownerDisplayName: "سارة خالد",
+    customerCompanyName: "مؤسسة الأفق للتجارة",
+    ownerDisplayName: "خالد المبيعات",
     openActivityCount: 2,
   },
   {
@@ -156,7 +157,7 @@ export const mockOpportunities: OpportunityCardRecord[] = [
     stageId: "stg-prop",
     stageFlag: "OPEN",
     status: "IN_PROGRESS",
-    title: "عقد صيانة سنوي - المستوى الذهبي",
+    title: "شراء رخص برمجيات",
     importance: 1,
     amount: 85000,
     currencyCode: "SAR",
@@ -166,8 +167,8 @@ export const mockOpportunities: OpportunityCardRecord[] = [
     createdAt: "2026-06-10T08:15:00Z",
     updatedAt: "2026-07-24T16:45:00Z",
     activityState: "FUTURE",
-    customerCompanyName: "المؤسسة الوطنية للتجارة",
-    ownerDisplayName: "أحمد عبدالله",
+    customerCompanyName: "مدارس الرواد",
+    ownerDisplayName: "أحمد المبيعات",
     openActivityCount: 1,
   },
   {
@@ -178,7 +179,7 @@ export const mockOpportunities: OpportunityCardRecord[] = [
     stageId: "stg-neg",
     stageFlag: "OPEN",
     status: "IN_PROGRESS",
-    title: "مشروع تطبيق الجوال الذكي",
+    title: "تجهيز فرع جديد",
     importance: 3,
     amount: 420000,
     currencyCode: "SAR",
@@ -188,8 +189,8 @@ export const mockOpportunities: OpportunityCardRecord[] = [
     createdAt: "2026-05-05T13:00:00Z",
     updatedAt: "2026-07-26T09:10:00Z",
     activityState: "TODAY",
-    customerCompanyName: "شركة الحلول السريعة",
-    ownerDisplayName: "محمد العتيبي",
+    customerCompanyName: "شركة الإنشاءات",
+    ownerDisplayName: "فاطمة العملاء",
     openActivityCount: 3,
   },
   {
@@ -200,7 +201,7 @@ export const mockOpportunities: OpportunityCardRecord[] = [
     stageId: "stg-won",
     stageFlag: "WON",
     status: "WON",
-    title: "توريد أجهزة خوادم شبكية",
+    title: "مشروع تطوير الويب",
     importance: 2,
     amount: 550000,
     currencyCode: "SAR",
@@ -211,13 +212,14 @@ export const mockOpportunities: OpportunityCardRecord[] = [
     updatedAt: "2026-07-05T15:00:00Z",
     wonAt: "2026-07-05T15:00:00Z",
     activityState: "NO_OPEN",
-    customerCompanyName: "مجموعة العليان للصناعة",
-    ownerDisplayName: "سارة خالد",
+    customerCompanyName: "شركة التقنية",
+    ownerDisplayName: "خالد المبيعات",
     openActivityCount: 0,
   }
 ];
 
 export function getMockBoard(): OpportunityBoard {
+    const { t } = useI18n();
   const stages: OpportunityBoardLane[] = mockStages.map(stage => {
     const items = mockOpportunities.filter(o => o.stageId === stage.id);
     const amountSum = items.reduce((acc, curr) => acc + curr.amount, 0);
@@ -247,3 +249,4 @@ export function getMockBoard(): OpportunityBoard {
     stages,
   };
 }
+

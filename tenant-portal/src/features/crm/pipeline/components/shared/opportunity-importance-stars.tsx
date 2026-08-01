@@ -2,6 +2,7 @@
 
 import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface OpportunityImportanceStarsProps {
   importance: number;
@@ -16,8 +17,9 @@ export function OpportunityImportanceStars({
   className,
   starClassName
 }: OpportunityImportanceStarsProps) {
+    const { t } = useI18n();
   return (
-    <div className={cn("flex gap-0.5", className)} title="الأهمية (اضغط للتعديل)">
+    <div className={cn("flex gap-0.5", className)} title={t.crm.importanceClickToEdit}>
       {[1, 2, 3].map((star) => (
         <button
           key={star}

@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface CreateModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface CreateModalProps {
 }
 
 export function CreateCrmCustomFieldsModal({ isOpen, onClose, onSubmit }: CreateModalProps) {
+    const { t } = useI18n();
   const [label, setLabel] = useState("");
   const [key, setKey] = useState("");
   const [targetEntity, setTargetEntity] = useState<"lead" | "deal" | "contact" | "organization">("lead");
@@ -28,31 +30,31 @@ export function CreateCrmCustomFieldsModal({ isOpen, onClose, onSubmit }: Create
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="إضافة حقل مخصص جديد (Custom Field)" maxWidth="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.crm.addANewCustomField} maxWidth="md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input label="عنوان الحقل" placeholder="مثال: رقم الرخصة التجارية" value={label} onChange={(e) => setLabel(e.target.value)} required />
-        <Input label="مفتاح الحقل البرمجي (Key)" placeholder="commercial_license_no" value={key} onChange={(e) => setKey(e.target.value)} required />
+        <Input label={t.crm.fieldTitle} placeholder={t.crm.exampleCommercialLicenseNu} value={label} onChange={(e) => setLabel(e.target.value)} required />
+        <Input label={t.crm.fieldKeyKey} placeholder="commercial_license_no" value={key} onChange={(e) => setKey(e.target.value)} required />
         <div className="grid grid-cols-2 gap-3">
           <Select
-            label="الكيان المستهدف"
+            label={t.crm.targetEntity}
             value={targetEntity}
             onChange={(e) => setTargetEntity(e.target.value as any)}
             options={[
-              { label: "عميل محتمل (Lead)", value: "lead" },
-              { label: "صفقة تجارية (Deal)", value: "deal" },
-              { label: "جهة اتصال (Contact)", value: "contact" },
-              { label: "منظمة (Organization)", value: "organization" },
+              { label: t.crm.lead, value: "lead" },
+              { label: t.crm.deal, value: "deal" },
+              { label: t.crm.contact, value: "contact" },
+              { label: t.crm.organization, value: "organization" },
             ]}
           />
           <Select
-            label="نوع الحقل"
+            label={t.crm.fieldType}
             value={fieldType}
             onChange={(e) => setFieldType(e.target.value as any)}
             options={[
-              { label: "نص (Text)", value: "text" },
-              { label: "رقم (Number)", value: "number" },
-              { label: "قائمة اختيار (Select)", value: "select" },
-              { label: "تاريخ (Date)", value: "date" },
+              { label: t.crm.text, value: "text" },
+              { label: t.crm.number, value: "number" },
+              { label: t.crm.selectMenu, value: "select" },
+              { label: t.crm.date, value: "date" },
             ]}
           />
         </div>
@@ -64,11 +66,11 @@ export function CreateCrmCustomFieldsModal({ isOpen, onClose, onSubmit }: Create
             onChange={(e) => setIsRequired(e.target.checked)}
             className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
           />
-          <label htmlFor="req" className="text-xs text-slate-700 dark:text-slate-300">حقل إجباري (Required)</label>
+          <label htmlFor="req" className="text-xs text-slate-700 dark:text-slate-300">{t.crm.requiredField}</label>
         </div>
         <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-          <Button type="button" variant="ghost" onClick={onClose}>إلغاء</Button>
-          <Button type="submit" variant="primary">حفظ الحقل</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t.crm.cancellation}</Button>
+          <Button type="submit" variant="primary">{t.crm.saveField}</Button>
         </div>
       </form>
     </Modal>

@@ -61,7 +61,7 @@ export function WidgetBuilderDialog({ open, onOpenChange, defaultValues, onSubmi
     onOpenChange(false);
   };
 
-  const title = defaultValues?.id ? (isRtl ? "تعديل التطبيق المصغر" : "Edit Widget") : (isRtl ? "تطبيق مصغر جديد" : "New Widget");
+  const title = defaultValues?.id ? (isRtl ? "Edit the widget" : "Edit Widget") : (isRtl ? "New widget" : "New Widget");
 
   return (
     <Modal isOpen={open} onClose={() => onOpenChange(false)} title={title} maxWidth="2xl">
@@ -91,11 +91,11 @@ export function WidgetBuilderDialog({ open, onOpenChange, defaultValues, onSubmi
             {activeTab === "basics" && (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">{isRtl ? "الاسم" : "Name"}</label>
-                  <Input {...form.register("name")} placeholder={isRtl ? "الاسم" : "Name"} />
+                  <label className="text-sm font-medium">{isRtl ? "the name" : "Name"}</label>
+                  <Input {...form.register("name")} placeholder={isRtl ? "the name" : "Name"} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">{isRtl ? "مصدر البيانات" : "Data Source"}</label>
+                  <label className="text-sm font-medium">{isRtl ? "Data source" : "Data Source"}</label>
                   <select {...form.register("dataSource")} className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
                     <option value="LEADS">Leads</option>
                     <option value="DEALS">Deals</option>
@@ -129,7 +129,7 @@ export function WidgetBuilderDialog({ open, onOpenChange, defaultValues, onSubmi
 
         {/* Right Pane - Live Preview */}
         <div className="w-full md:w-1/2 p-6 flex flex-col bg-gray-100/50 dark:bg-black/20">
-          <h3 className="text-sm font-medium text-gray-500 mb-4">{isRtl ? "معاينة مباشرة" : "Live Preview"}</h3>
+          <h3 className="text-sm font-medium text-gray-500 mb-4">{isRtl ? "Live preview" : "Live Preview"}</h3>
           <div className="flex-1 bg-white dark:bg-gray-900 rounded-xl border dark:border-gray-800 shadow-sm overflow-hidden flex items-center justify-center">
             <div className="w-full h-full p-4 relative">
               <DashboardWidgetRenderer 
@@ -165,10 +165,10 @@ export function WidgetBuilderDialog({ open, onOpenChange, defaultValues, onSubmi
 
       <div className="mt-6 flex justify-end gap-2 border-t pt-4">
         <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-          {isRtl ? "إلغاء" : "Cancel"}
+          {isRtl ? "cancellation" : "Cancel"}
         </Button>
         <Button type="submit" form="widget-form" disabled={form.formState.isSubmitting}>
-          {isRtl ? "حفظ التطبيق" : "Save Widget"}
+          {isRtl ? "Save the application" : "Save Widget"}
         </Button>
       </div>
     </Modal>

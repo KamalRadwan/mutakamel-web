@@ -13,9 +13,9 @@ export interface BrowserContractRuleItem {
 }
 
 const mockContractRules: BrowserContractRuleItem[] = [
-  { id: "cbc-01", ruleName: "الغلاف الموحد للاستجابات الناجحة (Success Envelope)", envelopeStructure: "{ success, status, statusCode, code, message, data, meta }", errorCategory: "N/A", statusCode: 200, status: "enforced" },
-  { id: "cbc-02", ruleName: "معالجة أخطاء المدخلات والتحقق (Validation Error Envelope)", envelopeStructure: "{ success: false, status: 'ERROR', errorCategory: 'VALIDATION' }", errorCategory: "VALIDATION", statusCode: 422, status: "enforced" },
-  { id: "cbc-03", ruleName: "المرور الهيكلي عبر Gateway Path", envelopeStructure: "/api/tenant/crm/v1/*", errorCategory: "ROUTING", statusCode: 200, status: "enforced" },
+  { id: "cbc-01", ruleName: "I18N_FALLBACK", envelopeStructure: "{ success, status, statusCode, code, message, data, meta }", errorCategory: "N/A", statusCode: 200, status: "enforced" },
+  { id: "cbc-02", ruleName: "I18N_FALLBACK", envelopeStructure: "{ success: false, status: 'ERROR', errorCategory: 'VALIDATION' }", errorCategory: "VALIDATION", statusCode: 422, status: "enforced" },
+  { id: "cbc-03", ruleName: "I18N_FALLBACK", envelopeStructure: "/api/tenant/crm/v1/*", errorCategory: "ROUTING", statusCode: 200, status: "enforced" },
 ];
 
 export function useCommonBrowserContract() {

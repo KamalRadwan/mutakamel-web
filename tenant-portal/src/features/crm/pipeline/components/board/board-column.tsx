@@ -3,17 +3,20 @@
 import { Droppable } from "@hello-pangea/dnd";
 import { ChevronRight, ChevronLeft, MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
-import type { OpportunityBoardLane } from "../../../models/pipeline-types";
+import type { OpportunityBoardLane, OpportunityCardRecord } from "../../models/pipeline-types";
 import { OpportunityCard } from "./opportunity-card";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface BoardColumnProps {
   lane: OpportunityBoardLane;
   updateImportance: (cardId: string, importance: number) => void;
+  onOpenActivitiesModal?: (item: OpportunityCardRecord) => void;
 }
 
-export function BoardColumn({ lane, updateImportance }: BoardColumnProps) {
+export function BoardColumn({ lane, updateImportance, onOpenActivitiesModal }: BoardColumnProps) {
+    const { t } = useI18n();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { stage, items, summary, activitySummary } = lane;
 
@@ -51,7 +54,7 @@ export function BoardColumn({ lane, updateImportance }: BoardColumnProps) {
         </div>
         <div className="flex-1 w-full flex flex-col items-center py-6 gap-4">
           <div className={cn("w-3 h-3 rounded-full", getStageColor(stage.colorTheme))} />
-          <div className="writing-vertical-rl text-sm font-semibold text-gray-700 dark:text-gray-300 transform rotate-180">
+          <div className="writing-vertical-rl text-sm font-semibold text-gray-700 dark:text-gray-300 transform rotate-90">
             {stage.nameAr}
           </div>
           <div className="mt-4 px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded-full text-xs font-bold text-gray-700 dark:text-gray-300">
@@ -86,10 +89,10 @@ export function BoardColumn({ lane, updateImportance }: BoardColumnProps) {
         
         {/* Activity Status Bar */}
         <div className="w-full flex h-1.5 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-800 gap-0.5 mt-1">
-          {activitySummary.overdueCount > 0 && <div className="bg-rose-500 h-full" style={{ width: `${(activitySummary.overdueCount / summary.totalCount) * 100}%` }} title="متأخر" />}
-          {activitySummary.todayCount > 0 && <div className="bg-orange-500 h-full" style={{ width: `${(activitySummary.todayCount / summary.totalCount) * 100}%` }} title="اليوم" />}
-          {activitySummary.futureCount > 0 && <div className="bg-emerald-500 h-full" style={{ width: `${(activitySummary.futureCount / summary.totalCount) * 100}%` }} title="مستقبلي" />}
-          {activitySummary.noOpenCount > 0 && <div className="bg-gray-300 dark:bg-gray-700 h-full" style={{ width: `${(activitySummary.noOpenCount / summary.totalCount) * 100}%` }} title="لا يوجد نشاط" />}
+          {activitySummary.overdueCount > 0 && <div className="bg-rose-500 h-full" style={{ width: `${(activitySummary.overdueCount / summary.totalCount) * 100}%` }} title={t.crm.late} />}
+          {activitySummary.todayCount > 0 && <div className="bg-orange-500 h-full" style={{ width: `${(activitySummary.todayCount / summary.totalCount) * 100}%` }} title={t.crm.today} />}
+          {activitySummary.futureCount > 0 && <div className="bg-emerald-500 h-full" style={{ width: `${(activitySummary.futureCount / summary.totalCount) * 100}%` }} title={t.crm.myFuture} />}
+          {activitySummary.noOpenCount > 0 && <div className="bg-gray-300 dark:bg-gray-700 h-full" style={{ width: `${(activitySummary.noOpenCount / summary.totalCount) * 100}%` }} title={t.crm.thereIsNoActivity} />}
         </div>
         
         <div className="text-xs text-gray-500 mt-2 font-medium">
@@ -111,12 +114,11 @@ export function BoardColumn({ lane, updateImportance }: BoardColumnProps) {
             {stage.category !== "CLOSED" && (
               <Button variant="ghost" className="w-full justify-start text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm mb-1">
                 <Plus className="w-4 h-4 mr-2" />
-                إضافة فرصة
-              </Button>
+                {t.crm.addAnOpportunity}</Button>
             )}
 
-            {items.map((item, index) => (
-              <OpportunityCard key={item.id} item={item} index={index} updateImportance={updateImportance} />
+            {items.map((item: OpportunityCardRecord, index: number) => (
+              <OpportunityCard key={item.id} item={item} index={index} updateImportance={updateImportance} onOpenActivitiesModal={onOpenActivitiesModal} />
             ))}
             {provided.placeholder}
           </div>

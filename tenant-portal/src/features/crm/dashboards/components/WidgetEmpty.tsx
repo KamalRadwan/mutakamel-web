@@ -9,7 +9,7 @@ interface WidgetEmptyProps {
 
 export function WidgetEmpty({ message }: WidgetEmptyProps) {
   const { lang } = useI18n();
-  const defaultMessage = lang === "ar" ? "لا توجد بيانات متاحة لعرضها" : "No data available";
+  const defaultMessage = lang === "ar" ? "There is no data available to display" : "No data available";
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-gray-400 dark:text-gray-500">

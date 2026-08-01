@@ -64,7 +64,7 @@ export function DashboardDrilldownPanel({ open, onClose, title, subtitle, record
               <div className="flex items-center gap-2">
                 <Button variant="secondary" className="gap-2" onClick={() => exportToCSV(records, title)}>
                   <Download className="w-4 h-4" />
-                  {isRtl ? "تصدير" : "Export"}
+                  {isRtl ? "export" : "Export"}
                 </Button>
                 <button
                   onClick={onClose}
@@ -83,7 +83,7 @@ export function DashboardDrilldownPanel({ open, onClose, title, subtitle, record
                 </div>
               ) : records.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                  <p>{isRtl ? "لا توجد بيانات متاحة." : "No data available."}</p>
+                  <p>{isRtl ? "No data available." : "No data available."}</p>
                 </div>
               ) : (
                 <div className="border dark:border-slate-800 rounded-lg overflow-hidden">
@@ -117,7 +117,7 @@ export function DashboardDrilldownPanel({ open, onClose, title, subtitle, record
             {!isLoading && records.length > 0 && (
               <div className="p-4 border-t dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
                 <p className="text-sm text-slate-500">
-                  {isRtl ? "عرض" : "Showing"} {((page - 1) * itemsPerPage) + 1} {isRtl ? "إلى" : "to"} {Math.min(page * itemsPerPage, records.length)} {isRtl ? "من" : "of"} {records.length} {isRtl ? "سجل" : "records"}
+                  {isRtl ? "an offer" : "Showing"} {((page - 1) * itemsPerPage) + 1} {isRtl ? "to" : "to"} {Math.min(page * itemsPerPage, records.length)} {isRtl ? "from" : "of"} {records.length} {isRtl ? "register" : "records"}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button 

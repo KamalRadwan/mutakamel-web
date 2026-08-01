@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface CreateModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface CreateModalProps {
 }
 
 export function CreateCrmStaticCatalogueModal({ isOpen, onClose, onSubmit }: CreateModalProps) {
+    const { t } = useI18n();
   const [catalogName, setCatalogName] = useState("");
   const [category, setCategory] = useState<"lead_sources" | "industry_types" | "deal_reasons" | "currencies">("industry_types");
 
@@ -24,22 +26,22 @@ export function CreateCrmStaticCatalogueModal({ isOpen, onClose, onSubmit }: Cre
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="إضافة كتالوج بيانات ثابتة لموديول CRM" maxWidth="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.crm.addingAStaticDataCatalogT} maxWidth="md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input label="اسم الكتالوج / القائمة المرجعية" placeholder="مثال: دليل الأنشطة الطبية والدوائية" value={catalogName} onChange={(e) => setCatalogName(e.target.value)} required />
+        <Input label={t.crm.catalogReferenceListName} placeholder={t.crm.exampleGuideToMedicalAnd} value={catalogName} onChange={(e) => setCatalogName(e.target.value)} required />
         <Select
-          label="التصنيف المرجعي"
+          label={t.crm.referenceClassification}
           value={category}
           onChange={(e) => setCategory(e.target.value as any)}
           options={[
-            { label: "أنواع القطاعات (Industry Types)", value: "industry_types" },
-            { label: "أسباب الخسارة (Deal Lost Reasons)", value: "deal_reasons" },
-            { label: "مصادر الاستقطاب (Lead Sources)", value: "lead_sources" },
+            { label: t.crm.industryTypes, value: "industry_types" },
+            { label: t.crm.dealLostReasons, value: "deal_reasons" },
+            { label: t.crm.leadSources, value: "lead_sources" },
           ]}
         />
         <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-          <Button type="button" variant="ghost" onClick={onClose}>إلغاء</Button>
-          <Button type="submit" variant="primary">حفظ الكتالوج</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t.crm.cancellation}</Button>
+          <Button type="submit" variant="primary">{t.crm.saveTheCatalog}</Button>
         </div>
       </form>
     </Modal>

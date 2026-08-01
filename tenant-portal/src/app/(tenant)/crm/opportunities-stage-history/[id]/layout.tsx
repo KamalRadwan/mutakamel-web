@@ -2,6 +2,7 @@
 
 import { use } from "react";
 import { DetailTabsLayout } from "@/components/ui/DetailTabsLayout";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function OpportunityDetailLayout({
   children,
@@ -10,12 +11,13 @@ export default function OpportunityDetailLayout({
   children: React.ReactNode;
   params: Promise<{ id: string }>;
 }) {
+    const { t } = useI18n();
   const resolvedParams = use(params);
 
   return (
     <DetailTabsLayout
       title={`الفرصة التجارية: ${resolvedParams.id}`}
-      subtitle="تفاصيل القيمة، المرحلة والتحديث المباشر"
+      subtitle={t.crm.valueDetailsPhaseAndLive}
       basePath={`/crm/opportunities-stage-history/${resolvedParams.id}`}
     >
       {children}

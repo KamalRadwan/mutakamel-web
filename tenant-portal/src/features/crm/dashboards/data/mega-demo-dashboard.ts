@@ -1,10 +1,11 @@
 import type { CrmDashboard, DashboardRunResult } from "../models/dashboard-types";
+import { useI18n } from "@/i18n/I18nContext";
 
 // Widget Definitions & Placements for the Mega Fake CRM Dashboard
 export const megaDemoDashboard: CrmDashboard = {
   id: "mega-crm-dashboard",
-  name: "لوحة التحليلات الشاملة وجميع الأشكال البيانية (Mega CRM Analytics)",
-  description: "لوحة تحكم فائقة الأداء تضم كافة أنواع الأدوات والرسومات البيانية والمؤشرات لتقييم أداء CRM بكل تفاصيله",
+  name: "",
+  description: "",
   isFavorite: true,
   accessLevel: "EDIT",
   revision: 1,
@@ -21,7 +22,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 0, y: 0, width: 3, height: 2,
       widget: {
         id: "w-metric-1",
-        name: "إجمالي الإيرادات (Total Revenue)",
+        name: "",
         visualizationType: "METRIC_CARD",
         querySpec: { series: [] },
         displaySpec: { numberFormat: "currency" },
@@ -34,7 +35,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 3, y: 0, width: 3, height: 2,
       widget: {
         id: "w-metric-2",
-        name: "الفرص البيعية النشطة (Active Deals)",
+        name: "",
         visualizationType: "METRIC_CARD",
         querySpec: { series: [] },
         displaySpec: { numberFormat: "compact" },
@@ -47,7 +48,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 6, y: 0, width: 3, height: 2,
       widget: {
         id: "w-metric-3",
-        name: "معدل تحويل الفرص (Win Rate)",
+        name: "",
         visualizationType: "METRIC_CARD",
         querySpec: { series: [] },
         displaySpec: { numberFormat: "percent" },
@@ -60,7 +61,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 9, y: 0, width: 3, height: 2,
       widget: {
         id: "w-metric-4",
-        name: "متوسط فترة الإغلاق (Avg Sales Cycle)",
+        name: "",
         visualizationType: "METRIC_CARD",
         querySpec: { series: [] },
         displaySpec: { numberFormat: "compact" },
@@ -75,7 +76,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 0, y: 2, width: 6, height: 2,
       widget: {
         id: "w-prog-1",
-        name: "تحقيق هدف المبيعات الربع سنوي (Q3 Revenue Quota)",
+        name: "",
         visualizationType: "PROGRESS_CARD",
         querySpec: { series: [] },
         displaySpec: { numberFormat: "compact" },
@@ -88,7 +89,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 6, y: 2, width: 6, height: 2,
       widget: {
         id: "w-prog-2",
-        name: "معدل استقطاب العملاء الجدد (Lead Gen Target)",
+        name: "",
         visualizationType: "PROGRESS_CARD",
         querySpec: { series: [] },
         displaySpec: { numberFormat: "compact" },
@@ -103,7 +104,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 0, y: 4, width: 6, height: 4,
       widget: {
         id: "w-line-1",
-        name: "مسار الإيرادات الشهرية 2025-2026 (Monthly Revenue Trend)",
+        name: "",
         visualizationType: "LINE",
         querySpec: { series: [] },
         displaySpec: { title: "Monthly Revenue Trend" },
@@ -116,7 +117,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 6, y: 4, width: 6, height: 4,
       widget: {
         id: "w-combo-1",
-        name: "حجم الصفقة مقابل تحقيق Target (Sales Volume vs Target)",
+        name: "",
         visualizationType: "COMBO",
         querySpec: { series: [] },
         displaySpec: { title: "Sales Volume vs Target" },
@@ -131,7 +132,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 0, y: 8, width: 6, height: 4,
       widget: {
         id: "w-stacked-1",
-        name: "توزيع خط المبيعات حسب المناطق (Pipeline by Region)",
+        name: "",
         visualizationType: "STACKED_BAR",
         querySpec: { series: [] },
         displaySpec: { title: "Pipeline Distribution" },
@@ -144,7 +145,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 6, y: 8, width: 6, height: 4,
       widget: {
         id: "w-area-1",
-        name: "النمو التراكمي في قاعدة المشتركين (Subscriber Growth)",
+        name: "",
         visualizationType: "AREA",
         querySpec: { series: [] },
         displaySpec: { title: "Cumulative Subscribers" },
@@ -159,7 +160,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 0, y: 12, width: 4, height: 4,
       widget: {
         id: "w-pie-1",
-        name: "الحصة السوقية حسب شرائح العملاء (Market Share)",
+        name: "",
         visualizationType: "PIE",
         querySpec: { series: [] },
         displaySpec: { title: "Customer Segments" },
@@ -172,7 +173,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 4, y: 12, width: 4, height: 4,
       widget: {
         id: "w-donut-1",
-        name: "توزيع الإيرادات حسب خطة الاشتراك (Revenue by Plan)",
+        name: "",
         visualizationType: "DONUT",
         querySpec: { series: [] },
         displaySpec: { title: "Subscription Plans" },
@@ -185,7 +186,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 8, y: 12, width: 4, height: 4,
       widget: {
         id: "w-stacked100-1",
-        name: "نسبة الفوز والخسارة حسب القطاع (Win/Loss % by Sector)",
+        name: "",
         visualizationType: "STACKED_BAR_100",
         querySpec: { series: [] },
         displaySpec: { title: "Win/Loss Percentage" },
@@ -200,7 +201,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 0, y: 16, width: 4, height: 4,
       widget: {
         id: "w-funnel-1",
-        name: "مسار التحويل الكامل للعملاء (Sales Conversion Funnel)",
+        name: "",
         visualizationType: "FUNNEL",
         querySpec: { series: [] },
         displaySpec: { title: "Conversion Funnel" },
@@ -213,7 +214,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 4, y: 16, width: 4, height: 4,
       widget: {
         id: "w-column-1",
-        name: "الصفقات المغلقة حسب المرحلة (Deals by Stage)",
+        name: "",
         visualizationType: "COLUMN",
         querySpec: { series: [] },
         displaySpec: { title: "Closed Deals" },
@@ -226,7 +227,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 8, y: 16, width: 4, height: 4,
       widget: {
         id: "w-bar-1",
-        name: "الإيرادات حسب مصدر العملاء (Revenue by Lead Source)",
+        name: "",
         visualizationType: "BAR",
         querySpec: { series: [] },
         displaySpec: { title: "Lead Source Breakdown" },
@@ -241,7 +242,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 0, y: 20, width: 6, height: 4,
       widget: {
         id: "w-scatter-1",
-        name: "حجم الصفقة vs طول دورة المبيعات (Deal Size vs Cycle)",
+        name: "",
         visualizationType: "SCATTER",
         querySpec: { series: [] },
         displaySpec: { title: "Deal Size Correlation" },
@@ -254,7 +255,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 6, y: 20, width: 6, height: 4,
       widget: {
         id: "w-bubble-1",
-        name: "قيمة الحساب vs رضا العملاء (Account Value vs CSAT)",
+        name: "",
         visualizationType: "BUBBLE",
         querySpec: { series: [] },
         displaySpec: { title: "Account Portfolio Analysis" },
@@ -269,7 +270,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 0, y: 24, width: 6, height: 4,
       widget: {
         id: "w-linearea-1",
-        name: "العملاء المحتملون vs العملاء المؤهلون (Leads vs MQLs)",
+        name: "",
         visualizationType: "LINE_AREA",
         querySpec: { series: [] },
         displaySpec: { title: "Lead Generation Comparison" },
@@ -282,7 +283,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 6, y: 24, width: 6, height: 4,
       widget: {
         id: "w-heatmap-1",
-        name: "خريطة تفاعل العملاء خلال ساعات العمل (Engagement Heatmap)",
+        name: "",
         visualizationType: "HEATMAP",
         querySpec: { series: [] },
         displaySpec: { title: "Activity Heatmap" },
@@ -297,7 +298,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 0, y: 28, width: 3, height: 3,
       widget: {
         id: "w-gauge-1",
-        name: "نسبة تحقيق المستهدف السنوي (Annual Quota)",
+        name: "",
         visualizationType: "SEMI_CIRCLE_GAUGE",
         querySpec: { series: [] },
         displaySpec: { title: "Semi-Circle Gauge" },
@@ -310,7 +311,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 3, y: 28, width: 3, height: 3,
       widget: {
         id: "w-gauge-2",
-        name: "مؤشر رضا العملاء CSAT (Customer Satisfaction)",
+        name: "",
         visualizationType: "THREE_QUARTER_GAUGE",
         querySpec: { series: [] },
         displaySpec: { title: "3/4 Gauge" },
@@ -323,7 +324,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 6, y: 28, width: 3, height: 3,
       widget: {
         id: "w-gauge-3",
-        name: "معدل الالتزام باتفاقية الخدمة (SLA Compliance)",
+        name: "",
         visualizationType: "CIRCULAR_PROGRESS_GAUGE",
         querySpec: { series: [] },
         displaySpec: { title: "Circular Gauge" },
@@ -336,7 +337,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 9, y: 28, width: 3, height: 3,
       widget: {
         id: "w-gauge-4",
-        name: "سرعة تدفق المبيعات (Sales Velocity Index)",
+        name: "",
         visualizationType: "DETAILED_SPEEDOMETER",
         querySpec: { series: [] },
         displaySpec: { title: "Speedometer" },
@@ -351,7 +352,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 0, y: 31, width: 8, height: 5,
       widget: {
         id: "w-table-1",
-        name: "قائمة أكبر الفرص البيعية النشطة (Top Deals Table)",
+        name: "",
         visualizationType: "TABLE",
         querySpec: { series: [] },
         displaySpec: { title: "High Value Deals" },
@@ -364,7 +365,7 @@ export const megaDemoDashboard: CrmDashboard = {
       x: 8, y: 31, width: 4, height: 5,
       widget: {
         id: "w-leaderboard-1",
-        name: "أفضل ممثلي المبيعات أداءً (Sales Leaderboard)",
+        name: "",
         visualizationType: "LEADERBOARD",
         querySpec: { series: [] },
         displaySpec: { title: "Top Reps" },
@@ -518,7 +519,7 @@ export const megaDemoRunResult: DashboardRunResult = {
           points: [
             { key: "NA", label: "North America", value: 450000 },
             { key: "EU", label: "Europe", value: 380000 },
-            { key: "ME", label: "Middle East (الشرق الأوسط)", value: 620000 },
+            { key: "ME", label: "", value: 620000 },
             { key: "APAC", label: "Asia Pacific", value: 290000 },
           ],
         },
@@ -528,7 +529,7 @@ export const megaDemoRunResult: DashboardRunResult = {
           points: [
             { key: "NA", label: "North America", value: 280000 },
             { key: "EU", label: "Europe", value: 210000 },
-            { key: "ME", label: "Middle East (الشرق الأوسط)", value: 410000 },
+            { key: "ME", label: "", value: 410000 },
             { key: "APAC", label: "Asia Pacific", value: 180000 },
           ],
         },
@@ -538,7 +539,7 @@ export const megaDemoRunResult: DashboardRunResult = {
           points: [
             { key: "NA", label: "North America", value: 150000 },
             { key: "EU", label: "Europe", value: 130000 },
-            { key: "ME", label: "Middle East (الشرق الأوسط)", value: 240000 },
+            { key: "ME", label: "", value: 240000 },
             { key: "APAC", label: "Asia Pacific", value: 95000 },
           ],
         },
@@ -576,10 +577,10 @@ export const megaDemoRunResult: DashboardRunResult = {
           key: "s-segments",
           label: "Customer Tiers",
           points: [
-            { key: "ent", label: "Enterprise (الشركات الكبرى)", value: 42 },
-            { key: "mid", label: "Mid-Market (الشركات المتوسطة)", value: 28 },
-            { key: "smb", label: "SMB (الأعمال الصغيرة)", value: 18 },
-            { key: "gov", label: "Government (القطاع الحكومي)", value: 12 },
+            { key: "ent", label: "", value: 42 },
+            { key: "mid", label: "", value: 28 },
+            { key: "smb", label: "", value: 18 },
+            { key: "gov", label: "", value: 12 },
           ],
         },
       ],
@@ -763,7 +764,7 @@ export const megaDemoRunResult: DashboardRunResult = {
       shape: "CATEGORY",
       series: [
         {
-          key: "Sun", label: "Sun (الأحد)",
+          key: "Sun", label: "",
           points: [
             { key: "h9", label: "9 AM", value: 45 },
             { key: "h12", label: "12 PM", value: 80 },
@@ -772,7 +773,7 @@ export const megaDemoRunResult: DashboardRunResult = {
           ],
         },
         {
-          key: "Mon", label: "Mon (الإثنين)",
+          key: "Mon", label: "",
           points: [
             { key: "h9", label: "9 AM", value: 60 },
             { key: "h12", label: "12 PM", value: 110 },
@@ -781,7 +782,7 @@ export const megaDemoRunResult: DashboardRunResult = {
           ],
         },
         {
-          key: "Tue", label: "Tue (الثلاثاء)",
+          key: "Tue", label: "",
           points: [
             { key: "h9", label: "9 AM", value: 75 },
             { key: "h12", label: "12 PM", value: 130 },
@@ -790,7 +791,7 @@ export const megaDemoRunResult: DashboardRunResult = {
           ],
         },
         {
-          key: "Wed", label: "Wed (الأربعاء)",
+          key: "Wed", label: "",
           points: [
             { key: "h9", label: "9 AM", value: 70 },
             { key: "h12", label: "12 PM", value: 125 },
@@ -847,7 +848,7 @@ export const megaDemoRunResult: DashboardRunResult = {
         rows: [
           {
             id: "t1",
-            title: "مشروع التحديث الرقمي - البنك الأهلي ($850,000)",
+            title: "",
             severity: "SUCCESS",
             reasonCode: "HIGH_VALUE_WIN",
             occurredAt: "2026-07-26T00:00:00.000Z",
@@ -855,7 +856,7 @@ export const megaDemoRunResult: DashboardRunResult = {
           },
           {
             id: "t2",
-            title: "منظومة الاتصالات السحابية - شركة موبايلي ($620,000)",
+            title: "",
             severity: "WARNING",
             reasonCode: "NEGOTIATION_PENDING",
             occurredAt: "2026-07-25T00:00:00.000Z",
@@ -863,7 +864,7 @@ export const megaDemoRunResult: DashboardRunResult = {
           },
           {
             id: "t3",
-            title: "بوابة خدمات العملاء - وزارة الصحة ($1,200,000)",
+            title: "",
             severity: "INFO",
             reasonCode: "PROPOSAL_SUBMITTED",
             occurredAt: "2026-07-24T00:00:00.000Z",
@@ -871,7 +872,7 @@ export const megaDemoRunResult: DashboardRunResult = {
           },
           {
             id: "t4",
-            title: "منصة الذكاء الاصطناعي - سدايا ($940,000)",
+            title: "",
             severity: "SUCCESS",
             reasonCode: "CONTRACT_SIGNED",
             occurredAt: "2026-07-23T00:00:00.000Z",
@@ -879,7 +880,7 @@ export const megaDemoRunResult: DashboardRunResult = {
           },
           {
             id: "t5",
-            title: "حلول الأمن السيبراني - شركة علم ($430,000)",
+            title: "",
             severity: "INFO",
             reasonCode: "QUALIFICATION_IN_PROGRESS",
             occurredAt: "2026-07-22T00:00:00.000Z",
@@ -901,35 +902,35 @@ export const megaDemoRunResult: DashboardRunResult = {
           {
             id: "l1",
             rank: 1,
-            label: "أحمد بن يوسف Al-Youssef",
+            label: "",
             primaryMeasure: { key: "sales", label: "Sales Volume", unit: "MONEY", currencyCode: "USD", value: 1850000 },
             secondaryMeasures: [],
           },
           {
             id: "l2",
             rank: 2,
-            label: "سارة خالد Al-Khaled",
+            label: "",
             primaryMeasure: { key: "sales", label: "Sales Volume", unit: "MONEY", currencyCode: "USD", value: 1420000 },
             secondaryMeasures: [],
           },
           {
             id: "l3",
             rank: 3,
-            label: "محمد العتيبي Al-Otaibi",
+            label: "",
             primaryMeasure: { key: "sales", label: "Sales Volume", unit: "MONEY", currencyCode: "USD", value: 1180000 },
             secondaryMeasures: [],
           },
           {
             id: "l4",
             rank: 4,
-            label: "فاطمة الشمري Al-Shammari",
+            label: "",
             primaryMeasure: { key: "sales", label: "Sales Volume", unit: "MONEY", currencyCode: "USD", value: 950000 },
             secondaryMeasures: [],
           },
           {
             id: "l5",
             rank: 5,
-            label: "عمر الدوسري Al-Dossary",
+            label: "",
             primaryMeasure: { key: "sales", label: "Sales Volume", unit: "MONEY", currencyCode: "USD", value: 820000 },
             secondaryMeasures: [],
           },
@@ -938,3 +939,4 @@ export const megaDemoRunResult: DashboardRunResult = {
     },
   },
 };
+

@@ -10,8 +10,10 @@ import { Eye, Trash2, FormInput, Layers, Hash } from "lucide-react";
 import { useCrmCustomFields, CustomFieldItem } from "./hooks/useCrmCustomFields";
 import { CreateCrmCustomFieldsModal } from "./components/CreateCrmCustomFieldsModal";
 import { DeleteCrmCustomFieldsConfirmModal } from "./components/DeleteCrmCustomFieldsConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmCustomFieldsPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function CrmCustomFieldsPage() {
 
   const columns = [
     {
-      header: "عنوان الحقل",
+      header: t.crm.fieldTitle,
       cell: (item: CustomFieldItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400">
@@ -41,27 +43,27 @@ export default function CrmCustomFieldsPage() {
       ),
     },
     {
-      header: "الكيان المستهدف",
+      header: t.crm.targetEntity,
       cell: (item: CustomFieldItem) => (
         <Badge variant="info">{item.targetEntity.toUpperCase()}</Badge>
       ),
     },
     {
-      header: "نوع الحقل",
+      header: t.crm.fieldType,
       cell: (item: CustomFieldItem) => (
         <Badge variant="neutral">{item.fieldType}</Badge>
       ),
     },
     {
-      header: "إجباري؟",
+      header: t.crm.compulsory,
       cell: (item: CustomFieldItem) => (
         <Badge variant={item.isRequired ? "danger" : "neutral"}>
-          {item.isRequired ? "نعم (إجباري)" : "اختياري"}
+          {item.isRequired ? t.crm.yesMandatory : t.crm.optional}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: CustomFieldItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/custom-fields/${item.id}/general`}>
@@ -80,16 +82,16 @@ export default function CrmCustomFieldsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="الحقول المخصصة لنموذج الـ CRM (Custom Fields Builder)"
-        subtitle="توسيع واستحداث حقول ديناميكية للعملاء المحتملين والصفقات والشركات"
-        actionLabel="إضافة حقل مخصص"
+        title={t.crm.cRMFormCustomFieldsCustom}
+        subtitle={t.crm.expandAndCreateDynamicFiel}
+        actionLabel={t.crm.addACustomField}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث بالعنوان، المفتاح البرمجي، أو الكيان..."
+        placeholder={t.crm.searchByTitleCodeKeyOr}
       />
 
       <Table columns={columns} data={items} />

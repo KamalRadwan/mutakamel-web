@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface CreateModalProps {
   isOpen: boolean;
@@ -13,9 +14,10 @@ interface CreateModalProps {
 }
 
 export function CreateCrmDashboardBuilderModal({ isOpen, onClose, onSubmit }: CreateModalProps) {
+    const { t } = useI18n();
   const [name, setName] = useState("");
   const [type, setType] = useState<"chart_bar" | "chart_line" | "stat_card" | "funnel">("chart_bar");
-  const [metric, setMetric] = useState("إجمالي قيمة الصفقات المغلقة");
+  const [metric, setMetric] = useState(t.crm.totalValueOfClosedTrades);
   const [refreshInterval, setRefreshInterval] = useState("5 mins");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -26,36 +28,36 @@ export function CreateCrmDashboardBuilderModal({ isOpen, onClose, onSubmit }: Cr
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="إضافة وتصرف الـ Widget في لوحة التحليلات" maxWidth="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.crm.addAndManageTheWidgetInT} maxWidth="md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input label="اسم الـ Widget" placeholder="مثال: رسم بياني للصفقات الكبرى" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Input label={t.crm.widgetName} placeholder={t.crm.exampleAChartOfMajorTrad} value={name} onChange={(e) => setName(e.target.value)} required />
         <div className="grid grid-cols-2 gap-3">
           <Select
-            label="نوع الرسم / الودجت"
+            label={t.crm.drawingWidgetType}
             value={type}
             onChange={(e) => setType(e.target.value as any)}
             options={[
-              { label: "مخطط أعمدة (Bar Chart)", value: "chart_bar" },
-              { label: "مخطط خطي (Line Chart)", value: "chart_line" },
-              { label: "بطاقة رقمية (Stat Card)", value: "stat_card" },
-              { label: "قمع تحويل (Funnel)", value: "funnel" },
+              { label: t.crm.barChart, value: "chart_bar" },
+              { label: t.crm.lineChart, value: "chart_line" },
+              { label: t.crm.statCard, value: "stat_card" },
+              { label: t.crm.funnel, value: "funnel" },
             ]}
           />
-          <Input label="المقياس المستهدف Metric" value={metric} onChange={(e) => setMetric(e.target.value)} required />
+          <Input label={t.crm.targetMetric} value={metric} onChange={(e) => setMetric(e.target.value)} required />
         </div>
         <Select
-          label="معدل التحديث التلقائي"
+          label={t.crm.autoRefreshRate}
           value={refreshInterval}
           onChange={(e) => setRefreshInterval(e.target.value)}
           options={[
-            { label: "لحظي Real-time", value: "Real-time" },
-            { label: "كل 5 دقائق", value: "5 mins" },
-            { label: "كل 15 دقيقة", value: "15 mins" },
+            { label: t.crm.realTime, value: "Real-time" },
+            { label: t.crm.every5Minutes, value: "5 mins" },
+            { label: t.crm.every15Minutes, value: "15 mins" },
           ]}
         />
         <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-          <Button type="button" variant="ghost" onClick={onClose}>إلغاء</Button>
-          <Button type="submit" variant="primary">إضافة الـ Widget</Button>
+          <Button type="button" variant="ghost" onClick={onClose}>{t.crm.cancellation}</Button>
+          <Button type="submit" variant="primary">{t.crm.addTheWidget}</Button>
         </div>
       </form>
     </Modal>

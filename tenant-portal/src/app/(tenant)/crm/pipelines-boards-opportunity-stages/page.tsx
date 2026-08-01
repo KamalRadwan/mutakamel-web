@@ -10,8 +10,10 @@ import { Eye, Trash2, Kanban, Layers, GitMerge } from "lucide-react";
 import { usePipelinesBoards, PipelineBoardItem } from "./hooks/usePipelinesBoards";
 import { CreatePipelinesBoardsModal } from "./components/CreatePipelinesBoardsModal";
 import { DeletePipelinesBoardsConfirmModal } from "./components/DeletePipelinesBoardsConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function PipelinesBoardsPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function PipelinesBoardsPage() {
 
   const columns = [
     {
-      header: "اسم المسار / البورد",
+      header: t.crm.pathBoardName,
       cell: (item: PipelineBoardItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
@@ -41,27 +43,27 @@ export default function PipelinesBoardsPage() {
       ),
     },
     {
-      header: "عدد المراحل",
+      header: t.crm.numberOfStages,
       cell: (item: PipelineBoardItem) => (
-        <Badge variant="info">{item.stagesCount} مراحل</Badge>
+        <Badge variant="info">{item.stagesCount} {t.crm.stages}</Badge>
       ),
     },
     {
-      header: "إجمالي قيمة الصفقات",
+      header: t.crm.totalValueOfTransactions,
       cell: (item: PipelineBoardItem) => (
         <span className="font-bold text-emerald-600">{item.totalDealsValue}</span>
       ),
     },
     {
-      header: "الحالة",
+      header: t.crm.theCondition,
       cell: (item: PipelineBoardItem) => (
         <Badge variant={item.status === "active" ? "success" : "neutral"}>
-          {item.status === "active" ? "نشط ومستعمل" : "مؤرشف"}
+          {item.status === "active" ? t.crm.activeAndUsed : t.crm.archived}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: PipelineBoardItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/pipelines-boards-opportunity-stages/${item.id}/general`}>
@@ -80,16 +82,16 @@ export default function PipelinesBoardsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="لوحات ومسارات المبيعات (Pipelines & Kanban Boards)"
-        subtitle="بناء مسارات تفاعلية بنمط كانبان، وتوزيع الصفقات على مراحل الفرص المحددة"
-        actionLabel="إنشاء مسار مبيعات جديد"
+        title={t.crm.pipelinesKanbanBoards}
+        subtitle={t.crm.buildInteractiveKanbanStyle}
+        actionLabel={t.crm.createANewSalesFunnel}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث باسم المسار أو الكود..."
+        placeholder={t.crm.searchByPathNameOrCode}
       />
 
       <Table columns={columns} data={items} />

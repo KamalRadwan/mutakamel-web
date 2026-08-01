@@ -10,8 +10,10 @@ import { Eye, Trash2, Building2, UserCheck, DollarSign } from "lucide-react";
 import { useCustomerProfiles, CustomerProfileItem } from "./hooks/useCustomerProfiles";
 import { CreateCustomerProfilesModal } from "./components/CreateCustomerProfilesModal";
 import { DeleteCustomerProfilesConfirmModal } from "./components/DeleteCustomerProfilesConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CustomerProfilesPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function CustomerProfilesPage() {
 
   const columns = [
     {
-      header: "اسم العميل / الشركة",
+      header: t.crm.clientCompanyName,
       cell: (item: CustomerProfileItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
@@ -41,7 +43,7 @@ export default function CustomerProfilesPage() {
       ),
     },
     {
-      header: "التصنيف",
+      header: t.crm.classification,
       cell: (item: CustomerProfileItem) => (
         <Badge variant={item.category === "VIP" ? "warning" : item.category === "Enterprise" ? "info" : "neutral"}>
           {item.category}
@@ -49,21 +51,21 @@ export default function CustomerProfilesPage() {
       ),
     },
     {
-      header: "إجمالي قيمة الصفقات",
+      header: t.crm.totalValueOfTransactions,
       cell: (item: CustomerProfileItem) => (
         <span className="font-bold text-emerald-600">{item.totalDealsValue}</span>
       ),
     },
     {
-      header: "الحالة",
+      header: t.crm.theCondition,
       cell: (item: CustomerProfileItem) => (
         <Badge variant={item.status === "active" ? "success" : "neutral"}>
-          {item.status === "active" ? "عميل نشط" : "غير نشط"}
+          {item.status === "active" ? t.crm.activeClient : t.crm.inactive}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: CustomerProfileItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/customer-profiles/${item.id}/general`}>
@@ -82,16 +84,16 @@ export default function CustomerProfilesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="ملفات وبطاقات العملاء (Customer Profiles)"
-        subtitle="سجل شامل 360 درجة لبيانات العملاء، المعاملات المباشرة، وقيمة الصفقات المغلقة"
-        actionLabel="إضافة عميل جديد"
+        title={t.crm.customerProfilesAndCards}
+        subtitle={t.crm.aComprehensive360DegreeRec}
+        actionLabel={t.crm.addANewClient}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث باسم الشركة، المسؤول، أو البريد..."
+        placeholder={t.crm.searchByCompanyNameOffici}
       />
 
       <Table columns={columns} data={items} />

@@ -2,6 +2,7 @@
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { OpportunityItem } from "../hooks/useOpportunitiesStageHistory";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -11,14 +12,15 @@ interface DeleteModalProps {
 }
 
 export function DeleteOpportunitiesStageHistoryConfirmModal({ isOpen, item, onClose, onConfirm }: DeleteModalProps) {
+    const { t } = useI18n();
   return (
     <ConfirmModal
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
-      title="حذف الفرصة التجارية"
+      title={t.crm.deleteBusinessOpportunity}
       message={`هل أنت تأكد من حذف الفرصة التجارية "${item?.title || ""}" بقيمة ${item?.amount || ""} ${item?.currency || ""}؟`}
-      confirmText="حذف الفرصة"
+      confirmText={t.crm.deleteOpportunity}
       isDanger
     />
   );

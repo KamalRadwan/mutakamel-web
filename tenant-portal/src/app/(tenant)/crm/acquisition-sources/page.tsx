@@ -10,8 +10,10 @@ import { Eye, Trash2, TrendingUp, Share2, Megaphone } from "lucide-react";
 import { useAcquisitionSources, AcquisitionSourceItem } from "./hooks/useAcquisitionSources";
 import { CreateAcquisitionSourcesModal } from "./components/CreateAcquisitionSourcesModal";
 import { DeleteAcquisitionSourcesConfirmModal } from "./components/DeleteAcquisitionSourcesConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function AcquisitionSourcesPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function AcquisitionSourcesPage() {
 
   const columns = [
     {
-      header: "مصدر الاستقطاب",
+      header: t.crm.sourceOfPolarization,
       cell: (item: AcquisitionSourceItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
@@ -35,33 +37,33 @@ export default function AcquisitionSourcesPage() {
           </div>
           <div>
             <p className="font-bold text-slate-900 dark:text-slate-100">{item.name}</p>
-            <p className="text-[11px] text-slate-400">نوع القناة: {item.channelType}</p>
+            <p className="text-[11px] text-slate-400">{t.crm.channelType}{item.channelType}</p>
           </div>
         </div>
       ),
     },
     {
-      header: "عدد العملاء المستجلبين",
+      header: t.crm.numberOfClientsBroughtIn,
       cell: (item: AcquisitionSourceItem) => (
-        <span className="font-bold text-slate-900 dark:text-slate-100">{item.totalLeadsCount} عميل</span>
+        <span className="font-bold text-slate-900 dark:text-slate-100">{item.totalLeadsCount} {t.crm.client}</span>
       ),
     },
     {
-      header: "معدل التحويل (Conversion Rate)",
+      header: t.crm.conversionRate,
       cell: (item: AcquisitionSourceItem) => (
         <Badge variant="success">{item.conversionRate}</Badge>
       ),
     },
     {
-      header: "الحالة",
+      header: t.crm.theCondition,
       cell: (item: AcquisitionSourceItem) => (
         <Badge variant={item.status === "active" ? "success" : "neutral"}>
-          {item.status === "active" ? "نشط" : "موقف"}
+          {item.status === "active" ? t.crm.active : t.crm.position}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: AcquisitionSourceItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/acquisition-sources/${item.id}/general`}>
@@ -80,16 +82,16 @@ export default function AcquisitionSourcesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="مصادر الاستقطاب والقنوات التسويقية (Acquisition Sources)"
-        subtitle="تتبع وتحليل كفاءة مصادر جلب العملاء المحتملين ومعدلات التحويل المباشرة"
-        actionLabel="إضافة مصدر جديد"
+        title={t.crm.acquisitionSourcesAndMarket}
+        subtitle={t.crm.trackAndAnalyzeTheEfficien}
+        actionLabel={t.crm.addANewSource}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث باسم المصدر أو القناة..."
+        placeholder={t.crm.searchBySourceOrChannelNa}
       />
 
       <Table columns={columns} data={items} />

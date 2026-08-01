@@ -13,9 +13,9 @@ export interface StaticCatalogueItem {
 }
 
 const mockCatalogues: StaticCatalogueItem[] = [
-  { id: "cat-101", catalogName: "دليل القطاعات والأنشطة الاقتصادية (Industry Types)", category: "industry_types", entriesCount: 48, lastUpdated: "2026-07-20", status: "synced" },
-  { id: "cat-102", catalogName: "دليل أسباب خسارة الصفقات (Deal Lost Reasons)", category: "deal_reasons", entriesCount: 12, lastUpdated: "2026-07-22", status: "active" },
-  { id: "cat-103", catalogName: "دليل القنوات التسويقية الموحد (Global Lead Sources)", category: "lead_sources", entriesCount: 15, lastUpdated: "2026-07-25", status: "synced" },
+  { id: "cat-101", catalogName: "I18N_FALLBACK", category: "industry_types", entriesCount: 48, lastUpdated: "2026-07-20", status: "synced" },
+  { id: "cat-102", catalogName: "I18N_FALLBACK", category: "deal_reasons", entriesCount: 12, lastUpdated: "2026-07-22", status: "active" },
+  { id: "cat-103", catalogName: "I18N_FALLBACK", category: "lead_sources", entriesCount: 15, lastUpdated: "2026-07-25", status: "synced" },
 ];
 
 export function useCrmStaticCatalogue() {

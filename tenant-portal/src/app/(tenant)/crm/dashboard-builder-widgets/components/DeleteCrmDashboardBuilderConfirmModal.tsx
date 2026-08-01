@@ -2,6 +2,7 @@
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { WidgetItem } from "../hooks/useCrmDashboardBuilder";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -11,14 +12,15 @@ interface DeleteModalProps {
 }
 
 export function DeleteCrmDashboardBuilderConfirmModal({ isOpen, item, onClose, onConfirm }: DeleteModalProps) {
+    const { t } = useI18n();
   return (
     <ConfirmModal
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
-      title="حذف وإخفاء الـ Widget"
+      title={t.crm.deleteAndHideTheWidget}
       message={`هل أنت تأكد من إزالة الـ Widget "${item?.name || ""}" من لوحة المؤشرات؟`}
-      confirmText="إزالة الـ Widget"
+      confirmText={t.crm.removeTheWidget}
       isDanger
     />
   );

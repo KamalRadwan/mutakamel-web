@@ -2,6 +2,7 @@
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { OutboundEmailItem } from "../hooks/useOutboundEmails";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -11,14 +12,15 @@ interface DeleteModalProps {
 }
 
 export function DeleteOutboundEmailsConfirmModal({ isOpen, item, onClose, onConfirm }: DeleteModalProps) {
+    const { t } = useI18n();
   return (
     <ConfirmModal
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
-      title="حذف وحظر الرسالة"
+      title={t.crm.deleteAndBlockTheMessage}
       message={`هل أنت تأكد من إلغاء وحذف الرسالة الموجهة إلى "${item?.recipientEmail || ""}"؟`}
-      confirmText="حذف الرسالة"
+      confirmText={t.crm.deleteTheMessage}
       isDanger
     />
   );

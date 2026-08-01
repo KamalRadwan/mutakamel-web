@@ -14,9 +14,9 @@ export interface WidgetItem {
 }
 
 const mockWidgets: WidgetItem[] = [
-  { id: "wdg-101", name: "قمع تحويل المبيعات (Sales Funnel)", type: "funnel", metric: "Leads to Deals Rate", refreshInterval: "5 mins", isDefault: true, status: "active" },
-  { id: "wdg-102", name: "مخطط الإيرادات الشهرية المكتسبة", type: "chart_bar", metric: "Monthly Revenue (SAR)", refreshInterval: "15 mins", isDefault: true, status: "active" },
-  { id: "wdg-103", name: "بطاقات أداء أفضل مندوبي المبيعات", type: "stat_card", metric: "Top Reps Won Deals", refreshInterval: "Real-time", isDefault: false, status: "active" },
+  { id: "wdg-101", name: "I18N_FALLBACK", type: "funnel", metric: "Leads to Deals Rate", refreshInterval: "5 mins", isDefault: true, status: "active" },
+  { id: "wdg-102", name: "I18N_FALLBACK", type: "chart_bar", metric: "Monthly Revenue (SAR)", refreshInterval: "15 mins", isDefault: true, status: "active" },
+  { id: "wdg-103", name: "I18N_FALLBACK", type: "stat_card", metric: "Top Reps Won Deals", refreshInterval: "Real-time", isDefault: false, status: "active" },
 ];
 
 export function useCrmDashboardBuilder() {

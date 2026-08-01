@@ -25,7 +25,7 @@ export function DashboardShareDialog({ open, onOpenChange, dashboardId }: Dashbo
     setEmail("");
   };
 
-  const title = isRtl ? "مشاركة اللوحة" : "Share Dashboard";
+  const title = isRtl ? "Share the painting" : "Share Dashboard";
 
   return (
     <Modal isOpen={open} onClose={() => onOpenChange(false)} title={title}>
@@ -34,7 +34,7 @@ export function DashboardShareDialog({ open, onOpenChange, dashboardId }: Dashbo
           <input 
             type="email" 
             required
-            placeholder={isRtl ? "البريد الإلكتروني للمستخدم..." : "User email..."}
+            placeholder={isRtl ? "User email..." : "User email..."}
             className="flex-1 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -44,14 +44,14 @@ export function DashboardShareDialog({ open, onOpenChange, dashboardId }: Dashbo
             value={accessLevel}
             onChange={(e) => setAccessLevel(e.target.value as "VIEW" | "EDIT")}
           >
-            <option value="VIEW">{isRtl ? "عرض فقط" : "View Only"}</option>
-            <option value="EDIT">{isRtl ? "تعديل" : "Can Edit"}</option>
+            <option value="VIEW">{isRtl ? "View only" : "View Only"}</option>
+            <option value="EDIT">{isRtl ? "amendment" : "Can Edit"}</option>
           </select>
-          <Button type="submit">{isRtl ? "دعوة" : "Invite"}</Button>
+          <Button type="submit">{isRtl ? "invitation" : "Invite"}</Button>
         </form>
 
         <div>
-          <h4 className="text-sm font-medium text-gray-500 mb-3">{isRtl ? "الأشخاص الذين لديهم حق الوصول" : "People with access"}</h4>
+          <h4 className="text-sm font-medium text-gray-500 mb-3">{isRtl ? "People who have access" : "People with access"}</h4>
           <div className="space-y-3">
             <div className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
               <div className="flex items-center gap-3">
@@ -77,9 +77,9 @@ export function DashboardShareDialog({ open, onOpenChange, dashboardId }: Dashbo
                 </div>
               </div>
               <select className="text-xs border-none bg-transparent text-gray-500 cursor-pointer focus:ring-0 px-0">
-                <option value="VIEW">{isRtl ? "عرض فقط" : "View Only"}</option>
-                <option value="EDIT">{isRtl ? "تعديل" : "Can Edit"}</option>
-                <option value="REMOVE" className="text-red-500">{isRtl ? "إزالة" : "Remove"}</option>
+                <option value="VIEW">{isRtl ? "View only" : "View Only"}</option>
+                <option value="EDIT">{isRtl ? "amendment" : "Can Edit"}</option>
+                <option value="REMOVE" className="text-red-500">{isRtl ? "removal" : "Remove"}</option>
               </select>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { useState } from "react";
 import type { OpportunityRecord, StageFlag } from "../../models/pipeline-types";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface TerminalMoveModalProps {
   isOpen: boolean;
@@ -14,15 +15,16 @@ interface TerminalMoveModalProps {
 }
 
 export function TerminalMoveModal({ isOpen, onClose, opportunity, targetFlag, onConfirm }: TerminalMoveModalProps) {
+    const { t, lang } = useI18n();
   const [reason, setReason] = useState("");
 
   if (!opportunity) return null;
 
   const isWon = targetFlag === "WON";
-  const title = isWon ? "إغلاق الفرصة بنجاح (فوز)" : "خسارة الفرصة";
+  const title = isWon ? t.crm.opportunityClosedSuccessfull : t.crm.lossOfOpportunity;
   const description = isWon 
-    ? `أنت على وشك إغلاق فرصة "${opportunity.title}" بنجاح. يمكنك إضافة ملاحظات الإغلاق أدناه.`
-    : `أنت على وشك تحديد فرصة "${opportunity.title}" كخسارة. يرجى تحديد سبب الخسارة أدناه.`;
+    ? lang === "ar" ? `أنت على وشك إغلاق فرصة "${opportunity.title}" بنجاح. يمكنك إضافة ملاحظات الإغلاق أدناه.` : `You are about to successfully close the opportunity "${opportunity.title}". You can add closing notes below.`
+    : lang === "ar" ? `أنت على وشك تحديد فرصة "${opportunity.title}" كخسارة. يرجى تحديد سبب الخسارة أدناه.` : `You are about to mark the opportunity "${opportunity.title}" as lost. Please specify the reason for the loss below.`;
 
   const handleConfirm = () => {
     onConfirm(reason);
@@ -38,27 +40,26 @@ export function TerminalMoveModal({ isOpen, onClose, opportunity, targetFlag, on
 
         <div className="flex flex-col gap-2">
           <label className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-            {isWon ? "ملاحظات إضافية (اختياري)" : "سبب الخسارة (مطلوب)"}
+            {isWon ? t.crm.additionalNotesOptional : t.crm.reasonForLossRequired}
           </label>
           <textarea
             className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-700 dark:text-white"
             rows={4}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder={isWon ? "اكتب ملاحظاتك هنا..." : "لماذا خسرنا هذه الفرصة؟"}
+            placeholder={isWon ? t.crm.writeYourCommentsHere : t.crm.whyDidWeLoseThisOpportuni}
           />
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="ghost" onClick={onClose}>
-            إلغاء
-          </Button>
+            {t.crm.cancellation}</Button>
           <Button 
             variant={isWon ? "primary" : "danger"} 
             onClick={handleConfirm}
             disabled={!isWon && reason.trim() === ""}
           >
-            تأكيد {isWon ? "الفوز" : "الخسارة"}
+            {t.crm.toBeSure}{isWon ? t.crm.winning : t.crm.loss}
           </Button>
         </div>
       </div>

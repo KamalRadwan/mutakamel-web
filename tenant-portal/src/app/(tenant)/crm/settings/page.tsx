@@ -10,8 +10,10 @@ import { Eye, Trash2, Sliders, Settings2, ShieldCheck } from "lucide-react";
 import { useCrmModuleSettings, CrmModuleSettingItem } from "./hooks/useCrmModuleSettings";
 import { CreateCrmModuleSettingsModal } from "./components/CreateCrmModuleSettingsModal";
 import { DeleteCrmModuleSettingsConfirmModal } from "./components/DeleteCrmModuleSettingsConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmModuleSettingsPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function CrmModuleSettingsPage() {
 
   const columns = [
     {
-      header: "اسم الإعداد",
+      header: t.crm.settingName,
       cell: (item: CrmModuleSettingItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
@@ -41,25 +43,25 @@ export default function CrmModuleSettingsPage() {
       ),
     },
     {
-      header: "القيمة المعينة",
+      header: t.crm.theAssignedValue,
       cell: (item: CrmModuleSettingItem) => (
         <span className="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">{item.value}</span>
       ),
     },
     {
-      header: "المجموعة",
+      header: t.crm.group,
       cell: (item: CrmModuleSettingItem) => (
         <Badge variant="info">{item.group.toUpperCase()}</Badge>
       ),
     },
     {
-      header: "الحالة",
+      header: t.crm.theCondition,
       cell: (item: CrmModuleSettingItem) => (
-        <Badge variant="success">نشط ومطبق</Badge>
+        <Badge variant="success">{t.crm.activeAndApplied}</Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: CrmModuleSettingItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/settings/${item.id}/general`}>
@@ -78,16 +80,16 @@ export default function CrmModuleSettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="إعدادات موديول إدارة العملاء (CRM General Settings)"
-        subtitle="تخصيص قواعد التوزيع الآلي، حدود الخصومات للمندوبين وخوادم البريد لموديول CRM"
-        actionLabel="إضافة إعداد جديد"
+        title={t.crm.cRMGeneralSettingsModule}
+        subtitle={t.crm.customizeAutomatedDistributi}
+        actionLabel={t.crm.addANewSetting}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث باسم الإعداد أو المفتاح أو القيمة..."
+        placeholder={t.crm.searchBySettingKeyOrVal}
       />
 
       <Table columns={columns} data={items} />

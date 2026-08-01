@@ -2,6 +2,7 @@
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { NoteAttachmentItem } from "../hooks/useCrmNotesAttachments";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -11,14 +12,15 @@ interface DeleteModalProps {
 }
 
 export function DeleteCrmNotesAttachmentsConfirmModal({ isOpen, item, onClose, onConfirm }: DeleteModalProps) {
+    const { t } = useI18n();
   return (
     <ConfirmModal
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
-      title="حذف الملاحظة والمرفق"
+      title={t.crm.deleteTheNoteAndAttachment}
       message={`هل أنت تأكد من حذف الملاحظة "${item?.title || ""}" والمرفق المقترن "${item?.attachmentName || ""}"؟`}
-      confirmText="حذف الملاحظة والمرفق"
+      confirmText={t.crm.deleteTheNoteAndAttachment}
       isDanger
     />
   );

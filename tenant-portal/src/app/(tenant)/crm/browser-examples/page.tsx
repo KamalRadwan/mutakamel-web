@@ -10,8 +10,10 @@ import { Eye, Trash2, Globe, Play, FileJson } from "lucide-react";
 import { useCrmBrowserExamples, BrowserExampleItem } from "./hooks/useCrmBrowserExamples";
 import { CreateCrmBrowserExamplesModal } from "./components/CreateCrmBrowserExamplesModal";
 import { DeleteCrmBrowserExamplesConfirmModal } from "./components/DeleteCrmBrowserExamplesConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmBrowserExamplesPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function CrmBrowserExamplesPage() {
 
   const columns = [
     {
-      header: "اسم النموذج",
+      header: t.crm.modelName,
       cell: (item: BrowserExampleItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400">
@@ -41,19 +43,19 @@ export default function CrmBrowserExamplesPage() {
       ),
     },
     {
-      header: "الكود المتوقع",
+      header: t.crm.expectedCode,
       cell: (item: BrowserExampleItem) => (
         <Badge variant={item.httpStatusExpected < 300 ? "success" : "warning"}>{item.httpStatusExpected} OK</Badge>
       ),
     },
     {
-      header: "البيئة",
+      header: t.crm.theEnvironment,
       cell: (item: BrowserExampleItem) => (
         <Badge variant={item.environment === "sandbox" ? "info" : "neutral"}>{item.environment.toUpperCase()}</Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: BrowserExampleItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/browser-examples/${item.id}/general`}>
@@ -72,16 +74,16 @@ export default function CrmBrowserExamplesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="أمثلة استدعاء المتصفح (Browser Calls & Sandbox Examples)"
-        subtitle="نماذج واختبارات حية لاختبار استدعاءات API من متصفح العميل لموديول CRM"
-        actionLabel="إضافة نموذج جديد"
+        title={t.crm.browserCallsSandboxExampl}
+        subtitle={t.crm.liveModelsAndTestsToTest}
+        actionLabel={t.crm.addANewForm}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث بالاسم أو المسار..."
+        placeholder={t.crm.searchByNameOrPath}
       />
 
       <Table columns={columns} data={items} />

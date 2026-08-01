@@ -11,30 +11,30 @@ import { DashboardFormDialog } from "@/features/crm/dashboards/components/dashbo
 const mockDashboards = [
   {
     id: "mega-crm-dashboard",
-    name: "لوحة التحليلات الشاملة (Mega CRM Dashboard)",
-    description: "لوحة فائقة البيانات تضم 22 ودجت بكافة أنواع الأشكال البيانية والمؤشرات والجدوال الجاهزة.",
+    name: "I18N_FALLBACK",
+    description: "I18N_FALLBACK",
     favorite: true,
     widgets: 22,
     isMega: true,
   },
   {
     id: "sales-overview",
-    name: "ملخص المبيعات (Sales Overview)",
-    description: "الأداء العام للمبيعات وحجم الصفقات الإجمالي.",
+    name: "I18N_FALLBACK",
+    description: "I18N_FALLBACK",
     favorite: true,
     widgets: 12,
   },
   {
     id: "marketing-campaigns",
-    name: "الحملات التسويقية (Marketing Campaigns)",
-    description: "تحليل استقطاب العملاء المحتملين ومعدل التحويل.",
+    name: "I18N_FALLBACK",
+    description: "I18N_FALLBACK",
     favorite: false,
     widgets: 8,
   },
   {
     id: "support-tickets",
-    name: "تذاكر الدعم والخدمة (Support Tickets)",
-    description: "معدل الالتزام باتفاقيات المستوى وفض النزاعات.",
+    name: "I18N_FALLBACK",
+    description: "I18N_FALLBACK",
     favorite: true,
     widgets: 5,
   },
@@ -57,10 +57,10 @@ export default function DashboardsIndexPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white" style={{ fontFamily: "Outfit, Inter, sans-serif" }}>
-            {isRtl ? "لوحات القيادة والتحليلات" : "CRM Dashboards"}
+            {isRtl ? "I18N_FALLBACK" : "CRM Dashboards"}
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            {isRtl ? "إدارة واستعراض جميع لوحات القيادة والمؤشرات المخصصة." : "Manage and customize your analytics dashboards."}
+            {isRtl ? "I18N_FALLBACK" : "Manage and customize your analytics dashboards."}
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export default function DashboardsIndexPage() {
             <Search className={`absolute ${isRtl ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400`} />
             <input
               type="text"
-              placeholder={isRtl ? "البحث في اللوحات..." : "Search dashboards..."}
+              placeholder={isRtl ? "I18N_FALLBACK" : "Search dashboards..."}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={`w-full ${isRtl ? "pr-10 pl-4" : "pl-10 pr-4"} py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500`}
@@ -77,7 +77,7 @@ export default function DashboardsIndexPage() {
           </div>
           <Button onClick={() => setIsNewOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 whitespace-nowrap">
             <Plus className="w-4 h-4" />
-            {isRtl ? "لوحة جديدة" : "New Dashboard"}
+            {isRtl ? "I18N_FALLBACK" : "New Dashboard"}
           </Button>
         </div>
       </div>
@@ -98,7 +98,7 @@ export default function DashboardsIndexPage() {
                 <div className="flex items-center gap-2">
                   {dash.isMega && (
                     <span className="text-[11px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 px-2 py-0.5 rounded-full">
-                      {isRtl ? "شاملة" : "Mega"}
+                      {isRtl ? "I18N_FALLBACK" : "Mega"}
                     </span>
                   )}
                   {dash.favorite && <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />}
@@ -114,10 +114,10 @@ export default function DashboardsIndexPage() {
 
               <div className="mt-4 pt-3 border-t dark:border-gray-800 flex justify-between items-center text-xs text-gray-500">
                 <span className="font-medium text-slate-700 dark:text-slate-300">
-                  {dash.widgets} {isRtl ? "ودجت ومؤشر" : "widgets"}
+                  {dash.widgets} {isRtl ? "I18N_FALLBACK" : "widgets"}
                 </span>
                 <span className="text-blue-600 dark:text-blue-400 font-medium group-hover:translate-x-1 transition-transform">
-                  {isRtl ? "فتح اللوحة ←" : "View Dashboard →"}
+                  {isRtl ? "I18N_FALLBACK" : "View Dashboard →"}
                 </span>
               </div>
             </div>

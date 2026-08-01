@@ -10,8 +10,10 @@ import { Eye, Trash2, Target, History, DollarSign } from "lucide-react";
 import { useOpportunitiesStageHistory, OpportunityItem } from "./hooks/useOpportunitiesStageHistory";
 import { CreateOpportunitiesStageHistoryModal } from "./components/CreateOpportunitiesStageHistoryModal";
 import { DeleteOpportunitiesStageHistoryConfirmModal } from "./components/DeleteOpportunitiesStageHistoryConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function OpportunitiesStageHistoryPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function OpportunitiesStageHistoryPage() {
 
   const columns = [
     {
-      header: "الفرصة التجارية والعميل",
+      header: t.crm.businessOpportunityAndClien,
       cell: (item: OpportunityItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
@@ -41,21 +43,21 @@ export default function OpportunitiesStageHistoryPage() {
       ),
     },
     {
-      header: "القيمة الموردة",
+      header: t.crm.suppliedValue,
       cell: (item: OpportunityItem) => (
         <span className="font-bold text-emerald-600">{item.amount} {item.currency}</span>
       ),
     },
     {
-      header: "المرحلة الحالية",
+      header: t.crm.currentStage,
       cell: (item: OpportunityItem) => (
         <Badge variant={item.status === "won" ? "success" : "info"}>{item.currentStage}</Badge>
       ),
     },
-    { header: "المرحلة السابقة", accessorKey: "previousStage" as keyof OpportunityItem },
-    { header: "المسؤول", accessorKey: "assignedOwner" as keyof OpportunityItem },
+    { header: t.crm.previousStage, accessorKey: "previousStage" as keyof OpportunityItem },
+    { header: t.crm.responsible, accessorKey: "assignedOwner" as keyof OpportunityItem },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: OpportunityItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/opportunities-stage-history/${item.id}/general`}>
@@ -74,16 +76,16 @@ export default function OpportunitiesStageHistoryPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="الفرص التجارية وسجل الانتقالات (Opportunities & Stage History)"
-        subtitle="إدارة الفرص المفتوحة والمغلقة، وتتبع الوقت المستغرق في كل مرحلة مبيعات"
-        actionLabel="إضافة فرصة جديدة"
+        title={t.crm.businessOpportunitiesAndTra}
+        subtitle={t.crm.manageOpenAndClosedOpportu}
+        actionLabel={t.crm.addANewOpportunity}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث بالعنوان، اسم العميل، أو المرحلة..."
+        placeholder={t.crm.searchByTitleClientName}
       />
 
       <Table columns={columns} data={items} />

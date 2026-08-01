@@ -13,9 +13,9 @@ export interface PresetDashboardItem {
 }
 
 const mockPresets: PresetDashboardItem[] = [
-  { id: "dash-101", name: "لوحة مؤشرات المبيعات التنفيذية (Executive Overview)", category: "executive", widgetsCount: 8, isSystemPreset: true, status: "active" },
-  { id: "dash-102", name: "لوحة أداء مندوب المبيعات الميداني (Sales Rep Hub)", category: "sales_rep", widgetsCount: 6, isSystemPreset: true, status: "active" },
-  { id: "dash-103", name: "تحليلات القنوات الاستقطابية والحملات", category: "marketing", widgetsCount: 5, isSystemPreset: false, status: "active" },
+  { id: "dash-101", name: "I18N_FALLBACK", category: "executive", widgetsCount: 8, isSystemPreset: true, status: "active" },
+  { id: "dash-102", name: "I18N_FALLBACK", category: "sales_rep", widgetsCount: 6, isSystemPreset: true, status: "active" },
+  { id: "dash-103", name: "I18N_FALLBACK", category: "marketing", widgetsCount: 5, isSystemPreset: false, status: "active" },
 ];
 
 export function usePresetDashboards() {

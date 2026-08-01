@@ -16,8 +16,8 @@ export interface NoteAttachmentItem {
 }
 
 const mockNotes: NoteAttachmentItem[] = [
-  { id: "note-101", title: "ملاحظات الاجتماع الأخير وعرض الأسعار الفني", targetType: "deal", targetName: "صفقة مستشفى الحياة", noteContent: "تم الاتفاق على تقديم خصم 5% مقابل السداد المباشر", attachmentName: "Technical_Proposal_v2.pdf", fileSize: "2.4 MB", createdBy: "أحمد محمود", createdAt: "2026-07-22" },
-  { id: "note-102", title: "السجل التجاري والشهادات الضريبية للعميل", targetType: "customer", targetName: "شركة الأمل للتوريدات", noteContent: "مرفق السجل التجاري المحدث الصادر من وزارة التجارة", attachmentName: "Commercial_CR_2026.pdf", fileSize: "1.1 MB", createdBy: "منى علي", createdAt: "2026-07-24" },
+  { id: "note-101", title: "I18N_FALLBACK", targetType: "deal", targetName: "I18N_FALLBACK", noteContent: "I18N_FALLBACK", attachmentName: "Technical_Proposal_v2.pdf", fileSize: "2.4 MB", createdBy: "I18N_FALLBACK", createdAt: "2026-07-22" },
+  { id: "note-102", title: "I18N_FALLBACK", targetType: "customer", targetName: "I18N_FALLBACK", noteContent: "I18N_FALLBACK", attachmentName: "Commercial_CR_2026.pdf", fileSize: "1.1 MB", createdBy: "I18N_FALLBACK", createdAt: "2026-07-24" },
 ];
 
 export function useCrmNotesAttachments() {

@@ -17,9 +17,9 @@ export interface OpportunityItem {
 }
 
 const mockOpps: OpportunityItem[] = [
-  { id: "opp-201", title: "توريد وتطوير النظام الطبي المتكامل", customerName: "شركة الأمل للتوريدات الطبية", amount: "450,000.00", currency: "SAR", currentStage: "المفاوضات النهائية", previousStage: "تقديم العرض الفني", assignedOwner: "أحمد محمود", expectedCloseDate: "2026-08-15", status: "open" },
-  { id: "opp-202", title: "ترخيص وتخصيص البوابة السحابية", customerName: "مجموعة الأفق التقنية", amount: "820,000.00", currency: "SAR", currentStage: "صفقة ناجحة (Won)", previousStage: "المفاوضات النهائية", assignedOwner: "منى علي", expectedCloseDate: "2026-07-20", status: "won" },
-  { id: "opp-203", title: "عقد صيانة الخوادم السنوية", customerName: "مؤسسة الرواد اللوجستية", amount: "120,000.00", currency: "SAR", currentStage: "تم التواصل والتأهيل", previousStage: "عميل محتمل جديد", assignedOwner: "أحمد محمود", expectedCloseDate: "2026-09-01", status: "open" },
+  { id: "opp-201", title: "I18N_FALLBACK", customerName: "I18N_FALLBACK", amount: "450,000.00", currency: "SAR", currentStage: "I18N_FALLBACK", previousStage: "I18N_FALLBACK", assignedOwner: "I18N_FALLBACK", expectedCloseDate: "2026-08-15", status: "open" },
+  { id: "opp-202", title: "I18N_FALLBACK", customerName: "I18N_FALLBACK", amount: "820,000.00", currency: "SAR", currentStage: "I18N_FALLBACK", previousStage: "I18N_FALLBACK", assignedOwner: "I18N_FALLBACK", expectedCloseDate: "2026-07-20", status: "won" },
+  { id: "opp-203", title: "I18N_FALLBACK", customerName: "I18N_FALLBACK", amount: "120,000.00", currency: "SAR", currentStage: "I18N_FALLBACK", previousStage: "I18N_FALLBACK", assignedOwner: "I18N_FALLBACK", expectedCloseDate: "2026-09-01", status: "open" },
 ];
 
 export function useOpportunitiesStageHistory() {

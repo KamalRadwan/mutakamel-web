@@ -10,8 +10,10 @@ import { Eye, Trash2, LayoutGrid, BarChart2, PieChart } from "lucide-react";
 import { useCrmDashboardBuilder, WidgetItem } from "./hooks/useCrmDashboardBuilder";
 import { CreateCrmDashboardBuilderModal } from "./components/CreateCrmDashboardBuilderModal";
 import { DeleteCrmDashboardBuilderConfirmModal } from "./components/DeleteCrmDashboardBuilderConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmDashboardBuilderPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function CrmDashboardBuilderPage() {
 
   const columns = [
     {
-      header: "اسم الـ Widget",
+      header: t.crm.widgetName,
       cell: (item: WidgetItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
@@ -41,22 +43,22 @@ export default function CrmDashboardBuilderPage() {
       ),
     },
     {
-      header: "نوع العرض Visual",
+      header: t.crm.displayTypeVisual,
       cell: (item: WidgetItem) => (
         <Badge variant="info">{item.type.toUpperCase()}</Badge>
       ),
     },
-    { header: "التحديث الآلي", accessorKey: "refreshInterval" as keyof WidgetItem },
+    { header: t.crm.automatedUpdate, accessorKey: "refreshInterval" as keyof WidgetItem },
     {
-      header: "افتراضي؟",
+      header: t.crm.hypothetical,
       cell: (item: WidgetItem) => (
         <Badge variant={item.isDefault ? "success" : "neutral"}>
-          {item.isDefault ? "في اللوحة الرئيسية" : "مخصص"}
+          {item.isDefault ? t.crm.onTheMainBoard : t.crm.custom}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: WidgetItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/dashboard-builder-widgets/${item.id}/general`}>
@@ -75,16 +77,16 @@ export default function CrmDashboardBuilderPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="مخصص لوحة التحليلات والودجتس (Dashboard Builder & Widgets)"
-        subtitle="بناء وتخصيص المؤشرات البيانية ومصفوفات الأداء التفاعلية لموديول CRM"
-        actionLabel="إضافة Widget جديد"
+        title={t.crm.customDashboardBuilderWid}
+        subtitle={t.crm.buildAndCustomizeGraphical}
+        actionLabel={t.crm.addNewWidget}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث باسم الـ Widget أو المقياس..."
+        placeholder={t.crm.searchByTheNameOfTheWidg}
       />
 
       <Table columns={columns} data={items} />

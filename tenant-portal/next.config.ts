@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true, // as requested to save RAM during dev
   },
+  webpack: (config) => {
+    config.watchOptions = {
+      ...config.watchOptions,
+      poll: false,
+      ignored: ['**/node_modules', '**/.git', '**/.next'],
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

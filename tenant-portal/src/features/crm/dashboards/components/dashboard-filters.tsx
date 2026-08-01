@@ -23,7 +23,7 @@ export function DashboardFilters({ dashboard }: DashboardFiltersProps) {
     <div className={`w-full p-4 border-b dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 flex flex-wrap items-center gap-4 ${isRtl ? "rtl" : "ltr"}`} dir={isRtl ? "rtl" : "ltr"}>
       <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
         <Filter className="w-4 h-4" />
-        {isRtl ? "التصنيفات:" : "Filters:"}
+        {isRtl ? "Categories:" : "Filters:"}
       </div>
 
       {Object.entries(dashboard.defaultFilters).map(([key, filterSpec]: [string, any]) => (
@@ -37,7 +37,7 @@ export function DashboardFilters({ dashboard }: DashboardFiltersProps) {
               value={filters[key] || ""}
               onChange={(e) => setFilters({ ...filters, [key]: e.target.value })}
             >
-              <option value="">{isRtl ? "الكل" : "All"}</option>
+              <option value="">{isRtl ? "everyone" : "All"}</option>
               {filterSpec.options?.map((opt: any) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
@@ -48,7 +48,7 @@ export function DashboardFilters({ dashboard }: DashboardFiltersProps) {
               <input 
                 type="text" 
                 className="text-sm border-none bg-transparent focus:ring-0 p-0 w-24 placeholder-gray-400 font-medium text-gray-900 dark:text-gray-100"
-                placeholder={isRtl ? "بحث..." : "Search..."}
+                placeholder={isRtl ? "research..." : "Search..."}
                 value={filters[key] || ""}
                 onChange={(e) => setFilters({ ...filters, [key]: e.target.value })}
               />
@@ -62,7 +62,7 @@ export function DashboardFilters({ dashboard }: DashboardFiltersProps) {
           onClick={() => setFilters({})}
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
         >
-          {isRtl ? "مسح التصنيفات" : "Clear filters"}
+          {isRtl ? "Clear classifications" : "Clear filters"}
         </button>
       )}
     </div>

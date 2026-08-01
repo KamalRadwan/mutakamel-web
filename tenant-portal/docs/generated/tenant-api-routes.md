@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-07-25T10:33:32.546Z**
+Generated at: **2026-07-29T05:28:05.220Z**
 
 Frontend revision: `236bb35e6637+dirty`
 
-Backend revision: `12071ad1df73+dirty`
+Backend revision: `e2a7582ee1ee+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -17,10 +17,10 @@ canonical Gateway path mappings.
 
 | App | Routes |
 | --- | ---: |
-| core | 198 |
+| core | 200 |
 | crm | 137 |
 | trade | 226 |
-| **Total** | **561** |
+| **Total** | **563** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -43,6 +43,8 @@ Machine-readable source:
 | core | POST | `/api/tenant/core/v1/activities/:id/complete` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.activities.complete` |
 | core | GET | `/api/tenant/core/v1/activities/assignees` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.activities.assignees` |
 | core | GET | `/api/tenant/core/v1/activity-types` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.activities.types` |
+| core | GET | `/api/tenant/core/v1/audit` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.audit.list` |
+| core | GET | `/api/tenant/core/v1/audit/entities/:entityType/:entityId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.audit.entity-history` |
 | core | POST | `/api/tenant/core/v1/auth/accept-invite` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.accept-invite` |
 | core | POST | `/api/tenant/core/v1/auth/forgot-password` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.forgot-password` |
 | core | POST | `/api/tenant/core/v1/auth/login` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.login` |

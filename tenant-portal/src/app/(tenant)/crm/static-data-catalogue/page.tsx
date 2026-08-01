@@ -10,8 +10,10 @@ import { Eye, Trash2, Database, BookOpen, Layers } from "lucide-react";
 import { useCrmStaticCatalogue, StaticCatalogueItem } from "./hooks/useCrmStaticCatalogue";
 import { CreateCrmStaticCatalogueModal } from "./components/CreateCrmStaticCatalogueModal";
 import { DeleteCrmStaticCatalogueConfirmModal } from "./components/DeleteCrmStaticCatalogueConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmStaticCataloguePage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function CrmStaticCataloguePage() {
 
   const columns = [
     {
-      header: "اسم الكتالوج المرجعي",
+      header: t.crm.referenceCatalogName,
       cell: (item: StaticCatalogueItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -35,33 +37,33 @@ export default function CrmStaticCataloguePage() {
           </div>
           <div>
             <p className="font-bold text-slate-900 dark:text-slate-100">{item.catalogName}</p>
-            <p className="text-[11px] text-slate-400">آخر تحديث: {item.lastUpdated}</p>
+            <p className="text-[11px] text-slate-400">{t.crm.latestUpdate}{item.lastUpdated}</p>
           </div>
         </div>
       ),
     },
     {
-      header: "التصنيف",
+      header: t.crm.classification,
       cell: (item: StaticCatalogueItem) => (
         <Badge variant="info">{item.category.toUpperCase()}</Badge>
       ),
     },
     {
-      header: "عدد المخلات المرجعية",
+      header: t.crm.numberOfReferenceScraps,
       cell: (item: StaticCatalogueItem) => (
-        <span className="font-bold text-slate-900 dark:text-slate-100">{item.entriesCount} عنصر</span>
+        <span className="font-bold text-slate-900 dark:text-slate-100">{item.entriesCount} {t.crm.component}</span>
       ),
     },
     {
-      header: "الحالة",
+      header: t.crm.theCondition,
       cell: (item: StaticCatalogueItem) => (
         <Badge variant={item.status === "synced" ? "success" : "neutral"}>
-          {item.status === "synced" ? "متزامن مع Core" : "مخصص محلياً"}
+          {item.status === "synced" ? t.crm.synchronizedWithCore : t.crm.customizedLocally}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: StaticCatalogueItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/static-data-catalogue/${item.id}/general`}>
@@ -80,16 +82,16 @@ export default function CrmStaticCataloguePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="كتالوج البيانات الثابتة والمرجعيات (Static Data Catalogue)"
-        subtitle="إدارة وتغذية القوائم المرجعية لقطاعات الأعمال، أسباب الخسارة، والعملات المعتمدة في الـ CRM"
-        actionLabel="إضافة كتالوج جديد"
+        title={t.crm.staticDataCatalogAndRefere}
+        subtitle={t.crm.managingAndFeedingChecklist}
+        actionLabel={t.crm.addANewCatalog}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث باسم الكتالوج أو التصنيف..."
+        placeholder={t.crm.searchByCatalogNameOrCate}
       />
 
       <Table columns={columns} data={items} />

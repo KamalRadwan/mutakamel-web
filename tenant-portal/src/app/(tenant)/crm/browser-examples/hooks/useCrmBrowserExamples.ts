@@ -13,8 +13,8 @@ export interface BrowserExampleItem {
 }
 
 const mockBrowserExamples: BrowserExampleItem[] = [
-  { id: "ex-crm-01", name: "نموذج تسجيل زائر من الموقع (Web-to-Lead)", targetEndpoint: "/api/tenant/crm/v1/leads/public", samplePayload: '{"name":"أحمد", "phone":"+966500000000"}', httpStatusExpected: 201, environment: "sandbox" },
-  { id: "ex-crm-02", name: "طلب استعلام رصيد العقد والصفقة", targetEndpoint: "/api/tenant/crm/v1/deals/check", samplePayload: '{"dealId":"dl-992"}', httpStatusExpected: 200, environment: "sandbox" },
+  { id: "ex-crm-01", name: "I18N_FALLBACK", targetEndpoint: "/api/tenant/crm/v1/leads/public", samplePayload: "I18N_FALLBACK", httpStatusExpected: 201, environment: "sandbox" },
+  { id: "ex-crm-02", name: "I18N_FALLBACK", targetEndpoint: "/api/tenant/crm/v1/deals/check", samplePayload: '{"dealId":"dl-992"}', httpStatusExpected: 200, environment: "sandbox" },
 ];
 
 export function useCrmBrowserExamples() {

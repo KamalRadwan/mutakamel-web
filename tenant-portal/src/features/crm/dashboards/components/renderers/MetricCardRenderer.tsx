@@ -62,7 +62,7 @@ export function MetricCardRenderer({ widget, result, onClick }: MetricCardRender
               <span dir="ltr">{Math.abs(percentChange).toFixed(1)}%</span>
             </div>
             <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              {isRtl ? "مقارنة بالفترة السابقة" : "vs previous"}
+              {isRtl ? "Compared to the previous period" : "vs previous"}
             </span>
           </div>
         )}

@@ -47,7 +47,7 @@ export function TableRenderer({ widget, result }: TableRendererProps) {
           className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
         >
           <Download className="w-3.5 h-3.5" />
-          {isRtl ? "تصدير CSV" : "Export CSV"}
+          {isRtl ? "CSV export" : "Export CSV"}
         </button>
       </div>
 
@@ -55,9 +55,9 @@ export function TableRenderer({ widget, result }: TableRendererProps) {
         <table className="w-full text-start text-slate-700 dark:text-slate-300 relative border-collapse">
           <thead className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-50/90 dark:bg-slate-800/90 sticky top-0 z-10 border-b border-slate-200/60 dark:border-slate-700/60 backdrop-blur-md">
             <tr>
-              <th className="px-4 py-2.5 text-start font-bold">{isRtl ? "الاسم" : "Name"}</th>
-              <th className="px-4 py-2.5 text-start font-bold">{isRtl ? "القيمة" : "Value"}</th>
-              <th className="px-4 py-2.5 text-start font-bold">{isRtl ? "الحالة" : "Status"}</th>
+              <th className="px-4 py-2.5 text-start font-bold">{isRtl ? "the name" : "Name"}</th>
+              <th className="px-4 py-2.5 text-start font-bold">{isRtl ? "Value" : "Value"}</th>
+              <th className="px-4 py-2.5 text-start font-bold">{isRtl ? "the condition" : "Status"}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100/50 dark:divide-slate-800/50">

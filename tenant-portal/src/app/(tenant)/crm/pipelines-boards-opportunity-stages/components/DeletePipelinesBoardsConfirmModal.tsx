@@ -2,6 +2,7 @@
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { PipelineBoardItem } from "../hooks/usePipelinesBoards";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -11,14 +12,15 @@ interface DeleteModalProps {
 }
 
 export function DeletePipelinesBoardsConfirmModal({ isOpen, item, onClose, onConfirm }: DeleteModalProps) {
+    const { t } = useI18n();
   return (
     <ConfirmModal
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
-      title="حذف مسار المبيعات"
+      title={t.crm.deleteSalesFunnel}
       message={`هل أنت تأكد من حذف مسار المبيعات "${item?.name || ""}"؟`}
-      confirmText="حذف المسار"
+      confirmText={t.crm.deletePath}
       isDanger
     />
   );

@@ -14,9 +14,9 @@ export interface CrmModuleSettingItem {
 }
 
 const mockCrmSettings: CrmModuleSettingItem[] = [
-  { id: "set-crm-1", settingName: "سياسة التوزيع التلقائي للعملاء المحتملين (Round-Robin)", key: "crm.auto_lead_routing", value: "Enabled (Balanced)", group: "lead_routing", updatedAt: "2026-07-20", status: "active" },
-  { id: "set-crm-2", settingName: "حد الخصم الأقصى لمسؤولي المبيعات دون موافقة", key: "crm.max_sales_rep_discount", value: "10.00%", group: "deal_limits", updatedAt: "2026-07-22", status: "active" },
-  { id: "set-crm-3", settingName: "خادم إرسال رسائل الـ CRM (SMTP Integration)", key: "crm.smtp_gateway", value: "smtp.mutakamel.ai:587", group: "email_integration", updatedAt: "2026-07-24", status: "active" },
+  { id: "set-crm-1", settingName: "I18N_FALLBACK", key: "crm.auto_lead_routing", value: "Enabled (Balanced)", group: "lead_routing", updatedAt: "2026-07-20", status: "active" },
+  { id: "set-crm-2", settingName: "I18N_FALLBACK", key: "crm.max_sales_rep_discount", value: "10.00%", group: "deal_limits", updatedAt: "2026-07-22", status: "active" },
+  { id: "set-crm-3", settingName: "I18N_FALLBACK", key: "crm.smtp_gateway", value: "smtp.mutakamel.ai:587", group: "email_integration", updatedAt: "2026-07-24", status: "active" },
 ];
 
 export function useCrmModuleSettings() {

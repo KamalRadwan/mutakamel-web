@@ -10,8 +10,10 @@ import { Eye, Trash2, Code2, Server, CheckCircle2 } from "lucide-react";
 import { useCrmApiDocs, ApiDocItem } from "./hooks/useCrmApiDocs";
 import { CreateCrmApiDocsModal } from "./components/CreateCrmApiDocsModal";
 import { DeleteCrmApiDocsConfirmModal } from "./components/DeleteCrmApiDocsConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmApiDocsPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function CrmApiDocsPage() {
 
   const columns = [
     {
-      header: "عنوان API",
+      header: t.crm.aPIAddress,
       cell: (item: ApiDocItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
@@ -41,33 +43,33 @@ export default function CrmApiDocsPage() {
       ),
     },
     {
-      header: "التطبيق الخلفي (App)",
+      header: t.crm.backEndApplication,
       cell: (item: ApiDocItem) => (
         <Badge variant="neutral">{item.owningBackendApp}</Badge>
       ),
     },
     {
-      header: "فئة DTO Validation",
+      header: t.crm.dTOValidationClass,
       cell: (item: ApiDocItem) => (
         <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{item.dtoValidation}</span>
       ),
     },
     {
-      header: "تاريخ المطابقة",
+      header: t.crm.matchDate,
       cell: (item: ApiDocItem) => (
         <span className="text-xs text-slate-500">{item.verificationDate}</span>
       ),
     },
     {
-      header: "الحالة",
+      header: t.crm.theCondition,
       cell: (item: ApiDocItem) => (
         <Badge variant={item.status === "verified" ? "success" : "warning"}>
-          {item.status === "verified" ? "مطابق للمواصفات" : "مسودة"}
+          {item.status === "verified" ? t.crm.conformsToSpecifications : t.crm.draft}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: ApiDocItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/api-documentation/${item.id}/general`}>
@@ -86,16 +88,16 @@ export default function CrmApiDocsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="توثيق واجهات CRM (CRM API Documentation)"
-        subtitle="سجل وثائق عقد الواجهات البرمجية والتأكد من مطابقة الـ DTO لخدمات موديول إدارة العملاء"
-        actionLabel="إضافة توثيق API"
+        title={t.crm.cRMAPIDocumentation}
+        subtitle={t.crm.recordAPIContractDocuments}
+        actionLabel={t.crm.addAPIDocumentation}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث بالعنوان، المسار، أو اسم الـ DTO..."
+        placeholder={t.crm.searchByTitlePathOrName}
       />
 
       <Table columns={columns} data={items} />

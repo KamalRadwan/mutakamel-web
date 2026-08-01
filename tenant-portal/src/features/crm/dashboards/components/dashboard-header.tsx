@@ -56,7 +56,7 @@ export function DashboardHeader({ dashboard, onRefresh, onEditClick, onShareClic
           <>
             <Button variant="secondary" className="gap-2 text-gray-600 dark:text-gray-300">
               <Calendar className="w-4 h-4" />
-              {isRtl ? "هذا الشهر" : "This Month"}
+              {isRtl ? "This month" : "This Month"}
             </Button>
             
             <Button variant="secondary" onClick={onRefresh} disabled={isRefreshing} className="text-gray-600 dark:text-gray-300">
@@ -64,18 +64,18 @@ export function DashboardHeader({ dashboard, onRefresh, onEditClick, onShareClic
             </Button>
 
             <Button variant="secondary" onClick={onShareClick} className="gap-2 text-gray-600 dark:text-gray-300">
-              {isRtl ? "مشاركة" : "Share"}
+              {isRtl ? "sharing" : "Share"}
             </Button>
 
             <Button variant="secondary" className="gap-2 text-gray-600 dark:text-gray-300">
               <Download className="w-4 h-4" />
-              {isRtl ? "تصدير" : "Export"}
+              {isRtl ? "export" : "Export"}
             </Button>
 
             {dashboard.accessLevel === "EDIT" && (
               <Button onClick={() => setEditMode(true)} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
                 <Edit className="w-4 h-4" />
-                {isRtl ? "تعديل اللوحة" : "Edit Dashboard"}
+                {isRtl ? "Modify the panel" : "Edit Dashboard"}
               </Button>
             )}
           </>
@@ -83,17 +83,17 @@ export function DashboardHeader({ dashboard, onRefresh, onEditClick, onShareClic
           <>
             <Button variant="secondary" onClick={onEditClick} className="gap-2">
               <Settings className="w-4 h-4" />
-              {isRtl ? "خصائص اللوحة" : "Properties"}
+              {isRtl ? "Panel properties" : "Properties"}
             </Button>
 
             <Button variant="ghost" onClick={handleCancel} className="gap-2 text-gray-500 hover:text-red-600">
               <X className="w-4 h-4" />
-              {isRtl ? "إلغاء والتراجع" : "Cancel"}
+              {isRtl ? "Cancel and undo" : "Cancel"}
             </Button>
 
             <Button onClick={handleSave} disabled={!isDirty} className={`gap-2 ${isDirty ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-100 text-gray-400"}`}>
               <Save className="w-4 h-4" />
-              {isRtl ? "حفظ التغييرات" : "Save Changes"}
+              {isRtl ? "Save changes" : "Save Changes"}
             </Button>
           </>
         )}

@@ -10,8 +10,10 @@ import { Eye, Trash2, FileCheck, ShieldCheck, Braces } from "lucide-react";
 import { useCommonBrowserContract, BrowserContractRuleItem } from "./hooks/useCommonBrowserContract";
 import { CreateCommonBrowserContractModal } from "./components/CreateCommonBrowserContractModal";
 import { DeleteCommonBrowserContractConfirmModal } from "./components/DeleteCommonBrowserContractConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CommonBrowserContractPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function CommonBrowserContractPage() {
 
   const columns = [
     {
-      header: "اسم القاعدة العقدية",
+      header: t.crm.nameOfTheNodalRule,
       cell: (item: BrowserContractRuleItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400">
@@ -41,25 +43,25 @@ export default function CommonBrowserContractPage() {
       ),
     },
     {
-      header: "تصنيف الخطأ",
+      header: t.crm.errorClassification,
       cell: (item: BrowserContractRuleItem) => (
         <Badge variant="neutral">{item.errorCategory}</Badge>
       ),
     },
     {
-      header: "كود الاستجابة HTTP",
+      header: t.crm.hTTPResponseCode,
       cell: (item: BrowserContractRuleItem) => (
         <Badge variant={item.statusCode === 200 ? "success" : "warning"}>{item.statusCode}</Badge>
       ),
     },
     {
-      header: "الحالة",
+      header: t.crm.theCondition,
       cell: (item: BrowserContractRuleItem) => (
-        <Badge variant="success">مفعل وإلزامي</Badge>
+        <Badge variant="success">{t.crm.enabledAndMandatory}</Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: BrowserContractRuleItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/common-browser-contract/${item.id}/general`}>
@@ -78,16 +80,16 @@ export default function CommonBrowserContractPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="عقد استجابات المتصفح الموحد (Common Browser Contract)"
-        subtitle="توثيق معايير الهيكل الموحد لجميع استجابات الـ Envelope الخاصة بالعميل وموديول الـ CRM"
-        actionLabel="تعريف قاعدة جديدة"
+        title={t.crm.commonBrowserContract}
+        subtitle={t.crm.documentingTheUnifiedStruct}
+        actionLabel={t.crm.defineANewRule}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث باسم القاعدة أو الهيكل..."
+        placeholder={t.crm.searchByNameOfBaseOrStru}
       />
 
       <Table columns={columns} data={items} />

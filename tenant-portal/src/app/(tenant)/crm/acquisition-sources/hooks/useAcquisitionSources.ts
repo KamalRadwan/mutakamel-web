@@ -13,9 +13,9 @@ export interface AcquisitionSourceItem {
 }
 
 const mockSources: AcquisitionSourceItem[] = [
-  { id: "src-1", name: "إعلانات جوجل ورصيد البحث (Google Ads)", channelType: "digital", totalLeadsCount: 1420, conversionRate: "18.4%", status: "active" },
-  { id: "src-2", name: "معرض الصحة والتكنولوجيا الرياض 2026", channelType: "event", totalLeadsCount: 320, conversionRate: "24.1%", status: "active" },
-  { id: "src-3", name: "التوصيات المباشرة للشركاء (Referrals)", channelType: "referral", totalLeadsCount: 88, conversionRate: "42.0%", status: "active" },
+  { id: "src-1", name: "I18N_FALLBACK", channelType: "digital", totalLeadsCount: 1420, conversionRate: "18.4%", status: "active" },
+  { id: "src-2", name: "I18N_FALLBACK", channelType: "event", totalLeadsCount: 320, conversionRate: "24.1%", status: "active" },
+  { id: "src-3", name: "I18N_FALLBACK", channelType: "referral", totalLeadsCount: 88, conversionRate: "42.0%", status: "active" },
 ];
 
 export function useAcquisitionSources() {

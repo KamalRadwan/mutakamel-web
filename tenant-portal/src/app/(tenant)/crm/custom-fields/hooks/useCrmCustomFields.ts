@@ -14,9 +14,9 @@ export interface CustomFieldItem {
 }
 
 const mockCustomFields: CustomFieldItem[] = [
-  { id: "cf-101", label: "ميزانية العميل المتوقعة", key: "expected_budget", targetEntity: "lead", fieldType: "number", isRequired: true, status: "active" },
-  { id: "cf-102", label: "نوع الترخيص الطبي المطلوبة", key: "medical_license_type", targetEntity: "organization", fieldType: "select", isRequired: false, status: "active" },
-  { id: "cf-103", label: "تاريخ الافتتاح المستهدف", key: "target_opening_date", targetEntity: "deal", fieldType: "date", isRequired: false, status: "active" },
+  { id: "cf-101", label: "I18N_FALLBACK", key: "expected_budget", targetEntity: "lead", fieldType: "number", isRequired: true, status: "active" },
+  { id: "cf-102", label: "I18N_FALLBACK", key: "medical_license_type", targetEntity: "organization", fieldType: "select", isRequired: false, status: "active" },
+  { id: "cf-103", label: "I18N_FALLBACK", key: "target_opening_date", targetEntity: "deal", fieldType: "date", isRequired: false, status: "active" },
 ];
 
 export function useCrmCustomFields() {

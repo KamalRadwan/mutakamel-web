@@ -39,24 +39,24 @@ export function DashboardFormDialog({ open, onOpenChange, defaultValues, onSubmi
     onOpenChange(false);
   };
 
-  const title = defaultValues?.name ? (isRtl ? "تعديل اللوحة" : "Edit Dashboard") : (isRtl ? "لوحة جديدة" : "New Dashboard");
+  const title = defaultValues?.name ? (isRtl ? "Modify the panel" : "Edit Dashboard") : (isRtl ? "New plate" : "New Dashboard");
 
   return (
     <Modal isOpen={open} onClose={() => onOpenChange(false)} title={title}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4" dir={isRtl ? "rtl" : "ltr"}>
         <div className="space-y-2">
-          <label className="text-sm font-medium">{isRtl ? "الاسم" : "Name"}</label>
-          <Input {...form.register("name")} placeholder={isRtl ? "مثال: مبيعات الربع الأول" : "e.g. Q1 Sales"} />
+          <label className="text-sm font-medium">{isRtl ? "the name" : "Name"}</label>
+          <Input {...form.register("name")} placeholder={isRtl ? "Example: first quarter sales" : "e.g. Q1 Sales"} />
           {form.formState.errors.name && (
             <p className="text-xs text-red-500">{form.formState.errors.name.message}</p>
           )}
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">{isRtl ? "الوصف" : "Description"}</label>
+          <label className="text-sm font-medium">{isRtl ? "Description" : "Description"}</label>
           <textarea 
             {...form.register("description")} 
-            placeholder={isRtl ? "وصف اختياري" : "Optional description"} 
+            placeholder={isRtl ? "Optional description" : "Optional description"} 
             className="flex min-h-[80px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:placeholder:text-slate-400 dark:focus-visible:ring-blue-800 resize-none h-24" 
           />
           {form.formState.errors.description && (
@@ -66,10 +66,10 @@ export function DashboardFormDialog({ open, onOpenChange, defaultValues, onSubmi
 
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-            {isRtl ? "إلغاء" : "Cancel"}
+            {isRtl ? "cancellation" : "Cancel"}
           </Button>
           <Button type="submit" disabled={form.formState.isSubmitting}>
-            {isRtl ? "حفظ" : "Save"}
+            {isRtl ? "save" : "Save"}
           </Button>
         </div>
       </form>

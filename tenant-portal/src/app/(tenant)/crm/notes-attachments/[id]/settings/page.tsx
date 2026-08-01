@@ -2,19 +2,21 @@
 
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function NoteSettingsPage() {
+    const { t } = useI18n();
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 max-w-xl">
-      <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">سياسة صلاحيات الوصول للملاحظة</h2>
+      <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">{t.crm.noteAccessPolicy}</h2>
       <Select
-        label="مستوى الخصوصية"
+        label={t.crm.privacyLevel}
         options={[
-          { label: "عامة لفريق المبيعات (Public)", value: "public" },
-          { label: "خاصة بالمُنشئ فقط (Private)", value: "private" },
+          { label: t.crm.generalForTheSalesTeamPu, value: "public" },
+          { label: t.crm.privateForTheCreatorOnly, value: "private" },
         ]}
       />
-      <Button variant="secondary">حفظ الخصوصية</Button>
+      <Button variant="secondary">{t.crm.savePrivacy}</Button>
     </div>
   );
 }

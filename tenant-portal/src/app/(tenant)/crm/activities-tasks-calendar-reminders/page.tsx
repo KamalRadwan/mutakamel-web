@@ -10,8 +10,10 @@ import { Eye, Trash2, Calendar, Clock, CheckCircle } from "lucide-react";
 import { useCrmActivitiesTasks, CrmTaskItem } from "./hooks/useCrmActivitiesTasks";
 import { CreateCrmActivitiesTasksModal } from "./components/CreateCrmActivitiesTasksModal";
 import { DeleteCrmActivitiesTasksConfirmModal } from "./components/DeleteCrmActivitiesTasksConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmActivitiesTasksPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,7 +29,7 @@ export default function CrmActivitiesTasksPage() {
 
   const columns = [
     {
-      header: "موضوع المهمة",
+      header: t.crm.taskTopic,
       cell: (item: CrmTaskItem) => (
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
@@ -41,24 +43,24 @@ export default function CrmActivitiesTasksPage() {
       ),
     },
     {
-      header: "النوع",
+      header: t.crm.type,
       cell: (item: CrmTaskItem) => (
         <Badge variant={item.taskType === "demo" ? "info" : item.taskType === "meeting" ? "success" : "neutral"}>
           {item.taskType.toUpperCase()}
         </Badge>
       ),
     },
-    { header: "التاريخ والوقت", accessorKey: "dueDate" as keyof CrmTaskItem },
+    { header: t.crm.dateAndTime, accessorKey: "dueDate" as keyof CrmTaskItem },
     {
-      header: "الحالة",
+      header: t.crm.theCondition,
       cell: (item: CrmTaskItem) => (
         <Badge variant={item.status === "done" ? "success" : "warning"}>
-          {item.status === "done" ? "منجزة" : "قيد المتابعة"}
+          {item.status === "done" ? t.crm.completed : t.crm.underFollowUp}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: CrmTaskItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/activities-tasks-calendar-reminders/${item.id}/general`}>
@@ -77,16 +79,16 @@ export default function CrmActivitiesTasksPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="أنشطة الـ CRM والتقويم الإداري (Activities & Calendar)"
-        subtitle="جدولة مواعيد الاجتماعات، المكالمات، عروض الـ Demo، والتنبيهات المباشرة للعملاء"
-        actionLabel="جدولة مهمة جديدة"
+        title={t.crm.cRMActivitiesAndAdministrat}
+        subtitle={t.crm.schedulingMeetingsCallsDe}
+        actionLabel={t.crm.scheduleANewTask}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث بالموضوع أو اسم العميل..."
+        placeholder={t.crm.searchBySubjectOrCustomer}
       />
 
       <Table columns={columns} data={items} />

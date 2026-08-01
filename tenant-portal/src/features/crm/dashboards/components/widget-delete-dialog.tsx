@@ -30,7 +30,7 @@ export function WidgetDeleteDialog({ open, onOpenChange, widget, onConfirm }: Wi
     }
   };
 
-  const title = isRtl ? "حذف التطبيق المصغر" : "Delete Widget";
+  const title = isRtl ? "Delete the widget" : "Delete Widget";
 
   return (
     <Modal isOpen={open} onClose={() => onOpenChange(false)} title={title}>
@@ -43,10 +43,10 @@ export function WidgetDeleteDialog({ open, onOpenChange, widget, onConfirm }: Wi
 
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={isDeleting}>
-            {isRtl ? "إلغاء" : "Cancel"}
+            {isRtl ? "cancellation" : "Cancel"}
           </Button>
           <Button type="button" variant="danger" onClick={handleDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white">
-            {isDeleting ? (isRtl ? "جاري الحذف..." : "Deleting...") : (isRtl ? "نعم، احذف" : "Yes, Delete")}
+            {isDeleting ? (isRtl ? "Deleting..." : "Deleting...") : (isRtl ? "Yes, delete" : "Yes, Delete")}
           </Button>
         </div>
       </div>

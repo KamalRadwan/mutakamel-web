@@ -14,8 +14,8 @@ export interface PipelineBoardItem {
 }
 
 const mockPipelines: PipelineBoardItem[] = [
-  { id: "pipe-101", name: "قمع المبيعات المباشرة للمستشفيات والشركات الكبرى", code: "b2b_enterprise", stagesCount: 5, totalDealsValue: "1,390,000.00 SAR", isDefault: true, status: "active" },
-  { id: "pipe-102", name: "قمع المبيعات الرقمية والمؤسسات المتوسطة", code: "b2b_sme", stagesCount: 4, totalDealsValue: "420,000.00 SAR", isDefault: false, status: "active" },
+  { id: "pipe-101", name: "I18N_FALLBACK", code: "b2b_enterprise", stagesCount: 5, totalDealsValue: "1,390,000.00 SAR", isDefault: true, status: "active" },
+  { id: "pipe-102", name: "I18N_FALLBACK", code: "b2b_sme", stagesCount: 4, totalDealsValue: "420,000.00 SAR", isDefault: false, status: "active" },
 ];
 
 export function usePipelinesBoards() {

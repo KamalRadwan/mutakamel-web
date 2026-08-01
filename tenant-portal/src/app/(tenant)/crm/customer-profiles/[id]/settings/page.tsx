@@ -2,13 +2,15 @@
 
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function CustomerSettingsPage() {
+    const { t } = useI18n();
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 max-w-xl">
-      <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">إعدادات الائتمان وسقف التسهيلات</h2>
-      <Input label="سقف المشتريات الآجلة (Credit Limit)" defaultValue="500,000.00 SAR" />
-      <Button variant="secondary">حفظ حد الائتمان</Button>
+      <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">{t.crm.creditSettingsAndFacilityL}</h2>
+      <Input label={t.crm.creditLimit} defaultValue="500,000.00 SAR" />
+      <Button variant="secondary">{t.crm.saveCreditLimit}</Button>
     </div>
   );
 }

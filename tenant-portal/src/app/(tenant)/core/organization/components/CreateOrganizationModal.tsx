@@ -29,7 +29,7 @@ export function CreateOrganizationModal({ isOpen, onClose, onSubmit }: CreateMod
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="إضافة وحدة تنظيمية جديدة (شركة/فرع/قسم/فريق)" maxWidth="md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input label="اسم الوحدة التنظيمية" placeholder="مثال: فرع جدة" value={name} onChange={(e) => setName(e.target.value)} required />
+        <Input label="اسم الوحدة التنظيمية" value={name} onChange={(e) => setName(e.target.value)} required />
         <div className="grid grid-cols-2 gap-3">
           <Select
             label="نوع الوحدة"

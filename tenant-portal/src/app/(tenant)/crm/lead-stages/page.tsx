@@ -10,8 +10,10 @@ import { Eye, Trash2, GitCommit, ArrowRightLeft } from "lucide-react";
 import { useLeadStages, LeadStageItem } from "./hooks/useLeadStages";
 import { CreateLeadStagesModal } from "./components/CreateLeadStagesModal";
 import { DeleteLeadStagesConfirmModal } from "./components/DeleteLeadStagesConfirmModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 export default function LeadStagesPage() {
+//     const { t } = useI18n();
   const {
     t,
     items,
@@ -27,39 +29,39 @@ export default function LeadStagesPage() {
 
   const columns = [
     {
-      header: "اسم المرحلة",
+      header: t.crm.stageName,
       cell: (item: LeadStageItem) => (
         <div className="flex items-center gap-2.5">
           <div className="w-3 h-8 rounded-full" style={{ backgroundColor: item.color }} />
           <div>
             <p className="font-bold text-slate-900 dark:text-slate-100">{item.name}</p>
-            <p className="text-[11px] text-slate-400">الترتيب: #{item.order}</p>
+            <p className="text-[11px] text-slate-400">{t.crm.order}{item.order}</p>
           </div>
         </div>
       ),
     },
     {
-      header: "احتمالية النجاح",
+      header: t.crm.probabilityOfSuccess,
       cell: (item: LeadStageItem) => (
         <Badge variant="info">{item.winProbability}</Badge>
       ),
     },
     {
-      header: "عدد العملاء المترابطين",
+      header: t.crm.numberOfConnectedClients,
       cell: (item: LeadStageItem) => (
-        <span className="font-bold text-slate-900 dark:text-slate-100">{item.leadsCount} عميل</span>
+        <span className="font-bold text-slate-900 dark:text-slate-100">{item.leadsCount} {t.crm.client}</span>
       ),
     },
     {
-      header: "الحالة",
+      header: t.crm.theCondition,
       cell: (item: LeadStageItem) => (
         <Badge variant={item.status === "active" ? "success" : "neutral"}>
-          {item.status === "active" ? "نشطة" : "مؤرشفة"}
+          {item.status === "active" ? t.crm.active : t.crm.archived}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
+      header: t.crm.procedures,
       cell: (item: LeadStageItem) => (
         <div className="flex items-center gap-1.5">
           <Link href={`/crm/lead-stages/${item.id}/general`}>
@@ -78,16 +80,16 @@ export default function LeadStagesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="مراحل قمع المبيعات (Lead Stages & Pipeline Builder)"
-        subtitle="تهيئة وتسلسل مراحل تقدم العملاء المحتملين من الاستقطاب وحتى الإغلاق"
-        actionLabel="إضافة مرحلة جديدة"
+        title={t.crm.salesFunnelStagesLeadStag}
+        subtitle={t.crm.preparingAndSequencingTheS}
+        actionLabel={t.crm.addANewStage}
         onAction={() => setIsCreateOpen(true)}
       />
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="ابحث باسم المرحلة..."
+        placeholder={t.crm.searchByStageName}
       />
 
       <Table columns={columns} data={items} />

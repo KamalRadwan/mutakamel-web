@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generatedAt": "2026-07-25T10:33:32.546Z",
+    "generatedAt": "2026-07-29T05:28:05.220Z",
     "generator": "scripts/docs/generate-route-inventory.mjs",
     "frontendRevision": "236bb35e6637+dirty",
-    "backendRevision": "12071ad1df73+dirty",
+    "backendRevision": "e2a7582ee1ee+dirty",
     "sourcePolicy": "Gateway master ownership and canonicalization rules for master=tenant",
     "canonicalNamespaces": [
       "/api/tenant/core/v1/*",
@@ -13,28 +13,28 @@
     "excludes": "Admin, partner, and direct Worker routes. Core PUBLIC public/files routes are included because tenant master owns them."
   },
   "counts": {
-    "total": 561,
+    "total": 563,
     "byApp": {
-      "core": 198,
+      "core": 200,
       "crm": 137,
       "trade": 226
     },
     "byMethod": {
-      "GET": 207,
+      "GET": 209,
       "POST": 234,
       "PATCH": 61,
       "PUT": 16,
       "DELETE": 43
     },
     "byRouteClass": {
-      "AUTHENTICATED": 199,
+      "AUTHENTICATED": 201,
       "WRITE_SENSITIVE": 329,
       "PUBLIC": 11,
       "READ_HEAVY": 22
     }
   },
   "sourceHashes": {
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "e26f6e1614186e939fb7f6e87c03bbac99afed53316044287fa3b949313dd224",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "3ded040a5b3ff411b3228ff82cd0dce29843bb57effdaeec1079e71506d28a38",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts": "85f4626ed6b94bc8947c6ff7e54988df586a0c0cb5aa95ea8d2a3a55b9f44f61",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts": "fc3d367b91b785796d7f09205c319b77e09ee38cb3f6b01340a4a09652ac7006",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "a4b5f00eceb33085c98d155909c842f8a16e56fb31583cd7ae81f332a95dc4f6",
@@ -204,6 +204,56 @@
       "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
       "organizationScopeMode": "NONE",
       "circuitBreakerKey": "core-app.activities"
+    },
+    {
+      "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/audit",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.audit.list",
+      "method": "GET",
+      "pathPattern": "/api/v1/tenant/audit",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/audit",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "organizationScopeMode": "NONE",
+      "domainIdempotencyOperation": null,
+      "fingerprintSchemaId": null,
+      "maxReplayResponseBytes": null,
+      "circuitBreakerKey": "core-app.audit",
+      "requiredPermissions": [
+        "audit.read"
+      ]
+    },
+    {
+      "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/audit/entities/:entityType/:entityId",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.audit.entity-history",
+      "method": "GET",
+      "pathPattern": "/api/v1/tenant/audit/entities/:entityType/:entityId",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/audit/entities/:entityType/:entityId",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "organizationScopeMode": "NONE",
+      "domainIdempotencyOperation": null,
+      "fingerprintSchemaId": null,
+      "maxReplayResponseBytes": null,
+      "circuitBreakerKey": "core-app.audit",
+      "requiredPermissions": [
+        "audit.read"
+      ]
     },
     {
       "app": "core",
