@@ -1,7 +1,7 @@
 # Admin Portal — Enums Reference
 
 Transport values extracted from the current Core common/database packages and
-admin APIs. Last verified: **2026-07-24**.
+admin APIs. Last verified: **2026-07-30**.
 
 Enum values are case-sensitive. Keep translated UI labels separate from these
 wire values and render a safe fallback for unknown additive values.
@@ -28,6 +28,30 @@ enum UserStatusEnum {
   DEACTIVATED = 'DEACTIVATED',
 }
 ```
+
+---
+
+## System Settings Values
+
+### `PlatformSmtpProtocol`
+
+```typescript
+type PlatformSmtpProtocol = 'smtp' | 'smtps';
+```
+
+### `PlatformSmtpConfigHistoryAction`
+
+```typescript
+enum PlatformSmtpConfigHistoryAction {
+  CONFIGURED = 'CONFIGURED',
+  UPDATED = 'UPDATED',
+  CONNECTION_VERIFIED = 'CONNECTION_VERIFIED',
+}
+```
+
+Generic system-setting values have no shared enum. Each registered key has its
+own strict string, integer, or boolean schema. See
+[System Settings and Platform SMTP](../api/system-settings.md).
 
 ---
 
@@ -117,6 +141,144 @@ enum DatabaseServerHistoryAction {
 Database-server history has no generic `LIFECYCLE` action. See the
 [Database Servers Frontend Contract](../api/database-servers.md) for transition
 and deletion preconditions.
+
+---
+
+## Storage Server Enums
+
+```typescript
+enum StorageServerProvider {
+  GARAGE = 'GARAGE',
+}
+
+enum StorageServerPlacementRole {
+  GENERAL = 'GENERAL',
+  BACKUP_ONLY = 'BACKUP_ONLY',
+}
+
+enum StorageServerStatus {
+  DRAFT = 'DRAFT',
+  ACTIVE = 'ACTIVE',
+  DRAINING = 'DRAINING',
+  OFFLINE = 'OFFLINE',
+}
+
+enum StorageServerAvailabilityClass {
+  DEGRADED_SINGLE_NODE = 'DEGRADED_SINGLE_NODE',
+  SINGLE_NODE_OPERATIONAL = 'SINGLE_NODE_OPERATIONAL',
+  BACKUP_TARGET_OPERATIONAL = 'BACKUP_TARGET_OPERATIONAL',
+  HA_PRODUCTION_READY = 'HA_PRODUCTION_READY',
+}
+
+enum StorageServerHealthStatus {
+  UNKNOWN = 'UNKNOWN',
+  HEALTHY = 'HEALTHY',
+  UNHEALTHY = 'UNHEALTHY',
+}
+
+enum StoragePrincipal {
+  CORE = 'CORE',
+  CRM = 'CRM',
+  TRADE = 'TRADE',
+  WORKER = 'WORKER',
+  BACKUP = 'BACKUP',
+  PROBE = 'PROBE',
+}
+
+enum StorageCredentialRole {
+  OPERATION = 'OPERATION',
+  SIGNING = 'SIGNING',
+}
+
+enum StorageVerificationRunStatus {
+  PENDING = 'PENDING',
+  PASS = 'PASS',
+  FAIL = 'FAIL',
+  EXPIRED = 'EXPIRED',
+}
+
+enum StorageRecoveryDestinationKind {
+  OFFLINE_RESTIC_MEDIA_V1 = 'OFFLINE_RESTIC_MEDIA_V1',
+}
+
+enum StorageRecoveryDestinationStatus {
+  DRAFT = 'DRAFT',
+  ACTIVE = 'ACTIVE',
+  OFFLINE = 'OFFLINE',
+}
+
+enum StorageRecoveryPolicyStatus {
+  DRAFT = 'DRAFT',
+  VERIFIED = 'VERIFIED',
+  REVOKED = 'REVOKED',
+}
+
+enum StorageServerHistoryAction {
+  BOOTSTRAPPED = 'BOOTSTRAPPED',
+  CREATED = 'CREATED',
+  UPDATED = 'UPDATED',
+  BINDINGS_CHANGED = 'BINDINGS_CHANGED',
+  PRINCIPAL_ROTATED = 'PRINCIPAL_ROTATED',
+  VERIFIED = 'VERIFIED',
+  ACTIVATED = 'ACTIVATED',
+  DRAINED = 'DRAINED',
+  OFFLINED = 'OFFLINED',
+  DELETED = 'DELETED',
+}
+```
+
+`DELETED` is a history action, not a Storage Server status. Recovery
+destination `ACTIVE` describes registered current offline evidence; it is not
+the Storage Server `ACTIVE` placement state. The full principal-role matrix,
+attestation-key statuses, recovery evidence rules, and lifecycle preconditions
+are in the
+[Storage Servers Frontend Contract](../api/storage-servers.md).
+
+### Tenant Storage Server migration enums
+
+```typescript
+enum TenantStorageMigrationStatus {
+  REQUESTED = 'REQUESTED',
+  FENCING = 'FENCING',
+  FENCED = 'FENCED',
+  COPYING = 'COPYING',
+  VERIFYING = 'VERIFYING',
+  CUTOVER = 'CUTOVER',
+  ROLLBACK_WINDOW = 'ROLLBACK_WINDOW',
+  ROLLBACK_FENCING = 'ROLLBACK_FENCING',
+  ROLLBACK_FENCED = 'ROLLBACK_FENCED',
+  ROLLBACK_COPYING = 'ROLLBACK_COPYING',
+  ROLLBACK_VERIFYING = 'ROLLBACK_VERIFYING',
+  ROLLBACK_CUTOVER = 'ROLLBACK_CUTOVER',
+  FINALIZING = 'FINALIZING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}
+
+enum TenantStoragePostCutoverOperation {
+  ROLLBACK = 'ROLLBACK',
+  FINALIZE = 'FINALIZE',
+}
+
+enum TenantStoragePostCutoverStatus {
+  FENCING = 'FENCING',
+  FENCED = 'FENCED',
+  QUEUED = 'QUEUED',
+  RUNNING = 'RUNNING',
+  VERIFYING = 'VERIFYING',
+  PURGING = 'PURGING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}
+```
+
+`lastDurableStage` uses the migration status set except `FAILED` and
+`CANCELLED`. These are backend source values for a default-off feature; keep
+an unknown-value fallback and see
+[Tenant Storage Server Migrations](../api/tenant-storage-migrations.md) before
+building UI.
 
 ---
 

@@ -1,6 +1,14 @@
 # Reusable UI Components Architecture — Admin Portal
 
+Status: **Target component behavior; not runtime integration evidence**
+
+Last source verification: **2026-07-30**
+
 To enforce visual consistency, high information density, RTL/LTR support, and prevent code duplication across the Admin Portal, all pages must utilize the standardized shared components defined in this folder.
+
+The API guides and
+[frontend capability matrix](../audit/frontend-capability-matrix.md) determine
+whether a component is live, partial, missing, or gated.
 
 ---
 
@@ -16,6 +24,8 @@ To enforce visual consistency, high information density, RTL/LTR support, and pr
 | `FloatingWebPhone` | [floating-webphone.md](floating-webphone.md) | Admin shell floating WebRTC phone widget, call controls, call logs |
 | `ConfirmActionModal` | [confirm-action-modal.md](confirm-action-modal.md) | Destructive/lifecycle actions (Suspend, Delete, Void, Cancel, Reprovision) |
 | `FormDrawer` | [form-drawer.md](form-drawer.md) | Slide-over panels for Create User, Edit Role, Add FQDN, System Setting overrides |
+| Storage Server modal/edit flows | [storage-server-modal.md](storage-server-modal.md) | Add Storage Server, embedded detail edit mode, and critical storage confirmations |
+| Tenant Storage Server migration | [tenant-storage-migrations.md](../api/tenant-storage-migrations.md) | Future tenant-detail migration panel; default-off and blocked on a complete safe read model |
 
 ---
 

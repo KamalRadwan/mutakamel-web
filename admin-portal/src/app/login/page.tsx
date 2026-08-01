@@ -1,9 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { ShieldCheck, Mail, Lock, Eye, EyeOff, Loader2, KeyRound } from "lucide-react";
-import { LanguageToggle } from "@/components/layout/LanguageToggle";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { useLogin } from "./hooks/useLogin";
 
 export default function LoginPage() {
@@ -16,14 +13,12 @@ export default function LoginPage() {
     rememberMe,
     showPassword,
     isSubmitting,
-    error,
     isForgotModalOpen,
     forgotSent,
     setIsForgotModalOpen,
     toggleShowPassword,
     toggleRememberMe,
     handleSubmit,
-    handleKeyDown,
     handleForgotPassword,
   } = useLogin();
 
@@ -51,15 +46,9 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Error Alert Box */}
-          {error && (
-            <div className="p-3 text-xs font-medium bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-xl text-center animate-in fade-in">
-              {error}
-            </div>
-          )}
 
           {/* Form Fields */}
-          <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email Field */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block text-start">

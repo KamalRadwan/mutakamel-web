@@ -1,76 +1,81 @@
-# Tenant Settings API
+# Tenant workspace settings and branding API
 
-Base paths:
-- `/tenant/workspace-settings`
-- `/tenant/branding`
-- `/tenant/numbering`
+> **Contract status:** Current
+> **Last verified:** 2026-07-25
+> **Backend owner:** Core (`core-app`)
+> **Canonical browser prefixes:** `/api/tenant/core/v1/workspace-settings`, `/api/tenant/core/v1/branding`
+> **Controller-relative prefixes:** `/tenant/workspace-settings`, `/tenant/branding`
+> **Tenant Portal status:** Planned. The legacy settings implementation is live in `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings/tenant-settings-page.tsx`.
+> **Documentation:** Hand-written and source-verified; not generated.
 
-This module manages the global settings for the tenant workspace, including regional configurations, visual branding, and system-wide numbering sequences.
+Currency, tax, and numbering contracts are documented separately in [finance-configuration.md](finance-configuration.md).
 
-## Workspace Settings
+## Source of truth
 
-### `GET /tenant/workspace-settings`
-Returns the tenant workspace settings singleton (language, timezone, default currency, and support access toggles).
-- **Permissions**: `workspace.read`
-- **Response**: `200 OK`
+- Gateway routes: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
+- Workspace controller, DTO, service: `../backend/mutakamel-apps/core-app/src/tenant/workspace-settings`
+- Branding controller, DTO, service: `../backend/mutakamel-apps/core-app/src/tenant/branding`
+- Legacy API/page: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
 
-### `PUT /tenant/workspace-settings`
-Updates the tenant workspace settings singleton.
-- **Permissions**: `workspace.manage`
-- **Body**: `UpdateWorkspaceSettingsDto`
-- **Response**: `200 OK`
+## Common contract
+
+All routes except public branding require a tenant JWT, a verified host matching the token tenant, active session version, subscription access, and the listed permission. The browser calls same-origin canonical paths and must not send trusted tenant/company/branch headers.
+
+Core rejects unknown DTO fields. The standard success envelope is `{success:true,data,correlationId,timestamp}`. The error envelope is `{success:false,statusCode,errorCode,errorCategory,message,details?,correlationId,timestamp,path}`. These settings commands are not explicitly replay-safe: do not automatically retry them after an ambiguous network failure.
+
+Security is tenant/session/permission based, with host-only access for public branding. Workspace/branding updates have no application idempotency contract and expose no asynchronous job.
+
+## Workspace settings
+
+| Method and canonical browser path | Permission | Body/result |
+|---|---|---|
+| `GET /api/tenant/core/v1/workspace-settings` | `workspace.read` | Returns the singleton |
+| `PUT /api/tenant/core/v1/workspace-settings` | `workspace.manage` | Partial `UpdateWorkspaceSettingsDto`; returns updated singleton |
+
+Accepted update fields:
+
+- `defaultLanguage`: `en` or `ar`; trimmed and lowercased, maximum 8.
+- `defaultCurrencyCode`: exactly three characters, trimmed and uppercased; it must reference an active tenant currency.
+- `timezone`: non-empty, trimmed, maximum 48, and a runtime-valid IANA zone such as `Africa/Cairo` or `UTC`.
+- `allowSupport`: strict boolean (`true`/`false`, including those exact query-style strings after transformation).
+
+Safe workspace-update example:
+
+```http
+PUT /api/tenant/core/v1/workspace-settings
+Authorization: Bearer <tenant-access-token>
+Content-Type: application/json
+
+{"defaultLanguage":"ar","defaultCurrencyCode":"EGP","timezone":"Africa/Cairo","allowSupport":false}
+```
+
+`GET` may be served through Core's tenant cache for up to 300 seconds; an update purges that cache. Expected domain errors include `TENANT_NOT_READY`, `CURRENCY_NOT_ENABLED`, `TIMEZONE_INVALID`, and `LANGUAGE_INVALID`.
 
 ## Branding
 
-### `GET /tenant/branding/public`
-Returns display-only tenant branding for pre-auth screens resolved by the tenant request host.
-- **Permissions**: Public
-- **Response**: `200 OK`
+| Method and canonical browser path | Permission/access | Body/result |
+|---|---|---|
+| `GET /api/tenant/core/v1/branding/public` | Public, verified tenant host | Display-only pre-auth branding |
+| `GET /api/tenant/core/v1/branding` | `branding.read` | Full branding singleton |
+| `PUT /api/tenant/core/v1/branding` | `branding.manage` | Partial `UpdateBrandingDto` |
+| `POST /api/tenant/core/v1/branding/logo` | `branding.manage` | Multipart `file`; replaces logo |
+| `POST /api/tenant/core/v1/branding/icon` | `branding.manage` | Multipart `file`; replaces icon |
 
-### `GET /tenant/branding`
-Returns the tenant branding singleton used by authenticated branding settings screens.
-- **Permissions**: `branding.read`
-- **Response**: `200 OK`
+`UpdateBrandingDto` accepts only:
 
-### `PUT /tenant/branding`
-Updates tenant branding colors, font, application labels, and sanitized login-page HTML.
-- **Permissions**: `branding.manage`
-- **Body**: `UpdateBrandingDto`
-- **Response**: `200 OK`
+| Field | Validation |
+|---|---|
+| `primaryColor`, `secondaryColor` | CSS hex color |
+| `fontFamily`, `appName`, `tabTitle` | string, maximum 120 |
+| `loginHtml` | string, maximum 20,000; sanitized server-side before persistence |
 
-### `POST /tenant/branding/logo`
-Uploads/replaces the tenant logo using the platform storage layer.
-- **Permissions**: `branding.manage`
-- **Body**: `multipart/form-data` with a `file` field
-- **Response**: `201 Created`
+Uploads use exactly one `file` field. Allowed MIME types are `image/png`, `image/jpeg`, and `image/webp`; maximum size is 2 MiB. Do not trust filename extensions or attempt to create storage paths in the portal.
 
-### `POST /tenant/branding/icon`
-Uploads/replaces the tenant icon using the platform storage layer.
-- **Permissions**: `branding.manage`
-- **Body**: `multipart/form-data` with a `file` field
-- **Response**: `201 Created`
+Expected errors include `BRANDING_FILE_REQUIRED`, `BRANDING_FILE_TYPE_UNSUPPORTED`, `BRANDING_FILE_TOO_LARGE`, and `BRANDING_STORAGE_UNAVAILABLE`. Public branding is one of the few reads allowed while a tenant is suspended, so it must remain free of private tenant configuration. Treat both branding reads as tenant-specific; never cache them globally or across hosts.
 
-## Numbering Sequences
+## AI implementation rules
 
-### `POST /tenant/numbering`
-Creates a tenant numbering sequence, optionally scoped to a company, with prefix, padding, and starting value.
-- **Permissions**: `numbering.manage`
-- **Body**: `CreateNumberingSequenceDto`
-- **Response**: `201 Created`
-
-### `GET /tenant/numbering`
-Returns tenant numbering sequences with pagination, search, sorting, company, and exact code filters.
-- **Permissions**: `numbering.read`
-- **Response**: `200 OK` (Paginated)
-
-### `PATCH /tenant/numbering/:id`
-Updates a numbering sequence prefix, padding, or next value.
-- **Permissions**: `numbering.manage`
-- **Body**: `UpdateNumberingSequenceDto`
-- **Response**: `200 OK`
-
-### `GET /tenant/numbering/:code/peek`
-Returns the current next value and formatted preview for a numbering sequence code.
-- **Permissions**: `numbering.read`
-- **Queries**: `companyId` (Optional)
-- **Response**: `200 OK`
+- Fetch public branding only after host status succeeds.
+- Use the returned server-issued asset URLs as opaque values.
+- Refresh workspace-derived locale/timezone state from the successful update response.
+- Never render unsanitized request `loginHtml`; render only the server-returned value under the portal's HTML policy.

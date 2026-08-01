@@ -1,32 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useI18n } from "@/i18n/I18nContext";
-
-export interface DatabaseServerRow {
-  id: string;
-  name: string;
-  driver: string;
-  host: string;
-  port: number;
-  maintenanceDatabase: string;
-  sslMode: string;
-  status: "ACTIVE" | "DRAINING" | "OFFLINE" | "DELETED";
-  currentTenants: number;
-  maxTenants: number;
-  utilization: number;
-  countryIsoCode: string;
-  countryName: string;
-  region: string;
-  isPlacementTarget: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import { useToast } from "@/components/ui/ToastContext";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { DatabaseServerListResponse, DatabaseServerRow, DatabaseServerStatus, DatabaseServerView } from "@/types/database-server";
 
 export function useDatabaseServers() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const toast = useToast();
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [countryFilter, setCountryFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
@@ -37,92 +22,94 @@ export function useDatabaseServers() {
 
   // Destructive Action Modal States
   const [activeModalServer, setActiveModalServer] = useState<DatabaseServerRow | null>(null);
-  const [modalActionType, setModalActionType] = useState<"drain" | "delete" | "activate" | null>(null);
+  const [modalActionType, setModalActionType] = useState<"drain" | "delete" | "activate" | "offline" | null>(null);
 
-  const [servers, setServers] = useState<DatabaseServerRow[]>([
-    {
-      id: "019f0000-0001-7000-8000-000000000001",
-      name: "DB-PRIMARY-EG-01",
-      driver: "postgres",
-      host: "db-primary-eg-01.internal",
-      port: 5432,
-      maintenanceDatabase: "postgres",
-      sslMode: "require",
-      status: "ACTIVE",
-      currentTenants: 45,
-      maxTenants: 50,
-      utilization: 90,
-      countryIsoCode: "EG",
-      countryName: "مصر",
-      region: "Middle East",
-      isPlacementTarget: true,
-      createdAt: "2026-06-15",
-      updatedAt: "2026-07-20",
-    },
-    {
-      id: "019f0000-0002-7000-8000-000000000002",
-      name: "DB-PRIMARY-SA-01",
-      driver: "postgres",
-      host: "db-primary-sa-01.internal",
-      port: 5432,
-      maintenanceDatabase: "postgres",
-      sslMode: "require",
-      status: "ACTIVE",
-      currentTenants: 28,
-      maxTenants: 50,
-      utilization: 56,
-      countryIsoCode: "SA",
-      countryName: "السعودية",
-      region: "GCC",
-      isPlacementTarget: true,
-      createdAt: "2026-06-18",
-      updatedAt: "2026-07-19",
-    },
-    {
-      id: "019f0000-0003-7000-8000-000000000003",
-      name: "DB-PRIMARY-AE-01",
-      driver: "postgres",
-      host: "db-primary-ae-01.internal",
-      port: 5432,
-      maintenanceDatabase: "postgres",
-      sslMode: "require",
-      status: "ACTIVE",
-      currentTenants: 12,
-      maxTenants: 50,
-      utilization: 24,
-      countryIsoCode: "AE",
-      countryName: "الإمارات",
-      region: "GCC",
-      isPlacementTarget: true,
-      createdAt: "2026-07-01",
-      updatedAt: "2026-07-22",
-    },
-  ]);
-
-  const filteredServers = servers.filter((srv) => {
-    const matchesSearch =
-      search === "" ||
-      srv.name.toLowerCase().includes(search.toLowerCase()) ||
-      srv.host.toLowerCase().includes(search.toLowerCase()) ||
-      srv.countryName.toLowerCase().includes(search.toLowerCase());
-
-    const matchesStatus = statusFilter === "ALL" || srv.status === statusFilter;
-    const matchesCountry = countryFilter === "ALL" || srv.countryIsoCode === countryFilter;
-
-    return matchesSearch && matchesStatus && matchesCountry;
+  const [servers, setServers] = useState<DatabaseServerRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [meta, setMeta] = useState<{ total: number; totalPages: number; hasNext: boolean; hasPrev: boolean }>({
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false
   });
 
+  // Derived Summary Metrics - currently based on current page data as there is no specific metrics endpoint. 
+  // In a real app, a separate endpoint might be needed for global metrics. 
   const summaryMetrics = {
-    totalServers: servers.length,
+    totalServers: meta.total, // Using total from meta
     activeServers: servers.filter((s) => s.status === "ACTIVE" && s.isPlacementTarget).length,
     drainingServers: servers.filter((s) => s.status === "DRAINING").length,
     offlineServers: servers.filter((s) => s.status === "OFFLINE").length,
     maxCapacity: servers.reduce((acc, s) => acc + s.maxTenants, 0),
     totalTenantsPlaced: servers.reduce((acc, s) => acc + s.currentTenants, 0),
-    platformUtilizationRatio: Math.round(
-      servers.reduce((acc, s) => acc + s.utilization, 0) / (servers.length || 1)
-    ),
+    platformUtilizationRatio: servers.reduce((acc, s) => acc + s.maxTenants, 0) > 0
+      ? servers.reduce((acc, s) => acc + s.currentTenants, 0) / servers.reduce((acc, s) => acc + s.maxTenants, 0)
+      : 0,
   };
+
+  // Debounce Search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1); // Reset page on new search
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, countryFilter]);
+
+  const fetchServers = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      params.append("page", page.toString());
+      params.append("limit", limit.toString());
+      if (debouncedSearch) params.append("search", debouncedSearch);
+      if (statusFilter === "DELETED") {
+        params.append("withDeleted", "true");
+      } else if (statusFilter !== "ALL") {
+        params.append("status", statusFilter);
+      }
+      if (countryFilter !== "ALL") params.append("countryIsoCode", countryFilter);
+
+      const response = await axiosClient.get<any>(`/api/admin/core/v1/database-servers?${params.toString()}`);
+      
+      const rawData = response.data;
+      const itemsList: DatabaseServerView[] = rawData.items || rawData.data || (Array.isArray(rawData) ? rawData : []);
+
+      const mappedServers: DatabaseServerRow[] = itemsList.map((srv: DatabaseServerView) => {
+        const utilizationRatio = srv.maxTenants > 0 ? srv.currentTenants / srv.maxTenants : 0;
+        const isPlacementTarget = srv.status === "ACTIVE" && srv.currentTenants < srv.maxTenants && srv.runtimePrincipalsReady && srv.hasProvisioningCredentials;
+        return {
+          ...srv,
+          driver: "postgres",
+          utilizationRatio,
+          isPlacementTarget
+        };
+      });
+      setServers(mappedServers);
+      setMeta({
+        total: rawData.total ?? rawData.meta?.total ?? itemsList.length,
+        totalPages: rawData.totalPages ?? rawData.meta?.totalPages ?? 1,
+        hasNext: Boolean(rawData.hasNext ?? rawData.meta?.hasNext),
+        hasPrev: Boolean(rawData.hasPrev ?? rawData.meta?.hasPrev),
+      });
+    } catch (err: any) {
+      console.warn("Failed to fetch database servers", err.message);
+      setError(err.response?.data?.message || "Failed to fetch servers.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, limit, debouncedSearch, statusFilter, countryFilter]);
+
+  useEffect(() => {
+    fetchServers();
+  }, [fetchServers]);
 
   const openActivateModal = (srv: DatabaseServerRow) => {
     setActiveModalServer(srv);
@@ -134,30 +121,43 @@ export function useDatabaseServers() {
     setModalActionType("drain");
   };
 
+  const openOfflineModal = (srv: DatabaseServerRow) => {
+    setActiveModalServer(srv);
+    setModalActionType("offline");
+  };
+
   const openDeleteModal = (srv: DatabaseServerRow) => {
     setActiveModalServer(srv);
     setModalActionType("delete");
   };
 
-  const confirmModalAction = () => {
+  const confirmModalAction = async () => {
     if (!activeModalServer || !modalActionType) return;
-    if (modalActionType === "activate") {
-      setServers((prev) =>
-        prev.map((s) =>
-          s.id === activeModalServer.id ? { ...s, status: "ACTIVE", isPlacementTarget: true } : s
-        )
+    
+    try {
+      if (modalActionType === "activate") {
+        await axiosClient.post(`/api/admin/core/v1/database-servers/${activeModalServer.id}/activate`, {});
+      } else if (modalActionType === "drain") {
+        await axiosClient.post(`/api/admin/core/v1/database-servers/${activeModalServer.id}/drain`, {});
+      } else if (modalActionType === "offline") {
+        await axiosClient.post(`/api/admin/core/v1/database-servers/${activeModalServer.id}/offline`, {});
+      } else if (modalActionType === "delete") {
+        await axiosClient.delete(`/api/admin/core/v1/database-servers/${activeModalServer.id}`);
+      }
+      
+      // Refresh the list after successful action
+      await fetchServers();
+    } catch (err: any) {
+      console.warn(`Failed to ${modalActionType} database server`, err.message);
+      const errMsg = err.response?.data?.message || `فشل إجراء ${modalActionType}`;
+      toast.error(
+        lang === "ar" ? "تعذر إتمام الإجراء" : "Action Failed",
+        errMsg
       );
-    } else if (modalActionType === "drain") {
-      setServers((prev) =>
-        prev.map((s) =>
-          s.id === activeModalServer.id ? { ...s, status: "DRAINING", isPlacementTarget: false } : s
-        )
-      );
-    } else if (modalActionType === "delete") {
-      setServers((prev) => prev.filter((s) => s.id !== activeModalServer.id));
+    } finally {
+      setActiveModalServer(null);
+      setModalActionType(null);
     }
-    setActiveModalServer(null);
-    setModalActionType(null);
   };
 
   return {
@@ -175,8 +175,11 @@ export function useDatabaseServers() {
     setIsCreateOpen,
     auditServerId,
     setAuditServerId,
-    servers: filteredServers,
-    totalItems: filteredServers.length,
+    servers,
+    isLoading,
+    error,
+    meta,
+    totalItems: meta.total,
     summaryMetrics,
     activeModalServer,
     modalActionType,
@@ -184,6 +187,8 @@ export function useDatabaseServers() {
     confirmModalAction,
     openActivateModal,
     openDrainModal,
+    openOfflineModal,
     openDeleteModal,
+    refresh: fetchServers,
   };
 }

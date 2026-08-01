@@ -1,132 +1,99 @@
-# Organization API
+# Tenant organization API
 
-Base path: `/tenant/organization`
+> **Contract status:** Current
+> **Last verified:** 2026-07-25
+> **Backend owner:** Core (`core-app`)
+> **Canonical browser prefix:** `/api/tenant/core/v1/organization`
+> **Controller-relative prefix:** `/tenant/organization`
+> **Tenant Portal status:** Planned. The legacy settings area consumes the organization tree but does not provide a complete replacement-grade administration flow.
+> **Documentation:** Hand-written and source-verified; not generated.
 
-The Organization module manages the tenant's structural hierarchy: Companies -> Branches -> Departments -> Teams.
+## Source of truth
 
-## Organization Tree
+- Gateway contracts: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
+- Controller/service/DTOs: `../backend/mutakamel-apps/core-app/src/tenant/organization`
+- Database enums/entities: `../backend/mutakamel-apps/core-app/packages/database/src/entities/tenant`
+- Legacy use: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
 
-### `GET /tenant/organization/tree`
-Returns the tenant company, branch, department, and team hierarchy in a single tree payload.
-- **Permissions**: `org.company.read`
-- **Response**: `200 OK` (Tree of Companies -> Branches -> Departments -> Teams)
+## Security and shared transport
 
-## Companies
+Every route requires a tenant JWT, a verified host matching that token, current session/subscription, the listed permission, and the actor's effective company/branch scope. A permission does not grant visibility outside that scope. The browser must use the canonical path and must not send trusted scope headers.
 
-### `POST /tenant/organization/companies`
-Creates a tenant company after validating code uniqueness and optional active default currency.
-- **Permissions**: `org.company.manage`
-- **Body**: `CreateCompanyDto`
-- **Response**: `201 Created`
+Core rejects unknown DTO fields. All resource IDs are UUIDv7. List routes use common pagination (`page` default 1, `limit` default 20/max 100, `search` max 200, whitelisted `sortBy`, `sortDir=ASC|DESC`) and return item arrays in `data` with `meta`. JSON errors use the standard Core error envelope. Mutations do not declare application-level idempotency; avoid automatic retry after an ambiguous response.
 
-### `GET /tenant/organization/companies`
-Returns tenant companies with pagination, search, sorting, and optional status filtering.
-- **Permissions**: `org.company.read`
-- **Queries**: Pagination, `status`
-- **Response**: `200 OK` (Paginated Companies)
+## Routes
 
-### `GET /tenant/organization/companies/:id`
-Returns one tenant company by ID.
-- **Permissions**: `org.company.read`
-- **Response**: `200 OK`
+| Resource | Method and canonical browser path | Permission |
+|---|---|---|
+| Tree | `GET /api/tenant/core/v1/organization/tree` | `org.company.read` |
+| Company | `POST /api/tenant/core/v1/organization/companies` | `org.company.manage` |
+| Company | `GET /api/tenant/core/v1/organization/companies`, `GET /api/tenant/core/v1/organization/companies/:id` | `org.company.read` |
+| Company | `PATCH /api/tenant/core/v1/organization/companies/:id`, `DELETE /api/tenant/core/v1/organization/companies/:id` | `org.company.manage` |
+| Branch | `POST /api/tenant/core/v1/organization/branches` | `org.branch.manage` |
+| Branch | `GET /api/tenant/core/v1/organization/branches`, `GET /api/tenant/core/v1/organization/branches/:id` | `org.branch.read` |
+| Branch | `PATCH /api/tenant/core/v1/organization/branches/:id`, `DELETE /api/tenant/core/v1/organization/branches/:id` | `org.branch.manage` |
+| Department | `POST /api/tenant/core/v1/organization/departments` | `org.department.manage` |
+| Department | `GET /api/tenant/core/v1/organization/departments`, `GET /api/tenant/core/v1/organization/departments/:id` | `org.department.read` |
+| Department | `PATCH /api/tenant/core/v1/organization/departments/:id`, `DELETE /api/tenant/core/v1/organization/departments/:id` | `org.department.manage` |
+| Team | `POST /api/tenant/core/v1/organization/teams` | `org.team.manage` |
+| Team | `GET /api/tenant/core/v1/organization/teams`, `GET /api/tenant/core/v1/organization/teams/:id` | `org.team.read` |
+| Team | `PATCH /api/tenant/core/v1/organization/teams/:id`, `DELETE /api/tenant/core/v1/organization/teams/:id` | `org.team.manage` |
 
-### `PATCH /tenant/organization/companies/:id`
-Updates company metadata, currency, and status while blocking invalid currency and unsafe deactivation.
-- **Permissions**: `org.company.manage`
-- **Body**: `UpdateCompanyDto`
-- **Response**: `200 OK`
+## Validation and static values
 
-### `DELETE /tenant/organization/companies/:id`
-Soft-deletes a company when it has no branches and no users placed directly in it.
-- **Permissions**: `org.company.manage`
-- **Response**: `204 No Content`
+All nodes use case-sensitive status `ACTIVE|INACTIVE`. Codes are trimmed/uppercased, maximum 32, and unique within the owning level.
 
-## Branches
+### Company
 
-### `POST /tenant/organization/branches`
-Creates a branch under an active company, validating branch code uniqueness and headquarters uniqueness.
-- **Permissions**: `org.branch.manage`
-- **Body**: `CreateBranchDto`
-- **Response**: `201 Created`
+Create requires `code` and `name` (maximum 120). Optional: `legalName` (200), `taxNumber` (64), and `currencyCode` (exactly three uppercased characters referencing an active tenant currency). Update accepts `name`, `legalName`, `taxNumber`, `currencyCode`, and `status`.
 
-### `GET /tenant/organization/branches`
-Returns tenant branches with pagination, search, sorting, and optional company/status filters.
-- **Permissions**: `org.branch.read`
-- **Queries**: Pagination, `companyId`, `status`
-- **Response**: `200 OK` (Paginated Branches)
+Company list accepts optional `status`.
 
-### `GET /tenant/organization/branches/:id`
-Returns one tenant branch by ID.
-- **Permissions**: `org.branch.read`
-- **Response**: `200 OK`
+### Branch
 
-### `PATCH /tenant/organization/branches/:id`
-Updates branch metadata, headquarters flag, and status while blocking unsafe deactivation.
-- **Permissions**: `org.branch.manage`
-- **Body**: `UpdateBranchDto`
-- **Response**: `200 OK`
+Create requires `companyId`, `code`, and `name` (120). Optional: `address` (2,000), `phone` (32), `isHeadquarters` boolean. Update accepts `name`, `address`, `phone`, `isHeadquarters`, and `status`.
 
-### `DELETE /tenant/organization/branches/:id`
-Soft-deletes a branch when it has no departments and no users placed in it.
-- **Permissions**: `org.branch.manage`
-- **Response**: `204 No Content`
+Branch list accepts `companyId` and `status`. Only one headquarters branch may exist for a company.
 
-## Departments
+### Department
 
-### `POST /tenant/organization/departments`
-Creates a department under an active branch and validates department code uniqueness within that branch.
-- **Permissions**: `org.department.manage`
-- **Body**: `CreateDepartmentDto`
-- **Response**: `201 Created`
+Create requires `branchId`, `code`, and `name` (120). Update accepts `name` and `status`. List accepts `branchId` and `status`.
 
-### `GET /tenant/organization/departments`
-Returns tenant departments with pagination, search, sorting, and optional branch/status filters.
-- **Permissions**: `org.department.read`
-- **Queries**: Pagination, `branchId`, `status`
-- **Response**: `200 OK` (Paginated Departments)
+### Team
 
-### `GET /tenant/organization/departments/:id`
-Returns one tenant department by ID.
-- **Permissions**: `org.department.read`
-- **Response**: `200 OK`
+Create requires `departmentId`, `code`, and `name` (120); optional `leadUserId` UUIDv7. Update accepts `name`, nullable/updated `leadUserId`, and `status`. List accepts `departmentId` and `status`.
 
-### `PATCH /tenant/organization/departments/:id`
-Updates department name and status while blocking unsafe deactivation.
-- **Permissions**: `org.department.manage`
-- **Body**: `UpdateDepartmentDto`
-- **Response**: `200 OK`
+Safe branch-create example:
 
-### `DELETE /tenant/organization/departments/:id`
-Soft-deletes a department when it has no teams and no users placed in it.
-- **Permissions**: `org.department.manage`
-- **Response**: `204 No Content`
+```http
+POST /api/tenant/core/v1/organization/branches
+Authorization: Bearer <tenant-access-token>
+Content-Type: application/json
 
-## Teams
+{
+  "companyId":"019f9872-0a1a-7cc0-914d-a57aa437fc41",
+  "code":"CAI",
+  "name":"Cairo",
+  "isHeadquarters":true
+}
+```
 
-### `POST /tenant/organization/teams`
-Creates a team under an active department, validating team code uniqueness and optional lead user existence.
-- **Permissions**: `org.team.manage`
-- **Body**: `CreateTeamDto`
-- **Response**: `201 Created`
+## Domain rules and errors
 
-### `GET /tenant/organization/teams`
-Returns tenant teams with pagination, search, sorting, and optional department/status filters.
-- **Permissions**: `org.team.read`
-- **Queries**: Pagination, `departmentId`, `status`
-- **Response**: `200 OK` (Paginated Teams)
+- A child can only be created below an active parent.
+- Deactivation is rejected when dependent active placement would become unsafe.
+- Delete is soft-delete and only succeeds when the node has no child nodes or directly placed users.
+- Company currency must be enabled.
+- Team lead must exist and be valid for the scope.
+- Branch/company authorization is enforced in addition to the route permission.
 
-### `GET /tenant/organization/teams/:id`
-Returns one tenant team by ID.
-- **Permissions**: `org.team.read`
-- **Response**: `200 OK`
+Expected errors include `ORG_NODE_NOT_FOUND`, `ORG_CODE_TAKEN`, `ORG_NODE_NOT_EMPTY`, `ORG_PARENT_INACTIVE`, `ORG_HQ_EXISTS`, `ORG_LEAD_USER_NOT_FOUND`, `CURRENCY_NOT_ENABLED`, and `PERMISSION_SCOPE_UNAVAILABLE`.
 
-### `PATCH /tenant/organization/teams/:id`
-Updates team name, lead user, and status while blocking unsafe deactivation.
-- **Permissions**: `org.team.manage`
-- **Body**: `UpdateTeamDto`
-- **Response**: `200 OK`
+Organization reads are private tenant data and must not be shared-cached across actors/scopes. Commands are synchronous and expose no client-polled asynchronous job.
 
-### `DELETE /tenant/organization/teams/:id`
-Soft-deletes a team when it has no users placed in it.
-- **Permissions**: `org.team.manage`
-- **Response**: `204 No Content`
+## AI implementation rules
+
+- Use the tree for navigation but refetch the specific collection after a mutation.
+- Do not infer access from tree presence; backend scope remains authoritative.
+- Ask for confirmation before deactivation/delete because dependent placements can make the operation fail.
+- Treat `204` delete responses as having no JSON body.

@@ -29,21 +29,13 @@ interface ServerCapacityChartProps {
 
 import { useI18n } from "@/i18n/I18nContext";
 
-const defaultMockServers: ServerCapacityItem[] = [
-  { id: "1", name: "DB-PRIMARY-01", currentTenants: 42, maxTenants: 50, utilization: 0.84 },
-  { id: "2", name: "DB-SECONDARY-01", currentTenants: 28, maxTenants: 50, utilization: 0.56 },
-  { id: "3", name: "DB-REPLICA-01", currentTenants: 15, maxTenants: 50, utilization: 0.3 },
-];
-
 export function ServerCapacityChart({
   servers,
   height = 240,
 }: ServerCapacityChartProps) {
   const { t } = useI18n();
 
-  const dataList = !servers || servers.length === 0 ? defaultMockServers : servers;
-
-  const chartData = dataList.map((s) => ({
+  const chartData = servers.map((s) => ({
     name: s.name,
     used: s.currentTenants,
     remaining: Math.max(0, s.maxTenants - s.currentTenants),
@@ -85,4 +77,3 @@ export function ServerCapacityChart({
     </div>
   );
 }
-

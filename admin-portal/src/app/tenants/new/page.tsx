@@ -17,19 +17,29 @@ import {
 } from "lucide-react";
 import { useRegisterTenant } from "./hooks/useRegisterTenant";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatStorageBytes } from "../lib/storage-placement";
 
 export default function RegisterTenantWizardPage() {
   const {
     t,
     currentStep,
-    setCurrentStep,
+    goToStep,
     formData,
     setFormData,
+    storagePlacementOptions,
+    storagePlacementState,
+    storagePlacementError,
+    selectedStoragePlacement,
+    showStorageSelectionError,
+    setShowStorageSelectionError,
+    loadStoragePlacementOptions,
+    hasValidStorageSelection,
+    isSubmitting,
+    submitError,
     isValidatingIdentity,
     identityResult,
     isPreviewingPlan,
     provisioningDag,
-    isSubmitting,
     handleValidateIdentity,
     handlePreviewPlan,
     handleSubmit,
@@ -69,7 +79,8 @@ export default function RegisterTenantWizardPage() {
         <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="grid grid-cols-5 gap-1 text-center text-xs font-bold">
             <button
-              onClick={() => setCurrentStep(1)}
+              type="button"
+              onClick={() => goToStep(1)}
               className={`py-2 px-1 rounded-xl transition-all ${
                 currentStep === 1
                   ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
@@ -82,7 +93,8 @@ export default function RegisterTenantWizardPage() {
             </button>
 
             <button
-              onClick={() => setCurrentStep(2)}
+              type="button"
+              onClick={() => goToStep(2)}
               className={`py-2 px-1 rounded-xl transition-all ${
                 currentStep === 2
                   ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
@@ -95,7 +107,8 @@ export default function RegisterTenantWizardPage() {
             </button>
 
             <button
-              onClick={() => setCurrentStep(3)}
+              type="button"
+              onClick={() => goToStep(3)}
               className={`py-2 px-1 rounded-xl transition-all ${
                 currentStep === 3
                   ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
@@ -108,7 +121,8 @@ export default function RegisterTenantWizardPage() {
             </button>
 
             <button
-              onClick={() => setCurrentStep(4)}
+              type="button"
+              onClick={() => goToStep(4)}
               className={`py-2 px-1 rounded-xl transition-all ${
                 currentStep === 4
                   ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
@@ -121,7 +135,8 @@ export default function RegisterTenantWizardPage() {
             </button>
 
             <button
-              onClick={() => setCurrentStep(5)}
+              type="button"
+              onClick={() => goToStep(5)}
               className={`py-2 px-1 rounded-xl transition-all ${
                 currentStep === 5
                   ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
@@ -347,55 +362,267 @@ export default function RegisterTenantWizardPage() {
             </div>
           )}
 
-          {/* Step 3: Database Host Placement */}
+          {/* Step 3: Infrastructure Placement */}
           {currentStep === 3 && (
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
                 <Server className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                <span>{lang === "ar" ? "الخطوة 3: تحديد سيرفر قاعدة البيانات (Database Host Placement)" : "Step 3: Database Host Placement"}</span>
+                <span>{lang === "ar" ? "الخطوة 3: تحديد البنية التحتية (Infrastructure Placement)" : "Step 3: Infrastructure Placement"}</span>
               </h3>
 
-              <div className="space-y-3">
-                <div className="p-4 bg-blue-50/60 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-blue-700 dark:text-blue-400">{lang === "ar" ? "التسكين الذكي التلقائي (Auto Optimal Target Placement)" : "Auto Optimal Placement"}</span>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{lang === "ar" ? "يقوم الـ Control Plane بااختيار أفضل سيرفر نشط حسب القرب الجغرافي والسعة المتاحة." : "Control Plane selects the optimal database host based on region and capacity."}</p>
-                  </div>
-                  <input
-                    type="radio"
-                    name="placement"
-                    checked={formData.placementMode === "AUTO"}
-                    onChange={() => setFormData({ ...formData, placementMode: "AUTO", databaseServerId: "" })}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                </div>
-
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between">
+              <div className="space-y-6">
+                {/* Database Placement */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 pb-1">
+                    {lang === "ar" ? "سيرفر قاعدة البيانات (Database Host)" : "Database Host"}
+                  </h4>
+                  <div className="p-4 bg-blue-50/60 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800 flex items-center justify-between">
                     <div>
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{lang === "ar" ? "التحديد اليدوي لسيرفر معين" : "Manual Host Selection"}</span>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{lang === "ar" ? "اختر سيرفر محدد من قائمة السيرفرات النشطة المعرفة في المنصة." : "Select a specific active database server host from the cluster list."}</p>
+                      <span className="text-xs font-bold text-blue-700 dark:text-blue-400">{lang === "ar" ? "التسكين الذكي التلقائي (Auto Optimal Target Placement)" : "Auto Optimal Placement"}</span>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{lang === "ar" ? "يقوم الـ Control Plane بااختيار أفضل سيرفر نشط حسب القرب الجغرافي والسعة المتاحة." : "Control Plane selects the optimal database host based on region and capacity."}</p>
                     </div>
                     <input
                       type="radio"
                       name="placement"
-                      checked={formData.placementMode === "MANUAL"}
-                      onChange={() => setFormData({ ...formData, placementMode: "MANUAL" })}
+                      checked={formData.placementMode === "AUTO"}
+                      onChange={() => setFormData({ ...formData, placementMode: "AUTO", databaseServerId: "" })}
                       className="w-4 h-4 text-blue-600"
                     />
                   </div>
 
-                  {formData.placementMode === "MANUAL" && (
-                    <select
-                      value={formData.databaseServerId}
-                      onChange={(e) => setFormData({ ...formData, databaseServerId: e.target.value })}
-                      className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{lang === "ar" ? "التحديد اليدوي لسيرفر معين" : "Manual Host Selection"}</span>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{lang === "ar" ? "اختر سيرفر محدد من قائمة السيرفرات النشطة المعرفة في المنصة." : "Select a specific active database server host from the cluster list."}</p>
+                      </div>
+                      <input
+                        type="radio"
+                        name="placement"
+                        checked={formData.placementMode === "MANUAL"}
+                        onChange={() => setFormData({ ...formData, placementMode: "MANUAL" })}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                    </div>
+
+                    {formData.placementMode === "MANUAL" && (
+                      <select
+                        value={formData.databaseServerId}
+                        onChange={(e) => setFormData({ ...formData, databaseServerId: e.target.value })}
+                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="">{lang === "ar" ? "-- اختر السيرفر المطلوب --" : "-- Select Database Host --"}</option>
+                        <option value="srv-eg-01">DB-PRIMARY-EG-01 (Egypt - 45/50 tenants)</option>
+                        <option value="srv-eg-02">DB-PRIMARY-EG-02 (Egypt - 12/50 tenants)</option>
+                        <option value="srv-sa-01">DB-PRIMARY-SA-01 (KSA - 8/50 tenants)</option>
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                {/* Storage Placement */}
+                <div className="space-y-3 pt-3">
+                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 pb-1">
+                    {lang === "ar" ? "سيرفر التخزين (مطلوب)" : "Storage Server (required)"}
+                  </h4>
+                  {storagePlacementState === "loading" && (
+                    <div
+                      className="p-4 bg-blue-50/60 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800 flex items-center gap-3"
+                      role="status"
                     >
-                      <option value="">{lang === "ar" ? "-- اختر السيرفر المطلوب --" : "-- Select Database Host --"}</option>
-                      <option value="srv-eg-01">DB-PRIMARY-EG-01 (Egypt - 45/50 tenants)</option>
-                      <option value="srv-eg-02">DB-PRIMARY-EG-02 (Egypt - 12/50 tenants)</option>
-                      <option value="srv-sa-01">DB-PRIMARY-SA-01 (KSA - 8/50 tenants)</option>
-                    </select>
+                      <Loader2 className="w-4 h-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" />
+                      <div>
+                        <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
+                          {lang === "ar"
+                            ? "جاري تحميل أهداف التخزين المؤهلة"
+                            : "Loading eligible storage targets"}
+                        </span>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {lang === "ar"
+                            ? "لا يمكن متابعة إنشاء المستأجر قبل اكتمال هذه الخطوة."
+                            : "Tenant creation stays blocked until this check completes."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {storagePlacementState === "forbidden" && (
+                    <div
+                      className="p-4 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800 flex items-start gap-3"
+                      role="alert"
+                    >
+                      <ShieldCheck className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                      <div>
+                        <span className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                          {lang === "ar"
+                            ? "صلاحية إنشاء المستأجر مطلوبة"
+                            : "Tenant creation permission required"}
+                        </span>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
+                          {lang === "ar"
+                            ? "تحتاج إلى admin.tenants.create لعرض أهداف التخزين وإنشاء مستأجر."
+                            : "You need admin.tenants.create to load storage targets and create a tenant."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {storagePlacementState === "error" && (
+                    <div
+                      className="p-4 bg-rose-50 dark:bg-rose-950/40 rounded-xl border border-rose-200 dark:border-rose-800 space-y-3"
+                      role="alert"
+                    >
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                        <div>
+                          <span className="text-xs font-bold text-rose-800 dark:text-rose-300">
+                            {lang === "ar"
+                              ? "تعذر تحميل أهداف التخزين"
+                              : "Storage targets unavailable"}
+                          </span>
+                          <p className="text-[11px] text-rose-700 dark:text-rose-400 mt-0.5">
+                            {storagePlacementError?.message}
+                          </p>
+                          {storagePlacementError?.correlationId && (
+                            <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 mt-1 font-mono">
+                              {lang === "ar" ? "رقم التتبع" : "Correlation ID"}:{" "}
+                              {storagePlacementError.correlationId}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void loadStoragePlacementOptions()}
+                        className="px-3 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-300 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-800 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-colors"
+                      >
+                        {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+                      </button>
+                    </div>
+                  )}
+
+                  {storagePlacementState === "empty" && (
+                    <div
+                      className="p-4 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800 space-y-3"
+                      role="alert"
+                    >
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                        <div>
+                          <span className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                            {lang === "ar"
+                              ? "لا يوجد هدف تخزين جاهز للإنتاج"
+                              : "No production-ready storage target"}
+                          </span>
+                          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
+                            {lang === "ar"
+                              ? "سيبقى النموذج محفوظاً، لكن لا يمكن إنشاء المستأجر حتى يصبح هدف مؤهل متاحاً."
+                              : "Your draft remains available, but tenant creation is blocked until an eligible target exists."}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void loadStoragePlacementOptions()}
+                        className="px-3 py-1.5 text-xs font-bold text-amber-800 dark:text-amber-300 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-950/60 transition-colors"
+                      >
+                        {lang === "ar" ? "تحديث القائمة" : "Refresh targets"}
+                      </button>
+                    </div>
+                  )}
+
+                  {storagePlacementState === "ready" && (
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {lang === "ar"
+                            ? "اختر هدف التخزين صراحة"
+                            : "Select a storage target explicitly"}
+                        </span>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {lang === "ar"
+                            ? "لا يوجد اختيار تلقائي أو احتياطي. يعيد Core التحقق من الأهلية عند الإنشاء."
+                            : "There is no automatic target or fallback. Core revalidates eligibility during creation."}
+                        </p>
+                      </div>
+                      <select
+                        value={formData.storageServerId}
+                        onChange={(e) => {
+                          setFormData({
+                            ...formData,
+                            storageServerId: e.target.value,
+                          });
+                          setShowStorageSelectionError(false);
+                        }}
+                        aria-invalid={
+                          showStorageSelectionError && !hasValidStorageSelection
+                        }
+                        className={`w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border rounded-xl text-slate-900 dark:text-slate-100 ${
+                          showStorageSelectionError && !hasValidStorageSelection
+                            ? "border-rose-400 dark:border-rose-700"
+                            : "border-slate-200 dark:border-slate-700"
+                        }`}
+                        required
+                      >
+                        <option value="">{lang === "ar" ? "-- اختر السيرفر المطلوب --" : "-- Select Storage Server --"}</option>
+                        {storagePlacementOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name} · {option.region} · {option.capacityPercent}% ·{" "}
+                            {formatStorageBytes(option.availableReservationBytes)}{" "}
+                            {lang === "ar" ? "متاح" : "available"}
+                          </option>
+                        ))}
+                      </select>
+
+                      {showStorageSelectionError &&
+                        !hasValidStorageSelection && (
+                          <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            {lang === "ar"
+                              ? "اختر هدف تخزين مؤهل قبل المتابعة."
+                              : "Select an eligible storage target before continuing."}
+                          </p>
+                        )}
+
+                      {selectedStoragePlacement && (
+                        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px]">
+                          <div>
+                            <dt className="text-slate-500">
+                              {lang === "ar" ? "الموفر" : "Provider"}
+                            </dt>
+                            <dd className="font-bold mt-0.5">
+                              {selectedStoragePlacement.provider}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-slate-500">
+                              {lang === "ar" ? "المنطقة" : "Region"}
+                            </dt>
+                            <dd className="font-bold mt-0.5">
+                              {selectedStoragePlacement.region}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-slate-500">
+                              {lang === "ar" ? "الاستخدام" : "Capacity"}
+                            </dt>
+                            <dd className="font-bold mt-0.5">
+                              {selectedStoragePlacement.capacityPercent}%
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-slate-500">
+                              {lang === "ar" ? "الحجوزات المتاحة" : "Available reservation"}
+                            </dt>
+                            <dd className="font-bold mt-0.5">
+                              {formatStorageBytes(
+                                selectedStoragePlacement.availableReservationBytes,
+                              )}
+                            </dd>
+                          </div>
+                        </dl>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -485,7 +712,29 @@ export default function RegisterTenantWizardPage() {
                   <span className="text-slate-500">{t.tenants.hostingServer}:</span>
                   <span className="font-bold font-mono">{formData.placementMode === "AUTO" ? (lang === "ar" ? "تسكين ذكي تلقائي" : "Auto Optimal Placement") : formData.databaseServerId}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">{lang === "ar" ? "سيرفر التخزين:" : "Storage Server:"}</span>
+                  <span className="font-bold font-mono text-end">
+                    {selectedStoragePlacement
+                      ? `${selectedStoragePlacement.name} (${selectedStoragePlacement.id})`
+                      : lang === "ar"
+                        ? "لم يتم الاختيار"
+                        : "Not selected"}
+                  </span>
+                </div>
               </div>
+              {submitError && (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200 flex flex-col gap-1"
+                >
+                  <p className="font-bold flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {lang === "ar" ? "فشل إنشاء المستأجر" : "Tenant creation failed"}</p>
+                  <p className="mt-1">{submitError.message}</p>
+                  {submitError.correlationId && (
+                    <p className="mt-1 opacity-80 font-mono">Correlation ID: {submitError.correlationId}</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -511,17 +760,11 @@ export default function RegisterTenantWizardPage() {
             ) : (
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !hasValidStorageSelection}
                 className="px-6 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-600/20 transition-colors cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
               >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{lang === "ar" ? "جاري التجهيز والإنشاء..." : "Provisioning Environment..."}</span>
-                  </>
-                ) : (
-                  <span>{lang === "ar" ? "تأكيد وبدء التجهيز التلقائي" : "Confirm & Start Provisioning"}</span>
-                )}
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                <span>{lang === "ar" ? "تأكيد الإنشاء" : "Confirm Creation"}</span>
               </button>
             )}
           </div>

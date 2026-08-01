@@ -1,7 +1,7 @@
 # Admin Portal Navigation and Permission Mapping
 
 Last verified against the current frontend routes and Core permission
-decorators on **2026-07-24**.
+decorators on **2026-07-30**.
 
 Frontend page paths and API paths are different namespaces. Navigation must use
 paths such as `/tenants`; data requests must use paths such as
@@ -11,13 +11,14 @@ paths such as `/tenants`; data requests must use paths such as
 
 | UI item | Frontend route | Required permission | Current data status |
 |:---|:---|:---|:---|
-| Dashboard | `/dashboard` | `admin.reports.read` | Mock |
-| Database Servers | `/database-servers` | `admin.database_servers.read` | Mock |
-| Tenants | `/tenants` | `admin.tenants.read` | Mock |
-| Modules | `/modules` | `admin.catalog.read` | Mock |
-| Admin → Users | `/users` | `admin.users.read` | Mock |
-| Admin → Roles | `/roles` | `admin.roles.read` | Mock |
-| Settings | `/settings` | At least one visible settings permission; individual screens use `admin.settings.read` | Mixed static/fallback |
+| Dashboard | `/dashboard` | `admin.reports.read` | `DONE/REFACTOR` |
+| Database Servers | `/database-servers` | `admin.database_servers.read` | `DONE/REFACTOR` |
+| Storage Servers | `/storage-servers` | `admin.storage_servers.read` | Live bounded registry list/detail subset |
+| Tenants | `/tenants` | `admin.tenants.read` | `PARTIAL/BROKEN` |
+| Modules | `/modules` | `admin.catalog.read` | `DONE/PARTIAL/REFACTOR` |
+| Admin → Users | `/users` | `admin.users.read` | `DONE/PARTIAL` |
+| Admin → Roles | `/roles` | `admin.roles.read` | `DONE/PARTIAL/REFACTOR` |
+| Settings | `/settings` | At least one visible settings permission; individual screens use `admin.settings.read` | `DONE/PARTIAL/REFACTOR` |
 
 The current `Navbar` does not permission-gate these items. When wiring RBAC,
 derive visibility from the `permissions` array returned by
@@ -31,6 +32,9 @@ derive visibility from the `permissions` array returned by
 /database-servers
 ├─ /database-servers/new
 └─ /database-servers/[id]
+
+/storage-servers
+└─ /storage-servers/[id]
 
 /tenants
 ├─ /tenants/new
@@ -67,14 +71,30 @@ frontend page exists yet:
 | Subscriptions | `/subscriptions` | Core `/api/admin/core/v1/subscriptions` | `admin.subscriptions.read` |
 | Invoices | `/invoices` | Core `/api/admin/core/v1/invoices` | `admin.invoices.read` |
 | Reports | `/reports` | Core `/api/admin/core/v1/reports` | `admin.reports.read` |
+| Payments and reconciliation | `/payments` | Core `/api/admin/core/v1/payments` | `admin.wallet.read` / `admin.billing.reconcile` |
+| Provisioning governance | `/provisioning` | Core `/api/admin/core/v1/provisioning` | Domain-specific `admin.provisioning.*` |
+| Control-plane audit | `/audit` | Core `/api/admin/core/v1/audit` | `admin.audit.read` |
 | Logging | `/logging` | Core `/api/admin/core/v1/logging` | `admin.logging.read` |
 | Backup & Restore | `/backups` | Worker `/api/admin/worker/v1/backups` and `/restores` | `admin.backups.read` |
 
-Wallet, tenant users, and provisioning operations are naturally nested under
-`/tenants/[id]` rather than primary navigation items.
+Wallet, tenant users, provisioning operations, and the future tenant Storage
+Server migration panel are naturally nested under `/tenants/[id]` rather than
+primary navigation items.
 
-Notifications currently appear as a navbar dropdown. It should use
-`admin.notifications.read` when it becomes server-backed.
+Notifications currently appear as a static navbar dropdown. A server-backed
+inbox should use `admin.notifications.read` and REST polling until Admin
+Realtime is released.
+
+The live bounded Storage Servers module uses an add modal on `/storage-servers` and
+one `/storage-servers/[id]` route for both view and embedded edit mode. It does
+not require `/storage-servers/new` or `/storage-servers/[id]/edit`. See
+[Storage Servers](../api/storage-servers.md).
+
+Do not add a top-level tenant-storage-migrations route. When the feature's
+read-model and operational release gates close, expose it as a permissioned
+panel under `/tenants/[id]`. Ordinary profile edit must continue to exclude
+`storageServerId`. See
+[Tenant Storage Server Migrations](../api/tenant-storage-migrations.md).
 
 ## Permission-gating rules
 

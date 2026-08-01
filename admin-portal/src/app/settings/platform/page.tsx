@@ -6,13 +6,48 @@ import { SettingField } from "../components/SettingField";
 import { SettingSearch } from "../components/SettingSearch";
 import { Server, Loader2 } from "lucide-react";
 
+import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
+
 export default function PlatformSettingsPage() {
   const [search, setSearch] = useState("");
-  const { lang, settings: platformSettings, isLoading: isPlatformLoading, updateSetting } = useSettings("platform.");
-  const { settings: supportSettings, isLoading: isSupportLoading } = useSettings("support.");
+  const { 
+    lang, 
+    settings: platformSettings, 
+    isLoading: isPlatformLoading, 
+    updateSetting: updatePlatformSetting,
+    hasUnsavedChanges: platformHasUnsaved,
+    isSaving: platformIsSaving,
+    saveAllSettings: savePlatformSettings
+  } = useSettings("platform.");
+  
+  const { 
+    settings: supportSettings, 
+    isLoading: isSupportLoading,
+    updateSetting: updateSupportSetting,
+    hasUnsavedChanges: supportHasUnsaved,
+    isSaving: supportIsSaving,
+    saveAllSettings: saveSupportSettings
+  } = useSettings("support.");
 
   const allSettings = [...platformSettings, ...supportSettings];
   const isLoading = isPlatformLoading || isSupportLoading;
+  const hasUnsavedChanges = platformHasUnsaved || supportHasUnsaved;
+  const isSaving = platformIsSaving || supportIsSaving;
+
+  const updateSetting = (key: string, newValue: string | number | boolean) => {
+    if (key.startsWith("platform.")) {
+      updatePlatformSetting(key, newValue);
+    } else {
+      updateSupportSetting(key, newValue);
+    }
+  };
+
+  const handleSaveAll = async () => {
+    const promises = [];
+    if (platformHasUnsaved) promises.push(savePlatformSettings());
+    if (supportHasUnsaved) promises.push(saveSupportSettings());
+    await Promise.all(promises);
+  };
 
   const filteredSettings = allSettings.filter((s) => {
     if (!search.trim()) return true;
@@ -39,6 +74,13 @@ export default function PlatformSettingsPage() {
 
         <SettingSearch value={search} onChange={setSearch} />
       </div>
+
+      <SaveSettingsBanner 
+        hasUnsavedChanges={hasUnsavedChanges} 
+        isSaving={isSaving} 
+        onSave={handleSaveAll} 
+        lang={lang} 
+      />
 
       <div className="space-y-4">
         {isLoading ? (

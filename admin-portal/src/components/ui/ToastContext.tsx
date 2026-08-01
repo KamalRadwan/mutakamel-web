@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
 import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { useEffect } from "react";
 
 export type ToastType = "success" | "error" | "info" | "warning";
 
@@ -54,6 +55,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     info: (title: string, message?: string, duration?: number) => addToast("info", title, message, duration),
     warning: (title: string, message?: string, duration?: number) => addToast("warning", title, message, duration),
   };
+
+  useEffect(() => {
+    const handleGlobalToast = (e: CustomEvent) => {
+      const { type, title, message, duration } = e.detail;
+      addToast(type, title, message, duration);
+    };
+    window.addEventListener("global-toast", handleGlobalToast as EventListener);
+    return () => window.removeEventListener("global-toast", handleGlobalToast as EventListener);
+  }, [addToast]);
 
   return (
     <ToastContext.Provider value={{ toast, removeToast }}>

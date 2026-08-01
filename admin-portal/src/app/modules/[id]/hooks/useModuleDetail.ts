@@ -1,29 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
+import { axiosClient, generateUUIDv7 } from "@/lib/api/axiosClient";
+import { useToast } from "@/components/ui/ToastContext";
+import {
+  ModuleView,
+  TierView,
+  FeatureView,
+  TierFeatureGrantView,
+  PriceTierView,
+} from "@/types/module";
 
-export type ModuleTabKey = "preview" | "tiers" | "features" | "grants" | "price";
-
-export interface TierRecord {
-  id: string;
-  tierKey: string;
-  tierName: string;
-  color: string;
-  rank: number;
-  isActive: boolean;
-}
-
-export interface FeatureRecord {
-  id: string;
-  featureKey: string;
-  featureName: string;
-  valueType: "BOOLEAN" | "NUMERIC_LIMIT" | "TEXT_SET";
-  defaultValue: string;
-  description: string;
-  isActive: boolean;
-}
+export type ModuleTabKey = "preview" | "tiers" | "features" | "grants" | "price" | "history";
 
 export interface TierFeatureGrant {
   tierId: string;
@@ -32,35 +22,50 @@ export interface TierFeatureGrant {
   value: string;
 }
 
-export interface PriceBracket {
+export interface ModuleAuditLogEntry {
   id: string;
-  tierId: string;
-  billingCycle: "MONTHLY" | "YEARLY";
-  minUsers: number;
-  maxUsers: number | null; // null = open-ended (∞) Infinity
-  unitPriceUsd: string;
+  schemaVersion: number;
+  entityType: string;
+  action: string;
+  entityId: string | null;
+  moduleId: string;
+  tierId: string | null;
+  actorAdminId: string | null;
+  actorLabel: string | null;
+  operationId: string;
+  idempotencyKey: string | null;
+  sourceType: string;
+  sourceId: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  diff: { field: string; before?: unknown; after?: unknown }[];
+  correlationId: string | null;
+  metadata: Record<string, unknown> | null;
+  occurredAt: string;
 }
 
 export function useModuleDetail(id: string) {
   const router = useRouter();
   const { t, lang } = useI18n();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<ModuleTabKey>("preview");
   const [isSaved, setIsSaved] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saveTabMessage, setSaveTabMessage] = useState("");
   const [pricingValidationError, setPricingValidationError] = useState<string | null>(null);
 
   // Modals state
   const [isAddTierOpen, setIsAddTierOpen] = useState(false);
-  const [editingTier, setEditingTier] = useState<TierRecord | null>(null);
-
+  const [editingTier, setEditingTier] = useState<TierView | null>(null);
   const [isAddFeatureOpen, setIsAddFeatureOpen] = useState(false);
   const [isImportFeaturesOpen, setIsImportFeaturesOpen] = useState(false);
   const [importJsonText, setImportJsonText] = useState("");
-  const [editingFeature, setEditingFeature] = useState<FeatureRecord | null>(null);
-
+  const [editingFeature, setEditingFeature] = useState<FeatureView | null>(null);
   const [isAddPriceBracketOpen, setIsAddPriceBracketOpen] = useState(false);
+  const [editingPriceBracket, setEditingPriceBracket] = useState<PriceTierView | null>(null);
 
   // Add Tier Form
   const [newTierKey, setNewTierKey] = useState("");
@@ -69,166 +74,190 @@ export function useModuleDetail(id: string) {
   const [newTierIsActive, setNewTierIsActive] = useState(true);
 
   // Add Feature Form
-  const [newFeatureKey, setNewFeatureKey] = useState(`${id}.`);
+  const [newFeatureKey, setNewFeatureKey] = useState("");
   const [newFeatureName, setNewFeatureName] = useState("");
   const [newFeatureType, setNewFeatureType] = useState<"BOOLEAN" | "NUMERIC_LIMIT" | "TEXT_SET">("BOOLEAN");
   const [newFeatureDefault, setNewFeatureDefault] = useState("true");
   const [newFeatureDesc, setNewFeatureDesc] = useState("");
 
   // Add Price Bracket Form
-  const [newBracketTierId, setNewBracketTierId] = useState("t-1");
+  const [newBracketTierId, setNewBracketTierId] = useState("");
   const [newBracketMinUsers, setNewBracketMinUsers] = useState(1);
   const [newBracketMaxUsers, setNewBracketMaxUsers] = useState<number | null>(10);
   const [newBracketIsInfinity, setNewBracketIsInfinity] = useState(false);
   const [newBracketUnitPrice, setNewBracketUnitPrice] = useState("15.00");
-  const [newBracketCycle, setNewBracketCycle] = useState<"MONTHLY" | "YEARLY">("MONTHLY");
+  const [newBracketCycle, setNewBracketCycle] = useState<"MONTHLY" | "ANNUAL">("MONTHLY");
 
-  // Section 5 Pricing Filters (Dual Filters: 1: Cycle MONTHLY/YEARLY, 2: Tier)
-  const [pricingTierFilter, setPricingTierFilter] = useState<string>("t-1");
+  // Filters
+  const [pricingTierFilter, setPricingTierFilter] = useState<string>("ALL");
   const [pricingCycleFilter, setPricingCycleFilter] = useState<string>("MONTHLY");
 
-  // Section 1: Preview Module Data
-  const [moduleData, setModuleData] = useState({
-    id: `mod-${id}`,
-    moduleKey: id,
-    moduleName:
-      id === "crm"
-        ? "إدارة علاقات العملاء (CRM Suite)"
-        : id === "trade"
-        ? "محرك التجارة والاشتراكات (Trade Engine)"
-        : id === "worker"
-        ? "محرك المهام والتحليلات (Worker & Analytics)"
-        : "النواة الأساسية (Core Foundation)",
-    description:
-      "مكّون منصي متكامل يوفر البنية الأساسية وإدارة الأذونات والتكامل البرمجي العالي الكفاءة للمستأجرين.",
-    status: "ACTIVE" as "ACTIVE" | "BETA" | "DEPRECATED",
-    category: "FOUNDATION",
-  });
+  // Data states
+  const [moduleData, setModuleData] = useState<ModuleView | null>(null);
+  const [resolvedModuleId, setResolvedModuleId] = useState<string>(id);
+  const [tiers, setTiers] = useState<TierView[]>([]);
+  const [features, setFeatures] = useState<FeatureView[]>([]);
+  const [grants, setGrants] = useState<TierFeatureGrant[]>([]);
+  const [priceBrackets, setPriceBrackets] = useState<PriceTierView[]>([]);
+  const [auditLogs, setAuditLogs] = useState<ModuleAuditLogEntry[]>([]);
+  const [auditFilter, setAuditFilter] = useState<string>("ALL");
+  const [auditSearch, setAuditSearch] = useState<string>("");
 
-  // Section 2: Tiers
-  const [tiers, setTiers] = useState<TierRecord[]>([
-    {
-      id: "t-1",
-      tierKey: "starter",
-      tierName: "الحزمة الأساسية (Starter)",
-      color: "#10b981",
-      rank: 1,
-      isActive: true,
-    },
-    {
-      id: "t-2",
-      tierKey: "business",
-      tierName: "حزمة الأعمال (Business)",
-      color: "#0b6ff4",
-      rank: 2,
-      isActive: true,
-    },
-    {
-      id: "t-3",
-      tierKey: "pro",
-      tierName: "الحزمة المتقدمة (Pro)",
-      color: "#8b5cf6",
-      rank: 3,
-      isActive: true,
-    },
-    {
-      id: "t-4",
-      tierKey: "enterprise",
-      tierName: "حزمة المؤسسات (Enterprise)",
-      color: "#f59e0b",
-      rank: 4,
-      isActive: true,
-    },
-  ]);
+  // Audit log initial population helper
+  const fetchAuditLogs = useCallback(async (targetId: string, modName?: string) => {
+    try {
+      const res = await axiosClient.get(`/api/admin/core/v1/modules/${targetId}/audit`).catch(() => null);
+      if (res?.data?.data?.items && Array.isArray(res.data.data.items)) {
+        setAuditLogs(res.data.data.items);
+        return;
+      }
+    } catch (e) {
+      console.warn("Failed to fetch audit logs");
+    }
+    setAuditLogs([]);
+  }, []);
 
-  // Section 3: Features Catalogue
-  const [features, setFeatures] = useState<FeatureRecord[]>([
-    {
-      id: "f-1",
-      featureKey: `${id}.leads.export`,
-      featureName: "تصدير بيانات العملاء (CSV/Excel)",
-      valueType: "BOOLEAN",
-      defaultValue: "true",
-      description: "السماح بتصدير جداول البيانات والتقرير",
-      isActive: true,
-    },
-    {
-      id: "f-2",
-      featureKey: `${id}.max_custom_fields`,
-      featureName: "الحد الأقصى للحقول المخصصة",
-      valueType: "NUMERIC_LIMIT",
-      defaultValue: "50",
-      description: "عدد الحقول الإضافية المسموحة للنماذج",
-      isActive: true,
-    },
-    {
-      id: "f-3",
-      featureKey: `${id}.api_rate_limit`,
-      featureName: "معدل استدعاءات الـ API / دقيقة",
-      valueType: "NUMERIC_LIMIT",
-      defaultValue: "1000",
-      description: "حد حماية السيرفر والاستدعاءات البرمجية",
-      isActive: true,
-    },
-  ]);
+  // Resolve ID helper if passed key instead of UUID
+  const resolveTargetId = useCallback(async (): Promise<string> => {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUuid) return id;
 
-  // Section 4: Tier -> Feature Grants Matrix
-  const [grants, setGrants] = useState<TierFeatureGrant[]>([
-    { tierId: "t-1", featureId: "f-1", isEnabled: true, value: "true" },
-    { tierId: "t-1", featureId: "f-2", isEnabled: true, value: "10" },
-    { tierId: "t-2", featureId: "f-1", isEnabled: true, value: "true" },
-    { tierId: "t-2", featureId: "f-2", isEnabled: true, value: "50" },
-    { tierId: "t-3", featureId: "f-1", isEnabled: true, value: "true" },
-    { tierId: "t-3", featureId: "f-2", isEnabled: true, value: "200" },
-  ]);
+    try {
+      const res = await axiosClient.get('/api/admin/core/v1/modules?limit=100');
+      const items: ModuleView[] = res.data?.items || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      const found = items.find((m) => m.key.toLowerCase() === id.toLowerCase() || m.id === id);
+      if (found) return found.id;
+    } catch (e) {
+      console.warn("Failed to resolve module ID from key");
+    }
+    return id;
+  }, [id]);
 
-  // Section 5: Price Brackets (Valid contiguity & start at 1, end at ∞ Infinity)
-  const [priceBrackets, setPriceBrackets] = useState<PriceBracket[]>([
-    // Tier 1 (Starter) Monthly
-    { id: "p-101", tierId: "t-1", billingCycle: "MONTHLY", minUsers: 1, maxUsers: 10, unitPriceUsd: "10.00" },
-    { id: "p-102", tierId: "t-1", billingCycle: "MONTHLY", minUsers: 11, maxUsers: null, unitPriceUsd: "8.00" },
+  // Fetch Module
+  const fetchModule = useCallback(async (targetId: string) => {
+    try {
+      const res = await axiosClient.get(`/api/admin/core/v1/modules/${targetId}`);
+      setModuleData(res.data.data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Module not found.");
+    }
+  }, []);
 
-    // Tier 1 (Starter) Yearly
-    { id: "p-103", tierId: "t-1", billingCycle: "YEARLY", minUsers: 1, maxUsers: null, unitPriceUsd: "8.00" },
+  // Fetch Tiers
+  const fetchTiers = useCallback(async (targetId: string) => {
+    try {
+      const res = await axiosClient.get(`/api/admin/core/v1/modules/${targetId}/tiers`);
+      setTiers(res.data.data || []);
+      
+      const loadedTiers = res.data.data || [];
+      if (loadedTiers.length > 0 && pricingTierFilter === "ALL") {
+         setPricingTierFilter(loadedTiers[0].id);
+         setNewBracketTierId(loadedTiers[0].id);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch tiers");
+    }
+  }, [pricingTierFilter]);
 
-    // Tier 2 (Business) Monthly
-    { id: "p-201", tierId: "t-2", billingCycle: "MONTHLY", minUsers: 1, maxUsers: 10, unitPriceUsd: "15.00" },
-    { id: "p-202", tierId: "t-2", billingCycle: "MONTHLY", minUsers: 11, maxUsers: 50, unitPriceUsd: "12.00" },
-    { id: "p-203", tierId: "t-2", billingCycle: "MONTHLY", minUsers: 51, maxUsers: null, unitPriceUsd: "9.00" },
+  // Fetch Features
+  const fetchFeatures = useCallback(async (targetId: string) => {
+    try {
+      const res = await axiosClient.get(`/api/admin/core/v1/modules/${targetId}/features`);
+      setFeatures(res.data.data || []);
+    } catch (err) {
+      console.warn("Failed to fetch features");
+    }
+  }, []);
 
-    // Tier 2 (Business) Yearly
-    { id: "p-204", tierId: "t-2", billingCycle: "YEARLY", minUsers: 1, maxUsers: null, unitPriceUsd: "10.00" },
-  ]);
+  // Fetch Grants
+  const fetchGrants = useCallback(async (currentTiers: TierView[]) => {
+    try {
+      const allGrants: TierFeatureGrant[] = [];
+      for (const tier of currentTiers) {
+        const res = await axiosClient.get(`/api/admin/core/v1/tiers/${tier.id}/features`);
+        const tierGrants = res.data.data || [];
+        tierGrants.forEach((g: any) => {
+          allGrants.push({
+            tierId: g.tierId,
+            featureId: g.featureId,
+            isEnabled: true,
+            value: g.config ? JSON.stringify(g.config) : "true",
+          });
+        });
+      }
+      setGrants(allGrants);
+    } catch (err) {
+      console.warn("Failed to fetch grants");
+    }
+  }, []);
 
-  // Filter Price Brackets by BOTH Tier and Billing Cycle
+  // Fetch Pricing
+  const fetchPricing = useCallback(async (currentTiers: TierView[]) => {
+    try {
+      let allBrackets: PriceTierView[] = [];
+      for (const tier of currentTiers) {
+        const res = await axiosClient.get(`/api/admin/core/v1/tiers/${tier.id}/price-tiers?billingCycle=MONTHLY`);
+        const resAnn = await axiosClient.get(`/api/admin/core/v1/tiers/${tier.id}/price-tiers?billingCycle=ANNUAL`);
+        const monthlyData = (res.data?.data || []).map((b: any) => ({
+          ...b,
+          tierId: b.tierId || tier.id,
+          unitPriceUsd: b.unitPriceUsd !== undefined ? String(b.unitPriceUsd) : (b.unitPrice !== undefined ? String(b.unitPrice) : "0.0000"),
+          minUsers: b.minUsers ?? 1,
+          maxUsers: b.maxUsers ?? null,
+        }));
+        const annualData = (resAnn.data?.data || []).map((b: any) => ({
+          ...b,
+          tierId: b.tierId || tier.id,
+          unitPriceUsd: b.unitPriceUsd !== undefined ? String(b.unitPriceUsd) : (b.unitPrice !== undefined ? String(b.unitPrice) : "0.0000"),
+          minUsers: b.minUsers ?? 1,
+          maxUsers: b.maxUsers ?? null,
+        }));
+        allBrackets = [...allBrackets, ...monthlyData, ...annualData];
+      }
+      setPriceBrackets(allBrackets);
+    } catch (err) {
+      console.warn("Failed to fetch prices");
+    }
+  }, []);
+
+  // Initial Load
+  useEffect(() => {
+    const loadAll = async () => {
+      setIsLoading(true);
+      const targetId = await resolveTargetId();
+      setResolvedModuleId(targetId);
+
+      await fetchModule(targetId);
+      
+      try {
+        const tiersRes = await axiosClient.get(`/api/admin/core/v1/modules/${targetId}/tiers`);
+        const loadedTiers = tiersRes.data.data || [];
+        setTiers(loadedTiers);
+        
+        if (loadedTiers.length > 0) {
+           setPricingTierFilter(loadedTiers[0].id);
+           setNewBracketTierId(loadedTiers[0].id);
+        }
+
+        await fetchFeatures(targetId);
+        await fetchGrants(loadedTiers);
+        await fetchPricing(loadedTiers);
+        await fetchAuditLogs(targetId, moduleData?.name);
+      } catch (e) {
+        // Handle failures gracefully
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadAll();
+  }, [id, resolveTargetId, fetchModule, fetchFeatures, fetchGrants, fetchPricing]);
+
+
   const filteredPriceBrackets = priceBrackets.filter((p) => {
     const matchesTier = pricingTierFilter === "ALL" || p.tierId === pricingTierFilter;
     const matchesCycle = pricingCycleFilter === "ALL" || p.billingCycle === pricingCycleFilter;
     return matchesTier && matchesCycle;
   });
-
-  // Tier Reorder Drag & Drop Up/Down
-  const moveTierUp = (index: number) => {
-    if (index <= 0) return;
-    setTiers((prev) => {
-      const next = [...prev];
-      const temp = next[index];
-      next[index] = next[index - 1];
-      next[index - 1] = temp;
-      return next.map((item, idx) => ({ ...item, rank: idx + 1 }));
-    });
-  };
-
-  const moveTierDown = (index: number) => {
-    if (index >= tiers.length - 1) return;
-    setTiers((prev) => {
-      const next = [...prev];
-      const temp = next[index];
-      next[index] = next[index + 1];
-      next[index + 1] = temp;
-      return next.map((item, idx) => ({ ...item, rank: idx + 1 }));
-    });
-  };
 
   const toggleGrant = (tierId: string, featureId: string) => {
     setGrants((prev) => {
@@ -243,112 +272,185 @@ export function useModuleDetail(id: string) {
   };
 
   // Tier CRUD
-  const handleCreateTier = (e: React.FormEvent) => {
+  const handleCreateTier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTierKey || !newTierName) return;
-
-    const newRecord: TierRecord = {
-      id: `t-${Date.now()}`,
-      tierKey: newTierKey.toLowerCase().trim(),
-      tierName: newTierName.trim(),
-      color: newTierColor,
-      rank: tiers.length + 1,
-      isActive: newTierIsActive,
-    };
-
-    setTiers((prev) => [...prev, newRecord]);
-    setNewTierKey("");
-    setNewTierName("");
-    setIsAddTierOpen(false);
+    setIsSubmitting(true);
+    try {
+      await axiosClient.post(`/api/admin/core/v1/modules/${resolvedModuleId}/tiers`, {
+        key: newTierKey.toLowerCase().trim(),
+        name: newTierName.trim(),
+        color: newTierColor,
+        isActive: newTierIsActive,
+      });
+      await fetchTiers(resolvedModuleId);
+      toast.success(
+        lang === "ar" ? "تم إضافة المستوى" : "Tier Created",
+        lang === "ar" ? `تم إضافة المستوى (${newTierName}) بنجاح` : `Tier (${newTierName}) created successfully`
+      );
+      setNewTierKey("");
+      setNewTierName("");
+      setIsAddTierOpen(false);
+    } catch (err: any) {
+      toast.error(lang === "ar" ? "فشل إنشاء المستوى" : "Failed to create tier", err.response?.data?.message || err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleUpdateTier = (e: React.FormEvent) => {
+  const handleUpdateTier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTier) return;
-
-    setTiers((prev) =>
-      prev.map((t) => (t.id === editingTier.id ? editingTier : t))
-    );
-    setEditingTier(null);
+    setIsSubmitting(true);
+    try {
+      await axiosClient.patch(`/api/admin/core/v1/tiers/${editingTier.id}`, {
+        name: editingTier.name,
+        color: editingTier.color,
+        isActive: editingTier.isActive,
+      }, {
+        headers: { "x-idempotency-key": generateUUIDv7() }
+      });
+      await fetchTiers(resolvedModuleId);
+      toast.success(
+        lang === "ar" ? "تم تحديث المستوى" : "Tier Updated",
+        lang === "ar" ? `تم حفظ تعديلات المستوى بنجاح` : `Tier updated successfully`
+      );
+      setEditingTier(null);
+    } catch (err: any) {
+      toast.error(lang === "ar" ? "فشل تعديل المستوى" : "Failed to update tier", err.response?.data?.message || err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDeleteTier = (tierId: string) => {
-    setTiers((prev) => prev.filter((t) => t.id !== tierId));
-    setEditingTier(null);
+  const handleDeleteTier = async (tierId: string) => {
+    try {
+      await axiosClient.delete(`/api/admin/core/v1/tiers/${tierId}`, {
+        headers: { "x-idempotency-key": generateUUIDv7() }
+      });
+      await fetchTiers(resolvedModuleId);
+      toast.success(
+        lang === "ar" ? "تم حذف المستوى" : "Tier Deleted",
+        lang === "ar" ? `تم إزالة المستوى بنجاح` : `Tier deleted successfully`
+      );
+      setEditingTier(null);
+    } catch (err: any) {
+      toast.error(lang === "ar" ? "فشل حذف المستوى" : "Delete Failed", err.response?.data?.message || err.message);
+    }
   };
 
-  // Feature CRUD & Bulk Import/Export
-  const handleCreateFeature = (e: React.FormEvent) => {
+  // Feature CRUD
+  const handleCreateFeature = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFeatureKey || !newFeatureName) return;
+    setIsSubmitting(true);
+    try {
+      await axiosClient.post(`/api/admin/core/v1/modules/${resolvedModuleId}/features`, {
+        key: newFeatureKey.toLowerCase().trim(),
+        name: newFeatureName.trim(),
+        description: newFeatureDesc.trim() || undefined,
+        rank: 0,
+        isActive: true,
+      });
+      await fetchFeatures(resolvedModuleId);
+      toast.success(
+        lang === "ar" ? "تم إضافة الميزة" : "Feature Created",
+        lang === "ar" ? `تم إضافة الميزة (${newFeatureName}) بنجاح` : `Feature (${newFeatureName}) created successfully`
+      );
+      setNewFeatureKey("");
+      setNewFeatureName("");
+      setNewFeatureDesc("");
+      setIsAddFeatureOpen(false);
+    } catch (err: any) {
+      toast.error(lang === "ar" ? "فشل إضافة الميزة" : "Failed to create feature", err.response?.data?.message || err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    const newRecord: FeatureRecord = {
-      id: `f-${Date.now()}`,
-      featureKey: newFeatureKey.toLowerCase().trim(),
-      featureName: newFeatureName.trim(),
-      valueType: newFeatureType,
-      defaultValue: newFeatureDefault,
-      description: newFeatureDesc,
-      isActive: true,
-    };
+  const handleUpdateFeature = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFeature) return;
+    setIsSubmitting(true);
+    try {
+      await axiosClient.patch(`/api/admin/core/v1/features/${editingFeature.id}`, {
+        description: editingFeature.description || null,
+        isActive: editingFeature.isActive,
+      }, {
+        headers: { "x-idempotency-key": generateUUIDv7() }
+      });
+      await fetchFeatures(resolvedModuleId);
+      toast.success(
+        lang === "ar" ? "تم تعديل الميزة" : "Feature Updated",
+        lang === "ar" ? `تم حفظ تعديلات الميزة بنجاح` : `Feature updated successfully`
+      );
+      setEditingFeature(null);
+    } catch (err: any) {
+      toast.error(lang === "ar" ? "فشل تعديل الميزة" : "Failed to update feature", err.response?.data?.message || err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    setFeatures((prev) => [...prev, newRecord]);
-    setNewFeatureKey(`${id}.`);
-    setNewFeatureName("");
-    setNewFeatureDesc("");
-    setIsAddFeatureOpen(false);
+  const handleDeleteFeature = async (featureId: string) => {
+    try {
+      await axiosClient.delete(`/api/admin/core/v1/features/${featureId}`, {
+        headers: { "x-idempotency-key": generateUUIDv7() }
+      });
+      await fetchFeatures(resolvedModuleId);
+      toast.success(
+        lang === "ar" ? "تم حذف الميزة" : "Feature Deleted",
+        lang === "ar" ? `تم إزالة الميزة بنجاح` : `Feature deleted successfully`
+      );
+      setEditingFeature(null);
+    } catch (err: any) {
+      toast.error(lang === "ar" ? "فشل حذف الميزة" : "Delete Failed", err.response?.data?.message || err.message);
+    }
   };
 
   const handleImportFeatures = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const parsed = JSON.parse(importJsonText);
-      if (Array.isArray(parsed)) {
-        const importedList: FeatureRecord[] = parsed.map((item, idx) => ({
-          id: `f-imp-${Date.now()}-${idx}`,
-          featureKey: item.key || item.featureKey || `${id}.imported_${idx}`,
-          featureName: item.name || item.featureName || `M feature ${idx + 1}`,
-          valueType: item.valueType || "BOOLEAN",
-          defaultValue: String(item.defaultValue ?? "true"),
-          description: item.description || "استيراد كتل برمجية",
-          isActive: true,
-        }));
-        setFeatures((prev) => [...prev, ...importedList]);
-        setImportJsonText("");
-        setIsImportFeaturesOpen(false);
-      }
-    } catch {
-      alert("البيانات المدخلة ليست صيغة JSON صالحة.");
-    }
-  };
-
-  const handleExportFeatures = () => {
-    const exportData = JSON.stringify(features, null, 2);
-    const blob = new Blob([exportData], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${moduleData.moduleKey}_features_export.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleUpdateFeature = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingFeature) return;
-
-    setFeatures((prev) =>
-      prev.map((f) => (f.id === editingFeature.id ? editingFeature : f))
+    toast.error(
+      lang === "ar" ? "غير مدعوم حالياً" : "Import Not Supported",
+      lang === "ar" ? "الاستيراد الجماعي يتطلب واجهة دفعة مجمعة غير متوفرة حالياً" : "Bulk import requires batch API which is not supported."
     );
-    setEditingFeature(null);
+  };
+  const handleExportFeatures = () => {
+    toast.error(
+      lang === "ar" ? "غير مدعوم حالياً" : "Export Disabled",
+      lang === "ar" ? "خاصية التصدير معطلة مؤقتاً" : "Export functionality is disabled."
+    );
   };
 
-  const handleDeleteFeature = (featureId: string) => {
-    setFeatures((prev) => prev.filter((f) => f.id !== featureId));
-    setEditingFeature(null);
+  // Price Bracket Validation & CRUD
+  const openAddPriceBracketModal = (targetTierId?: string, targetCycle?: "MONTHLY" | "ANNUAL") => {
+    const activeTierId = targetTierId || (newBracketTierId ? newBracketTierId : (pricingTierFilter !== "ALL" ? pricingTierFilter : (tiers[0]?.id || "")));
+    const activeCycle = targetCycle || (newBracketCycle ? newBracketCycle : (pricingCycleFilter !== "ALL" ? pricingCycleFilter : "MONTHLY"));
+
+    setNewBracketTierId(activeTierId);
+    setNewBracketCycle(activeCycle as "MONTHLY" | "ANNUAL");
+
+    const existingForTier = priceBrackets.filter(p => p.tierId === activeTierId && p.billingCycle === activeCycle);
+    if (existingForTier.length === 0) {
+      setNewBracketMinUsers(1);
+      setNewBracketMaxUsers(10);
+      setNewBracketIsInfinity(false);
+    } else {
+      const sorted = [...existingForTier].sort((a, b) => a.minUsers - b.minUsers);
+      const last = sorted[sorted.length - 1];
+      if (last.maxUsers === null) {
+        setNewBracketMinUsers(last.minUsers + 10);
+        setNewBracketMaxUsers(null);
+        setNewBracketIsInfinity(true);
+      } else {
+        setNewBracketMinUsers(last.maxUsers + 1);
+        setNewBracketMaxUsers(last.maxUsers + 10);
+        setNewBracketIsInfinity(false);
+      }
+    }
+    setIsAddPriceBracketOpen(true);
   };
 
-  // Price Bracket Validation & CRUD (First min must be 1, last max must be Infinity)
   const handleCreatePriceBracket = (e: React.FormEvent) => {
     e.preventDefault();
     setPricingValidationError(null);
@@ -356,80 +458,228 @@ export function useModuleDetail(id: string) {
     const minUsers = Number(newBracketMinUsers);
     const maxUsers = newBracketIsInfinity ? null : newBracketMaxUsers !== null ? Number(newBracketMaxUsers) : null;
 
-    if (minUsers < 1) {
-      setPricingValidationError(
-        lang === "ar"
-          ? "فشل التحقق: يجب أن يبدأ الحد الأدنى لفئة المقاعد الأولى من 1 على الأقل (minUsers >= 1)."
-          : "Validation Failed: First minUsers must start at 1 (minUsers >= 1)."
+    const effectiveTierId = newBracketTierId || (tiers[0]?.id || "");
+
+    if (!effectiveTierId) {
+      toast.error(
+        lang === "ar" ? "تحديـد المستوى مطلوب" : "Tier Selection Required",
+        lang === "ar" ? "يرجى إنشاء وإضافة مستوى (Tier) أولاً قبل إضافة فئة سعرية." : "Please create a Tier first before adding price brackets."
       );
       return;
+    }
+
+    const existingForTier = priceBrackets.filter(p => p.tierId === effectiveTierId && p.billingCycle === newBracketCycle);
+    const sorted = [...existingForTier].sort((a, b) => a.minUsers - b.minUsers);
+    const lastBracket = sorted.length > 0 ? sorted[sorted.length - 1] : null;
+
+    // Rule 4: If previous bracket is Infinity (maxUsers === null), block adding new bracket
+    if (lastBracket && lastBracket.maxUsers === null) {
+      const msg = lang === "ar"
+        ? "توجد فئة سعرية مفتوحة (Infinity) حالياً لهذه الدورة. يرجى تعديل الفئة السابقة لتحديد حد أقصى للمقاعد قبل إضافة فئة جديدة."
+        : "The previous price bracket is open-ended (Infinity). Edit the previous bracket to set a max limit before adding a new bracket.";
+      setPricingValidationError(msg);
+      toast.error(lang === "ar" ? "الفئة السعرية مسدودة" : "Infinity Bracket Exists", msg);
+      return;
+    }
+
+    // Rule 1: First price bracket MUST have minUsers = 1
+    if (sorted.length === 0 && minUsers !== 1) {
+      const msg = lang === "ar"
+        ? "خطأ في التسلسل: الفئة السعرية الأولى لهذه الباقة والدورة يجب أن تبدأ من المقعد 1."
+        : "Sequence Error: The first price bracket for this tier and cycle must start at seat 1.";
+      setPricingValidationError(msg);
+      toast.error(lang === "ar" ? "خطأ تسلسل المقاعد" : "Seat Sequence Error", msg);
+      return;
+    }
+
+    // Rule 3: Adding more prices -> minUsers MUST be lastMax + 1
+    if (sorted.length > 0 && lastBracket && lastBracket.maxUsers !== null) {
+      const expectedMin = lastBracket.maxUsers + 1;
+      if (minUsers !== expectedMin) {
+        const msg = lang === "ar"
+          ? `خطأ في التسلسل: يجب أن يبدأ الحد الأدنى للمقاعد من المقعد ${expectedMin} للتسلسل الصحيح.`
+          : `Sequence Error: Min seats must start at ${expectedMin} to follow the previous bracket cleanly.`;
+        setPricingValidationError(msg);
+        toast.error(lang === "ar" ? "خطأ تسلسل المقاعد" : "Seat Sequence Error", msg);
+        return;
+      }
     }
 
     if (maxUsers !== null && maxUsers <= minUsers) {
-      setPricingValidationError(
-        lang === "ar"
-          ? "فشل التحقق: يجب أن يكون الحد الأقصى للمقاعد أكبر من الحد الأدنى."
-          : "Validation Failed: maxUsers must be greater than minUsers."
-      );
+      const msg = lang === "ar" ? "خطأ في التحقق: يجب أن يكون الحد الأقصى للمقاعد أكبر من الحد الأدنى." : "Validation Failed: maxUsers must be greater than minUsers.";
+      setPricingValidationError(msg);
+      toast.error(lang === "ar" ? "خطأ في الفئة السعرية" : "Pricing Validation Error", msg);
       return;
     }
 
-    const newRecord: PriceBracket = {
-      id: `p-${Date.now()}`,
-      tierId: newBracketTierId,
-      billingCycle: newBracketCycle,
+    const newRecord: PriceTierView = {
+      id: generateUUIDv7(), // Temp ID for draft
+      tierId: effectiveTierId,
+      billingCycle: newBracketCycle as "MONTHLY" | "ANNUAL",
       minUsers,
       maxUsers,
-      unitPriceUsd: parseFloat(newBracketUnitPrice).toFixed(2),
+      unitPriceUsd: parseFloat(newBracketUnitPrice).toFixed(4),
     };
 
     setPriceBrackets((prev) => [...prev, newRecord]);
+    toast.success(
+      lang === "ar" ? "تم إضافة الفئة السعرية" : "Price Bracket Added",
+      lang === "ar" ? `تم إضافة الفئة السعرية بنجاح` : `Price bracket added successfully`
+    );
     setIsAddPriceBracketOpen(false);
   };
 
   const handleDeletePriceBracket = (bracketId: string) => {
-    setPriceBrackets((prev) => prev.filter((p) => p.id !== bracketId));
-  };
-
-  // Save changes & Validate Price Brackets Contiguity Rule (First min = 1, Last max = ∞)
-  const handleSaveTabChanges = async (tabName: string) => {
-    setPricingValidationError(null);
-
-    if (tabName.includes("Price")) {
-      // Validate NestJS Price Bracket Rules: First bracket min = 1, Last bracket max = null (Infinity)
-      const currentTierBrackets = priceBrackets.filter(
-        (p) => p.tierId === pricingTierFilter && p.billingCycle === (pricingCycleFilter === "ALL" ? "MONTHLY" : pricingCycleFilter)
-      );
-
-      if (currentTierBrackets.length > 0) {
-        const sorted = [...currentTierBrackets].sort((a, b) => a.minUsers - b.minUsers);
-        if (sorted[0].minUsers !== 1) {
-          setPricingValidationError(
-            lang === "ar"
-              ? "خطأ في التحقق من الفئات السعرية: الفئة الأولى يجب أن تبدأ من المقعد رقم 1 (minUsers must start at 1)."
-              : "Validation Error: The first price bracket must start at seat 1 (minUsers = 1)."
-          );
-          return;
-        }
-
-        const lastBracket = sorted[sorted.length - 1];
-        if (lastBracket.maxUsers !== null) {
-          setPricingValidationError(
-            lang === "ar"
-              ? "خطأ في التحقق من الفئات السعرية: الفئة الأخيرة يجب أن تكون مفتوحة السقف حتى المالانهاية (Last bracket maxUsers must be Infinity ∞ / null)."
-              : "Validation Error: The final price bracket must be open-ended (maxUsers = Infinity ∞ / null)."
-          );
-          return;
-        }
+    const target = priceBrackets.find(p => p.id === bracketId);
+    if (target) {
+      const tierCycleBrackets = priceBrackets
+        .filter(b => b.tierId === target.tierId && b.billingCycle === target.billingCycle)
+        .sort((a, b) => a.minUsers - b.minUsers);
+      
+      const isLast = tierCycleBrackets.length > 0 && tierCycleBrackets[tierCycleBrackets.length - 1].id === bracketId;
+      if (!isLast) {
+        toast.error(
+          lang === "ar" ? "حذف غير مسموح" : "Delete Not Allowed",
+          lang === "ar"
+            ? "يسمح فقط بحذف الفئة السعرية الأخيرة في التسلسل للحفاظ على ترابط المقاعد."
+            : "Only the last price bracket in the sequence can be deleted to preserve seat continuity."
+        );
+        return;
       }
     }
 
+    setPriceBrackets((prev) => prev.filter((p) => p.id !== bracketId));
+    toast.success(
+      lang === "ar" ? "تم حذف الفئة السعرية" : "Bracket Deleted",
+      lang === "ar" ? `تم إزالة الفئة السعرية بنجاح` : `Price bracket deleted successfully`
+    );
+  };
+
+  const handleUpdatePriceBracket = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPriceBracket) return;
+
+    if (editingPriceBracket.minUsers < 1) {
+      const msg = lang === "ar" ? "خطأ في التحقق: يجب أن تبدأ الفئة السعرية الأولى من المقعد 1." : "Validation Failed: First minUsers must start at 1.";
+      setPricingValidationError(msg);
+      toast.error(lang === "ar" ? "خطأ في الفئة السعرية" : "Pricing Validation Error", msg);
+      return;
+    }
+
+    if (editingPriceBracket.maxUsers !== null && editingPriceBracket.maxUsers <= editingPriceBracket.minUsers) {
+      const msg = lang === "ar" ? "خطأ في التحقق: يجب أن يكون الحد الأقصى للمقاعد أكبر من الحد الأدنى." : "Validation Failed: maxUsers must be greater than minUsers.";
+      setPricingValidationError(msg);
+      toast.error(lang === "ar" ? "خطأ في الفئة السعرية" : "Pricing Validation Error", msg);
+      return;
+    }
+
+    setPriceBrackets((prev) =>
+      prev.map((p) => (p.id === editingPriceBracket.id ? editingPriceBracket : p))
+    );
+    toast.success(
+      lang === "ar" ? "تم تعديل الفئة السعرية" : "Price Bracket Updated",
+      lang === "ar" ? `تم تحديث بيانات الفئة السعرية بنجاح` : `Price bracket updated successfully`
+    );
+    setEditingPriceBracket(null);
+  };
+
+  // Save Tab Changes (Module Preview, Grants, Pricing)
+  const handleSaveTabChanges = async (tabName: string) => {
+    const key = tabName.toLowerCase();
+    setPricingValidationError(null);
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setIsSubmitting(false);
-    setSaveTabMessage(tabName);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+
+    try {
+      if ((key.includes("preview") || key === "preview") && moduleData) {
+        await axiosClient.patch(`/api/admin/core/v1/modules/${resolvedModuleId}`, {
+          name: moduleData.name,
+          description: moduleData.description,
+          isActive: moduleData.isActive,
+        }, {
+          headers: { "x-idempotency-key": generateUUIDv7() }
+        });
+      }
+
+      if (key.includes("grant") || key.includes("grants")) {
+        for (const tier of tiers) {
+          const tierGrants = grants.filter(g => g.tierId === tier.id && g.isEnabled);
+          const payload = {
+            features: tierGrants.map(g => {
+               // Try to parse config, otherwise send nothing
+               let config = undefined;
+               try {
+                 if (g.value && g.value !== "true" && g.value !== "false") {
+                    config = JSON.parse(g.value);
+                 }
+               } catch(e) {}
+               return { featureId: g.featureId, config };
+            })
+          };
+          await axiosClient.patch(`/api/admin/core/v1/tiers/${tier.id}/features`, payload, {
+            headers: { "x-idempotency-key": generateUUIDv7() }
+          });
+        }
+      }
+
+      if (key.includes("price") || key.includes("pricing")) {
+        const currentTierBrackets = priceBrackets.filter(
+          (p) => p.tierId === pricingTierFilter && p.billingCycle === pricingCycleFilter
+        );
+
+        if (currentTierBrackets.length > 0) {
+          const sorted = [...currentTierBrackets].sort((a, b) => a.minUsers - b.minUsers);
+          if (sorted[0].minUsers !== 1) {
+             const msg = "Validation Error: The first price bracket must start at seat 1.";
+             setPricingValidationError(msg);
+             toast.error(lang === "ar" ? "خطأ تسعير" : "Pricing Error", msg);
+             setIsSubmitting(false);
+             return;
+          }
+          const lastBracket = sorted[sorted.length - 1];
+          if (lastBracket.maxUsers !== null) {
+             const msg = "Validation Error: The final price bracket must be open-ended.";
+             setPricingValidationError(msg);
+             toast.error(lang === "ar" ? "خطأ تسعير" : "Pricing Error", msg);
+             setIsSubmitting(false);
+             return;
+          }
+
+          const payload = {
+            billingCycle: pricingCycleFilter,
+            brackets: sorted.map(b => ({
+              minUsers: b.minUsers,
+              maxUsers: b.maxUsers,
+              unitPrice: b.unitPriceUsd
+            }))
+          };
+
+          await axiosClient.patch(`/api/admin/core/v1/tiers/${pricingTierFilter}/price-tiers`, payload, {
+            headers: { "x-idempotency-key": generateUUIDv7() }
+          });
+        }
+      }
+
+      setSaveTabMessage(tabName);
+      setIsSaved(true);
+      toast.success(
+        lang === "ar" ? "تم حفظ التعديلات" : "Saved Successfully",
+        lang === "ar" ? `تم حفظ تعديلات (${tabName}) بنجاح` : `Changes for (${tabName}) saved successfully`
+      );
+      setTimeout(() => setIsSaved(false), 3000);
+      
+      // Refetch
+      if (key.includes("grant") || key.includes("grants")) await fetchGrants(tiers);
+      if (key.includes("price") || key.includes("pricing")) await fetchPricing(tiers);
+      if (key.includes("preview") || key === "preview") await fetchModule(resolvedModuleId);
+
+    } catch (err: any) {
+      toast.error(
+        lang === "ar" ? "فشل حفظ التعديلات" : "Save Failed",
+        err.response?.data?.message || err.message
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return {
@@ -448,6 +698,8 @@ export function useModuleDetail(id: string) {
     pricingCycleFilter,
     setPricingCycleFilter,
     pricingValidationError,
+    isLoading,
+    error,
     isSubmitting,
     isSaved,
     saveTabMessage,
@@ -465,8 +717,6 @@ export function useModuleDetail(id: string) {
     setNewTierColor,
     newTierIsActive,
     setNewTierIsActive,
-    moveTierUp,
-    moveTierDown,
 
     // Feature Modal States & Import/Export Functions
     isAddFeatureOpen,
@@ -493,6 +743,8 @@ export function useModuleDetail(id: string) {
     // Price Bracket States
     isAddPriceBracketOpen,
     setIsAddPriceBracketOpen,
+    editingPriceBracket,
+    setEditingPriceBracket,
     newBracketTierId,
     setNewBracketTierId,
     newBracketMinUsers,
@@ -506,6 +758,13 @@ export function useModuleDetail(id: string) {
     newBracketCycle,
     setNewBracketCycle,
 
+    // Audit Log States
+    auditLogs,
+    auditFilter,
+    setAuditFilter,
+    auditSearch,
+    setAuditSearch,
+
     // Handlers
     toggleGrant,
     handleCreateTier,
@@ -514,7 +773,9 @@ export function useModuleDetail(id: string) {
     handleCreateFeature,
     handleUpdateFeature,
     handleDeleteFeature,
+    openAddPriceBracketModal,
     handleCreatePriceBracket,
+    handleUpdatePriceBracket,
     handleDeletePriceBracket,
     handleSaveTabChanges,
     onBack: () => router.push("/modules"),

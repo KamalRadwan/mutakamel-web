@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useI18n } from "@/i18n/I18nContext";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { ModuleView } from "@/types/module";
+import { useToast } from "@/components/ui/ToastContext";
 
 export interface ModuleRecord {
   id: string;
@@ -10,13 +13,12 @@ export interface ModuleRecord {
   description: string;
   status: "ACTIVE" | "BETA" | "DEPRECATED";
   rank: number;
-  tiersCount: number;
-  featuresCount: number;
   createdAt: string;
 }
 
 export function useModules() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const toast = useToast();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -27,52 +29,55 @@ export function useModules() {
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
 
-  const [modules, setModules] = useState<ModuleRecord[]>([
-    {
-      id: "mod-01",
-      moduleKey: "core",
-      moduleName: "النواة الأساسية (Core Foundation)",
-      description: "المكوّن الأساسي لهوية المستأجر، الهيكل التنظيمي، وإدارة الفروع والأقسام والمستخدمين.",
-      status: "ACTIVE",
-      rank: 1,
-      tiersCount: 4,
-      featuresCount: 18,
-      createdAt: "2026-06-01",
-    },
-    {
-      id: "mod-02",
-      moduleKey: "crm",
-      moduleName: "إدارة علاقات العملاء (CRM Suite)",
-      description: "إدارة الفرص التجارية، العملاء المحتملين، المسارات، الاتصالات المباشرة وشبكات التسويق.",
-      status: "ACTIVE",
-      rank: 2,
-      tiersCount: 3,
-      featuresCount: 24,
-      createdAt: "2026-06-05",
-    },
-    {
-      id: "mod-03",
-      moduleKey: "trade",
-      moduleName: "محرك التجارة والاشتراكات (Trade Engine)",
-      description: "محرك التجارة الإلكترونية، نقاط البيع، كتالوج المنتجات، والفوترة المتكررة بمتعدد العملات.",
-      status: "ACTIVE",
-      rank: 3,
-      tiersCount: 3,
-      featuresCount: 32,
-      createdAt: "2026-06-10",
-    },
-    {
-      id: "mod-04",
-      moduleKey: "worker",
-      moduleName: "محرك المهام والتحليلات (Worker & Analytics)",
-      description: "معالجة الطوابير الخلفية، الأتمتة المجدولة، وتقارير الذكاء الاصطناعي التنبؤية.",
-      status: "BETA",
-      rank: 4,
-      tiersCount: 2,
-      featuresCount: 12,
-      createdAt: "2026-07-01",
-    },
-  ]);
+  const [modules, setModules] = useState<ModuleRecord[]>([]);
+  const [activeCurrenciesCount, setActiveCurrenciesCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchModules = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Fetch modules list
+      const response = await axiosClient.get(`/api/admin/core/v1/modules?page=1&limit=100`);
+      const items: ModuleView[] = response.data?.items || response.data?.data || (Array.isArray(response.data) ? response.data : []);
+
+      const mapped: ModuleRecord[] = items.map((m) => ({
+        id: m.id,
+        moduleKey: m.key,
+        moduleName: m.name,
+        description: m.description || "",
+        status: m.isActive ? "ACTIVE" : "DEPRECATED",
+        rank: m.rank,
+        createdAt: m.createdAt,
+      }));
+
+      // Set modules and ensure they are sorted by rank
+      setModules(mapped.sort((a, b) => a.rank - b.rank));
+    } catch (err: any) {
+      console.warn("Failed to fetch modules", err.message);
+      setError(err.response?.data?.message || "Failed to fetch modules.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchCurrencies = useCallback(async () => {
+    try {
+      const response = await axiosClient.get(`/api/admin/core/v1/billing/currency-rates`);
+      const data = response.data?.items || response.data?.data || (Array.isArray(response.data) ? response.data : []);
+      setActiveCurrenciesCount(data.length);
+    } catch (err) {
+      // Non-fatal
+      console.warn("Failed to load currency rates");
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchModules();
+    fetchCurrencies();
+  }, [fetchModules, fetchCurrencies]);
 
   const filteredModules = modules.filter((m) => {
     const matchesSearch =
@@ -88,56 +93,68 @@ export function useModules() {
 
   const summaryMetrics = {
     totalModules: modules.length,
-    activeTiers: modules.reduce((acc, m) => acc + m.tiersCount, 0),
-    totalFeatures: modules.reduce((acc, m) => acc + m.featuresCount, 0),
-    activeCurrencies: 5,
+    activeCurrencies: activeCurrenciesCount,
   };
 
-  const moveRankUp = (index: number) => {
-    if (index <= 0) return;
+  const reorderModules = async (sourceIndex: number, targetIndex: number) => {
+    if (sourceIndex === targetIndex || sourceIndex < 0 || targetIndex < 0) return;
+    if (sourceIndex >= filteredModules.length || targetIndex >= filteredModules.length) return;
+
+    const source = filteredModules[sourceIndex];
+    const target = filteredModules[targetIndex];
+
     setModules((prev) => {
       const next = [...prev];
-      const temp = next[index];
-      next[index] = next[index - 1];
-      next[index - 1] = temp;
-      // Re-assign ranks
+      const sourceRealIdx = next.findIndex((m) => m.id === source.id);
+      const targetRealIdx = next.findIndex((m) => m.id === target.id);
+
+      if (sourceRealIdx === -1 || targetRealIdx === -1) return prev;
+
+      const [moved] = next.splice(sourceRealIdx, 1);
+      next.splice(targetRealIdx, 0, moved);
       return next.map((item, idx) => ({ ...item, rank: idx + 1 }));
     });
+
+    try {
+      await axiosClient.patch(`/api/admin/core/v1/modules/${source.id}/rank`, {
+        targetId: target.id,
+      });
+      toast.success(
+        lang === "ar" ? "تم تعديل الترتيب" : "Rank Updated",
+        lang === "ar" ? `تم نقل الموديول (${source.moduleName}) بنجاح` : `Moved (${source.moduleName}) successfully`
+      );
+    } catch (err: any) {
+      toast.error(lang === "ar" ? "فشل إعادة الترتيب" : "Reorder Failed", err.response?.data?.message || err.message);
+      await fetchModules();
+    }
   };
 
-  const moveRankDown = (index: number) => {
-    if (index >= modules.length - 1) return;
-    setModules((prev) => {
-      const next = [...prev];
-      const temp = next[index];
-      next[index] = next[index + 1];
-      next[index + 1] = temp;
-      // Re-assign ranks
-      return next.map((item, idx) => ({ ...item, rank: idx + 1 }));
-    });
-  };
-
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newKey || !newName) return;
 
-    const newRecord: ModuleRecord = {
-      id: `mod-${Date.now()}`,
-      moduleKey: newKey.toLowerCase().trim(),
-      moduleName: newName.trim(),
-      description: newDesc.trim() || "وصف الموديول الجديد",
-      status: "ACTIVE",
-      rank: modules.length + 1,
-      tiersCount: 1,
-      featuresCount: 5,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-
-    setModules((prev) => [...prev, newRecord]);
-    setNewKey("");
-    setNewName("");
-    setNewDesc("");
-    setIsCreateOpen(false);
+    setIsSubmitting(true);
+    try {
+      await axiosClient.post(`/api/admin/core/v1/modules`, {
+        key: newKey.toLowerCase().trim(),
+        name: newName.trim(),
+        description: newDesc.trim() || undefined,
+        isActive: true,
+      });
+      await fetchModules();
+      toast.success(
+        lang === "ar" ? "تم تسجيل الموديول" : "Module Registered",
+        lang === "ar" ? `تم تسجيل الموديول (${newName}) بنجاح` : `Module (${newName}) registered successfully`
+      );
+      setNewKey("");
+      setNewName("");
+      setNewDesc("");
+      setIsCreateOpen(false);
+    } catch (err: any) {
+      toast.error(lang === "ar" ? "فشل تسجيل الموديول" : "Create Failed", err.response?.data?.message || err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return {
@@ -156,8 +173,10 @@ export function useModules() {
     setNewDesc,
     modules: filteredModules,
     summaryMetrics,
-    moveRankUp,
-    moveRankDown,
+    isLoading,
+    error,
+    isSubmitting,
+    reorderModules,
     handleCreateSubmit,
   };
 }

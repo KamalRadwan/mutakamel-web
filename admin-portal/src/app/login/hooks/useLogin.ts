@@ -50,12 +50,6 @@ export function useLogin() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSubmit();
-    }
-  };
-
   const handleForgotPassword = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setForgotSent(true);
@@ -85,7 +79,6 @@ export function useLogin() {
     toggleShowPassword,
     toggleRememberMe,
     handleSubmit,
-    handleKeyDown,
     handleForgotPassword,
   };
 }

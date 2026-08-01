@@ -1,8 +1,12 @@
 # Admin Modules and Catalogue Frontend Contract
 
+Status: **Verified backend contract; frontend DONE/PARTIAL/REFACTOR**
+
+Last source verification: **2026-07-30**
+
 Verified against the current API Gateway route contracts, Core controller,
 DTOs, services, repositories, entities, error catalogue, idempotency layers,
-and active Admin Portal screens on **2026-07-24**.
+and active Admin Portal screens.
 
 This is the implementation contract for the Admin Portal’s `/modules` feature:
 modules, tiers, features, tier-feature grants, graduated price ladders, and
@@ -19,7 +23,7 @@ managed billing currency rates.
 | Guard | `AdminGuard` |
 | Entity identifiers | UUIDv7; the currency-rate path instead uses a normalized three-letter code |
 | Frontend routes | `/modules`, `/modules/[id]`; `/module` only redirects to `/modules` |
-| Current frontend status | Fully mocked local state and simulated saves; no catalogue request is implemented |
+| Current frontend status | Main module/tier/feature/grant/price/currency/module-audit calls are integrated; bounded gaps and refactors remain |
 
 Browser code must use the canonical API Gateway paths below. The shorter
 `/admin/...` forms are Nest controller-relative paths only.
@@ -37,8 +41,8 @@ generated UUIDv7 for the user’s mutation intent.
 | `GET /api/admin/core/v1/modules` | `admin.catalog.read` | `200` | No | Paginated ranked module list |
 | `GET /api/admin/core/v1/modules/:id` | `admin.catalog.read` | `200` | No | Get one module by UUIDv7 |
 | `PATCH /api/admin/core/v1/modules/:id/rank` | `admin.catalog.manage` | `200` | Yes | Move one module to another module’s position |
-| `PATCH /api/admin/core/v1/modules/:id` | `admin.catalog.manage` | `200` | Yes | Update mutable module fields |
-| `DELETE /api/admin/core/v1/modules/:id` | `admin.catalog.destroy` | `204` | Yes | Soft-delete an unused module |
+| `PATCH /api/admin/core/v1/modules/:id` | `admin.catalog.manage` + `admin.catalog.critical` | `200` | Yes | Update mutable module fields |
+| `DELETE /api/admin/core/v1/modules/:id` | `admin.catalog.destroy` + `admin.catalog.critical` | `204` | Yes | Soft-delete an unused module |
 
 ### Tiers and features
 
@@ -46,26 +50,36 @@ generated UUIDv7 for the user’s mutation intent.
 |:---|:---|:---:|:---:|:---|
 | `POST /api/admin/core/v1/modules/:moduleId/tiers` | `admin.catalog.manage` | `201` | No | Append a tier |
 | `GET /api/admin/core/v1/modules/:moduleId/tiers` | `admin.catalog.read` | `200` | No | Complete tier list, rank order |
-| `PATCH /api/admin/core/v1/tiers/:id` | `admin.catalog.manage` | `200` | Yes | Update a tier |
-| `DELETE /api/admin/core/v1/tiers/:id` | `admin.catalog.manage` | `204` | Yes | Soft-delete an unused tier |
+| `PATCH /api/admin/core/v1/tiers/:id` | `admin.catalog.manage` + `admin.catalog.critical` | `200` | Yes | Update a tier |
+| `DELETE /api/admin/core/v1/tiers/:id` | `admin.catalog.manage` + `admin.catalog.critical` | `204` | Yes | Soft-delete an unused tier |
 | `POST /api/admin/core/v1/modules/:moduleId/features` | `admin.catalog.manage` | `201` | No | Append/create a feature |
 | `GET /api/admin/core/v1/modules/:moduleId/features` | `admin.catalog.read` | `200` | No | Complete feature list, rank order |
-| `PATCH /api/admin/core/v1/features/:id` | `admin.catalog.manage` | `200` | Yes | Update a feature |
-| `DELETE /api/admin/core/v1/features/:id` | `admin.catalog.manage` | `204` | Yes | Soft-delete a feature |
+| `PATCH /api/admin/core/v1/features/:id` | `admin.catalog.manage` + `admin.catalog.critical` | `200` | Yes | Update a feature |
+| `DELETE /api/admin/core/v1/features/:id` | `admin.catalog.manage` + `admin.catalog.critical` | `204` | Yes | Soft-delete a feature |
 
 ### Grants, pricing, and currency rates
 
 | Method and browser path | Permission | Success | Idempotency key | Purpose |
 |:---|:---|:---:|:---:|:---|
 | `GET /api/admin/core/v1/tiers/:tierId/features` | `admin.catalog.read` | `200` | No | List one tier’s grants |
-| `PATCH /api/admin/core/v1/tiers/:tierId/features` | `admin.catalog.manage` | `200` | Yes | Replace one tier’s complete grant set |
+| `PATCH /api/admin/core/v1/tiers/:tierId/features` | `admin.catalog.manage` + `admin.catalog.critical` | `200` | Yes | Replace one tier’s complete grant set |
 | `GET /api/admin/core/v1/tiers/:tierId/price-tiers` | `admin.catalog.read` | `200` | No | List one or both billing-cycle ladders |
-| `PATCH /api/admin/core/v1/tiers/:tierId/price-tiers` | `admin.catalog.manage` | `200` | Yes | Replace one complete price ladder |
+| `PATCH /api/admin/core/v1/tiers/:tierId/price-tiers` | `admin.catalog.manage` + `admin.catalog.critical` | `200` | Yes | Replace one complete price ladder |
 | `GET /api/admin/core/v1/billing/currency-rates` | `admin.catalog.read` | `200` | No | List managed non-USD rates |
-| `PATCH /api/admin/core/v1/billing/currency-rates` | `admin.billing.currency.manage` | `200` | Yes | Upsert a non-empty batch of rates |
-| `PATCH /api/admin/core/v1/billing/currency-rates/:currencyCode` | `admin.billing.currency.manage` | `200` | Yes | Upsert one managed rate |
+| `PATCH /api/admin/core/v1/billing/currency-rates` | `admin.billing.currency.manage` + `admin.catalog.critical` | `200` | Yes | Upsert a non-empty batch of rates |
+| `PATCH /api/admin/core/v1/billing/currency-rates/:currencyCode` | `admin.billing.currency.manage` + `admin.catalog.critical` | `200` | Yes | Upsert one managed rate |
 
-There are exactly **21** browser-visible catalogue routes.
+### Audit and Storage entitlements
+
+| Method and browser path | Permission | Success | Idempotency key | Purpose |
+|:---|:---|:---:|:---:|:---|
+| `GET /api/admin/core/v1/catalog/audit` | `admin.catalog.read` | `200` | No | Global catalogue audit |
+| `GET /api/admin/core/v1/modules/:moduleId/audit` | `admin.catalog.read` | `200` | No | Module-scoped catalogue audit |
+| `GET /api/admin/core/v1/tiers/:id/storage-entitlement` | `admin.catalog.read` | `200` | No | Read tier Storage quotas |
+| `PATCH /api/admin/core/v1/tiers/:id/storage-entitlement` | `admin.catalog.manage` + `admin.catalog.critical` | `200` | Yes | Replace tier Storage entitlement |
+| `DELETE /api/admin/core/v1/tiers/:id/storage-entitlement` | `admin.catalog.manage` + `admin.catalog.critical` | `204` | Yes | Remove tier Storage entitlement |
+
+There are exactly **26** browser-visible catalogue route-key entries.
 
 ## HTTP response and error envelopes
 
@@ -170,6 +184,25 @@ this API. Modules, tiers, features, and currency rates use `isActive: boolean`.
 Strict boolean DTO fields accept `true`, `false`, `"true"`, `"false"`, `"1"`,
 and `"0"`. Send JSON booleans from frontend bodies and query booleans as
 `true`/`false`.
+
+## Activation and effective tenant access
+
+Catalogue configuration and effective tenant access are separate concerns:
+
+- module, tier, and feature `isActive` flags are independent;
+- tier/feature list endpoints return both active and inactive rows;
+- Core permits creating or configuring tiers/features under an inactive
+  module, and permits editing grants/prices for an inactive tier;
+- a grant may reference an inactive feature, but the feature is omitted from
+  materialized tenant access until it is active;
+- an inactive/deleted module or tier removes that subscribed item from the
+  materialized tenant policy; an inactive/deleted feature removes only that
+  feature entitlement.
+
+Do not infer child activation from the parent or silently hide inactive
+catalogue rows in admin screens. Show each flag explicitly and treat the
+materialized tenant policy—not the presence of a catalogue/grant row—as the
+authority for effective tenant access.
 
 ## Response models
 
@@ -371,7 +404,7 @@ tier or tab.
 ```ts
 interface UpdateModuleDto {
   name?: string; // max 128
-  description?: string; // max 512
+  description?: string | null; // max 512; null clears it
   avatarDataUrl?: string | null; // null clears it
   isActive?: boolean;
 }
@@ -379,8 +412,11 @@ interface UpdateModuleDto {
 
 `key` and `rank` are immutable here. Use the rank command for module order.
 The current update DTO permits an empty `name`; frontend validation should
-continue to require a trimmed non-empty value. `description: null` is rejected;
-send an empty string if the product chooses that as its clear representation.
+continue to require a trimmed non-empty value. Although the TypeScript DTO
+declares `description?: string`, the active validator treats `null` as
+optional and the service persists it to the nullable column, so
+`description: null` is the current clear operation. Omission leaves the
+existing description unchanged.
 
 Changing `isActive` rebuilds affected tenants’ access-policy projections and
 expires their access-policy cache. Show an impact warning before deactivation;
@@ -534,7 +570,7 @@ settings belong in a tier grant’s `config`.
 ```ts
 interface UpdateFeatureDto {
   name?: string; // max 128
-  description?: string; // max 512
+  description?: string | null; // max 512; null clears it
   rank?: number; // integer >= 0
   isActive?: boolean;
 }
@@ -545,6 +581,10 @@ interface UpdateFeatureDto {
 
 `key` and `moduleId` are immutable. Feature ranks do not have a uniqueness
 constraint; ties are resolved by key in list reads.
+
+As with modules, the active validator accepts `description: null` and the
+service persists it as the clear operation. Omission leaves the description
+unchanged.
 
 Changing `isActive` or deleting a feature rebuilds affected tenant access
 policies. Feature deletion is a soft-delete and currently does not explicitly
@@ -861,40 +901,40 @@ mutation. Keep those actions independently gated.
 | `422` | `PRICE_LADDER_INVALID` | Show the returned ladder rule near the draft |
 | `422` | `PRICE_LADDER_INCOMPLETE` | Operational persisted-ladder problem |
 | `422` | `DUPLICATE_CURRENCY_RATE` | De-duplicate normalized currency codes |
+| `422` | `CURRENCY_RATE_INVALID` | Treat an invalid persisted/admin rate as unusable and refetch/escalate |
 
 The `MODULE_NOT_FOUND` and `TIER_NOT_FOUND` statuses are not assumptions:
 although catalogue services construct not-found exceptions, the current Core
 error catalogue overrides these shared codes to HTTP `422`.
 
+Array-size, UUIDv7, currency-code, decimal-format, missing-field, and
+unknown-field failures normally stop in DTO validation as HTTP `400` with
+field `details`; service-level fallback codes for the same invariant are not a
+stable substitute for field validation handling.
+
 ## Current frontend gaps
 
-The active implementation under `src/app/modules/` is a prototype:
+The active implementation under `src/app/modules/` calls the main Core
+Catalogue APIs, but it is not full parity:
 
-1. No hook performs a catalogue API request.
-2. List search, filtering, creation, and rank changes mutate local mock state.
-3. Module links use keys (`crm`) where the backend requires UUIDv7 IDs.
-4. `ModuleRecord` invents `status`, `tiersCount`, and `featuresCount`.
-5. The detail header invents module `category` and status values.
-6. Module edit uses `moduleKey/moduleName` instead of immutable `key` and
-   mutable `name`.
-7. Tier up/down controls imply an atomic reorder endpoint that does not exist.
-8. Feature state invents `valueType` and `defaultValue`.
-9. Feature import has no backend bulk endpoint and currently succeeds only
-   locally.
-10. Grant state invents `isEnabled`/`value`; the API models enabled state by
-    grant presence and settings in `config`.
-11. The matrix save is simulated; the API replaces one tier at a time.
-12. Pricing uses invalid `YEARLY` instead of `ANNUAL`.
-13. Pricing converts decimal strings through `parseFloat`, risking precision
-    loss.
-14. Local price validation rejects `maxUsers === minUsers`, although the
-    backend permits a single-user bracket.
-15. Price add/delete controls act like per-row endpoints; only full-ladder
-    replacement exists.
-16. No mutation supplies the required UUIDv7 idempotency header.
-17. The “active currencies” metric is hard-coded and has no currency-rate UI.
-18. Loading, empty, forbidden, validation, conflict, in-flight, replay, and
-    partial-import states are absent.
+1. Module deletion is not implemented.
+2. Global catalogue audit is not implemented; module-scoped audit is present.
+3. Batch currency-rate replacement is not implemented; list and single-rate
+   update are present.
+4. Tier Storage entitlement read/replace/delete is not implemented.
+5. The detail UI still exposes invalid `YEARLY` presentation/state in places
+   and must use `ANNUAL` on the wire.
+6. Pricing code converts decimal strings through `parseFloat`, risking
+   precision loss.
+7. Some response and mutation state remains loose, including `any`,
+   console-only failures, and catch-to-null audit behavior.
+8. Permission exposure is incomplete and write-sensitive mutations rely too
+   heavily on interceptor-generated keys instead of stable caller-owned
+   intents.
+9. Loading, empty, forbidden, validation, conflict, in-flight, replay, and
+   partial nested failure states remain inconsistent.
+10. Any client-only import/export behavior must remain explicitly non-atomic
+    because no catalogue bulk-import endpoint exists.
 
 ## Recommended implementation sequence
 

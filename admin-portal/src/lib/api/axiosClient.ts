@@ -1,5 +1,10 @@
 // Production Admin Portal Native HTTP Client with Web Locks Mutex & Single-Retry 401 Queue
 
+import {
+  getAuthErrorStatus,
+  isDefinitiveAuthFailure,
+} from "../auth/sessionRefresh";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export interface AxiosResponse<T = any> {
@@ -9,17 +14,22 @@ export interface AxiosResponse<T = any> {
   headers: Headers;
 }
 
+export interface ApiRequestConfig extends RequestInit {
+  /** The caller already owns the auth lock and must handle a 401 directly. */
+  skipAuthRefresh?: boolean;
+}
+
 export interface SessionTokenMetadata {
-  accessToken: string;
   savedAt: number;
   expiresIn: number;
   tokenType: string;
   loginGeneration: string;
+  remember: boolean;
   cookieRevision?: number;
 }
 
 export interface AdminAuthTokenResponse {
-  accessToken: string;
+  accessToken?: string;
   expiresIn?: number;
   tokenType?: string;
   refreshExpiresIn?: number;
@@ -33,20 +43,54 @@ export interface AdminAuthTokenResponse {
 export function readAdminAuthTokenResponse(
   payload: unknown,
 ): AdminAuthTokenResponse | null {
-  const root = record(payload);
-  if (!root) return null;
-
-  const candidate = record(root.data) ?? root;
-  if (typeof candidate.accessToken !== "string" || !candidate.accessToken.trim()) {
-    return null;
+  let parsed: unknown = payload;
+  if (typeof payload === "string") {
+    try {
+      parsed = JSON.parse(payload);
+    } catch {
+      return null;
+    }
   }
 
+  const root = record(parsed);
+  if (!root) return null;
+  const firstEnvelope = record(root.data) ?? root;
+  const target = record(firstEnvelope.data) ?? firstEnvelope;
+
+  const rawToken =
+    target.accessToken ??
+    target.access_token ??
+    target.token ??
+    root.accessToken ??
+    root.access_token ??
+    root.token;
+
+  const expiresIn =
+    target.expiresIn ?? target.expires_in ?? root.expiresIn ?? root.expires_in;
+  const tokenType =
+    target.tokenType ?? target.token_type ?? root.tokenType ?? root.token_type;
+  const refreshExpiresIn =
+    target.refreshExpiresIn ??
+    target.refresh_expires_in ??
+    root.refreshExpiresIn ??
+    root.refresh_expires_in;
+
+  const normalizedExpiresIn = optionalPositiveNumber(expiresIn);
+  const normalizedTokenType = optionalString(tokenType);
+  if (!normalizedExpiresIn || !normalizedTokenType) return null;
+
   return {
-    accessToken: candidate.accessToken,
-    expiresIn: optionalPositiveNumber(candidate.expiresIn),
-    tokenType: optionalString(candidate.tokenType),
-    refreshExpiresIn: optionalPositiveNumber(candidate.refreshExpiresIn),
+    accessToken: optionalString(rawToken),
+    expiresIn: normalizedExpiresIn,
+    tokenType: normalizedTokenType,
+    refreshExpiresIn: optionalPositiveNumber(refreshExpiresIn),
   };
+}
+
+/** Unwrap the canonical Core success envelope while retaining direct payload compatibility. */
+export function unwrapCoreData<T>(payload: unknown): T {
+  const root = record(payload);
+  return (root && "data" in root ? root.data : payload) as T;
 }
 
 // -------------------------------------------------------------
@@ -54,16 +98,16 @@ export function readAdminAuthTokenResponse(
 // -------------------------------------------------------------
 let isRefreshing = false;
 let failedQueue: Array<{
-  resolve: (token: string) => void;
+  resolve: () => void;
   reject: (err: any) => void;
 }> = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error?: any) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
-    } else if (token) {
-      prom.resolve(token);
+    } else {
+      prom.resolve();
     }
   });
   failedQueue = [];
@@ -84,8 +128,19 @@ export async function withAuthLock<T>(callback: () => Promise<T>): Promise<T> {
 export function getStoredSessionMeta(): SessionTokenMetadata | null {
   if (typeof window === "undefined") return null;
   try {
+    sessionStorage.removeItem("access_token");
     const raw = sessionStorage.getItem("admin_session_meta");
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+
+    const metadata = JSON.parse(raw) as SessionTokenMetadata & {
+      accessToken?: unknown;
+    };
+    if ("accessToken" in metadata) {
+      delete metadata.accessToken;
+      sessionStorage.setItem("admin_session_meta", JSON.stringify(metadata));
+    }
+
+    return metadata;
   } catch {
     return null;
   }
@@ -99,45 +154,118 @@ export function clearLocalAuthState() {
   sessionStorage.removeItem("user_profile");
 }
 
+function removeLegacyBrowserAccessToken() {
+  if (typeof window === "undefined") return;
+  getStoredSessionMeta();
+}
+
+export async function refreshAdminCookieSession(
+  rememberOverride?: boolean,
+): Promise<AdminAuthTokenResponse> {
+  const storedMeta = getStoredSessionMeta();
+  const remember = rememberOverride ?? storedMeta?.remember ?? false;
+  const refreshRes = await fetch(
+    `${API_BASE_URL}/api/admin/core/v1/auth/refresh`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-auth-cookie-mode": "1",
+        "x-auth-remember": remember ? "1" : "0",
+      },
+      body: JSON.stringify({}),
+      credentials: "include",
+    },
+  );
+
+  if (!refreshRes.ok) {
+    const refreshError = Object.assign(new Error("REFRESH_REJECTED"), {
+      status: refreshRes.status,
+    });
+    throw refreshError;
+  }
+
+  const refreshTokens = readAdminAuthTokenResponse(await refreshRes.json());
+  if (!refreshTokens || typeof window === "undefined") {
+    throw Object.assign(new Error("INVALID_REFRESH_RESPONSE"), { status: 500 });
+  }
+
+  removeLegacyBrowserAccessToken();
+
+  if (storedMeta) {
+    const updatedMeta: SessionTokenMetadata = {
+      ...storedMeta,
+      savedAt: Date.now(),
+      expiresIn: refreshTokens.expiresIn || storedMeta.expiresIn,
+      cookieRevision: (storedMeta.cookieRevision || 0) + 1,
+    };
+    sessionStorage.setItem("admin_session_meta", JSON.stringify(updatedMeta));
+  }
+
+  return refreshTokens;
+}
+
+export function generateUUIDv7(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+
+  const ms = Date.now();
+  const high = Math.floor(ms / 0x100000000);
+  const low = ms % 0x100000000;
+
+  bytes[0] = (high >> 8) & 0xff;
+  bytes[1] = high & 0xff;
+  bytes[2] = (low >> 24) & 0xff;
+  bytes[3] = (low >> 16) & 0xff;
+  bytes[4] = (low >> 8) & 0xff;
+  bytes[5] = low & 0xff;
+
+  bytes[6] = (bytes[6] & 0x0f) | 0x70;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  let uuid = "";
+  for (let i = 0; i < 16; i++) {
+    uuid += bytes[i].toString(16).padStart(2, "0");
+    if (i === 3 || i === 5 || i === 7 || i === 9) uuid += "-";
+  }
+  return uuid;
+}
+
 export async function customFetch<T = any>(
   endpoint: string,
-  options: RequestInit = {},
+  options: ApiRequestConfig = {},
   isRetry = false
 ): Promise<AxiosResponse<T>> {
+  const { skipAuthRefresh = false, ...requestOptions } = options;
+
   // Always relative same-origin URL unless an absolute URL is explicitly passed
   const url = endpoint.startsWith("http")
     ? endpoint
     : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
-  const headers = new Headers(options.headers || {});
-  if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
+  const headers = new Headers(requestOptions.headers || {});
+  if (!headers.has("Content-Type") && !(requestOptions.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
-  // Mandatory cookie mode header for backend cookie mode validation
-  if (!headers.has("x-auth-cookie-mode")) {
-    headers.set("x-auth-cookie-mode", "1");
+  // Automatically attach x-idempotency-key for mutating requests if not present
+  const method = (options.method || "GET").toUpperCase();
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && !headers.has("x-idempotency-key")) {
+    headers.set("x-idempotency-key", generateUUIDv7());
   }
 
-  // Attach Bearer Access Token from sessionStorage for protected endpoints
-  const isAuthEndpoint =
-    endpoint.includes("/auth/login") ||
-    endpoint.includes("/auth/refresh") ||
-    endpoint.includes("/auth/logout") ||
-    endpoint.includes("/auth/forgot-password") ||
-    endpoint.includes("/auth/reset-password");
 
-  if (typeof window !== "undefined" && !isAuthEndpoint) {
-    const accessToken = sessionStorage.getItem("access_token");
-    if (accessToken && !headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${accessToken}`);
-    }
-  }
+
+  const isPublicAuthEndpoint = isPublicAdminAuthEndpoint(endpoint);
+
+  // Browser authentication is cookie-only in development and production.
+  headers.set("x-auth-cookie-mode", "1");
+  removeLegacyBrowserAccessToken();
 
   const fetchOptions: RequestInit = {
-    ...options,
+    ...requestOptions,
     headers,
-    credentials: "include", // Required for browser-managed HttpOnly refresh cookies
+    credentials: "include", // Required for browser-managed HttpOnly cookies
   };
 
   try {
@@ -146,14 +274,17 @@ export async function customFetch<T = any>(
     // -------------------------------------------------------------
     // 401 BEHAVIOR: COORDINATED REFRESH UNDER WEB LOCK MUTEX
     // -------------------------------------------------------------
-    if (response.status === 401 && !isRetry && !isAuthEndpoint) {
+    if (
+      response.status === 401 &&
+      !isRetry &&
+      !skipAuthRefresh &&
+      !isPublicAuthEndpoint
+    ) {
       if (isRefreshing) {
         return new Promise<AxiosResponse<T>>((resolve, reject) => {
           failedQueue.push({
-            resolve: (newToken: string) => {
-              const retryHeaders = new Headers(options.headers || {});
-              retryHeaders.set("Authorization", `Bearer ${newToken}`);
-              resolve(customFetch<T>(endpoint, { ...options, headers: retryHeaders }, true));
+            resolve: () => {
+              resolve(customFetch<T>(endpoint, options, true));
             },
             reject,
           });
@@ -163,60 +294,56 @@ export async function customFetch<T = any>(
       isRefreshing = true;
 
       try {
-        const newAccessToken = await withAuthLock(async () => {
+        await withAuthLock(async () => {
           const storedMeta = getStoredSessionMeta();
-          const rememberFlag = storedMeta?.cookieRevision ? "1" : "0";
+          const requestRemember = new Headers(requestOptions.headers).get("x-auth-remember");
+          const remember =
+            requestRemember === null
+              ? storedMeta?.remember
+              : requestRemember === "1" ||
+                requestRemember.toLowerCase() === "true";
 
-          // POST /api/admin/core/v1/auth/refresh with body {} and NO Authorization header
-          const refreshRes = await fetch(`${API_BASE_URL}/api/admin/core/v1/auth/refresh`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-auth-cookie-mode": "1",
-              "x-auth-remember": rememberFlag,
-            },
-            body: JSON.stringify({}),
-            credentials: "include",
-          });
-
-          if (!refreshRes.ok) {
-            throw new Error("REFRESH_REJECTED");
-          }
-
-          const refreshTokens = readAdminAuthTokenResponse(await refreshRes.json());
-          if (!refreshTokens || typeof window === "undefined") {
-            throw new Error("INVALID_REFRESH_RESPONSE");
-          }
-
-          const token = refreshTokens.accessToken;
-
-          // Update sessionStorage access token & metadata
-          sessionStorage.setItem("access_token", token);
-          if (storedMeta) {
-            const updatedMeta: SessionTokenMetadata = {
-              ...storedMeta,
-              accessToken: token,
-              savedAt: Date.now(),
-              expiresIn: refreshTokens.expiresIn || storedMeta.expiresIn,
-              cookieRevision: (storedMeta.cookieRevision || 0) + 1,
-            };
-            sessionStorage.setItem("admin_session_meta", JSON.stringify(updatedMeta));
-          }
-
-          return token;
+          await refreshAdminCookieSession(remember);
         });
 
-        processQueue(null, newAccessToken);
+        processQueue();
 
         // Retry original request exactly once
-        const retryHeaders = new Headers(options.headers || {});
-        retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
-        return customFetch<T>(endpoint, { ...options, headers: retryHeaders }, true);
-      } catch (refreshErr) {
-        processQueue(refreshErr, null);
-        clearLocalAuthState();
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
+        return customFetch<T>(endpoint, options, true);
+      } catch (refreshErr: any) {
+        processQueue(refreshErr);
+
+        // Do NOT remove access token or redirect to login if refresh failed due to 5XX server error or network issue
+        const status = getAuthErrorStatus(refreshErr);
+
+        if (isDefinitiveAuthFailure(refreshErr)) {
+          clearLocalAuthState();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("global-toast", {
+                detail: {
+                  type: "error",
+                  title: "Session Expired",
+                  message: "Your session has expired. Please log in again.",
+                },
+              })
+            );
+            if (window.location.pathname !== "/login") {
+              window.location.href = "/login";
+            }
+          }
+        } else if (status === undefined || status >= 500) {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("global-toast", {
+                detail: {
+                  type: "error",
+                  title: "Server Error",
+                  message: "An internal server error occurred while refreshing your session.",
+                },
+              })
+            );
+          }
         }
         throw refreshErr;
       } finally {
@@ -225,16 +352,49 @@ export async function customFetch<T = any>(
     }
 
     let data: any;
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      data = await response.json();
-    } else {
-      data = await response.text();
+    const text = await response.text();
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
     }
 
     if (!response.ok) {
-      const err: any = new Error(data?.message || response.statusText || "HTTP Error");
-      err.response = { data, status: response.status, statusText: response.statusText, headers: response.headers };
+      // Normalize CoreErrorResponse and GatewayProblemDetails
+      const message = data?.message ?? data?.title ?? data?.detail ?? response.statusText ?? "HTTP Error";
+      const code = data?.errorCode ?? data?.code ?? "UNKNOWN_ERROR";
+      const correlationId = data?.correlationId ?? "";
+      const details = data?.details ?? data?.errors ?? undefined;
+
+      const err: any = new Error(message);
+      err.response = {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        data: {
+          ...data,
+          message,
+          errorCode: code,
+          correlationId,
+          details
+        }
+      };
+
+      // -------------------------------------------------------------
+      // 403 FORBIDDEN BEHAVIOR
+      // -------------------------------------------------------------
+      if (response.status === 403 && typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("global-toast", {
+            detail: {
+              type: "error",
+              title: "Access Denied",
+              message: "You do not have permission to perform this action.",
+            },
+          })
+        );
+      }
+
       throw err;
     }
 
@@ -250,31 +410,31 @@ export async function customFetch<T = any>(
 }
 
 export const axiosClient = {
-  get: <T = any>(url: string, config?: RequestInit) =>
+  get: <T = any>(url: string, config?: ApiRequestConfig) =>
     customFetch<T>(url, { ...config, method: "GET" }),
 
-  post: <T = any>(url: string, body?: any, config?: RequestInit) =>
+  post: <T = any>(url: string, body?: any, config?: ApiRequestConfig) =>
     customFetch<T>(url, {
       ...config,
       method: "POST",
       body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
-  put: <T = any>(url: string, body?: any, config?: RequestInit) =>
+  put: <T = any>(url: string, body?: any, config?: ApiRequestConfig) =>
     customFetch<T>(url, {
       ...config,
       method: "PUT",
       body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
-  patch: <T = any>(url: string, body?: any, config?: RequestInit) =>
+  patch: <T = any>(url: string, body?: any, config?: ApiRequestConfig) =>
     customFetch<T>(url, {
       ...config,
       method: "PATCH",
       body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
-  delete: <T = any>(url: string, config?: RequestInit) =>
+  delete: <T = any>(url: string, config?: ApiRequestConfig) =>
     customFetch<T>(url, { ...config, method: "DELETE" }),
 };
 
@@ -282,6 +442,21 @@ function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function isPublicAdminAuthEndpoint(endpoint: string): boolean {
+  const requestPath = endpoint.split("?")[0].replace(/\/+$/, "");
+  const authStart = requestPath.indexOf("/auth/");
+  if (authStart < 0) return false;
+
+  return [
+    "/auth/login",
+    "/auth/refresh",
+    "/auth/logout",
+    "/auth/accept-invite",
+    "/auth/forgot-password",
+    "/auth/reset-password",
+  ].includes(requestPath.slice(authStart));
 }
 
 function optionalPositiveNumber(value: unknown): number | undefined {

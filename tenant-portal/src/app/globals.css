@@ -1,1 +1,67 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --color-bg-canvas: #f8fafc;
+  --color-bg-surface: #ffffff;
+  --color-bg-raised: #ffffff;
+  --color-bg-subtle: #f1f5f9;
+  --color-bg-hover: #f8fafc;
+  --color-bg-selected: #eff6ff;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-border-subtle: #e2e8f0;
+  --color-border-default: #cbd5e1;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+
+  /* Tenant Theme Aliases for Dashboard Adapter */
+  --tenant-border: #e2e8f0;
+  --tenant-muted: #64748b;
+  --tenant-surface: #ffffff;
+  --tenant-text: #0f172a;
+  --tenant-field: #f1f5f9;
+  --tenant-primary: #2563eb;
+  --tenant-primary-soft: #eff6ff;
+  --tenant-green: #10b981;
+  --tenant-orange: #f59e0b;
+  --tenant-red: #ef4444;
+}
+
+.dark {
+  color-scheme: dark;
+  --color-bg-canvas: #090d16;
+  --color-bg-surface: #111a2b;
+  --color-bg-raised: #172235;
+  --color-bg-subtle: #172235;
+  --color-bg-hover: #1e2b41;
+  --color-bg-selected: #102a4c;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-border-subtle: #1e293b;
+  --color-border-default: #334155;
+  --color-primary: #3b82f6;
+  --color-primary-hover: #60a5fa;
+
+  /* Dark Mode Tenant Theme Aliases */
+  --tenant-border: #1e293b;
+  --tenant-muted: #94a3b8;
+  --tenant-surface: #111a2b;
+  --tenant-text: #f8fafc;
+  --tenant-field: #1e2b41;
+  --tenant-primary: #3b82f6;
+  --tenant-primary-soft: #102a4c;
+  --tenant-green: #22c55e;
+  --tenant-orange: #fbbf24;
+  --tenant-red: #f87171;
+}
+
+body {
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif);
+}

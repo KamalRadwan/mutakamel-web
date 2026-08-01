@@ -1,5 +1,9 @@
 # Component Specification: `AuditLogViewer` (History & Audit Logs)
 
+Status: **Target reusable behavior; control-plane explorer MISSING**
+
+Last source verification: **2026-07-30**
+
 The `AuditLogViewer` component provides a unified, reusable timeline and table view for inspecting audit logs, entity change history, and system event logs across the Admin Portal.
 
 ---
@@ -9,9 +13,11 @@ The `AuditLogViewer` component provides a unified, reusable timeline and table v
 | Module / Page | Backend Endpoint | Log Item Structure |
 |:---|:---|:---|
 | **Database Server Audit** | `GET /api/admin/core/v1/database-servers/:id/history` | Success envelope whose `data` is a direct array of field changes (`field`, `label`, `previousValue`, `newValue`), exact action (`CREATE`, `UPDATE`, `ACTIVATE`, `DRAIN`, `OFFLINE`, `DELETE`), and `actorId` |
-| **System SMTP Audit** | `GET /admin/system-settings/email/audit` | SMTP configuration modifications, testing logs |
-| **Logging Level Overrides** | `GET /admin/logging/level-overrides/history` | Scope change, level adjustment (`previousLevel`, `level`), `reason`, `actorId` |
-| **Tenant Operations Timeline** | `GET /admin/tenants/:tenantId/operations/:operationId/timeline` | Operation step messages, status transitions, phase updates |
+| **Storage Server Audit** | `GET /api/admin/core/v1/storage-servers/:id/history` | Success envelope whose `data` is `{ items, total }`; each item has exact action, revision triplet, `changes[]` with `previousValue`/`nextValue`, `actorId`, optional `correlationId`, and `createdAt` |
+| **System SMTP Audit** | `GET /api/admin/core/v1/system-settings/email/audit` | SMTP configuration modifications, testing logs |
+| **Logging Level Overrides** | `GET /api/admin/core/v1/logging/level-overrides/history` | Scope change, level adjustment (`previousLevel`, `level`), `reason`, `actorId` |
+| **Tenant Operations Timeline** | `GET /api/admin/core/v1/tenants/:tenantId/operations/:operationId/timeline` | Operation step messages, status transitions, phase updates |
+| **Control-plane audit** | `GET /api/admin/core/v1/audit` | Immutable cross-domain evidence; see [Control-plane audit](../api/control-plane-audit.md) |
 
 ---
 

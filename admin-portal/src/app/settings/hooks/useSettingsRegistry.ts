@@ -32,14 +32,15 @@ export const SETTINGS_UI_REGISTRY: Record<string, SettingUIMetadata> = {
       { value: "SAR", label: "Saudi Riyal (SAR)", labelAr: "ريال سعودي (SAR)" },
     ],
   },
-  "billing.invoice_lead_days": {
-    key: "billing.invoice_lead_days",
-    titleEn: "Invoice Lead Days",
-    titleAr: "أيام مهلة إشعار الفاتورة",
+
+  "billing.invoice_due_days": {
+    key: "billing.invoice_due_days",
+    titleEn: "Invoice Payment Due Days",
+    titleAr: "عدد أيام استحقاق الفاتورة",
     inputType: "number",
     defaultValue: 14,
-    descEn: "Number of days before the subscription boundary when its collection invoice is issued.",
-    descAr: "عدد الأيام قبل نهاية فترة الاشتراك التي يتم عندها إصدار فاتورة التحصيل.",
+    descEn: "Number of days given to pay an issued invoice before it becomes overdue.",
+    descAr: "عدد الأيام المتاحة لدفع الفاتورة الصادرة قبل اعتبارها متأخرة.",
     min: 1,
     max: 365,
   },

@@ -1,17 +1,18 @@
 "use client";
 
-import { RotateCw, Calendar, Printer, BarChart2, LayoutGrid, Clock } from "lucide-react";
+import { RotateCw, Calendar, Printer, Clock } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { DateRangePreset } from "../hooks/useDashboardData";
 
 export type AutoRefreshInterval = "off" | "30s" | "60s" | "5m";
-export type DashboardViewMode = "charts" | "cards";
 
 interface DashboardHeaderProps {
   isRefreshing: boolean;
   onRefresh: () => void;
   rangePreset: DateRangePreset;
   onRangeChange: (preset: DateRangePreset) => void;
+  customRange?: { from?: string; to?: string };
+  onCustomRangeChange?: (range: { from?: string; to?: string }) => void;
   autoRefreshInterval?: AutoRefreshInterval;
   onAutoRefreshChange?: (interval: AutoRefreshInterval) => void;
   onPrintReport?: () => void;
@@ -22,11 +23,13 @@ export function DashboardHeader({
   onRefresh,
   rangePreset,
   onRangeChange,
+  customRange,
+  onCustomRangeChange,
   autoRefreshInterval = "off",
   onAutoRefreshChange,
   onPrintReport,
 }: DashboardHeaderProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
 
   return (
     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
@@ -65,7 +68,50 @@ export function DashboardHeader({
           >
             {t.dashboard.lastMonth}
           </button>
+          <button
+            onClick={() => onRangeChange("custom")}
+            className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+              rangePreset === "custom"
+                ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            }`}
+          >
+            {lang === "ar" ? "مخصص" : "Custom"}
+          </button>
         </div>
+
+        {rangePreset === "custom" && onCustomRangeChange && (
+          <div className="inline-flex items-center gap-2 rounded-xl bg-slate-100 p-1 text-xs dark:bg-slate-800">
+            <input
+              type="date"
+              value={customRange?.from ?? ""}
+              onChange={(event) =>
+                onCustomRangeChange({
+                  ...customRange,
+                  from: event.target.value || undefined,
+                })
+              }
+              aria-label={lang === "ar" ? "من تاريخ" : "From date"}
+              className="min-h-8 rounded-lg border-0 bg-white px-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:text-slate-200"
+            />
+            <span className="text-slate-400" aria-hidden="true">
+              –
+            </span>
+            <input
+              type="date"
+              value={customRange?.to ?? ""}
+              min={customRange?.from}
+              onChange={(event) =>
+                onCustomRangeChange({
+                  ...customRange,
+                  to: event.target.value || undefined,
+                })
+              }
+              aria-label={lang === "ar" ? "إلى تاريخ" : "To date"}
+              className="min-h-8 rounded-lg border-0 bg-white px-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:text-slate-200"
+            />
+          </div>
+        )}
 
         {/* Auto Refresh Interval Selector */}
         {onAutoRefreshChange && (

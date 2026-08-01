@@ -1,0 +1,69 @@
+# Mutakamel Tenant Portal
+
+Standalone Next.js tenant application replacing tenant-facing behavior in
+../backend/mutakamel-apps/mutakamel-web-app.
+
+Current application status: bootstrap only.
+Documentation verification date: 2026-07-25.
+Visual design documentation: intentionally excluded.
+
+## Read first
+
+- AGENTS.md
+- docs/ai/START_HERE.md
+- docs/DOCUMENTATION_CONTRACT.md
+- docs/ai/SOURCE_OF_TRUTH.md
+- docs/app/replacement-scope.md
+- docs/app/application-architecture.md
+- docs/api/README.md
+- docs/security/README.md
+- docs/validation/README.md
+
+## Browser API namespaces
+
+- Core: /api/tenant/core/v1/*
+- CRM: /api/tenant/crm/v1/*
+- Trade: /api/tenant/trade/v1/*
+- Worker: no direct tenant-browser API
+
+The API Gateway is the only browser backend edge. Never call owning services
+directly. Never modify ../backend from this project.
+
+## Source precedence
+
+1. Gateway typed route contracts
+2. Owning controller and global/module guards
+3. DTOs, enums, service/response contracts, entities, and tests
+4. Old-web live clients and tests
+5. Tenant Portal documentation
+6. Mocks and comments, which are not contracts
+
+## Machine-readable route evidence
+
+- docs/generated/tenant-api-routes.json
+- Generator: scripts/docs/generate-route-inventory.mjs
+
+## AI build references
+
+- docs/ai/PROJECT_INDEX.md
+- docs/ai/SYSTEM_CONTEXT.md
+- docs/ai/IMPLEMENTATION_PLAYBOOK.md
+- docs/ai/FEATURE_TEMPLATE.md
+- docs/ai/CONTRACT_VERIFICATION.md
+- docs/ai/TEST_MATRIX.md
+- docs/ai/KNOWN_GAPS.md
+- docs/ai/GLOSSARY.md
+- docs/ai/DECISIONS.md
+
+## Verification
+
+From tenant-portal:
+
+- npm run docs:routes
+- npm run docs:check
+- npm run lint
+- npm run typecheck
+- npm run build
+
+Do not report a capability live until it exists in tenant-portal, uses the
+server-backed contract, and has proportional tests.

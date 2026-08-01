@@ -21,25 +21,6 @@ export function BillingInvoiceStatusPieChart({ paid, outstanding, overdue, heigh
 
   const total = paid + outstanding + overdue;
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      const ratio = total > 0 ? ((data.value / total) * 100).toFixed(1) : 0;
-      return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-lg shadow-lg text-xs">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: data.color }} />
-            <p className="font-bold text-slate-800 dark:text-slate-200">{data.name}</p>
-          </div>
-          <p className="text-slate-600 dark:text-slate-400 pl-4">
-            Total: <span className="font-mono font-bold">${data.value.toLocaleString()}</span> ({ratio}%)
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div style={{ height, width: "100%" }} className="relative flex items-center justify-center">
       <ResponsiveContainer width="100%" height="100%">
@@ -58,16 +39,21 @@ export function BillingInvoiceStatusPieChart({ paid, outstanding, overdue, heigh
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Pie>
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip
+            formatter={(value) => [
+              Number(value ?? 0).toLocaleString(),
+              lang === "ar" ? "العدد" : "Count",
+            ]}
+          />
         </PieChart>
       </ResponsiveContainer>
       
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tighter">
-          ${(total / 1000).toFixed(1)}k
+          {total.toLocaleString()}
         </span>
         <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 mt-1">
-          {lang === "ar" ? "إجمالي الفواتير" : "Total Invoiced"}
+          {lang === "ar" ? "إجمالي الفواتير" : "Total Invoices"}
         </span>
       </div>
     </div>

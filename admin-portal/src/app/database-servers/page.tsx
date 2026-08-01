@@ -17,6 +17,10 @@ import { DatabaseServerSummary } from "./components/DatabaseServerSummary";
 import { DatabaseServerAuditDrawer } from "./components/DatabaseServerAuditDrawer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
+import { useAuth } from "@/context/AuthContext";
+import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+import { Country } from "country-state-city";
+import { CountrySelect } from "@/components/shared/CountrySelect";
 
 export default function DatabaseServersPage() {
   const {
@@ -40,8 +44,16 @@ export default function DatabaseServersPage() {
     confirmModalAction,
     openActivateModal,
     openDrainModal,
+    openOfflineModal,
     openDeleteModal,
+    isLoading,
+    error,
+    meta,
   } = useDatabaseServers();
+
+  const { user } = useAuth();
+  const canUpdate = adminCanAll(user, ADMIN_RBAC_CRITICAL.DB_SERVERS_UPDATE);
+  const canDelete = adminCanAll(user, ADMIN_RBAC_CRITICAL.DB_SERVERS_DELETE);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
@@ -95,18 +107,15 @@ export default function DatabaseServersPage() {
               <option value="ACTIVE">ACTIVE (نشط)</option>
               <option value="DRAINING">DRAINING (تفريغ)</option>
               <option value="OFFLINE">OFFLINE (متوقف)</option>
+              <option value="DELETED">DELETED (محذوف)</option>
             </select>
 
-            <select
+            <CountrySelect
               value={countryFilter}
-              onChange={(e) => setCountryFilter(e.target.value)}
-              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 cursor-pointer"
-            >
-              <option value="ALL">{t.dbServers.allCountries}</option>
-              <option value="EG">مصر (Egypt)</option>
-              <option value="SA">السعودية (KSA)</option>
-              <option value="AE">الإمارات (UAE)</option>
-            </select>
+              onChange={(isoCode) => setCountryFilter(isoCode)}
+              allowAll={true}
+              allLabel={t.dbServers.allCountries}
+            />
           </div>
         </div>
 
@@ -125,8 +134,21 @@ export default function DatabaseServersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {servers.map((srv) => (
-                  <tr key={srv.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 h-11">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-500">جاري التحميل... (Loading...)</td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-red-500">{error}</td>
+                  </tr>
+                ) : servers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-500">لا توجد خوادم مطابقة (No servers found)</td>
+                  </tr>
+                ) : (
+                  servers.map((srv) => (
+                    <tr key={srv.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 h-11">
                     <td className="py-2.5 px-4 font-bold text-slate-900 dark:text-slate-100">
                       <Link href={`/database-servers/${srv.id}`} className="hover:underline flex items-center gap-2">
                         <Server className="w-4 h-4 text-purple-500" />
@@ -138,12 +160,12 @@ export default function DatabaseServersPage() {
                     </td>
                     <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">
                       <div className="flex items-center gap-1.5">
-                        <Globe className="w-3.5 h-3.5 text-blue-500" />
-                        <span>{srv.countryName}</span>
+                        <span className="text-sm">{Country.getCountryByCode(srv.countryIsoCode || "")?.flag || "🌐"}</span>
+                        <span>{Country.getCountryByCode(srv.countryIsoCode || "")?.name || srv.countryName || srv.countryIsoCode}</span>
                       </div>
                     </td>
                     <td className="py-2.5 px-4 font-mono">
-                      {srv.currentTenants} / {srv.maxTenants} ({srv.utilization}%)
+                      {srv.currentTenants} / {srv.maxTenants} ({Math.round(srv.utilizationRatio * 100)}%)
                     </td>
                     <td className="py-2.5 px-4">
                       <StatusBadge status={srv.status} enumType="db-server" size="sm" />
@@ -166,36 +188,80 @@ export default function DatabaseServersPage() {
                           <ExternalLink className="w-3 h-3" />
                         </Link>
 
-                        {srv.status === "DRAINING" ? (
-                          <button
-                            onClick={() => openActivateModal(srv)}
-                            className="px-2 py-1 text-[11px] font-semibold text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                          >
-                            تفعيل
-                          </button>
-                        ) : srv.status === "ACTIVE" ? (
-                          <button
-                            onClick={() => openDrainModal(srv)}
-                            className="px-2 py-1 text-[11px] font-semibold text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>تفريغ</span>
-                          </button>
+                        {srv.status === "DRAINING" || srv.status === "OFFLINE" ? (
+                          canUpdate && (
+                            <button
+                              onClick={() => openActivateModal(srv)}
+                              className="px-2 py-1 text-[11px] font-semibold text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                            >
+                              تفعيل
+                            </button>
+                          )
                         ) : null}
 
-                        <button
-                          onClick={() => openDeleteModal(srv)}
-                          className="p-1.5 text-rose-500 hover:text-rose-700 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {srv.status === "ACTIVE" ? (
+                          canUpdate && (
+                            <button
+                              onClick={() => openDrainModal(srv)}
+                              className="px-2 py-1 text-[11px] font-semibold text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>تفريغ</span>
+                            </button>
+                          )
+                        ) : null}
+
+                        {srv.status !== "OFFLINE" ? (
+                          canUpdate && (
+                            <button
+                              onClick={() => openOfflineModal(srv)}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                            >
+                              إيقاف
+                            </button>
+                          )
+                        ) : null}
+
+                        {canDelete && (
+                          <button
+                            onClick={() => openDeleteModal(srv)}
+                            className="p-1.5 text-rose-500 hover:text-rose-700 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination Controls */}
+          {!isLoading && !error && meta.totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800">
+              <div className="text-xs text-slate-500">
+                إجمالي العناصر: {meta.total} | الصفحة {page} من {meta.totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={!meta.hasPrev}
+                  onClick={() => setPage(page - 1)}
+                  className="px-3 py-1 text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  السابق (Prev)
+                </button>
+                <button
+                  disabled={!meta.hasNext}
+                  onClick={() => setPage(page + 1)}
+                  className="px-3 py-1 text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  التالي (Next)
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
@@ -213,6 +279,8 @@ export default function DatabaseServersPage() {
               ? `تأكيد إعادة تفعيل السيرفر (${activeModalServer.name})`
               : modalActionType === "drain"
               ? `تأكيد تفريغ السيرفر (${activeModalServer.name})`
+              : modalActionType === "offline"
+              ? `تأكيد إيقاف السيرفر (${activeModalServer.name})`
               : `تأكيد حذف السيرفر (${activeModalServer.name})`
           }
           description={
@@ -220,6 +288,8 @@ export default function DatabaseServersPage() {
               ? "سيسمح هذا الإجراء باستقبال مستأجرين جدد على هذا السيرفر."
               : modalActionType === "drain"
               ? "سيعمل هذا الإجراء على منع تخصيص أي مستأجرين جدد على هذا السيرفر ونقل المستأجرين الحاليين عند الطلب."
+              : modalActionType === "offline"
+              ? "سيقوم هذا الإجراء بإيقاف السيرفر وجعله غير متاح كلياً."
               : "سيقوم هذا الإجراء بإزالة السيرفر نهائياً بشرط عدم وجود مستأجرين مرتبطين به."
           }
         />

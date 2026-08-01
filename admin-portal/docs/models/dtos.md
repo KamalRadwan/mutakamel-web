@@ -1,7 +1,7 @@
 # Admin Portal — Selected DTOs Reference
 
 High-use request DTOs and validation rules extracted from the current backend.
-Last verified: **2026-07-24**.
+Last verified: **2026-07-30**.
 
 This page is not a substitute for each domain API page. The backend DTO remains
 authoritative, and the Core global validation pipe rejects unknown fields.
@@ -236,6 +236,58 @@ values are in `meta`. The field is `total`, not `totalItems`.
 
 ---
 
+## System Settings DTOs
+
+### `SystemSettingQueryDto`
+
+```typescript
+{
+  prefix?: string; // trimmed, max 120
+}
+```
+
+### `SystemSettingKeyParamDto`
+
+```typescript
+{
+  key: string; // trimmed, max 120;
+               // /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/
+}
+```
+
+### `UpsertSystemSettingDto`
+
+```typescript
+{
+  value: unknown;       // required; validated by the selected registry schema
+  description?: string; // trimmed string, max 255
+}
+```
+
+### `PatchPlatformSmtpConfigDto`
+
+```typescript
+{
+  fromAddress?: string;  // valid email, max 320
+  fromName?: string;     // 1..200
+  senderDomain?: string; // max 253
+  smtpHost?: string;     // max 253
+  smtpPort?: number;     // integer 1..65535
+  smtpSecure?: boolean;
+  smtpProtocol?: 'smtp' | 'smtps';
+  smtpUsername?: string; // 1..320
+  smtpPassword?: string; // 1..1024, write-only
+}
+```
+
+Initial SMTP setup must be complete. SMTP hostname/domain normalization,
+TLS/protocol/port compatibility, the 31 registered key schemas, bodyless
+connection verification, runtime-effect boundaries, and UUIDv7 idempotency
+rules are documented in the
+[System Settings and Platform SMTP Frontend Contract](../api/system-settings.md).
+
+---
+
 ## Database Server DTOs
 
 The database-server create, connectivity, query, history-query, and update DTOs
@@ -243,6 +295,36 @@ contain credential, SSL, pool, timeout, capacity, and lifecycle rules that are
 too interdependent for a short shared excerpt. Use the verified
 [Database Servers Frontend Contract](../api/database-servers.md), including its
 normalization table and cross-field validation rules.
+
+---
+
+## Storage Server DTOs
+
+Storage Server registration, base update, full routing-profile replacement,
+principal-reference rotation, verification, lifecycle, attestation-key, and
+source-bound recovery-evidence DTOs are documented in the verified
+[Storage Servers Frontend Contract](../api/storage-servers.md).
+
+Important shared constraints:
+
+- all Storage Server and attestation-key mutations require UUIDv7
+  `x-idempotency-key`;
+- create/update endpoint URLs are absolute and credential-free, and the public
+  endpoint is HTTPS;
+- routing profile is a full replacement with an
+  `expectedBindingRevision`, four distinct mandatory class buckets, nine
+  principal references, and six attestation key IDs;
+- principal references match exact `env:S3_<PREFIX>_<PRINCIPAL>_<ROLE>`
+  suffixes and are never secret material;
+- rotation, verification, lifecycle, key promotion, and delete requests have
+  no body where the API contract says none;
+- recovery-destination registration accepts a write-only
+  `env:STORAGE_RECOVERY_*` locator, while policy verification is
+  revision-fenced and requires a trusted source-bound evidence package;
+- recovery evidence uses canonical millisecond UTC timestamps, distinct
+  lowercase SHA-256 digests, and three distinct administration boundaries;
+- no DTO accepts an access key, secret key, Ed25519 private key, raw
+  fingerprint, or force-activation flag.
 
 ---
 
@@ -269,12 +351,44 @@ Important shared constraints:
   idempotency identifiers that explicitly require UUIDv7 cannot use mock UUIDs.
 - Tenant creation requires a current server-issued `quoteId`; do not submit
   invented plan labels, `placementMode`, or frontend-computed totals.
+- Tenant creation requires an explicit UUIDv7 `storageServerId` loaded from
+  the safe placement-options endpoint; it is part of the durable command
+  fingerprint.
 - `UpdateTenantDto.expectedUpdatedAt` is an exact ISO timestamp used for
   optimistic concurrency.
+- `UpdateTenantDto` does not accept `storageServerId`; existing placement is
+  read-only in ordinary profile edit. A separate fenced migration contract
+  exists but is default-off and lacks the complete frontend-safe read model.
 - Tenant-user `DELETED` is a visibility value, not `UserStatusEnum`.
 - Branch-role updates are full replacement sets, not add/remove deltas.
 - Gateway tenant mutations require an `x-idempotency-key` UUIDv7 even where an
   individual Core controller lacks `@IdempotencyRequired()`.
+
+### Tenant Storage Server migration DTOs
+
+```typescript
+interface CreateTenantStorageMigrationDto {
+  targetStorageServerId: string;               // UUIDv7
+  expectedSourcePlacementRevision: number;    // integer >= 1
+  expectedSourceStorageFenceRevision: number; // integer >= 1
+  rollbackRetentionDays?: number;              // integer 1..90, default 7
+}
+
+interface RollbackTenantStorageMigrationDto {
+  expectedPlacementRevision: number;    // integer >= 1
+  expectedStorageFenceRevision: number; // integer >= 1
+}
+
+interface FinalizeTenantStorageMigrationDto {
+  expectedRetainedUntil: string; // strict ISO-8601 timestamp
+}
+```
+
+All migration mutations require UUIDv7 `x-idempotency-key`. Retry, cancel,
+and post-cutover retry/cancel have no body. The ordinary tenant response does
+not currently expose the source revisions required by create, so the portal
+must not invent them. See
+[Tenant Storage Server Migrations](../api/tenant-storage-migrations.md).
 
 ---
 

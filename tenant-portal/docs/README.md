@@ -1,63 +1,119 @@
 # Tenant Portal Documentation
 
-Welcome to the documentation for the `tenant-portal` application. This guide serves as a comprehensive reference for the Tenant APIs, static data structures, and Role-Based Access Control (RBAC) implementations. 
+Last documentation verification: **2026-07-25**
 
-The Tenant Portal allows tenant administrators and users to manage their organization, settings, billing, templates, documents, and day-to-day activities within the Mutakamel workspace.
+This is the source-verified build guide for the standalone Tenant Portal. The
+new application will replace the tenant-facing area currently implemented in
+`backend/mutakamel-apps/mutakamel-web-app`.
 
-## API Documentation
+Documentation describes both backend capability and intended replacement
+coverage. Every page must state whether the new `tenant-portal` implementation
+is live, partial, absent, or only planned.
 
-Detailed endpoint specifications, required permissions, and frontend implementation notes are grouped by domain:
+## Start here
 
-- [Auth API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/auth.md): Authentication, sessions, and multi-factor authentication (MFA).
-- [Organization API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/organization.md): Companies, branches, departments, teams, and the organizational tree.
-- [Users API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/users.md): User lifecycle, directory, invitations, and WebPhone configurations.
-- [Roles API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/roles.md): Custom roles, permission catalogs, and branch-scoped role assignments.
-- [Billing API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/billing.md): Invoices, payments, subscriptions, taxes, and currencies.
-- [Settings API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/settings.md): Workspace configuration, branding, and document numbering sequences.
-- [Tenant Host API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/tenant-host.md): Unauthenticated tenant resolution based on Host headers.
-- [User Modules API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/user-modules.md): Seat licensing and business module assignment for users.
-- [Notifications API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/notifications.md): In-app/push notifications, delivery preferences, and custom SMTP settings.
-- [Templates API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/templates.md): The Template Designer platform, business letter generation, and asset management.
-- [Activities API](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/activities.md): Task and log management, completions, cancellations, and assignments.
+1. [Documentation contract](DOCUMENTATION_CONTRACT.md)
+2. [Replacement scope](app/replacement-scope.md)
+3. [Capability and route map](app/capability-map.md)
+4. [System context](architecture/system-context.md)
+5. [API and Gateway rules](api/README.md)
+6. [Validation rules](validation/README.md)
+7. [Security model](security/README.md)
+8. [Static data](static-data.md)
+9. [AI start page](ai/START_HERE.md)
+10. [Examples](examples/README.md)
+11. [Audit and coverage](audit/README.md)
+12. [Generated tenant routes](generated/tenant-api-routes.md)
 
-### CRM Module
+## Documentation map
 
-- [CRM Leads](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/crm/leads.md): Lead capture, branch-scoped visibility, and conversion flows.
-- [CRM Opportunities](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/crm/opportunities.md): Pipeline opportunity tracking and stages.
-- [CRM Profiles](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/crm/customer-profiles.md): Unified prospective and active customer tracking.
-- [CRM Custom Fields](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/crm/custom-fields.md): Tenant-defined custom fields and requirement definitions.
-- [CRM Notes & Attachments](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/crm/notes-attachments.md): Appended text notes and file uploads for CRM records.
-- [CRM Outbound Emails](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/crm/outbound-emails.md): Targeted email dispatches and delivery tracking.
-- [CRM Dashboards](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/crm/dashboards.md): Pre-aggregated widgets for pipeline and activity performance.
-- [CRM Settings](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/crm/settings.md): Pipelines, Lead Stages, and global CRM Limits.
+| Area | Purpose |
+| --- | --- |
+| `app/` | Replacement boundary, feature ownership, routes, and delivery status |
+| `architecture/` | Runtime boundaries and cross-application flows |
+| `api/` | Core, CRM, and Trade tenant API contracts |
+| `validation/` | Transport, form, query, response, and state validation |
+| `security/` | Threat model, authentication, isolation, and browser rules |
+| `ai/` | Compact context and implementation rules for coding agents |
+| `examples/` | Safe integration and error-handling examples |
+| `audit/` | Route coverage and source-verification evidence |
+| `generated/` | Regenerable inventories; never hand-edit |
 
-### Trade Module
+## Backend ownership
 
-- [Trade Catalog](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/catalog.md): Items, UOMs, company/branch overrides, and distribution channels.
-- [Trade Commercial Accounts](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/commercial-accounts.md): B2B trade accounts, customer and vendor status.
-- [Trade Documents](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/documents.md): Financial and operational documents (Quotations, Sales Orders).
-- [Trade Financial Documents](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/financial-documents.md): Billing invoices and business contracts.
-- [Trade Purchasing](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/purchasing.md): Procurement tracking and Purchase Orders.
-- [Trade Purchase Quotations](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/purchase-quotations.md): Vendor quote management and RFQs.
-- [Trade Inventory & Pricing](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/inventory-pricing.md): Stock availability, pricing rules, and reservations.
-- [Trade Policy Studio](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/policy-studio.md): Evaluated pricing rules, discounts, and workflow logic.
-- [Trade Control Tower](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/control-tower.md): Global error catching, retries, and manual overrides.
-- [Trade Extensions & Automation](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/extensions-automation.md): Webhooks, bulk import schemas, and custom integrations.
-- [Trade Dashboards](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/dashboards.md): Custom analytics engine for SQL widgets and shared grid layouts.
-- [Trade Configuration Scope](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/configuration-scope.md): Evaluates hierarchal global settings based on branch contexts.
-- [Trade Document Platform](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/api/trade/document-platform.md): Low-level profile configurations and numbering rules for B2B documents.
+| Backend app | Tenant Portal responsibility |
+| --- | --- |
+| API Gateway | Only browser-facing API edge; canonical paths, JWT checks, transport policy, rate limits, and trusted context |
+| Core | Host admission, tenant auth, identity, organization, RBAC, workspace, billing, notifications, templates, activities, subscriptions, and tenant update projections |
+| CRM | Leads, profiles, opportunities, activities, pipelines, outbound email, attachments, and CRM dashboards |
+| Trade | Catalogue, accounts, pricing, quotations, orders, purchasing, inventory, policy, automation, Control Tower, and Trade dashboards |
+| Worker | Background provisioning, migrations, rendering, email, notifications, and scheduled effects; never called directly by Tenant Portal |
+| Shared packages | Auth, database tenancy, common DTOs, broker contracts, storage, templates, logging, and other cross-cutting primitives |
 
-## Architecture and Security
+## Canonical browser paths
 
-- [RBAC Matrix](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/rbac-matrix.md): A comprehensive list of all required permissions and how they map to the various APIs.
-- [Static Data & Enums](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/static-data.md): Key entity states, status codes, and global enumerations used across the platform.
-- [Data Models (DTOs)](file:///c:/mutakamel.ai/frontend/tenant-portal/docs/dtos.md): Core Data Transfer Objects detailing request and response payloads.
+```text
+/api/tenant/core/v1/*   -> API Gateway -> Core
+/api/tenant/crm/v1/*    -> API Gateway -> CRM
+/api/tenant/trade/v1/*  -> API Gateway -> Trade
+```
 
-## Development Guidelines
+Controller-relative paths such as `/tenant/auth`, `/crm/leads`, or
+`/trade/quotations` are backend implementation paths. Browser code must not
+call them directly.
 
-When developing features for the `tenant-portal`, adhere to the following principles:
-- **Permissions**: Every non-public route must be guarded by `@UseGuards(TenantGuard)` and have appropriate `@RequirePermissions(...)` decorators mapped.
-- **Tenant Scope**: Always use the authenticated `tenantId` extracted from the actor context (`@CurrentTenant` or `@CurrentActor`) to ensure queries strictly return tenant-owned data.
-- **Internationalization**: Follow the established guidelines for bilingual (Arabic/English) support for UI strings.
+Public host admission is performed server-side using the Gateway-exposed Core
+host-status contract and the original request host. Unknown or unverified hosts
+must fail before tenant UI renders.
 
-For detailed guidelines, refer to the [AGENTS.md](file:///c:/mutakamel.ai/frontend/tenant-portal/.agents/AGENTS.md) file.
+## API references
+
+### Core
+
+- [Authentication](api/auth.md)
+- [Tenant host admission](api/tenant-host.md)
+- [Organization](api/organization.md)
+- [Users and directory](api/users.md)
+- [Roles](api/roles.md)
+- [User modules and seats](api/user-modules.md)
+- [Billing and subscriptions](api/billing.md)
+- [Workspace settings](api/settings.md)
+- [Notifications](api/notifications.md)
+- [Templates](api/templates.md)
+- [Activities](api/activities.md)
+
+Additional Core pages are listed in [API index](api/README.md).
+
+### CRM
+
+- [CRM index](api/crm/README.md)
+
+### Trade
+
+- [Trade index](api/trade/README.md)
+
+## Cross-cutting references
+
+- [DTO conventions](dtos.md)
+- [RBAC matrix](rbac-matrix.md)
+- [Static data and enums](static-data.md)
+- [Error handling](validation/error-handling.md)
+- [API examples](examples/api-requests.md)
+
+## Source roots
+
+Backend source is read-only for this frontend project. Paths below are relative
+to `C:\mutakamel.ai\frontend`:
+
+```text
+../backend/mutakamel-apps/api-gateway-app
+../backend/mutakamel-apps/core-app
+../backend/mutakamel-apps/crm-app
+../backend/mutakamel-apps/trade-app
+../backend/mutakamel-apps/worker-app
+../backend/mutakamel-apps/shared-libs
+../backend/mutakamel-apps/mutakamel-web-app
+```
+
+When source and prose disagree, follow
+[DOCUMENTATION_CONTRACT.md](DOCUMENTATION_CONTRACT.md) and correct the prose.

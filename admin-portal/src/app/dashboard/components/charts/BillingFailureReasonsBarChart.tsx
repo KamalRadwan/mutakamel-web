@@ -10,7 +10,7 @@ import {
   CartesianGrid,
   Cell
 } from "recharts";
-import { useI18n } from "@/i18n/I18nContext";
+import { ChartTooltip } from "./ChartTooltip";
 
 export interface FailureReasonData {
   reason: string;
@@ -23,23 +23,6 @@ interface Props {
 }
 
 export function BillingFailureReasonsBarChart({ data, height = 280 }: Props) {
-  const { lang } = useI18n();
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-lg shadow-lg text-xs">
-          <p className="font-bold mb-1 text-slate-800 dark:text-slate-200">{data.reason}</p>
-          <p className="text-slate-600 dark:text-slate-400">
-            {lang === "ar" ? "العدد" : "Count"}: <span className="font-mono font-bold text-rose-500">{data.count}</span>
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div style={{ height, width: "100%" }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -61,7 +44,10 @@ export function BillingFailureReasonsBarChart({ data, height = 280 }: Props) {
             className="text-slate-500 dark:text-slate-400"
             width={100}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: "currentColor", opacity: 0.05 }} />
+          <Tooltip
+            content={<ChartTooltip />}
+            cursor={{ fill: "currentColor", opacity: 0.05 }}
+          />
           
           <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={16}>
             {data.map((entry, index) => (

@@ -15,11 +15,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
   feature, tier, pricing, or managed-currency work, read
   `docs/api/catalog.md`; for tenant work, read `docs/api/tenants.md` and the
   nested `docs/api/tenant-users.md` and `docs/api/tenant-operations.md`
-  contracts relevant to the screen.
-- **Backend Scope**: `core-app` is the primary Admin Portal backend;
+  contracts relevant to the screen; for platform, auth, billing, notification,
+  Asterisk, or SMTP settings work, read `docs/api/system-settings.md`.
+- **Backend Scope & Prohibition**: `core-app` is the primary Admin Portal backend;
   `worker-app` owns backup/restore execution; `api-gateway-app` owns the public
   browser route contract. CRM and Trade APIs are tenant-product APIs unless the
-  gateway explicitly adds an admin-master route.
+  gateway explicitly adds an admin-master route. NEVER edit, modify, or update
+  any backend file under `../backend/` under any circumstances.
 - **Canonical Browser APIs**: Call Core through
   `/api/admin/core/v1/<route>` and Worker through
   `/api/admin/worker/v1/<route>`. Never call controller-relative
@@ -28,14 +30,18 @@ This version has breaking changes — APIs, conventions, and file structure may 
   then verify guards, permissions, DTO validation, enums, and response shapes
   in the owning backend controller/DTO/service. Frontend mock objects and
   endpoint comments are design fixtures, not API evidence.
-- **Integration Status**: Authentication is currently server-backed. Most
-  dashboard, tenant, database-server, catalogue, admin-user, and role screens
-  are mocked. Settings contain fail-open preview fallbacks. Do not describe a
-  screen as integrated until its real loading, empty, forbidden, validation,
-  and error states are implemented.
+- **Integration Status**: Authentication, dashboard, admin users/roles,
+  Database Servers, bounded Storage Servers, Catalogue, and settings contain
+  substantial real Core integration. Tenants remain partial and
+  contract-breaking; several operational modules are missing. Use
+  `docs/audit/frontend-capability-matrix.md` for the current source boundary.
+  Do not treat source integration as authenticated runtime or deployment
+  evidence.
 - **Shared HTTP Behavior**: Use the shared API client so protected calls use
-  Bearer auth, `credentials: "include"`, and the coordinated single refresh
-  retry. Do not introduce raw `fetch` paths that bypass session handling.
+  HttpOnly cookie auth, `credentials: "include"`, `x-auth-cookie-mode: 1`, and
+  the coordinated single refresh retry. Browser feature code must not read or
+  attach JWT bearer tokens or introduce raw `fetch` paths that bypass session
+  handling.
   Core success payloads are under `data`; paginated responses also use `meta`,
   while Core failures expose `errorCode` and Gateway Problem Details expose
   `code`. Normalize both without discarding `correlationId`.
@@ -47,7 +53,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
   preserve case-sensitive enum wire values, and do not submit placeholder IDs
   to UUID-validated endpoints.
 - **RBAC**: Derive navigation and action visibility from `/auth/me`
-  permissions. UI hiding is not a replacement for backend authorization.
+  permissions. Permission pairs use ALL semantics; use ANY only when the
+  Gateway route explicitly declares it. UI hiding is not a replacement for
+  backend authorization, and `403` is not an empty state.
 - **Documentation Maintenance**: When a route, DTO, enum, permission, response
   adapter, or live/mock boundary changes, update the relevant file under
   `docs/` and refresh its verification date in the same task.
@@ -60,4 +68,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Logic/View Separation**: Put state, effects, handlers, and API integration
   in `hooks/use<ComponentName>.ts`; keep `.tsx` components focused on markup
   and Tailwind classes.
+- **WebPhone Security**: The floating Admin WebPhone uses browser-only `jssip`
+  plus `/api/admin/core/v1/users/me/webphone`, Asterisk settings, and call-log
+  routes. SIP passwords may exist only in active component memory and must
+  never be written to browser storage, logs, analytics, or UI fixtures.
 - **File Scope**: Modify files only when the user has authorized changes.

@@ -2,10 +2,22 @@
 
 import { useSettings } from "../hooks/useSettings";
 import { SettingField } from "../components/SettingField";
-import { Phone, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Phone, RefreshCw } from "lucide-react";
+
+import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
 
 export default function AsteriskSettingsPage() {
-  const { lang, settings, isLoading, updateSetting } = useSettings("asterisk.");
+  const {
+    lang,
+    settings,
+    isLoading,
+    isSaving,
+    hasUnsavedChanges,
+    loadError,
+    updateSetting,
+    saveAllSettings,
+    refetch,
+  } = useSettings("asterisk.");
 
   return (
     <div className="space-y-6">
@@ -20,6 +32,13 @@ export default function AsteriskSettingsPage() {
           </p>
         </div>
       </div>
+
+      <SaveSettingsBanner 
+        hasUnsavedChanges={hasUnsavedChanges} 
+        isSaving={isSaving} 
+        onSave={saveAllSettings} 
+        lang={lang} 
+      />
 
       <div className="space-y-4">
         {isLoading ? (

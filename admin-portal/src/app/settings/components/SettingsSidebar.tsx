@@ -15,42 +15,42 @@ import { useI18n } from "@/i18n/I18nContext";
 
 export function SettingsSidebar() {
   const pathname = usePathname();
-  const { lang } = useI18n();
+  const { t, lang } = useI18n();
 
   const links = [
     {
       href: "/settings/platform",
-      label: lang === "ar" ? "المنصة والدعم" : "Platform & Support",
+      label: t.settings.tabs.platform,
       icon: Server,
       color: "text-blue-500",
     },
     {
       href: "/settings/auth",
-      label: lang === "ar" ? "المصادقة والأمان" : "Authentication",
+      label: t.settings.tabs.auth,
       icon: ShieldCheck,
       color: "text-emerald-500",
     },
     {
       href: "/settings/billing",
-      label: lang === "ar" ? "الفوترة والاشتراكات" : "Billing & Trials",
+      label: t.settings.tabs.billing,
       icon: CreditCard,
       color: "text-indigo-500",
     },
     {
       href: "/settings/notifications",
-      label: lang === "ar" ? "قنوات الإشعارات" : "Notifications",
+      label: t.settings.tabs.notifications,
       icon: Bell,
       color: "text-amber-500",
     },
     {
       href: "/settings/asterisk",
-      label: lang === "ar" ? "بوابة WebRTC (Asterisk)" : "WebRTC (Asterisk)",
+      label: t.settings.tabs.webphone,
       icon: Phone,
       color: "text-purple-500",
     },
     {
       href: "/settings/smtp",
-      label: lang === "ar" ? "إعدادات البريد (SMTP)" : "SMTP Email Gateway",
+      label: t.settings.tabs.smtp,
       icon: Mail,
       color: "text-rose-500",
     },
@@ -61,7 +61,7 @@ export function SettingsSidebar() {
       <div className="mb-4 px-3">
         <h2 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-2">
           <Settings className="w-4.5 h-4.5 text-blue-500" />
-          {lang === "ar" ? "إعدادات النظام" : "System Settings"}
+          {t.settings.pageTitle}
         </h2>
       </div>
 

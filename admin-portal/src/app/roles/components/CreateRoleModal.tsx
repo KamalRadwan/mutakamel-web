@@ -3,27 +3,48 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, X, Loader2, Info } from "lucide-react";
+import { useToast } from "@/components/ui/ToastContext";
+import { axiosClient } from "@/lib/api/axiosClient";
 import { useI18n } from "@/i18n/I18nContext";
 
-export function CreateRoleModal({ onClose }: { onClose: () => void }) {
+export function CreateRoleModal({ onClose, onSuccess }: { onClose: () => void, onSuccess?: () => void }) {
   const { lang } = useI18n();
   const router = useRouter();
+  const toast = useToast();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [type, setType] = useState<"SUPER_ADMIN" | "ADMIN" | "USER">("ADMIN");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const res = await axiosClient.post('/api/admin/core/v1/roles', {
+        name: name.trim(),
+        description: description.trim() || undefined,
+      });
+      
+      const newRoleId = res.data?.data?.id;
+      
+      toast.success(
+        lang === "ar" ? "تم الإنشاء" : "Role Created",
+        lang === "ar" ? "تم إنشاء الدور بنجاح." : "Role created successfully."
+      );
+      
       onClose();
-      // Redirect to the new role to configure permissions
-      router.push("/roles/new-role-id");
-    }, 1000);
+      if (onSuccess) onSuccess();
+      
+      if (newRoleId) {
+        router.push(`/roles/${newRoleId}`);
+      }
+    } catch (error: any) {
+      toast.error(
+        lang === "ar" ? "فشل الإنشاء" : "Creation failed",
+        error?.response?.data?.message || (lang === "ar" ? "حدث خطأ أثناء إنشاء الدور." : "An error occurred while creating the role.")
+      );
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -64,21 +85,6 @@ export function CreateRoleModal({ onClose }: { onClose: () => void }) {
               placeholder={lang === "ar" ? "مثال: مدير الفواتير" : "e.g., Billing Manager"}
               className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors"
             />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              {lang === "ar" ? "مستوى الصلاحية (Tier)" : "Tier Type"} <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as any)}
-              className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors cursor-pointer"
-            >
-              <option value="USER">User (View-Only / Operator)</option>
-              <option value="ADMIN">Admin (Standard Administrator)</option>
-              <option value="SUPER_ADMIN">Super Admin (Unrestricted)</option>
-            </select>
           </div>
 
           <div>

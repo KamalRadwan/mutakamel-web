@@ -1,7 +1,6 @@
 "use client";
 
 import { MetricDonutChart, DonutSegment } from "./MetricDonutChart";
-import { toneToColorClass } from "../../utils/formatters";
 import { DashboardMetricTone } from "@/types/dashboard";
 
 interface TenantStatusDonutChartProps {
@@ -55,4 +54,3 @@ export function TenantStatusDonutChart({
     />
   );
 }
-

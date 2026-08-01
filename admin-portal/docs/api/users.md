@@ -1,230 +1,135 @@
-# Admin Users API — `/admin/users`
+# Admin Users, Profile, and WebPhone API
 
-Browser prefix: `/api/admin/core/v1`. The `/admin/...` forms below are Core
-controller-relative paths, not browser request URLs.
+Status: **Verified backend contract; frontend COMPLETE**
 
-Base Path: `admin/users`
-Guard: `AdminGuard` (all endpoints)
+Last source verification: **2026-07-30**
 
----
+Owner: **Core**
 
-## POST `/admin/users` — Invite Admin User
+Canonical browser prefix: `/api/admin/core/v1/users`
 
-**Permission**: `admin.users.invite`
-**HTTP Status**: 201
+## Route matrix
 
-### Request Body — `CreateAdminUserDto`
-```typescript
-{
-  email: string;        // @IsEmail, @MaxLength(255), auto-trimmed & lowercased
-  firstName: string;    // @IsString, @MinLength(1), @MaxLength(80), auto-trimmed
-  lastName: string;     // @IsString, @MinLength(1), @MaxLength(80), auto-trimmed
-  tier?: AdminTierEnum; // @IsOptional, 'SUPER_ADMIN' | 'ADMIN' | 'USER'
-  roleIds?: string[];   // @IsOptional, @IsArray, @ArrayUnique, @IsUUID('7')
+| Method and canonical browser path | Permission mode | Success | Frontend |
+| --- | --- | ---: | --- |
+| `POST /api/admin/core/v1/users` | `admin.users.invite` + `admin.users.critical` | `201` | `DONE` |
+| `GET /api/admin/core/v1/users` | `admin.users.read` | `200` | `DONE` |
+| `GET /api/admin/core/v1/users/:id` | `admin.users.read` | `200` | `DONE` |
+| `PATCH /api/admin/core/v1/users/:id` | `admin.users.update` + `admin.users.critical` | `200` | `DONE` |
+| `POST /api/admin/core/v1/users/:id/suspend` | `admin.users.suspend` + `admin.users.critical` | `201` | `DONE` |
+| `POST /api/admin/core/v1/users/:id/activate` | `admin.users.suspend` + `admin.users.critical` | `201` | `DONE` |
+| `DELETE /api/admin/core/v1/users/:id` | `admin.users.delete` + `admin.users.critical` | `204` | `DONE` |
+| `PATCH /api/admin/core/v1/users/:id/roles` | `admin.users.assign_roles` + `admin.users.critical` | `204` | `DONE` |
+| `GET /api/admin/core/v1/users/:id/webphone` | `admin.users.read` | `200` | `DONE` |
+| `PATCH /api/admin/core/v1/users/:id/webphone` | `admin.users.update` + `admin.users.critical` | `200` | `DONE` |
+| `GET /api/admin/core/v1/users/me/profile` | Authenticated | `200` | `DONE` |
+| `PATCH /api/admin/core/v1/users/me/profile` | Authenticated | `200` | `DONE` |
+| `GET /api/admin/core/v1/users/me/webphone` | Authenticated | `200` | `DONE` |
+| `GET /api/admin/core/v1/users/me/webphone/call-logs` | Authenticated | `200` | `DONE` |
+| `POST /api/admin/core/v1/users/me/webphone/call-logs` | Authenticated | `201` | `DONE` |
+
+Every paired permission uses ALL semantics.
+
+## Invite
+
+```ts
+interface CreateAdminUserDto {
+  email: string;      // email, lowercase, max 255
+  firstName: string;  // trimmed, 1..80
+  lastName: string;   // trimmed, 1..80
+  roleId: string;     // UUIDv7
+  isSuperAdmin?: boolean;
 }
 ```
 
-### Frontend Notes
-- User starts as `INVITED` status
-- Invite acceptance happens through `/admin/auth/accept-invite`
+The returned user remains `INVITED` until invite acceptance. Only a current
+super admin may create another super admin. Duplicate email/role/invariant
+errors must be displayed from the authoritative response.
 
----
+## List
 
-## GET `/admin/users` — List Admin Users
+The list accepts pagination/search/status, `isSuperAdmin`, and `roleId` filters
+from `AdminUserQueryDto`. Rows are in `data`; the total is `meta.total`, never
+`totalItems`.
 
-**Permission**: `admin.users.read`
-**HTTP Status**: 200
+```ts
+type UserStatus = "INVITED" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+```
 
-### Query Parameters — `AdminUserQueryDto` (extends `PaginationQueryDto`)
-```typescript
-{
-  page?: number;
-  limit?: number;
-  sortBy?: string;    // default: 'createdAt'
-  sortDir?: 'ASC' | 'DESC';
-  search?: string;    // matches email, firstName, lastName
-  status?: UserStatusEnum;  // 'INVITED' | 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED'
-  tier?: AdminTierEnum;     // 'SUPER_ADMIN' | 'ADMIN' | 'USER'
+## Update and lifecycle
+
+- Email is immutable.
+- Identity, role, or super-admin changes use `PATCH /users/:id`.
+- Dedicated role replacement uses `PATCH /users/:id/roles` with the complete
+  desired role set.
+- Suspend/activate enforce self-protection and last-active-super-admin
+  invariants.
+- Delete is a soft delete and returns `204` with no body.
+- Refresh the user projection after mutations because affected sessions can be
+  invalidated.
+
+## Self profile
+
+```ts
+interface UpdateAdminProfileDto {
+  themeKey?: string;
+  language?: string;
+  extensions?: Record<string, unknown>;
 }
 ```
 
-### Response — Paginated
-```typescript
-{
-  data: AdminUser[];
-  meta: { page, limit, totalItems, totalPages }
+The current Portal has no self-profile page. Theme/language UI elsewhere does
+not prove this profile contract is integrated.
+
+## WebPhone
+
+The self-service WebPhone route may return the SIP password required for active
+browser registration. It may exist only in current component memory.
+
+The administrative projection omits the password and returns
+`passwordConfigured`. Initialize edit password fields empty; blank means
+preserve unless the DTO explicitly represents a clear action.
+
+Never write SIP passwords to browser storage, logs, analytics, diagnostics, or
+fixtures.
+
+Call logs use:
+
+```ts
+interface CreateAdminWebphoneCallLogDto {
+  type: string;
+  displayName?: string | null;
+  phoneNumber: string;
+  startedAt?: string | null;
+  answeredAt?: string | null;
+  endedAt?: string | null;
+  durationSeconds?: number | null;
+  cause?: string | null;
 }
 ```
 
----
+## Idempotency and state
 
-## GET `/admin/users/me/profile` — Get My Profile
+Gateway write-sensitive routes require UUIDv7 intent keys where declared in the
+[generated inventory](../generated/admin-core-api-routes.md). Disable duplicate
+submissions and retain the original key for an exact retry.
 
-**Permission**: Any authenticated admin
-**HTTP Status**: 200
+A missing read permission renders forbidden, not an empty user list.
 
-### Response
-```typescript
-{
-  themeKey: string;
-  language: string;
-  extensions: Record<string, unknown>;
-}
-```
+## Current frontend evidence
 
----
+- `src/app/users/hooks/useUsers.ts`
+- `src/app/users/[id]/hooks/useUserDetail.ts`
+- `src/components/layout/webphone/`
+- `src/components/layout/hooks/useWebRTCPhone.ts`
 
-## PUT `/admin/users/me/profile` — Update My Profile
+The user list, invite, detail, lifecycle, role assignment, administrative
+WebPhone, self WebPhone, and call-log foundations use real APIs. Self profile
+remains missing and error/state typing still requires refactoring.
 
-**Permission**: Any authenticated admin
-**HTTP Status**: 200
+## Source map
 
-### Request Body — `UpdateAdminProfileDto`
-```typescript
-{
-  themeKey?: string;   // @IsOptional, @MaxLength(64)
-  language?: string;   // @IsOptional, must be from SUPPORTED_LANGUAGES
-  extensions?: Record<string, unknown>; // @IsOptional, shallow-merged
-}
-```
-
----
-
-## GET `/admin/users/me/webphone` — Get My WebPhone Config
-
-**Permission**: Any authenticated admin
-**HTTP Status**: 200
-
----
-
-## GET `/admin/users/me/webphone/call-logs` — List My Call Logs
-
-**Permission**: Any authenticated admin
-**HTTP Status**: 200 (Latest 50 records)
-
----
-
-## POST `/admin/users/me/webphone/call-logs` — Create Call Log
-
-**Permission**: Any authenticated admin
-**HTTP Status**: 201
-
-### Request Body — `CreateAdminWebphoneCallLogDto`
-```typescript
-{
-  type: WebphoneCallLogType;    // @IsIn(WebphoneCallLogType values)
-  displayName?: string | null;  // @MaxLength(120)
-  phoneNumber: string;          // @IsNotEmpty, @MaxLength(80)
-  startedAt?: string | null;    // @IsDateString
-  answeredAt?: string | null;   // @IsDateString
-  endedAt?: string | null;      // @IsDateString
-  durationSeconds?: number | null; // @IsInt, @Min(0), @Max(86400)
-  cause?: string | null;        // @MaxLength(120)
-}
-```
-
----
-
-## GET `/admin/users/:id` — Get Admin User
-
-**Permission**: `admin.users.read`
-**HTTP Status**: 200
-
----
-
-## PATCH `/admin/users/:id` — Update Admin User
-
-**Permission**: `admin.users.update`
-**HTTP Status**: 200
-
-### Request Body — `UpdateAdminUserDto`
-```typescript
-{
-  firstName?: string;    // @IsOptional, @MinLength(1), @MaxLength(80)
-  lastName?: string;     // @IsOptional, @MinLength(1), @MaxLength(80)
-  tier?: AdminTierEnum;  // @IsOptional
-}
-```
-
-### Frontend Notes
-- Email is immutable (not in DTO)
-- Role changes use the dedicated roles assignment endpoint
-
----
-
-## GET `/admin/users/:id/webphone` — Get Admin WebPhone Config
-
-**Permission**: `admin.users.read`
-**HTTP Status**: 200
-
----
-
-## PUT `/admin/users/:id/webphone` — Update Admin WebPhone Config
-
-**Permission**: `admin.users.update`
-**HTTP Status**: 200
-
-### Request Body — `UpdateAdminUserWebphoneDto`
-```typescript
-{
-  enabled?: boolean;
-  extension?: string | null;       // @MaxLength(32)
-  sipUsername?: string | null;     // @MaxLength(120)
-  sipPassword?: string | null;    // @MaxLength(255)
-  displayName?: string | null;    // @MaxLength(120)
-  outboundCallerId?: string | null; // @MaxLength(64)
-  transport?: 'ws' | 'wss';
-}
-```
-
----
-
-## POST `/admin/users/:id/suspend` — Suspend Admin User
-
-**Permission**: `admin.users.suspend`
-**HTTP Status**: 201
-
-### Frontend Notes
-- Cannot self-suspend
-- Cannot suspend last active SUPER_ADMIN
-
----
-
-## POST `/admin/users/:id/activate` — Activate Admin User
-
-**Permission**: `admin.users.suspend`
-**HTTP Status**: 201
-
-### Frontend Notes
-- Pending invites must be accepted first
-
----
-
-## DELETE `/admin/users/:id` — Delete Admin User
-
-**Permission**: `admin.users.delete`
-**HTTP Status**: 204 (No Content)
-
-### Frontend Notes
-- Soft-delete with self-deletion protection
-- Cannot delete last active SUPER_ADMIN
-- Remove row locally after success
-
----
-
-## PUT `/admin/users/:id/roles` — Replace Admin User Roles
-
-**Permission**: `admin.users.assign_roles`
-**HTTP Status**: 204 (No Content)
-
-### Request Body — `SetUserRolesDto`
-```typescript
-{
-  roleIds: string[]; // @IsArray, @ArrayUnique, @IsUUID('7')
-}
-```
-
-### Frontend Notes
-- Full replacement (submit complete desired role set)
-- Empty array removes all roles
-- Invalidates target user sessions
+- `../backend/mutakamel-apps/core-app/src/admin/admin-users/admin-users.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/admin-users/dto/`
+- `../backend/mutakamel-apps/core-app/src/admin/admin-roles/admin-user-roles.controller.ts`
+- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`

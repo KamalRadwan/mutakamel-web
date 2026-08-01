@@ -18,25 +18,6 @@ export function BillingTaxDistributionPie({ data, height = 250 }: Props) {
   const { lang } = useI18n();
   const total = data.reduce((acc, curr) => acc + curr.amount, 0);
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const p = payload[0].payload;
-      const ratio = total > 0 ? ((p.amount / total) * 100).toFixed(1) : 0;
-      return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-lg shadow-lg text-xs">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-            <p className="font-bold text-slate-800 dark:text-slate-200">{p.region}</p>
-          </div>
-          <p className="text-slate-600 dark:text-slate-400 pl-4">
-            {lang === "ar" ? "الضريبة" : "Tax"}: <span className="font-mono font-bold">${p.amount.toLocaleString()}</span> ({ratio}%)
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div style={{ height, width: "100%" }} className="relative flex items-center justify-center">
       <ResponsiveContainer width="100%" height="100%">
@@ -55,7 +36,12 @@ export function BillingTaxDistributionPie({ data, height = 250 }: Props) {
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Pie>
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip
+            formatter={(value) => [
+              `$${Number(value ?? 0).toLocaleString()}`,
+              lang === "ar" ? "الضريبة" : "Tax",
+            ]}
+          />
         </PieChart>
       </ResponsiveContainer>
       

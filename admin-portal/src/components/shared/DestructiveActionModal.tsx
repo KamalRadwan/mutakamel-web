@@ -11,7 +11,7 @@ export interface DestructiveActionModalProps {
   title: string;
   description: string;
   targetName: string;
-  actionType: "drain" | "suspend" | "delete" | "destroy" | "activate" | "reset-password" | "change-password";
+  actionType: "drain" | "offline" | "suspend" | "delete" | "destroy" | "activate" | "reset-password" | "change-password";
   requireNameTyping?: boolean;
   isSubmitting?: boolean;
   extraToggle?: {
@@ -61,6 +61,8 @@ export function DestructiveActionModal({
         return "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/30";
       case "drain":
         return "bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/30";
+      case "offline":
+        return "bg-slate-700 hover:bg-slate-800 text-white shadow-slate-700/30";
     }
   };
 
@@ -80,6 +82,8 @@ export function DestructiveActionModal({
         return <PauseCircle className="w-5 h-5 text-amber-600" />;
       case "drain":
         return <RotateCcw className="w-5 h-5 text-purple-600" />;
+      case "offline":
+        return <PauseCircle className="w-5 h-5 text-slate-600" />;
     }
   };
 

@@ -5,7 +5,6 @@ import { ToastProvider } from "@/components/ui/ToastContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { WebRTCPhoneWidget } from "@/components/layout/WebRTCPhoneWidget";
-import { BrowserPermissionsModal } from "@/components/layout/BrowserPermissionsModal";
 
 export const metadata: Metadata = {
   title: "متكامل - Control Plane Admin Portal",
@@ -26,7 +25,6 @@ export default function RootLayout({
               <AuthGuard>
                 {children}
                 <WebRTCPhoneWidget />
-                <BrowserPermissionsModal />
               </AuthGuard>
             </AuthProvider>
           </ToastProvider>

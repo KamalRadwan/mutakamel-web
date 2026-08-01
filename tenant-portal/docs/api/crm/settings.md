@@ -1,162 +1,111 @@
-# CRM Settings API
+# CRM tenant settings
 
-Base paths:
-- `/crm/settings`
-- `/crm/pipelines`
-- `/crm/lead-stages`
-- `/crm/acquisition-sources`
+> Status: `verified-current`
+> Last source verification: `2026-07-25`
+> Owner: CRM (`crm-app`)
+> Canonical browser prefix: `/api/tenant/crm/v1`
+> Controller-relative prefix: `/api/v1/crm`
+> Tenant Portal replacement: `not-started`
+> Legacy frontend: `live-partial`
+> Authorship: hand-written from current source
 
-This module manages the configuration of CRM environments, including pipelines, lead stages, acquisition sources, and global CRM limits.
+CRM settings are a tenant singleton. This page covers only the two settings routes; pipeline/stage/source/custom-field administration has separate pages.
 
-## CRM Settings
+## Endpoint catalogue
 
-### `GET /crm/settings`
-Returns the tenant CRM settings singleton, including duplicate policies and CRM limits.
-- **Permissions**: `crm.settings.read`
-- **Response**: `200 OK`
+| Method | Canonical browser path | Controller/upstream path | Permission | Success |
+|---|---|---|---|---|
+| `GET` | `/api/tenant/crm/v1/settings` | `/api/v1/crm/settings` | `crm.settings.read` | `200`, settings |
+| `PUT` | `/api/tenant/crm/v1/settings` | `/api/v1/crm/settings` | `crm.settings.manage` | `200`, settings |
 
-### `PUT /crm/settings`
-Updates mutable CRM limits and duplicate policies for the resolved tenant.
-- **Permissions**: `crm.settings.manage`
-- **Response**: `200 OK`
+These are tenant-wide static permissions. The controller does not use `crm.settings.update`; current writes require `crm.settings.manage`.
 
-## Pipelines
+## Update validation
 
-### `POST /crm/pipelines`
-Creates a pipeline and ranked memberships for reusable opportunity stages.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `201 Created`
+`PUT` is a partial update. Send only changed fields; unknown fields are rejected.
 
-### `GET /crm/pipelines`
-Returns active pipelines available through ALL, direct-user, or team assignment access.
-- **Permissions**: `crm.pipelines.read`
-- **Response**: `200 OK`
+| Field | Contract |
+|---|---|
+| `requireQualifiedStageForConversion` | optional strict boolean |
+| `defaultLeadStageId` | optional UUIDv7 |
+| `outboundEmailContentRetentionDays` | optional integer `30..2555` |
+| `asteriskIntegration` | optional nested partial object |
 
-### `GET /crm/pipelines/configuration`
-Returns active and inactive pipelines with assignment configuration for administrators.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `200 OK`
+The response also contains server-owned `defaultPipelineId` and `outboundEmailRetentionPolicyRevision`; neither is accepted in this DTO. Manage the default pipeline through [Pipelines](./pipelines-opportunity-stages.md). The server increments the retention-policy revision only when the retention-day value changes.
 
-### `GET /crm/pipelines/assignment-options`
-Returns active/invited CRM-seat users or tenant owners and active teams for pipeline access configuration.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `200 OK`
+### Asterisk integration
 
-### `GET /crm/pipelines/:id`
-Returns an available pipeline with its ranked stage memberships.
-- **Permissions**: `crm.pipelines.read`
-- **Response**: `200 OK`
+| Field | Contract |
+|---|---|
+| `enabled` | strict boolean |
+| `websocketUrl` | `ws://` or `wss://`, maximum 512, nullable |
+| `sipDomain`, `realm` | maximum 180, nullable |
+| `outboundProxy` | maximum 512, nullable |
+| `defaultCallerId` | maximum 64, nullable |
+| `fromDomain`, `registrarServer` | maximum 180, nullable |
+| `contactUri` | maximum 255, nullable |
+| `registerExpires` | integer `60..86400`, nullable |
+| `sessionTimers`, `traceSip`, `allowInvalidTlsCertificate` | strict booleans |
+| `stunServers` | string array, each maximum 512 |
+| `turnServers`, `iceServers` | arrays of objects; public item schema is currently unresolved |
+| `extra` | object; schema is intentionally opaque |
 
-### `PATCH /crm/pipelines/:id`
-Updates pipeline labels, description, or activation state.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `200 OK`
+The service merges supplied Asterisk subfields into the current object rather than replacing omitted subfields.
 
-### `DELETE /crm/pipelines/:id`
-Soft-deletes a non-default pipeline that has no active opportunities.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `204 No Content`
+No SIP username/password field is accepted by this DTO. Do not add credentials to `extra`, browser storage, logs, or documentation examples.
 
-### `PUT /crm/pipelines/:id/default`
-Atomically makes an active ALL-access pipeline the tenant default.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `200 OK`
+`allowInvalidTlsCertificate: true` weakens transport security. The portal must present it as a high-risk administrative setting, default to false, and never turn it on implicitly.
 
-### `POST /crm/pipelines/:id/reset`
-Restores the canonical six stage definitions and ranks on the current default pipeline.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `200 OK`
+## Seed state
 
-### `GET /crm/pipelines/:id/assignments`
-Returns direct user/team assignments and access mode.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `200 OK`
+Fresh settings are:
 
-### `PUT /crm/pipelines/:id/assignments`
-Atomically replaces direct user/team targets and the explicit ALL/RESTRICTED access mode.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `200 OK`
+```json
+{
+  "requireQualifiedStageForConversion": true,
+  "defaultLeadStageId": null,
+  "outboundEmailContentRetentionDays": 730,
+  "outboundEmailRetentionPolicyRevision": 1,
+  "asteriskIntegration": {
+    "enabled": false,
+    "registerExpires": 600,
+    "sessionTimers": false,
+    "traceSip": false,
+    "allowInvalidTlsCertificate": false,
+    "stunServers": [],
+    "turnServers": [],
+    "iceServers": [],
+    "extra": {}
+  }
+}
+```
 
-### `POST /crm/pipelines/:id/stages`
-Adds an active reusable opportunity stage at the final rank.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `201 Created`
+The seed also stores the seeded default pipeline ID. Always read live settings because tenants can change mutable values and seed details can evolve.
 
-### `PATCH /crm/pipelines/:id/stages/reorder`
-Atomically replaces dense pipeline membership ranks.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `200 OK`
+## Responses, errors, and retry
 
-### `DELETE /crm/pipelines/:id/stages/:pipelineStageId`
-Removes an unused, non-required pipeline-stage membership.
-- **Permissions**: `crm.pipelines.manage`
-- **Response**: `204 No Content`
+Both endpoints return the raw settings entity, not `{success,data}`. Update is synchronous and audited inside the transaction.
 
-## Lead Stages
+Neither route uses Gateway idempotency. After an ambiguous `PUT`, re-read settings before retrying. Unknown/nonnested fields produce `CRM_VALIDATION_FAILED`; invalid referenced stages and semantic settings can produce domain `404`/`422` errors.
 
-### `POST /crm/lead-stages`
-Creates a tenant-defined lead stage with a fixed semantic flag.
-- **Permissions**: `crm.lead_stages.manage`
-- **Response**: `201 Created`
+Settings can expose infrastructure topology. Keep responses out of client analytics, crash dumps, and shared caches; use same-origin authenticated requests with `no-store`.
 
-### `GET /crm/lead-stages`
-Returns all lead stages for the tenant in workflow order.
-- **Permissions**: `crm.lead_stages.read`
-- **Response**: `200 OK`
+## Safe example
 
-### `PATCH /crm/lead-stages/reorder`
-Atomically replaces the dense one-based stage order.
-- **Permissions**: `crm.lead_stages.manage`
-- **Response**: `200 OK`
+```http
+PUT /api/tenant/crm/v1/settings
+Content-Type: application/json
 
-### `PATCH /crm/lead-stages/:id`
-Updates mutable display/order/activation fields for a lead stage.
-- **Permissions**: `crm.lead_stages.manage`
-- **Response**: `200 OK`
+{
+  "requireQualifiedStageForConversion": true,
+  "outboundEmailContentRetentionDays": 730
+}
+```
 
-### `POST /crm/lead-stages/:id/default`
-Marks an active lead stage as the tenant default for new leads.
-- **Permissions**: `crm.lead_stages.manage`
-- **Response**: `201 Created`
+## Sources
 
-### `DELETE /crm/lead-stages/:id`
-Removes or deactivates a lead stage.
-- **Permissions**: `crm.lead_stages.manage`
-- **Response**: `204 No Content`
-
-## Acquisition Sources
-
-### `POST /crm/acquisition-sources`
-Creates a tenant-defined bilingual source.
-- **Permissions**: `crm.acquisition_sources.manage`
-- **Response**: `201 Created`
-
-### `POST /crm/acquisition-sources/:id/icon`
-Uploads or replaces an icon and stores its key.
-- **Permissions**: `crm.acquisition_sources.manage`
-- **Response**: `201 Created`
-
-### `GET /crm/acquisition-sources/:id/icon`
-Streams the stored icon.
-- **Permissions**: `crm.acquisition_sources.read`
-- **Response**: `200 OK`
-
-### `GET /crm/acquisition-sources`
-List sources.
-- **Permissions**: `crm.acquisition_sources.read`
-- **Response**: `200 OK`
-
-### `PATCH /crm/acquisition-sources/reorder`
-Reorders sources.
-- **Permissions**: `crm.acquisition_sources.manage`
-- **Response**: `200 OK`
-
-### `PATCH /crm/acquisition-sources/:id`
-Update source.
-- **Permissions**: `crm.acquisition_sources.manage`
-- **Response**: `200 OK`
-
-### `DELETE /crm/acquisition-sources/:id`
-Delete source.
-- **Permissions**: `crm.acquisition_sources.manage`
-- **Response**: `204 No Content`
+- `../backend/mutakamel-apps/crm-app/src/crm/settings/crm-settings.controller.ts`
+- `../backend/mutakamel-apps/crm-app/src/crm/settings/dto/update-crm-settings.dto.ts`
+- `../backend/mutakamel-apps/crm-app/src/crm/settings/crm-settings.service.ts`
+- `../backend/mutakamel-apps/crm-app/packages/database/src/seeds/v0.0.1/catalogue.ts`
+- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts`

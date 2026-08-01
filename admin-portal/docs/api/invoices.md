@@ -1,84 +1,87 @@
-# Invoices API — `/admin/invoices`
+# Invoice Administration API
 
-Browser prefix: `/api/admin/core/v1`. The `/admin/...` forms below are Core
-controller-relative paths, not browser request URLs.
+Status: **Verified backend contract; frontend MISSING**
 
-Base Path: `admin/invoices`
-Guard: `AdminGuard`
+Last source verification: **2026-07-30**
 
----
+Owner: **Core**
 
-## POST `/admin/invoices/generate` — Generate Invoice
+## Routes
 
-**Permission**: `admin.invoices.create`
-**HTTP Status**: 201
+| Method and canonical browser path | Permissions | Success |
+| --- | --- | ---: |
+| `POST /api/admin/core/v1/invoices/generate` | `admin.invoices.create` | `201` |
+| `GET /api/admin/core/v1/invoices` | `admin.invoices.read` | `200` |
+| `GET /api/admin/core/v1/invoices/:id` | `admin.invoices.read` | `200` |
+| `PATCH /api/admin/core/v1/invoices/:id` | `admin.invoices.update` | `200` |
+| `POST /api/admin/core/v1/invoices/:id/issue` | `admin.invoices.update` + `admin.invoices.critical` | `201` |
+| `POST /api/admin/core/v1/invoices/:invoiceId/offline-payments` | `admin.wallet.manage` + `admin.billing.critical` | `201` |
+| `POST /api/admin/core/v1/invoices/:id/void` | `admin.invoices.void` + `admin.invoices.critical` | `201` |
 
-### Request Body — `GenerateInvoiceDto`
-Billing period and optional currency for invoice generation.
+Permission pairs use ALL semantics.
 
----
+## DTOs
 
-## GET `/admin/invoices` — List Invoices
+```ts
+interface GenerateInvoiceDto {
+  tenantId: string;
+  periodStart: string;
+  periodEnd: string;
+  currencyCode?: string;
+  purpose?: "TRIAL_ACTIVATION" | "RENEWAL" | "PRORATION" | "MANUAL";
+}
 
-**Permission**: `admin.invoices.read`
-**HTTP Status**: 200
+interface InvoiceLineInputDto {
+  description: string;
+  quantity: string;
+  unitPrice: string;
+}
 
-### Query Parameters — `InvoiceQueryDto`
-```typescript
-{
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortDir?: 'ASC' | 'DESC';
-  search?: string;
-  tenantId?: string;              // UUID filter
-  status?: InvoiceStatusEnum;     // 'DRAFT' | 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID'
+interface UpdateInvoiceDto {
+  lines?: InvoiceLineInputDto[];
+  dueAt?: string;
+}
+
+interface IssueInvoiceDto {
+  dueAt: string;
 }
 ```
 
----
+Read the current offline-payment DTO before implementing its form.
 
-## GET `/admin/invoices/:id` — Get Invoice
+## Wire values
 
-**Permission**: `admin.invoices.read`
-**HTTP Status**: 200
+```ts
+type InvoiceStatus =
+  | "DRAFT"
+  | "ISSUED"
+  | "PARTIALLY_PAID"
+  | "PAID"
+  | "OVERDUE"
+  | "VOID";
+```
 
----
+Keep quantity, price, subtotal, tax, discount, paid, due, and total fields as
+decimal strings. Do not use browser floating-point arithmetic for invoice
+truth.
 
-## PATCH `/admin/invoices/:id` — Update Draft Invoice
+## Lifecycle rules
 
-**Permission**: `admin.invoices.update`
-**HTTP Status**: 200
+- Only eligible draft invoices can be edited/issued.
+- Issue, offline payment, and void are authoritative commands.
+- Critical commands require explicit confirmation and stable UUIDv7 intent
+  keys.
+- Refresh the invoice and billing summary after a command.
+- Render conflicts for invalid lifecycle transitions.
+- List rows are under `data`; pagination uses `meta.total`.
 
-### Request Body — `UpdateInvoiceDto`
-Replaces draft invoice lines and/or due date.
+## Current frontend status
 
-### Frontend Notes
-- Only DRAFT invoices can be edited
-- Disable editing after issue
+No invoice list, detail, editor, issue, offline-payment, or void workflow exists
+in Admin Portal source.
 
----
+## Source map
 
-## POST `/admin/invoices/:id/issue` — Issue Invoice
-
-**Permission**: `admin.invoices.update`
-**HTTP Status**: 201
-
-### Request Body — `IssueInvoiceDto`
-Invoice due date for the issued document.
-
-### Frontend Notes
-- Require a future due date
-- Use confirmation action
-
----
-
-## POST `/admin/invoices/:id/void` — Void Invoice
-
-**Permission**: `admin.invoices.void`
-**HTTP Status**: 201
-
-### Frontend Notes
-- Can void DRAFT, ISSUED, or OVERDUE invoices
-- Cannot void PAID or already VOID invoices
-- Use confirmation action
+- `../backend/mutakamel-apps/core-app/src/admin/invoices/invoices.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/invoices/dto/`
+- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`

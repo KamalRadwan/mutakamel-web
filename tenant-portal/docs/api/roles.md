@@ -1,73 +1,97 @@
-# Tenant Roles API
+# Tenant roles and role assignments API
 
-Base path: `/tenant`
+> **Contract status:** Current; legacy branch assignments and newer exact-scope assignments coexist
+> **Last verified:** 2026-07-25
+> **Backend owner:** Core (`core-app`)
+> **Canonical browser prefix:** `/api/tenant/core/v1`
+> **Controller-relative prefix:** `/tenant`
+> **Tenant Portal status:** Planned. No complete replacement-grade role editor exists in `tenant-portal`.
+> **Documentation:** Hand-written and source-verified; not generated.
 
-The Roles module manages tenant custom roles, their permissions, and branch-scoped role assignments for tenant users.
+## Source of truth
 
-## Permission Catalog
+- Gateway contracts: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
+- Roles controller/service/DTOs: `../backend/mutakamel-apps/core-app/src/tenant/tenant-roles`
+- Exact-scope controller/service/DTOs: `../backend/mutakamel-apps/core-app/src/tenant/scope-role-assignments`
+- Legacy settings/users UI: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
 
-### `GET /tenant/permissions`
-Returns the tenant permission catalog with localized permission labels grouped for role-building UIs.
-- **Permissions**: `roles.permission.read`
-- **Queries**: Pagination, `group`
-- **Response**: `200 OK` (Paginated permissions)
+## Security and common contract
 
-## Roles
+Routes require a tenant JWT, matching verified host, current session/subscription, the listed permission, and effective branch/company scope. Exact-scope assignment GET and PUT additionally require the current actor to be an active tenant owner; the permission alone is insufficient.
 
-### `POST /tenant/roles`
-Creates a custom tenant role and optionally grants tenant permission IDs in the same transaction.
-- **Permissions**: `roles.role.create`
-- **Body**: `CreateTenantRoleDto`
-- **Response**: `201 Created`
+All IDs are UUIDv7. Unknown DTO fields are rejected. List routes use common pagination (`page` 1, `limit` 20/max 100, `search` max 200). Paginated results put the array in `data` and counts in `meta`. Standard errors use the Core envelope; `204` has no body.
 
-### `GET /tenant/roles`
-Returns tenant roles with pagination, search, and optional system-role filtering.
-- **Permissions**: `roles.role.read`
-- **Queries**: Pagination, `isSystem`
-- **Response**: `200 OK` (Paginated Roles)
+These mutations have no explicit application idempotency contract. Role/assignment changes bump session versions for affected users; the UI must expect their access tokens to become stale.
 
-### `GET /tenant/roles/:id`
-Returns a tenant role detail including the permission IDs granted to the role.
-- **Permissions**: `roles.role.read`
-- **Response**: `200 OK`
+Role data is private and scope-sensitive; do not store it in a shared/public cache. All routes are synchronous from the portal contract and expose no async job.
 
-### `PATCH /tenant/roles/:id`
-Updates a custom tenant role name and description while preventing edits to system roles.
-- **Permissions**: `roles.role.update`
-- **Body**: `UpdateTenantRoleDto`
-- **Response**: `200 OK`
+## Permission catalogue and roles
 
-### `PUT /tenant/roles/:id/permissions`
-Replaces all permissions granted to a custom tenant role and bumps sessions for users holding that role.
-- **Permissions**: `roles.role.update`
-- **Body**: `SetRolePermissionsDto`
-- **Response**: `200 OK`
+| Method and canonical browser path | Permission | Contract |
+|---|---|---|
+| `GET /api/tenant/core/v1/permissions` | `roles.permission.read` | Paginated catalogue; use returned keys/labels |
+| `POST /api/tenant/core/v1/roles` | `roles.role.create` | Create non-system role |
+| `GET /api/tenant/core/v1/roles` | `roles.role.read` | Paginated; strict optional `isSystem` |
+| `GET /api/tenant/core/v1/roles/:id` | `roles.role.read` | Role plus permission IDs |
+| `PATCH /api/tenant/core/v1/roles/:id` | `roles.role.update` | Update custom role |
+| `PUT /api/tenant/core/v1/roles/:id/permissions` | `roles.role.update` | Replace permission set |
+| `DELETE /api/tenant/core/v1/roles/:id` | `roles.role.delete` | `204`, soft delete if unused |
 
-### `DELETE /tenant/roles/:id`
-Soft-deletes a custom tenant role after verifying it is not a system role and not assigned to users.
-- **Permissions**: `roles.role.delete`
-- **Response**: `204 No Content`
+Create: `name` required/non-empty, maximum 120; optional `description` maximum 2,000; optional unique `permissionIds` UUIDv7 array. Update accepts `name` and `description`. Permission replacement body is `{permissionIds:[...]}`; an empty array is valid.
 
-## Assignments
+Do not hard-code the permission catalogue. Unknown IDs return `PERMISSION_UNKNOWN`. System roles cannot be updated/deleted.
 
-### `GET /tenant/users/:userId/assignments`
-Returns the branch-scoped role assignments for one tenant user, including related role and branch records.
-- **Permissions**: `users.user.assign_roles`
-- **Response**: `200 OK`
+## Legacy branch-role assignments
 
-### `PUT /tenant/users/:userId/assignments`
-Replaces all branch-role assignments for one tenant user after validating actor branch access and target branches/roles.
-- **Permissions**: `users.user.assign_roles`
-- **Body**: `SetUserBranchRolesDto`
-- **Response**: `200 OK`
+| Method and canonical browser path | Permission |
+|---|---|
+| `GET /api/tenant/core/v1/users/:userId/assignments` | `users.user.assign_roles` |
+| `PUT /api/tenant/core/v1/users/:userId/assignments` | `users.user.assign_roles` |
+| `POST /api/tenant/core/v1/users/:userId/assignments` | `users.user.assign_roles` |
+| `DELETE /api/tenant/core/v1/users/:userId/assignments/:assignmentId` | `users.user.assign_roles` |
 
-### `POST /tenant/users/:userId/assignments`
-Adds one branch-role assignment for a tenant user after validating actor access and duplicate assignments.
-- **Permissions**: `users.user.assign_roles`
-- **Body**: `AddAssignmentDto`
-- **Response**: `201 Created`
+An assignment is `{branchId,roleId}`. PUT body replaces the unique pair list; POST adds one pair. Actor branch access, target user, role, duplicate, self-assignment, and owner protections are enforced.
 
-### `DELETE /tenant/users/:userId/assignments/:assignmentId`
-Deletes one branch-role assignment for a tenant user after validating actor branch access.
-- **Permissions**: `users.user.assign_roles`
-- **Response**: `204 No Content`
+## Exact-scope assignments
+
+| Method and canonical browser path | Permission plus guard |
+|---|---|
+| `GET /api/tenant/core/v1/users/:userId/scope-role-assignments` | `users.user.assign_roles` + active tenant owner |
+| `PUT /api/tenant/core/v1/users/:userId/scope-role-assignments` | `users.user.assign_roles` + active tenant owner |
+
+PUT accepts `{assignments:[...]}` with at most 500 unique tuples. Each item:
+
+```ts
+{
+  scopeTarget: "TENANT" | "COMPANY" | "BRANCH";
+  roleId: UUIDv7;
+  companyId?: UUIDv7;
+  branchId?: UUIDv7;
+}
+```
+
+Shape rules:
+
+- `TENANT`: no company or branch.
+- `COMPANY`: company required; no branch.
+- `BRANCH`: both company and branch required and related.
+
+An empty assignment array is valid and removes all assignable exact-scope grants, subject to owner protections.
+
+Safe catalogue example:
+
+```http
+GET /api/tenant/core/v1/permissions?page=1&limit=20&sortBy=group&sortDir=ASC
+Authorization: Bearer <tenant-access-token>
+```
+
+Validation combines DTO rules (UUIDv7, lengths, unique tuples, scope shape) with owner/branch/role domain checks.
+
+## Errors and AI implementation rules
+
+Expected errors include `ROLE_NOT_FOUND`, `ROLE_NAME_TAKEN`, `ROLE_IN_USE`, `ROLE_IS_SYSTEM`, `PERMISSION_UNKNOWN`, `ASSIGNMENT_EXISTS`, `ASSIGNMENT_NOT_FOUND`, `BRANCH_OR_ROLE_INVALID`, `BRANCH_ACCESS_DENIED`, `TENANT_USER_NOT_FOUND`, `TENANT_OWNER_PROTECTED`, `ROLE_SELF_ASSIGNMENT_FORBIDDEN`, `ACTOR_NOT_FOUND`, and `SCOPE_ROLE_ASSIGNMENT_OWNER_REQUIRED`.
+
+- Prefer exact-scope assignments for new owner administration flows; keep legacy branch routes only where existing behavior requires them.
+- Show the effective scope tuple explicitly before replacement.
+- Refetch assignments after write and require reauthentication if the current user's session becomes stale.
+- Never infer tenant-owner status from a role name or permission key.

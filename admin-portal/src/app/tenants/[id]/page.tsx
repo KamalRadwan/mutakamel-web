@@ -30,15 +30,20 @@ import {
   TrendingDown, 
   DollarSign, 
   LockIcon, 
-  Filter 
+  Filter,
+  HardDrive
 } from "lucide-react";
 import { useTenantDetail } from "./hooks/useTenantDetail";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { useI18n } from "@/i18n/I18nContext";
+import { useAuth } from "@/context/AuthContext";
+import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export default function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { user } = useAuth();
+  const canDestroyTenant = adminCanAll(user, ADMIN_RBAC_CRITICAL.TENANTS_DESTROY);
   const {
     t,
     tenant,
@@ -65,6 +70,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     isSubmitting,
     isSaved,
     setIsSaved,
+    isLoadingDetails,
     isInviteUserOpen,
     setIsInviteUserOpen,
     isEditUserOpen,
@@ -99,7 +105,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     setAdjCurrency,
     adjNote,
     setAdjNote,
-    handleUpdateSubmit,
+    handleUpdateTenantProfile,
     handleCancelProvisioning,
     handleActivate,
     handleSuspend,
@@ -198,21 +204,25 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
             ) : null}
 
             {tenant.status === "DELETED" ? (
-              <button
-                onClick={() => setDestructiveModalAction("destroy")}
-                className="px-3.5 py-1.5 text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1"
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>{t.tenants.destroy}</span>
-              </button>
+              canDestroyTenant && (
+                <button
+                  onClick={() => setDestructiveModalAction("destroy")}
+                  className="px-3.5 py-1.5 text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>{t.tenants.destroy}</span>
+                </button>
+              )
             ) : (
-              <button
-                onClick={() => setDestructiveModalAction("delete")}
-                className="px-3.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>{t.tenants.delete}</span>
-              </button>
+              canDestroyTenant && (
+                <button
+                  onClick={() => setDestructiveModalAction("delete")}
+                  className="px-3.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{t.tenants.delete}</span>
+                </button>
+              )
             )}
           </div>
         </div>
@@ -245,12 +255,26 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
-            <span className="text-xs text-slate-500 font-semibold">{t.tenants.hostingServer}</span>
-            <div className="text-sm font-bold font-mono text-purple-600 dark:text-purple-400 flex items-center gap-1">
-              <Server className="w-4 h-4" />
-              <span>{tenant.databaseServerName}</span>
+            <span className="text-xs text-slate-500 font-semibold">{lang === "ar" ? "البنية التحتية" : "Infrastructure"}</span>
+            <div className="flex flex-col gap-2 pt-1">
+              <div className="text-sm font-bold font-mono text-purple-600 dark:text-purple-400 flex items-center gap-1" title="Database">
+                <Server className="w-4 h-4" />
+                <span>{tenant.databaseServerName}</span>
+              </div>
+              <div className="text-[11px] font-bold font-mono text-blue-600 dark:text-blue-400 flex items-center gap-1" title="Storage">
+                <HardDrive className="w-4 h-4" />
+                <span>
+                  {tenant.storageServer?.name ||
+                    (tenant.storageServerId
+                      ? lang === "ar"
+                        ? "تفاصيل التسكين غير متاحة"
+                        : "Placement details unavailable"
+                      : lang === "ar"
+                        ? "تسكين قديم غير متاح"
+                        : "Legacy placement unavailable")}
+                </span>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-400">{tenant.countryName}</p>
           </div>
 
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
@@ -334,9 +358,95 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
-        {/* Tab 1: Profile & Metadata */}
-        {activeTab === "details" && (
-          <form onSubmit={handleUpdateSubmit} className="space-y-6">
+        {isLoadingDetails ? (
+          <div className="flex flex-col items-center justify-center p-12 text-slate-500">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
+            <p>{lang === "ar" ? "جاري تحميل تفاصيل المستأجر..." : "Loading tenant details..."}</p>
+          </div>
+        ) : (
+          <>
+            {/* Tab 1: Profile & Metadata */}
+            {activeTab === "details" && tenant && (
+              <form onSubmit={handleUpdateTenantProfile} className="space-y-6">
+            <section
+              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs"
+              aria-labelledby="tenant-storage-placement-heading"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div>
+                  <h3
+                    id="tenant-storage-placement-heading"
+                    className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"
+                  >
+                    <HardDrive className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span>
+                      {lang === "ar"
+                        ? "تسكين التخزين"
+                        : "Storage placement"}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    {lang === "ar"
+                      ? "مرجع للقراءة فقط. حفظ الملف التعريفي لا يغير هذا التسكين."
+                      : "Read-only placement evidence. Saving the tenant profile does not change this assignment."}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {lang === "ar" ? "للقراءة فقط" : "Read only"}
+                </span>
+              </div>
+
+              <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                <div className="space-y-1">
+                  <dt className="text-slate-500">
+                    {lang === "ar" ? "اسم سيرفر التخزين" : "Storage Server name"}
+                  </dt>
+                  <dd className="font-bold text-slate-900 dark:text-slate-100">
+                    {tenant.storageServer?.name ||
+                      (tenant.storageServerId
+                        ? lang === "ar"
+                          ? "التفاصيل الآمنة غير متاحة"
+                          : "Safe summary unavailable"
+                        : lang === "ar"
+                          ? "تسكين قديم أو غير مكتمل"
+                          : "Legacy or incomplete placement")}
+                  </dd>
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <dt className="text-slate-500">Storage Server ID</dt>
+                  <dd className="font-mono font-semibold break-all text-slate-900 dark:text-slate-100">
+                    {tenant.storageServerId ||
+                      (lang === "ar" ? "غير متاح" : "Unavailable")}
+                  </dd>
+                </div>
+                {tenant.storageServer && (
+                  <>
+                    <div className="space-y-1">
+                      <dt className="text-slate-500">
+                        {lang === "ar" ? "الموفر" : "Provider"}
+                      </dt>
+                      <dd className="font-bold">{tenant.storageServer.provider}</dd>
+                    </div>
+                    <div className="space-y-1">
+                      <dt className="text-slate-500">
+                        {lang === "ar" ? "المنطقة" : "Region"}
+                      </dt>
+                      <dd className="font-bold">{tenant.storageServer.region}</dd>
+                    </div>
+                    <div className="space-y-1">
+                      <dt className="text-slate-500">
+                        {lang === "ar" ? "الحالة والجاهزية" : "Status and readiness"}
+                      </dt>
+                      <dd className="font-bold">
+                        {tenant.storageServer.status} ·{" "}
+                        {tenant.storageServer.availabilityClass}
+                      </dd>
+                    </div>
+                  </>
+                )}
+              </dl>
+            </section>
+
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
                 <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -507,7 +617,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                    {subscription.items.map((it) => (
+                    {subscription.items.map((it: any) => (
                       <tr key={it.id}>
                         <td className="py-2.5 font-bold text-slate-900 dark:text-slate-100">{it.moduleName} ({it.moduleKey})</td>
                         <td className="py-2.5 text-blue-600 dark:text-blue-400 font-bold">{it.tierKey}</td>
@@ -883,6 +993,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
               ))}
             </div>
           </div>
+        )}
+          </>
         )}
       </main>
 

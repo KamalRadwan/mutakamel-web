@@ -2,9 +2,17 @@
 
 interface ChartTooltipProps {
   active?: boolean;
-  payload?: any[];
+  payload?: ChartTooltipPayloadItem[];
   label?: string;
-  valueFormatter?: (value: any) => string;
+  valueFormatter?: (value: unknown) => string;
+}
+
+interface ChartTooltipPayloadItem {
+  color?: string;
+  fill?: string;
+  name?: string;
+  dataKey?: string | number;
+  value?: unknown;
 }
 
 export function ChartTooltip({
@@ -25,7 +33,7 @@ export function ChartTooltip({
         </div>
       )}
       <div className="space-y-1">
-        {payload.map((item: any, index: number) => (
+        {payload.map((item, index) => (
           <div key={`item-${index}`} className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
               <span

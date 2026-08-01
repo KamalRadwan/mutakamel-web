@@ -1,12 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
 import { 
   Building2, 
   Users, 
   CreditCard, 
   Server, 
-  Database, 
   ShieldCheck, 
   ShieldAlert, 
   Globe, 
@@ -19,21 +17,11 @@ import {
 } from "lucide-react";
 import { DashboardMetric } from "@/types/dashboard";
 import { formatDashboardMetric, toneToColorClass } from "../utils/formatters";
-import { SparklineChart } from "./charts/SparklineChart";
 
 interface KpiCardProps {
   card: DashboardMetric;
   currencyCode?: string;
 }
-
-const toneToHexColor: Record<string, string> = {
-  amber: "#f59e0b",
-  blue: "#3b82f6",
-  cyan: "#06b6d4",
-  green: "#10b981",
-  purple: "#8b5cf6",
-  red: "#ef4444",
-};
 
 export function getCardIcon(key: string, label: string) {
   const k = (key + " " + label).toLowerCase();
@@ -58,20 +46,7 @@ export function getCardIcon(key: string, label: string) {
 export function KpiCard({ card, currencyCode = "USD" }: KpiCardProps) {
   const formattedValue = formatDashboardMetric(card, currencyCode);
   const toneColor = toneToColorClass(card.tone);
-  const sparkColor = toneToHexColor[card.tone] || "#3b82f6";
   const icon = getCardIcon(card.key, card.label);
-
-  const sparkData = useMemo(() => {
-    const numVal = typeof card.value === "number" ? card.value : parseFloat(String(card.value)) || 10;
-    const base = Math.max(numVal, 5);
-    return [
-      { value: Math.round(base * 0.65) },
-      { value: Math.round(base * 0.8) },
-      { value: Math.round(base * 0.72) },
-      { value: Math.round(base * 0.9) },
-      { value: Math.round(base) },
-    ];
-  }, [card.value]);
 
   return (
     <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3 flex flex-col justify-between overflow-hidden relative group hover:border-slate-300 dark:hover:border-slate-700 transition-all">
@@ -98,9 +73,10 @@ export function KpiCard({ card, currencyCode = "USD" }: KpiCardProps) {
         </p>
       </div>
 
-      <div className="pt-2 -mb-2 -mx-2 opacity-80 group-hover:opacity-100 transition-opacity">
-        <SparklineChart data={sparkData} color={sparkColor} height={32} />
-      </div>
+      <div
+        className={`h-1 w-10 rounded-full bg-current ${toneColor.split(" ")[0]}`}
+        aria-hidden="true"
+      />
     </div>
   );
 }

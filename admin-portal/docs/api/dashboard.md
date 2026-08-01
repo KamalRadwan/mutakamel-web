@@ -1,7 +1,11 @@
 # Admin Dashboard API
 
+Status: **Verified backend contract; frontend DONE/REFACTOR**
+
+Last source verification: **2026-07-30**
+
 Verified against the current `core-app` controller, query DTO, service response
-types, and API Gateway route contract on 2026-07-24.
+types, active frontend integration, and API Gateway route contract.
 
 ## Route and authorization
 
@@ -131,6 +135,9 @@ interface DashboardResponse {
         id: string;
         name: string;
         metadata: string;
+        status: string;
+        countryName: string;
+        countryIsoCode: string;
         currentTenants: number;
         maxTenants: number;
         utilization: number; // normalized 0..1
@@ -203,8 +210,98 @@ interface DashboardResponse {
       }>;
     };
   };
+
+  analytics: {
+    subscriptions: {
+      recurringRevenue: DashboardDataset<{
+        currencyCode: "USD";
+        monthlyRecurringRevenue: number;
+        annualRecurringRevenue: number;
+        byBillingCycle: DashboardNamedValue[];
+      }>;
+      arrTarget: DashboardDataset<unknown>;
+      averageCollectedRevenue: DashboardDataset<{
+        currencyCode: "USD";
+        points: DashboardTimeSeriesPoint[];
+      }>;
+      paymentHealth: DashboardDataset<DashboardNamedValue[]>;
+      churnAndAcquisition: DashboardDataset<{
+        points: DashboardDualTimeSeriesPoint[];
+      }>;
+      upcomingRenewals: DashboardDataset<{
+        windowDays: 90;
+        points: DashboardTimeSeriesPoint[];
+      }>;
+      revenueFlow: DashboardUnavailableDataset;
+      lifetimeValue: DashboardUnavailableDataset;
+      promotionImpact: DashboardUnavailableDataset;
+      cohortRetention: DashboardUnavailableDataset;
+    };
+    billing: {
+      aging: DashboardDataset<{
+        currencyCode: "USD";
+        items: DashboardNamedValue[];
+      }>;
+      daysSalesOutstanding: DashboardDataset<{
+        unit: "days";
+        points: DashboardTimeSeriesPoint[];
+      }>;
+      cashFlow: DashboardDataset<{
+        currencyCode: "USD";
+        points: DashboardDualTimeSeriesPoint[];
+      }>;
+      revenueByPurpose: DashboardDataset<{
+        currencyCode: "USD";
+        items: DashboardNamedValue[];
+      }>;
+      paymentProviders: DashboardDataset<DashboardNamedValue[]>;
+      paymentFailureReasons: DashboardDataset<DashboardNamedValue[]>;
+      refunds: DashboardDataset<{
+        currencyCode: "USD";
+        points: DashboardTimeSeriesPoint[];
+      }>;
+      taxByCountry: DashboardDataset<{
+        currencyCode: "USD";
+        items: DashboardNamedValue[];
+      }>;
+      renewalForecast: DashboardDataset<{
+        currencyCode: "USD";
+        windowDays: 90;
+        points: DashboardTimeSeriesPoint[];
+      }>;
+      usageOverage: DashboardUnavailableDataset;
+      costBreakdown: DashboardUnavailableDataset;
+      discountImpact: DashboardUnavailableDataset;
+      chargebacks: DashboardUnavailableDataset;
+    };
+    servers: {
+      nodes: DashboardDataset<DatabaseCapacityItem[]>;
+      regions: DashboardDataset<DashboardRegionItem[]>;
+      latency: DashboardUnavailableDataset;
+      capacityHistory: DashboardUnavailableDataset;
+    };
+    platformHealth: DashboardUnavailableDataset;
+  };
 }
 ```
+
+Every advanced dataset uses a discriminated availability envelope:
+
+```ts
+type DashboardDataset<T> =
+  | { available: true; data: T }
+  | {
+      available: false;
+      reasonCode:
+        | "SOURCE_NOT_CONFIGURED"
+        | "HISTORICAL_DATA_NOT_STORED"
+        | "TARGET_NOT_CONFIGURED";
+      message: string;
+    };
+```
+
+An unavailable dataset is not an authoritative zero. The frontend must show its
+unavailable state and must not substitute generated, fixed, or random values.
 
 The literal section keys above are the keys currently emitted by the service,
 but the frontend should still render `sections` dynamically so additive cards
@@ -217,13 +314,17 @@ do not require a UI release.
 | Main KPI cards | `overview.kpis` | Format by `kind`; never infer formatting from `key` |
 | Tenant lifecycle | `overview.tenantLifecycle` | Render `items`; multiply `ratio` by 100 only at presentation time |
 | Tenant status panel | `panels.tenantStatus` | The backend omits zero-count statuses except for its empty-state fallback |
-| Database capacity | `panels.databaseCapacity.items` | `utilization` is `0..1`; the item does not expose a raw server `status` field |
+| Database capacity | `panels.databaseCapacity.items` | `utilization` is `0..1`; `status` and country fields are safe report fields. Host and port are intentionally excluded |
 | Database health summary | `overview.databaseHealth` | Use the separate `capacity` and `stats` fields |
 | Subscription status | `overview.subscriptionStatus` | Use for subscription cards/charts |
 | Billing | `overview.billingSummary` | Currency amounts are numeric; use `tenantBillingGrowth.currencyCode` when formatting the growth series |
 | Domain health | `overview.domainHealth` | Use `actionRequired` for the alert state and `message` as server-authored supporting text |
 | Growth chart | `overview.tenantBillingGrowth.points` | The property is named `month` even when granularity is `day` |
 | Recent tenants | `overview.recentTenants.items` | No `companyName` is returned by this endpoint |
+| Subscription analytics | `analytics.subscriptions` | MRR/ARR and renewal forecast include USD subscriptions only; payment charts are transaction counts |
+| Billing analytics | `analytics.billing` | Financial series use settlement USD, or original totals only when the original currency is USD |
+| Server analytics | `analytics.servers` | Nodes and regions are current snapshots; latency and capacity history are explicitly unavailable |
+| Platform health | `analytics.platformHealth` | Unavailable until an observability/telemetry source is connected |
 
 ### Metric formatting
 
@@ -255,19 +356,27 @@ ratio fields inside capacity and breakdown objects are numeric `0..1` values.
 
 ## Current frontend integration status
 
-`src/app/dashboard/hooks/useDashboard.ts` currently supplies mock data and does
-not call this endpoint. Its local shape is not the backend contract:
+`src/app/dashboard/hooks/useDashboardData.ts` calls the browser-facing endpoint
+through the shared HTTP client. Overview, tenant, subscription, billing, and
+server views consume the typed response directly.
 
-- it uses `money` and `percent` display values as preformatted strings;
-- it stores server utilization as `0..100`, while the API uses `0..1`;
-- it expects raw server statuses that `panels.databaseCapacity.items` does not
-  provide;
-- it flattens tenant lifecycle counts instead of consuming `items`;
-- it includes `companyName` on recent tenants, which the API does not return;
-- its billing summary shape differs from `overview.billingSummary`.
+- No dashboard chart generates random or fixed business values.
+- KPI cards do not synthesize historical sparklines.
+- Custom dates send date-only `from` and `to` query values.
+- Advanced panels render the API-provided unavailable reason when a source or
+  historical projection does not exist.
+- Server cards show only report-safe metadata; host and port remain on the
+  separately permissioned database-server API.
 
-Integrate through an adapter or update the view props before replacing the
-mock. Do not cast the API response to the current mock type.
+### Snapshot and range semantics
+
+- Current tenant/subscription status and server capacity are snapshots as of
+  `asOf`; they are not filtered to records created in the range.
+- Event series (creation, cancellation, invoice issue/due/payment/refund) use
+  the selected range.
+- `tenantLifecycle.deleted` is an all-time soft-deleted count.
+- Receivables aging is a current snapshot grouped by `due_at`.
+- Upcoming renewals and their USD value use the next 90 days from `asOf`.
 
 ## Error handling
 

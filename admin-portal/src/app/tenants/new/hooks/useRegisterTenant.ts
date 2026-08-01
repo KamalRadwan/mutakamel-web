@@ -1,23 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
+import { useAuth } from "@/context/AuthContext";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { adminCan } from "@/lib/auth/rbac";
+import {
+  getStoragePlacementState,
+  readStoragePlacementOptions,
+  TENANT_CREATE_PERMISSION,
+  type TenantStoragePlacementOption,
+} from "../../lib/storage-placement";
 
 export function useRegisterTenant() {
   const router = useRouter();
   const { t, lang } = useI18n();
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canCreateTenant = adminCan(user, TENANT_CREATE_PERMISSION);
 
   const [currentStep, setCurrentStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isValidatingIdentity, setIsValidatingIdentity] = useState(false);
   const [identityResult, setIdentityResult] = useState<{ valid: boolean; message: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<{ message: string; correlationId?: string } | null>(null);
   const [isPreviewingPlan, setIsPreviewingPlan] = useState(false);
   const [provisioningDag, setProvisioningDag] = useState<{
     selectionDigest: string;
     components: string[];
     stepsCount: number;
   } | null>(null);
+  const [storagePlacementOptions, setStoragePlacementOptions] = useState<
+    TenantStoragePlacementOption[]
+  >([]);
+  const [isLoadingStoragePlacement, setIsLoadingStoragePlacement] =
+    useState(true);
+  const [storagePlacementError, setStoragePlacementError] = useState<{
+    message: string;
+    correlationId?: string;
+  } | null>(null);
+  const [showStorageSelectionError, setShowStorageSelectionError] =
+    useState(false);
 
   // Form State (matching CreateTenantDto)
   const [formData, setFormData] = useState({
@@ -48,9 +71,10 @@ export function useRegisterTenant() {
     sendInvitation: true,
     ownerActive: true,
 
-    // Step 3: Database Host Placement
+    // Step 3: Infrastructure Placement
     placementMode: "AUTO" as "AUTO" | "MANUAL",
     databaseServerId: "",
+    storageServerId: "",
 
     // Step 4: Modules & Subscription Seed
     selectedModules: ["core", "crm", "trade", "worker"],
@@ -59,6 +83,74 @@ export function useRegisterTenant() {
     trialDays: 14,
     allowedUsers: 25,
   });
+
+  const loadStoragePlacementOptions = useCallback(async () => {
+    if (isAuthLoading) {
+      setIsLoadingStoragePlacement(true);
+      return;
+    }
+
+    if (!canCreateTenant) {
+      setStoragePlacementOptions([]);
+      setStoragePlacementError(null);
+      setIsLoadingStoragePlacement(false);
+      return;
+    }
+
+    setIsLoadingStoragePlacement(true);
+    setStoragePlacementError(null);
+    try {
+      const response = await axiosClient.get(
+        "/api/admin/core/v1/tenants/storage-placement-options",
+      );
+      const options = readStoragePlacementOptions(response.data);
+      setStoragePlacementOptions(options);
+      setFormData((current) =>
+        current.storageServerId &&
+        !options.some((option) => option.id === current.storageServerId)
+          ? { ...current, storageServerId: "" }
+          : current,
+      );
+    } catch (error: unknown) {
+      const apiError = readApiError(error);
+      setStoragePlacementOptions([]);
+      setFormData((current) => ({ ...current, storageServerId: "" }));
+      setStoragePlacementError({
+        message:
+          apiError.message ||
+          (lang === "ar"
+            ? "تعذر تحميل أهداف التخزين المؤهلة."
+            : "Storage placement targets could not be loaded."),
+        correlationId: apiError.correlationId,
+      });
+    } finally {
+      setIsLoadingStoragePlacement(false);
+    }
+  }, [canCreateTenant, isAuthLoading, lang]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadStoragePlacementOptions();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [loadStoragePlacementOptions]);
+
+  const storagePlacementState = getStoragePlacementState({
+    canCreateTenant,
+    isLoading: isAuthLoading || isLoadingStoragePlacement,
+    hasError: storagePlacementError !== null,
+    optionCount: storagePlacementOptions.length,
+  });
+  const selectedStoragePlacement = useMemo(
+    () =>
+      storagePlacementOptions.find(
+        (option) => option.id === formData.storageServerId,
+      ) ?? null,
+    [formData.storageServerId, storagePlacementOptions],
+  );
+  const hasValidStorageSelection =
+    storagePlacementState === "ready" &&
+    selectedStoragePlacement !== null;
 
   const handleValidateIdentity = async () => {
     setIsValidatingIdentity(true);
@@ -104,31 +196,160 @@ export function useRegisterTenant() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasValidStorageSelection) {
+      setShowStorageSelectionError(true);
+      setCurrentStep(3);
+      return;
+    }
+
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    setIsSubmitting(false);
-    router.push("/tenants");
+    setSubmitError(null);
+
+    try {
+      // 1. Fetch Subscription Quote
+      const quotePayload = {
+        modules: formData.selectedModules.map((moduleKey) => ({
+          moduleKey,
+          tierKey: "business",
+          seats: formData.allowedUsers,
+        })),
+        billingCycle: formData.billingCycle,
+        currencyCode: "USD",
+      };
+      const quoteRes = await axiosClient.post("/api/admin/core/v1/subscriptions/quote", quotePayload);
+      const quoteId = quoteRes.data?.data?.quoteId || quoteRes.data?.quoteId;
+      if (!quoteId) {
+        throw new Error("Failed to obtain a valid subscription quote from the catalogue.");
+      }
+
+      // 2. Submit Tenant Creation
+      const payload = {
+        quoteId,
+        name: formData.name,
+        companyName: formData.companyName,
+        countryName: formData.countryName,
+        countryIsoCode: formData.countryIsoCode,
+        industry: formData.industry,
+        timezone: formData.timezone,
+        phoneCountryCode: formData.phoneCountryCode,
+        phone: formData.phone,
+        address: {
+          city: formData.city,
+          state: formData.state,
+          postalCode: formData.postalCode,
+          street1: formData.street,
+        },
+        taxNumber: formData.taxNumber,
+        commercialRegistrationNumber: formData.commercialRegistrationNumber,
+        databaseServerId: formData.databaseServerId || undefined,
+        storageServerId: formData.storageServerId,
+        ownerEmail: formData.ownerEmail,
+        ownerFirstName: formData.ownerFirstName,
+        ownerLastName: formData.ownerLastName,
+        ownerPhoneCountryCode: formData.ownerPhoneCountryCode,
+        ownerPhone: formData.ownerPhone,
+        ownerJobTitle: formData.ownerJobTitle,
+        ownerLanguage: formData.ownerLanguage,
+        sendInvitation: formData.sendInvitation,
+        ownerActive: formData.ownerActive,
+        billingCycle: formData.billingCycle,
+        currencyCode: "USD",
+        trialDays: formData.trialDays,
+        modules: formData.selectedModules.map((moduleKey) => ({
+          moduleKey,
+          tierKey: "business",
+          seats: formData.allowedUsers,
+        })),
+      };
+
+      await axiosClient.post("/api/admin/core/v1/tenants", payload);
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("global-toast", {
+            detail: {
+              type: "success",
+              title: lang === "ar" ? "تم الإنشاء" : "Created",
+              message:
+                lang === "ar"
+                  ? "تم إنشاء بيئة العمل بنجاح."
+                  : "Tenant created successfully.",
+            },
+          }),
+        );
+      }
+      router.push("/tenants");
+    } catch (error: unknown) {
+      setSubmitError({
+        message: readApiError(error).message || "An error occurred while creating the tenant.",
+        correlationId: readApiError(error).correlationId,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const nextStep = () => setCurrentStep((s) => Math.min(5, s + 1));
+  const goToStep = (step: number) => {
+    const next = Math.max(1, Math.min(5, step));
+    if (next > 3 && !hasValidStorageSelection) {
+      setShowStorageSelectionError(true);
+      setCurrentStep(3);
+      return;
+    }
+    setCurrentStep(next);
+  };
+  const nextStep = () => goToStep(currentStep + 1);
   const prevStep = () => setCurrentStep((s) => Math.max(1, s - 1));
 
   return {
     t,
     currentStep,
-    setCurrentStep,
+    goToStep,
     formData,
     setFormData,
+    canCreateTenant,
+    storagePlacementOptions,
+    storagePlacementState,
+    storagePlacementError,
+    selectedStoragePlacement,
+    showStorageSelectionError,
+    setShowStorageSelectionError,
+    loadStoragePlacementOptions,
+    hasValidStorageSelection,
+    isSubmitting,
+    submitError,
     isValidatingIdentity,
     identityResult,
     isPreviewingPlan,
     provisioningDag,
-    isSubmitting,
     handleValidateIdentity,
     handlePreviewPlan,
     handleSubmit,
     nextStep,
     prevStep,
     onCancel: () => router.push("/tenants"),
+  };
+}
+
+function readApiError(error: unknown): {
+  message?: string;
+  correlationId?: string;
+} {
+  if (!error || typeof error !== "object") return {};
+  const response = "response" in error ? error.response : null;
+  if (!response || typeof response !== "object" || !("data" in response)) {
+    return {};
+  }
+  const data = response.data;
+  if (!data || typeof data !== "object") return {};
+  return {
+    message:
+      "message" in data && typeof data.message === "string"
+        ? data.message
+        : undefined,
+    correlationId:
+      "correlationId" in data && typeof data.correlationId === "string"
+        ? data.correlationId
+        : undefined,
   };
 }

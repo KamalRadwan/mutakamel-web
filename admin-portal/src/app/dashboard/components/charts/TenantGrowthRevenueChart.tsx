@@ -27,6 +27,15 @@ interface TenantGrowthRevenueChartProps {
   height?: number;
 }
 
+interface GrowthLegendEntry {
+  color?: string;
+  value?: string | number;
+}
+
+interface GrowthLegendProps {
+  payload?: readonly GrowthLegendEntry[];
+}
+
 export function TenantGrowthRevenueChart({
   points,
   currencyCode = "USD",
@@ -49,11 +58,11 @@ export function TenantGrowthRevenueChart({
       maximumFractionDigits: 0,
     }).format(val);
 
-  const renderCustomLegend = (props: any) => {
+  const renderCustomLegend = (props: GrowthLegendProps) => {
     const { payload } = props;
     return (
       <div className="flex flex-wrap items-center justify-end gap-4 text-xs mb-3">
-        {payload?.map((entry: any, index: number) => (
+        {payload?.map((entry, index) => (
           <div key={`item-${index}`} className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
             <span
               className="w-2.5 h-2.5 rounded-xs inline-block shrink-0"
@@ -138,5 +147,3 @@ export function TenantGrowthRevenueChart({
     </div>
   );
 }
-
-

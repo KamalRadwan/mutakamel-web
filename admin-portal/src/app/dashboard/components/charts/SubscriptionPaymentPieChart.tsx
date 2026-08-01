@@ -21,25 +21,6 @@ export function SubscriptionPaymentPieChart({ success, failed, recovered, height
 
   const total = success + failed + recovered;
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      const ratio = total > 0 ? ((data.value / total) * 100).toFixed(1) : 0;
-      return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-lg shadow-lg text-xs">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: data.color }} />
-            <p className="font-bold text-slate-800 dark:text-slate-200">{data.name}</p>
-          </div>
-          <p className="text-slate-600 dark:text-slate-400 pl-4">
-            Count: <span className="font-mono font-bold">{data.value}</span> ({ratio}%)
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div style={{ height, width: "100%" }} className="relative flex items-center justify-center">
       <ResponsiveContainer width="100%" height="100%">
@@ -58,7 +39,12 @@ export function SubscriptionPaymentPieChart({ success, failed, recovered, height
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Pie>
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip
+            formatter={(value) => [
+              Number(value ?? 0).toLocaleString(),
+              lang === "ar" ? "العدد" : "Count",
+            ]}
+          />
         </PieChart>
       </ResponsiveContainer>
       

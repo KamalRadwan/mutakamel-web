@@ -1,68 +1,54 @@
-# Backups & Restores API
+# Worker Backup and Restore API
 
-Browser prefix: `/api/admin/worker/v1`
+Status: **Backend route family documented; frontend MISSING**
 
-These routes are served by `worker-app` through API Gateway. The `/admin/...`
-forms below are Worker controller-relative paths, not browser request URLs.
+Last source verification: **2026-07-30**
 
-## Backups — `/admin/backups`
+Owner: **Worker**
 
-Base Path: `admin/backups`
-Guard: `AdminGuard`
+Canonical browser prefix: `/api/admin/worker/v1`
 
----
+This secondary Admin domain is outside the 243 Core Admin route count.
 
-### GET `/admin/backups/policies` — List Backup Policies
-**Permission**: `admin.backups.read`
+## Backup routes
 
-### GET `/admin/backups/policies/:databaseServerId` — Get Policy
-**Permission**: `admin.backups.read`
+| Method and canonical browser path | Permission |
+| --- | --- |
+| `GET /api/admin/worker/v1/backups/policies` | `admin.backups.read` |
+| `GET /api/admin/worker/v1/backups/policies/:databaseServerId` | `admin.backups.read` |
+| `PUT /api/admin/worker/v1/backups/policies/:databaseServerId` | `admin.backups.manage` |
+| `GET /api/admin/worker/v1/backups/policies/:databaseServerId/databases` | `admin.backups.read` |
+| `PUT /api/admin/worker/v1/backups/policies/:databaseServerId/databases/:tenantId` | `admin.backups.manage` |
+| `DELETE /api/admin/worker/v1/backups/policies/:databaseServerId/databases/:tenantId` | `admin.backups.manage` |
+| `POST /api/admin/worker/v1/backups/runs` | `admin.backups.manage` |
+| `GET /api/admin/worker/v1/backups/runs` | `admin.backups.read` |
+| `GET /api/admin/worker/v1/backups/runs/:runId` | `admin.backups.read` |
+| `DELETE /api/admin/worker/v1/backups/runs/:runId` | `admin.backups.delete` |
+| `GET /api/admin/worker/v1/backups/artifacts` | `admin.backups.read` |
+| `DELETE /api/admin/worker/v1/backups/artifacts/:artifactId` | `admin.backups.delete` |
 
-### PUT `/admin/backups/policies/:databaseServerId` — Upsert Policy
-**Permission**: `admin.backups.manage`
+## Restore routes
 
-### GET `/admin/backups/policies/:databaseServerId/databases` — List Databases
-**Permission**: `admin.backups.read`
+| Method and canonical browser path | Permission |
+| --- | --- |
+| `POST /api/admin/worker/v1/restores/runs` | `admin.backups.restore` |
+| `GET /api/admin/worker/v1/restores/runs` | `admin.backups.read` |
+| `GET /api/admin/worker/v1/restores/runs/:runId` | `admin.backups.read` |
+| `POST /api/admin/worker/v1/restores/runs/:runId/promote` | `admin.backups.restore` |
 
-### PUT `/admin/backups/policies/:databaseServerId/databases/:tenantId` — Upsert Override
-**Permission**: `admin.backups.manage`
+## Frontend rules
 
-### DELETE `/admin/backups/policies/:databaseServerId/databases/:tenantId` — Remove Override
-**Permission**: `admin.backups.manage`
+- Use the shared authenticated client and Worker canonical prefix.
+- Keep backup/restore job state asynchronous and authoritative.
+- Never expose storage credentials or artifact secrets.
+- Apply exact Worker route idempotency/permissions after rechecking the current
+  Worker Gateway contract.
 
-### POST `/admin/backups/runs` — Start Backup Run
-**Permission**: `admin.backups.manage`
+## Current frontend status
 
-### GET `/admin/backups/runs` — List Backup Runs
-**Permission**: `admin.backups.read`
+No backup/restore route exists in Admin Portal source.
 
-### GET `/admin/backups/runs/:runId` — Get Run
-**Permission**: `admin.backups.read`
+## Source map
 
-### DELETE `/admin/backups/runs/:runId` — Delete Run
-**Permission**: `admin.backups.delete`
-
-### GET `/admin/backups/artifacts` — List Artifacts
-**Permission**: `admin.backups.read`
-
-### DELETE `/admin/backups/artifacts/:artifactId` — Delete Artifact
-**Permission**: `admin.backups.delete`
-
----
-
-## Restores — `/admin/restores`
-
-Base Path: `admin/restores`
-Guard: `AdminGuard`
-
-### POST `/admin/restores/runs` — Start Restore
-**Permission**: `admin.backups.restore`
-
-### GET `/admin/restores/runs` — List Restores
-**Permission**: `admin.backups.read`
-
-### GET `/admin/restores/runs/:runId` — Get Restore
-**Permission**: `admin.backups.read`
-
-### POST `/admin/restores/runs/:runId/promote` — Promote Restore
-**Permission**: `admin.backups.restore`
+- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/worker.route-contracts.ts`
+- `../backend/mutakamel-apps/worker-app/src/`

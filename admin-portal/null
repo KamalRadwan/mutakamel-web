@@ -1,0 +1,1 @@
+{"success":false,"statusCode":400,"errorCode":"COMMON.GENERIC.VALIDATION_FAILED","errorCategory":"VALIDATION","message":"Validation failed","correlationId":"019f9f0b-c124-7c80-ad09-880b37c45b1e","timestamp":"2026-07-26T15:29:35.537Z","path":"/api/v1/admin/auth/login"}

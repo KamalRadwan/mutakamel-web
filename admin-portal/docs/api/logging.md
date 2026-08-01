@@ -1,125 +1,66 @@
-# Logging API — `/admin/logging/level-overrides`
+# Logging Overrides and Live Stream API
 
-Browser prefix: `/api/admin/core/v1`. The `/admin/...` forms below are Core
-controller-relative paths, not browser request URLs.
+Status: **Verified backend contract; frontend MISSING**
 
-Base Path: `admin/logging/level-overrides`
-Guard: `AdminGuard`
+Last source verification: **2026-07-30**
 
----
+Owner: **Core**
 
-## GET `/admin/logging/level-overrides` — List Overrides
+## Routes
 
-**Permission**: `admin.logging.read`
-**HTTP Status**: 200
+| Method and canonical browser path | Permissions | Protocol |
+| --- | --- | --- |
+| `GET /api/admin/core/v1/logging/level-overrides` | `admin.logging.read` | JSON |
+| `GET /api/admin/core/v1/logging/level-overrides/effective` | `admin.logging.read` | JSON |
+| `GET /api/admin/core/v1/logging/level-overrides/history` | `admin.logging.read` | JSON |
+| `GET /api/admin/core/v1/logging/level-overrides/live` | `admin.logging.read` + `admin.logging.critical` | SSE |
+| `PUT /api/admin/core/v1/logging/level-overrides` | `admin.logging.update` + `admin.logging.critical` | JSON |
+| `DELETE /api/admin/core/v1/logging/level-overrides/:id` | `admin.logging.update` + `admin.logging.critical` | `204` |
 
-### Query Parameters — `LoggingLevelOverrideQueryDto`
-```typescript
-{
-  scope?: LoggingOverrideScopeEnum;  // 'GLOBAL' | 'APP' | 'TENANT' | 'TENANT_APP'
-  appName?: LoggingAppEnum;          // Service name enum
-  tenantId?: string;                 // UUID filter
-}
-```
+Permission pairs use ALL semantics.
 
-### Response
-```typescript
-Array<{
-  id: string;
-  scope: LoggingOverrideScopeEnum;
-  appName: string | null;
-  tenantId: string | null;
-  level: string;       // 'debug' | 'info' | 'warn' | 'error' | 'fatal'
+## Override DTO
+
+```ts
+interface UpsertLoggingLevelOverrideDto {
+  scope: "GLOBAL" | "APP" | "TENANT" | "TENANT_APP";
+  appName?: string;
+  tenantId?: string;
+  level: "debug" | "info" | "warn" | "error" | "fatal";
   reason: string;
-  expiresAt: string;
-  updatedAt: string;
-}>
-```
-
-### Frontend Notes
-- Scope precedence: `TENANT_APP > TENANT > APP > GLOBAL`
-- Hide expired entries by default
-
----
-
-## GET `/admin/logging/level-overrides/history` — Change History
-
-**Permission**: `admin.logging.read`
-**HTTP Status**: 200
-
-### Query Parameters — `LoggingLevelOverrideHistoryQueryDto`
-```typescript
-{
-  overrideId?: string;   // UUID
-  action?: string;       // 'CREATE' | 'UPDATE' | 'DELETE'
-  scope?: LoggingOverrideScopeEnum;
-  appName?: LoggingAppEnum;
-  tenantId?: string;
-  limit?: number;        // 1-200, default 50
+  expiresAt: string; // no more than 24 hours in the future
 }
 ```
 
----
+`trace` can be read/filtered where supported but is not a writable override
+level.
 
-## GET `/admin/logging/level-overrides/effective` — Resolve Effective Level
+Scope precedence:
 
-**Permission**: `admin.logging.read`
-**HTTP Status**: 200
-
-### Query Parameters — `EffectiveLoggingLevelQueryDto`
-```typescript
-{
-  appName: LoggingAppEnum;
-  tenantId?: string;
-}
+```text
+TENANT_APP > TENANT > APP > GLOBAL
 ```
 
-### Response
-```typescript
-{
-  level: string;   // 'debug' | 'info' | 'warn' | 'error' | 'fatal'
-  source: string;  // Override scope that determined the level
-}
-```
+Validate required/forbidden `appName` and `tenantId` combinations from the
+scope-specific DTO rules.
 
----
+## Live stream
 
-## SSE `/admin/logging/level-overrides/live` — Stream Live Logs
+Use a credential-compatible SSE implementation through Gateway. Preserve
+cookie authentication, query filters, connection/reconnection state, and
+correlation/support detail. Do not silently downgrade critical permission
+failures into an empty stream.
 
-**Permission**: `admin.logging.read`
-**Protocol**: Server-Sent Events (`Accept: text/event-stream`)
+Logs can contain sensitive data. Apply safe rendering, bounded buffering, and
+export/copy restrictions; never deliberately surface secrets.
 
-### Query Parameters — `LiveLoggingQueryDto`
-```typescript
-{
-  appName?: LoggingAppEnum;
-  tenantId?: string;
-  minLevel?: LogLevelEnum;
-}
-```
+## Current frontend status
 
----
+There is no logging route, override editor, history/effective viewer, or live
+stream client in `src/app/`.
 
-## PUT `/admin/logging/level-overrides` — Upsert Override
+## Source map
 
-**Permission**: `admin.logging.update`
-**HTTP Status**: 200
-
-### Request Body — `UpsertLoggingLevelOverrideDto`
-```typescript
-{
-  scope: LoggingOverrideScopeEnum;
-  appName?: LoggingAppEnum;
-  tenantId?: string;
-  level: string;       // 'debug' | 'info' | 'warn' | 'error' | 'fatal'
-  reason: string;
-  expiresAt: string;   // Max 24 hours in the future
-}
-```
-
----
-
-## DELETE `/admin/logging/level-overrides/:id` — Delete Override
-
-**Permission**: `admin.logging.update`
-**HTTP Status**: 204
+- `../backend/mutakamel-apps/core-app/src/admin/logging/logging-level-overrides.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/logging/dto/`
+- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`

@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { 
   Package, 
@@ -26,10 +26,13 @@ import {
   Upload, 
   Download, 
   FileJson, 
-  Filter 
+  Filter,
+  History,
+  Search
 } from "lucide-react";
 import { useModuleDetail } from "./hooks/useModuleDetail";
 import { useI18n } from "@/i18n/I18nContext";
+import { TierView } from "@/types/module";
 
 export default function ModuleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -51,10 +54,8 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
     isSubmitting,
     isSaved,
     saveTabMessage,
-
-    // Tier Modal States & Functions
-    isAddTierOpen,
-    setIsAddTierOpen,
+    isLoading,
+    error,
     editingTier,
     setEditingTier,
     newTierKey,
@@ -65,8 +66,9 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
     setNewTierColor,
     newTierIsActive,
     setNewTierIsActive,
-    moveTierUp,
-    moveTierDown,
+    // Tier Modal States & Functions
+    isAddTierOpen,
+    setIsAddTierOpen,
 
     // Feature Modal States & Import/Export Functions
     isAddFeatureOpen,
@@ -93,6 +95,8 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
     // Price Bracket States
     isAddPriceBracketOpen,
     setIsAddPriceBracketOpen,
+    editingPriceBracket,
+    setEditingPriceBracket,
     newBracketTierId,
     setNewBracketTierId,
     newBracketMinUsers,
@@ -106,6 +110,13 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
     newBracketCycle,
     setNewBracketCycle,
 
+    // Audit Log States
+    auditLogs,
+    auditFilter,
+    setAuditFilter,
+    auditSearch,
+    setAuditSearch,
+
     // Handlers
     toggleGrant,
     handleCreateTier,
@@ -114,18 +125,41 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
     handleCreateFeature,
     handleUpdateFeature,
     handleDeleteFeature,
+    openAddPriceBracketModal,
     handleCreatePriceBracket,
+    handleUpdatePriceBracket,
     handleDeletePriceBracket,
     handleSaveTabChanges,
     onBack,
   } = useModuleDetail(id);
   const { lang } = useI18n();
 
+  const [deletingTierTarget, setDeletingTierTarget] = useState<TierView | null>(null);
+  const [deleteTierConfirmKeyInput, setDeleteTierConfirmKeyInput] = useState<string>("");
+
+  if (isLoading && !moduleData) {
+    return (
+      <div className="flex flex-col flex-1 h-screen bg-slate-50 dark:bg-slate-950 items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-500 font-medium">جاري تحميل بيانات الموديول...</p>
+      </div>
+    );
+  }
+
+  if (error || !moduleData) {
+    return (
+      <div className="flex flex-col flex-1 h-screen bg-slate-50 dark:bg-slate-950 items-center justify-center">
+        <div className="text-rose-500 mb-4 font-bold">{error || "Module Not Found"}</div>
+        <button onClick={onBack} className="text-blue-600 underline">العودة للكتالوج</button>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+    <div className="flex flex-col min-h-screen bg-slate-100/90 dark:bg-[#090d16]" dir={lang === "ar" ? "rtl" : "ltr"}>
       <Navbar />
 
-      <main className="flex-1 p-4 sm:p-6 max-w-6xl w-full mx-auto space-y-6">
+      <main className="flex-1 p-4 sm:p-6 max-w-6xl w-full mx-auto space-y-6 pb-16 overflow-y-auto">
         {/* Header Title with Back Button */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center gap-3">
@@ -138,99 +172,126 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                  {moduleData.moduleName}
+                  {moduleData.name}
                 </h1>
-                <span className="text-xs px-2.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 font-mono font-bold text-blue-600">
-                  {moduleData.moduleKey}
+                <span className="text-xs px-2.5 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 font-mono font-bold text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50">
+                  {moduleData.key}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-mono mt-0.5">
-                Category: {moduleData.category}
-              </p>
             </div>
           </div>
 
-          <span className="px-3 py-1 text-xs font-bold font-mono rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 self-start md:self-auto">
-            STATUS: {moduleData.status}
+          <span className={`px-3 py-1 text-xs font-bold font-mono rounded-full self-start md:self-auto ${
+            moduleData.isActive 
+              ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800"
+              : "bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700"
+          }`}>
+            STATUS: {(moduleData.isActive ? "ACTIVE" : "INACTIVE")}
           </span>
         </div>
 
-        {/* Saved Toast Notification */}
-        {isSaved && (
-          <div className="p-3 text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center gap-2 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>
-              {lang === "ar"
-                ? `تم حفظ تعديلات قسم (${saveTabMessage}) بنجاح!`
-                : `Changes for tab (${saveTabMessage}) saved successfully!`}
-            </span>
-          </div>
-        )}
 
-        {/* Pricing Validation Error Alert */}
-        {pricingValidationError && (
-          <div className="p-3 text-xs font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-xl flex items-center gap-2 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{pricingValidationError}</span>
-          </div>
-        )}
 
-        {/* 5 Mandatory Section Tabs */}
-        <div className="border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-2 overflow-x-auto pb-px">
+        {/* Section Navigation Tabs with Vibrant Color-Coded Themes */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-1.5 shadow-2xs">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+            {/* 1. Preview */}
             <button
               onClick={() => setActiveTab("preview")}
-              className={`px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border ${
                 activeTab === "preview"
-                  ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
-                  : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
+                  ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 shadow-2xs"
+                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              {t.modules.sections.preview}
+              <Package className="w-4 h-4 text-blue-500 shrink-0" />
+              <span>{t.modules.sections.preview}</span>
             </button>
 
+            {/* 2. Tiers */}
             <button
               onClick={() => setActiveTab("tiers")}
-              className={`px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border ${
                 activeTab === "tiers"
-                  ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
-                  : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
+                  ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 shadow-2xs"
+                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              {t.modules.sections.tiers} ({tiers.length})
+              <Award className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>{t.modules.sections.tiers}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold transition-colors ${
+                activeTab === "tiers"
+                  ? "bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+              }`}>
+                ({tiers.length})
+              </span>
             </button>
 
+            {/* 3. Features */}
             <button
               onClick={() => setActiveTab("features")}
-              className={`px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border ${
                 activeTab === "features"
-                  ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
-                  : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
+                  ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 shadow-2xs"
+                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              {t.modules.sections.features} ({features.length})
+              <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>{t.modules.sections.features}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold transition-colors ${
+                activeTab === "features"
+                  ? "bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+              }`}>
+                ({features.length})
+              </span>
             </button>
 
+            {/* 4. Grants */}
             <button
               onClick={() => setActiveTab("grants")}
-              className={`px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border ${
                 activeTab === "grants"
-                  ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
-                  : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
+                  ? "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 shadow-2xs"
+                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              {t.modules.sections.grants}
+              <ShieldCheck className="w-4 h-4 text-purple-500 shrink-0" />
+              <span>{t.modules.sections.grants}</span>
             </button>
 
+            {/* 5. Pricing */}
             <button
               onClick={() => setActiveTab("price")}
-              className={`px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border ${
                 activeTab === "price"
-                  ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
-                  : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
+                  ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 shadow-2xs"
+                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60"
               }`}
             >
-              {t.modules.sections.price}
+              <DollarSign className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>{t.modules.sections.price}</span>
+            </button>
+
+            {/* 6. Changes History */}
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border ${
+                activeTab === "history"
+                  ? "bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800 shadow-2xs"
+                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <History className="w-4 h-4 text-cyan-500 shrink-0" />
+              <span>{t.modules.sections.history}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold transition-colors ${
+                activeTab === "history"
+                  ? "bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+              }`}>
+                ({auditLogs.length})
+              </span>
             </button>
           </div>
         </div>
@@ -249,9 +310,9 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">رمز الموديول (moduleKey)</label>
                   <input
                     type="text"
-                    value={moduleData.moduleKey}
+                    value={moduleData.key}
                     disabled
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-100 dark:bg-slate-800 border rounded-xl text-slate-500"
+                    className="w-full px-3 py-2 text-xs font-mono bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-medium opacity-90 cursor-not-allowed"
                   />
                 </div>
 
@@ -259,9 +320,9 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">اسم الموديول</label>
                   <input
                     type="text"
-                    value={moduleData.moduleName}
-                    onChange={(e) => setModuleData({ ...moduleData, moduleName: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border rounded-xl"
+                    value={moduleData.name}
+                    onChange={(e) => setModuleData({ ...moduleData, name: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -269,10 +330,10 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
               <div className="space-y-1 pt-2">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">الوصف الوظيفي المباشر</label>
                 <textarea
-                  value={moduleData.description}
+                  value={moduleData.description || ""}
                   onChange={(e) => setModuleData({ ...moduleData, description: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border rounded-xl"
+                  rows={4}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -315,42 +376,20 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                 <table className="w-full text-xs text-start">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold uppercase">
-                      <th className="pb-3 text-start w-20">{lang === "ar" ? "الترتيب" : "Reorder"}</th>
-                      <th className="pb-3 text-start">{lang === "ar" ? "اللون (Hex Color)" : "Color"}</th>
-                      <th className="pb-3 text-start">رمز المستوى (key)</th>
-                      <th className="pb-3 text-start">اسم المستوى (name)</th>
-                      <th className="pb-3 text-start">الحالة (isActive)</th>
-                      <th className="pb-3 text-end">الإجراءات</th>
+                      <th className="pb-3 text-center w-20">{lang === "ar" ? "الترتيب" : "Rank"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "اللون" : "Color"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "رمز المستوى" : "Tier Key"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "اسم المستوى" : "Tier Name"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "الحالة" : "Status"}</th>
+                      <th className="pb-3 text-end">{lang === "ar" ? "الإجراءات" : "Actions"}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
                     {tiers.map((tr, idx) => (
                       <tr key={tr.id} className="h-14 font-sans hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        {/* Drag & Reorder Control */}
-                        <td className="py-2.5 font-mono">
-                          <div className="flex items-center gap-1">
-                            <GripVertical className="w-4 h-4 text-slate-400 cursor-grab shrink-0" />
-                            <div className="flex flex-col gap-0.5">
-                              <button
-                                type="button"
-                                onClick={() => moveTierUp(idx)}
-                                disabled={idx === 0}
-                                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer"
-                                title="ترتيب للأعلى"
-                              >
-                                <ArrowUp className="w-3 h-3 text-slate-600 dark:text-slate-300" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => moveTierDown(idx)}
-                                disabled={idx === tiers.length - 1}
-                                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer"
-                                title="ترتيب لأسفل"
-                              >
-                                <ArrowDown className="w-3 h-3 text-slate-600 dark:text-slate-300" />
-                              </button>
-                            </div>
-                          </div>
+                        {/* Rank Display (No Reorder) */}
+                        <td className="py-2.5 font-mono text-slate-500 text-center">
+                          {tr.rank}
                         </td>
 
                         <td className="py-2.5">
@@ -362,8 +401,8 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                             <span className="text-slate-500 font-mono text-[11px]">{tr.color}</span>
                           </div>
                         </td>
-                        <td className="py-2.5 font-bold font-mono text-blue-600">{tr.tierKey}</td>
-                        <td className="py-2.5 font-bold text-slate-900 dark:text-slate-100">{tr.tierName}</td>
+                        <td className="py-2.5 font-bold font-mono text-blue-600">{tr.key}</td>
+                        <td className="py-2.5 font-bold text-slate-900 dark:text-slate-100">{tr.name}</td>
                         <td className="py-2.5">
                           <span
                             className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full font-mono ${
@@ -376,14 +415,28 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                           </span>
                         </td>
                         <td className="py-2.5 text-end">
-                          <button
-                            type="button"
-                            onClick={() => setEditingTier({ ...tr })}
-                            className="px-2.5 py-1 text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 me-1"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                            <span>تعديل</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setEditingTier({ ...tr })}
+                              className="px-2.5 py-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                              <span>{lang === "ar" ? "تعديل" : "Edit"}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeletingTierTarget(tr);
+                                setDeleteTierConfirmKeyInput("");
+                              }}
+                              className="px-2.5 py-1 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
+                              title={lang === "ar" ? "حذف المستوى" : "Delete Tier"}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>{lang === "ar" ? "حذف" : "Delete"}</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -452,27 +505,27 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                 <table className="w-full text-xs text-start">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold uppercase">
-                      <th className="pb-3 text-start">رمز الميزة (key)</th>
-                      <th className="pb-3 text-start">اسم الميزة والوصف</th>
-                      <th className="pb-3 text-start">نوع القيمة (valueType)</th>
-                      <th className="pb-3 text-start">القيمة الافتراضية</th>
-                      <th className="pb-3 text-end">الإجراءات</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "رمز الميزة" : "Feature Key"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "اسم الميزة والوصف" : "Name & Description"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "رمز القيمة" : "Type Code"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "القيمة الافتراضية" : "Default Value"}</th>
+                      <th className="pb-3 text-end">{lang === "ar" ? "الإجراءات" : "Actions"}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
                     {features.map((f) => (
                       <tr key={f.id} className="h-12 font-sans">
-                        <td className="py-2.5 font-bold font-mono text-slate-900 dark:text-slate-100">{f.featureKey}</td>
+                        <td className="py-2.5 font-bold font-mono text-slate-900 dark:text-slate-100">{f.key}</td>
                         <td className="py-2.5">
-                          <div className="font-bold text-slate-900 dark:text-slate-100">{f.featureName}</div>
+                          <div className="font-bold text-slate-900 dark:text-slate-100">{f.name}</div>
                           <div className="text-[11px] text-slate-400">{f.description}</div>
                         </td>
                         <td className="py-2.5 font-mono">
                           <span className="px-2 py-0.5 text-[10px] bg-slate-100 dark:bg-slate-800 rounded font-bold text-purple-600">
-                            {f.valueType}
+                            {f.key}
                           </span>
                         </td>
-                        <td className="py-2.5 font-mono font-bold text-emerald-600">{f.defaultValue}</td>
+                        <td className="py-2.5 font-mono font-bold text-emerald-600">{f.key}</td>
                         <td className="py-2.5 text-end">
                           <button
                             type="button"
@@ -518,12 +571,12 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                 <table className="w-full text-xs text-start">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold uppercase">
-                      <th className="pb-3 text-start">الميزة (Feature)</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "الميزة" : "Feature"}</th>
                       {tiers.map((tr) => (
                         <th key={tr.id} className="pb-3 text-center font-bold text-blue-600">
                           <div className="flex items-center justify-center gap-1">
                             <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tr.color }} />
-                            <span>{tr.tierKey}</span>
+                            <span>{tr.key}</span>
                           </div>
                         </th>
                       ))}
@@ -532,7 +585,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {features.map((f) => (
                       <tr key={f.id} className="h-12">
-                        <td className="py-2.5 font-bold font-mono text-slate-900 dark:text-slate-100">{f.featureKey}</td>
+                        <td className="py-2.5 font-bold font-mono text-slate-900 dark:text-slate-100">{f.key}</td>
                         {tiers.map((tr) => {
                           const g = grants.find((gr) => gr.tierId === tr.id && gr.featureId === f.id);
                           const isGranted = g?.isEnabled ?? false;
@@ -591,7 +644,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
 
                 <button
                   type="button"
-                  onClick={() => setIsAddPriceBracketOpen(true)}
+                  onClick={() => openAddPriceBracketModal()}
                   className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
                 >
                   <Plus className="w-4 h-4" />
@@ -603,35 +656,35 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
                   <Filter className="w-3.5 h-3.5 text-blue-500" />
-                  <span>{lang === "ar" ? "فلترة الفئات السعرية (Dual Filters):" : "Pricing Filters:"}</span>
+                  <span>{lang === "ar" ? "فلترة الفئات السعرية:" : "Pricing Filters:"}</span>
                 </div>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
-                  {/* Filter 1: Billing Cycle (MONTHLY / YEARLY) */}
+                  {/* Filter 1: Billing Cycle (MONTHLY / ANNUAL) */}
                   <div className="flex items-center gap-1.5 text-xs">
-                    <span className="text-slate-500 font-semibold">1. الفوترة:</span>
+                    <span className="text-slate-500 font-semibold">{lang === "ar" ? "1. الفوترة:" : "1. Cycle:"}</span>
                     <select
                       value={pricingCycleFilter}
                       onChange={(e) => setPricingCycleFilter(e.target.value)}
                       className="px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-bold text-purple-600"
                     >
-                      <option value="ALL">جميع الدورات (ALL)</option>
-                      <option value="MONTHLY">MONTHLY (شهري)</option>
-                      <option value="YEARLY">YEARLY (سنوي)</option>
+                      <option value="ALL">{lang === "ar" ? "جميع الدورات (ALL)" : "ALL Cycles"}</option>
+                      <option value="MONTHLY">{lang === "ar" ? "MONTHLY (شهري)" : "MONTHLY"}</option>
+                      <option value="YEARLY">{lang === "ar" ? "ANNUAL (سنوي)" : "ANNUAL"}</option>
                     </select>
                   </div>
 
                   {/* Filter 2: Tier Package */}
                   <div className="flex items-center gap-1.5 text-xs">
-                    <span className="text-slate-500 font-semibold">2. المستوى:</span>
+                    <span className="text-slate-500 font-semibold">{lang === "ar" ? "2. المستوى:" : "2. Tier:"}</span>
                     <select
                       value={pricingTierFilter}
                       onChange={(e) => setPricingTierFilter(e.target.value)}
                       className="px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 font-bold text-blue-600"
                     >
-                      <option value="ALL">جميع المستويات (ALL)</option>
+                      <option value="ALL">{lang === "ar" ? "جميع المستويات (ALL)" : "ALL Tiers"}</option>
                       {tiers.map((tr) => (
-                        <option key={tr.id} value={tr.id}>{tr.tierName} ({tr.tierKey})</option>
+                        <option key={tr.id} value={tr.id}>{tr.name} ({tr.key})</option>
                       ))}
                     </select>
                   </div>
@@ -643,30 +696,39 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                 <table className="w-full text-xs text-start">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold uppercase">
-                      <th className="pb-3 text-start">المستوى (Tier)</th>
-                      <th className="pb-3 text-start">دورة الفوترة (billingCycle)</th>
-                      <th className="pb-3 text-start">من مستخدم (minUsers)</th>
-                      <th className="pb-3 text-start">إلى مستخدم (maxUsers)</th>
-                      <th className="pb-3 text-start">سعر المقعد (unitPrice USD)</th>
-                      <th className="pb-3 text-end">الإجراءات</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "المستوى" : "Tier"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "دورة الفوترة" : "Billing Cycle"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "من مقعد" : "Min Seats"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "إلى مقعد" : "Max Seats"}</th>
+                      <th className="pb-3 text-start">{lang === "ar" ? "سعر المقعد (USD)" : "Unit Price (USD)"}</th>
+                      <th className="pb-3 text-end">{lang === "ar" ? "الإجراءات" : "Actions"}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
                     {priceBrackets.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-8 text-center text-slate-400 font-sans">
-                          لا توجد فئات سعرية مطابقة للفلاتر المحددة (سجل فئة جديدة وابدأ من مقعد 1).
+                          {lang === "ar"
+                            ? "لا توجد فئات سعرية مطابقة للفلاتر المحددة."
+                            : "No matching price brackets found for selected filters."}
                         </td>
                       </tr>
                     ) : (
                       priceBrackets.map((p) => {
                         const matchedTier = tiers.find((t) => t.id === p.tierId);
+
+                        // Only allow delete for the LAST bracket in the sequence for tier & cycle
+                        const tierCycleBrackets = priceBrackets
+                          .filter((b) => b.tierId === p.tierId && b.billingCycle === p.billingCycle)
+                          .sort((a, b) => a.minUsers - b.minUsers);
+                        const isLastBracket = tierCycleBrackets.length > 0 && tierCycleBrackets[tierCycleBrackets.length - 1].id === p.id;
+
                         return (
                           <tr key={p.id} className="h-14 font-sans hover:bg-slate-50 dark:hover:bg-slate-800/40">
                             <td className="py-2.5 font-bold font-mono text-blue-600">
                               <div className="flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: matchedTier?.color || "#0b6ff4" }} />
-                                <span>{matchedTier?.tierKey || p.tierId}</span>
+                                <span>{matchedTier?.key || p.tierId}</span>
                               </div>
                             </td>
                             <td className="py-2.5 font-bold font-mono text-purple-600">{p.billingCycle}</td>
@@ -676,14 +738,35 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                             </td>
                             <td className="py-2.5 font-mono font-extrabold text-emerald-600 dark:text-emerald-400">${p.unitPriceUsd} USD / user</td>
                             <td className="py-2.5 text-end">
-                              <button
-                                type="button"
-                                onClick={() => handleDeletePriceBracket(p.id)}
-                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
-                                title="حذف الفئة السعرية"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingPriceBracket({ ...p })}
+                                  className="px-2.5 py-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
+                                  title={lang === "ar" ? "تعديل الفئة السعرية" : "Edit Price Bracket"}
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                  <span>{lang === "ar" ? "تعديل" : "Edit"}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={!isLastBracket}
+                                  onClick={() => handleDeletePriceBracket(p.id)}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    isLastBracket
+                                      ? "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 cursor-pointer"
+                                      : "text-slate-300 dark:text-slate-700 cursor-not-allowed opacity-40"
+                                  }`}
+                                  title={
+                                    isLastBracket
+                                      ? (lang === "ar" ? "حذف الفئة السعرية" : "Delete Price Bracket")
+                                      : (lang === "ar" ? "يسمح فقط بحذف الفئة الأخيرة في التسلسل" : "Only the last bracket can be deleted")
+                                  }
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -710,119 +793,318 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
         )}
       </main>
 
-      {/* Add Price Bracket Modal with NestJS Validations */}
-      {isAddPriceBracketOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-              <DollarSign className="w-5 h-5 text-emerald-600" />
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  {lang === "ar" ? "إضافة فئة سعرية للمقاعد (PriceBracketDto)" : "Add Price Bracket"}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {lang === "ar" ? "قاعدة التحقق: الفئة الأولى تبدأ من 1، والفئة الأخيرة تكون ∞" : "Rule: First minUsers = 1, Final maxUsers = Infinity ∞"}
-                </p>
-              </div>
-            </div>
+      {/* Add Price Bracket Modal with Live Red Validation Highlights & Rules 1-4 */}
+      {isAddPriceBracketOpen && (() => {
+        const existingForTierAndCycle = priceBrackets
+          .filter((p) => p.tierId === newBracketTierId && p.billingCycle === newBracketCycle)
+          .sort((a, b) => a.minUsers - b.minUsers);
 
-            <form onSubmit={handleCreatePriceBracket} className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">المستوى (Tier)</label>
-                  <select
-                    value={newBracketTierId}
-                    onChange={(e) => setNewBracketTierId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border rounded-xl"
-                  >
-                    {tiers.map((tr) => (
-                      <option key={tr.id} value={tr.id}>{tr.tierName} ({tr.tierKey})</option>
-                    ))}
-                  </select>
+        const lastBracket = existingForTierAndCycle.length > 0 ? existingForTierAndCycle[existingForTierAndCycle.length - 1] : null;
+
+        // Rule 4: Infinity found -> Block adding new bracket
+        const hasInfinityPrevious = lastBracket !== null && lastBracket.maxUsers === null;
+
+        // Rule 1 & Rule 3: Expected Min Users calculation
+        const expectedMin = existingForTierAndCycle.length === 0 ? 1 : (lastBracket ? lastBracket.maxUsers! + 1 : 1);
+
+        const isMinValid = !hasInfinityPrevious && newBracketMinUsers === expectedMin;
+        const isMaxValid = newBracketIsInfinity || (newBracketMaxUsers !== null && newBracketMaxUsers > newBracketMinUsers);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 border border-emerald-200 dark:border-emerald-800">
+                    <DollarSign className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {lang === "ar" ? "إضافة فئة سعرية جديدة" : "Add New Price Bracket"}
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {lang === "ar" ? "تطبيق قواعد التسلسل والتحقق للمقاعد" : "Enforces seat ladder sequence & limits"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddPriceBracketOpen(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreatePriceBracket} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "المستوى" : "Tier Package"}
+                    </label>
+                    <select
+                      value={newBracketTierId}
+                      onChange={(e) => {
+                        const targetId = e.target.value;
+                        setNewBracketTierId(targetId);
+                        const existing = priceBrackets.filter((p) => p.tierId === targetId && p.billingCycle === newBracketCycle).sort((a, b) => a.minUsers - b.minUsers);
+                        if (existing.length === 0) {
+                          setNewBracketMinUsers(1);
+                          setNewBracketMaxUsers(10);
+                          setNewBracketIsInfinity(false);
+                        } else {
+                          const last = existing[existing.length - 1];
+                          if (last.maxUsers !== null) {
+                            setNewBracketMinUsers(last.maxUsers + 1);
+                            setNewBracketMaxUsers(last.maxUsers + 10);
+                            setNewBracketIsInfinity(false);
+                          }
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500"
+                    >
+                      {tiers.map((tr) => (
+                        <option key={tr.id} value={tr.id}>{tr.name} ({tr.key})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "دورة الفوترة" : "Billing Cycle"}
+                    </label>
+                    <select
+                      value={newBracketCycle}
+                      onChange={(e) => {
+                        const targetCycle = e.target.value as "MONTHLY" | "ANNUAL";
+                        setNewBracketCycle(targetCycle);
+                        const existing = priceBrackets.filter((p) => p.tierId === newBracketTierId && p.billingCycle === targetCycle).sort((a, b) => a.minUsers - b.minUsers);
+                        if (existing.length === 0) {
+                          setNewBracketMinUsers(1);
+                          setNewBracketMaxUsers(10);
+                          setNewBracketIsInfinity(false);
+                        } else {
+                          const last = existing[existing.length - 1];
+                          if (last.maxUsers !== null) {
+                            setNewBracketMinUsers(last.maxUsers + 1);
+                            setNewBracketMaxUsers(last.maxUsers + 10);
+                            setNewBracketIsInfinity(false);
+                          }
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="MONTHLY">{lang === "ar" ? "MONTHLY (شهري)" : "MONTHLY"}</option>
+                      <option value="ANNUAL">{lang === "ar" ? "ANNUAL (سنوي)" : "ANNUAL"}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "من مقعد *" : "Min Seats *"}
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={newBracketMinUsers}
+                      onChange={(e) => setNewBracketMinUsers(Number(e.target.value))}
+                      className={`w-full px-3 py-2 text-xs font-mono rounded-xl border transition-colors ${
+                        !isMinValid
+                          ? "bg-rose-50 border-rose-500 text-rose-900 dark:bg-rose-950/60 dark:border-rose-600 dark:text-rose-100 ring-2 ring-rose-500/50 font-extrabold"
+                          : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500"
+                      }`}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "إلى مقعد" : "Max Seats"}
+                    </label>
+                    <input
+                      type="number"
+                      disabled={newBracketIsInfinity}
+                      value={newBracketIsInfinity || newBracketMaxUsers === null ? "" : newBracketMaxUsers}
+                      onChange={(e) => setNewBracketMaxUsers(e.target.value === "" ? null : Number(e.target.value))}
+                      placeholder={newBracketIsInfinity ? "∞ Infinity" : "e.g. 50"}
+                      className={`w-full px-3 py-2 text-xs font-mono rounded-xl border transition-colors disabled:opacity-40 ${
+                        !isMaxValid
+                          ? "bg-rose-50 border-rose-500 text-rose-900 dark:bg-rose-950/60 dark:border-rose-600 dark:text-rose-100 ring-2 ring-rose-500/50 font-extrabold"
+                          : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-blue-600 dark:text-blue-400 select-none">
+                    <input
+                      type="checkbox"
+                      checked={newBracketIsInfinity}
+                      onChange={(e) => {
+                        setNewBracketIsInfinity(e.target.checked);
+                        if (e.target.checked) setNewBracketMaxUsers(null);
+                      }}
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span>{lang === "ar" ? "فئة غير محدودة المقاعد (∞ Infinity)" : "Unlimited / Open-ended Seats (∞ Infinity)"}</span>
+                  </label>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">دورة الفوترة (billingCycle)</label>
-                  <select
-                    value={newBracketCycle}
-                    onChange={(e) => setNewBracketCycle(e.target.value as any)}
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border rounded-xl"
-                  >
-                    <option value="MONTHLY">MONTHLY (شهري)</option>
-                    <option value="YEARLY">YEARLY (سنوي)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">من مستخدم (minUsers) *</label>
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    {lang === "ar" ? "سعر المقعد (USD) *" : "Seat Unit Price (USD) *"}
+                  </label>
                   <input
-                    type="number"
-                    min={1}
-                    value={newBracketMinUsers}
-                    onChange={(e) => setNewBracketMinUsers(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border rounded-xl"
+                    type="text"
+                    value={newBracketUnitPrice}
+                    onChange={(e) => setNewBracketUnitPrice(e.target.value)}
+                    placeholder="e.g. 15.0000"
+                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500"
                     required
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">إلى مستخدم (maxUsers)</label>
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddPriceBracketOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                  >
+                    {lang === "ar" ? "إلغاء" : "Cancel"}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={hasInfinityPrevious || !isMinValid || !isMaxValid}
+                    className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl shadow-md cursor-pointer transition-colors"
+                  >
+                    {lang === "ar" ? "إضافة الفئة السعرية" : "Add Price Bracket"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Section 6: Audit Log (Changes History) */}
+      {activeTab === "history" && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <History className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span>{lang === "ar" ? "سجل التغييرات وعمليات التدقيق (Audit Log History)" : "Module Audit Log & Changes History"}</span>
+              </h3>
+
+              {/* Filter and Search controls */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 rtl:left-auto rtl:right-3" />
                   <input
-                    type="number"
-                    disabled={newBracketIsInfinity}
-                    value={newBracketIsInfinity || newBracketMaxUsers === null ? "" : newBracketMaxUsers}
-                    onChange={(e) => setNewBracketMaxUsers(e.target.value === "" ? null : Number(e.target.value))}
-                    placeholder={newBracketIsInfinity ? "مفتوح ∞" : "e.g. 50"}
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border rounded-xl disabled:opacity-50"
+                    type="text"
+                    value={auditSearch}
+                    onChange={(e) => setAuditSearch(e.target.value)}
+                    placeholder={lang === "ar" ? "بحث بالسجل..." : "Search history..."}
+                    className="pl-8 pr-3 rtl:pl-3 rtl:pr-8 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400"
                   />
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={newBracketIsInfinity}
-                    onChange={(e) => {
-                      setNewBracketIsInfinity(e.target.checked);
-                      if (e.target.checked) setNewBracketMaxUsers(null);
-                    }}
-                    className="w-4 h-4 rounded text-blue-600"
-                  />
-                  <span>فئة مفتوحة السقف المالانهاية (maxUsers = Infinity ∞ / null)</span>
-                </label>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">سعر المستخدم الفردي ($ USD / unitPrice) *</label>
-                <input
-                  type="text"
-                  value={newBracketUnitPrice}
-                  onChange={(e) => setNewBracketUnitPrice(e.target.value)}
-                  placeholder="e.g. 12.50"
-                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border rounded-xl"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddPriceBracketOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl"
+                <select
+                  value={auditFilter}
+                  onChange={(e) => setAuditFilter(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium"
                 >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md"
-                >
-                  حفظ الفئة السعرية
-                </button>
+                  <option value="ALL">{lang === "ar" ? "جميع الأحداث" : "All Categories"}</option>
+                  <option value="MODULE">MODULE</option>
+                  <option value="TIER">TIER</option>
+                  <option value="FEATURE">FEATURE</option>
+                  <option value="GRANT">GRANT</option>
+                  <option value="PRICE">PRICE</option>
+                </select>
               </div>
-            </form>
+            </div>
+
+            {/* Timeline View */}
+            {(() => {
+              const filteredLogs = auditLogs.filter((log) => {
+                const matchesCat = auditFilter === "ALL" || log.entityType === auditFilter;
+                const matchesQuery = !auditSearch || 
+                  log.action.toLowerCase().includes(auditSearch.toLowerCase()) ||
+                  (log.actorLabel && log.actorLabel.toLowerCase().includes(auditSearch.toLowerCase()));
+                return matchesCat && matchesQuery;
+              });
+
+              if (filteredLogs.length === 0) {
+                return (
+                  <div className="py-12 text-center text-slate-400">
+                    {lang === "ar" ? "لا توجد سجلات تدقيق مطابقة." : "No matching audit log entries found."}
+                  </div>
+                );
+              }
+
+              return (
+                <div className="relative pl-6 rtl:pl-0 rtl:pr-6 border-l-2 rtl:border-l-0 rtl:border-r-2 border-slate-200 dark:border-slate-800 space-y-6 my-2">
+                  {filteredLogs.map((log) => (
+                    <div key={log.id} className="relative group">
+                      {/* Timeline Bullet Dot */}
+                      <div className={`absolute -left-[31px] rtl:-left-auto rtl:-right-[31px] top-1.5 w-4 h-4 rounded-full border-2 bg-white dark:bg-slate-900 ${
+                        log.entityType === "MODULE" || log.entityType === "MODULE_ORDER" ? "border-blue-500 text-blue-500" :
+                        log.entityType === "TIER" ? "border-emerald-500 text-emerald-500" :
+                        log.entityType === "FEATURE" ? "border-purple-500 text-purple-500" :
+                        log.entityType === "PRICE_LADDER" ? "border-amber-500 text-amber-500" :
+                        "border-cyan-500 text-cyan-500"
+                      }`} />
+
+                      <div className="bg-slate-50/60 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/80 p-4 rounded-2xl border border-slate-200/60 dark:border-slate-800 transition-all space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`px-2.5 py-0.5 text-[10px] font-extrabold font-mono rounded-md ${
+                              log.entityType === "MODULE" || log.entityType === "MODULE_ORDER" ? "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400" :
+                              log.entityType === "TIER" ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400" :
+                              log.entityType === "FEATURE" ? "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400" :
+                              log.entityType === "PRICE_LADDER" ? "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400" :
+                              "bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400"
+                            }`}>
+                              {log.action}
+                            </span>
+                            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                              {log.actorLabel || "System"}
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                            <span>{new Date(log.occurredAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+
+                        {log.diff && log.diff.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {log.diff.map((c, idx) => {
+                              const beforeStr = typeof c.before === 'object' ? JSON.stringify(c.before) : String(c.before ?? "null");
+                              const afterStr = typeof c.after === 'object' ? JSON.stringify(c.after) : String(c.after ?? "null");
+                              return (
+                                <span key={idx} className="text-[11px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-600 dark:text-slate-400 font-mono">
+                                  {c.field}: <span className="line-through text-slate-400 me-1">{beforeStr}</span> &rarr; <span className="font-semibold text-slate-900 dark:text-slate-200">{afterStr}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-4 text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-200/40 dark:border-slate-800/40 mt-2">
+                          {log.sourceType && <span>Source: {log.sourceType}</span>}
+                          {log.correlationId && <span>Correlation: {log.correlationId}</span>}
+                          {log.operationId && <span>Operation: {log.operationId}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -844,7 +1126,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                 <textarea
                   value={importJsonText}
                   onChange={(e) => setImportJsonText(e.target.value)}
-                  placeholder={`[\n  { "key": "${id}.custom_1", "name": "Feature Name", "valueType": "BOOLEAN", "defaultValue": "true" }\n]`}
+                  placeholder={`[\n  { "key": "${id}.custom_1", "name": "Feature Name", "key": "BOOLEAN", "key": "true" }\n]`}
                   rows={8}
                   className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border rounded-xl"
                   required
@@ -968,11 +1250,15 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Edit className="w-4 h-4 text-blue-600" />
-                <span>تعديل بيانات المستوى ({editingTier.tierKey})</span>
+                <span>تعديل بيانات المستوى ({editingTier.key})</span>
               </h3>
               <button
                 type="button"
-                onClick={() => handleDeleteTier(editingTier.id)}
+                onClick={() => {
+                  setDeletingTierTarget(editingTier);
+                  setDeleteTierConfirmKeyInput("");
+                  setEditingTier(null);
+                }}
                 className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
                 title="حذف المستوى"
               >
@@ -985,8 +1271,8 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">اسم المستوى (name)</label>
                 <input
                   type="text"
-                  value={editingTier.tierName}
-                  onChange={(e) => setEditingTier({ ...editingTier, tierName: e.target.value })}
+                  value={editingTier.name}
+                  onChange={(e) => setEditingTier({ ...editingTier, name: e.target.value })}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-xl"
                   required
                 />
@@ -1145,7 +1431,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Edit className="w-4 h-4 text-amber-600" />
-                <span>تعديل الميزة ({editingFeature.featureKey})</span>
+                <span>تعديل الميزة ({editingFeature.key})</span>
               </h3>
               <button
                 type="button"
@@ -1162,8 +1448,8 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">اسم الميزة (name)</label>
                 <input
                   type="text"
-                  value={editingFeature.featureName}
-                  onChange={(e) => setEditingFeature({ ...editingFeature, featureName: e.target.value })}
+                  value={editingFeature.name}
+                  onChange={(e) => setEditingFeature({ ...editingFeature, name: e.target.value })}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-xl"
                   required
                 />
@@ -1172,7 +1458,7 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">الوصف</label>
                 <textarea
-                  value={editingFeature.description}
+                  value={editingFeature.description || ""}
                   onChange={(e) => setEditingFeature({ ...editingFeature, description: e.target.value })}
                   rows={2}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-xl"
@@ -1198,6 +1484,228 @@ export default function ModuleDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       )}
+
+      {/* Delete Tier Confirmation Modal (Confirm by key) */}
+      {deletingTierTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  {lang === "ar"
+                    ? `تأكيد حذف المستوى (${deletingTierTarget.key})`
+                    : `Confirm Delete Tier (${deletingTierTarget.key})`}
+                </h3>
+                <p className="text-xs text-rose-600 dark:text-rose-400 font-medium mt-0.5">
+                  {lang === "ar"
+                    ? "إجراء حساس: سيتم إزالة هذا المستوى نهائياً."
+                    : "Sensitive action: This tier will be deleted permanently."}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                {lang === "ar"
+                  ? `لتأكيد عملية الحذف، يرجى كتابة رمز المستوى البرمجي`
+                  : `To confirm deletion, please type the exact tier key`}{" "}
+                <span className="font-mono font-extrabold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/80 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-800">
+                  {deletingTierTarget.key}
+                </span>{" "}
+                {lang === "ar" ? "أدناه:" : "below:"}
+              </p>
+
+              <input
+                type="text"
+                value={deleteTierConfirmKeyInput}
+                onChange={(e) => setDeleteTierConfirmKeyInput(e.target.value)}
+                placeholder={deletingTierTarget.key}
+                className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setDeletingTierTarget(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              >
+                {lang === "ar" ? "إلغاء الإجراء" : "Cancel"}
+              </button>
+
+              <button
+                type="button"
+                disabled={deleteTierConfirmKeyInput !== deletingTierTarget.key}
+                onClick={async () => {
+                  await handleDeleteTier(deletingTierTarget.id);
+                  setDeletingTierTarget(null);
+                }}
+                className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl shadow-md cursor-pointer transition-colors inline-flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{lang === "ar" ? "حذف المستوى الآن" : "Delete Tier Now"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Edit Price Bracket Modal */}
+      {editingPriceBracket && (() => {
+        const otherBrackets = priceBrackets
+          .filter((p) => p.id !== editingPriceBracket.id && p.tierId === editingPriceBracket.tierId && p.billingCycle === editingPriceBracket.billingCycle)
+          .sort((a, b) => a.minUsers - b.minUsers);
+
+        const isMinValid = editingPriceBracket.minUsers >= 1;
+        const isMaxValid = editingPriceBracket.maxUsers === null || editingPriceBracket.maxUsers > editingPriceBracket.minUsers;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Edit className="w-4 h-4 text-emerald-600" />
+                  <span>{lang === "ar" ? "تعديل الفئة السعرية" : "Edit Price Bracket"}</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setEditingPriceBracket(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdatePriceBracket} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "المستوى" : "Tier Package"}
+                    </label>
+                    <select
+                      value={editingPriceBracket.tierId}
+                      onChange={(e) => setEditingPriceBracket({ ...editingPriceBracket, tierId: e.target.value })}
+                      className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500"
+                    >
+                      {tiers.map((tr) => (
+                        <option key={tr.id} value={tr.id}>{tr.name} ({tr.key})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "دورة الفوترة" : "Billing Cycle"}
+                    </label>
+                    <select
+                      value={editingPriceBracket.billingCycle}
+                      onChange={(e) => setEditingPriceBracket({ ...editingPriceBracket, billingCycle: e.target.value as any })}
+                      className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="MONTHLY">{lang === "ar" ? "MONTHLY (شهري)" : "MONTHLY"}</option>
+                      <option value="ANNUAL">{lang === "ar" ? "ANNUAL (سنوي)" : "ANNUAL"}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "من مقعد *" : "Min Seats *"}
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={editingPriceBracket.minUsers}
+                      onChange={(e) => setEditingPriceBracket({ ...editingPriceBracket, minUsers: Number(e.target.value) })}
+                      className={`w-full px-3 py-2 text-xs font-mono rounded-xl border transition-colors ${
+                        !isMinValid
+                          ? "bg-rose-50 border-rose-500 text-rose-900 dark:bg-rose-950/60 dark:border-rose-600 dark:text-rose-100 ring-2 ring-rose-500/50 font-extrabold"
+                          : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500"
+                      }`}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "إلى مقعد" : "Max Seats"}
+                    </label>
+                    <input
+                      type="number"
+                      disabled={editingPriceBracket.maxUsers === null}
+                      value={editingPriceBracket.maxUsers === null ? "" : editingPriceBracket.maxUsers}
+                      onChange={(e) =>
+                        setEditingPriceBracket({
+                          ...editingPriceBracket,
+                          maxUsers: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      placeholder="∞ Infinity"
+                      className={`w-full px-3 py-2 text-xs font-mono rounded-xl border transition-colors disabled:opacity-40 ${
+                        !isMaxValid
+                          ? "bg-rose-50 border-rose-500 text-rose-900 dark:bg-rose-950/60 dark:border-rose-600 dark:text-rose-100 ring-2 ring-rose-500/50 font-extrabold"
+                          : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-blue-600 dark:text-blue-400 select-none">
+                    <input
+                      type="checkbox"
+                      checked={editingPriceBracket.maxUsers === null}
+                      onChange={(e) =>
+                        setEditingPriceBracket({
+                          ...editingPriceBracket,
+                          maxUsers: e.target.checked ? null : editingPriceBracket.minUsers + 9,
+                        })
+                      }
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span>{lang === "ar" ? "فئة غير محدودة المقاعد (∞ Infinity)" : "Unlimited / Open-ended Seats (∞ Infinity)"}</span>
+                  </label>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    {lang === "ar" ? "سعر المقعد (USD) *" : "Seat Unit Price (USD) *"}
+                  </label>
+                  <input
+                    type="text"
+                    value={editingPriceBracket.unitPriceUsd ?? ""}
+                    onChange={(e) => setEditingPriceBracket({ ...editingPriceBracket, unitPriceUsd: e.target.value })}
+                    placeholder="e.g. 15.0000"
+                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setEditingPriceBracket(null)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                  >
+                    {lang === "ar" ? "إلغاء" : "Cancel"}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!isMinValid || !isMaxValid}
+                    className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl shadow-md cursor-pointer transition-colors"
+                  >
+                    {lang === "ar" ? "حفظ التعديلات" : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

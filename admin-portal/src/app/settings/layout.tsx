@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { SettingsSidebar } from "./components/SettingsSidebar";
+import { RequirePermission } from "@/components/auth/RequirePermission";
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   return (
@@ -11,7 +12,9 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
         <SettingsSidebar />
 
         <div className="flex-1 min-w-0">
-          {children}
+          <RequirePermission permission="admin.settings.read">
+            {children}
+          </RequirePermission>
         </div>
       </main>
     </div>

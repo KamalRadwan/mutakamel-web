@@ -1,130 +1,79 @@
-# Roles & Permissions API
+# Admin Roles and Permissions API
 
-Browser prefix: `/api/admin/core/v1`. The `/admin/...` forms below are Core
-controller-relative paths, not browser request URLs.
+Status: **Verified backend contract; frontend DONE/PARTIAL/REFACTOR**
 
-## Admin Roles — `/admin/roles`
+Last source verification: **2026-07-30**
 
-Base Path: `admin/roles`
-Guard: `AdminGuard`
+Owner: **Core**
 
----
+## Routes
 
-### POST `/admin/roles` — Create Admin Role
+| Method and canonical browser path | Permissions | Success |
+| --- | --- | ---: |
+| `POST /api/admin/core/v1/roles` | `admin.roles.create` + `admin.roles.critical` | `201` |
+| `GET /api/admin/core/v1/roles` | `admin.roles.read` | `200` |
+| `GET /api/admin/core/v1/roles/:id` | `admin.roles.read` | `200` |
+| `PATCH /api/admin/core/v1/roles/:id` | `admin.roles.update` | `200` |
+| `PATCH /api/admin/core/v1/roles/:id/permissions` | `admin.roles.update` + `admin.roles.critical` | `200` |
+| `DELETE /api/admin/core/v1/roles/:id` | `admin.roles.delete` + `admin.roles.critical` | `204` |
+| `GET /api/admin/core/v1/permissions` | `admin.permissions.read` | `200` |
 
-**Permission**: `admin.roles.create`
-**HTTP Status**: 201
+Permission pairs use ALL semantics.
 
-#### Request Body — `CreateAdminRoleDto`
-```typescript
-{
-  name: string;           // Role name (unique)
-  description?: string;   // Optional description
-  type: AdminTierEnum;    // 'SUPER_ADMIN' | 'ADMIN' | 'USER'
-  permissionIds?: string[]; // Initial permission set (UUIDs)
-}
-```
+## Critical distinction
 
----
+Ordinary role metadata update requires only `admin.roles.update`. Do not
+over-restrict it with `admin.roles.critical`. Replacing the permission set is
+critical and requires both permissions.
 
-### GET `/admin/roles` — List Admin Roles
+## Role DTOs
 
-**Permission**: `admin.roles.read`
-**HTTP Status**: 200
-
-#### Query Parameters — `AdminRoleQueryDto`
-```typescript
-{
-  page?: number;
-  limit?: number;
-  sortBy?: string;       // default: 'createdAt'
-  sortDir?: 'ASC' | 'DESC';
-  search?: string;
-  type?: AdminTierEnum;  // 'SUPER_ADMIN' | 'ADMIN' | 'USER'
-  isSystem?: 'true' | 'false'; // Filter seeded vs custom roles
-}
-```
-
----
-
-### GET `/admin/roles/:id` — Get Admin Role
-
-**Permission**: `admin.roles.read`
-**HTTP Status**: 200
-
----
-
-### PATCH `/admin/roles/:id` — Update Admin Role
-
-**Permission**: `admin.roles.update`
-**HTTP Status**: 200
-
-#### Request Body — `UpdateAdminRoleDto`
-```typescript
-{
-  name?: string;
+```ts
+interface CreateAdminRoleDto {
+  name: string;
   description?: string;
+  permissionIds?: string[];
+}
+
+interface UpdateAdminRoleDto {
+  name?: string;
+  description?: string | null;
+}
+
+interface SetRolePermissionsDto {
+  permissionIds: string[]; // complete replacement, UUIDv7 values
 }
 ```
 
-#### Frontend Notes
-- System roles cannot be edited
-- Permission membership is changed via dedicated endpoint
+Read exact validation limits from the current DTOs before implementing a form.
+Strict Core validation rejects unknown fields.
 
----
+## List and catalogue
 
-### PUT `/admin/roles/:id/permissions` — Replace Role Permissions
+Role list uses Core pagination; rows are under `data` and totals under
+`meta.total`. The permission catalogue is read-only and seeded by Core. Render
+permission keys as the transport identity; localized labels are presentation
+only.
 
-**Permission**: `admin.roles.update`
-**HTTP Status**: 200
+## Mutations
 
-#### Request Body — `SetRolePermissionsDto`
-```typescript
-{
-  permissionIds: string[]; // Full replacement set of permission UUIDs
-}
-```
+- Permission replacement submits the complete desired set.
+- Empty permission IDs clear assignable permissions when backend invariants
+  allow it.
+- System roles and assigned roles can reject update/delete.
+- Role/permission changes can invalidate affected sessions.
+- Delete returns `204` with no body.
+- Retain one UUIDv7 key for one exact retry of a write-sensitive intent.
 
-#### Frontend Notes
-- Full replacement save from permissions matrix
-- Empty array clears all permissions
-- Invalidates sessions for affected role holders
+## Current frontend status
 
----
+`src/app/roles/` uses real Core role and permission calls. Remaining refactors
+include exact response types, explicit error/data states, stable mutation
+intents, and avoiding critical over-restriction for ordinary metadata updates.
 
-### DELETE `/admin/roles/:id` — Delete Admin Role
+## Source map
 
-**Permission**: `admin.roles.delete`
-**HTTP Status**: 204
-
-#### Frontend Notes
-- Cannot delete system roles
-- Cannot delete roles still assigned to users
-- Use destructive confirmation UI
-
----
-
-## Admin Permissions — `/admin/permissions`
-
-### GET `/admin/permissions` — List Permission Catalogue
-
-**Permission**: `admin.permissions.read`
-**HTTP Status**: 200
-
-#### Response
-```typescript
-Array<{
-  id: string;
-  key: string;        // e.g. 'admin.tenants.create'
-  group: string;      // e.g. 'tenants'
-  labelAr: string;
-  labelEn: string;
-  descriptionAr: string;
-  descriptionEn: string;
-}>
-```
-
-#### Frontend Notes
-- Read-only seeded catalogue (no write API)
-- Use to render role-management permission matrices
-- Cache briefly, refresh after deployments
+- `../backend/mutakamel-apps/core-app/src/admin/admin-roles/admin-roles.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/admin-roles/admin-permissions.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/admin-roles/dto/`
+- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`

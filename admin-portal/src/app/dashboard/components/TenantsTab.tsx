@@ -1,124 +1,77 @@
 "use client";
 
-import { Building2, Globe, ShieldCheck, Users, Server, CreditCard, Activity, TrendingUp, Trash2 } from "lucide-react";
+import { Building2, Globe, ShieldCheck, Users, Trash2, TrendingUp } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { DashboardBreakdownItem, DashboardMetricTone, DashboardMetric } from "@/types/dashboard";
-import { toneToColorClass, formatDashboardMetric } from "../utils/formatters";
-import { SparklineChart } from "./charts/SparklineChart";
-import { TenantStatusDonutChart } from "./charts/TenantStatusDonutChart";
+import { DashboardResponse } from "@/types/dashboard";
 import { RegionalDistributionBarChart } from "./charts/RegionalDistributionBarChart";
 import { DomainHealthGaugeChart } from "./charts/DomainHealthGaugeChart";
-import { TenantGrowthRevenueChart } from "./charts/TenantGrowthRevenueChart";
-import { TenantTreemapChart } from "./charts/TenantTreemapChart";
-import { DashboardViewMode } from "./DashboardHeader";
 
 interface TenantsTabProps {
-  lifecycle: {
-    total: number;
-    current: number;
-    deleted: number;
-    items: DashboardBreakdownItem[];
-    stats: any[]; // Or DashboardMetric[]
-  };
-
-  domainHealth: {
-    totalDomains: number;
-    verifiedDomains: number;
-    unverifiedDomains?: number;
-    invalidDomains: number;
-    regions: Array<{
-      key: string;
-      countryName: string;
-      countryIsoCode: string;
-      count: number;
-      ratio: number; // 0..1
-      tone: DashboardMetricTone;
-    }>;
-  };
-  tenantStatus: {
-    title: string;
-    subtitle: string;
-    items: Array<{
-      key: string;
-      label: string;
-      count: number;
-      description: string;
-      ratio: number; // 0..1
-      tone: DashboardMetricTone;
-    }>;
-  };
-  subscriptionStatus?: any;
-  billingGrowth?: any;
-  databaseCapacity?: any;
+  lifecycle: DashboardResponse["overview"]["tenantLifecycle"];
+  domainHealth: DashboardResponse["overview"]["domainHealth"];
+  tenantStatus: DashboardResponse["panels"]["tenantStatus"];
 }
 
 export function TenantsTab({ 
   lifecycle, 
   domainHealth, 
-  tenantStatus, 
-  subscriptionStatus,
-  billingGrowth,
-  databaseCapacity
+  tenantStatus,
 }: TenantsTabProps) {
   const { t, lang } = useI18n();
-
-  // Helper for KPI Icons
-  const getKpiIcon = (key: string) => {
-    const k = key.toLowerCase();
-    if (k.includes("user") || k.includes("staff")) return <Users className="w-4 h-4" />;
-    if (k.includes("server") || k.includes("db") || k.includes("capacity")) return <Server className="w-4 h-4" />;
-    if (k.includes("revenue") || k.includes("bill") || k.includes("invoice")) return <CreditCard className="w-4 h-4" />;
-    if (k.includes("active") || k.includes("health")) return <Activity className="w-4 h-4" />;
-    return <Building2 className="w-4 h-4" />;
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
 
-      {/* Net Acquisition vs Churn Visualizer (Full Width - Top) */}
+      {/* Tenant lifecycle snapshot */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>Net Tenant Acquisition vs. Churn</span>
+            <span>{lang === "ar" ? "ملخص دورة حياة المستأجرين" : "Tenant Lifecycle Snapshot"}</span>
           </h3>
           <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-200/60 dark:border-emerald-800/60">
-            Selected Range
+            {lang === "ar" ? "حتى الآن" : "As of now"}
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
           <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 rounded-xl space-y-1">
             <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
-              <span>New Tenants Joined</span>
+              <span>{lang === "ar" ? "المستأجرون الحاليون" : "Current Tenants"}</span>
               <Users className="w-3.5 h-3.5" />
             </div>
             <div className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono">
-              +{lifecycle.current || 0}
+              {lifecycle.current}
             </div>
-            <p className="text-[10px] text-emerald-600 dark:text-emerald-400">Newly provisioned in range</p>
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+              {lang === "ar" ? "جميع السجلات غير المحذوفة" : "All non-deleted tenant records"}
+            </p>
           </div>
 
           <div className="p-4 bg-red-50/50 dark:bg-red-950/20 border border-red-200/60 dark:border-red-900/40 rounded-xl space-y-1">
             <div className="text-xs font-semibold text-red-700 dark:text-red-400 flex items-center justify-between">
-              <span>Churned / Deleted</span>
+              <span>{lang === "ar" ? "المحذوفون" : "Deleted Tenants"}</span>
               <Trash2 className="w-3.5 h-3.5" />
             </div>
             <div className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono">
-              -{lifecycle.deleted || 0}
+              {lifecycle.deleted}
             </div>
-            <p className="text-[10px] text-red-600 dark:text-red-400">Decommissioned tenants</p>
+            <p className="text-[10px] text-red-600 dark:text-red-400">
+              {lang === "ar" ? "إجمالي الحذف عبر الزمن" : "All-time soft-deleted records"}
+            </p>
           </div>
 
           <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 rounded-xl space-y-1">
             <div className="text-xs font-semibold text-blue-700 dark:text-blue-400 flex items-center justify-between">
-              <span>Net Growth</span>
+              <span>{lang === "ar" ? "إجمالي دورة الحياة" : "Lifecycle Total"}</span>
               <Building2 className="w-3.5 h-3.5" />
             </div>
             <div className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono">
-              {(lifecycle.current || 0) - (lifecycle.deleted || 0)}
+              {lifecycle.total}
             </div>
-            <p className="text-[10px] text-blue-600 dark:text-blue-400">Net active tenant delta</p>
+            <p className="text-[10px] text-blue-600 dark:text-blue-400">
+              {lang === "ar" ? "الحاليون + المحذوفون" : "Current plus deleted tenants"}
+            </p>
           </div>
         </div>
       </div>
@@ -143,13 +96,14 @@ export function TenantsTab({
         {/* 100% Stacked Horizontal Distribution Progress Bar */}
         <div className="space-y-1.5">
           <div className="flex justify-between text-[11px] font-semibold text-slate-400">
-            <span>Overall Lifecycle Distribution</span>
-            <span>{lifecycle.total > 0 ? `${lifecycle.total} Total` : "No Active Tenants"}</span>
+            <span>{lang === "ar" ? "توزيع الحالة الحالية" : "Current Status Distribution"}</span>
+            <span>{lifecycle.current > 0 ? `${lifecycle.current} Current` : "No Current Tenants"}</span>
           </div>
           <div className="h-3.5 w-full bg-slate-100 dark:bg-slate-800/80 rounded-full overflow-hidden flex p-0.5 border border-slate-200/50 dark:border-slate-800 gap-0.5">
             {(() => {
               const items = tenantStatus?.items || [];
-              const total = lifecycle.total || items.reduce((acc, i) => acc + i.count, 0);
+              const total =
+                lifecycle.current || items.reduce((acc, i) => acc + i.count, 0);
 
               const colorMap: Record<string, string> = {
                 green: "bg-emerald-500",
@@ -190,7 +144,6 @@ export function TenantsTab({
               { key: "PROVISIONING", label: "Provisioning", description: "Environments being set up", tone: "blue", count: 0, ratio: 0 },
               { key: "SUSPENDED", label: "Suspended", description: "Temporarily suspended tenants", tone: "amber", count: 0, ratio: 0 },
               { key: "FAILED", label: "Failed", description: "Setup or provisioning failed", tone: "red", count: 0, ratio: 0 },
-              { key: "DELETED", label: "Deleted / Archiving", description: "Decommissioned tenants", tone: "purple", count: 0, ratio: 0 },
             ];
 
             // Ensure all statuses are displayed even if backend returned 0 items

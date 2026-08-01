@@ -15,52 +15,76 @@ const DTMF_FREQUENCIES: Record<string, [number, number]> = {
   "#": [941, 1477],
 };
 
+type WebAudioWindow = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
+
 let audioCtx: AudioContext | null = null;
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass =
+      window.AudioContext ?? (window as WebAudioWindow).webkitAudioContext;
     if (AudioContextClass) {
       audioCtx = new AudioContextClass();
     }
   }
   if (audioCtx && audioCtx.state === "suspended") {
-    audioCtx.resume();
+    void audioCtx.resume().catch(() => undefined);
   }
   return audioCtx;
 }
 
-export function playDtmfTone(char: string, duration = 0.12) {
+export function playDtmfTone(
+  char: string,
+  volume = 100,
+  duration = 0.12,
+) {
   const freqs = DTMF_FREQUENCIES[char];
-  if (!freqs) return;
+  if (!freqs || volume <= 0) return;
 
   const ctx = getAudioContext();
   if (!ctx) return;
 
-  const [lowFreq, highFreq] = freqs;
+  try {
+    const [lowFreq, highFreq] = freqs;
+    const start = ctx.currentTime + 0.01;
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    const toneVolume = Math.max(0.02, Math.min(0.12, volume / 850));
 
-  const osc1 = ctx.createOscillator();
-  const osc2 = ctx.createOscillator();
-  const gainNode = ctx.createGain();
+    osc1.type = "sine";
+    osc2.type = "sine";
+    osc1.frequency.setValueAtTime(lowFreq, start);
+    osc2.frequency.setValueAtTime(highFreq, start);
+    gainNode.gain.setValueAtTime(0.0001, start);
+    gainNode.gain.exponentialRampToValueAtTime(
+      toneVolume,
+      start + 0.015,
+    );
+    gainNode.gain.setValueAtTime(toneVolume, start + duration * 0.65);
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.0001,
+      start + duration,
+    );
 
-  osc1.type = "sine";
-  osc2.type = "sine";
+    osc1.connect(gainNode);
+    osc2.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    osc1.start(start);
+    osc2.start(start);
+    osc1.stop(start + duration + 0.01);
+    osc2.stop(start + duration + 0.01);
 
-  osc1.frequency.setValueAtTime(lowFreq, ctx.currentTime);
-  osc2.frequency.setValueAtTime(highFreq, ctx.currentTime);
-
-  // Set gain level (volume) to avoid clipping
-  gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-
-  osc1.connect(gainNode);
-  osc2.connect(gainNode);
-  gainNode.connect(ctx.destination);
-
-  osc1.start(ctx.currentTime);
-  osc2.start(ctx.currentTime);
-
-  osc1.stop(ctx.currentTime + duration);
-  osc2.stop(ctx.currentTime + duration);
+    window.setTimeout(() => {
+      osc1.disconnect();
+      osc2.disconnect();
+      gainNode.disconnect();
+    }, Math.ceil((duration + 0.08) * 1000));
+  } catch {
+    // DTMF feedback must never block keypad input or an active SIP call.
+  }
 }

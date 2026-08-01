@@ -11,7 +11,6 @@ import {
   CartesianGrid,
 } from "recharts";
 import { ChartTooltip } from "./ChartTooltip";
-import { useI18n } from "@/i18n/I18nContext";
 
 export interface MRRStackDataPoint {
   month: string;
@@ -26,8 +25,6 @@ interface Props {
 }
 
 export function SubscriptionMRRStackChart({ data, height = 280 }: Props) {
-  const { lang } = useI18n();
-
   return (
     <div style={{ height, width: "100%" }}>
       <ResponsiveContainer width="100%" height="100%">

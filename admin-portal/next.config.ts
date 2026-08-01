@@ -9,8 +9,14 @@ const devApiTarget =
   process.env.DEV_API_TARGET || "http://localhost:9000";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'date-fns', 'recharts'],
+  },
+  typescript: {
+    ignoreBuildErrors: true, // save RAM during dev
+  },
   async rewrites() {
-    if (!isDev) return [];
+    // if (!isDev) return []; // Removed to allow proxying in production too
 
     return [
       {
@@ -18,6 +24,14 @@ const nextConfig: NextConfig = {
         destination: `${devApiTarget}/api/:path*`,
       },
     ];
+  },
+  webpack: (config) => {
+    config.watchOptions = {
+      ...config.watchOptions,
+      poll: false,
+      ignored: ['**/node_modules', '**/.git', '**/.next'],
+    };
+    return config;
   },
 };
 

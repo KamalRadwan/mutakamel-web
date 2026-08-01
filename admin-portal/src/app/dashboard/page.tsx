@@ -14,12 +14,14 @@ import { useI18n } from "@/i18n/I18nContext";
 import { KpiCard } from "./components/KpiCard";
 
 export default function DashboardPage() {
-  const { t, lang } = useI18n();
+  const { lang } = useI18n();
   const {
     activeTab,
     setActiveTab,
     rangePreset,
     setRangePreset,
+    customRange,
+    setCustomRange,
     autoRefreshInterval,
     setAutoRefreshInterval,
     data,
@@ -60,6 +62,8 @@ export default function DashboardPage() {
           onRefresh={handleRefresh}
           rangePreset={rangePreset}
           onRangeChange={setRangePreset}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
           autoRefreshInterval={autoRefreshInterval}
           onAutoRefreshChange={setAutoRefreshInterval}
         />
@@ -94,10 +98,11 @@ export default function DashboardPage() {
             {activeTab === "overview" && (
               <OverviewTab
                 data={{
-                  kpis: data.overview.kpis as any,
-                  recentTenants: data.overview.recentTenants.items as any,
-                  billingGrowth: data.overview.tenantBillingGrowth as any,
-                  subscriptionStatus: data.overview.subscriptionStatus as any,
+                  kpis: data.overview.kpis,
+                  recentTenants: data.overview.recentTenants.items,
+                  billingGrowth: data.overview.tenantBillingGrowth,
+                  subscriptionStatus: data.overview.subscriptionStatus,
+                  platformHealth: data.analytics?.platformHealth,
                 }}
               />
             )}
@@ -179,50 +184,32 @@ export default function DashboardPage() {
                 {/* Specific Layout Fallbacks for Known Sections */}
                 {activeTab === "tenants" && (
                   <TenantsTab
-                    lifecycle={data.overview.tenantLifecycle as any}
-                    domainHealth={data.overview.domainHealth as any}
-                    tenantStatus={data.panels.tenantStatus as any}
-                    subscriptionStatus={data.overview.subscriptionStatus as any}
-                    billingGrowth={data.overview.tenantBillingGrowth as any}
-                    databaseCapacity={data.panels.databaseCapacity as any}
+                    lifecycle={data.overview.tenantLifecycle}
+                    domainHealth={data.overview.domainHealth}
+                    tenantStatus={data.panels.tenantStatus}
                   />
                 )}
 
                 {activeTab === "databaseServers" && (
                   <ServersTab
-                    servers={data.panels.databaseCapacity.items as any}
+                    analytics={data.analytics?.servers}
                     extraCards={data.sections.find((s) => s.key === "databaseServers")?.cards.slice(6) || []}
                   />
                 )}
 
-                {activeTab === "invoices" && (() => {
-                  // Map Invoice Status from API if available
-                  const bItems = data.overview.billingSummary?.items || [];
-                  const getVal = (k: string) => bItems.find((i) => i.key.toLowerCase().includes(k))?.value || 0;
-                  
-                  const invoiceStatusData = bItems.length > 0 
-                    ? { paid: getVal("paid"), outstanding: getVal("outstand"), overdue: getVal("overdue") }
-                    : undefined;
-
-                  // Map Cash Flow from tenantBillingGrowth
-                  const growthPoints = data.overview.tenantBillingGrowth?.points || [];
-                  const cashFlowData = growthPoints.length > 0
-                    ? growthPoints.map(p => ({ month: p.month, expected: p.collected * 1.1, actual: p.collected }))
-                    : undefined;
-
-                  return (
-                    <BillingTab 
-                      summary={data.overview.billingSummary as any} 
-                      extraCards={data.sections.find((s) => s.key === "invoices")?.cards || []}
-                      invoiceStatusData={invoiceStatusData}
-                      cashFlowData={cashFlowData}
-                    />
-                  );
-                })()}
+                {activeTab === "invoices" && (
+                  <BillingTab
+                    summary={data.overview.billingSummary}
+                    extraCards={
+                      data.sections.find((s) => s.key === "invoices")?.cards || []
+                    }
+                    analytics={data.analytics?.billing}
+                  />
+                )}
                 {activeTab === "subscriptions" && (
-                  <SubscriptionsTab 
-                    subscriptionStatus={data.overview.subscriptionStatus as any} 
-                    billingGrowth={data.overview.tenantBillingGrowth as any}
+                  <SubscriptionsTab
+                    subscriptionStatus={data.overview.subscriptionStatus}
+                    analytics={data.analytics?.subscriptions}
                   />
                 )}
               </div>
@@ -233,4 +220,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

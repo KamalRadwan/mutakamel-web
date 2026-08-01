@@ -4,6 +4,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { DashboardTabKey } from "../hooks/useDashboardData";
 
 import { Layout, Building, Server, CreditCard, Calendar } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 interface DashboardTabsNavProps {
   activeTab: DashboardTabKey;
@@ -31,7 +32,7 @@ export function DashboardTabsNav({ activeTab, onTabChange, sections = [] }: Dash
     Invoices: "الفواتير",
   };
 
-  const IconMap: Record<string, any> = {
+  const IconMap: Record<string, LucideIcon> = {
     overview: Layout,
     tenants: Building,
     databaseServers: Server,
@@ -49,7 +50,12 @@ export function DashboardTabsNav({ activeTab, onTabChange, sections = [] }: Dash
     invoices: "text-amber-500 dark:text-amber-400",
   };
 
-  const tabs: Array<{ key: DashboardTabKey; label: string; icon: any; color: string }> = [
+  const tabs: Array<{
+    key: DashboardTabKey;
+    label: string;
+    icon: LucideIcon;
+    color: string;
+  }> = [
     { key: "overview", label: t.dashboard.tabs.overview || "نظرة عامة", icon: Layout, color: IconColorMap["overview"] },
     ...sections.map((sec) => {
       let label = sectionLabelMap[sec.key];
@@ -94,4 +100,3 @@ export function DashboardTabsNav({ activeTab, onTabChange, sections = [] }: Dash
     </div>
   );
 }
-

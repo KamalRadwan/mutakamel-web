@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { 
   axiosClient, 
@@ -8,16 +8,22 @@ import {
   clearLocalAuthState, 
   getStoredSessionMeta,
   readAdminAuthTokenResponse,
+  refreshAdminCookieSession,
+  unwrapCoreData,
   SessionTokenMetadata
 } from "@/lib/api/axiosClient";
+import { startAdminSessionRefreshScheduler } from "@/lib/auth/sessionRefresh";
 
 export interface UserProfile {
   id: string;
   email: string;
   firstName?: string;
   lastName?: string;
-  role?: string;
-  permissions?: string[];
+  isSuperAdmin: boolean;
+  roleId?: string;
+  role?: { name: string; description?: string };
+  status?: string;
+  permissions: string[];
 }
 
 interface LoginOptions {
@@ -35,6 +41,26 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function readUserProfile(payload: unknown): UserProfile {
+  const profile = unwrapCoreData<unknown>(payload);
+  if (
+    !profile ||
+    typeof profile !== "object" ||
+    typeof (profile as UserProfile).id !== "string" ||
+    typeof (profile as UserProfile).email !== "string" ||
+    !Array.isArray((profile as UserProfile).permissions)
+  ) {
+    throw new Error("INVALID_AUTH_PROFILE");
+  }
+
+  // Ensure permissions are strictly a string array of keys
+  const rawPerms = (profile as UserProfile).permissions;
+  const stringPerms = rawPerms.map((p: any) => typeof p === "string" ? p : p.key || p.id).filter(Boolean);
+  (profile as UserProfile).permissions = stringPerms;
+
+  return profile as UserProfile;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -78,58 +104,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
-    const storedMeta = getStoredSessionMeta();
-    if (!storedMeta || !storedMeta.expiresIn) return;
-
-    const now = Date.now();
-    const elapsedSeconds = Math.floor((now - storedMeta.savedAt) / 1000);
-    const timeUntilExpiry = storedMeta.expiresIn - elapsedSeconds;
-    
-    // Refresh 60 seconds before expiration
-    const refreshDelaySeconds = Math.max(timeUntilExpiry - 60, 5);
-
-    const timer = setTimeout(async () => {
-      try {
+    return startAdminSessionRefreshScheduler({
+      getMetadata: getStoredSessionMeta,
+      refresh: async () => {
         await withAuthLock(async () => {
           const currentMeta = getStoredSessionMeta();
           if (!currentMeta) return;
-
-          const rememberFlag = currentMeta.cookieRevision ? "1" : "0";
-          const res = await axiosClient.post(
-            "/api/admin/core/v1/auth/refresh",
-            {},
-            {
-              headers: {
-                "x-auth-cookie-mode": "1",
-                "x-auth-remember": rememberFlag,
-              },
-            }
-          );
-
-          const refreshTokens = readAdminAuthTokenResponse(res.data);
-          if (refreshTokens) {
-            sessionStorage.setItem("access_token", refreshTokens.accessToken);
-            const updatedMeta: SessionTokenMetadata = {
-              ...currentMeta,
-              accessToken: refreshTokens.accessToken,
-              savedAt: Date.now(),
-              expiresIn: refreshTokens.expiresIn || currentMeta.expiresIn,
-              cookieRevision: (currentMeta.cookieRevision || 0) + 1,
-            };
-            sessionStorage.setItem("admin_session_meta", JSON.stringify(updatedMeta));
-          } else {
-            throw new Error("INVALID_REFRESH_RESPONSE");
-          }
+          await refreshAdminCookieSession(currentMeta.remember);
         });
-      } catch {
-        // Proactive refresh failed -> fail closed safely
+      },
+      onDefinitiveFailure: () => {
         clearLocalAuthState();
         setUser(null);
         router.push("/login");
-      }
-    }, refreshDelaySeconds * 1000);
-
-    return () => clearTimeout(timer);
+      },
+    });
   }, [user, router]);
 
   // -------------------------------------------------------------
@@ -138,17 +127,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const storedToken = sessionStorage.getItem("access_token");
+        const storedToken = sessionStorage.getItem("admin_session_meta");
         const storedUser = sessionStorage.getItem("user_profile");
 
         if (storedToken && storedUser) {
-          setUser(JSON.parse(storedUser));
+          setUser(readUserProfile(JSON.parse(storedUser)));
         } else if (storedToken) {
           const { data } = await axiosClient.get("/api/admin/core/v1/auth/me");
-          setUser(data);
-          sessionStorage.setItem("user_profile", JSON.stringify(data));
+          const userProfile = readUserProfile(data);
+          setUser(userProfile);
+          sessionStorage.setItem("user_profile", JSON.stringify(userProfile));
+        } else {
+          setUser(null);
         }
-      } catch (err) {
+      } catch {
         clearLocalAuthState();
         setUser(null);
       } finally {
@@ -170,46 +162,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Step 2: Clear stale local auth generation safely
         clearLocalAuthState();
 
-        // Step 3: POST /login with cookie mode headers & credentials: "include"
+        // Step 3: POST /login with remember flag & credentials: "include"
         const rememberFlag = rememberMe ? "1" : "0";
         const loginRes = await axiosClient.post(
           "/api/admin/core/v1/auth/login",
           { email, password },
           {
             headers: {
-              "x-auth-cookie-mode": "1",
               "x-auth-remember": rememberFlag,
             },
           }
         );
 
-        // Step 4: Receive accessToken in JSON
+        // Step 4: Validate the session metadata & tokens.
         const loginTokens = readAdminAuthTokenResponse(loginRes.data);
         if (!loginTokens) {
           throw new Error("INVALID_AUTH_RESPONSE");
         }
-        const { accessToken, expiresIn, tokenType } = loginTokens;
+        const { expiresIn, tokenType } = loginTokens;
 
-        // Store access token in sessionStorage for immediate /me call
-        sessionStorage.setItem("access_token", accessToken);
-
-        // Step 5: Call GET /auth/me using received access token in Authorization
+        // Step 5: Validate the new cookie session through GET /auth/me.
         const meRes = await axiosClient.get("/api/admin/core/v1/auth/me", {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+          skipAuthRefresh: true,
         });
 
-        const userProfile = meRes.data;
+        const userProfile = readUserProfile(meRes.data);
 
-        // Step 6: Store access token & validated user metadata only after /me succeeds
+        // Step 6: Store validated user metadata only after /me succeeds
         const loginGeneration = "gen_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now();
         const sessionMeta: SessionTokenMetadata = {
-          accessToken,
           savedAt: Date.now(),
           expiresIn: expiresIn || 3600,
           tokenType: tokenType || "Bearer",
           loginGeneration,
+          remember: rememberMe,
           cookieRevision: 1,
         };
 
@@ -247,9 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "/api/admin/core/v1/auth/logout",
           {},
           {
-            headers: {
-              "x-auth-cookie-mode": "1",
-            },
+            headers: {},
           }
         ).catch(() => {});
       });

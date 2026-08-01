@@ -2,24 +2,29 @@
 
 Complete inventory of NestJS Guards, Custom Decorators, and RBAC Permission Keys used across the Admin Portal backend (`core-app`).
 
+Last source verification: **2026-07-30**.
+
 ---
 
 ## 🛡️ Admin Guards & Decorators Overview
 
 | Guard / Decorator | Scope & Behavior | Frontend Action / Integration |
 |:---|:---|:---|
-| **`AdminGuard`** | Primary auth guard applied across all `/admin/*` controllers. Validates Bearer access token and ensures identity belongs to an admin user (`SUPER_ADMIN`, `ADMIN`, or `USER` tier). | Include Bearer Token header: `Authorization: Bearer <accessToken>`. On 401/403, trigger token refresh or redirect to `/login`. |
-| **`@Public()`** | Bypasses `AdminGuard` for unauthenticated routes (`login`, `refresh`, `accept-invite`, `forgot-password`, `reset-password`, `logout`). | Public forms — do not attach bearer token unless session cookie is used. |
-| **`@RequirePermissions(...)`** | Method/Controller level RBAC check. Verifies that `actor.permissions` array contains all specified permission keys. | Drive UI element visibility (hide buttons/links when user lacks the key) and route guards (`hasPermission('admin.users.create')`). |
-| **`@IdempotencyRequired()`** | Requires `X-Idempotency-Key` header (UUID v7) for mutation requests (create/update/cancel). Prevents duplicate operations on network retries. | Generate a fresh `crypto.randomUUID()` or UUIDv7 for each form submission and attach as `X-Idempotency-Key` header. |
+| **`AdminGuard`** | Primary auth guard applied across all `/admin/*` controllers. Validates the Gateway-forwarded admin access token and ensures identity belongs to an admin user (`SUPER_ADMIN`, `ADMIN`, or `USER` tier). | Use the shared cookie-mode client with `credentials: "include"` and `x-auth-cookie-mode: 1`; browser feature code must not read or attach a bearer token. |
+| **`@Public()`** | Bypasses `AdminGuard` for unauthenticated routes (`login`, `refresh`, `accept-invite`, `forgot-password`, `reset-password`, `logout`). | Use the documented public auth flow through the same-origin Gateway; do not invent service-direct or browser bearer-token behavior. |
+| **`@RequirePermissions(...)`** | Method/Controller level RBAC check. Verifies that `actor.permissions` contains all specified keys. | Use ONE/ALL frontend requirements and render `403` as forbidden. |
+| **`@RequireAnyPermissions(...)`** | Explicit ANY-permission check. The current Admin route inventory uses it for FQDN validation. | Use an ANY requirement; do not convert it to ALL. |
+| **`@IdempotencyRequired()`** | Requires `X-Idempotency-Key` header (UUIDv7) for mutation requests (create/update/cancel). Prevents duplicate operations on network retries. | Generate a fresh UUIDv7 for each confirmed intent and attach it as `X-Idempotency-Key`. `crypto.randomUUID()` returns UUIDv4 and is not valid for these routes. |
 | **`@CurrentActor()`** | Injects `CurrentUserContext` into controller handlers. | Hydrated automatically by `AdminGuard` from JWT claims. |
 | **`@Language()`** | Extracts language header/query (`ar` / `en`) for localized email delivery or messages. | Send `Accept-Language: ar` or `Accept-Language: en` header. |
 
 ---
 
-## 🔑 Complete RBAC Permission Matrix
+## 🔑 Admin Portal RBAC Permission Matrix
 
-Total Permission Keys: **44 Keys** grouped into 15 domain modules.
+This is a frontend-focused domain inventory. The backend seed contains
+additional internal and newer capability keys; each API document remains
+authoritative for its exact route permissions.
 
 ### 1. Auth (`admin/auth`)
 - **Guards**: `@Public()` for login/refresh/reset/invite; `AdminGuard` for `/me` and `/logout-all`.
@@ -106,31 +111,94 @@ Total Permission Keys: **44 Keys** grouped into 15 domain modules.
 - `admin.database_servers.update` — Update capacity/connection, drain, activate, set offline
 - `admin.database_servers.delete` — Delete database server host
 
-### 13. Backups & Restores (`admin.backups.*`)
+### 13. Storage Servers (`admin.storage_servers.*`)
+- **Guard**: `AdminGuard`
+- `admin.storage_servers.read` — List/view Storage Servers, history, exact verification runs, public attestation-key registry, recovery destinations, and source-bound recovery policies
+- `admin.storage_servers.create` — Register a DRAFT Storage Server; every create route also requires `.critical`
+- `admin.storage_servers.update` — Update empty DRAFT/OFFLINE configuration, replace routing, rotate principal evidence, verify, lifecycle, manage attestation keys, register recovery destinations, and verify/revoke recovery policies; every route also requires `.critical`
+- `admin.storage_servers.delete` — Soft-delete an eligible empty DRAFT/OFFLINE Storage Server; the route also requires `.critical`
+- `admin.storage_servers.critical` — Required together with create, update, lifecycle, verification, routing, key-management, rotation, and delete permissions
+
+See [Storage Servers](../api/storage-servers.md) for the exact permission pair
+beside every endpoint.
+
+### 14. Tenant Storage Server Migrations (`admin.storage_migrations.*`)
+
+- **Guard**: `AdminGuard`
+- `admin.storage_migrations.read` — Read an exact tenant migration by tenant and migration ID
+- `admin.storage_migrations.create` — Start a fenced migration; also requires `.critical`
+- `admin.storage_migrations.manage` — Retry or cancel the main migration; also requires `.critical`
+- `admin.storage_migrations.rollback` — Start a retained-source rollback; also requires `.critical`
+- `admin.storage_migrations.finalize` — Finalize and purge retained source after the rollback deadline; also requires `.critical`
+- `admin.storage_migrations.post_cutover.retry` — Retry a failed rollback/finalize operation; also requires `.critical`
+- `admin.storage_migrations.post_cutover.cancel` — Cancel an eligible rollback/finalize operation; also requires `.critical`
+- `admin.storage_migrations.critical` — Required together with every migration mutation permission
+
+These APIs are default-off and not yet safe to expose in the Admin Portal
+because the public read model cannot originate and recover the complete
+workflow. See
+[Tenant Storage Server Migrations](../api/tenant-storage-migrations.md).
+
+### 15. Backups & Restores (`admin.backups.*`)
 - **Guard**: `AdminGuard`
 - `admin.backups.read` — View policies, backup runs, artifacts, restore runs
 - `admin.backups.manage` — Upsert backup policy, database overrides, start backup run
 - `admin.backups.delete` — Delete backup run or artifact
 - `admin.backups.restore` — Start database restore run, promote restore
 
-### 14. System Settings (`admin.settings.*`)
+### 16. System Settings (`admin.settings.*`)
 - **Guard**: `AdminGuard`
-- `admin.settings.read` — View platform settings, SMTP configuration, email audit
-- `admin.settings.update` — Upsert setting override, patch SMTP config, verify SMTP connection
+- `admin.settings.read` — List/get the 31-key platform registry, read the SMTP singleton, and view its latest 25 audit entries
+- `admin.settings.update` — Upsert generic setting overrides, patch the SMTP singleton, and verify its saved connection
 
-### 15. Catalogue & Billing Currency (`admin.catalog.*` & `admin.billing.*`)
+All three settings mutations are also Gateway `WRITE_SENSITIVE` routes and
+require an `x-idempotency-key` UUIDv7.
+
+### 17. Catalogue & Billing Currency (`admin.catalog.*` & `admin.billing.*`)
 - **Guard**: `AdminGuard`
 - `admin.catalog.read` — View modules, tiers, features, price brackets, currency rates
 - `admin.catalog.manage` — Create/update/reorder modules, tiers, features, tier-feature grants, price tiers
 - `admin.catalog.destroy` — Delete catalogue modules
 - `admin.billing.currency.manage` — Update currency exchange rates
 
-### 16. Notifications (`admin.notifications.*`)
+### 18. Notifications (`admin.notifications.*`)
 - **Guard**: `AdminGuard`
 - `admin.notifications.read` — View notification config, inbox, unread count, preferences
 - `admin.notifications.manage` — Upsert preferences, register/revoke device tokens, mark read, acknowledge, dismiss
 
-### 17. Logging Overrides (`admin.logging.*`)
+### 19. Logging Overrides (`admin.logging.*`)
 - **Guard**: `AdminGuard`
 - `admin.logging.read` — View runtime log-level overrides, change history, effective level, SSE live stream
 - `admin.logging.update` — Upsert or delete runtime log-level override
+
+---
+
+## 🌍 Bilingual API Payload & Critical Semantics
+
+Starting with the Admin Portal v2 refactor, permissions are distributed as a bilingual catalogue item via `/api/admin/core/v1/permissions`:
+```typescript
+type AdminPermission = {
+  id: string;
+  key: string;              // e.g. "admin.database_servers.update"
+  nameAr: string;           // Localized name (Arabic)
+  nameEn: string;           // Localized name (English)
+  group: string;            // Categorical UI grouping
+  description?: string;     // Legacy fallback
+};
+```
+
+### Authorization Rules:
+1. **Never authorize by localized names**: Component guards (`RequirePermission`, `adminCan`) MUST strictly authorize using the immutable `key`.
+2. **Critical Action Pairs**: Destructive and highly sensitive operations require a `.critical` pair.
+   - E.g., deleting a database server requires **both** `["admin.database_servers.delete", "admin.database_servers.critical"]`.
+   - Storage registration requires **both** `["admin.storage_servers.create", "admin.storage_servers.critical"]`; storage update/lifecycle/verification/recovery-evidence mutation requires **both** `["admin.storage_servers.update", "admin.storage_servers.critical"]`; deletion requires **both** `["admin.storage_servers.delete", "admin.storage_servers.critical"]`.
+   - Tenant Storage Server migration mutations require their exact
+     `admin.storage_migrations.*` action permission together with
+     `admin.storage_migrations.critical`; read permission alone never enables
+     a migration command.
+   - A super admin (`isSuperAdmin: true`) bypasses all frontend `adminCan`/`adminCanAll` checks automatically.
+3. **Permission requirement type**: frontend foundations must support
+   `adminCan`, `adminCanAll`, and `adminCanAny`, plus ONE/ALL/ANY component
+   requirements. The current source still lacks `adminCanAny`.
+4. **Independent nested access**: tenant detail access does not imply tenant
+   user, subscription, wallet, payment, invoice, audit, or provisioning access.

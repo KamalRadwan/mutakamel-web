@@ -1,165 +1,427 @@
-# Tenant Portal RBAC Matrix
+# Tenant Portal Authorization and Permission Catalogue
 
-The Tenant Portal uses a robust Role-Based Access Control (RBAC) system. Permissions are strictly scoped to the tenant workspace and, in some cases, further scoped to specific branches or companies (via assignments).
+Status: **verified-current**
 
-This matrix summarizes the key permissions used across the Tenant Portal APIs.
+Last source verification: **2026-07-25**
 
-## Core System & Settings
+Owning apps: **Core, CRM, Trade**
 
-| Permission | Description |
-| :--- | :--- |
-| `workspace.read` | View global workspace settings (language, timezone, toggles). |
-| `workspace.manage` | Update global workspace settings. |
-| `workspace.email.read` | View custom SMTP settings. |
-| `workspace.email.manage` | Update custom SMTP settings and verify connections. |
-| `branding.read` | View tenant custom branding configurations. |
-| `branding.manage` | Update tenant branding colors, logos, and UI strings. |
-| `numbering.read` | View numbering sequences and simulate next values. |
-| `numbering.manage` | Create or update document numbering sequences. |
+Tenant Portal implementation: **not-started**
 
-## Billing & Finance
+Authoring mode: **hand-written from current permission catalogues and guards**
 
-*Note: Most Billing and Subscription endpoints are strictly guarded by `TenantOwnerGuard` and do not rely on standard RBAC permissions.*
+## Authorization is multi-dimensional
 
-| Permission | Description |
-| :--- | :--- |
-| `taxes.tax.read` | List and view tax rates. |
-| `taxes.tax.manage` | Create, update, or deactivate tax rates. |
-| `currencies.currency.read` | List and view active currencies. |
-| `currencies.currency.manage` | Create, update, deactivate, or set default currencies. |
+A permission string alone never proves access. A tenant request can also be
+rejected by:
 
-## Users & Roles
+- tenant-host and token-tenant mismatch;
+- session generation or user status;
+- company, branch, channel, inventory-node, own/team/all, or assignment scope;
+- product module, feature, seat, or subscription access mode;
+- tenant-owner-only policy;
+- resource ownership or domain-state policy;
+- rate, transport, and write-sensitivity policy at the Gateway.
 
-| Permission | Description |
-| :--- | :--- |
-| `users.user.read` | List and view tenant users and directory profiles. |
-| `users.user.invite` | Invite new users to the tenant workspace. |
-| `users.user.update` | Update user settings, language preferences, and profiles. |
-| `users.user.deactivate` | Deactivate active users. |
-| `users.user.delete` | Soft-delete users. |
-| `users.user.manage_memberships` | Add or remove users from departments and teams. |
-| `users.user.assign_roles` | Assign custom or system roles to users for specific branches. |
-| `roles.permission.read` | View the catalog of available permissions. |
-| `roles.role.read` | List and view custom roles. |
-| `roles.role.create` | Create new custom roles. |
-| `roles.role.update` | Update custom roles and their assigned permissions. |
-| `roles.role.delete` | Delete custom roles. |
-| `users.user.manage_modules` | Assign or unassign licensed user modules. |
+Use permissions to control navigation and affordances, but treat `403` from the
+server as authoritative. Never hide data only in the browser, and never send
+trusted tenant/scope headers from feature code.
 
-## Templates & Documents
+## Guard order
 
-| Permission | Description |
-| :--- | :--- |
-| `templates.read` | List, search, and view templates, data sources, and assets. |
-| `templates.create` | Create templates, duplicate templates, and use starters. |
-| `templates.update` | Edit template drafts and restore snapshots. |
-| `templates.publish` | Publish drafts to new versions and retire old versions. |
-| `templates.restore` | Restore previous versions of a template. |
-| `templates.archive` | Archive or permanently delete templates. |
-| `templates.preview` | Generate HTML, Email, or PDF previews of templates. |
-| `templates.assets.manage` | Upload and delete template graphical assets. |
-| `templates.assignments.manage` | Link templates to system events and resolve issues. |
+The current high-level order is:
 
-## Business Letters
+| App | Global authorization chain |
+| --- | --- |
+| Core | JWT, FQDN tenant, session version, permission, branch access, subscription enforcement, rate limit |
+| CRM | JWT, trusted Gateway tenant, current tenant user/CRM seat, permission, branch plus own/team/all access, subscription, rate limit |
+| Trade | JWT, trusted Gateway tenant, current user/Trade seat, subscription, company/branch/channel scope, permission, rate limit |
 
-| Permission | Description |
-| :--- | :--- |
-| `business_letters.read` | List and view business letters and their PDF jobs. |
-| `business_letters.create` | Create new business letter drafts. |
-| `business_letters.update` | Edit business letter drafts. |
-| `business_letters.issue` | Issue letters to make them final/read-only. |
-| `business_letters.render` | Render business letters to PDF. |
+Route and module guards can add constraints. A route with no permission
+decorator is not automatically public.
 
-## Activities
+## Core permission catalogue
 
-| Permission | Description |
-| :--- | :--- |
-| `activities.read` | List and view activities and activity types. |
-| `activities.create` | Create new tasks or log entries. |
-| `activities.update` | Update activity details. |
-| `activities.assign` | Reassign activities to other users or teams. |
-| `activities.complete` | Mark activities as completed. |
-| `activities.cancel` | Cancel activities. |
+Core seeds the following exact tenant permission keys.
 
-## Notifications
+### Organization
 
-| Permission | Description |
-| :--- | :--- |
-| `notifications.notification.read` | View inbox, mark as read, acknowledge, and dismiss. |
-| `notifications.preference.read` | View notification delivery preferences. |
-| `notifications.preference.manage` | Update delivery channels (email, push, in-app). |
-| `notifications.device_token.manage` | Register or revoke push notification device tokens. |
+```text
+org.company.read
+org.company.manage
+org.branch.read
+org.branch.manage
+org.department.read
+org.department.manage
+org.team.read
+org.team.manage
+```
 
-## CRM
+### Users, roles, and permissions
 
-| Permission | Description |
-| :--- | :--- |
-| `crm.leads.read.*` | Read and view CRM leads within scope. |
-| `crm.leads.create.*` | Create new leads within scope. |
-| `crm.leads.update.*` | Update leads, change stages within scope. |
-| `crm.leads.convert.*` | Convert qualified leads to profiles and opportunities. |
-| `crm.leads.delete.*` | Delete leads. |
-| `crm.opportunities.read.*` | Read and view CRM opportunities within scope. |
-| `crm.opportunities.create.*` | Create new opportunities. |
-| `crm.opportunities.update.*` | Update opportunities, change stages. |
-| `crm.opportunities.delete.*` | Delete opportunities. |
-| `crm.customer_profiles.read.*` | Read customer profiles. |
-| `crm.customer_profiles.create.*` | Create customer profiles. |
-| `crm.customer_profiles.update.*` | Update profiles and contacts. |
-| `crm.customer_profiles.delete.*` | Delete profiles. |
-| `crm.pipelines.read` | View pipeline configurations. |
-| `crm.pipelines.manage` | Manage pipelines, stages, and assignments. |
-| `crm.lead_stages.read` | View lead stage definitions. |
-| `crm.lead_stages.manage` | Create, update, or reorder lead stages. |
-| `crm.acquisition_sources.read` | View acquisition sources. |
-| `crm.acquisition_sources.manage` | Manage acquisition sources. |
-| `crm.settings.read` | Read CRM global settings. |
-| `crm.settings.manage` | Update CRM limits and duplication rules. |
-| `crm.custom_fields.read` | View custom field definitions and values. |
-| `crm.custom_fields.manage` | Manage custom field definitions and upsert values. |
-| `crm.notes.*` | Read, create, update, or delete CRM notes. |
-| `crm.attachments.*` | Read, create, or delete CRM file attachments. |
-| `crm.email.send.*` | Send and retry outbound CRM emails. |
-| `crm.dashboards.read.*` | View CRM executive and performance dashboards. |
+```text
+users.user.read
+users.user.invite
+users.user.update
+users.user.assign_roles
+users.user.manage_memberships
+users.user.deactivate
+users.user.delete
 
-## Trade
+roles.role.read
+roles.role.create
+roles.role.update
+roles.role.delete
+roles.permission.read
+```
 
-| Permission | Description |
-| :--- | :--- |
-| `trade.catalog_master.manage.*` | Manage master items and global configurations. |
-| `trade.item.read.*` | View catalog items, uoms, and channels. |
-| `trade.item.manage.*` | Manage items overlays, profiles, and channel listings. |
-| `trade.commercial_account.read.*` | View trade commercial accounts. |
-| `trade.commercial_account.manage.*` | Manage trade accounts and branch rules. |
-| `trade.credit.view.*` | Evaluate account credit availability. |
-| `trade.quotation.read.*` | View sales quotations. |
-| `trade.quotation.create.*` | Create draft quotations. |
-| `trade.quotation.update.*` | Update quotations and create revisions. |
-| `trade.quotation.send.*` | Mark quotations as sent. |
-| `trade.quotation.accept.*` | Mark quotations as accepted. |
-| `trade.quotation.reject.*` | Mark quotations as rejected. |
-| `trade.quotation.cancel.*` | Cancel quotations. |
-| `trade.quotation.convert.*` | Convert accepted quotations to sales orders. |
-| `trade.sales_order.read.*` | View sales orders. |
-| `trade.sales_order.create.*` | Create sales orders. |
-| `trade.sales_order.update.*` | Update sales orders. |
-| `trade.sales_order.confirm.*` | Confirm sales orders and trigger inventory reservations. |
-| `trade.sales_order.hold.*` | Put sales orders on hold or release hold. |
-| `trade.sales_order.cancel.*` | Cancel sales orders. |
-| `trade.inventory.read.*` | Read inventory stock. |
-| `trade.inventory.reserve.*` | Create or remove inventory reservations. |
-| `trade.pricing.read.*` | Evaluate final pricing. |
-| `trade.pricing.lock.*` | Acquire price locks for checkout. |
-| `trade.invoice.*` | Read, create, update, and issue invoices. |
-| `trade.contract.*` | Read, create, update, and activate legal contracts. |
-| `trade.purchase_order.*` | Lifecycle management for B2B procurement (read, create, submit, approve, confirm, cancel). |
-| `trade.purchase_quotation.*` | Lifecycle management for RFQs (read, create, update, issue). |
-| `trade.policy.*` | Govern rules, discounts, and workflows (read, manage, test, approve, publish). |
-| `trade.control_tower.*` | Oversee system anomalies (read, retry, resolve exceptions). |
-| `trade.extension.*` | Manage tenant extension profiles and targets (read, manage, publish). |
-| `trade.import.*` | Define import schemas and execute bulk data imports. |
-| `trade.webhook.*` | Subscribe to real-time events and manage delivery replays. |
-| `trade.dashboard.*` | Create, read, update, or share custom analytics dashboards. |
-| `trade.widget.*` | Create, read, update, or share custom analytics widgets. |
-| `trade.configuration.*` | Manage and resolve scoped system configurations. |
-| `trade.document_profile.*` | Manage B2B document layouts, rules, and numbering sequences. |
+### Workspace and finance configuration
+
+```text
+branding.read
+branding.manage
+currencies.currency.read
+currencies.currency.manage
+numbering.read
+numbering.manage
+taxes.tax.read
+taxes.tax.manage
+workspace.read
+workspace.manage
+workspace.email.read
+workspace.email.manage
+```
+
+### Directory
+
+```text
+directory.party.read
+directory.party.manage
+directory.contact.manage
+directory.address.manage
+directory.role.manage
+directory.relationship.manage
+directory.settings.manage
+```
+
+### Notifications
+
+```text
+notifications.notification.read
+notifications.preference.read
+notifications.preference.manage
+notifications.device_token.manage
+```
+
+### Template platform
+
+```text
+templates.read
+templates.create
+templates.update
+templates.archive
+templates.assets.manage
+templates.publish
+templates.restore
+templates.assignments.manage
+templates.preview
+templates.render
+```
+
+### Business letters
+
+```text
+business_letters.read
+business_letters.create
+business_letters.update
+business_letters.issue
+business_letters.render
+```
+
+### Activities
+
+```text
+activities.read
+activities.read.all
+activities.create
+activities.update
+activities.update.all
+activities.complete
+activities.complete.all
+activities.cancel
+activities.cancel.all
+activities.assign
+```
+
+The `.all` activity variants expand access inside an already-authorized
+branch. They do not grant cross-tenant or arbitrary branch access.
+
+### Core scope-role targets
+
+Role assignments can target:
+
+```text
+TENANT
+COMPANY
+BRANCH
+```
+
+The assignment target and the user's current branch context must both be
+considered. Do not flatten branch-scoped role assignments into one global
+frontend boolean.
+
+## CRM permission catalogue
+
+CRM has static permissions and scoped permissions.
+
+### Static CRM permissions
+
+```text
+crm.settings.read
+crm.settings.update
+crm.settings.manage
+crm.lead_stages.read
+crm.lead_stages.manage
+crm.acquisition_sources.read
+crm.acquisition_sources.manage
+crm.pipelines.read
+crm.pipelines.manage
+crm.custom_fields.read
+crm.custom_fields.manage
+crm.dashboards.create
+crm.dashboards.update
+crm.dashboards.delete
+crm.dashboards.share
+crm.widgets.read
+crm.widgets.create
+crm.widgets.update
+crm.widgets.delete
+crm.widgets.share
+```
+
+`crm.settings.update` and `crm.settings.manage` are distinct current keys.
+Do not collapse or rename them.
+
+### Scoped CRM permission bases
+
+Each base below is expanded with exactly one lowercase suffix:
+
+```text
+own
+team
+all
+```
+
+For example, `crm.leads.read.team` is valid;
+`crm.leads.read.TEAM` and the unsuffixed `crm.leads.read` are not catalogue
+entries.
+
+```text
+crm.customer_profiles.read
+crm.customer_profiles.create
+crm.customer_profiles.update
+crm.customer_profiles.delete
+crm.leads.read
+crm.leads.create
+crm.leads.update
+crm.leads.convert
+crm.leads.delete
+crm.opportunities.read
+crm.opportunities.create
+crm.opportunities.update
+crm.opportunities.delete
+crm.activities.read
+crm.activities.create
+crm.activities.update
+crm.activities.delete
+crm.notes.read
+crm.notes.create
+crm.notes.update
+crm.notes.delete
+crm.attachments.read
+crm.attachments.create
+crm.attachments.delete
+crm.dashboards.read
+crm.email.send
+```
+
+The permission suffix is evaluated together with branch access and the
+record's assignee/team rules. Having `.all` does not remove branch constraints.
+
+## Trade permission catalogue
+
+Trade permissions are not suffixed with `.own`, `.team`, or `.all`. The Trade
+scope guards independently enforce authorized company, branch, channel, and
+other operating context.
+
+### Configuration, catalogue, accounts, credit, and pricing
+
+```text
+trade.configuration.read
+trade.configuration.manage
+trade.catalog_master.manage
+trade.items.read
+trade.items.manage
+trade.commercial_accounts.read
+trade.commercial_accounts.manage
+trade.credit.view
+trade.credit.override
+trade.pricing.read
+trade.pricing.manage
+trade.pricing.view_cost
+trade.pricing.override
+```
+
+### Policy, document profiles, extensions, and automation
+
+```text
+trade.policy.read
+trade.policy.manage
+trade.policy.test
+trade.policy.approve
+trade.policy.publish
+trade.policy.view_sensitive_facts
+trade.document_profiles.read
+trade.document_profiles.manage
+trade.document_profiles.validate
+trade.document_profiles.publish
+trade.extensions.read
+trade.extensions.manage
+trade.extensions.publish
+trade.import.manage
+trade.import.execute
+trade.webhooks.manage
+trade.webhooks.replay
+trade.automation.manage
+```
+
+### Quotations and sales orders
+
+```text
+trade.quotations.create
+trade.quotations.read
+trade.quotations.update
+trade.quotations.send
+trade.quotations.accept
+trade.quotations.reject
+trade.quotations.cancel
+trade.quotations.convert
+trade.sales_orders.create
+trade.sales_orders.read
+trade.sales_orders.update
+trade.sales_orders.confirm
+trade.sales_orders.hold
+trade.sales_orders.cancel
+trade.sales_orders.amend
+```
+
+### Purchasing and financial documents
+
+```text
+trade.purchase_orders.create
+trade.purchase_orders.read
+trade.purchase_orders.update
+trade.purchase_orders.submit
+trade.purchase_orders.approve
+trade.purchase_orders.confirm
+trade.purchase_orders.cancel
+trade.purchase_quotations.create
+trade.purchase_quotations.read
+trade.purchase_quotations.update
+trade.purchase_quotations.issue
+trade.invoices.create
+trade.invoices.read
+trade.invoices.update
+trade.invoices.issue
+trade.contracts.create
+trade.contracts.read
+trade.contracts.update
+trade.contracts.activate
+trade.purchasing.override
+```
+
+### Inventory and Control Tower
+
+```text
+trade.inventory.read
+trade.inventory.view_cost
+trade.inventory.nodes.manage
+trade.inventory.opening_balance
+trade.inventory.reserve
+trade.inventory.receive
+trade.inventory.deliver
+trade.inventory.adjust
+trade.inventory.governance.manage
+trade.control_tower.read
+trade.control_tower.retry
+trade.control_tower.resolve
+trade.control_tower.view_sensitive
+```
+
+### Dashboards and widgets
+
+```text
+trade.dashboards.read
+trade.dashboards.create
+trade.dashboards.update
+trade.dashboards.delete
+trade.dashboards.share
+trade.widgets.read
+trade.widgets.create
+trade.widgets.update
+trade.widgets.delete
+trade.widgets.share
+```
+
+## Feature and seat gates
+
+Permissions, features, and seats answer different questions:
+
+| Gate | Question |
+| --- | --- |
+| Permission | May this user perform this action? |
+| Scope | On which company, branch, team, channel, node, or record? |
+| Seat/module assignment | Is this user assigned to the application module? |
+| Tenant subscription/feature | Has the tenant purchased and activated the capability? |
+| Access mode | Are reads/writes currently permitted under billing state? |
+
+The UI must compute an affordance only from the complete server projection,
+when available. Never grant access because a permission name exists in the
+static catalogue.
+
+## Frontend implementation pattern
+
+Centralize authorization queries and preserve an explicit scope:
+
+```ts
+type CapabilityDecision =
+  | { allowed: true }
+  | {
+      allowed: false;
+      reason:
+        | "permission"
+        | "scope"
+        | "seat"
+        | "feature"
+        | "access-mode"
+        | "state";
+    };
+```
+
+This type is for presentation only. The server must repeat every check.
+
+## Source evidence
+
+```text
+../backend/mutakamel-apps/core-app/packages/database/src/seeds/v0.0.1/tenant/permissions.seed.ts
+../backend/mutakamel-apps/core-app/src/tenant/tenant-roles/
+../backend/mutakamel-apps/core-app/src/common/guards/
+../backend/mutakamel-apps/crm-app/packages/common/src/constants/permissions.ts
+../backend/mutakamel-apps/crm-app/src/common/guards/
+../backend/mutakamel-apps/crm-app/src/crm/static-data/
+../backend/mutakamel-apps/trade-app/packages/common/src/constants/permissions.ts
+../backend/mutakamel-apps/trade-app/src/common/guards/
+../backend/mutakamel-apps/trade-app/src/common/entitlement.service.ts
+```
+
+Route-specific requirements are documented under [API](api/README.md).

@@ -1,8 +1,12 @@
 # Database Servers Frontend Contract
 
+Status: **Verified backend contract; frontend DONE/REFACTOR**
+
+Last source verification: **2026-07-30**
+
 Verified against the current API Gateway route contracts, Core controller,
 DTOs, service projections, repositories, entities, and active Admin Portal
-screens on **2026-07-24**.
+screens.
 
 ## Ownership and route prefix
 
@@ -15,7 +19,7 @@ screens on **2026-07-24**.
 | Resource IDs | UUIDv7 |
 | API response envelope | Canonical Core success envelope; paginated lists also include `meta` |
 | Frontend routes | `/database-servers`, `/database-servers/new`, `/database-servers/[id]` |
-| Current frontend status | Mock data and simulated mutations; no database-server API call is implemented yet |
+| Current frontend status | CRUD, connectivity, history, lifecycle, and delete call real Core APIs; filtering, typing, errors, metrics, and tests need refactoring |
 
 The unversioned `/admin/database-servers` form is the Nest controller-relative
 path. Browser code must use the canonical API Gateway prefix above.
@@ -25,18 +29,19 @@ path. Browser code must use the canonical API Gateway prefix above.
 | Method and browser path | Permission | Success | Purpose |
 |:---|:---|:---:|:---|
 | `POST /api/admin/core/v1/database-servers` | `admin.database_servers.create` | `201` | Register and preflight a server |
-| `POST /api/admin/core/v1/database-servers/check-connectivity` | `admin.database_servers.create` | `200` | Test one primary PostgreSQL connection |
+| `POST /api/admin/core/v1/database-servers/check-connectivity` | `admin.database_servers.create` | `200` | Test every submitted PostgreSQL credential group |
 | `GET /api/admin/core/v1/database-servers` | `admin.database_servers.read` | `200` | Paginated list |
 | `GET /api/admin/core/v1/database-servers/:id` | `admin.database_servers.read` | `200` | Safe detail view |
 | `GET /api/admin/core/v1/database-servers/:id/history` | `admin.database_servers.read` | `200` | Audit history |
-| `PATCH /api/admin/core/v1/database-servers/:id` | `admin.database_servers.update` | `200` | Update mutable configuration |
-| `POST /api/admin/core/v1/database-servers/:id/drain` | `admin.database_servers.update` | `201` | Stop new placements, keep hosted tenants |
-| `POST /api/admin/core/v1/database-servers/:id/activate` | `admin.database_servers.update` | `201` | Make eligible for placement when credentials are ready |
-| `POST /api/admin/core/v1/database-servers/:id/offline` | `admin.database_servers.update` | `201` | Mark unavailable |
-| `DELETE /api/admin/core/v1/database-servers/:id` | `admin.database_servers.delete` | `204` | Soft-delete an empty drained/offline server |
+| `PATCH /api/admin/core/v1/database-servers/:id` | `admin.database_servers.update` + `admin.database_servers.critical` | `200` | Update mutable configuration |
+| `POST /api/admin/core/v1/database-servers/:id/drain` | `admin.database_servers.update` + `admin.database_servers.critical` | `201` | Stop new placements, keep hosted tenants |
+| `POST /api/admin/core/v1/database-servers/:id/activate` | `admin.database_servers.update` + `admin.database_servers.critical` | `201` | Make eligible for placement when credentials are ready |
+| `POST /api/admin/core/v1/database-servers/:id/offline` | `admin.database_servers.update` + `admin.database_servers.critical` | `201` | Mark unavailable |
+| `DELETE /api/admin/core/v1/database-servers/:id` | `admin.database_servers.delete` + `admin.database_servers.critical` | `204` | Soft-delete an empty drained/offline server |
 
-All protected requests use the shared Admin Portal client with the access-token
-Bearer header, included credentials, and coordinated refresh behavior.
+All protected requests use the shared cookie-mode Admin Portal client with
+`credentials: "include"`, `x-auth-cookie-mode: 1`, and coordinated refresh
+behavior. Browser code does not attach a bearer token.
 
 Every database-server mutation in the table—including connectivity checks and
 lifecycle commands—has a `WRITE_SENSITIVE`, `idempotent: true` Gateway
@@ -412,6 +417,9 @@ interface CheckDatabaseServerConnectivityDto {
   port?: number;
 
   credentials?: DatabaseServerCredentialsDto;
+  runtimeCredentials?: DatabaseServerRuntimeCredentialsDto;
+  provisioningCredentials?: DatabaseServerCredentialsDto;
+  backupCredentials?: DatabaseServerCredentialsDto;
   username?: string;
   password?: string;
 
@@ -428,11 +436,18 @@ interface CheckDatabaseServerConnectivityDto {
 interface DatabaseServerConnectivityResult {
   connected: boolean;
   message: string;
+  checks: Array<{
+    principal: "primary" | "provisioning" | "backup" | "coreApp" | "crmApp" | "tradeApp" | "workerApp";
+    connected: boolean;
+    message: string;
+  }>;
 }
 ```
 
 Use nested `credentials`. The top-level `username`/`password` pair is a compact
 compatibility form. Nested credentials take precedence if both forms are sent.
+Send every credential group that will be saved. The endpoint probes each group,
+continues after a failure, and returns one safe result per submitted principal.
 
 For a DTO-valid request, connection failure still returns HTTP `200`:
 
@@ -441,7 +456,11 @@ For a DTO-valid request, connection failure still returns HTTP `200`:
   "success": true,
   "data": {
     "connected": false,
-    "message": "Database connection failed."
+    "message": "One or more database credential checks failed.",
+    "checks": [
+      { "principal": "primary", "connected": true, "message": "connected" },
+      { "principal": "crmApp", "connected": false, "message": "password authentication failed" }
+    ]
   },
   "correlationId": "request-correlation-id",
   "timestamp": "2026-07-24T12:00:00.000Z"
@@ -803,32 +822,24 @@ authoritative.
 
 ## Current frontend gaps
 
-The active hooks and views under `src/app/database-servers/` are prototypes:
+The active hooks and views under `src/app/database-servers/` use real Core
+routes, but still need refactoring:
 
-1. No hook calls any database-server endpoint.
-2. List filtering and pagination are client-side over three mock rows.
-3. `DatabaseServerRow.status` incorrectly includes `DELETED`.
-4. The row expects `driver`, `utilization`, `region`, and
-   `isPlacementTarget`, which must be constant/derived rather than read from
-   the response.
-5. Summary utilization averages row percentages rather than weighting total
-   tenants by total capacity.
-6. The list has activate/drain/delete actions but no offline action.
-7. The create drawer does not submit its form data; its “save” button only
-   closes the drawer.
-8. `/database-servers/new` simulates connectivity and submission.
-9. Detail state pre-fills usernames, masked passwords, and certificate content
-   that the API never returns. These must become blank replacement controls.
-10. Detail history uses `LIFECYCLE`, `user`, `timestamp`, and `oldValue`; the
-    API uses specific actions, `actorId`, `createdAt`, and `previousValue`.
-11. Hosted tenants are hard-coded and use invalid placeholder IDs.
-12. Loading, empty, validation, forbidden, conflict, stale-data, and retry
-    states are not implemented.
-13. Duplicate code under `src/app/admin/database-servers/` has no page route.
-    Keep the active implementation under `src/app/database-servers/`.
-
-Choose one create experience (`/database-servers/new` or the drawer) and share
-one form schema/payload builder so the two prototypes do not drift further.
+1. List/detail response handling remains loose and includes explicit `any`.
+2. Filtering, pagination, and error projection are not consistently modeled as
+   typed server state.
+3. Derived utilization/placement/region fields need one documented adapter;
+   weighted capacity must use totals, not an average of percentages.
+4. Secret replacement inputs must always remain blank unless the operator
+   enters new values; safe detail responses do not return credentials.
+5. History and hosted-tenant failures need independent forbidden/error/retry
+   states.
+6. Permission exposure and caller-owned stable idempotency intents are
+   incomplete.
+7. Connectivity/create/update/lifecycle/delete need broader negative and
+   conflict regression coverage.
+8. Duplicate/inactive legacy code must not become a second route
+   implementation.
 
 ## Recommended frontend implementation sequence
 

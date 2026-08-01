@@ -9,7 +9,10 @@ interface Props {
 }
 
 export function SubscriptionTargetGauge({ actualARR, targetARR, height = 250 }: Props) {
-  const percentage = Math.min(100, Math.max(0, (actualARR / targetARR) * 100));
+  const percentage =
+    targetARR > 0
+      ? Math.min(100, Math.max(0, (actualARR / targetARR) * 100))
+      : 0;
   
   // Data for the semi-circle gauge (active vs empty)
   const data = [
@@ -20,12 +23,10 @@ export function SubscriptionTargetGauge({ actualARR, targetARR, height = 250 }: 
   // Colors: primary gradient/solid vs empty track
   const COLORS = ["#10b981", "currentColor"]; 
 
-  // Needle calculations
   const cx = "50%";
   const cy = "75%";
   const iR = 60;
   const oR = 90;
-  const needleValue = percentage;
 
   return (
     <div style={{ height, width: "100%" }} className="relative flex items-center justify-center">

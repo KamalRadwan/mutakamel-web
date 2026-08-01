@@ -1,118 +1,443 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
+import { useToast } from "@/components/ui/ToastContext";
+import {
+  getAdminUser,
+  getUserWebphone,
+  listRoles,
+  updateAdminUser,
+  assignUserRole,
+  updateUserWebphone,
+  suspendAdminUser,
+  activateAdminUser,
+  deleteAdminUser,
+  normalizeErrorCode,
+} from "../api/adminUsersApi";
+import { getErrorMessageAndDetails } from "../utils/errorMapping";
+import type {
+  AdminUser,
+  AdminRole,
+  AdminWebphoneConfig,
+  AdminUserStatus,
+  AdminUserErrorCode,
+} from "../types";
 
-export interface RoleOption {
-  id: string;
-  name: string;
-  type: "SUPER_ADMIN" | "ADMIN" | "USER";
-  description?: string;
-}
+export type WebphoneForm = {
+  enabled: boolean;
+  extension: string;
+  sipUsername: string;
+  sipPassword: string;
+  displayName: string;
+  outboundCallerId: string;
+  transport: "ws" | "wss";
+};
 
-const mockAvailableRoles: RoleOption[] = [
-  { id: "role-1", name: "Super Administrator", type: "SUPER_ADMIN", description: "Full system access." },
-  { id: "role-2", name: "Billing Admin", type: "ADMIN", description: "Manage subscriptions and wallets." },
-  { id: "role-3", name: "Support Agent", type: "USER", description: "View-only access for support." },
-  { id: "role-4", name: "Security Officer", type: "ADMIN", description: "Manage platform security policies." },
-];
+const emptyWebphoneForm: WebphoneForm = {
+  enabled: false,
+  extension: "",
+  sipUsername: "",
+  sipPassword: "",
+  displayName: "",
+  outboundCallerId: "",
+  transport: "wss",
+};
 
 export function useUserDetail(id: string) {
   const router = useRouter();
   const { lang, t } = useI18n();
+  const toast = useToast();
 
-  // User Profile Identity
-  console.log("Fetching details for user:", id);
-  const [firstName, setFirstName] = useState("كمال");
-  const [lastName, setLastName] = useState("رضوان");
-  const [email] = useState("kamal.radwan@mutakamel.ai"); // Immutable
-  const [tier, setTier] = useState<"SUPER_ADMIN" | "ADMIN" | "USER">("SUPER_ADMIN");
-  const [status, setStatus] = useState<"INVITED" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED">("ACTIVE");
+  const [user, setUser] = useState<AdminUser>();
+  const [availableRoles, setAvailableRoles] = useState<AdminRole[]>([]);
+  const [assignedRoleId, setAssignedRoleId] = useState<string | undefined>();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
+  const [status, setStatus] = useState<AdminUserStatus>("INVITED");
 
-  // Assigned Roles State
-  const [assignedRoleIds, setAssignedRoleIds] = useState<Set<string>>(new Set(["role-1", "role-2"]));
+  const [webphone, setWebphone] = useState<AdminWebphoneConfig>();
+  const [webphoneForm, setWebphoneForm] = useState<WebphoneForm>(emptyWebphoneForm);
 
-  // WebPhone SIP Config State
-  const [sipExtension, setSipExtension] = useState("1001");
-  const [sipUsername, setSipUsername] = useState("kamal_sip");
-  const [sipPassword, setSipPassword] = useState("SecretSipPass123!");
-  const [outboundCallerId, setOutboundCallerId] = useState("+201001234567");
-
-  // UI Auto-Save State
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
-  // Auto-Save Handler for Identity Fields (PATCH /admin/users/:id)
-  const handleIdentityBlur = () => {
+  const [error, setError] = useState<string>();
+  const [errorCode, setErrorCode] = useState<AdminUserErrorCode | string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [correlationId, setCorrelationId] = useState<string>("");
+
+  const [extensionError, setExtensionError] = useState<string | null>(null);
+  const [sipUsernameError, setSipUsernameError] = useState<string | null>(null);
+
+  const loadUser = useCallback(async () => {
+    setIsLoading(true);
+    setError(undefined);
+    setErrorCode(null);
+    setNotFound(false);
+    setPermissionDenied(false);
+
+    try {
+      const [loadedUser, loadedWebphone, rolesData] = await Promise.all([
+        getAdminUser(id),
+        getUserWebphone(id).catch(() => undefined),
+        listRoles({ page: 1, limit: 100, sortBy: "name", sortDir: "ASC" }).catch(() => undefined),
+      ]);
+
+      const assignedRoles = loadedUser.role ? [loadedUser.role] : [];
+      const rolesList = rolesData?.data ?? assignedRoles;
+
+      setUser(loadedUser);
+      setFirstName(loadedUser.firstName);
+      setLastName(loadedUser.lastName);
+      setIsSuperAdmin(loadedUser.isSuperAdmin);
+      setStatus(loadedUser.status);
+      setAvailableRoles(rolesList);
+      setAssignedRoleId(loadedUser.roleId ?? loadedUser.role?.id ?? undefined);
+
+      if (loadedWebphone) {
+        setWebphone(loadedWebphone);
+        setWebphoneForm(webphoneFormFromConfig(loadedWebphone));
+      }
+    } catch (requestError: any) {
+      const code = normalizeErrorCode(requestError);
+      setErrorCode(code);
+
+      if (requestError?.response?.status === 404 || code === "ADMIN_USER_NOT_FOUND") {
+        setNotFound(true);
+      } else if (requestError?.response?.status === 403 || code === "MISSING_REQUIRED_PERMISSIONS") {
+        setPermissionDenied(true);
+      } else {
+        const details = getErrorMessageAndDetails(requestError, lang);
+        setError(details.message);
+        setCorrelationId(details.correlationId || "");
+        toast.error(lang === "ar" ? "فشل التحميل" : "Load Error", details.message);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, lang, toast]);
+
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
+  const identityHasChanges = useMemo(() => {
+    if (!user) return false;
+    return (
+      firstName.trim() !== user.firstName ||
+      lastName.trim() !== user.lastName ||
+      isSuperAdmin !== user.isSuperAdmin
+    );
+  }, [user, firstName, lastName, isSuperAdmin]);
+
+  const roleHasChanges = useMemo(() => {
+    if (!user) return false;
+    return (assignedRoleId ?? null) !== (user.roleId ?? null);
+  }, [user, assignedRoleId]);
+
+  const webphoneHasChanges = useMemo(
+    () => webphoneFormChanged(webphoneForm, webphone),
+    [webphone, webphoneForm]
+  );
+
+  const saveIdentity = async () => {
+    if (!user || !identityHasChanges || isSaving) return;
+    if (!firstName.trim() || !lastName.trim()) {
+      const msg = lang === "ar" ? "الاسم الأول واسم العائلة مطلوبان." : "First name and last name are required.";
+      setError(msg);
+      toast.error(lang === "ar" ? "حقل مطلوب" : "Required Field", msg);
+      return;
+    }
+
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    setError(undefined);
+
+    try {
+      const updated = await updateAdminUser(user.id, {
+        firstName: firstName.trim() !== user.firstName ? firstName.trim() : undefined,
+        lastName: lastName.trim() !== user.lastName ? lastName.trim() : undefined,
+        isSuperAdmin: isSuperAdmin !== user.isSuperAdmin ? isSuperAdmin : undefined,
+      });
+
+      setUser(updated);
+      setFirstName(updated.firstName);
+      setLastName(updated.lastName);
+      setIsSuperAdmin(updated.isSuperAdmin);
       setLastSaved(new Date());
-    }, 500);
+
+      toast.success(
+        lang === "ar" ? "تم الحفظ" : "Saved",
+        lang === "ar" ? "تم تحديث البيانات الشخصية بنجاح." : "Identity profile updated successfully."
+      );
+    } catch (requestError: any) {
+      const details = getErrorMessageAndDetails(requestError, lang);
+      setError(details.message);
+      setCorrelationId(details.correlationId || "");
+      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", details.message);
+
+      setFirstName(user.firstName);
+      setLastName(user.lastName);
+      setIsSuperAdmin(user.isSuperAdmin);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // Toggle Role Assignment (PUT /admin/users/:id/roles)
-  const toggleRole = (roleId: string) => {
-    setIsSaving(true);
-    setAssignedRoleIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(roleId)) next.delete(roleId);
-      else next.add(roleId);
-      return next;
-    });
+  const saveRole = async () => {
+    if (!user || !roleHasChanges || !assignedRoleId || isSaving) return;
 
-    setTimeout(() => {
-      setIsSaving(false);
+    setIsSaving(true);
+    setError(undefined);
+
+    try {
+      await assignUserRole(user.id, { roleId: assignedRoleId });
+      const freshUser = await getAdminUser(user.id);
+
+      setUser(freshUser);
+      setAssignedRoleId(freshUser.roleId ?? freshUser.role?.id ?? undefined);
       setLastSaved(new Date());
-    }, 500);
+
+      toast.success(
+        lang === "ar" ? "تم تعيين الدور" : "Role Assigned",
+        lang === "ar"
+          ? "تم تحديث دور المشرف بنجاح وتم إبطال الجلسات السابقة."
+          : "Role updated successfully. Active sessions have been invalidated."
+      );
+    } catch (requestError: any) {
+      const details = getErrorMessageAndDetails(requestError, lang);
+      setError(details.message);
+      setCorrelationId(details.correlationId || "");
+      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", details.message);
+
+      setAssignedRoleId(user.roleId ?? user.role?.id ?? undefined);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // Auto-Save Handler for WebPhone Config (PUT /admin/users/:id/webphone)
-  const handleWebphoneBlur = () => {
+  const saveWebphone = async () => {
+    if (!user || !webphoneHasChanges || isSaving) return;
+
+    const validationError = validateWebphoneForm(webphoneForm, webphone, lang);
+    if (validationError) {
+      setError(validationError);
+      toast.error(lang === "ar" ? "خطأ في التحقق" : "Validation Error", validationError);
+      return;
+    }
+
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    setError(undefined);
+    setExtensionError(null);
+    setSipUsernameError(null);
+
+    try {
+      const payload = webphonePayloadFromForm(webphoneForm);
+      const updated = await updateUserWebphone(user.id, payload);
+
+      setWebphone(updated);
+      setWebphoneForm(webphoneFormFromConfig(updated));
       setLastSaved(new Date());
-    }, 500);
+
+      toast.success(
+        lang === "ar" ? "تم حفظ إعدادات الهاتف" : "Phone Settings Saved",
+        lang === "ar" ? "تم تحديث إعدادات WebPhone بنجاح." : "WebPhone configuration updated successfully."
+      );
+    } catch (requestError: any) {
+      const details = getErrorMessageAndDetails(requestError, lang);
+      if (details.fieldErrors?.extension) setExtensionError(details.fieldErrors.extension);
+      if (details.fieldErrors?.sipUsername) setSipUsernameError(details.fieldErrors.sipUsername);
+
+      setError(details.message);
+      setCorrelationId(details.correlationId || "");
+      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", details.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleStatusChange = (newStatus: "ACTIVE" | "SUSPENDED") => {
+  const handleStatusChange = async (nextStatus: "ACTIVE" | "SUSPENDED") => {
+    if (!user || isSaving) return;
+
     setIsSaving(true);
-    setStatus(newStatus);
-    setTimeout(() => {
-      setIsSaving(false);
+    setError(undefined);
+
+    try {
+      const updated =
+        nextStatus === "ACTIVE" ? await activateAdminUser(user.id) : await suspendAdminUser(user.id);
+
+      setUser(updated);
+      setStatus(updated.status);
       setLastSaved(new Date());
-    }, 500);
+
+      toast.success(
+        lang === "ar" ? "نجاح" : "Success",
+        lang === "ar" ? "تم تحديث حالة المستخدم بنجاح." : "User status updated successfully."
+      );
+    } catch (requestError: any) {
+      const details = getErrorMessageAndDetails(requestError, lang);
+      setError(details.message);
+      setCorrelationId(details.correlationId || "");
+      toast.error(lang === "ar" ? "خطأ في التحديث" : "Update Error", details.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!user || isSaving) return;
+
+    setIsSaving(true);
+    setError(undefined);
+
+    try {
+      await deleteAdminUser(user.id);
+      toast.success(
+        lang === "ar" ? "تم الحذف" : "Deleted",
+        lang === "ar" ? "تم حذف حساب المشرف بنجاح." : "Admin user deleted successfully."
+      );
+      router.push("/users");
+    } catch (requestError: any) {
+      const details = getErrorMessageAndDetails(requestError, lang);
+      setError(details.message);
+      setCorrelationId(details.correlationId || "");
+      toast.error(lang === "ar" ? "خطأ في الحذف" : "Delete Error", details.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return {
     lang,
     t,
     router,
+    user,
+    isLoading,
+    isSaving,
+    lastSaved,
+    error,
+    errorCode,
+    notFound,
+    permissionDenied,
+    correlationId,
+    reload: loadUser,
+
     firstName,
     setFirstName,
     lastName,
     setLastName,
-    email,
-    tier,
-    setTier,
+    email: user?.email ?? "",
+    isSuperAdmin,
+    setIsSuperAdmin,
+    assignedRoleId,
+    setAssignedRoleId,
+    availableRoles,
     status,
-    availableRoles: mockAvailableRoles,
-    assignedRoleIds,
-    sipExtension,
-    setSipExtension,
-    sipUsername,
-    setSipUsername,
-    sipPassword,
-    setSipPassword,
-    outboundCallerId,
-    setOutboundCallerId,
-    isSaving,
-    lastSaved,
-    handleIdentityBlur,
-    toggleRole,
-    handleWebphoneBlur,
+
+    identityHasChanges,
+    roleHasChanges,
+    webphoneHasChanges,
+
+    webphoneEnabled: webphoneForm.enabled,
+    setWebphoneEnabled: (enabled: boolean) =>
+      setWebphoneForm((current) => ({ ...current, enabled })),
+    sipExtension: webphoneForm.extension,
+    setSipExtension: (extension: string) => {
+      setExtensionError(null);
+      setWebphoneForm((current) => ({ ...current, extension }));
+    },
+    sipUsername: webphoneForm.sipUsername,
+    setSipUsername: (sipUsername: string) => {
+      setSipUsernameError(null);
+      setWebphoneForm((current) => ({ ...current, sipUsername }));
+    },
+    sipPassword: webphoneForm.sipPassword,
+    setSipPassword: (sipPassword: string) =>
+      setWebphoneForm((current) => ({ ...current, sipPassword })),
+    webphoneDisplayName: webphoneForm.displayName,
+    setWebphoneDisplayName: (displayName: string) =>
+      setWebphoneForm((current) => ({ ...current, displayName })),
+    outboundCallerId: webphoneForm.outboundCallerId,
+    setOutboundCallerId: (outboundCallerId: string) =>
+      setWebphoneForm((current) => ({ ...current, outboundCallerId })),
+    webphoneTransport: webphoneForm.transport,
+    setWebphoneTransport: (transport: "ws" | "wss") =>
+      setWebphoneForm((current) => ({ ...current, transport })),
+    passwordConfigured: Boolean(webphone?.passwordConfigured),
+
+    webphoneConfig: webphone,
+    extensionError,
+    sipUsernameError,
+
+    saveIdentity,
+    saveRole,
+    saveWebphone,
     handleStatusChange,
+    handleDelete,
   };
+}
+
+function webphoneFormFromConfig(config?: AdminWebphoneConfig | null): WebphoneForm {
+  return {
+    enabled: Boolean(config?.enabled),
+    extension: config?.extension ?? "",
+    sipUsername: config?.sipUsername ?? "",
+    sipPassword: "",
+    displayName: config?.displayName ?? "",
+    outboundCallerId: config?.outboundCallerId ?? "",
+    transport: config?.transport === "ws" ? "ws" : "wss",
+  };
+}
+
+function webphonePayloadFromForm(form: WebphoneForm) {
+  return {
+    enabled: form.enabled,
+    extension: nullableText(form.extension),
+    sipUsername: nullableText(form.sipUsername),
+    ...(form.sipPassword.trim() ? { sipPassword: form.sipPassword.trim() } : {}),
+    displayName: nullableText(form.displayName),
+    outboundCallerId: nullableText(form.outboundCallerId),
+    transport: form.transport,
+  };
+}
+
+function webphoneFormChanged(form: WebphoneForm, config?: AdminWebphoneConfig | null) {
+  const baseline = webphoneFormFromConfig(config);
+  return (
+    form.enabled !== baseline.enabled ||
+    form.extension.trim() !== baseline.extension ||
+    form.sipUsername.trim() !== baseline.sipUsername ||
+    Boolean(form.sipPassword.trim()) ||
+    form.displayName.trim() !== baseline.displayName ||
+    form.outboundCallerId.trim() !== baseline.outboundCallerId ||
+    form.transport !== baseline.transport
+  );
+}
+
+function validateWebphoneForm(
+  form: WebphoneForm,
+  config: AdminWebphoneConfig | undefined,
+  lang: "ar" | "en"
+) {
+  if (!form.enabled) return undefined;
+  if (!form.extension.trim() || !form.sipUsername.trim()) {
+    return lang === "ar"
+      ? "تفعيل WebPhone يتطلب رقم الامتداد واسم مستخدم SIP."
+      : "Enabled WebPhone settings require an extension and SIP username.";
+  }
+  if (!form.sipPassword.trim() && !config?.passwordConfigured) {
+    return lang === "ar"
+      ? "تفعيل WebPhone يتطلب كلمة مرور SIP."
+      : "Enabled WebPhone settings require a SIP password.";
+  }
+  return undefined;
+}
+
+function nullableText(value: string) {
+  const trimmed = value.trim();
+  return trimmed || null;
 }

@@ -1,12 +1,12 @@
 # Admin Portal — Key Interfaces & Types
 
-Selected high-use response types. Last verified: **2026-07-24**.
+Selected high-use response types. Last verified: **2026-07-30**.
 
 ---
 
 ## Auth Types
 
-### `AdminMe` (GET `/admin/auth/me` response)
+### `AdminMe` (`GET /api/admin/core/v1/auth/me` response)
 ```typescript
 interface AdminMe {
   id: string;
@@ -62,6 +62,60 @@ interface AdminProfile {
   extensions: Record<string, unknown>;
 }
 ```
+
+---
+
+## System Settings Types
+
+```typescript
+type SystemSettingValue = string | number | boolean;
+
+interface MergedSystemSetting {
+  key: string;
+  value: SystemSettingValue;
+  description: string;
+  descriptionI18n: {
+    en: string;
+    ar: string;
+  };
+  isDefault: boolean;
+  readOnly: boolean;
+}
+
+interface PlatformSmtpConfig {
+  configured: boolean;
+  revision: number | null;
+  fromAddress: string | null;
+  fromName: string | null;
+  senderDomain: string | null;
+  smtpHost: string | null;
+  smtpPort: number | null;
+  smtpSecure: boolean | null;
+  smtpProtocol: 'smtp' | 'smtps' | null;
+  smtpUsername: string | null;
+  smtpPasswordConfigured: boolean;
+  updatedAt: string | null;
+}
+
+interface PlatformSmtpConfigHistory {
+  id: string;
+  action: 'CONFIGURED' | 'UPDATED' | 'CONNECTION_VERIFIED';
+  revision: number | null;
+  actor: string;
+  changes: Array<{
+    field: string;
+    label: string;
+    previousValue: string | number | boolean | null;
+    newValue: string | number | boolean | null;
+  }>;
+  createdAt: string;
+}
+```
+
+The generic setting response does not expose schema constraints or timestamps.
+SMTP credentials are write-only; only `smtpPasswordConfigured` is returned.
+See the
+[System Settings and Platform SMTP Frontend Contract](../api/system-settings.md).
 
 ---
 
@@ -140,11 +194,21 @@ interface TenantView {
     currentTenants?: number;
     status: string;
   };
+  storageServerId?: string | null;
+  storageServer?: {
+    id: string;
+    name: string;
+    provider: 'GARAGE';
+    region: string;
+    status: string;
+    availabilityClass: string;
+  };
 }
 ```
 
 The tenant response has no `code`, `primaryFqdn`, plan name, subscription id,
-subscription items, database credentials, or provisioning percentage. See the
+subscription items, database credentials, Storage Server endpoints/buckets/
+credential references, or provisioning percentage. See the
 [Admin Tenants Frontend Contract](../api/tenants.md) for derivation and
 lifecycle rules.
 
@@ -266,6 +330,160 @@ pagination `meta`.
 
 ---
 
+## Storage Server Types
+
+```typescript
+interface StorageServerAdminView {
+  id: string;
+  code: string;
+  name: string;
+  provider: 'GARAGE';
+  placementRole: 'GENERAL' | 'BACKUP_ONLY';
+  internalEndpoint: string;
+  publicEndpoint: string;
+  region: string;
+  forcePathStyle: true;
+  configRevision: number;
+  bindingRevision: number;
+  readinessRevision: number;
+  status: StorageServerStatus;
+  availabilityClass: StorageServerAvailabilityClass;
+  healthStatus: StorageServerHealthStatus;
+  maxTenants: number;
+  currentTenants: number;
+  retainedTenants: number;
+  reservedTenants: number;
+  desiredNodeCount: number;
+  desiredZoneCount: number;
+  requiredReplicationFactor: number;
+  observedNodeCount: number | null;
+  observedZoneCount: number | null;
+  observedReplicationFactor: number | null;
+  usableCapacityBytes: string | null;
+  usedCapacityBytes: string | null;
+  allocatableCapacityBytes: string | null;
+  activeReservedCapacityBytes: string;
+  warningPercent: number;
+  criticalPercent: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TenantCreateStoragePlacementOptionView {
+  id: string;
+  name: string;
+  provider: 'GARAGE';
+  region: string;
+  status: 'ACTIVE';
+  availabilityClass: 'HA_PRODUCTION_READY';
+  currentTenants: number;
+  retainedTenants: number;
+  reservedTenants: number;
+  maxTenants: number;
+  capacityPercent: number;
+  allocatableCapacityBytes: string;
+  availableReservationBytes: string;
+}
+
+interface StorageRecoveryDestinationView {
+  id: string;
+  code: string;
+  name: string;
+  kind: 'OFFLINE_RESTIC_MEDIA_V1';
+  administrationBoundaryKey: string;
+  status: 'DRAFT' | 'ACTIVE' | 'OFFLINE';
+  credentialsConfigured: true;
+  encryptionEvidenceSha256: string | null;
+  disconnectEvidenceSha256: string | null;
+  lastIsolatedRestoreAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface StorageRecoveryPolicyView {
+  id: string;
+  sourceStorageServerId: string;
+  onlineDestinationStorageServerId: string;
+  offlineRecoveryDestinationId: string;
+  sourceReadinessRevision: number;
+  sourceDeploymentFingerprint: string;
+  onlineDestinationReadinessRevision: number;
+  onlineDestinationDeploymentFingerprint: string;
+  sourceAdministrationBoundaryKey: string;
+  onlineAdministrationBoundaryKey: string;
+  offlineAdministrationBoundaryKey: string;
+  failureDomainDisjointEvidenceSha256: string;
+  administrationBoundaryDisjointEvidenceSha256: string;
+  onlineCopyManifestSha256: string;
+  offlineGenerationManifestSha256: string;
+  isolatedRestoreManifestSha256: string;
+  rpoSeconds: number;
+  lastOnlineCopyAt: string;
+  lastOfflineGenerationAt: string;
+  lastIsolatedRestoreAt: string;
+  evidenceRevision: number;
+  status: 'DRAFT' | 'VERIFIED' | 'REVOKED';
+  verifiedAt: string;
+  verifiedExpiresAt: string;
+  verifiedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+The registry view exposes administrative endpoints but never credentials,
+credential references, bucket bindings, topology-member encryption evidence,
+or recovery evidence. The tenant-create placement view is narrower and omits
+endpoints too. Byte counters are decimal strings and require `BigInt`-safe
+formatting. Recovery projections are separate, read-permission-gated
+operational views; the destination view exposes only
+`credentialsConfigured`, never its credential locator. Treat recovery
+fingerprints, boundary keys, and evidence hashes as sensitive metadata. See the
+[Storage Servers Frontend Contract](../api/storage-servers.md).
+
+### Tenant Storage Server migration views
+
+```typescript
+interface TenantStorageMigrationView {
+  migrationId: string;
+  tenantId: string;
+  sourceStorageServerId: string;
+  targetStorageServerId: string;
+  status: TenantStorageMigrationStatus;
+  lastDurableStage: Exclude<
+    TenantStorageMigrationStatus,
+    'FAILED' | 'CANCELLED'
+  >;
+  sourcePlacementRevision: number;
+  storageFenceRevision: number;
+  attemptNumber: number;
+  stageRevision: number;
+  inventoryChecksum: string | null;
+  inventoryCount: number | null;
+  inventoryBytes: string | null;
+  safeErrorCode: string | null;
+  rollbackRetainUntil: string;
+  replayed: boolean;
+}
+
+interface TenantStoragePostCutoverOperationView {
+  operationId: string;
+  migrationId: string;
+  tenantId: string;
+  operation: 'ROLLBACK' | 'FINALIZE';
+  status: TenantStoragePostCutoverStatus;
+  replayed: boolean;
+}
+```
+
+These views belong to the separate default-off migration workflow.
+`TenantView` intentionally does not embed them. The current API also lacks a
+current-migration lookup and a post-cutover operation GET projection, so the
+portal cannot safely recover the workflow after refresh. See
+[Tenant Storage Server Migrations](../api/tenant-storage-migrations.md).
+
+---
+
 ## Modules and Catalogue Types
 
 ```typescript
@@ -334,10 +552,13 @@ interface CurrencyRateView {
 ```
 
 Catalogue activation is represented by `isActive`; module, tier, and feature
-responses do not contain a general `status`. Grant `config` is feature-specific.
-Keep `unitPrice` and `currencyUnitsPerUsd` as decimal strings. The complete
-DTOs, list envelopes, replacement semantics, and UI derivation rules are in the
-[Modules and Catalogue Frontend Contract](../api/catalog.md).
+responses do not contain a general `status`. These flags are independent:
+inactive catalogue rows remain administratively configurable, while the
+materialized tenant policy omits inactive modules, tiers, and features. Grant
+`config` is feature-specific. Keep `unitPrice` and `currencyUnitsPerUsd` as
+decimal strings. The complete DTOs, list envelopes, replacement semantics, and
+UI derivation rules are in the [Modules and Catalogue Frontend
+Contract](../api/catalog.md).
 
 ---
 

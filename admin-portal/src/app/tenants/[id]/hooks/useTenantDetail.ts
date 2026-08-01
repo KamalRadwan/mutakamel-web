@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { buildUpdateTenantProfileDto } from "../../lib/tenant-profile-update";
+import { sanitizeTenantStoragePlacement } from "../../lib/storage-placement";
 
 export type TenantDetailTabKey = "details" | "subscriptions" | "wallet" | "fqdns" | "users" | "operations";
 
@@ -69,203 +72,94 @@ export function useTenantDetail(id: string) {
   const [userRoleFilter, setUserRoleFilter] = useState<string>("ALL");
   const [showDeletedUsers, setShowDeletedUsers] = useState(false);
 
-  // Mock Tenant Detail Record
-  const [tenant, setTenant] = useState({
-    id,
-    expectedUpdatedAt: "2026-07-23T20:00:00.000Z",
-    name: "acme-retail",
-    code: "ACME-EG",
-    companyName: "Acme Retail LLC",
-    primaryFqdn: "acme-retail.mutakamel.ai",
-    industry: "تجارة التجزئة والتجارة الإلكترونية",
-    countryName: "مصر",
-    countryIsoCode: "EG",
-    timezone: "Africa/Cairo",
-    phoneCountryCode: "+20",
-    phone: "1001234567",
-    taxNumber: "123-456-789",
-    commercialRegistrationNumber: "CR-998877",
-    status: "ACTIVE" as "ACTIVE" | "PROVISIONING" | "FAILED" | "SUSPENDED" | "DELETED",
-    databaseServerName: "DB-PRIMARY-EG-01",
-    databaseServerId: "srv-eg-01",
-    createdAt: "2026-06-20 10:00:00",
-    updatedAt: "2026-07-20 14:30:00",
+  const [tenant, setTenant] = useState<any>(null);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [wallet, setWallet] = useState<any>(null);
+  const [ledger, setLedger] = useState<WalletLedgerItem[]>([]);
+  const [fqdns, setFqdns] = useState<any[]>([]);
+  const [tenantUsers, setTenantUsers] = useState<any[]>([]);
+  const [operations, setOperations] = useState<any[]>([]);
+  const [editProfileData, setEditProfileData] = useState<any>({});
 
-    address: {
-      street1: "123 كورنيش النيل",
-      street2: "مبنى البنك التجاري",
-      buildingNo: "12B",
-      district: "حي المعادي",
-      city: "القاهرة",
-      state: "محافظة القاهرة",
-      postalCode: "11511",
-      landmark: "بجوار برج الكورنيش",
-      formattedAddress: "12B كورنيش النيل، حي المعادي، القاهرة، مصر",
-    },
+  const [isLoadingDetails, setIsLoadingDetails] = useState(true);
 
-    ownerEmail: "mona.ali@acme.test",
-    ownerFirstName: "منى",
-    ownerLastName: "علي",
-    ownerJobTitle: "الرئيس التنفيذي",
-  });
+  useEffect(() => {
+    let isMounted = true;
+    const fetchInitialData = async () => {
+      try {
+        setIsLoadingDetails(true);
+        const [tenantRes, subRes, walletRes, fqdnRes, usersRes] = await Promise.allSettled([
+          axiosClient.get(`/api/admin/core/v1/tenants/${id}`),
+          axiosClient.get(`/api/admin/core/v1/tenants/${id}/subscription`),
+          axiosClient.get(`/api/admin/core/v1/tenants/${id}/wallet`),
+          axiosClient.get(`/api/admin/core/v1/tenants/${id}/fqdns`),
+          axiosClient.get(`/api/admin/core/v1/tenants/${id}/users`)
+        ]);
 
-  const [editProfileData, setEditProfileData] = useState({
-    companyName: tenant.companyName,
-    industry: tenant.industry,
-    taxNumber: tenant.taxNumber,
-    commercialRegistrationNumber: tenant.commercialRegistrationNumber,
-    phoneCountryCode: tenant.phoneCountryCode,
-    phone: tenant.phone,
-    address: { ...tenant.address },
-  });
+        if (!isMounted) return;
 
-  // Mock Subscription Data
-  const [subscription, setSubscription] = useState({
-    id: "sub-9901",
-    status: "ACTIVE",
-    planName: "Enterprise Pro Suite",
-    billingCycle: "MONTHLY",
-    currencyCode: "USD",
-    totalPrice: 400,
-    allowedUsers: 50,
-    startedAt: "2026-06-20",
-    currentPeriodEnd: "2026-12-31",
-    cancelAt: null as string | null,
-    items: [
-      { id: "item-1", moduleKey: "core", moduleName: "النواة الأساسية (Core)", tierKey: "enterprise", seats: 50, lineTotal: 150 },
-      { id: "item-2", moduleKey: "crm", moduleName: "إدارة العملاء (CRM)", tierKey: "pro", seats: 50, lineTotal: 120 },
-      { id: "item-3", moduleKey: "trade", moduleName: "محرك التجارة (Trade)", tierKey: "pro", seats: 50, lineTotal: 130 },
-    ],
-  });
+        if (tenantRes.status === "fulfilled" && tenantRes.value.data?.success) {
+          const tenantData = sanitizeTenantStoragePlacement(
+            tenantRes.value.data.data,
+          );
+          setTenant(tenantData);
+          setEditProfileData({
+            companyName: tenantData.companyName,
+            industry: tenantData.industry,
+            taxNumber: tenantData.taxNumber,
+            commercialRegistrationNumber:
+              tenantData.commercialRegistrationNumber,
+            phoneCountryCode: tenantData.phoneCountryCode,
+            phone: tenantData.phone,
+            address: { ...((tenantData.address as object | null) || {}) },
+          });
+        }
+        if (subRes.status === "fulfilled" && subRes.value.data?.success) {
+          setSubscription(subRes.value.data.data);
+        }
+        if (walletRes.status === "fulfilled" && walletRes.value.data?.success) {
+          setWallet(walletRes.value.data.data);
+        }
+        if (fqdnRes.status === "fulfilled" && fqdnRes.value.data?.success) {
+          setFqdns(fqdnRes.value.data.data || []);
+        }
+        if (usersRes.status === "fulfilled" && usersRes.value.data?.success) {
+          setTenantUsers(usersRes.value.data.data || []);
+        }
+      } catch (err) {
+        console.error("Error loading tenant details:", err);
+      } finally {
+        if (isMounted) setIsLoadingDetails(false);
+      }
+    };
+    fetchInitialData();
+    return () => { isMounted = false; };
+  }, [id]);
 
-  // Mock Wallet Data
-  const [wallet, setWallet] = useState({
-    id: "wal-8801",
-    currencyCode: "USD",
-    balanceUsd: 2500.0,
-    reservedBalanceUsd: 150.0,
-    availableBalanceUsd: 2350.0,
-    lifetimeCreditUsd: 5000.0,
-    lifetimeDebitUsd: 2500.0,
-  });
-
-  // Mock Wallet Ledger Entries
-  const [ledger, setLedger] = useState<WalletLedgerItem[]>([
-    { id: "led-101", txRef: "TX-99081", direction: "CREDIT", reason: "DEPOSIT", sourceAmount: 25000.0, sourceCurrencyCode: "EGP", ratePerUsd: 50.0, amountUsd: 500.0, balanceAfterUsd: 2500.0, actorName: "منى علي (Super Admin)", note: "إيداع محفظة عبر التحويل البنكي المباشر", createdAt: "2026-07-20 11:00:00" },
-    { id: "led-102", txRef: "TX-99082", direction: "DEBIT", reason: "SUBSCRIPTION_PAYMENT", sourceAmount: 400.0, sourceCurrencyCode: "USD", ratePerUsd: 1.0, amountUsd: 400.0, balanceAfterUsd: 2100.0, actorName: "System Billing", note: "تجديد اشتراك باقة Enterprise Pro لشهر 7", createdAt: "2026-07-01 00:00:00" },
-  ]);
-
-  // Mock FQDNs
-  const [fqdns, setFqdns] = useState([
-    { id: "fqdn-1", domain: "acme-retail.mutakamel.ai", type: "PRIMARY", status: "VERIFIED", createdAt: "2026-06-20 10:00:00" },
-    { id: "fqdn-2", domain: "portal.acme-retail.com", type: "SECONDARY", status: "VERIFIED", createdAt: "2026-06-22 14:00:00" },
-    { id: "fqdn-3", domain: "app.acme.eg", type: "SECONDARY", status: "PENDING", createdAt: "2026-07-20 09:15:00" },
-  ]);
+  useEffect(() => {
+    if (activeTab === "wallet" && tenant) {
+      axiosClient.get(`/api/admin/core/v1/tenants/${id}/wallet/ledger`).then(res => {
+        if (res.data?.success) setLedger(res.data.data || []);
+      }).catch(console.error);
+    }
+    if (activeTab === "operations" && tenant) {
+      axiosClient.get(`/api/admin/core/v1/tenants/${id}/operations`).then(res => {
+        if (res.data?.success) setOperations(res.data.data || []);
+      }).catch(console.error);
+    }
+  }, [activeTab, id, tenant]);
 
   // Users Summary
   const usersSummary = {
-    total: 24,
-    invited: 2,
-    active: 18,
-    suspended: 2,
-    deactivated: 1,
-    deleted: 1,
-    owners: 1,
-    webphoneEnabled: 6,
+    total: tenantUsers.length,
+    invited: tenantUsers.filter((u) => u.status === "INVITED").length,
+    active: tenantUsers.filter((u) => u.status === "ACTIVE").length,
+    suspended: tenantUsers.filter((u) => u.status === "SUSPENDED").length,
+    deactivated: tenantUsers.filter((u) => u.status === "DEACTIVATED").length,
+    deleted: tenantUsers.filter((u) => u.deletedAt).length,
+    owners: tenantUsers.filter((u) => u.isTenantOwner).length,
+    webphoneEnabled: tenantUsers.filter((u) => u.webphoneEnabled).length,
   };
-
-  // Mock Tenant Users
-  const [tenantUsers, setTenantUsers] = useState<Array<{
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    jobTitle: string;
-    status: string;
-    isTenantOwner: boolean;
-    lastLoginAt: string | null;
-    roles: string[];
-    departmentId: string;
-    departmentName: string;
-    webphoneEnabled: boolean;
-    deletedAt: string | null;
-  }>>([
-    {
-      id: "usr-01",
-      email: "mona.ali@acme.test",
-      firstName: "منى",
-      lastName: "علي",
-      jobTitle: "الرئيس التنفيذي",
-      status: "ACTIVE",
-      isTenantOwner: true,
-      lastLoginAt: "2026-07-23 09:30:00",
-      roles: ["Super Admin"],
-      departmentId: "d-exec",
-      departmentName: "الإدارة التنفيذية",
-      webphoneEnabled: true,
-      deletedAt: null as string | null,
-    },
-    {
-      id: "usr-02",
-      email: "samer.sales@acme.test",
-      firstName: "سامر",
-      lastName: "أحمد",
-      jobTitle: "مدير مبيعات",
-      status: "ACTIVE",
-      isTenantOwner: false,
-      lastLoginAt: "2026-07-22 15:45:00",
-      roles: ["Sales Manager", "CRM User"],
-      departmentId: "d-sales",
-      departmentName: "المبيعات المركزية",
-      webphoneEnabled: true,
-      deletedAt: null,
-    },
-    {
-      id: "usr-03",
-      email: "omar.it@acme.test",
-      firstName: "عمر",
-      lastName: "محمود",
-      jobTitle: "دعم فني",
-      status: "SUSPENDED",
-      isTenantOwner: false,
-      lastLoginAt: "2026-06-30 11:20:00",
-      roles: ["IT Support"],
-      departmentId: "d-it",
-      departmentName: "تقنية المعلومات",
-      webphoneEnabled: false,
-      deletedAt: null,
-    },
-    {
-      id: "usr-04",
-      email: "layla.hr@acme.test",
-      firstName: "ليلى",
-      lastName: "كمال",
-      jobTitle: "موظف موارد بشرية",
-      status: "INVITED",
-      isTenantOwner: false,
-      lastLoginAt: null,
-      roles: ["HR Rep"],
-      departmentId: "d-hr",
-      departmentName: "الموارد البشرية",
-      webphoneEnabled: false,
-      deletedAt: null,
-    },
-    {
-      id: "usr-05",
-      email: "deleted.user@acme.test",
-      firstName: "مستخدم",
-      lastName: "محذوف",
-      jobTitle: "مبيعات سابقة",
-      status: "DELETED",
-      isTenantOwner: false,
-      lastLoginAt: "2026-01-10 10:00:00",
-      roles: [],
-      departmentId: "d-sales",
-      departmentName: "المبيعات المركزية",
-      webphoneEnabled: false,
-      deletedAt: "2026-02-01 12:00:00",
-    },
-  ]);
 
   // Advanced User Filtering
   const filteredTenantUsers = tenantUsers.filter((u) => {
@@ -298,30 +192,42 @@ export function useTenantDetail(id: string) {
     { id: "r-hr", name: "HR Rep", description: "إدارة شؤون الموظفين" },
   ];
 
-  // Mock Operations
-  const [operations, setOperations] = useState([
-    { id: "op-1", type: "TENANT_PROVISIONING", status: "COMPLETED", percent: 100, createdAt: "2026-06-20 10:00:00", completedAt: "2026-06-20 10:05:00" },
-    { id: "op-2", type: "MODULE_ENABLEMENT", status: "COMPLETED", percent: 100, createdAt: "2026-06-21 09:00:00", completedAt: "2026-06-21 09:02:00" },
-  ]);
 
   // Handlers
   const handleUpdateTenantProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    await new Promise((res) => setTimeout(res, 600));
-    setTenant({ ...tenant, ...editProfileData });
-    setIsEditingProfile(false);
-    setIsSubmitting(false);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
-  };
-
-  const handleUpdateSubmit = async () => {
-    setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setIsSubmitting(false);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+    try {
+      const updateDto = buildUpdateTenantProfileDto({
+        ...editProfileData,
+        updatedAt: tenant.updatedAt,
+      });
+      const res = await axiosClient.patch(
+        `/api/admin/core/v1/tenants/${id}`,
+        updateDto,
+      );
+      if (res.data?.success) {
+        const tenantData = sanitizeTenantStoragePlacement(res.data.data);
+        setTenant(tenantData);
+        setEditProfileData({
+          companyName: tenantData.companyName,
+          industry: tenantData.industry,
+          taxNumber: tenantData.taxNumber,
+          commercialRegistrationNumber:
+            tenantData.commercialRegistrationNumber,
+          phoneCountryCode: tenantData.phoneCountryCode,
+          phone: tenantData.phone,
+          address: { ...((tenantData.address as object | null) || {}) },
+        });
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+      setIsEditingProfile(false);
+    }
   };
 
   // Lifecycle
@@ -340,59 +246,102 @@ export function useTenantDetail(id: string) {
   };
 
   // User Lifecycle
-  const handleSuspendUser = (userId: string) => {
-    setTenantUsers(prev => prev.map(u => u.id === userId ? { ...u, status: "SUSPENDED" } : u));
+  const handleSuspendUser = async (userId: string) => {
+    try {
+      await axiosClient.patch(`/api/admin/core/v1/tenants/${id}/users/${userId}/suspend`);
+      setTenantUsers(prev => prev.map(u => u.id === userId ? { ...u, status: "SUSPENDED" } : u));
+    } catch (err) { console.error(err); }
   };
-  const handleActivateUser = (userId: string) => {
-    setTenantUsers(prev => prev.map(u => u.id === userId ? { ...u, status: "ACTIVE" } : u));
+  const handleActivateUser = async (userId: string) => {
+    try {
+      await axiosClient.patch(`/api/admin/core/v1/tenants/${id}/users/${userId}/activate`);
+      setTenantUsers(prev => prev.map(u => u.id === userId ? { ...u, status: "ACTIVE" } : u));
+    } catch (err) { console.error(err); }
   };
-  const handleDeleteUser = (userId: string) => {
-    setTenantUsers(prev => prev.map(u => u.id === userId ? { ...u, status: "DELETED", deletedAt: new Date().toISOString() } : u));
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      await axiosClient.delete(`/api/admin/core/v1/tenants/${id}/users/${userId}`);
+      setTenantUsers(prev => prev.map(u => u.id === userId ? { ...u, status: "DELETED", deletedAt: new Date().toISOString() } : u));
+    } catch (err) { console.error(err); }
   };
-  const handleRestoreUser = (userId: string) => {
-    setTenantUsers(prev => prev.map(u => u.id === userId ? { ...u, status: "SUSPENDED", deletedAt: null } : u));
+  const handleRestoreUser = async (userId: string) => {
+    try {
+      await axiosClient.patch(`/api/admin/core/v1/tenants/${id}/users/${userId}/restore`);
+      setTenantUsers(prev => prev.map(u => u.id === userId ? { ...u, status: "SUSPENDED", deletedAt: null } : u));
+    } catch (err) { console.error(err); }
   };
-  const handleResendInvite = (userId: string) => {
-    // API Call: POST /users/:id/resend-invite
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+  const handleResendInvite = async (userId: string) => {
+    try {
+      await axiosClient.post(`/api/admin/core/v1/tenants/${id}/users/${userId}/resend-invite`);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (err) { console.error(err); }
   };
 
   // FQDN
-  const handleAddFqdnSubmit = (e: React.FormEvent) => {
+  const handleAddFqdnSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFqdnInput) return;
-    setFqdns([
-      ...fqdns,
-      { id: `fqdn-${Date.now()}`, domain: newFqdnInput, type: "SECONDARY", status: "PENDING", createdAt: new Date().toISOString() },
-    ]);
-    setNewFqdnInput("");
-    setIsAddFqdnOpen(false);
+    try {
+      const res = await axiosClient.post(`/api/admin/core/v1/tenants/${id}/fqdns`, { domain: newFqdnInput });
+      if (res.data?.success) {
+        setFqdns([...fqdns, { id: res.data.data.id || `fqdn-${Date.now()}`, domain: newFqdnInput, type: "SECONDARY", status: "PENDING", createdAt: new Date().toISOString() }]);
+        setNewFqdnInput("");
+        setIsAddFqdnOpen(false);
+      }
+    } catch (err) { console.error(err); }
   };
 
-  const handleRemoveFqdn = (fqdnId: string) => {
-    setFqdns(fqdns.filter((f) => f.id !== fqdnId));
+  const handleRemoveFqdn = async (fqdnId: string) => {
+    try {
+      await axiosClient.delete(`/api/admin/core/v1/tenants/${id}/fqdns/${fqdnId}`);
+      setFqdns(fqdns.filter((f) => f.id !== fqdnId));
+    } catch (err) { console.error(err); }
   };
 
-  const handleSetPrimaryFqdn = (fqdnId: string) => {
-    setFqdns(prev => prev.map(f => ({
-      ...f,
-      type: f.id === fqdnId ? "PRIMARY" : "SECONDARY",
-      status: f.id === fqdnId ? "VERIFIED" : f.status
-    })));
+  const handleSetPrimaryFqdn = async (fqdnId: string) => {
+    try {
+      const res = await axiosClient.patch(`/api/admin/core/v1/tenants/${id}/fqdns/${fqdnId}/primary`);
+      if (res.data?.success) {
+        setFqdns(prev => prev.map(f => ({
+          ...f,
+          type: f.id === fqdnId ? "PRIMARY" : "SECONDARY",
+          status: f.id === fqdnId ? "VERIFIED" : f.status
+        })));
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 3000);
+      }
+    } catch (err) {
+      console.error("Failed to set primary FQDN", err);
+    }
   };
 
   // Wallet/Subscriptions
-  const handleCancelSubscription = () => setSubscription({ ...subscription, status: "CANCELED" });
-
-  const submitCreditAdjustment = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsAddCreditOpen(false);
+  const handleCancelSubscription = async () => {
+    try {
+      await axiosClient.post(`/api/admin/core/v1/tenants/${id}/subscription/cancel`);
+      setSubscription({ ...subscription, status: "CANCELED" });
+    } catch (err) { console.error(err); }
   };
 
-  const submitDebitAdjustment = (e: React.FormEvent) => {
+  const submitCreditAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsAddDebitOpen(false);
+    try {
+      await axiosClient.post(`/api/admin/core/v1/tenants/${id}/wallet/credit`, { amount: adjAmount, currency: adjCurrency, note: adjNote });
+      setIsAddCreditOpen(false);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (err) { console.error(err); }
+  };
+
+  const submitDebitAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await axiosClient.post(`/api/admin/core/v1/tenants/${id}/wallet/debit`, { amount: adjAmount, currency: adjCurrency, note: adjNote });
+      setIsAddDebitOpen(false);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (err) { console.error(err); }
   };
 
   return {
@@ -417,6 +366,7 @@ export function useTenantDetail(id: string) {
     setUserRoleFilter,
     showDeletedUsers,
     setShowDeletedUsers,
+    isLoadingDetails,
     operations,
     isSubmitting,
     isSaved,
@@ -476,7 +426,6 @@ export function useTenantDetail(id: string) {
     mockRoles,
 
     // Handlers
-    handleUpdateSubmit,
     handleActivate,
     handleSuspend,
     handleDelete,

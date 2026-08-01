@@ -1,105 +1,85 @@
-# Subscriptions API — `/admin/subscriptions`
+# Subscriptions API
 
-Browser prefix: `/api/admin/core/v1`. The `/admin/...` forms below are Core
-controller-relative paths, not browser request URLs.
+Status: **Verified backend contract; frontend MISSING/PARTIAL/BROKEN**
 
-Base Path: `admin/subscriptions`
-Guard: `AdminGuard`
+Last source verification: **2026-07-30**
 
----
+Owner: **Core**
 
-## GET `/admin/subscriptions` — List Subscriptions
+## Routes
 
-**Permission**: `admin.subscriptions.read`
-**HTTP Status**: 200
+| Method and canonical browser path | Permissions | Purpose |
+| --- | --- | --- |
+| `GET /api/admin/core/v1/subscriptions` | `admin.subscriptions.read` | Paginated cross-tenant list |
+| `POST /api/admin/core/v1/subscriptions/:tenantId/cancel` | `admin.subscriptions.cancel` + `admin.subscriptions.critical` | Schedule/apply cancellation |
+| `GET /api/admin/core/v1/tenants/:tenantId/subscription` | `admin.subscriptions.read` | Tenant subscription detail |
+| `GET /api/admin/core/v1/tenants/:tenantId/subscription/items` | `admin.subscriptions.read` | Item/entitlement lines |
+| `POST /api/admin/core/v1/tenants/:tenantId/subscription` | `admin.subscriptions.create` + `admin.subscriptions.critical` | Seed tenant subscription |
+| `POST /api/admin/core/v1/subscriptions/quote` | `admin.catalog.read` | Server-priced quote |
+| `POST /api/admin/core/v1/subscriptions/:id/plan-change-previews` | `admin.subscriptions.update` | Preview plan change |
+| `POST /api/admin/core/v1/subscriptions/:id/plan-change-previews/:previewId/apply` | `admin.subscriptions.update` + `admin.subscriptions.critical` | Apply reviewed preview |
 
-### Query Parameters — `SubscriptionQueryDto`
-```typescript
-{
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortDir?: 'ASC' | 'DESC';
-  search?: string;
-  status?: SubscriptionStatusEnum;  // 'TRIAL' | 'PENDING_ACTIVATION' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED'
-  tenantId?: string;  // UUID - filter by tenant
-}
+Permission pairs use ALL semantics.
+
+## Wire values
+
+```ts
+type BillingCycle = "MONTHLY" | "ANNUAL";
+
+type SubscriptionStatus =
+  | "TRIAL"
+  | "PENDING_ACTIVATION"
+  | "ACTIVE"
+  | "PAST_DUE"
+  | "CANCELLED";
 ```
 
-### Response — Paginated
-```typescript
-{
-  data: Array<{
-    subscription: {
-      id: string;
-      tenantId: string;
-      allowedUsers: number;
-      status: SubscriptionStatusEnum;
-      billingCycle: string;         // 'MONTHLY' etc.
-      currencyCode: string;        // 'USD' etc.
-      startedAt: string;
-      currentPeriodStart: string;
-      currentPeriodEnd: string;
-      pendingPeriodStart: string | null;
-      pendingPeriodEnd: string | null;
-      trialDays: number;
-      trialStartedAt: string | null;
-      trialEndsAt: string | null;
-      activationScheduledAt: string | null;
-      activatedAt: string | null;
-      cancelAt: string | null;
-      totalPrice: string;          // Decimal string
-      createdAt: string;
-      updatedAt: string;
-    };
-    effectiveAllowedUsers: number;
-    enabledModules: string[];
-    items: Array<{
-      id: string;
-      subscriptionId: string;
-      moduleId: string;
-      tierId: string;
-      moduleKey: string;
-      moduleName: string;
-      tierKey: string;
-      tierName: string;
-      seats: number;
-      lineTotal: string;
-      currencyCode: string;
-      features: string[];
-    }>;
-    tenant: {
-      id: string;
-      name: string;
-      companyName: string;
-      status: TenantStatusEnum;
-    };
+There is no `YEARLY` billing cycle and no `CANCELED` status.
+
+## Quote
+
+```ts
+interface QuoteSubscriptionDto {
+  billingCycle?: BillingCycle;
+  currencyCode?: "USD";
+  items: Array<{
+    moduleId: string;
+    tierId: string;
+    seats: number;
   }>;
-  meta: { page, limit, totalItems, totalPages }
 }
 ```
 
----
+Use the server quote as authoritative. Keep prices as decimal strings and do
+not calculate totals in the browser.
 
-## POST `/admin/subscriptions/:tenantId/cancel` — Cancel Subscription
+## List/detail behavior
 
-**Permission**: `admin.subscriptions.cancel`
-**HTTP Status**: 200
-**Idempotency**: Required
+Rows are under `data`; pagination total is `meta.total`. Full items and tenant
+detail are independently permissioned resources. Do not infer a full
+subscription from the nested tenant summary.
 
-### Response
-```typescript
-{
-  tenantId: string;
-  subscriptionId: string;
-  status: SubscriptionStatusEnum;
-  cancelAt: string | null;
-  scheduled: boolean;
-  changed: boolean;
-  appliedAt: string | null;
-}
-```
+## Plan changes and cancellation
 
-### Frontend Notes
-- Use behind a confirmation action
-- Display `cancelAt` date and refresh entitlement state
+- Preview and apply are separate user intents with separate UUIDv7 keys.
+- Display the exact server preview before apply.
+- Apply uses the preview ID and can fail as stale/expired/conflicting.
+- Cancellation uses
+  `POST /api/admin/core/v1/subscriptions/:tenantId/cancel`, not a tenant-nested
+  `/subscription/cancel` path.
+- Refresh subscription, items, billing summary, and effective access after an
+  authoritative change.
+
+## Current frontend status
+
+The tenant detail hook reads some subscription data but calls the wrong
+cancellation route. There is no complete subscription list, seed, quote
+administration, or plan-change UI.
+
+## Source map
+
+- `../backend/mutakamel-apps/core-app/src/admin/subscriptions/subscriptions.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/subscriptions/subscription-v2.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/subscriptions/subscription-items.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/subscriptions/dto/`
+- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`

@@ -1,10 +1,14 @@
 # Tenant Operations and Provisioning Frontend Contract
 
+Status: **Verified backend contract; frontend PARTIAL/MISSING**
+
+Last source verification: **2026-07-30**
+
 Verified against the current Gateway contracts, Core controllers, DTOs,
 operation/read-model services, provisioning command services, database enums,
-and the Admin Portal tenant-detail prototype on **2026-07-24**.
+and the Admin Portal tenant-detail source.
 
-This document covers the 15 tenant-prefixed operation/provisioning routes used
+This document covers the 16 tenant-prefixed operation/provisioning routes used
 to observe and manage a single tenant. Fleet rollout and release-publishing
 routes under `/api/admin/core/v1/provisioning/...` are a separate platform
 governance surface.
@@ -20,8 +24,8 @@ All paths below are canonical browser paths.
 | `GET /api/admin/core/v1/tenants/:tenantId/operations` | `admin.tenants.read` | `200` | No | Paginated operation history |
 | `GET /api/admin/core/v1/tenants/:tenantId/operations/:operationId` | `admin.tenants.read` | `200` | No | Operation, progress, and step DAG |
 | `GET /api/admin/core/v1/tenants/:tenantId/operations/:operationId/timeline` | `admin.tenants.read` | `200` | No | Paginated safe event timeline |
-| `POST /api/admin/core/v1/tenants/:tenantId/operations/:operationId/retry` | `admin.tenants.read` + `admin.tenants.reprovision` | `202` | Yes | Retry the latest eligible operation |
-| `POST /api/admin/core/v1/tenants/:tenantId/operations/:operationId/cancel` | `admin.tenants.read` + `admin.tenants.reprovision` | `202` | Yes | Request cancellation |
+| `POST /api/admin/core/v1/tenants/:tenantId/operations/:operationId/retry` | `admin.tenants.read` + `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Retry the latest eligible operation |
+| `POST /api/admin/core/v1/tenants/:tenantId/operations/:operationId/cancel` | `admin.tenants.read` + `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Request cancellation |
 
 The two command endpoints require **both** permissions.
 
@@ -29,25 +33,25 @@ The two command endpoints require **both** permissions.
 
 | Method and path | Permission | Success | UUIDv7 key | Purpose |
 |:---|:---|:---:|:---:|:---|
-| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/reconcile` | `admin.tenants.reprovision` | `202` | Yes | Reconcile eligible legacy-discovered state |
+| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/reconcile` | `admin.tenants.reprovision` + `admin.tenants.critical` + `admin.provisioning.critical` | `202` | Yes | Reconcile eligible legacy-discovered state |
 | `GET /api/admin/core/v1/tenants/:tenantId/provisioning/updates` | `admin.tenants.read` | `200` | No | Paginated server-computed update choices |
-| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/updates/apply` | `admin.tenants.reprovision` | `202` | Yes | Apply an exact update selection |
-| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/prerequisite-requests` | `admin.provisioning.prerequisites.request` | `202` | Yes | Request backup/maintenance evidence |
+| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/updates/apply` | `admin.tenants.reprovision` + `admin.tenants.critical` + `admin.provisioning.critical` | `202` | Yes | Apply an exact update selection |
+| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/prerequisite-requests` | `admin.provisioning.prerequisites.request` + `admin.provisioning.critical` | `202` | Yes | Request backup/maintenance evidence |
 | `GET /api/admin/core/v1/tenants/:tenantId/provisioning/prerequisite-evidence` | `admin.provisioning.prerequisites.read` | `200` | No | Read bounded prerequisite evidence |
 
 ### Managed provisioning and state
 
 | Method and path | Permission | Success | UUIDv7 key | Purpose |
 |:---|:---|:---:|:---:|:---|
-| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/add-module` | `admin.provisioning.add-module` | `202` | Yes | Materialize an already-entitled module |
-| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/repair` | `admin.provisioning.repair` | `202` | Yes | Repair one component closure |
-| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/decommission` | `admin.provisioning.decommission` | `202` | Yes | Disable/retain a component |
+| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/add-module` | `admin.provisioning.add-module` + `admin.provisioning.critical` | `202` | Yes | Materialize an already-entitled module |
+| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/repair` | `admin.provisioning.repair` + `admin.provisioning.critical` | `202` | Yes | Repair one component closure |
+| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/decommission` | `admin.provisioning.decommission` + `admin.provisioning.critical` | `202` | Yes | Disable/retain a component |
+| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/seed-conflicts/:seedStateId/resolve` | `admin.provisioning.conflicts.resolve` + `admin.provisioning.critical` | `202` | Yes | Resolve an eligible seed conflict |
 | `GET /api/admin/core/v1/tenants/:tenantId/provisioning-state/components` | `admin.tenants.read` | `200` | No | Paginated installation evidence |
 | `GET /api/admin/core/v1/tenants/:tenantId/provisioning-state/seeds` | `admin.tenants.read` | `200` | No | Paginated seed-state evidence |
 
-The Core controller also defines a seed-conflict resolution command, but the
-current Gateway has no browser route for it. Do not implement a frontend call
-until a Gateway contract is added.
+The seed-conflict command is present in the current Gateway contract. It
+remains frontend `MISSING` and requires both permissions shown.
 
 ## Shared envelopes and idempotency
 

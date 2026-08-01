@@ -1,151 +1,51 @@
-# Reports API — `/admin/reports`
+# Administrative Reports API
 
-Browser prefix: `/api/admin/core/v1`. The `/admin/...` forms below are Core
-controller-relative paths, not browser request URLs.
+Status: **Verified backend contract; frontend MISSING**
 
-Base Path: `admin/reports`
-Guard: `AdminGuard`
-Permission: `admin.reports.read` (controller-level)
+Last source verification: **2026-07-30**
 
----
+Owner: **Core**
 
-## GET `/admin/reports/overview` — Admin Overview Report
+All routes require `admin.reports.read`.
 
-**Permission**: `admin.reports.read`
-**HTTP Status**: 200
+## Routes
 
-### Query Parameters
-```typescript
-{
-  from?: string; // Optional ISO datetime (inclusive start)
-  to?: string;   // Optional ISO datetime (inclusive end, must be >= from)
-}
-```
+| Method and canonical browser path | Purpose |
+| --- | --- |
+| `GET /api/admin/core/v1/reports/overview` | Cross-domain control-plane summary |
+| `GET /api/admin/core/v1/reports/tenants` | Paginated tenant report |
+| `GET /api/admin/core/v1/reports/servers` | Database Server capacity/health |
+| `GET /api/admin/core/v1/reports/billing` | Invoice/billing buckets |
+| `GET /api/admin/core/v1/reports/provisioning` | Provisioning health/stuck work |
 
-### Response
-```typescript
-{
-  asOf: string;
-  tenantsByStatus: {
-    ACTIVE: number;
-    SUSPENDED: number;
-    PROVISIONING: number;
-  };
-  subscriptions: {
-    count: number;
-    totalAllowedUsers: number;
-  };
-  outstandingInvoices: {
-    count: number;
-    total: string;  // Decimal string (e.g. '1299.0000')
-  };
-}
-```
+These five routes are separate from the live
+`GET /api/admin/core/v1/dashboard` aggregation.
 
----
+## Shared query behavior
 
-## GET `/admin/reports/tenants` — Tenant Report
+Date filters are ISO date/datetime strings as defined by each report DTO. When
+both `from` and `to` are present, `to` must not precede `from`. Paginated report
+rows use `data` with `meta.total`.
 
-**Permission**: `admin.reports.read`
-**HTTP Status**: 200
+Do not create one global report sort/filter allowlist; read the exact DTO for
+the selected report.
 
-### Query Parameters
-```typescript
-{
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortDir?: 'ASC' | 'DESC';
-  search?: string;
-  status?: string;      // TenantStatusEnum
-  serverId?: string;    // Database server UUID filter
-}
-```
+## Response rules
 
-### Response — Paginated
-```typescript
-{
-  data: Array<{
-    id: string;
-    name: string;
-    status: TenantStatusEnum;
-    allowedUsers: number;
-    subscriptionStatus: SubscriptionStatusEnum;
-    createdAt: string;
-  }>;
-  meta: { page, limit, totalItems, totalPages }
-}
-```
+- Keep all money as decimal strings.
+- Do not fabricate unsupported metrics.
+- Render backend-unavailable analytics as unavailable.
+- A `403` is forbidden, not an empty report.
+- Preserve `asOf`, source timestamps, and `correlationId`.
+- Unknown/additive status buckets require a safe fallback.
 
----
+## Current frontend status
 
-## GET `/admin/reports/servers` — Database Server Report
+The Dashboard uses its own real endpoint, but there are no report routes,
+domain client modules, or operator pages for these five APIs.
 
-**Permission**: `admin.reports.read`
-**HTTP Status**: 200
+## Source map
 
-### Frontend Notes
-- Use for capacity charts and server health panels
-- Utilization = `currentTenants / maxTenants`
-
----
-
-## GET `/admin/reports/billing` — Billing Report
-
-**Permission**: `admin.reports.read`
-**HTTP Status**: 200
-
-### Query Parameters
-```typescript
-{
-  from?: string;    // Optional issuedAt start
-  to?: string;      // Optional issuedAt end
-  groupBy?: 'day' | 'week' | 'month';
-}
-```
-
-### Response
-```typescript
-{
-  asOf: string;
-  buckets: Array<{
-    status: InvoiceStatusEnum;
-    total: string;     // Decimal string
-    count: number;
-  }>;
-}
-```
-
----
-
-## GET `/admin/reports/provisioning` — Provisioning Health Report
-
-**Permission**: `admin.reports.read`
-**HTTP Status**: 200
-
-### Query Parameters
-```typescript
-{
-  page?: number;
-  limit?: number;
-  from?: string;
-  to?: string;
-}
-```
-
-### Response
-```typescript
-{
-  asOf: string;
-  stuck: number;    // Count of tenants stuck in provisioning
-  items: Array<{
-    id: string;
-    name: string;
-    status: 'PROVISIONING';
-    createdAt: string;
-  }>;
-}
-```
-
-### Frontend Notes
-- Highlight rows that have been provisioning longer than expected SLA
+- `../backend/mutakamel-apps/core-app/src/admin/reports/`
+- `../backend/mutakamel-apps/core-app/src/admin/reports/dto/`
+- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`

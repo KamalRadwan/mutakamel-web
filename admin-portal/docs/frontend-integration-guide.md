@@ -1,294 +1,178 @@
 # Admin Portal Frontend Integration Guide
 
-This is the starting point for UI developers and AI coding agents working in
-`admin-portal`. It records what the frontend currently implements, which data
-is mocked, how browser routes map to backend applications, and where to find
-the validated DTO and enum details.
+Status: **Current source integration guide**
 
-Last source verification: **2026-07-24**
+Last source verification: **2026-07-30**
 
-## Backend ownership
+## Scope
 
-The Admin Portal is a control-plane application:
+This guide connects the current Admin Portal source to the 243 Core Admin
+Gateway routes. It does not claim full parity, authenticated runtime success,
+release readiness, or deployment.
 
-| Backend app | Admin Portal responsibility |
-|:---|:---|
-| `core-app` | Primary backend: auth, dashboard, admin users and roles, tenants, provisioning, database servers, catalogue, subscriptions, invoices, wallets, reports, settings, logging, and notifications |
-| `api-gateway-app` | The only public routing contract the browser should use; it maps canonical public paths to upstream applications |
-| `worker-app` | Admin backup and restore APIs |
-| `crm-app` | Tenant product API; not a direct Admin Portal API source today |
-| `trade-app` | Tenant product API; not a direct Admin Portal API source today |
+Read the [documentation contract](DOCUMENTATION_CONTRACT.md) and
+[AI Start Here](ai/START_HERE.md) before changing a server-backed feature.
 
-Do not invent Admin Portal calls under `/api/admin/crm/...` or
-`/api/admin/trade/...`. The gateway currently assigns CRM and Trade routes to
-the tenant master, not the admin master.
+## Canonical transport
 
-## Public URL rules
-
-Browser code must use canonical API Gateway paths:
+Browser code uses:
 
 ```text
-Core admin:   /api/admin/core/v1/<route>
-Worker admin: /api/admin/worker/v1/<route>
+/api/admin/core/v1/<relative>
 ```
 
-Examples:
+Worker backup/restore uses:
 
 ```text
-POST /api/admin/core/v1/auth/login
-GET  /api/admin/core/v1/dashboard
-GET  /api/admin/core/v1/database-servers
-GET  /api/admin/core/v1/tenants
-GET  /api/admin/worker/v1/backups/runs
+/api/admin/worker/v1/<relative>
 ```
 
-Paths such as `/admin/tenants`, `/admin/system-settings`, and
-`/api/v1/admin/dashboard` are upstream/controller paths. They are useful when
-reading backend code, but browser code must not call them directly.
+`/admin/*` and `/api/v1/admin/*` are backend/internal paths, not browser URLs.
 
-### Local and production routing
+Use `src/lib/api/axiosClient.ts` so cookie-mode credentials and coordinated
+refresh behavior remain consistent. The current client is a foundation, not the
+final typed domain API architecture.
 
-- The portal runs on fixed port `5001`.
-- In development, `next.config.ts` rewrites same-origin `/api/*` requests to
-  `DEV_API_TARGET` (default gateway target `http://localhost:9000`).
-- In production, there is no Next rewrite. `NEXT_PUBLIC_API_URL` must be the API
-  Gateway origin, or requests must already be routed to the gateway by the
-  deployment ingress.
-- Prefer relative `/api/...` URLs in browser code when same-origin routing is
-  available. This keeps refresh cookies same-origin.
+## Source verification order
 
-## Source-of-truth order
+1. Gateway typed route entry.
+2. Core/Worker controller and guards.
+3. DTOs, response contracts, services, and tests.
+4. Current frontend hooks/types/tests.
+5. Markdown.
+6. Mocks and fixtures only as frontend defect evidence.
 
-When documentation and code disagree, use this order:
+See [Source of Truth](ai/SOURCE_OF_TRUTH.md).
 
-1. `api-gateway-app/src/routing-proxy/route-contracts/*.route-contracts.ts`
-   for the browser-visible method and path.
-2. The owning app controller for guards, permissions, parameters, and HTTP
-   behavior.
-3. The owning app DTOs and response/service types for validation and data
-   shape.
-4. The markdown documents in this folder.
-5. Frontend mock objects only as design fixtures, never as API contracts.
+## Current frontend routes
 
-Backend paths in this guide are written relative to
-`C:\mutakamel.ai\frontend`, whose backend sibling is
-`../backend/mutakamel-apps/`.
+| Frontend route | Source status | Primary contract |
+| --- | --- | --- |
+| `/login` | `DONE/PARTIAL/BROKEN`: login/refresh/me/logout real; forgot password simulated; accept/reset/logout-all absent | [Auth](api/auth.md) |
+| `/dashboard` | `DONE/REFACTOR`: real dashboard and unavailable states; report modules absent | [Dashboard](api/dashboard.md), [Reports](api/reports.md) |
+| `/database-servers` | `DONE/REFACTOR`: real list/actions; typing/filter/error/metric work remains | [Database Servers](api/database-servers.md) |
+| `/database-servers/new` | `DONE/REFACTOR`: real registration/connectivity; validation/error hardening remains | [Database Servers](api/database-servers.md) |
+| `/database-servers/[id]` | `DONE/REFACTOR`: real detail/history/lifecycle/delete | [Database Servers](api/database-servers.md) |
+| `/storage-servers` | `DONE/PARTIAL`: live bounded registry; critical advanced controls intentionally absent | [Storage Servers](api/storage-servers.md) |
+| `/storage-servers/[id]` | `DONE/PARTIAL/GATED`: detail/edit/history/verification/lifecycle live; recovery/attestation gated | [Storage Servers](api/storage-servers.md) |
+| `/tenants` | `PARTIAL/BROKEN`: real foundation mixed with weak types/local behaviors | [Tenants](api/tenants.md) |
+| `/tenants/new` | `PARTIAL/BROKEN`: real quote/Storage placement foundation; simulated/hardcoded sequence remains | [Tenants](api/tenants.md) |
+| `/tenants/[id]` | `PARTIAL/BROKEN`: real detail mixed with wrong routes/methods, mock catalogues, and local wallet/lifecycle | [Tenants](api/tenants.md), [Tenant users](api/tenant-users.md), [Operations](api/tenant-operations.md) |
+| `/modules` | `DONE/PARTIAL/REFACTOR`: main catalogue calls exist; bounded delete/audit/batch/Storage gaps remain | [Catalogue](api/catalog.md) |
+| `/modules/[id]` | `DONE/PARTIAL/REFACTOR`: real nested catalogue foundation; decimal/enum/error hardening remains | [Catalogue](api/catalog.md) |
+| `/users` | `DONE/PARTIAL`: real user list/invite/lifecycle; error/state hardening remains | [Users](api/users.md) |
+| `/users/[id]` | `DONE/PARTIAL`: real user/roles/WebPhone; self profile is separate and missing | [Users](api/users.md) |
+| `/roles` | `DONE/PARTIAL/REFACTOR`: real roles/permissions; ordinary metadata permission must remain non-critical | [Roles](api/roles-permissions.md) |
+| `/roles/[id]` | `DONE/PARTIAL/REFACTOR`: real role detail/permission replacement | [Roles](api/roles-permissions.md) |
+| `/settings/*` | `DONE/PARTIAL/REFACTOR`: real settings/SMTP/Asterisk foundation with remaining permission/fallback issues | [Settings](api/system-settings.md) |
 
-## Current frontend route inventory
+The app has no frontend route yet for reports, provisioning governance,
+subscriptions, invoices, payments/reconciliation, control-plane audit, logging,
+real notifications, or self-profile/auth completion.
 
-| Frontend route | Screen | Current data state | Primary API documentation |
-|:---|:---|:---|:---|
-| `/` | Redirect | Redirects to `/dashboard` | — |
-| `/login` | Admin login | Live login, refresh, `/me`, and logout calls; forgot-password modal is simulated | [Auth](api/auth.md) |
-| `/dashboard` | Control-plane dashboard | **Mock** in `useDashboard.ts` | [Dashboard](api/dashboard.md) |
-| `/database-servers` | Server list and actions | **Mock** | [Database servers](api/database-servers.md) |
-| `/database-servers/new` | Server registration | **Mock submit/connectivity** | [Database servers](api/database-servers.md) |
-| `/database-servers/[id]` | Server detail, tenants, history | **Mock** | [Database servers](api/database-servers.md) |
-| `/tenants` | Tenant list and lifecycle actions | **Mock** | [Tenants](api/tenants.md) |
-| `/tenants/new` | Tenant registration/provisioning wizard | **Mock** | [Tenants](api/tenants.md) |
-| `/tenants/[id]` | Tenant, subscription, wallet, FQDN, users, operations | **Mock** | [Tenants](api/tenants.md), [Tenant users](api/tenant-users.md), [Operations](api/tenant-operations.md), [Wallet](api/wallet.md) |
-| `/modules` | Module catalogue | **Mock** | [Catalogue](api/catalog.md) |
-| `/modules/[id]` | Module tiers, features, grants, pricing | **Mock** | [Catalogue](api/catalog.md) |
-| `/users` | Admin staff list | **Mock** | [Admin users](api/users.md) |
-| `/users/[id]` | Admin staff detail and roles | **Mock** | [Admin users](api/users.md), [Roles](api/roles-permissions.md) |
-| `/roles` | Admin role list | **Mock** | [Roles](api/roles-permissions.md) |
-| `/roles/[id]` | Role permissions | **Mock** | [Roles](api/roles-permissions.md) |
-| `/settings` | Settings index | Static navigation | [System settings](api/system-settings.md) |
-| `/settings/platform` | Platform and tenant defaults | Backend attempt with local fallback | [System settings](api/system-settings.md) |
-| `/settings/auth` | Auth TTL settings | Backend attempt with local fallback | [System settings](api/system-settings.md) |
-| `/settings/billing` | Billing settings | Backend attempt with local fallback | [System settings](api/system-settings.md) |
-| `/settings/asterisk` | Asterisk/WebRTC settings | Backend attempt with local fallback | [System settings](api/system-settings.md) |
-| `/settings/notifications` | Notification channel settings | Backend attempt with local fallback | [System settings](api/system-settings.md), [Notifications](api/notifications.md) |
-| `/settings/smtp` | Platform SMTP config and audit | Backend attempt with simulated success fallback | [System settings](api/system-settings.md) |
+## Broken tenant contracts
 
-Legacy compatibility routes:
+The current tenant detail hook contains the following confirmed defects:
 
-- `/module` redirects to `/modules`.
-- `/tenant` and `/tenant/[id]` redirect to `/tenants`.
-- `/database-server`, `/database-server/new`, and
-  `/database-server/[id]` redirect to the plural route family.
-- `src/app/admin/database-servers/` contains duplicate hook/component code but
-  no page route. Use `src/app/database-servers/` as the active screen source.
+| Current behavior | Required behavior |
+| --- | --- |
+| Calls nonexistent separate FQDN GET | Read nested FQDN projection from tenant detail |
+| Uses `PATCH` for tenant-user suspend/activate/restore | Use `POST` |
+| Sends `{ domain }` to FQDN create | Send `{ fqdn }` |
+| Uses `PATCH` for primary FQDN | Use `POST` |
+| Calls tenant-nested subscription cancel | Use `/subscriptions/:tenantId/cancel` |
+| Calls wallet credit/debit routes | Preview and confirm wallet adjustment |
+| Uses mock access catalogues | Load role/branch/department/team APIs independently |
 
-## Known integration hazards
+Tenant creation also contains hardcoded database IDs, hardcoded
+module/tier choices, `YEARLY`, simulated identity validation, simulated
+provisioning preview, and incomplete FQDN/reverse-geocode behavior.
 
-These are current-code facts that a UI developer must know before wiring APIs:
+## Shared HTTP contract
 
-1. Only authentication uses the shared `axiosClient` and canonical gateway
-   paths today.
-2. Dashboard, tenants, database servers, modules, admin users, and roles are
-   client-side mock implementations even where comments name real endpoints.
-3. General settings and SMTP hooks call `/admin/system-settings...` instead of
-   `/api/admin/core/v1/system-settings...`.
-4. Those settings hooks use raw `fetch`, do not share the coordinated 401
-   refresh behavior, and currently fall back to preview data or simulated
-   success when requests fail.
-5. The settings fallback base URL is `http://localhost:5001`, which points back
-   to the frontend rather than the gateway when `NEXT_PUBLIC_API_URL` is absent.
-6. Several links still target non-existent frontend paths:
-   `/admin/users/me/profile`, `/admin/roles`, `/admin/tenants`, and
-   `/admin/reports`.
-7. The notification dropdown and WebRTC phone UI are presentation fixtures;
-   do not assume they are hydrated by their documented APIs.
-8. Frontend mock status values are not always backend enum values. Examples
-   include tenant `"FAILED"` instead of `PROVISIONING_FAILED`, operation
-   `"COMPLETED"` instead of `SUCCEEDED`, and subscription `"CANCELED"` instead
-   of `CANCELLED`.
-9. The modules prototype links by module key, uses `YEARLY`, and invents
-   catalogue fields and bulk operations that are absent from the API. Use
-   UUIDv7 IDs, `ANNUAL`, and the exact replacement contracts documented in
-   [Modules and Catalogue](api/catalog.md).
-10. The tenant prototypes invent summary/detail fields, calculate provisioning
-    and billing values locally, use invalid operation/user states, and perform
-    local-only mutations. Tenant creation must use a server quote, every
-    Gateway mutation needs one UUIDv7 idempotency key per intent, deleted
-    tenant users use visibility rather than a `DELETED` status, and
-    provisioning completion must be polled from the operation API. Use
-    [Tenants](api/tenants.md), [Tenant Users](api/tenant-users.md), and
-    [Tenant Operations](api/tenant-operations.md).
-
-Do not hide these failures behind permanent mock fallbacks when converting a
-screen to production data. Use explicit loading, empty, permission-denied, and
-error states.
-
-## Authentication and request behavior
-
-The current auth flow is intentionally cookie-and-token based:
-
-- Send `credentials: "include"` so the HttpOnly refresh cookie is available.
-- Send `x-auth-cookie-mode: 1` to admin auth endpoints.
-- Login may send `x-auth-remember: 1` or `0`.
-- Store the access token only in `sessionStorage`; the refresh token remains in
-  the HttpOnly cookie.
-- Protected calls send `Authorization: Bearer <accessToken>`.
-- On a protected `401`, the shared client coordinates one refresh attempt
-  across callers and retries the original request once.
-- If refresh fails, clear local auth state and redirect to `/login`.
-- Core’s global response interceptor wraps successful handler payloads in
-  `{ success, data, correlationId, timestamp }`; paginated responses also have
-  `meta`. The Gateway streams that envelope unchanged. The current auth client
-  still accepts a legacy direct token object as a compatibility fallback, but
-  new feature clients should type and unwrap the canonical envelope.
-- Core errors use the canonical envelope’s `errorCode`; errors produced by the
-  Gateway itself use RFC 9457-style Problem Details with `code`. Normalize both
-  shapes and preserve `correlationId` for support.
-- Gateway routes classified as `WRITE_SENSITIVE` with `idempotent: true`
-  require an `x-idempotency-key` UUIDv7 header. Generate one key for each user
-  intent and reuse it only for an exact retry of that request.
-
-Public auth routes are login, refresh, accept-invite, forgot-password,
-reset-password, and logout. `/auth/me` and `/auth/logout-all` require an
-authenticated admin session.
-
-## Global DTO and validation rules
-
-`core-app` installs a global Nest `ValidationPipe` with:
+Core success:
 
 ```ts
-{
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-  transformOptions: { enableImplicitConversion: true }
+interface SuccessResponse<T> {
+  success: true;
+  data: T;
+  meta?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+  correlationId: string;
+  timestamp: string;
 }
 ```
 
-Frontend consequences:
+Use `data` for rows and `meta.total` for pagination. A successful `DELETE 204`
+has no body.
 
-- Send only documented DTO fields. Extra body, query, or parameter keys can
-  produce HTTP `400`.
-- Do not submit empty strings for optional typed fields unless the DTO
-  explicitly transforms them.
-- Treat IDs documented with `@IsUUID("7")` as UUIDv7; placeholder IDs such as
-  `"1"` and `"new-role-id"` are not valid API inputs.
-- Query booleans using DTOs with the strict boolean transform accept
-  `true`, `false`, `"true"`, `"false"`, `"1"`, and `"0"`. Other strings fail
-  boolean validation.
-- Dates use ISO date strings. Prefer `YYYY-MM-DD` for calendar filters and full
-  ISO timestamps for event timestamps.
-- Enum values are case-sensitive transport values. Translate labels in the UI,
-  but send the raw uppercase value.
-- Pagination defaults and allowed `sortBy` fields vary by endpoint. Do not
-  create one global sort-field list.
-- Error `message` may be a string or a validation-message array, and custom
-  domain errors may also include a stable `code`.
+Normalize Core `errorCode` and Gateway `code` into one error while preserving
+field errors and `correlationId`. See
+[HTTP and Error Contract](architecture/http-and-error-contract.md).
 
-Selected shared DTOs are in [models/dtos.md](models/dtos.md); each API page
-contains its domain DTOs and validation notes.
+## Authentication
 
-## Enum rules
+- Use HttpOnly cookie auth.
+- Send `credentials: "include"` and `x-auth-cookie-mode: 1`.
+- Store only non-secret session timing/generation and validated profile data.
+- Coordinate one refresh across callers and retry a protected request once.
+- Only definitive refresh `401/403` clears the session.
+- Never treat isolated unauthenticated `/auth/me` as failed-login evidence.
 
-Use [models/enums.md](models/enums.md) as the transport-value reference.
+## Permissions
 
-- Keep enum values separate from translated labels.
-- Always include an unknown-value fallback so a newly added backend enum does
-  not crash rendering.
-- `ratio` and `percent` fields in dashboard responses are normalized decimal
-  values unless a specific API document says otherwise.
-- Destructive actions must be derived from status and permission together, not
-  status alone.
+Permission lists use ALL semantics unless Gateway explicitly declares ANY.
+FQDN validation is the current explicit ANY route. The frontend needs
+`adminCan`, `adminCanAll`, `adminCanAny`, and a ONE/ALL/ANY requirement
+component.
 
-## RBAC and navigation
+Nested tenant permissions are independent. `admin.tenants.read` does not grant
+tenant-user, subscription, invoice, wallet, payment, audit, or provisioning
+access. A `403` renders forbidden, not empty.
 
-- Fetch `/api/admin/core/v1/auth/me` before showing protected portal content.
-- Treat the `permissions` array from `/auth/me` as the source for navigation
-  visibility and action availability.
-- Hiding a button is not authorization; the backend guard remains authoritative.
-- Dashboard visibility requires `admin.reports.read`.
-- See [rbac/permissions.md](rbac/permissions.md) for the permission catalogue
-  and [guides/sidebar-navigation.md](guides/sidebar-navigation.md) for the
-  proposed module mapping.
+## Idempotency
 
-The current top navigation is not yet permission-gated. Add permission checks
-when each module becomes server-backed.
+Write-sensitive commands use UUIDv7 keys. One exact user intent owns one key
+through pending and exact retry. The current auto-generating interceptor is not
+enough for exact retry because the mutation caller must retain the original
+intent key.
 
-## Backend capability snapshot
+Treat `GW.IDEM.IN_FLIGHT` as processing/reconcile. Treat mismatch/reuse errors
+as client defects.
 
-At the verification date, the API Gateway contains **202** Core admin route
-contracts and **16** Worker admin route contracts.
+## Data-state and numeric rules
 
-Core route groups:
+Each independent resource must distinguish loading, refreshing, data, empty,
+forbidden, unavailable, validation, conflict, stale, transport, replay, and
+terminal async failure.
 
-| Group | Routes | Existing frontend doc |
-|:---|---:|:---|
-| Auth | 8 | [auth.md](api/auth.md) |
-| Dashboard | 1 | [dashboard.md](api/dashboard.md) |
-| Admin users | 15 | [users.md](api/users.md) |
-| Roles and permissions | 7 | [roles-permissions.md](api/roles-permissions.md) |
-| Tenants and nested tenant resources | 58 | [tenants.md](api/tenants.md), [tenant-users.md](api/tenant-users.md), [tenant-operations.md](api/tenant-operations.md) |
-| Provisioning control plane | 32 | [tenants.md](api/tenants.md), [tenant-operations.md](api/tenant-operations.md) |
-| Database servers | 10 | [database-servers.md](api/database-servers.md) |
-| Catalogue: modules, tiers, features, grants, pricing | 18 | [catalog.md](api/catalog.md) |
-| Subscriptions | 5 | [subscriptions.md](api/subscriptions.md) |
-| Invoices | 7 | [invoices.md](api/invoices.md) |
-| Wallet and ledger | 2 direct groups plus nested tenant routes | [wallet.md](api/wallet.md) |
-| Reports | 5 | [reports.md](api/reports.md) |
-| System settings | 6 | [system-settings.md](api/system-settings.md) |
-| Logging | 6 | [logging.md](api/logging.md) |
-| Notifications | 14 | [notifications.md](api/notifications.md) |
-| Billing rates | 3 | [catalog.md](api/catalog.md) |
-| Payments/reconciliation | 4 plus nested tenant routes | Domain coverage is partial in current frontend docs |
+Keep money, FX, byte quotas, and capacities as strings. Do not use `parseFloat`
+for authoritative financial calculations.
 
-All 16 Worker admin routes belong to backup policies, backup runs/artifacts,
-and restore runs. Their canonical browser prefix is
-`/api/admin/worker/v1`, as detailed in
-[backups-restores.md](api/backups-restores.md).
+## Gated boundaries
 
-Counts are an inventory aid, not a stable API promise. Re-run the gateway route
-inventory when backend contracts change.
+- Existing-tenant Storage Server migration remains default-off and must not be
+  exposed.
+- Normal tenant PATCH must never accept `storageServerId`.
+- Admin Realtime is not activated; notification UX falls back to REST polling.
+- Storage attestation/recovery remains gated until its operator-safe evidence
+  contract is confirmed.
 
-## Recommended integration order
+## Implementation order
 
-1. Keep all requests on the shared client and canonical gateway paths.
-2. Replace the dashboard mock using the adapter notes in
-   [api/dashboard.md](api/dashboard.md).
-3. Wire permission-gated navigation from `/auth/me`.
-4. Integrate database servers, tenants, catalogue, admin users, and roles.
-5. Replace settings fail-open/simulated-success behavior with real error states.
-6. Add notifications and WebPhone only after their session and secret-handling
-   contracts are implemented.
-7. Add Worker backup/restore screens when they enter the Admin Portal
-   navigation.
+1. HTTP/error contracts, RBAC ONE/ALL/ANY, stable intent keys, decimal/byte
+   helpers, and shared API states.
+2. Repair false-live tenant/auth workflows.
+3. Complete the live tenant-creation sequence.
+4. Add operational modules.
+5. Add provisioning governance.
+6. Add bounded catalogue/infrastructure gaps while preserving gates.
 
-For every screen, complete loading, empty, validation, forbidden, conflict,
-rate-limit, and retry behavior before marking the integration production-ready.
+See the full [implementation playbook](ai/IMPLEMENTATION_PLAYBOOK.md) and
+[test matrix](ai/TEST_MATRIX.md).

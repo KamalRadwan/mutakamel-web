@@ -1,212 +1,347 @@
 "use client";
 
-import { 
-  PieChart, TrendingUp, Users, Target, Radar, CalendarDays, 
-  ArrowDownUp, Activity, CreditCard, Ticket, LayoutGrid 
+import { ReactNode } from "react";
+import {
+  Activity,
+  CalendarDays,
+  CreditCard,
+  PieChart,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { DashboardViewMode } from "./DashboardHeader";
-import { toneToColorClass } from "../utils/formatters";
-
-// Existing charts
+import { DashboardResponse } from "@/types/dashboard";
 import { TenantStatusDonutChart } from "./charts/TenantStatusDonutChart";
-import { TenantGrowthRevenueChart } from "./charts/TenantGrowthRevenueChart";
-
-// New charts
-import { SubscriptionChurnComposedChart } from "./charts/SubscriptionChurnComposedChart";
-import { SubscriptionMRRStackChart } from "./charts/SubscriptionMRRStackChart";
-import { SubscriptionTargetGauge } from "./charts/SubscriptionTargetGauge";
-import { SubscriptionCLTVRadarChart } from "./charts/SubscriptionCLTVRadarChart";
-import { SubscriptionRenewalsBarChart } from "./charts/SubscriptionRenewalsBarChart";
-import { SubscriptionMigrationWaterfallChart } from "./charts/SubscriptionMigrationWaterfallChart";
 import { SubscriptionARPUSplineChart } from "./charts/SubscriptionARPUSplineChart";
-import { SubscriptionPaymentPieChart } from "./charts/SubscriptionPaymentPieChart";
-import { SubscriptionPromoImpactScatter } from "./charts/SubscriptionPromoImpactScatter";
-import { SubscriptionRetentionGrid } from "./charts/SubscriptionRetentionGrid";
+import { SubscriptionChurnComposedChart } from "./charts/SubscriptionChurnComposedChart";
+import { SubscriptionRenewalsBarChart } from "./charts/SubscriptionRenewalsBarChart";
+import {
+  EmptyDashboardPanel,
+  UnavailableDashboardPanel,
+} from "./DashboardDataState";
 
 interface SubscriptionsTabProps {
-  subscriptionStatus?: {
-    items?: Array<{
-      key: string; label: string; value: number; description: string; tone: any;
-    }>;
-  };
-  billingGrowth?: any;
-  churnData?: any[];
-  mrrStackData?: any[];
-  cltvData?: any[];
-  renewalsData?: any[];
-  waterfallData?: any[];
-  arpuData?: any[];
-  promoData?: any[];
-  cohortData?: any[];
-  paymentHealth?: { success: number; failed: number; recovered: number };
-  arrTarget?: { actualARR: number; targetARR: number };
+  subscriptionStatus: DashboardResponse["overview"]["subscriptionStatus"];
+  analytics: DashboardResponse["analytics"]["subscriptions"];
 }
 
-export function SubscriptionsTab({ 
-  subscriptionStatus, 
-  billingGrowth,
-  churnData = [
-    { month: "Jan", newAcquisitions: 120, churned: 30 },
-    { month: "Feb", newAcquisitions: 140, churned: 35 },
-    { month: "Mar", newAcquisitions: 180, churned: 40 },
-    { month: "Apr", newAcquisitions: 220, churned: 45 },
-    { month: "May", newAcquisitions: 300, churned: 50 },
-    { month: "Jun", newAcquisitions: 350, churned: 60 },
-  ],
-  mrrStackData = [
-    { month: "Jan", basic: 5000, pro: 8000, enterprise: 12000 },
-    { month: "Feb", basic: 5500, pro: 9000, enterprise: 15000 },
-    { month: "Mar", basic: 6000, pro: 10500, enterprise: 18000 },
-    { month: "Apr", basic: 6500, pro: 12000, enterprise: 22000 },
-  ],
-  cltvData = [
-    { segment: "SME", cltv: 1200, cac: 300 },
-    { segment: "Mid-Market", cltv: 4500, cac: 1000 },
-    { segment: "Enterprise", cltv: 15000, cac: 3500 },
-    { segment: "Gov", cltv: 22000, cac: 4000 },
-    { segment: "Edu", cltv: 8000, cac: 1500 },
-  ],
-  renewalsData = [
-    { month: "July", renewals: 45 },
-    { month: "August", renewals: 62 },
-    { month: "September", renewals: 38 },
-    { month: "October", renewals: 85 },
-  ],
-  waterfallData = [
-    { name: "Starting MRR", start: 0, end: 50000, value: 50000, isTotal: true },
-    { name: "New Biz", start: 50000, end: 55000, value: 5000 },
-    { name: "Expansions", start: 55000, end: 58000, value: 3000 },
-    { name: "Contractions", start: 56500, end: 58000, value: -1500 },
-    { name: "Churn", start: 54000, end: 56500, value: -2500 },
-    { name: "Ending MRR", start: 0, end: 54000, value: 54000, isTotal: true },
-  ],
-  arpuData = [
-    { month: "Jan", arpu: 45 },
-    { month: "Feb", arpu: 48 },
-    { month: "Mar", arpu: 52 },
-    { month: "Apr", arpu: 55 },
-    { month: "May", arpu: 58 },
-    { month: "Jun", arpu: 65 },
-  ],
-  promoData = [
-    { discountPercent: 0, retentionMonths: 18, subscribers: 350 },
-    { discountPercent: 10, retentionMonths: 14, subscribers: 210 },
-    { discountPercent: 20, retentionMonths: 10, subscribers: 180 },
-    { discountPercent: 30, retentionMonths: 6, subscribers: 120 },
-    { discountPercent: 50, retentionMonths: 3, subscribers: 90 },
-  ],
-  cohortData = [
-    { cohortMonth: "Jan 2026", users: 120, retentionRates: [100, 95, 88, 80, 75, 71] },
-    { cohortMonth: "Feb 2026", users: 145, retentionRates: [100, 92, 85, 79, 74] },
-    { cohortMonth: "Mar 2026", users: 180, retentionRates: [100, 94, 87, 82] },
-    { cohortMonth: "Apr 2026", users: 210, retentionRates: [100, 96, 90] },
-    { cohortMonth: "May 2026", users: 250, retentionRates: [100, 97] },
-    { cohortMonth: "Jun 2026", users: 310, retentionRates: [100] },
-  ],
-  paymentHealth = { success: 8540, failed: 420, recovered: 315 },
-  arrTarget = { actualARR: 2450000, targetARR: 3000000 }
+export function SubscriptionsTab({
+  subscriptionStatus,
+  analytics,
 }: SubscriptionsTabProps) {
   const { lang } = useI18n();
-
-  if (!subscriptionStatus || !subscriptionStatus.items) return null;
+  const recurringRevenue = analytics.recurringRevenue.available
+    ? analytics.recurringRevenue.data
+    : undefined;
+  const averageRevenue = analytics.averageCollectedRevenue.available
+    ? analytics.averageCollectedRevenue.data.points
+    : [];
+  const paymentHealth = analytics.paymentHealth.available
+    ? analytics.paymentHealth.data
+    : [];
+  const churn = analytics.churnAndAcquisition.available
+    ? analytics.churnAndAcquisition.data.points
+    : [];
+  const renewals = analytics.upcomingRenewals.available
+    ? analytics.upcomingRenewals.data.points
+    : [];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
-      
-      {/* Row 1: Core Lifecycle & MRR (3 columns) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <ChartCard 
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <ValueCard
+          label={lang === "ar" ? "الإيراد الشهري المتكرر" : "USD MRR"}
+          value={formatUsd(recurringRevenue?.monthlyRecurringRevenue ?? 0)}
+          description={
+            lang === "ar"
+              ? "الاشتراكات النشطة والمتأخرة بالدولار"
+              : "Active and past-due USD subscriptions"
+          }
+        />
+        <ValueCard
+          label={lang === "ar" ? "الإيراد السنوي المتكرر" : "USD ARR"}
+          value={formatUsd(recurringRevenue?.annualRecurringRevenue ?? 0)}
+          description={
+            lang === "ar"
+              ? "القيمة السنوية المحسوبة من MRR الحالي"
+              : "Annualized from the current USD MRR"
+          }
+        />
+        {analytics.arrTarget.available ? (
+          <ValueCard
+            label={lang === "ar" ? "هدف ARR" : "ARR Target"}
+            value={`${formatUsd(analytics.arrTarget.data.actual)} / ${formatUsd(
+              analytics.arrTarget.data.target,
+            )}`}
+            description={lang === "ar" ? "الحالي مقابل المستهدف" : "Actual vs target"}
+          />
+        ) : (
+          <UnavailableDashboardPanel
+            title={lang === "ar" ? "هدف ARR" : "ARR Target"}
+            dataset={analytics.arrTarget}
+            className="min-h-36"
+          />
+        )}
+        <ValueCard
+          label={lang === "ar" ? "تجديدات 90 يومًا" : "90-day Renewals"}
+          value={new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US").format(
+            renewals.reduce((sum, point) => sum + point.value, 0),
+          )}
+          description={
+            lang === "ar"
+              ? "اشتراكات تنتهي فترتها الحالية"
+              : "Subscriptions reaching their period end"
+          }
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <ChartCard
           title={lang === "ar" ? "دورة حياة الاشتراك" : "Subscription Lifecycle"}
-          subtitle="Plan tier distribution"
-          icon={<PieChart className="w-4 h-4 text-blue-500" />}
+          subtitle={
+            lang === "ar" ? "الحالة الحالية للاشتراكات" : "Current subscription status"
+          }
+          icon={<PieChart className="size-4 text-blue-500" />}
         >
           <TenantStatusDonutChart
-            items={subscriptionStatus.items.map((it: any) => ({
-              key: it.key, label: it.label, count: it.value, ratio: 0.25, tone: it.tone || "blue", description: it.description || "",
+            items={subscriptionStatus.items.map((item) => ({
+              key: item.key,
+              label: item.label,
+              count: item.value,
+              ratio: item.ratio,
+              tone: item.tone,
+              description: item.description ?? "",
             }))}
-            total={subscriptionStatus.items.reduce((acc: number, it: any) => acc + (it.value || 0), 0)}
+            total={subscriptionStatus.total}
             height={220}
           />
         </ChartCard>
 
-        <ChartCard 
-          title="MRR by Tier"
-          subtitle="Revenue distribution across plans"
-          icon={<Activity className="w-4 h-4 text-indigo-500" />}
-          className="lg:col-span-2"
+        <ChartCard
+          title={lang === "ar" ? "MRR حسب دورة الفوترة" : "MRR by Billing Cycle"}
+          subtitle={
+            lang === "ar"
+              ? "القيمة الشهرية المكافئة بالدولار"
+              : "Monthly-equivalent USD value"
+          }
+          icon={<Activity className="size-4 text-indigo-500" />}
         >
-          <SubscriptionMRRStackChart data={mrrStackData} height={220} />
+          {recurringRevenue?.byBillingCycle.length ? (
+            <NamedValueBars
+              items={recurringRevenue.byBillingCycle}
+              valueFormatter={formatUsd}
+            />
+          ) : (
+            <EmptyInline />
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title={lang === "ar" ? "صحة عمليات الدفع" : "Payment Health"}
+          subtitle={
+            lang === "ar" ? "العمليات حسب الحالة" : "Transactions by status"
+          }
+          icon={<CreditCard className="size-4 text-amber-500" />}
+        >
+          {paymentHealth.length ? (
+            <NamedValueBars items={paymentHealth} />
+          ) : (
+            <EmptyInline />
+          )}
         </ChartCard>
       </div>
 
-      {/* Row 2: ARR Target, ARPU, Payment Health (3 columns) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <ChartCard title="ARR Target Pace" subtitle="Annual recurring revenue target" icon={<Target className="w-4 h-4 text-emerald-500" />}>
-          <SubscriptionTargetGauge actualARR={arrTarget.actualARR} targetARR={arrTarget.targetARR} height={220} />
-        </ChartCard>
-        
-        <ChartCard title="ARPU Trend" subtitle="Average Revenue Per User" icon={<TrendingUp className="w-4 h-4 text-purple-500" />}>
-          <SubscriptionARPUSplineChart data={arpuData} height={220} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <ChartCard
+          title={lang === "ar" ? "الإلغاء مقابل الاكتساب" : "Churn vs Acquisitions"}
+          subtitle={
+            lang === "ar"
+              ? "بدأت الاشتراكات مقابل تواريخ الإلغاء"
+              : "Subscription starts vs cancellation dates"
+          }
+          icon={<Users className="size-4 text-rose-500" />}
+        >
+          {churn.length ? (
+            <SubscriptionChurnComposedChart
+              data={churn.map((point) => ({
+                month: point.label,
+                newAcquisitions: point.primary,
+                churned: point.secondary,
+              }))}
+              height={280}
+            />
+          ) : (
+            <EmptyInline />
+          )}
         </ChartCard>
 
-        <ChartCard title="Payment Health" subtitle="Success vs failure rates" icon={<CreditCard className="w-4 h-4 text-amber-500" />}>
-          <SubscriptionPaymentPieChart success={paymentHealth.success} failed={paymentHealth.failed} recovered={paymentHealth.recovered} height={220} />
+        <ChartCard
+          title={lang === "ar" ? "التجديدات القادمة" : "Upcoming Renewals"}
+          subtitle={lang === "ar" ? "نافذة 90 يومًا" : "90-day window"}
+          icon={<CalendarDays className="size-4 text-blue-500" />}
+        >
+          {renewals.length ? (
+            <SubscriptionRenewalsBarChart
+              data={renewals.map((point) => ({
+                month: point.label,
+                renewals: point.value,
+              }))}
+              height={280}
+            />
+          ) : (
+            <EmptyInline />
+          )}
         </ChartCard>
+
+        <ChartCard
+          title={
+            lang === "ar"
+              ? "متوسط التحصيل لكل مستأجر دافع"
+              : "Average Collected Revenue"
+          }
+          subtitle={
+            lang === "ar"
+              ? "إجمالي الفواتير المدفوعة ÷ المستأجرين الدافعين"
+              : "Paid invoice total per paying tenant"
+          }
+          icon={<TrendingUp className="size-4 text-purple-500" />}
+        >
+          {averageRevenue.length ? (
+            <SubscriptionARPUSplineChart
+              data={averageRevenue.map((point) => ({
+                month: point.label,
+                arpu: point.value,
+              }))}
+              height={280}
+            />
+          ) : (
+            <EmptyInline />
+          )}
+        </ChartCard>
+
+        <UnavailableDashboardPanel
+          title={lang === "ar" ? "تدفق MRR" : "MRR Revenue Flow"}
+          dataset={analytics.revenueFlow}
+        />
+        <UnavailableDashboardPanel
+          title={lang === "ar" ? "CLTV مقابل CAC" : "CLTV vs CAC"}
+          dataset={analytics.lifetimeValue}
+        />
+        <UnavailableDashboardPanel
+          title={lang === "ar" ? "أثر الخصومات" : "Promotion Impact"}
+          dataset={analytics.promotionImpact}
+        />
+        <UnavailableDashboardPanel
+          title={lang === "ar" ? "الاحتفاظ حسب المجموعة" : "Cohort Retention"}
+          dataset={analytics.cohortRetention}
+        />
       </div>
-
-      {/* Row 3: Churn & Renewals (2 columns) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Churn vs Acquisitions" subtitle="Monthly subscribers flux" icon={<Users className="w-4 h-4 text-rose-500" />}>
-          <SubscriptionChurnComposedChart data={churnData} height={280} />
-        </ChartCard>
-
-        <ChartCard title="Upcoming Renewals" subtitle="90-day renewal timeline" icon={<CalendarDays className="w-4 h-4 text-blue-500" />}>
-          <SubscriptionRenewalsBarChart data={renewalsData} height={280} />
-        </ChartCard>
-      </div>
-
-      {/* Row 4: Waterfall & Radar (2 columns) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Revenue Flow (Waterfall)" subtitle="MRR Expansions and Contractions" icon={<ArrowDownUp className="w-4 h-4 text-emerald-500" />}>
-          <SubscriptionMigrationWaterfallChart data={waterfallData} height={280} />
-        </ChartCard>
-
-        <ChartCard title="CLTV vs CAC by Segment" subtitle="Customer Lifetime Value Radar" icon={<Radar className="w-4 h-4 text-purple-500" />}>
-          <SubscriptionCLTVRadarChart data={cltvData} height={280} />
-        </ChartCard>
-      </div>
-
-      {/* Row 5: Cohort Retention & Promo Impact */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <ChartCard title="Discount Impact" subtitle="Promo vs Retention length" icon={<Ticket className="w-4 h-4 text-amber-500" />}>
-          <SubscriptionPromoImpactScatter data={promoData} height={280} />
-        </ChartCard>
-
-        <ChartCard title="Cohort Retention Heatmap" subtitle="MoM retention by signup cohort" icon={<LayoutGrid className="w-4 h-4 text-indigo-500" />} className="lg:col-span-2">
-          <SubscriptionRetentionGrid data={cohortData} height={280} />
-        </ChartCard>
-      </div>
-
     </div>
   );
 }
 
-function ChartCard({ title, subtitle, icon, children, className = "" }: any) {
+function ValueCard({
+  label,
+  value,
+  description,
+}: {
+  label: string;
+  value: string;
+  description: string;
+}) {
   return (
-    <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs flex flex-col justify-between ${className}`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            {icon}
-            <span>{title}</span>
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-extrabold tabular-nums text-slate-900 dark:text-slate-100">
+        {value}
+      </p>
+      <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+        {description}
+      </p>
+    </section>
+  );
+}
+
+function ChartCard({
+  title,
+  subtitle,
+  icon,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="flex min-h-72 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+      <div>
+        <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+          {icon}
+          <span>{title}</span>
+        </h3>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+          {subtitle}
+        </p>
+      </div>
+      <div className="mt-4 flex-1">{children}</div>
+    </section>
+  );
+}
+
+function NamedValueBars({
+  items,
+  valueFormatter = (value) => new Intl.NumberFormat("en-US").format(value),
+}: {
+  items: Array<{ key: string; label: string; value: number }>;
+  valueFormatter?: (value: number) => string;
+}) {
+  const maximum = Math.max(...items.map((item) => item.value), 1);
+  return (
+    <div className="space-y-4 pt-2">
+      {items.map((item) => (
+        <div key={item.key} className="space-y-1.5">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="truncate font-medium text-slate-600 dark:text-slate-300">
+              {item.label}
+            </span>
+            <span className="font-bold tabular-nums text-slate-900 dark:text-slate-100">
+              {valueFormatter(item.value)}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+            <div
+              className="h-full rounded-full bg-blue-500"
+              style={{
+                width: `${
+                  item.value > 0
+                    ? Math.max((item.value / maximum) * 100, 2)
+                    : 0
+                }%`,
+              }}
+            />
+          </div>
         </div>
-      </div>
-      <div className="py-2 flex-1">
-        {children}
-      </div>
+      ))}
     </div>
   );
+}
+
+function EmptyInline() {
+  return (
+    <EmptyDashboardPanel
+      title="No data"
+      className="min-h-40 border-0 bg-transparent p-0 shadow-none"
+    />
+  );
+}
+
+function formatUsd(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
 }

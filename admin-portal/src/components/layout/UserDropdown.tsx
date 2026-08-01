@@ -58,7 +58,7 @@ export function UserDropdown() {
             {/* Menu Links */}
             <div className="p-1.5 space-y-0.5 text-xs">
               <Link
-                href="/admin/users/me/profile"
+                href="/profile"
                 onClick={close}
                 className="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
               >
@@ -66,7 +66,7 @@ export function UserDropdown() {
                 <span>{t.common.profileAndCurrency}</span>
               </Link>
               <Link
-                href="/admin/roles"
+                href="/roles"
                 onClick={close}
                 className="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
               >

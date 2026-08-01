@@ -1,5 +1,9 @@
 # Tenant Users and Access API
 
+Status: **Verified backend contract; frontend PARTIAL/BROKEN**
+
+Last source verification: **2026-07-30**
+
 This is the frontend contract for the tenant **Users / Access** area in Admin
 Portal. It covers the 18 Gateway routes that read or mutate tenant users and
 the tenant-side access catalogues.
@@ -25,22 +29,22 @@ the browser.
 |---|---|---|---:|---|
 | `GET` | `/api/admin/core/v1/tenants/:id/users` | `admin.tenant_users.read` | `200` | No |
 | `GET` | `/api/admin/core/v1/tenants/:id/users/summary` | `admin.tenant_users.read` | `200` | No |
-| `POST` | `/api/admin/core/v1/tenants/:id/users` | `admin.tenant_users.invite` | `201` | Required |
+| `POST` | `/api/admin/core/v1/tenants/:id/users` | `admin.tenant_users.invite` + `admin.tenant_users.critical` | `201` | Required |
 | `GET` | `/api/admin/core/v1/tenants/:id/access/roles` | `admin.tenant_users.assign_roles` | `200` | No |
 | `GET` | `/api/admin/core/v1/tenants/:id/access/branches` | `admin.tenant_users.read` | `200` | No |
 | `GET` | `/api/admin/core/v1/tenants/:id/access/departments` | `admin.tenant_users.read` | `200` | No |
 | `GET` | `/api/admin/core/v1/tenants/:id/access/teams` | `admin.tenant_users.read` | `200` | No |
 | `GET` | `/api/admin/core/v1/tenants/:id/users/:userId` | `admin.tenant_users.read` | `200` | No |
 | `PATCH` | `/api/admin/core/v1/tenants/:id/users/:userId` | `admin.tenant_users.update` | `200` | Required |
-| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/reset-password` | `admin.tenant_users.reset_password` | `202` | Required |
-| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/resend-invite` | `admin.tenant_users.invite` | `202` | Required |
-| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/change-password` | `admin.tenant_users.reset_password` | `200` | Required |
-| `PATCH` | `/api/admin/core/v1/tenants/:id/users/:userId/webphone` | `admin.tenant_users.manage_webphone` | `200` | Required |
-| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/suspend` | `admin.tenant_users.suspend` | `200` | Required |
-| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/activate` | `admin.tenant_users.suspend` | `200` | Required |
-| `PATCH` | `/api/admin/core/v1/tenants/:id/users/:userId/roles` | `admin.tenant_users.assign_roles` | `200` | Required |
-| `DELETE` | `/api/admin/core/v1/tenants/:id/users/:userId` | `admin.tenant_users.delete` | `204` | Required |
-| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/restore` | `admin.tenant_users.restore` | `200` | Required |
+| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/reset-password` | `admin.tenant_users.reset_password` + `admin.tenant_users.critical` | `202` | Required |
+| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/resend-invite` | `admin.tenant_users.invite` + `admin.tenant_users.critical` | `202` | Required |
+| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/change-password` | `admin.tenant_users.reset_password` + `admin.tenant_users.critical` | `200` | Required |
+| `PATCH` | `/api/admin/core/v1/tenants/:id/users/:userId/webphone` | `admin.tenant_users.manage_webphone` + `admin.tenant_users.critical` | `200` | Required |
+| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/suspend` | `admin.tenant_users.suspend` + `admin.tenant_users.critical` | `200` | Required |
+| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/activate` | `admin.tenant_users.suspend` + `admin.tenant_users.critical` | `200` | Required |
+| `PATCH` | `/api/admin/core/v1/tenants/:id/users/:userId/roles` | `admin.tenant_users.assign_roles` + `admin.tenant_users.critical` | `200` | Required |
+| `DELETE` | `/api/admin/core/v1/tenants/:id/users/:userId` | `admin.tenant_users.delete` + `admin.tenant_users.critical` | `204` | Required |
+| `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/restore` | `admin.tenant_users.restore` + `admin.tenant_users.critical` | `200` | Required |
 
 ## Enums
 
@@ -124,7 +128,7 @@ credential-presence signal.
 
 ## Directory and summary
 
-### `GET /admin/tenants/:id/users`
+### `GET /api/admin/core/v1/tenants/:id/users`
 
 ```ts
 interface AdminTenantUserQuery {
@@ -172,7 +176,7 @@ interface PaginatedTenantUsers {
 }
 ```
 
-### `GET /admin/tenants/:id/users/summary`
+### `GET /api/admin/core/v1/tenants/:id/users/summary`
 
 Accepts the same identity, status, organization, role, and visibility filters
 as the list. Its visibility default is `ALL`, not `ACTIVE`.
@@ -208,7 +212,7 @@ interface AccessCatalogueQuery {
 
 ### Roles
 
-`GET /admin/tenants/:id/access/roles`
+`GET /api/admin/core/v1/tenants/:id/access/roles`
 
 ```ts
 interface TenantRoleOption {
@@ -221,7 +225,7 @@ interface TenantRoleOption {
 
 ### Branches
 
-`GET /admin/tenants/:id/access/branches`
+`GET /api/admin/core/v1/tenants/:id/access/branches`
 
 ```ts
 interface TenantBranchOption {
@@ -235,12 +239,12 @@ interface TenantBranchOption {
 ### Departments and teams
 
 ```ts
-// GET /admin/tenants/:id/access/departments
+// GET /api/admin/core/v1/tenants/:id/access/departments
 interface DepartmentCatalogueQuery extends AccessCatalogueQuery {
   branchId: string; // required UUID
 }
 
-// GET /admin/tenants/:id/access/teams
+// GET /api/admin/core/v1/tenants/:id/access/teams
 interface TeamCatalogueQuery extends AccessCatalogueQuery {
   departmentId: string; // required UUID
 }
@@ -262,7 +266,7 @@ cascading editor:
 
 ## Invite a user
 
-`POST /admin/tenants/:id/users`
+`POST /api/admin/core/v1/tenants/:id/users`
 
 ```ts
 interface AdminInviteTenantUserDto {
@@ -315,7 +319,7 @@ with a new key; show the created user and offer resend invitation.
 
 ## Update profile and placement
 
-`PATCH /admin/tenants/:id/users/:userId`
+`PATCH /api/admin/core/v1/tenants/:id/users/:userId`
 
 ```ts
 interface AdminUpdateTenantUserDto {
@@ -340,7 +344,7 @@ existing refresh tokens.
 
 ### Send password reset
 
-`POST /admin/tenants/:id/users/:userId/reset-password`
+`POST /api/admin/core/v1/tenants/:id/users/:userId/reset-password`
 
 - Only an `ACTIVE` user is eligible.
 - The endpoint rotates a single-use reset token and queues email.
@@ -350,7 +354,7 @@ existing refresh tokens.
 
 ### Resend invitation
 
-`POST /admin/tenants/:id/users/:userId/resend-invite`
+`POST /api/admin/core/v1/tenants/:id/users/:userId/resend-invite`
 
 - Only an `INVITED` user is eligible.
 - Success is `202` with `{ userId, delivery }`.
@@ -365,7 +369,7 @@ interface TenantUserDelivery {
 
 ### Direct password change
 
-`POST /admin/tenants/:id/users/:userId/change-password`
+`POST /api/admin/core/v1/tenants/:id/users/:userId/change-password`
 
 ```ts
 interface AdminTenantUserChangePasswordDto {
@@ -382,7 +386,7 @@ tokens, and invalidates pending password-reset tokens.
 
 ## WebPhone
 
-`PATCH /admin/tenants/:id/users/:userId/webphone`
+`PATCH /api/admin/core/v1/tenants/:id/users/:userId/webphone`
 
 ```ts
 interface UpdateTenantUserWebphoneDto {
@@ -413,7 +417,7 @@ Only send `sipPassword` when creating, clearing, or rotating the secret.
 
 ## Roles
 
-`PATCH /admin/tenants/:id/users/:userId/roles`
+`PATCH /api/admin/core/v1/tenants/:id/users/:userId/roles`
 
 ```ts
 interface SetUserBranchRolesDto {
@@ -432,7 +436,7 @@ refreshed `AdminTenantUserView`.
 
 ### Suspend
 
-`POST /admin/tenants/:id/users/:userId/suspend`
+`POST /api/admin/core/v1/tenants/:id/users/:userId/suspend`
 
 - Owner accounts are protected.
 - Already `SUSPENDED` is idempotent and still revokes outstanding credentials.
@@ -441,7 +445,7 @@ refreshed `AdminTenantUserView`.
 
 ### Activate
 
-`POST /admin/tenants/:id/users/:userId/activate`
+`POST /api/admin/core/v1/tenants/:id/users/:userId/activate`
 
 - Owner accounts are protected.
 - Already `ACTIVE` is idempotent.
@@ -449,7 +453,7 @@ refreshed `AdminTenantUserView`.
 
 ### Delete
 
-`DELETE /admin/tenants/:id/users/:userId`
+`DELETE /api/admin/core/v1/tenants/:id/users/:userId`
 
 - Owner accounts are protected.
 - The user becomes `DEACTIVATED`, credentials are revoked, and the row is
@@ -458,7 +462,7 @@ refreshed `AdminTenantUserView`.
 
 ### Restore
 
-`POST /admin/tenants/:id/users/:userId/restore`
+`POST /api/admin/core/v1/tenants/:id/users/:userId/restore`
 
 - The route loads a soft-deleted record directly.
 - A non-deleted record returns `TENANT_USER_NOT_DELETED`.

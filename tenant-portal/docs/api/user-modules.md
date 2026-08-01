@@ -1,23 +1,49 @@
-# Tenant User Modules API
+# Tenant user-module assignments API
 
-Base path: `/tenant/users/:userId/modules`
+> **Contract status:** Current
+> **Last verified:** 2026-07-25
+> **Backend owner:** Core (`core-app`)
+> **Canonical browser prefix:** `/api/tenant/core/v1/users/:userId/modules`
+> **Controller-relative prefix:** `/tenant/users/:userId/modules`
+> **Tenant Portal status:** Planned. The legacy portal reads the current user's modules for navigation but has no complete assignment-management UI.
+> **Documentation:** Hand-written and source-verified; not generated.
 
-The User Modules API allows tenant administrators to assign or unassign specific licensed business modules (such as CRM, Trade B2B, Point of Sale, etc.) to individual users. This system governs the consumption of per-user seat licenses.
+## Source of truth
 
-## Endpoints
+- Gateway contracts: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
+- Controller/service/DTO: `../backend/mutakamel-apps/core-app/src/tenant/user-modules`
+- Subscription seat logic: `../backend/mutakamel-apps/core-app/src/tenant/subscription`
+- Legacy module use: `../backend/mutakamel-apps/mutakamel-web-app/src`
 
-### `GET /tenant/users/:userId/modules`
-Lists all the active module subscriptions/assignments for a specific user.
-- **Permissions**: `users.user.read`
-- **Response**: `200 OK`
+## Routes
 
-### `POST /tenant/users/:userId/modules`
-Assigns a new business module license to the user, consuming one seat from the tenant's global subscription pool.
-- **Permissions**: `users.user.update`
-- **Body**: `AssignModuleDto`
-- **Response**: `201 Created`
+| Method and canonical browser path | Permission | Result |
+|---|---|---|
+| `GET /api/tenant/core/v1/users/:userId/modules` | `users.user.read` | Active module assignments |
+| `POST /api/tenant/core/v1/users/:userId/modules` | `users.user.update` | `201`, assign and consume a seat |
+| `DELETE /api/tenant/core/v1/users/:userId/modules/:moduleKey` | `users.user.update` | `204`, unassign and release a seat |
 
-### `DELETE /tenant/users/:userId/modules/:moduleKey`
-Unassigns a business module from the user, freeing up the seat in the tenant's subscription pool.
-- **Permissions**: `users.user.update`
-- **Response**: `204 No Content`
+Security requires tenant authentication, matching verified host, current session/subscription, permission, and effective scope over the target user. `userId` is UUIDv7.
+
+POST accepts exactly:
+
+Safe body example:
+
+```json
+{"moduleKey":"crm"}
+```
+
+`moduleKey` is required, maximum 64, and matches `^[a-z][a-z0-9_]*$`. There is intentionally no client-side static module enum: validity and subscription entitlement come from the Core catalogue/database. Treat module keys as opaque case-sensitive wire identifiers.
+
+Core rejects unknown fields. Successes/errors use the normal Core envelopes, except `204` has no body. These mutations do not declare application-level idempotency; after an ambiguous failure, refetch assignments before deciding to retry.
+
+Validation is DTO- and catalogue-driven. Responses are private user/licensing data and must not be shared-cached. Assignment/unassignment is synchronous from the portal contract; downstream access-policy refresh does not create a client-polled async job.
+
+Expected errors include `TENANT_USER_NOT_FOUND`, `MODULE_NOT_FOUND`, `SUBSCRIPTION_NOT_FOUND`, `MODULE_NOT_SUBSCRIBED`, `SEAT_LIMIT_REACHED`, and `ASSIGNMENT_NOT_FOUND`.
+
+## AI implementation rules
+
+- Build available choices from server subscription/catalogue data, never a hard-coded marketing list.
+- Display seat impact before assignment.
+- Refetch both the user's assignments and subscription usage after a mutation.
+- Do not treat a navigation module claim as proof that the actor may administer another user.

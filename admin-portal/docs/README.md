@@ -1,108 +1,112 @@
 # Admin Portal Documentation
 
-Frontend-facing reference for building `admin-portal` against the current
-Mutakamel backend applications.
+Status: **Rebuilt source-verified frontend documentation**
 
-Last source verification: **2026-07-24**
+Last source verification: **2026-07-30**
+
+This documentation describes the current Admin Portal source, all
+browser-visible Core Admin capabilities, exact integration defects, required
+frontend contracts, and backend/release gates. Documentation completion does
+not mean frontend parity or deployment completion.
 
 ## Start here
 
-Read [frontend-integration-guide.md](frontend-integration-guide.md) first. It
-contains:
+1. [Documentation contract](DOCUMENTATION_CONTRACT.md)
+2. [AI Start Here](ai/START_HERE.md)
+3. [Frontend integration guide](frontend-integration-guide.md)
+4. [Frontend capability matrix](audit/frontend-capability-matrix.md)
+5. [API domain index](api/README.md)
+6. [Generated 243-route inventory](generated/admin-core-api-routes.md)
+7. [Known gaps](ai/KNOWN_GAPS.md)
+8. [Implementation playbook](ai/IMPLEMENTATION_PLAYBOOK.md)
+9. [Test matrix](ai/TEST_MATRIX.md)
 
-- backend ownership and canonical API Gateway URL rules;
-- the complete frontend route and live/mock integration inventory;
-- authentication, global validation, error, and RBAC conventions;
-- known frontend/backend mismatches;
-- a dated backend route-capability snapshot and recommended integration order.
-
-For the current dashboard task, continue with the exact
-[Dashboard API contract](api/dashboard.md).
-
-## Critical routing rule
-
-All endpoint pages in `api/` describe controller resources such as
-`/admin/tenants`. Browser code must address them through API Gateway:
+## Critical browser rules
 
 ```text
-Core admin controller /admin/<route>
-→ /api/admin/core/v1/<route>
-
-Worker admin controller /admin/<route>
-→ /api/admin/worker/v1/<route>
+Core Admin:   /api/admin/core/v1/*
+Worker Admin: /api/admin/worker/v1/*
 ```
 
-Examples:
+API Gateway is the only browser edge. Never use controller-relative
+`/admin/*` or upstream `/api/v1/admin/*` paths in frontend requests.
 
-```text
-/admin/dashboard       → /api/admin/core/v1/dashboard
-/admin/tenants         → /api/admin/core/v1/tenants
-/admin/backups/runs    → /api/admin/worker/v1/backups/runs
+Protected requests use the shared authenticated client with:
+
+```ts
+credentials: "include";
+"x-auth-cookie-mode": "1";
 ```
 
-Never copy the unversioned controller-relative path into frontend request code.
+Do not store JWT access or refresh tokens in browser-readable storage.
 
-## API references
+## Documentation map
 
-| Domain | Reference | Owning app |
-|:---|:---|:---|
-| Authentication | [auth.md](api/auth.md) | Core |
-| Dashboard | [dashboard.md](api/dashboard.md) | Core |
-| Admin users | [users.md](api/users.md) | Core |
-| Roles and permissions | [roles-permissions.md](api/roles-permissions.md) | Core |
-| Tenants | [tenants.md](api/tenants.md) | Core |
-| Tenant users | [tenant-users.md](api/tenant-users.md) | Core |
-| Tenant/provisioning operations | [tenant-operations.md](api/tenant-operations.md) | Core |
-| Subscriptions | [subscriptions.md](api/subscriptions.md) | Core |
-| Catalogue and currency rates | [catalog.md](api/catalog.md) | Core |
-| Invoices | [invoices.md](api/invoices.md) | Core |
-| Wallet and ledger | [wallet.md](api/wallet.md) | Core |
-| Database servers | [database-servers.md](api/database-servers.md) | Core |
-| Reports | [reports.md](api/reports.md) | Core |
-| System and SMTP settings | [system-settings.md](api/system-settings.md) | Core |
-| Notifications | [notifications.md](api/notifications.md) | Core |
-| Logging overrides | [logging.md](api/logging.md) | Core |
-| Backup and restore | [backups-restores.md](api/backups-restores.md) | Worker through Gateway |
+| Area | Reference |
+| --- | --- |
+| Source precedence/status evidence | [DOCUMENTATION_CONTRACT.md](DOCUMENTATION_CONTRACT.md) |
+| System ownership | [ai/SYSTEM_CONTEXT.md](ai/SYSTEM_CONTEXT.md) |
+| Source verification workflow | [ai/SOURCE_OF_TRUTH.md](ai/SOURCE_OF_TRUTH.md) |
+| Current frontend/live/mock status | [audit/frontend-capability-matrix.md](audit/frontend-capability-matrix.md) |
+| API contracts | [api/README.md](api/README.md) |
+| Full Gateway method/path inventory | [generated/admin-core-api-routes.md](generated/admin-core-api-routes.md) |
+| HTTP success/error envelopes | [architecture/http-and-error-contract.md](architecture/http-and-error-contract.md) |
+| Permissions/idempotency/data states | [architecture/permissions-idempotency-and-state.md](architecture/permissions-idempotency-and-state.md) |
+| Shared DTOs | [models/dtos.md](models/dtos.md) |
+| Wire enums | [models/enums.md](models/enums.md) |
+| Browser projections | [models/interfaces.md](models/interfaces.md) |
+| Permission catalogue | [rbac/permissions.md](rbac/permissions.md) |
+| Navigation mapping | [guides/sidebar-navigation.md](guides/sidebar-navigation.md) |
+| Reusable component behavior | [components/README.md](components/README.md) |
 
-## Models and security
+## Current route evidence
 
-- [Selected DTOs and validation rules](models/dtos.md)
-- [Transport enums](models/enums.md)
-- [Key response interfaces](models/interfaces.md)
-- [RBAC permission matrix](rbac/permissions.md)
-- [Navigation/permission mapping](guides/sidebar-navigation.md)
+The Gateway Core route table contains 443 routes across all masters. Exactly
+243 have `core.admin.*` route keys and canonical Admin browser paths. Of those,
+133 are write-sensitive and one uses explicit ANY permissions.
 
-The DTO and interface pages are shared high-use references. Domain-specific
-request/response fields remain in the corresponding API page. Backend DTOs and
-gateway route contracts remain authoritative if a markdown page is stale.
+The generated inventory is transport evidence only. Controller/DTO behavior
+comes from the hand-written domain guides and owning backend source.
 
-## Reusable UI specifications
+## Status boundaries
 
-- [Component index](components/README.md)
-- [Data table](components/data-table.md)
-- [Filter bar](components/filter-bar.md)
-- [Status badge](components/status-badge.md)
-- [Form drawer](components/form-drawer.md)
-- [Confirmation modal](components/confirm-action-modal.md)
-- [Audit log viewer](components/audit-log-viewer.md)
-- [Operation timeline](components/operation-timeline.md)
-- [Floating WebPhone](components/floating-webphone.md)
+- `DONE`, `PARTIAL`, `BROKEN`, `MISSING`, `GATED`, and `REFACTOR` describe
+  frontend source state.
+- Tests, typecheck, lint, and build are reported independently.
+- Live authenticated status requires a real authorized Gateway/Core session.
+- Deployment-verified status requires evidence from the target environment.
 
-These component files describe intended UI behavior. They do not prove that
-the corresponding frontend screen is server-backed; check the integration
-inventory first.
+Never say “full parity” while any BROKEN/MISSING item, required validation, live
+runtime check, or release gate remains open.
+
+## Validation
+
+Run from `C:\mutakamel.ai\frontend\admin-portal`:
+
+```powershell
+npm run docs:check
+npx tsc --noEmit
+npx vitest run
+npm run lint -- --max-warnings=0
+npm run build
+```
+
+Regenerate the route inventory after Gateway changes:
+
+```powershell
+npm run docs:routes
+```
 
 ## Backend source roots
 
 Paths below are relative to `C:\mutakamel.ai\frontend`:
 
 ```text
-../backend/mutakamel-apps/core-app
 ../backend/mutakamel-apps/api-gateway-app
+../backend/mutakamel-apps/core-app
 ../backend/mutakamel-apps/worker-app
-../backend/mutakamel-apps/crm-app
-../backend/mutakamel-apps/trade-app
+../backend/mutakamel-apps/realtime-app
 ```
 
-For browser paths, inspect the gateway route contract first. For fields and
-validation, inspect the owning controller and DTO next.
+Backend source is read-only unless a separate backend task explicitly
+authorizes changes.

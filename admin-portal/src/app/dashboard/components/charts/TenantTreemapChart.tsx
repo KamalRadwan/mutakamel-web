@@ -4,25 +4,34 @@ import { ResponsiveContainer, Treemap, Tooltip } from "recharts";
 import { ChartTooltip } from "./ChartTooltip";
 
 export interface TreemapNode {
+  [key: string]: string | number;
   name: string;
   size: number;
   color: string;
 }
 
 interface TenantTreemapChartProps {
-  data?: TreemapNode[];
+  data: TreemapNode[];
   height?: number;
 }
 
-const defaultTreemapData: TreemapNode[] = [
-  { name: "نشط (Active)", size: 38, color: "#10b981" },
-  { name: "معلق (Suspended)", size: 4, color: "#f59e0b" },
-  { name: "تجهيز (Provisioning)", size: 2, color: "#3b82f6" },
-  { name: "فشل (Failed)", size: 1, color: "#ef4444" },
-];
+interface CustomizedContentProps {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  name?: string;
+  color?: string;
+}
 
-const CustomizedContent = (props: any) => {
-  const { x, y, width, height, name, color } = props;
+const CustomizedContent = ({
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+  name = "",
+  color,
+}: CustomizedContentProps) => {
   if (width < 25 || height < 15) return null;
 
   return (
@@ -56,7 +65,7 @@ const CustomizedContent = (props: any) => {
 };
 
 export function TenantTreemapChart({
-  data = defaultTreemapData,
+  data,
   height = 200,
 }: TenantTreemapChartProps) {
   return (

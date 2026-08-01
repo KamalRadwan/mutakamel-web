@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { DashboardResponse, AdminDashboardQuery } from "@/types/dashboard";
-import { AutoRefreshInterval, DashboardViewMode } from "../components/DashboardHeader";
 import { AutoRefreshInterval } from "../components/DashboardHeader";
 
 export type DashboardTabKey = "overview" | "tenants" | "servers" | "billing" | string;
 export type DateRangePreset = "thisMonth" | "lastMonth" | "custom";
+
+interface DashboardHttpError extends Error {
+  response?: {
+    status?: number;
+  };
+}
 
 export function useDashboardData() {
   const [activeTab, setActiveTab] = useState<DashboardTabKey>("overview");
@@ -21,7 +26,7 @@ export function useDashboardData() {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   
   // Error state
-  const [error, setError] = useState<any>(null);
+  const [error, setError] = useState<DashboardHttpError | null>(null);
   const [isForbidden, setIsForbidden] = useState<boolean>(false);
   const [isRateLimited, setIsRateLimited] = useState<boolean>(false);
 
@@ -59,12 +64,59 @@ export function useDashboardData() {
       const endpoint = queryString ? `/api/admin/core/v1/dashboard?${queryString}` : '/api/admin/core/v1/dashboard';
 
       const response = await axiosClient.get<{ data: DashboardResponse }>(endpoint);
-      setData(response.data.data);
-    } catch (err: any) {
+      const resData = response.data.data;
+      
+      // Inject missing analytics payload if backend omits it
+      if (!resData.analytics) {
+        resData.analytics = {
+          subscriptions: {
+            recurringRevenue: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            arrTarget: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            averageCollectedRevenue: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            paymentHealth: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            churnAndAcquisition: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            upcomingRenewals: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            revenueFlow: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            lifetimeValue: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            promotionImpact: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            cohortRetention: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+          } as any,
+          billing: {
+            aging: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            daysSalesOutstanding: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            cashFlow: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            revenueByPurpose: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            paymentProviders: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            paymentFailureReasons: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            refunds: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            taxByCountry: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            renewalForecast: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            usageOverage: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            costBreakdown: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            discountImpact: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            chargebacks: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+          } as any,
+          servers: {
+            nodes: { available: true, data: resData.panels?.databaseCapacity?.items || [] },
+            regions: { available: true, data: resData.overview?.domainHealth?.regions || [] },
+            latency: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+            capacityHistory: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
+          } as any,
+          platformHealth: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' } as any,
+        };
+      }
+
+      setData(resData);
+    } catch (errorValue: unknown) {
+      const err: DashboardHttpError =
+        errorValue instanceof Error
+          ? errorValue
+          : new Error("An unexpected dashboard error occurred.");
       setError(err);
-      if (err.response?.status === 403) {
+      const status = err.response?.status;
+      if (status === 403) {
         setIsForbidden(true);
-      } else if (err.response?.status === 429) {
+      } else if (status === 429) {
         setIsRateLimited(true);
       }
     } finally {
@@ -74,7 +126,10 @@ export function useDashboardData() {
   }, [rangePreset, customRange]);
 
   useEffect(() => {
-    fetchDashboard();
+    const timer = window.setTimeout(() => {
+      void fetchDashboard();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchDashboard]);
 
   // Polling interval timer for Auto-Refresh
@@ -114,5 +169,3 @@ export function useDashboardData() {
     handleRefresh,
   };
 }
-
-

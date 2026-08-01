@@ -12,13 +12,14 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { DashboardMetric } from "@/types/dashboard";
+import {
+  DashboardMetric,
+  DashboardResponse,
+} from "@/types/dashboard";
 import { formatDashboardMetric, toneToColorClass } from "../utils/formatters";
-import { SparklineChart } from "./charts/SparklineChart";
 import { TenantGrowthRevenueChart } from "./charts/TenantGrowthRevenueChart";
-import { SubscriptionRevenueStackChart } from "./charts/SubscriptionRevenueStackChart";
 import { TenantStatusDonutChart } from "./charts/TenantStatusDonutChart";
-import { SaaSHealthIndexGauge } from "./charts/SaaSHealthIndexGauge";
+import { UnavailableDashboardPanel } from "./DashboardDataState";
 
 interface OverviewTabProps {
   data: {
@@ -41,10 +42,11 @@ interface OverviewTabProps {
         label: string;
         value: number;
         ratio: number;
-        tone: any;
+        tone: DashboardMetric["tone"];
         description?: string;
       }>;
     };
+    platformHealth: DashboardResponse["analytics"]["platformHealth"];
   };
 }
 
@@ -79,20 +81,6 @@ export function OverviewTab({ data }: OverviewTabProps) {
     return { label: kpi.label, description: kpi.description };
   };
 
-  const mockSparklineData: Record<string, Array<{ value: number }>> = {
-    "total-tenants": [{ value: 30 }, { value: 32 }, { value: 35 }, { value: 38 }, { value: 40 }, { value: 42 }],
-    "admin-staff": [{ value: 14 }, { value: 15 }, { value: 15 }, { value: 16 }, { value: 17 }, { value: 18 }],
-    "pending-invoices": [{ value: 800 }, { value: 950 }, { value: 1100 }, { value: 1050 }, { value: 1200 }, { value: 1299 }],
-    "db-utilization": [{ value: 50 }, { value: 55 }, { value: 60 }, { value: 62 }, { value: 65 }, { value: 68 }],
-  };
-
-  const sparklineColors: Record<string, string> = {
-    "total-tenants": "#3b82f6",
-    "admin-staff": "#10b981",
-    "pending-invoices": "#f59e0b",
-    "db-utilization": "#8b5cf6",
-  };
-
   const getKpiIcon = (key: string) => {
     switch (key) {
       case "total-tenants":
@@ -116,10 +104,6 @@ export function OverviewTab({ data }: OverviewTabProps) {
           const formattedValue = formatDashboardMetric(kpi, currency);
           const toneColor = toneToColorClass(kpi.tone);
           const localized = getLocalizedKpi(kpi);
-          const sparkData = mockSparklineData[kpi.key] || [
-            { value: 10 }, { value: 20 }, { value: 15 }, { value: 25 }, { value: 30 }
-          ];
-          const sparkColor = sparklineColors[kpi.key] || "#3b82f6";
 
           return (
             <div
@@ -149,9 +133,10 @@ export function OverviewTab({ data }: OverviewTabProps) {
                 </p>
               </div>
 
-              <div className="pt-2 -mb-2 -mx-2">
-                <SparklineChart data={sparkData} color={sparkColor} height={32} />
-              </div>
+              <div
+                className={`h-1 w-10 rounded-full bg-current ${toneColor.split(" ")[0]}`}
+                aria-hidden="true"
+              />
             </div>
           );
         })}
@@ -185,32 +170,10 @@ export function OverviewTab({ data }: OverviewTabProps) {
           </div>
         </div>
 
-        {/* SaaS Platform Aggregate Health Score Gauge Box (1 col) */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs flex flex-col justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">
-              مؤشر صحة المنصة
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              تقييم تشغيلي شامل للأداء والاستقرار
-            </p>
-          </div>
-
-          <div className="py-2">
-            <SaaSHealthIndexGauge score={94} height={180} />
-          </div>
-
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-1">
-            <div className="flex justify-between font-semibold">
-              <span>نسبة توفر الخدمات:</span>
-              <span className="text-emerald-600 font-bold font-mono">99.9%</span>
-            </div>
-            <div className="flex justify-between font-semibold">
-              <span>استقرار التشغيل:</span>
-              <span className="text-blue-600 font-bold">ممتاز</span>
-            </div>
-          </div>
-        </div>
+        <UnavailableDashboardPanel
+          title={lang === "ar" ? "مؤشر صحة المنصة" : "Platform Health"}
+          dataset={data.platformHealth}
+        />
       </div>
 
       {/* Grid for Recent Tenants + Subscription Tier Stack Chart / Numbers Box */}
@@ -222,7 +185,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
               {t.dashboard.overviewTab.recentTenantsTitle}
             </h3>
             <Link
-              href="/admin/tenants"
+              href="/tenants"
               className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
             >
               <span>{t.dashboard.overviewTab.viewAllTenants}</span>
@@ -247,7 +210,11 @@ export function OverviewTab({ data }: OverviewTabProps) {
                       <div>{tenant.name}</div>
                     </td>
                     <td className="py-3">
-                      <StatusBadge status={tenant.status as any} enumType="tenant" size="sm" />
+                      <StatusBadge
+                        status={tenant.status.replace(/\s+/g, "_").toUpperCase()}
+                        enumType="tenant"
+                        size="sm"
+                      />
                     </td>
                     <td className="py-3 text-slate-600 dark:text-slate-400 font-medium">
                       {tenant.plan}
@@ -289,7 +256,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
           </div>
 
           <Link
-            href="/admin/reports"
+            href="/settings/billing"
             className="w-full py-2.5 px-3 text-xs font-semibold text-center text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-xl transition-colors inline-flex items-center justify-center gap-1"
           >
             <span>{t.dashboard.overviewTab.viewDetailedFinancials}</span>
@@ -300,5 +267,3 @@ export function OverviewTab({ data }: OverviewTabProps) {
     </div>
   );
 }
-
-

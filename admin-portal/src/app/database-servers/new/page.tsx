@@ -5,7 +5,6 @@ import {
   Server, 
   ArrowLeft, 
   ArrowRight, 
-  CheckCircle2, 
   AlertCircle, 
   Loader2, 
   Database, 
@@ -17,6 +16,9 @@ import {
 } from "lucide-react";
 import { useRegisterDatabaseServer } from "./hooks/useRegisterDatabaseServer";
 import { useI18n } from "@/i18n/I18nContext";
+import { Country } from "country-state-city";
+import { CountrySelect } from "@/components/shared/CountrySelect";
+import { DatabaseServerConnectivityResult } from "../components/DatabaseServerConnectivityResult";
 
 export default function RegisterDatabaseServerPage() {
   const {
@@ -25,7 +27,10 @@ export default function RegisterDatabaseServerPage() {
     setFormData,
     isTesting,
     testResult,
+    isTestedAndConnected,
     isSubmitting,
+    error,
+    fieldErrors,
     handleTestConnection,
     handleSubmit,
     onCancel,
@@ -60,21 +65,9 @@ export default function RegisterDatabaseServerPage() {
 
         {/* Connectivity Test Alert */}
         {testResult && (
-          <div
-            className={`p-4 text-xs font-semibold rounded-2xl border flex items-center gap-3 animate-in fade-in ${
-              testResult.connected
-                ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                : "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800"
-            }`}
-          >
-            {testResult.connected ? (
-              <CheckCircle2 className="w-5 h-5 shrink-0" />
-            ) : (
-              <AlertCircle className="w-5 h-5 shrink-0" />
-            )}
-            <span>{testResult.message}</span>
-          </div>
+          <DatabaseServerConnectivityResult result={testResult} lang={lang} />
         )}
+
 
         {/* Main Multi-Section Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -146,15 +139,18 @@ export default function RegisterDatabaseServerPage() {
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   {t.dbServers.countryIso}
                 </label>
-                <select
+                <CountrySelect
                   value={formData.countryIsoCode}
-                  onChange={(e) => setFormData({ ...formData, countryIsoCode: e.target.value })}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
-                >
-                  <option value="EG">مصر (EG)</option>
-                  <option value="SA">المملكة العربية السعودية (SA)</option>
-                  <option value="AE">الإمارات العربية المتحدة (AE)</option>
-                </select>
+                  onChange={(code) => {
+                    const countryObj = Country.getCountryByCode(code);
+                    setFormData({
+                      ...formData,
+                      countryIsoCode: code,
+                      countryName: countryObj ? `${countryObj.flag} ${countryObj.name}` : code,
+                    });
+                  }}
+                  className="w-full"
+                />
               </div>
 
               <div className="space-y-1">
@@ -354,7 +350,7 @@ export default function RegisterDatabaseServerPage() {
                 </label>
                 <select
                   value={formData.sslMode}
-                  onChange={(e) => setFormData({ ...formData, sslMode: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, sslMode: e.target.value as any })}
                   className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
                 >
                   <option value="disable">disable</option>
@@ -364,64 +360,81 @@ export default function RegisterDatabaseServerPage() {
                 </select>
               </div>
 
-              <div className="flex items-center pt-5">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+              {formData.sslMode !== "disable" && (
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={formData.sslRejectUnauthorized}
+                      onChange={(e) => setFormData({ ...formData, sslRejectUnauthorized: e.target.checked })}
+                      className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                    />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "رفض الشهادات غير الموثوقة (sslRejectUnauthorized)" : "Reject Unauthorized Certificates (sslRejectUnauthorized)"}
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* PEM Certificates Area - Only visible when SSL is enabled */}
+            {formData.sslMode !== "disable" && (
+              <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    {lang === "ar" ? "شهادة CA الرئيسية (Root CA Certificate)" : "Root CA Certificate (sslConfig.ca)"}
+                  </label>
+                  <textarea
+                    value={formData.sslCa}
+                    onChange={(e) => setFormData({ ...formData, sslCa: e.target.value })}
+                    rows={2}
+                    placeholder="-----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----"
+                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "شهادة العميل (Client Certificate)" : "Client Certificate (sslConfig.cert)"}
+                    </label>
+                    <textarea
+                      value={formData.sslCert}
+                      onChange={(e) => setFormData({ ...formData, sslCert: e.target.value })}
+                      rows={2}
+                      placeholder="-----BEGIN CERTIFICATE-----"
+                      className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "المفتاح الخاص (Private Key)" : "Private Key (sslConfig.key)"}
+                    </label>
+                    <textarea
+                      value={formData.sslKey}
+                      onChange={(e) => setFormData({ ...formData, sslKey: e.target.value })}
+                      rows={2}
+                      placeholder="-----BEGIN PRIVATE KEY-----"
+                      className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    {lang === "ar" ? "كلمة مرور المفتاح الخاص (Private Key Passphrase)" : "Private Key Passphrase (sslConfig.passphrase)"}
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={formData.sslRejectUnauthorized}
-                    onChange={(e) => setFormData({ ...formData, sslRejectUnauthorized: e.target.checked })}
-                    className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
-                  />
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    رفض الشهادات غير الموثوقة (sslRejectUnauthorized)
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* PEM Certificates Area */}
-            <div className="space-y-3 pt-2">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  شهادة CA الرئيسية (sslConfig.ca) — PEM Certificate Text
-                </label>
-                <textarea
-                  value={formData.sslCa}
-                  onChange={(e) => setFormData({ ...formData, sslCa: e.target.value })}
-                  rows={2}
-                  placeholder="-----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----"
-                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Client Certificate (sslConfig.cert)
-                  </label>
-                  <textarea
-                    value={formData.sslCert}
-                    onChange={(e) => setFormData({ ...formData, sslCert: e.target.value })}
-                    rows={2}
-                    placeholder="-----BEGIN CERTIFICATE-----"
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Private Key (sslConfig.key)
-                  </label>
-                  <textarea
-                    value={formData.sslKey}
-                    onChange={(e) => setFormData({ ...formData, sslKey: e.target.value })}
-                    rows={2}
-                    placeholder="-----BEGIN PRIVATE KEY-----"
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
+                    type="password"
+                    value={formData.sslPassphrase}
+                    onChange={(e) => setFormData({ ...formData, sslPassphrase: e.target.value })}
+                    placeholder="Passphrase (optional)"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
                   />
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Section 6: Connection Pool Tuning & Timeouts */}
@@ -514,7 +527,12 @@ export default function RegisterDatabaseServerPage() {
               )}
             </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {!isTestedAndConnected && (
+                <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-200/60 dark:border-amber-800/60">
+                  {lang === "ar" ? "يلزم اختبار الاتصال بنجاح لتفعيل الحفظ" : "Test connection required to enable Save"}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={onCancel}
@@ -524,8 +542,8 @@ export default function RegisterDatabaseServerPage() {
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-600/20 transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-2"
+                disabled={isSubmitting || !isTestedAndConnected}
+                className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-600/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
               >
                 {isSubmitting ? (
                   <>

@@ -25,6 +25,15 @@ interface SubscriptionRevenueStackChartProps {
   height?: number;
 }
 
+interface RevenueLegendEntry {
+  color?: string;
+  value?: string | number;
+}
+
+interface RevenueLegendProps {
+  payload?: readonly RevenueLegendEntry[];
+}
+
 export function SubscriptionRevenueStackChart({
   data,
   height = 260,
@@ -39,11 +48,11 @@ export function SubscriptionRevenueStackChart({
     starter: lang === "ar" ? "مبتدئ (Starter)" : "Starter Standard",
   };
 
-  const renderCustomLegend = (props: any) => {
+  const renderCustomLegend = (props: RevenueLegendProps) => {
     const { payload } = props;
     return (
       <div className="flex flex-wrap items-center justify-end gap-3 text-xs mb-2 pb-1">
-        {payload?.map((entry: any, index: number) => (
+        {payload?.map((entry, index) => (
           <div key={`item-${index}`} className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
             <span
               className="w-2.5 h-2.5 rounded-xs inline-block shrink-0"
@@ -83,4 +92,3 @@ export function SubscriptionRevenueStackChart({
     </div>
   );
 }
-

@@ -7,6 +7,7 @@ import {
   ArrowLeft, 
   ArrowRight, 
   CheckCircle2, 
+  AlertCircle,
   History, 
   Building2, 
   Save, 
@@ -21,27 +22,101 @@ import {
 } from "lucide-react";
 import { useDatabaseServerDetail } from "./hooks/useDatabaseServerDetail";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { useI18n } from "@/i18n/I18nContext";
+import Link from "next/link";
+import { Country } from "country-state-city";
+import { CountrySelect } from "@/components/shared/CountrySelect";
+import { DatabaseServerConnectivityResult } from "../components/DatabaseServerConnectivityResult";
+import { useAuth } from "@/context/AuthContext";
+import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export default function DatabaseServerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const {
     t,
     server,
-    setServer,
+    formData,
+    setFormData,
+    isLoading,
+    error,
+    isForbidden,
+    fieldErrors,
     activeTab,
     setActiveTab,
     placedTenants,
+    tenantsLoading,
+    tenantsError,
+    tenantsMeta,
+    tenantsPage,
+    setTenantsPage,
     auditLogs,
+    historyLoading,
+    historyError,
+    isTesting,
+    testResult,
+    requiresConnectionTest,
+    isTestedAndConnected,
+    handleTestConnection,
     isSubmitting,
     isSaved,
     handleUpdateSubmit,
-    handleActivate,
-    handleDrain,
-    handleDelete,
+    modalActionType,
+    openActivateModal,
+    openDrainModal,
+    openOfflineModal,
+    openDeleteModal,
+    closeModal,
+    confirmModalAction,
     onBack,
   } = useDatabaseServerDetail(id);
   const { lang } = useI18n();
+  const { user } = useAuth();
+  const canUpdate = adminCanAll(user, ADMIN_RBAC_CRITICAL.DB_SERVERS_UPDATE);
+  const canDelete = adminCanAll(user, ADMIN_RBAC_CRITICAL.DB_SERVERS_DELETE);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2 text-slate-500">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <span className="text-sm font-semibold">جاري التحميل...</span>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || isForbidden || !server) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex flex-col">
+        <Navbar />
+        <main className="flex-1 p-4 sm:p-6 max-w-6xl w-full mx-auto">
+          <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs text-center space-y-4 max-w-md mx-auto mt-12">
+            <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-500 flex items-center justify-center mx-auto">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              {isForbidden ? "غير مصرح" : "حدث خطأ"}
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {error || (isForbidden ? "ليس لديك الصلاحية الكافية لعرض هذه الصفحة." : "تعذر العثور على الخادم.")}
+            </p>
+            <button
+              onClick={onBack}
+              className="px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 rounded-xl"
+            >
+              العودة للقائمة
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const utilPct = server.maxTenants > 0 ? Math.round((server.currentTenants / server.maxTenants) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
@@ -65,60 +140,67 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                 <StatusBadge status={server.status} enumType="db-server" size="md" />
               </div>
               <p className="text-xs text-slate-500 font-mono mt-0.5">
-                {server.host}:{server.port} · {server.countryName}
+                {server.host}:{server.port} · {Country.getCountryByCode(server.countryIsoCode || "")?.flag || ""} {Country.getCountryByCode(server.countryIsoCode || "")?.name || server.countryName || server.countryIsoCode}
               </p>
             </div>
           </div>
 
           {/* Action Control Buttons */}
           <div className="flex items-center gap-2">
-            {server.status === "DRAINING" ? (
-              <button
-                onClick={handleActivate}
-                className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                {t.dbServers.activate}
-              </button>
+            {server.status === "DRAINING" || server.status === "OFFLINE" ? (
+              canUpdate && (
+                <button
+                  onClick={openActivateModal}
+                  className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  {t.dbServers.activate}
+                </button>
+              )
             ) : server.status === "ACTIVE" ? (
-              <button
-                onClick={handleDrain}
-                className="px-3.5 py-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                {t.dbServers.drain}
-              </button>
+              canUpdate && (
+                <button
+                  onClick={openDrainModal}
+                  className="px-3.5 py-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  {t.dbServers.drain}
+                </button>
+              )
             ) : null}
 
-            <button
-              onClick={handleDelete}
-              className="px-3.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>{t.dbServers.delete}</span>
-            </button>
+            {server.status !== "OFFLINE" && canUpdate && (
+              <button
+                onClick={openOfflineModal}
+                className="px-3.5 py-1.5 text-xs font-bold bg-slate-600 hover:bg-slate-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                إيقاف (Offline)
+              </button>
+            )}
+
+            {canDelete && (
+              <button
+                onClick={openDeleteModal}
+                className="px-3.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{t.dbServers.delete}</span>
+              </button>
+            )}
           </div>
         </div>
-
-        {/* Saved Toast Notification */}
-        {isSaved && (
-          <div className="p-3 text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center gap-2 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>تم حفظ تعديلات سيرفر قواعد البيانات بنجاح!</span>
-          </div>
-        )}
 
         {/* Top Health Metric Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
             <span className="text-xs text-slate-500 font-semibold">{t.dbServers.tenantsCapacity}</span>
             <div className="text-xl font-extrabold text-slate-900 dark:text-slate-100">
-              {server.currentTenants} / {server.maxTenants} ({server.utilization}%)
+              {server.currentTenants} / {server.maxTenants} ({utilPct}%)
             </div>
             <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden mt-2">
               <div
                 className={`h-full rounded-full ${
-                  server.utilization >= 85 ? "bg-amber-500" : "bg-emerald-500"
+                  utilPct >= 85 ? "bg-amber-500" : "bg-emerald-500"
                 }`}
-                style={{ width: `${server.utilization}%` }}
+                style={{ width: `${utilPct}%` }}
               />
             </div>
           </div>
@@ -134,13 +216,13 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
             <span className="text-xs text-slate-500 font-semibold">{t.dbServers.placementStatus}</span>
             <div className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-              {server.isPlacementTarget ? (
+              {server.status === "ACTIVE" && server.currentTenants < server.maxTenants ? (
                 <span className="text-emerald-600 dark:text-emerald-400 text-sm">🟢 متاح للتسكين</span>
               ) : (
-                <span className="text-amber-600 dark:text-amber-400 text-sm">🟡 متوقف مؤقتاً</span>
+                <span className="text-amber-600 dark:text-amber-400 text-sm">🟡 غير متاح</span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400">تاريخ الإنشاء: {server.createdAt}</p>
+            <p className="text-[11px] text-slate-400">تاريخ الإنشاء: {new Date(server.createdAt).toLocaleString("en-GB")}</p>
           </div>
         </div>
 
@@ -165,7 +247,7 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"
               }`}
             >
-              🏢 المستأجرين المخدومين ({placedTenants.length})
+              🏢 المستأجرين المخدومين
             </button>
             <button
               onClick={() => setActiveTab("history")}
@@ -180,9 +262,11 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
           </div>
         </div>
 
-        {/* Tab 1: Full Update Form (UpdateDatabaseServerDto) */}
+        {/* Tab 1: Full Update Form */}
         {activeTab === "details" && (
-          <form onSubmit={handleUpdateSubmit} className="space-y-6">
+          <>
+            {testResult && <DatabaseServerConnectivityResult result={testResult} lang={lang} />}
+            <form onSubmit={handleUpdateSubmit} className="space-y-6">
             {/* Section A: Host Basic & Capacity */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
@@ -195,8 +279,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.dbServers.hostName}</label>
                   <input
                     type="text"
-                    value={server.name}
-                    onChange={(e) => setServer({ ...server, name: e.target.value })}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -205,8 +289,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.dbServers.hostAddress}</label>
                   <input
                     type="text"
-                    value={server.host}
-                    onChange={(e) => setServer({ ...server, host: e.target.value })}
+                    value={formData.host}
+                    onChange={(e) => setFormData({ ...formData, host: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -215,8 +299,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.dbServers.port}</label>
                   <input
                     type="number"
-                    value={server.port}
-                    onChange={(e) => setServer({ ...server, port: Number(e.target.value) })}
+                    value={formData.port}
+                    onChange={(e) => setFormData({ ...formData, port: Number(e.target.value) })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -227,31 +311,27 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.dbServers.maxTenants}</label>
                   <input
                     type="number"
-                    value={server.maxTenants}
-                    onChange={(e) => setServer({ ...server, maxTenants: Number(e.target.value) })}
+                    value={formData.maxTenants}
+                    onChange={(e) => setFormData({ ...formData, maxTenants: Number(e.target.value) })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.dbServers.countryIso}</label>
-                  <select
-                    value={server.countryIsoCode}
-                    onChange={(e) => setServer({ ...server, countryIsoCode: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
-                  >
-                    <option value="EG">مصر (EG)</option>
-                    <option value="SA">المملكة العربية السعودية (SA)</option>
-                    <option value="AE">الإمارات العربية المتحدة (AE)</option>
-                  </select>
+                  <CountrySelect
+                    value={formData.countryIsoCode}
+                    onChange={(code) => setFormData({ ...formData, countryIsoCode: code })}
+                    className="w-full"
+                  />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.dbServers.maintenanceDb}</label>
                   <input
                     type="text"
-                    value={server.maintenanceDatabase}
-                    onChange={(e) => setServer({ ...server, maintenanceDatabase: e.target.value })}
+                    value={formData.maintenanceDatabase}
+                    onChange={(e) => setFormData({ ...formData, maintenanceDatabase: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -270,8 +350,9 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.dbServers.dbUser}</label>
                   <input
                     type="text"
-                    value={server.username}
-                    onChange={(e) => setServer({ ...server, username: e.target.value })}
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    placeholder="استبدال اسم المستخدم (اختياري)"
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -280,8 +361,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.dbServers.dbPassword}</label>
                   <input
                     type="password"
-                    value={server.password}
-                    onChange={(e) => setServer({ ...server, password: e.target.value })}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     placeholder="اتركها فارغة إذا لم ترد التغيير"
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
@@ -302,15 +383,16 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <span className="text-xs font-bold text-blue-600 dark:text-blue-400">Core App Runtime Login</span>
                   <input
                     type="text"
-                    value={server.coreAppUser}
-                    onChange={(e) => setServer({ ...server, coreAppUser: e.target.value })}
+                    value={formData.coreAppUser}
+                    onChange={(e) => setFormData({ ...formData, coreAppUser: e.target.value })}
+                    placeholder="Core Username (اختياري)"
                     className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
                   />
                   <input
                     type="password"
-                    value={server.coreAppPass}
-                    onChange={(e) => setServer({ ...server, coreAppPass: e.target.value })}
-                    placeholder="تغيير كلمة مرور Core"
+                    value={formData.coreAppPass}
+                    onChange={(e) => setFormData({ ...formData, coreAppPass: e.target.value })}
+                    placeholder="Core Password (تغيير كلمة المرور)"
                     className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
                   />
                 </div>
@@ -320,15 +402,16 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">CRM App Runtime Login</span>
                   <input
                     type="text"
-                    value={server.crmAppUser}
-                    onChange={(e) => setServer({ ...server, crmAppUser: e.target.value })}
+                    value={formData.crmAppUser}
+                    onChange={(e) => setFormData({ ...formData, crmAppUser: e.target.value })}
+                    placeholder="CRM Username (اختياري)"
                     className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
                   />
                   <input
                     type="password"
-                    value={server.crmAppPass}
-                    onChange={(e) => setServer({ ...server, crmAppPass: e.target.value })}
-                    placeholder="تغيير كلمة مرور CRM"
+                    value={formData.crmAppPass}
+                    onChange={(e) => setFormData({ ...formData, crmAppPass: e.target.value })}
+                    placeholder="CRM Password (تغيير كلمة المرور)"
                     className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
                   />
                 </div>
@@ -338,15 +421,16 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <span className="text-xs font-bold text-amber-600 dark:text-amber-400">Trade App Runtime Login</span>
                   <input
                     type="text"
-                    value={server.tradeAppUser}
-                    onChange={(e) => setServer({ ...server, tradeAppUser: e.target.value })}
+                    value={formData.tradeAppUser}
+                    onChange={(e) => setFormData({ ...formData, tradeAppUser: e.target.value })}
+                    placeholder="Trade Username (اختياري)"
                     className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
                   />
                   <input
                     type="password"
-                    value={server.tradeAppPass}
-                    onChange={(e) => setServer({ ...server, tradeAppPass: e.target.value })}
-                    placeholder="تغيير كلمة مرور Trade"
+                    value={formData.tradeAppPass}
+                    onChange={(e) => setFormData({ ...formData, tradeAppPass: e.target.value })}
+                    placeholder="Trade Password (تغيير كلمة المرور)"
                     className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
                   />
                 </div>
@@ -356,15 +440,16 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <span className="text-xs font-bold text-purple-600 dark:text-purple-400">Worker App Runtime Login</span>
                   <input
                     type="text"
-                    value={server.workerAppUser}
-                    onChange={(e) => setServer({ ...server, workerAppUser: e.target.value })}
+                    value={formData.workerAppUser}
+                    onChange={(e) => setFormData({ ...formData, workerAppUser: e.target.value })}
+                    placeholder="Worker Username (اختياري)"
                     className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
                   />
                   <input
                     type="password"
-                    value={server.workerAppPass}
-                    onChange={(e) => setServer({ ...server, workerAppPass: e.target.value })}
-                    placeholder="تغيير كلمة مرور Worker"
+                    value={formData.workerAppPass}
+                    onChange={(e) => setFormData({ ...formData, workerAppPass: e.target.value })}
+                    placeholder="Worker Password (تغيير كلمة المرور)"
                     className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
                   />
                 </div>
@@ -385,8 +470,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                     <label className="flex items-center gap-1 text-[11px] text-slate-500 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={server.removeProvisioningCredentials}
-                        onChange={(e) => setServer({ ...server, removeProvisioningCredentials: e.target.checked })}
+                        checked={formData.removeProvisioningCredentials}
+                        onChange={(e) => setFormData({ ...formData, removeProvisioningCredentials: e.target.checked })}
                         className="rounded"
                       />
                       <span>حذف الاعتمادات</span>
@@ -394,15 +479,19 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   </div>
                   <input
                     type="text"
-                    value={server.provisioningUser}
-                    onChange={(e) => setServer({ ...server, provisioningUser: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    value={formData.provisioningUser}
+                    onChange={(e) => setFormData({ ...formData, provisioningUser: e.target.value })}
+                    placeholder="استبدال اسم المستخدم (اختياري)"
+                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg disabled:opacity-50"
+                    disabled={formData.removeProvisioningCredentials}
                   />
                   <input
                     type="password"
-                    value={server.provisioningPass}
-                    onChange={(e) => setServer({ ...server, provisioningPass: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    value={formData.provisioningPass}
+                    onChange={(e) => setFormData({ ...formData, provisioningPass: e.target.value })}
+                    placeholder="استبدال كلمة المرور"
+                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg disabled:opacity-50"
+                    disabled={formData.removeProvisioningCredentials}
                   />
                 </div>
 
@@ -412,8 +501,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                     <label className="flex items-center gap-1 text-[11px] text-slate-500 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={server.removeBackupCredentials}
-                        onChange={(e) => setServer({ ...server, removeBackupCredentials: e.target.checked })}
+                        checked={formData.removeBackupCredentials}
+                        onChange={(e) => setFormData({ ...formData, removeBackupCredentials: e.target.checked })}
                         className="rounded"
                       />
                       <span>حذف الاعتمادات</span>
@@ -421,15 +510,19 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   </div>
                   <input
                     type="text"
-                    value={server.backupUser}
-                    onChange={(e) => setServer({ ...server, backupUser: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    value={formData.backupUser}
+                    onChange={(e) => setFormData({ ...formData, backupUser: e.target.value })}
+                    placeholder="استبدال اسم المستخدم (اختياري)"
+                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg disabled:opacity-50"
+                    disabled={formData.removeBackupCredentials}
                   />
                   <input
                     type="password"
-                    value={server.backupPass}
-                    onChange={(e) => setServer({ ...server, backupPass: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    value={formData.backupPass}
+                    onChange={(e) => setFormData({ ...formData, backupPass: e.target.value })}
+                    placeholder="استبدال كلمة المرور"
+                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg disabled:opacity-50"
+                    disabled={formData.removeBackupCredentials}
                   />
                 </div>
               </div>
@@ -445,11 +538,11 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                 <label className="flex items-center gap-1 text-xs text-rose-500 font-semibold cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={server.removeSslConfig}
-                    onChange={(e) => setServer({ ...server, removeSslConfig: e.target.checked })}
+                    checked={formData.removeSslConfig}
+                    onChange={(e) => setFormData({ ...formData, removeSslConfig: e.target.checked })}
                     className="rounded"
                   />
-                  <span>حذف تكوين SSL</span>
+                  <span>حذف تكوين SSL (الشهادات والمفتاح)</span>
                 </label>
               </div>
 
@@ -457,9 +550,10 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.dbServers.sslMode}</label>
                   <select
-                    value={server.sslMode}
-                    onChange={(e) => setServer({ ...server, sslMode: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
+                    value={formData.sslMode}
+                    onChange={(e) => setFormData({ ...formData, sslMode: e.target.value as any })}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                    disabled={formData.removeSslConfig}
                   >
                     <option value="disable">disable</option>
                     <option value="require">require</option>
@@ -468,56 +562,85 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   </select>
                 </div>
 
-                <div className="flex items-center pt-5">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={server.sslRejectUnauthorized}
-                      onChange={(e) => setServer({ ...server, sslRejectUnauthorized: e.target.checked })}
-                      className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
-                    />
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      رفض الشهادات غير الموثوقة
-                    </span>
-                  </label>
-                </div>
+                {formData.sslMode !== "disable" && (
+                  <div className="flex items-center pt-5">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formData.sslRejectUnauthorized}
+                        onChange={(e) => setFormData({ ...formData, sslRejectUnauthorized: e.target.checked })}
+                        className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 disabled:opacity-50"
+                        disabled={formData.removeSslConfig}
+                      />
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {lang === "ar" ? "رفض الشهادات غير الموثوقة (sslRejectUnauthorized)" : "Reject Unauthorized Certificates"}
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-3 pt-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">CA Certificate</label>
-                  <textarea
-                    value={server.sslCa}
-                    onChange={(e) => setServer({ ...server, sslCa: e.target.value })}
-                    rows={2}
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {formData.sslMode !== "disable" && (
+                <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Client Cert</label>
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "شهادة CA الرئيسية (Root CA Certificate - استبدال)" : "Root CA Certificate (sslConfig.ca - replace)"}
+                    </label>
                     <textarea
-                      value={server.sslCert}
-                      onChange={(e) => setServer({ ...server, sslCert: e.target.value })}
+                      value={formData.sslCa}
+                      onChange={(e) => setFormData({ ...formData, sslCa: e.target.value })}
                       rows={2}
                       placeholder="-----BEGIN CERTIFICATE-----"
-                      className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
+                      className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                      disabled={formData.removeSslConfig}
                     />
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {lang === "ar" ? "شهادة العميل (Client Cert - استبدال)" : "Client Certificate (sslConfig.cert - replace)"}
+                      </label>
+                      <textarea
+                        value={formData.sslCert}
+                        onChange={(e) => setFormData({ ...formData, sslCert: e.target.value })}
+                        rows={2}
+                        placeholder="-----BEGIN CERTIFICATE-----"
+                        className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                        disabled={formData.removeSslConfig}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {lang === "ar" ? "المفتاح الخاص (Private Key - استبدال)" : "Private Key (sslConfig.key - replace)"}
+                      </label>
+                      <textarea
+                        value={formData.sslKey}
+                        onChange={(e) => setFormData({ ...formData, sslKey: e.target.value })}
+                        rows={2}
+                        placeholder="-----BEGIN PRIVATE KEY-----"
+                        className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                        disabled={formData.removeSslConfig}
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Private Key</label>
-                    <textarea
-                      value={server.sslKey}
-                      onChange={(e) => setServer({ ...server, sslKey: e.target.value })}
-                      rows={2}
-                      placeholder="-----BEGIN PRIVATE KEY-----"
-                      className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {lang === "ar" ? "كلمة مرور المفتاح الخاص (Passphrase)" : "Private Key Passphrase"}
+                    </label>
+                    <input
+                      type="password"
+                      value={formData.sslPassphrase}
+                      onChange={(e) => setFormData({ ...formData, sslPassphrase: e.target.value })}
+                      placeholder="Passphrase"
+                      className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 disabled:opacity-50"
+                      disabled={formData.removeSslConfig}
                     />
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Section F: Pool Tuning & Timeouts */}
@@ -532,8 +655,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Pool Min</label>
                   <input
                     type="number"
-                    value={server.poolMin}
-                    onChange={(e) => setServer({ ...server, poolMin: Number(e.target.value) })}
+                    value={formData.poolMin}
+                    onChange={(e) => setFormData({ ...formData, poolMin: Number(e.target.value) })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -542,8 +665,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Pool Max</label>
                   <input
                     type="number"
-                    value={server.poolMax}
-                    onChange={(e) => setServer({ ...server, poolMax: Number(e.target.value) })}
+                    value={formData.poolMax}
+                    onChange={(e) => setFormData({ ...formData, poolMax: Number(e.target.value) })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -552,8 +675,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Connect Timeout Ms</label>
                   <input
                     type="number"
-                    value={server.connectTimeoutMs}
-                    onChange={(e) => setServer({ ...server, connectTimeoutMs: Number(e.target.value) })}
+                    value={formData.connectTimeoutMs}
+                    onChange={(e) => setFormData({ ...formData, connectTimeoutMs: Number(e.target.value) })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -564,8 +687,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Statement Timeout Ms</label>
                   <input
                     type="number"
-                    value={server.statementTimeoutMs}
-                    onChange={(e) => setServer({ ...server, statementTimeoutMs: Number(e.target.value) })}
+                    value={formData.statementTimeoutMs}
+                    onChange={(e) => setFormData({ ...formData, statementTimeoutMs: Number(e.target.value) })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -574,35 +697,60 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Idle Timeout Ms</label>
                   <input
                     type="number"
-                    value={server.idleTimeoutMs}
-                    onChange={(e) => setServer({ ...server, idleTimeoutMs: Number(e.target.value) })}
+                    value={formData.idleTimeoutMs}
+                    onChange={(e) => setFormData({ ...formData, idleTimeoutMs: Number(e.target.value) })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Save Button Footer */}
-            <div className="flex items-center justify-end bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+            {/* Save & Test Connection Footer */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-6 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-600/20 transition-colors cursor-pointer flex items-center gap-2"
+                type="button"
+                onClick={handleTestConnection}
+                disabled={isTesting}
+                className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
-                {isSubmitting ? (
+                {isTesting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>جاري التحديث...</span>
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    <span>{t.dbServers.testingConnectivity}</span>
                   </>
                 ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    <span>حفظ كافة التعديلات</span>
-                  </>
+                  <span>{t.dbServers.testConnectionBtn}</span>
                 )}
               </button>
+
+              <div className="flex items-center gap-3">
+                {requiresConnectionTest && !isTestedAndConnected && (
+                  <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-200/60 dark:border-amber-800/60">
+                    {lang === "ar" ? "يلزم اختبار الاتصال بنجاح لتأكيد التعديلات" : "Test connection required to save changes"}
+                  </span>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting || (requiresConnectionTest && !isTestedAndConnected)}
+                  className="px-6 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-600/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>جاري التحديث...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>حفظ كافة التعديلات</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          </form>
+            </form>
+          </>
         )}
 
         {/* Tab 2: Placed Tenants */}
@@ -613,32 +761,78 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
               <span>قائمة المستأجرين المستضافين على هذا السيرفر ({placedTenants.length})</span>
             </h3>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-start">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold">
-                    <th className="pb-3 text-start">اسم الشركة</th>
-                    <th className="pb-3 text-start">الرمز</th>
-                    <th className="pb-3 text-start">الباقة</th>
-                    <th className="pb-3 text-start">الحالة</th>
-                    <th className="pb-3 text-start">تاريخ الانضمام</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {placedTenants.map((ten) => (
-                    <tr key={ten.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="py-3 font-semibold text-slate-900 dark:text-slate-100">{ten.name}</td>
-                      <td className="py-3 font-mono text-slate-500">{ten.code}</td>
-                      <td className="py-3 text-slate-600 dark:text-slate-400">{ten.plan}</td>
-                      <td className="py-3">
-                        <StatusBadge status={ten.status} enumType="tenant" size="sm" />
-                      </td>
-                      <td className="py-3 font-mono text-slate-400">{ten.joinedAt}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {tenantsLoading ? (
+              <div className="py-12 flex justify-center text-slate-500">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            ) : tenantsError ? (
+              <div className="py-8 text-center text-rose-500 text-xs font-semibold">{tenantsError}</div>
+            ) : placedTenants.length === 0 ? (
+              <div className="py-8 text-center text-slate-500 text-xs font-semibold">لا يوجد مستأجرين مضافين على هذا الخادم.</div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-start">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold">
+                        <th className="pb-3 text-start">معرف المستأجر</th>
+                        <th className="pb-3 text-start">الاسم</th>
+                        <th className="pb-3 text-start">حالة الدفع</th>
+                        <th className="pb-3 text-start">الحالة</th>
+                        <th className="pb-3 text-start">تاريخ الانضمام</th>
+                        <th className="pb-3 text-start"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {placedTenants.map((ten) => (
+                        <tr key={ten.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td className="py-3 font-mono text-slate-500">{ten.tenantId || ten.id}</td>
+                          <td className="py-3 font-semibold text-slate-900 dark:text-slate-100">{ten.name || ten.subdomain}</td>
+                          <td className="py-3 text-slate-600 dark:text-slate-400">{ten.subscriptionStatus || "N/A"}</td>
+                          <td className="py-3">
+                            <StatusBadge status={ten.status} enumType="tenant" size="sm" />
+                          </td>
+                          <td className="py-3 font-mono text-slate-400">
+                            {new Date(ten.createdAt).toLocaleDateString("en-GB")}
+                          </td>
+                          <td className="py-3 text-end">
+                            <Link
+                              href={`/tenants/${ten.id}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              عرض
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Optional Tenants Pagination */}
+                {tenantsMeta && tenantsMeta.totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <div className="text-xs text-slate-500">الصفحة {tenantsPage} من {tenantsMeta.totalPages}</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setTenantsPage(tenantsPage - 1)}
+                        disabled={!tenantsMeta.hasPrev}
+                        className="px-3 py-1 text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded-lg disabled:opacity-50"
+                      >
+                        السابق
+                      </button>
+                      <button
+                        onClick={() => setTenantsPage(tenantsPage + 1)}
+                        disabled={!tenantsMeta.hasNext}
+                        className="px-3 py-1 text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded-lg disabled:opacity-50"
+                      >
+                        التالي
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -653,54 +847,96 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
               <span className="text-xs text-slate-400 font-mono">إجمالي التغييرات: {auditLogs.length}</span>
             </div>
 
-            <div className="space-y-4">
-              {auditLogs.map((log) => (
-                <div key={log.id} className="p-4 bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800/80 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-mono">
-                        {log.action}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                        بواسطة: {log.user}
+            {historyLoading ? (
+              <div className="py-12 flex justify-center text-slate-500">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            ) : historyError ? (
+              <div className="py-8 text-center text-rose-500 text-xs font-semibold">{historyError}</div>
+            ) : auditLogs.length === 0 ? (
+              <div className="py-8 text-center text-slate-500 text-xs font-semibold">لا يوجد سجل تاريخي لهذا الخادم.</div>
+            ) : (
+              <div className="space-y-4">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="p-4 bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800/80 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-mono">
+                          {log.action}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                          بواسطة: {log.actorId || "النظام"}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {new Date(log.createdAt).toLocaleString("en-GB")}
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-400 font-mono">{log.timestamp}</span>
+
+                    <div className="space-y-2">
+                      {Array.isArray(log.changes) && log.changes.map((ch, idx) => (
+                        <div
+                          key={idx}
+                          className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 items-center text-xs"
+                        >
+                          <div className="font-mono font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-purple-500" />
+                            <span>{ch.label || ch.field}</span>
+                          </div>
+
+                          <div className="font-mono text-xs flex items-center gap-1.5" dir="ltr">
+                            <span className="text-[10px] text-slate-400 font-sans">old:</span>
+                            <span className="px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 font-medium border border-rose-200/60 dark:border-rose-800/60 line-through">
+                              {String(ch.previousValue ?? "N/A")}
+                            </span>
+                          </div>
+
+                          <div className="font-mono text-xs flex items-center gap-1.5" dir="ltr">
+                            <span className="text-[10px] text-slate-400 font-sans">new:</span>
+                            <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-200/60 dark:border-emerald-800/60">
+                              {String(ch.newValue ?? "N/A")}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-
-                  <div className="space-y-2">
-                    {log.changes.map((ch, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/60 dark:border-slate-800/80 items-center text-xs"
-                      >
-                        <div className="font-mono font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-purple-500" />
-                          <span>{ch.field}</span>
-                        </div>
-
-                        <div className="font-mono text-xs flex items-center gap-1.5" dir="ltr">
-                          <span className="text-[10px] text-slate-400 font-sans">old:</span>
-                          <span className="px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 font-medium border border-rose-200/60 dark:border-rose-800/60 line-through">
-                            {ch.oldValue}
-                          </span>
-                        </div>
-
-                        <div className="font-mono text-xs flex items-center gap-1.5" dir="ltr">
-                          <span className="text-[10px] text-slate-400 font-sans">new:</span>
-                          <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-200/60 dark:border-emerald-800/60">
-                            {ch.newValue}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
+
+      {/* Confirmation Modal */}
+      {modalActionType && (
+        <DestructiveActionModal
+          isOpen={true}
+          onClose={closeModal}
+          onConfirm={confirmModalAction}
+          actionType={modalActionType}
+          targetName={server.name}
+          requireNameTyping={modalActionType !== "activate"}
+          title={
+            modalActionType === "activate"
+              ? `تأكيد إعادة تفعيل السيرفر (${server.name})`
+              : modalActionType === "drain"
+              ? `تأكيد تفريغ السيرفر (${server.name})`
+              : modalActionType === "offline"
+              ? `تأكيد إيقاف السيرفر (${server.name})`
+              : `تأكيد حذف السيرفر (${server.name})`
+          }
+          description={
+            modalActionType === "activate"
+              ? "سيسمح هذا الإجراء باستقبال مستأجرين جدد على هذا السيرفر."
+              : modalActionType === "drain"
+              ? "سيعمل هذا الإجراء على منع تخصيص أي مستأجرين جدد على هذا السيرفر ونقل المستأجرين الحاليين عند الطلب."
+              : modalActionType === "offline"
+              ? "سيقوم هذا الإجراء بإيقاف السيرفر وجعله غير متاح كلياً."
+              : "سيقوم هذا الإجراء بإزالة السيرفر نهائياً بشرط عدم وجود مستأجرين مرتبطين به."
+          }
+        />
+      )}
     </div>
   );
 }

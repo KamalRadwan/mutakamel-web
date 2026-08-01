@@ -10,7 +10,7 @@ import {
   CartesianGrid,
   Cell,
 } from "recharts";
-import { useI18n } from "@/i18n/I18nContext";
+import { ChartTooltip } from "./ChartTooltip";
 
 export interface WaterfallDataPoint {
   name: string;
@@ -26,23 +26,6 @@ interface Props {
 }
 
 export function SubscriptionMigrationWaterfallChart({ data, height = 280 }: Props) {
-  const { lang } = useI18n();
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-lg shadow-lg text-xs">
-          <p className="font-bold mb-1 text-slate-800 dark:text-slate-200">{data.name}</p>
-          <p className="text-slate-600 dark:text-slate-400">
-            Value: <span className="font-mono font-bold">{data.value > 0 && !data.isTotal ? "+" : ""}{data.value}</span>
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div style={{ height, width: "100%" }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -61,7 +44,7 @@ export function SubscriptionMigrationWaterfallChart({ data, height = 280 }: Prop
             tick={{ fill: "currentColor", fontSize: 11 }}
             className="text-slate-500 dark:text-slate-400"
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: "transparent" }} />
+          <Tooltip content={<ChartTooltip />} cursor={{ fill: "transparent" }} />
           
           {/* Invisible bar to act as the float base for waterfall */}
           <Bar dataKey="start" stackId="a" fill="transparent" />

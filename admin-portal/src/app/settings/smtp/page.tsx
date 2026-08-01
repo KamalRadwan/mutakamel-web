@@ -20,6 +20,7 @@ export default function SmtpSettingsPage() {
     isVerifying,
     verifyStatus,
     errorMessage,
+    hasUpdatePermission,
   } = useSmtpSettings();
 
   const [passwordInput, setPasswordInput] = useState("");
@@ -74,23 +75,27 @@ export default function SmtpSettingsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={onTestConnection}
-            disabled={isVerifying || isLoading}
-            className="px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
-            {lang === "ar" ? "اختبار الاتصال" : "Test Connection"}
-          </button>
+          {hasUpdatePermission && (
+            <button
+              onClick={onTestConnection}
+              disabled={isVerifying || isLoading}
+              className="px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+              {lang === "ar" ? "اختبار الاتصال" : "Test Connection"}
+            </button>
+          )}
           
-          <button
-            onClick={onSave}
-            disabled={isSaving || isLoading}
-            className="px-3.5 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-600/20 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {lang === "ar" ? "حفظ التغييرات" : "Save Settings"}
-          </button>
+          {hasUpdatePermission && (
+            <button
+              onClick={onSave}
+              disabled={isSaving || isLoading}
+              className="px-3.5 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-600/20 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {lang === "ar" ? "حفظ التغييرات" : "Save Settings"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -145,8 +150,9 @@ export default function SmtpSettingsPage() {
                     type="email"
                     value={config.fromAddress || ""}
                     onChange={(e) => handleUpdate("fromAddress", e.target.value)}
+                    disabled={!hasUpdatePermission}
                     placeholder="no-reply@mutakamel.ai"
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 disabled:opacity-70 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -158,8 +164,9 @@ export default function SmtpSettingsPage() {
                     type="text"
                     value={config.fromName || ""}
                     onChange={(e) => handleUpdate("fromName", e.target.value)}
+                    disabled={!hasUpdatePermission}
                     placeholder="Mutakamel Platform"
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 disabled:opacity-70 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -171,8 +178,9 @@ export default function SmtpSettingsPage() {
                     type="text"
                     value={config.senderDomain || ""}
                     onChange={(e) => handleUpdate("senderDomain", e.target.value)}
+                    disabled={!hasUpdatePermission}
                     placeholder="mutakamel.ai"
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 disabled:opacity-70 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -194,8 +202,9 @@ export default function SmtpSettingsPage() {
                       type="text"
                       value={config.smtpHost || ""}
                       onChange={(e) => handleUpdate("smtpHost", e.target.value)}
+                      disabled={!hasUpdatePermission}
                       placeholder="smtp.example.com"
-                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono"
+                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono disabled:opacity-70 disabled:cursor-not-allowed"
                     />
                   </div>
 
@@ -207,7 +216,8 @@ export default function SmtpSettingsPage() {
                       type="number"
                       value={config.smtpPort || ""}
                       onChange={(e) => handleUpdate("smtpPort", Number(e.target.value))}
-                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono"
+                      disabled={!hasUpdatePermission}
+                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono disabled:opacity-70 disabled:cursor-not-allowed"
                     />
                   </div>
 
@@ -218,7 +228,8 @@ export default function SmtpSettingsPage() {
                     <select
                       value={config.smtpProtocol || "smtp"}
                       onChange={(e) => handleUpdate("smtpProtocol", e.target.value)}
-                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 cursor-pointer"
+                      disabled={!hasUpdatePermission}
+                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                       <option value="smtp">SMTP (TLS/STARTTLS)</option>
                       <option value="smtps">SMTPS (SSL)</option>
@@ -236,8 +247,9 @@ export default function SmtpSettingsPage() {
                     </div>
                     <button
                       type="button"
+                      disabled={!hasUpdatePermission}
                       onClick={() => handleUpdate("smtpSecure", !config.smtpSecure)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${config.smtpSecure ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-700"}`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${config.smtpSecure ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-700"}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.smtpSecure ? "translate-x-6" : "translate-x-1"}`} />
                     </button>
@@ -261,7 +273,8 @@ export default function SmtpSettingsPage() {
                     type="text"
                     value={config.smtpUsername || ""}
                     onChange={(e) => handleUpdate("smtpUsername", e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono"
+                    disabled={!hasUpdatePermission}
+                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono disabled:opacity-70 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -274,8 +287,9 @@ export default function SmtpSettingsPage() {
                       type={showPassword ? "text" : "password"}
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
+                      disabled={!hasUpdatePermission}
                       placeholder={config.smtpPasswordConfigured ? (lang === "ar" ? "تم الحفظ. اكتب قيمة جديدة لتغييرها." : "Configured. Type to overwrite.") : ""}
-                      className="w-full ps-3 pe-10 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono"
+                      className="w-full ps-3 pe-10 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono disabled:opacity-70 disabled:cursor-not-allowed"
                     />
                     <button
                       type="button"

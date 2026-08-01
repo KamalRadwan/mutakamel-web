@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useI18n } from "@/i18n/I18nContext";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { SuccessResponse } from "@/types/common";
+
+import { useHasPermission } from "@/components/auth/RequirePermission";
 
 export interface SmtpConfigState {
   fromAddress: string;
@@ -34,22 +38,21 @@ export interface SmtpAuditLog {
   createdAt: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
-
 export function useSmtpSettings() {
   const { lang } = useI18n();
+  const hasUpdatePermission = useHasPermission("admin.settings.update");
 
   const [config, setConfig] = useState<SmtpConfigState>({
-    fromAddress: "no-reply@mutakamel.ai",
-    fromName: "Mutakamel Admin",
-    senderDomain: "mutakamel.ai",
-    smtpHost: "smtp.mailgun.org",
-    smtpPort: 465,
+    fromAddress: "",
+    fromName: "",
+    senderDomain: "",
+    smtpHost: "",
+    smtpPort: 587,
     smtpSecure: true,
     smtpProtocol: "smtps",
-    smtpUsername: "postmaster@mutakamel.ai",
-    smtpPasswordConfigured: true,
-    configured: true,
+    smtpUsername: "",
+    smtpPasswordConfigured: false,
+    configured: false,
   });
 
   const [auditLogs, setAuditLogs] = useState<SmtpAuditLog[]>([]);
@@ -65,12 +68,12 @@ export function useSmtpSettings() {
     setIsLoading(true);
     try {
       const [configRes, auditRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/admin/system-settings/email`),
-        fetch(`${API_BASE_URL}/admin/system-settings/email/audit`),
+        axiosClient.get<SuccessResponse<any>>(`/api/admin/core/v1/system-settings/email`),
+        axiosClient.get<SuccessResponse<SmtpAuditLog[]>>(`/api/admin/core/v1/system-settings/email/audit`),
       ]);
 
-      if (configRes.ok) {
-        const data = await configRes.json();
+      if (configRes.data && configRes.data.success) {
+        const data = configRes.data.data;
         setConfig({
           fromAddress: data.fromAddress || "",
           fromName: data.fromName || "",
@@ -87,25 +90,12 @@ export function useSmtpSettings() {
         });
       }
 
-      if (auditRes.ok) {
-        const auditData = await auditRes.json();
-        setAuditLogs(auditData);
+      if (auditRes.data && auditRes.data.success) {
+        setAuditLogs(auditRes.data.data);
       }
-    } catch {
-      // Offline fallback audit log example
-      setAuditLogs([
-        {
-          id: "log-1",
-          action: "CONFIGURED",
-          revision: 1,
-          actor: "Platform administrator",
-          changes: [
-            { field: "smtpHost", label: "SMTP host", previousValue: null, newValue: "smtp.mailgun.org" },
-            { field: "smtpPort", label: "SMTP port", previousValue: null, newValue: 465 },
-          ],
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+    } catch (err) {
+      console.error("Failed to fetch SMTP settings or audit logs", err);
+      setAuditLogs([]);
     } finally {
       setIsLoading(false);
     }
@@ -139,21 +129,12 @@ export function useSmtpSettings() {
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/system-settings/email`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-        },
-        body: JSON.stringify(payload),
-      });
+      const res = await axiosClient.patch<SuccessResponse<any>>(
+        `/api/admin/core/v1/system-settings/email`,
+        payload
+      );
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || `Save failed with status ${res.status}`);
-      }
-
-      const updated = await res.json();
+      const updated = res.data.data;
       setConfig((prev) => ({
         ...prev,
         smtpPasswordConfigured: Boolean(updated.smtpPasswordConfigured),
@@ -163,12 +144,11 @@ export function useSmtpSettings() {
       setLastSaved(new Date());
       fetchConfig();
     } catch (err: any) {
-      // Offline simulation fallback
-      await new Promise((r) => setTimeout(r, 600));
-      setLastSaved(new Date());
-      if (password) {
-        setConfig((prev) => ({ ...prev, smtpPasswordConfigured: true }));
+      let msg = "Failed to save SMTP configuration";
+      if (err?.response?.data) {
+        msg = err.response.data.message || err.response.data.title || err.response.data.detail || msg;
       }
+      setErrorMessage(msg);
     } finally {
       setIsSaving(false);
     }
@@ -180,20 +160,20 @@ export function useSmtpSettings() {
     setErrorMessage(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/system-settings/email/verify-connection`, {
-        method: "POST",
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || "Connection verification failed");
-      }
+      await axiosClient.post<SuccessResponse<any>>(
+        `/api/admin/core/v1/system-settings/email/verify-connection`,
+        undefined // Explicitly no body
+      );
 
       setVerifyStatus("success");
+      fetchConfig();
     } catch (err: any) {
-      // Offline fallback simulation
-      await new Promise((r) => setTimeout(r, 1000));
-      setVerifyStatus("success");
+      setVerifyStatus("error");
+      let msg = "Connection verification failed";
+      if (err?.response?.data) {
+        msg = err.response.data.message || err.response.data.title || err.response.data.detail || msg;
+      }
+      setErrorMessage(msg);
     } finally {
       setIsVerifying(false);
     }
@@ -213,5 +193,6 @@ export function useSmtpSettings() {
     isVerifying,
     verifyStatus,
     refetch: fetchConfig,
+    hasUpdatePermission,
   };
 }

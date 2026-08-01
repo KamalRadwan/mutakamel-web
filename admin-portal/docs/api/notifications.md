@@ -1,103 +1,70 @@
-# Notifications API — `/admin/notifications`
+# Admin Notifications API
 
-Browser prefix: `/api/admin/core/v1`. The `/admin/...` forms below are Core
-controller-relative paths, not browser request URLs.
+Status: **Verified backend contract; frontend MISSING**
 
-Base Path: `admin/notifications`
-Guard: `AdminGuard`
+Last source verification: **2026-07-30**
 
----
+Owner: **Core**
 
-## GET `/admin/notifications/config` — Get Runtime Config
-**Permission**: `admin.notifications.read`
+## Read routes
 
-### Frontend Notes
-- Check before initializing push/realtime clients
-- Fall back to polling when realtime is disabled
+| Method and canonical browser path | Permission |
+| --- | --- |
+| `GET /api/admin/core/v1/notifications` | `admin.notifications.read` |
+| `GET /api/admin/core/v1/notifications/unread-count` | `admin.notifications.read` |
+| `GET /api/admin/core/v1/notifications/config` | `admin.notifications.read` |
+| `GET /api/admin/core/v1/notifications/preferences` | `admin.notifications.read` |
 
----
+Inbox query:
 
-## GET `/admin/notifications` — List Notifications
-**Permission**: `admin.notifications.read`
-
-### Query Parameters — `NotificationQueryDto`
-```typescript
-{
-  limit?: number;       // 1-50, default 20
-  cursor?: string;      // Opaque pagination cursor
+```ts
+interface NotificationQuery {
+  limit?: number; // 1..50
+  cursor?: string;
   unreadOnly?: boolean;
 }
 ```
 
-### Frontend Notes
-- Use `nextCursor` for infinite scroll
-- `unreadOnly=true` for badge-backed inbox filters
+Use the opaque cursor returned by Core. Do not reinterpret it as page/offset.
 
----
+## Management routes
 
-## GET `/admin/notifications/unread-count` — Unread Count
-**Permission**: `admin.notifications.read`
+All routes below require `admin.notifications.manage`:
 
-### Response
-```typescript
-{ count: number }
-```
+| Method and canonical browser path | Purpose |
+| --- | --- |
+| `PUT /api/admin/core/v1/notifications/preferences` | Replace/update preferences |
+| `POST /api/admin/core/v1/notifications/device-tokens` | Register push token |
+| `DELETE /api/admin/core/v1/notifications/device-tokens/:id` | Revoke push token |
+| `POST /api/admin/core/v1/notifications/mark-all-read` | Mark all read |
+| `POST /api/admin/core/v1/notifications/read-all` | Mark all read alias |
+| `POST /api/admin/core/v1/notifications/:id/read` | Mark one read |
+| `POST /api/admin/core/v1/notifications/:id/ack` | Acknowledge alias |
+| `POST /api/admin/core/v1/notifications/:id/acknowledge` | Acknowledge |
+| `POST /api/admin/core/v1/notifications/:id/dismiss` | Dismiss |
+| `DELETE /api/admin/core/v1/notifications/:id` | Dismiss alias |
 
----
+Use authoritative response statuses from the controller; several one-item
+actions return `204` with no body.
 
-## GET `/admin/notifications/preferences` — List Preferences
-**Permission**: `admin.notifications.read`
+## Runtime policy
 
----
+Read `/notifications/config` before enabling push or realtime. Admin Realtime
+remains gated, so the current implementation target is REST polling with
+visible refresh/retry state. Do not activate an Admin Socket.IO client from
+this documentation work.
 
-## PUT `/admin/notifications/preferences` — Upsert Preference
-**Permission**: `admin.notifications.manage`
+Device/push tokens are sensitive browser-bound values. Do not log or expose
+them in UI fixtures.
 
----
+## Current frontend defect
 
-## POST `/admin/notifications/device-tokens` — Register Device Token
-**Permission**: `admin.notifications.manage`
+`src/components/layout/hooks/useNotificationDropdown.ts` returns static local
+notifications. It is not a live inbox. No preferences, device-token, read,
+acknowledge, or dismiss workflow is integrated.
 
----
+## Source map
 
-## DELETE `/admin/notifications/device-tokens/:id` — Revoke Device Token
-**Permission**: `admin.notifications.manage`
-
----
-
-## POST `/admin/notifications/mark-all-read` — Mark All Read
-**Permission**: `admin.notifications.manage`
-
-### Response
-```typescript
-{ updated: number }
-```
-
----
-
-## POST `/admin/notifications/read-all` — Mark All Read (Alias)
-**Permission**: `admin.notifications.manage`
-
----
-
-## POST `/admin/notifications/:id/read` — Mark One Read
-**Permission**: `admin.notifications.manage`
-**HTTP Status**: 204
-
----
-
-## POST `/admin/notifications/:id/acknowledge` — Acknowledge
-**Permission**: `admin.notifications.manage`
-**HTTP Status**: 204
-
----
-
-## POST `/admin/notifications/:id/dismiss` — Dismiss
-**Permission**: `admin.notifications.manage`
-**HTTP Status**: 204
-
----
-
-## DELETE `/admin/notifications/:id` — Dismiss (Alias)
-**Permission**: `admin.notifications.manage`
-**HTTP Status**: 204
+- `../backend/mutakamel-apps/core-app/src/admin/notifications/`
+- `../backend/mutakamel-apps/core-app/src/admin/notifications/dto/`
+- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
