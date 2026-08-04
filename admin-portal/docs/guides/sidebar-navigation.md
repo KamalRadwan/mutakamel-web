@@ -114,6 +114,11 @@ panel under `/tenants/[id]`. Ordinary profile edit must continue to exclude
 `storageServerId`. See
 [Tenant Storage Server Migrations](../api/tenant-storage-migrations.md).
 
+The planned Storage Servers module uses an add modal on `/storage-servers` and
+one `/storage-servers/[id]` route for both view and embedded edit mode. It does
+not require `/storage-servers/new` or `/storage-servers/[id]/edit`. See
+[Storage Servers](../api/storage-servers.md).
+
 ## Permission-gating rules
 
 1. Complete `/auth/me` before rendering protected navigation.

@@ -426,6 +426,31 @@ Important shared constraints:
 
 ---
 
+## Storage Server DTOs
+
+Storage Server registration, base update, full routing-profile replacement,
+principal-reference rotation, verification, lifecycle, and attestation-key
+DTOs are documented in the verified
+[Storage Servers Frontend Contract](../api/storage-servers.md).
+
+Important shared constraints:
+
+- all Storage Server and attestation-key mutations require UUIDv7
+  `x-idempotency-key`;
+- create/update endpoint URLs are absolute and credential-free, and the public
+  endpoint is HTTPS;
+- routing profile is a full replacement with an
+  `expectedBindingRevision`, four distinct mandatory class buckets, nine
+  principal references, and six attestation key IDs;
+- principal references match exact `env:S3_<PREFIX>_<PRINCIPAL>_<ROLE>`
+  suffixes and are never secret material;
+- rotation, verification, lifecycle, key promotion, and delete requests have
+  no body where the API contract says none;
+- no DTO accepts an access key, secret key, Ed25519 private key, raw
+  fingerprint, or force-activation flag.
+
+---
+
 ## Tenant DTOs
 
 Tenant registration, identity/FQDN preflight, placement, provisioning preview,
