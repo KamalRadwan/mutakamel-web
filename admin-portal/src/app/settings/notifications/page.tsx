@@ -23,11 +23,11 @@ export default function NotificationsSettingsPage() {
         </div>
       </div>
 
-      <SaveSettingsBanner 
-        hasUnsavedChanges={hasUnsavedChanges} 
-        isSaving={isSaving} 
-        onSave={saveAllSettings} 
-        lang={lang} 
+      <SaveSettingsBanner
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={isSaving}
+        onSave={saveAllSettings}
+        lang={lang}
       />
 
       <div className="space-y-4">
@@ -37,11 +37,11 @@ export default function NotificationsSettingsPage() {
           </div>
         ) : (
           settings.map((setting) => (
-            <SettingField 
-              key={setting.key} 
-              setting={setting} 
-              lang={lang} 
-              onUpdate={updateSetting} 
+            <SettingField
+              key={setting.key}
+              setting={setting}
+              lang={lang}
+              onUpdate={updateSetting}
             />
           ))
         )}

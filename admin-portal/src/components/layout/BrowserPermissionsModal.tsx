@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Volume2, Bell, Mic, CheckCircle2, ShieldAlert, ChevronRight, X, Sparkles } from "lucide-react";
+import { Volume2, Bell, Mic, CheckCircle2, ChevronRight, X, Sparkles } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 
 import { usePathname } from "next/navigation";
@@ -69,6 +69,7 @@ export function BrowserPermissionsModal() {
     setIsRequesting(true);
     try {
       // Play a tiny silent/subtle audio tone to activate AudioContext
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
         const ctx = new AudioCtx();
@@ -136,7 +137,7 @@ export function BrowserPermissionsModal() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in select-none">
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 shadow-2xl space-y-6 relative overflow-hidden">
-        
+
         {/* Top Header & Skip */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
           <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400">
@@ -157,7 +158,7 @@ export function BrowserPermissionsModal() {
         <div className="grid grid-cols-3 gap-2">
           {/* Step 1: Speakers */}
           <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
-            speakersGranted 
+            speakersGranted
               ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300"
               : currentStep === "speakers"
               ? "bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/20"
@@ -169,7 +170,7 @@ export function BrowserPermissionsModal() {
 
           {/* Step 2: Notifications */}
           <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
-            notificationsGranted 
+            notificationsGranted
               ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300"
               : currentStep === "notifications"
               ? "bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/20"
@@ -181,7 +182,7 @@ export function BrowserPermissionsModal() {
 
           {/* Step 3: Mic */}
           <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${
-            micGranted 
+            micGranted
               ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300"
               : currentStep === "mic"
               ? "bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/20"
@@ -194,7 +195,7 @@ export function BrowserPermissionsModal() {
 
         {/* Dynamic Step Content */}
         <div className="space-y-4 py-2">
-          
+
           {/* STEP 1: SPEAKERS */}
           {currentStep === "speakers" && (
             <div className="space-y-3 animate-in fade-in">

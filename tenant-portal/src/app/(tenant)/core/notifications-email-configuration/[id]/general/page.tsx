@@ -1,22 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/ToastContext";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { Save, CheckCircle2, Send } from "lucide-react";
+import { Save, Send } from "lucide-react";
 
 export default function NotificationConfigGeneralPage() {
+  const toast = useToast();
   const [channel, setChannel] = useState("البريد الإلكتروني الرئيسي (SMTP)");
   const [senderEmail, setSenderEmail] = useState("noreply@tenant.mutakamel.ai");
   const [smtpHost, setSmtpHost] = useState("smtp.mailgun.org");
   const [port, setPort] = useState("587");
-  const [isSaved, setIsSaved] = useState(false);
   const [testSent, setTestSent] = useState(false);
 
   const handleInlineSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
+    toast.saved();
   };
 
   const handleTestConnection = () => {
@@ -31,12 +31,6 @@ export default function NotificationConfigGeneralPage() {
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">التعديل المباشر لخادم البريد</h2>
           <p className="text-xs text-slate-500">قم بتحديث قيم خادم SMTP واختبار الاتصال المباشر</p>
         </div>
-        {isSaved && (
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-            <CheckCircle2 className="w-4 h-4" />
-            تم الحفظ
-          </span>
-        )}
       </div>
 
       <form onSubmit={handleInlineSave} className="space-y-4 max-w-2xl">

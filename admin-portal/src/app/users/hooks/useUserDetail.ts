@@ -1,4 +1,6 @@
 "use client";
+ 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,13 +18,12 @@ import {
   deleteAdminUser,
   normalizeErrorCode,
 } from "../api/adminUsersApi";
-import { getErrorMessageAndDetails } from "../utils/errorMapping";
+import { getErrorMessageAndDetails, type MappedErrorDetails } from "../utils/errorMapping";
 import type {
   AdminUser,
   AdminRole,
   AdminWebphoneConfig,
   AdminUserStatus,
-  AdminUserErrorCode,
 } from "../types";
 
 export type WebphoneForm = {
@@ -45,6 +46,12 @@ const emptyWebphoneForm: WebphoneForm = {
   transport: "wss",
 };
 
+function toastErrorMessage(details: MappedErrorDetails) {
+  return details.correlationId
+    ? `${details.message}\nCorrelation ID: ${details.correlationId}`
+    : details.message;
+}
+
 export function useUserDetail(id: string) {
   const router = useRouter();
   const { lang, t } = useI18n();
@@ -63,21 +70,14 @@ export function useUserDetail(id: string) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-
-  const [error, setError] = useState<string>();
-  const [errorCode, setErrorCode] = useState<AdminUserErrorCode | string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
-  const [correlationId, setCorrelationId] = useState<string>("");
 
   const [extensionError, setExtensionError] = useState<string | null>(null);
   const [sipUsernameError, setSipUsernameError] = useState<string | null>(null);
 
   const loadUser = useCallback(async () => {
     setIsLoading(true);
-    setError(undefined);
-    setErrorCode(null);
     setNotFound(false);
     setPermissionDenied(false);
 
@@ -105,7 +105,6 @@ export function useUserDetail(id: string) {
       }
     } catch (requestError: any) {
       const code = normalizeErrorCode(requestError);
-      setErrorCode(code);
 
       if (requestError?.response?.status === 404 || code === "ADMIN_USER_NOT_FOUND") {
         setNotFound(true);
@@ -113,9 +112,7 @@ export function useUserDetail(id: string) {
         setPermissionDenied(true);
       } else {
         const details = getErrorMessageAndDetails(requestError, lang);
-        setError(details.message);
-        setCorrelationId(details.correlationId || "");
-        toast.error(lang === "ar" ? "فشل التحميل" : "Load Error", details.message);
+        toast.error(lang === "ar" ? "فشل التحميل" : "Load Error", toastErrorMessage(details));
       }
     } finally {
       setIsLoading(false);
@@ -123,7 +120,7 @@ export function useUserDetail(id: string) {
   }, [id, lang, toast]);
 
   useEffect(() => {
-    loadUser();
+    queueMicrotask(() => loadUser());
   }, [loadUser]);
 
   const identityHasChanges = useMemo(() => {
@@ -149,13 +146,11 @@ export function useUserDetail(id: string) {
     if (!user || !identityHasChanges || isSaving) return;
     if (!firstName.trim() || !lastName.trim()) {
       const msg = lang === "ar" ? "الاسم الأول واسم العائلة مطلوبان." : "First name and last name are required.";
-      setError(msg);
       toast.error(lang === "ar" ? "حقل مطلوب" : "Required Field", msg);
       return;
     }
 
     setIsSaving(true);
-    setError(undefined);
 
     try {
       const updated = await updateAdminUser(user.id, {
@@ -168,17 +163,13 @@ export function useUserDetail(id: string) {
       setFirstName(updated.firstName);
       setLastName(updated.lastName);
       setIsSuperAdmin(updated.isSuperAdmin);
-      setLastSaved(new Date());
-
       toast.success(
         lang === "ar" ? "تم الحفظ" : "Saved",
         lang === "ar" ? "تم تحديث البيانات الشخصية بنجاح." : "Identity profile updated successfully."
       );
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
-      setError(details.message);
-      setCorrelationId(details.correlationId || "");
-      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", details.message);
+      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", toastErrorMessage(details));
 
       setFirstName(user.firstName);
       setLastName(user.lastName);
@@ -192,7 +183,6 @@ export function useUserDetail(id: string) {
     if (!user || !roleHasChanges || !assignedRoleId || isSaving) return;
 
     setIsSaving(true);
-    setError(undefined);
 
     try {
       await assignUserRole(user.id, { roleId: assignedRoleId });
@@ -200,8 +190,6 @@ export function useUserDetail(id: string) {
 
       setUser(freshUser);
       setAssignedRoleId(freshUser.roleId ?? freshUser.role?.id ?? undefined);
-      setLastSaved(new Date());
-
       toast.success(
         lang === "ar" ? "تم تعيين الدور" : "Role Assigned",
         lang === "ar"
@@ -210,9 +198,7 @@ export function useUserDetail(id: string) {
       );
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
-      setError(details.message);
-      setCorrelationId(details.correlationId || "");
-      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", details.message);
+      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", toastErrorMessage(details));
 
       setAssignedRoleId(user.roleId ?? user.role?.id ?? undefined);
     } finally {
@@ -225,13 +211,11 @@ export function useUserDetail(id: string) {
 
     const validationError = validateWebphoneForm(webphoneForm, webphone, lang);
     if (validationError) {
-      setError(validationError);
       toast.error(lang === "ar" ? "خطأ في التحقق" : "Validation Error", validationError);
       return;
     }
 
     setIsSaving(true);
-    setError(undefined);
     setExtensionError(null);
     setSipUsernameError(null);
 
@@ -241,8 +225,6 @@ export function useUserDetail(id: string) {
 
       setWebphone(updated);
       setWebphoneForm(webphoneFormFromConfig(updated));
-      setLastSaved(new Date());
-
       toast.success(
         lang === "ar" ? "تم حفظ إعدادات الهاتف" : "Phone Settings Saved",
         lang === "ar" ? "تم تحديث إعدادات WebPhone بنجاح." : "WebPhone configuration updated successfully."
@@ -252,9 +234,7 @@ export function useUserDetail(id: string) {
       if (details.fieldErrors?.extension) setExtensionError(details.fieldErrors.extension);
       if (details.fieldErrors?.sipUsername) setSipUsernameError(details.fieldErrors.sipUsername);
 
-      setError(details.message);
-      setCorrelationId(details.correlationId || "");
-      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", details.message);
+      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", toastErrorMessage(details));
     } finally {
       setIsSaving(false);
     }
@@ -264,7 +244,6 @@ export function useUserDetail(id: string) {
     if (!user || isSaving) return;
 
     setIsSaving(true);
-    setError(undefined);
 
     try {
       const updated =
@@ -272,17 +251,13 @@ export function useUserDetail(id: string) {
 
       setUser(updated);
       setStatus(updated.status);
-      setLastSaved(new Date());
-
       toast.success(
         lang === "ar" ? "نجاح" : "Success",
         lang === "ar" ? "تم تحديث حالة المستخدم بنجاح." : "User status updated successfully."
       );
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
-      setError(details.message);
-      setCorrelationId(details.correlationId || "");
-      toast.error(lang === "ar" ? "خطأ في التحديث" : "Update Error", details.message);
+      toast.error(lang === "ar" ? "خطأ في التحديث" : "Update Error", toastErrorMessage(details));
     } finally {
       setIsSaving(false);
     }
@@ -292,7 +267,6 @@ export function useUserDetail(id: string) {
     if (!user || isSaving) return;
 
     setIsSaving(true);
-    setError(undefined);
 
     try {
       await deleteAdminUser(user.id);
@@ -303,9 +277,7 @@ export function useUserDetail(id: string) {
       router.push("/users");
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
-      setError(details.message);
-      setCorrelationId(details.correlationId || "");
-      toast.error(lang === "ar" ? "خطأ في الحذف" : "Delete Error", details.message);
+      toast.error(lang === "ar" ? "خطأ في الحذف" : "Delete Error", toastErrorMessage(details));
     } finally {
       setIsSaving(false);
     }
@@ -318,12 +290,8 @@ export function useUserDetail(id: string) {
     user,
     isLoading,
     isSaving,
-    lastSaved,
-    error,
-    errorCode,
     notFound,
     permissionDenied,
-    correlationId,
     reload: loadUser,
 
     firstName,

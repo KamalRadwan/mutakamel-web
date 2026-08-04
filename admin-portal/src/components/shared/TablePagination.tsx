@@ -1,0 +1,41 @@
+"use client";
+
+interface PaginationMeta {
+  totalPages: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+}
+
+interface TablePaginationProps {
+  meta: PaginationMeta;
+  page: number;
+  setPage: (updater: (prev: number) => number) => void;
+}
+
+export function TablePagination({ meta, page, setPage }: TablePaginationProps) {
+  if (meta.totalPages <= 1) return null;
+
+  return (
+    <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+      <span className="text-slate-500 dark:text-slate-400 font-medium">
+        Page {page} of {meta.totalPages}
+      </span>
+      <div className="flex gap-2">
+        <button
+          disabled={!meta.hasPrev}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-semibold"
+        >
+          Previous
+        </button>
+        <button
+          disabled={!meta.hasNext}
+          onClick={() => setPage((p) => p + 1)}
+          className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-semibold"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}

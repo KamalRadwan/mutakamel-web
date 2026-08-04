@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import type { RTCSession } from 'jssip/lib/RTCSession';
 import type { UA } from 'jssip';
-import { playDtmfTone } from '../utils/dtmfAudio';
+import { playDtmfTone, iceServersFromSettings, isWebphoneReady, normalizeCallTarget, sipUri } from '@mutakamel/webphone';
+import { safeStorage } from "@/lib/safeStorage";
 import { createMyWebphoneCallLog, loadAsteriskSettings, loadMyWebphoneCallLogs, loadMyWebphoneConfig } from '../webphone/api';
-import { iceServersFromSettings, isWebphoneReady, normalizeCallTarget, sipUri } from '../webphone/config';
 import type {
   ActiveCallContext,
   AdminWebphoneConfig,
@@ -16,7 +16,7 @@ import type {
   WebphoneCallState,
   WebphoneConnectionState,
   WebphoneTab,
-} from '../webphone/types';
+} from '@mutakamel/webphone';
 
 type PhoneLifecycle = {
   connectPhone: () => Promise<void>;
@@ -340,20 +340,20 @@ export function useWebRTCPhone() {
 
 function readBooleanPreference(key: string, fallback: boolean): boolean {
   if (typeof window === 'undefined') return fallback;
-  const value = window.localStorage.getItem(key);
+  const value = safeStorage.getItem(key);
   if (value === null) return fallback;
   return value === 'true';
 }
 
 function readNumberPreference(key: string, fallback: number): number {
   if (typeof window === 'undefined') return fallback;
-  const value = Number(window.localStorage.getItem(key));
+  const value = Number(safeStorage.getItem(key));
   return Number.isFinite(value) ? value : fallback;
 }
 
 function writePreference(key: string, value: unknown): void {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(key, String(value));
+  safeStorage.setItem(key, String(value));
 }
 
 export function formatWebphoneLogTime(dateStr?: string | null): string {

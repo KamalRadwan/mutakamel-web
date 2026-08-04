@@ -1,7 +1,7 @@
 # Admin Portal — Selected DTOs Reference
 
 High-use request DTOs and validation rules extracted from the current backend.
-Last verified: **2026-07-30**.
+Last verified: **2026-08-02**.
 
 This page is not a substitute for each domain API page. The backend DTO remains
 authoritative, and the Core global validation pipe rejects unknown fields.
@@ -290,11 +290,109 @@ rules are documented in the
 
 ## Database Server DTOs
 
-The database-server create, connectivity, query, history-query, and update DTOs
-contain credential, SSL, pool, timeout, capacity, and lifecycle rules that are
-too interdependent for a short shared excerpt. Use the verified
-[Database Servers Frontend Contract](../api/database-servers.md), including its
-normalization table and cross-field validation rules.
+```typescript
+interface DatabaseServerCredentialsDto {
+  username: string;
+  password: string;
+}
+
+interface DatabaseServerSslConfigDto {
+  ca?: string;
+  cert?: string;
+  key?: string;
+  passphrase?: string;
+}
+
+interface CreateDatabaseServerDto {
+  name: string;
+  host: string;
+  port?: number;
+  securityAdminCredentials: DatabaseServerCredentialsDto;
+  sslMode?: DatabaseServerSslMode;
+  sslRejectUnauthorized?: boolean;
+  sslConfig?: DatabaseServerSslConfigDto;
+  maintenanceDatabase?: string;
+  poolMin?: number;
+  poolMax?: number;
+  connectTimeoutMs?: number;
+  statementTimeoutMs?: number;
+  idleTimeoutMs?: number;
+  maxTenants: number;
+  countryName?: string;
+  countryIsoCode?: string;
+}
+
+type CheckDatabaseServerConnectivityDto = Omit<
+  CreateDatabaseServerDto,
+  'name' | 'poolMin' | 'poolMax' | 'maxTenants' | 'countryName' | 'countryIsoCode'
+>;
+
+interface UpdateDatabaseServerDto {
+  name?: string;
+  host?: string;
+  port?: number;
+  securityAdminCredentials?: DatabaseServerCredentialsDto;
+  sslMode?: DatabaseServerSslMode;
+  sslRejectUnauthorized?: boolean;
+  sslConfig?: DatabaseServerSslConfigDto;
+  removeSslConfig?: boolean;
+  maintenanceDatabase?: string;
+  poolMin?: number;
+  poolMax?: number;
+  connectTimeoutMs?: number;
+  statementTimeoutMs?: number;
+  idleTimeoutMs?: number;
+  maxTenants?: number;
+  countryName?: string;
+  countryIsoCode?: string;
+}
+
+interface RetryDatabaseServerCredentialBootstrapDto {
+  reason: string;
+}
+
+interface UpdateDatabaseServerSystemPrincipalRotationDto {
+  expectedCredentialRevision: string;
+  rotationEnabled?: boolean;
+  rotationIntervalHours?: number;
+  maintenanceWindowStartUtc?: number;
+  maintenanceWindowHours?: number;
+  reason: string;
+}
+
+interface BootstrapDatabaseServerApplicationDto {
+  expectedCatalogueRevision: string;
+  expectedPolicyRevision: string;
+  reason: string;
+}
+
+interface ApplicationDatabaseCredentialCommandDto {
+  expectedCredentialRevision: string;
+  reason: string;
+}
+
+interface DatabaseServerQueryDto {
+  page?: number;
+  limit?: number;
+  sortBy?: 'name' | 'host' | 'currentTenants' | 'createdAt';
+  sortDir?: 'ASC' | 'DESC';
+  search?: string;
+  status?: DatabaseServerStatus;
+  countryIsoCode?: string;
+  deleted?: boolean; // true returns only soft-deleted servers
+}
+
+interface DatabaseServerHistoryQueryDto {
+  action?: DatabaseServerHistoryAction;
+  limit?: number;
+}
+```
+
+Credential and SSL values are write-only. Optional credential objects must be
+omitted unless both username and password are present. Application passwords
+are generated inside Core and are never accepted or returned by these DTOs.
+Use the verified [Database Servers Frontend Contract](../api/database-servers.md)
+for exact bounds, cross-field rules, receipts, and lifecycle preconditions.
 
 ---
 
@@ -392,11 +490,70 @@ must not invent them. See
 
 ---
 
-## Modules and Catalogue DTOs
+## Application Catalogue DTOs
 
-Use the verified [Modules and Catalogue Frontend Contract](../api/catalog.md)
-as the source of truth for module, tier, feature, grant, price-ladder, and
-managed-currency requests. It records immutable keys, strict unknown-field
-rejection, per-field bounds, decimal-string formats, UUIDv7 idempotency
-requirements, and the cross-field rules that cannot be represented by isolated
-TypeScript property types.
+```typescript
+interface ApplicationListQueryDto {
+  page?: number;
+  limit?: number;
+  search?: string;
+  applicationType?: ApplicationType;
+  commercialMode?: ApplicationCommercialMode;
+  catalogueVisibility?: ApplicationCatalogueVisibility;
+  lifecycleStatus?: ApplicationLifecycleStatus;
+  databaseAccessMode?: ApplicationDatabaseAccessMode;
+}
+
+interface CreateApplicationDto {
+  key: string;
+  name: string;
+  description?: string;
+  avatarDataUrl?: string;
+  applicationType: ApplicationType;
+  commercialMode: ApplicationCommercialMode;
+  catalogueVisibility: ApplicationCatalogueVisibility;
+}
+
+interface UpdateApplicationDto {
+  expectedCatalogueRevision: string;
+  name?: string;
+  description?: string | null;
+  avatarDataUrl?: string | null;
+  commercialMode?: ApplicationCommercialMode;
+  catalogueVisibility?: ApplicationCatalogueVisibility;
+}
+
+interface ApplicationLifecycleCommandDto {
+  expectedCatalogueRevision: string;
+  reason: string;
+}
+
+interface CreateApplicationProvisioningBindingDto {
+  expectedTechnicalDefinitionRevision: string; // positive integer string
+  contractVersion: number; // integer 1..2,147,483,647
+  reason: string; // trimmed, non-empty, max 256
+}
+
+type DeleteApplicationQueryDto = ApplicationLifecycleCommandDto;
+
+interface UpdateApplicationDatabasePolicyDto {
+  expectedPolicyRevision: string;
+  enableOnNewServers?: boolean;
+  rotationEnabled?: boolean;
+  rotationIntervalHours?: number;
+  maintenanceWindowStartUtc?: number;
+  maintenanceWindowHours?: number;
+  reason: string;
+}
+```
+
+Application keys match `^[a-z][a-z0-9_]{0,63}$` and are immutable. Catalogue
+and policy revisions are positive integer strings. Rotation intervals are
+`24..8760` hours, the UTC window start is `0..23`, and its duration is `1..24`
+hours. Lifecycle reasons are trimmed, non-empty, and at most 256 characters.
+
+Use the verified [Application Catalogue Frontend Contract](../api/catalog.md)
+for tier, feature, grant, price-ladder, audit-query, and managed-currency DTOs.
+It records strict unknown-field rejection, per-field bounds, decimal-string
+formats, UUIDv7 idempotency requirements, and replacement rules that cannot be
+represented by isolated TypeScript property types.

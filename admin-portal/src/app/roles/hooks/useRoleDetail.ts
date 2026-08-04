@@ -22,7 +22,7 @@ export function useRoleDetail(id: string) {
   const [description, setDescription] = useState("");
   const [isSystem, setIsSystem] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  
+
   // Keep original values for diff checking
   const [originalName, setOriginalName] = useState("");
   const [originalDescription, setOriginalDescription] = useState("");
@@ -30,10 +30,9 @@ export function useRoleDetail(id: string) {
   // Permissions State
   const [assignedPermissions, setAssignedPermissions] = useState<Set<string>>(new Set());
   const pendingPermissionSave = useRef<NodeJS.Timeout | null>(null);
-  
+
   // UI State
   const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,7 +55,7 @@ export function useRoleDetail(id: string) {
           setIsSystem(roleData.isSystem);
 
           const isSuper = Boolean(
-            roleData.isSuperAdmin || 
+            roleData.isSuperAdmin ||
             roleData.name?.toLowerCase().includes("super admin") ||
             roleData.name?.includes("سوبر أدمن")
           );
@@ -66,10 +65,12 @@ export function useRoleDetail(id: string) {
           if (isSuper) {
             setAssignedPermissions(new Set(perms.map((p) => p.id)));
           } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const permissionIds = roleData.permissions?.map((p: any) => typeof p === 'string' ? p : p.id) || [];
             setAssignedPermissions(new Set(permissionIds));
           }
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         toast.error(
           lang === "ar" ? "فشل التحميل" : "Load Failed",
@@ -87,7 +88,7 @@ export function useRoleDetail(id: string) {
 
   // Grouped and Filtered Catalogue
   const normalizedSearch = search.trim().toLocaleLowerCase();
-  
+
   const visiblePermissions = catalogue.filter((permission) =>
     [
       permission.key,
@@ -119,8 +120,12 @@ export function useRoleDetail(id: string) {
       });
       setOriginalName(name);
       setOriginalDescription(description);
-      setLastSaved(new Date());
+      toast.success(
+        lang === "ar" ? "تم الحفظ تلقائياً" : "Saved Automatically",
+        lang === "ar" ? "تم تحديث بيانات الدور." : "Role metadata has been updated.",
+      );
       document.title = `Role: ${name} - Mutakamel Admin`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       toast.error(
         lang === "ar" ? "فشل الحفظ" : "Save Failed",
@@ -145,7 +150,11 @@ export function useRoleDetail(id: string) {
       await axiosClient.patch(`/api/admin/core/v1/roles/${id}/permissions`, {
         permissionIds: Array.from(newPermissions),
       });
-      setLastSaved(new Date());
+      toast.success(
+        lang === "ar" ? "تم الحفظ تلقائياً" : "Saved Automatically",
+        lang === "ar" ? "تم تحديث صلاحيات الدور." : "Role permissions have been updated.",
+      );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       toast.error(
         lang === "ar" ? "فشل حفظ الصلاحيات" : "Failed to save permissions",
@@ -167,7 +176,7 @@ export function useRoleDetail(id: string) {
 
   const togglePermission = (permId: string) => {
     if (isSystem || isSuperAdmin) return;
-    
+
     setAssignedPermissions((prev) => {
       const next = new Set(prev);
       if (next.has(permId)) {
@@ -182,7 +191,7 @@ export function useRoleDetail(id: string) {
 
   const toggleGroup = (groupName: string, state: boolean) => {
     if (isSystem || isSuperAdmin) return;
-    
+
     setAssignedPermissions((prev) => {
       const next = new Set(prev);
       catalogue
@@ -212,7 +221,6 @@ export function useRoleDetail(id: string) {
     assignedPermissions,
     catalogueLength: catalogue.length,
     isSaving,
-    lastSaved,
     isLoading,
     handleMetadataBlur,
     togglePermission,

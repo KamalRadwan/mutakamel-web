@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation';
 import type { RTCSession } from 'jssip/lib/RTCSession';
 import type { UA } from 'jssip';
 import { useAuth } from '@/context/AuthContext';
-import { playDtmfTone } from '../utils/dtmfAudio';
+import { playDtmfTone, iceServersFromSettings, isWebphoneReady, normalizeCallTarget, sipUri } from '@mutakamel/webphone';
 import { createMyWebphoneCallLog, loadAsteriskSettings, loadMyWebphoneCallLogs, loadMyWebphoneConfig } from '../webphone/api';
-import { iceServersFromSettings, isWebphoneReady, normalizeCallTarget, sipUri } from '../webphone/config';
+import { safeStorage } from "@/lib/safeStorage";
 import type {
   ActiveCallContext,
   AdminWebphoneConfig,
@@ -17,7 +17,7 @@ import type {
   WebphoneCallState,
   WebphoneConnectionState,
   WebphoneTab,
-} from '../webphone/types';
+} from '@mutakamel/webphone';
 
 type PhoneLifecycle = {
   connectPhone: () => Promise<void>;
@@ -437,6 +437,7 @@ export function useWebRTCPhone() {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function answerCall(targetSession?: any) {
     const session = targetSession && typeof targetSession.isEnded === 'function' ? targetSession : sessionRef.current;
     if (!session || session.isEnded()) return;
@@ -976,7 +977,7 @@ function readBooleanPreference(key: string, fallback: boolean) {
   if (typeof window === 'undefined') return fallback;
 
   try {
-    const value = window.localStorage.getItem(key);
+    const value = safeStorage.getItem(key);
     if (value === '1') return true;
     if (value === '0') return false;
   } catch {
@@ -989,9 +990,9 @@ function writeBooleanPreference(key: string, value: boolean) {
   if (typeof window === 'undefined') return;
 
   try {
-    window.localStorage.setItem(key, value ? '1' : '0');
+    safeStorage.setItem(key, value ? '1' : '0');
   } catch {
-    // Browser privacy modes can block localStorage.
+    // Browser privacy modes can block safeStorage.
   }
 }
 
@@ -999,7 +1000,7 @@ function readVolumePreference(key: string, fallback: number) {
   if (typeof window === 'undefined') return fallback;
 
   try {
-    const storedValue = window.localStorage.getItem(key);
+    const storedValue = safeStorage.getItem(key);
     if (storedValue == null) return fallback;
     const value = Number(storedValue);
     if (Number.isFinite(value)) return clampVolume(value);
@@ -1013,9 +1014,9 @@ function writeVolumePreference(key: string, value: number) {
   if (typeof window === 'undefined') return;
 
   try {
-    window.localStorage.setItem(key, String(clampVolume(value)));
+    safeStorage.setItem(key, String(clampVolume(value)));
   } catch {
-    // Browser privacy modes can block localStorage.
+    // Browser privacy modes can block safeStorage.
   }
 }
 

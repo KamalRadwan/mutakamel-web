@@ -1,25 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/ToastContext";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { Save, CheckCircle2, Download } from "lucide-react";
+import { Save, Download } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 
 export default function NoteGeneralPage() {
+  const toast = useToast();
     const { t } = useI18n();
   const [title, setTitle] = useState(t.crm.notesOfLastMeetingAndTech);
   const [targetType, setTargetType] = useState("deal");
   const [targetName, setTargetName] = useState(t.crm.alHayatHospitalDeal);
   const [noteContent, setNoteContent] = useState(t.crm.itWasAgreedToProvideA5);
   const [attachmentName, setAttachmentName] = useState("Technical_Proposal_v2.pdf");
-  const [isSaved, setIsSaved] = useState(false);
 
   const handleInlineSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
+    toast.saved();
   };
 
   return (
@@ -29,11 +29,6 @@ export default function NoteGeneralPage() {
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">{t.crm.directEditingOfNoteAndAtt}</h2>
           <p className="text-xs text-slate-500">{t.crm.updateTheNoteTextAndDirec}</p>
         </div>
-        {isSaved && (
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-            <CheckCircle2 className="w-4 h-4" />
-            {t.crm.saved}</span>
-        )}
       </div>
 
       <form onSubmit={handleInlineSave} className="space-y-4 max-w-2xl">

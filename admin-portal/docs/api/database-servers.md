@@ -1,58 +1,41 @@
 # Database Servers Frontend Contract
 
-Status: **Verified backend contract; frontend DONE/REFACTOR**
+Status: **Source-integrated; authenticated runtime verification remains open**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-04**
 
-Verified against the current API Gateway route contracts, Core controller,
-DTOs, service projections, repositories, entities, and active Admin Portal
-screens.
+This is the browser-facing Database Servers V1 contract. API Gateway is the
+browser authority; Core owns registration, PostgreSQL role administration,
+credential encryption, activation readiness, reconciliation, and audit.
+Worker is the only automatic-rotation scheduler.
 
-## Ownership and route prefix
+## Security model
 
-| Concern | Contract |
-|:---|:---|
-| Backend owner | `core-app` |
-| Browser prefix | `/api/admin/core/v1/database-servers` |
-| Core upstream prefix | `/api/v1/admin/database-servers` |
-| Guard | `AdminGuard` |
-| Resource IDs | UUIDv7 |
-| API response envelope | Canonical Core success envelope; paginated lists also include `meta` |
-| Frontend routes | `/database-servers`, `/database-servers/new`, `/database-servers/[id]` |
-| Current frontend status | CRUD, connectivity, history, lifecycle, and delete call real Core APIs; filtering, typing, errors, metrics, and tests need refactoring |
+The administrator submits only the PostgreSQL security-administrator username
+and password. Core generates and encrypts all other passwords:
 
-The unversioned `/admin/database-servers` form is the Nest controller-relative
-path. Browser code must use the canonical API Gateway prefix above.
+| Purpose | Fixed principal | Authority |
+| --- | --- | --- |
+| Tenant database creation and migrations | `mutakamel_provisioner` | Core generates; Worker resolves per operation |
+| Backup and restore reads | `mutakamel_backup` | Core generates; Worker resolves per operation |
+| Application runtime access | Application Catalogue `databasePrincipal` | Core generates one per Application |
 
-## Endpoint summary
+Passwords never appear in an HTTP response, broker command, audit value,
+download, browser storage, UI fixture, analytics event, or log. The portal may
+show only the fixed principal, purpose, lifecycle state, credential revision,
+rotation schedule, and safe failure code.
 
-| Method and browser path | Permission | Success | Purpose |
-|:---|:---|:---:|:---|
-| `POST /api/admin/core/v1/database-servers` | `admin.database_servers.create` | `201` | Register and preflight a server |
-| `POST /api/admin/core/v1/database-servers/check-connectivity` | `admin.database_servers.create` | `200` | Test every submitted PostgreSQL credential group |
-| `GET /api/admin/core/v1/database-servers` | `admin.database_servers.read` | `200` | Paginated list |
-| `GET /api/admin/core/v1/database-servers/:id` | `admin.database_servers.read` | `200` | Safe detail view |
-| `GET /api/admin/core/v1/database-servers/:id/history` | `admin.database_servers.read` | `200` | Audit history |
-| `PATCH /api/admin/core/v1/database-servers/:id` | `admin.database_servers.update` + `admin.database_servers.critical` | `200` | Update mutable configuration |
-| `POST /api/admin/core/v1/database-servers/:id/drain` | `admin.database_servers.update` + `admin.database_servers.critical` | `201` | Stop new placements, keep hosted tenants |
-| `POST /api/admin/core/v1/database-servers/:id/activate` | `admin.database_servers.update` + `admin.database_servers.critical` | `201` | Make eligible for placement when credentials are ready |
-| `POST /api/admin/core/v1/database-servers/:id/offline` | `admin.database_servers.update` + `admin.database_servers.critical` | `201` | Mark unavailable |
-| `DELETE /api/admin/core/v1/database-servers/:id` | `admin.database_servers.delete` + `admin.database_servers.critical` | `204` | Soft-delete an empty drained/offline server |
+## Canonical transport and envelopes
 
-All protected requests use the shared cookie-mode Admin Portal client with
-`credentials: "include"`, `x-auth-cookie-mode: 1`, and coordinated refresh
-behavior. Browser code does not attach a bearer token.
+Browser prefix:
 
-Every database-server mutation in the table—including connectivity checks and
-lifecycle commands—has a `WRITE_SENSITIVE`, `idempotent: true` Gateway
-contract. Send `x-idempotency-key: <UUIDv7>` on every `POST`, `PATCH`, and
-`DELETE`. Generate one key per user intent and reuse it only for an exact retry.
-The `GET` routes do not use this header.
+```text
+/api/admin/core/v1/database-servers
+```
 
-## HTTP envelopes
-
-Core applies its global response interceptor before the API Gateway streams the
-response to the browser:
+Use the shared cookie-mode client. Every Gateway `WRITE_SENSITIVE` route below
+requires a caller-owned UUIDv7 `x-idempotency-key`. Reuse a key only for an
+exact retry of the same intent.
 
 ```ts
 interface SuccessResponse<T> {
@@ -70,11 +53,13 @@ interface SuccessResponse<T> {
   timestamp: string;
 }
 
-interface ErrorResponse {
+interface CoreErrorResponse {
   success: false;
   statusCode: number;
   errorCode: string;
-  errorCategory: string;
+  errorCategory:
+    | "VALIDATION" | "AUTH" | "AUTHORIZATION" | "NOT_FOUND"
+    | "CONFLICT" | "RATE_LIMIT" | "SERVER_ERROR";
   message: string;
   details?: Record<string, string[]>;
   correlationId: string;
@@ -94,779 +79,438 @@ interface GatewayProblemDetails {
 }
 ```
 
-For object-returning endpoints, read the object from `response.data`. For the
-list endpoint, `response.data` is `DatabaseServerView[]` and pagination is in
-`response.meta`. History is a non-paginated array under `response.data`.
-HTTP `204` responses have no body.
+Core successes do not contain a second `status` or `code` field outside
+`data`. Normalize Core `errorCode` and Gateway `code` while retaining the
+`correlationId`.
 
-Core DTO/domain failures use `errorCode`. Gateway-originated rejections use
-Problem Details `code`. Normalize both shapes and retain `correlationId`.
+## Endpoints and permissions
 
-## Transport enums
+Permission arrays use ALL semantics.
 
-```ts
-type DatabaseServerStatus = "ACTIVE" | "DRAINING" | "OFFLINE";
+| Method and browser path | Permissions | Success | Body |
+| --- | --- | ---: | --- |
+| `POST /database-servers` | `admin.database_servers.create` | 201 | `CreateDatabaseServerDto` |
+| `POST /database-servers/check-connectivity` | create | 200 | `CheckDatabaseServerConnectivityDto` |
+| `POST /database-servers/:id/credential-bootstrap/retry` | create + critical | 200 | `{ reason }` |
+| `GET /database-servers/:id/system-principals` | read | 200 | none |
+| `PATCH /database-servers/:id/system-principals/:purpose/rotation-policy` | update + critical | 200 | system rotation policy DTO |
+| `POST /database-servers/:id/system-principals/:purpose/credential/regenerate` | credentials.rotate + critical | 200 | credential command |
+| `POST /database-servers/:id/system-principals/:purpose/credential/reconcile` | credentials.rotate + critical | 200 | credential command |
+| `POST /database-servers/:id/applications/:applicationKey/bootstrap` | update + critical | 200 | single-Application bootstrap DTO |
+| `POST /database-servers/:id/applications/:applicationKey/credential/regenerate` | credentials.rotate + critical | 200 | credential command |
+| `POST /database-servers/:id/applications/:applicationKey/credential/reconcile` | credentials.rotate + critical | 200 | credential command |
+| `GET /database-servers/:id/applications` | read | 200 | none |
+| `GET /database-servers` | read | 200 | query |
+| `GET /database-servers/:id/history` | read | 200 | query |
+| `GET /database-servers/:id` | read | 200 | none |
+| `PATCH /database-servers/:id` | update + critical | 200 | `UpdateDatabaseServerDto` |
+| `POST /database-servers/:id/drain` | update + critical | 201 | none |
+| `POST /database-servers/:id/activate` | update + critical | 201 | none |
+| `POST /database-servers/:id/offline` | update + critical | 201 | none |
+| `DELETE /database-servers/:id` | delete + critical | 204 | none |
+| `DELETE /database-servers/:id/destroy` | delete.hard + critical | 204 | none |
 
-type DatabaseServerSslMode =
-  | "disable"
-  | "require"
-  | "verify-ca"
-  | "verify-full";
+The ordinary `DELETE` route is soft delete only. It accepts an empty
+`DRAINING` or `OFFLINE` server and removes it from ordinary reads. To review
+those records, call `GET /database-servers?deleted=true`; this returns only
+soft-deleted rows and includes an authoritative non-null `deletedAt` value.
+Destroy is a separate permanent command and is rendered only for those rows.
+The browser never sends `hard=true` or overloads the soft-delete route.
 
-type DatabaseServerHistoryAction =
-  | "CREATE"
-  | "UPDATE"
-  | "ACTIVATE"
-  | "DRAIN"
-  | "OFFLINE"
-  | "DELETE";
-```
+Complete permission keys:
 
-Important:
+- `admin.database_servers.read`
+- `admin.database_servers.create`
+- `admin.database_servers.update`
+- `admin.database_servers.delete`
+- `admin.database_servers.delete.hard`
+- `admin.database_servers.critical`
+- `admin.database_servers.credentials.rotate`
 
-- `DELETED` is not a `DatabaseServerStatusEnum` value. Delete is a soft-delete,
-  and normal list/detail queries do not return deleted servers.
-- Audit history does not use a generic `LIFECYCLE` action. Each transition has
-  its own action.
-- SSL values are lowercase and case-sensitive after transport normalization.
+Credential routes are `no-store`. Mutation and reconciliation routes have no
+transport retry; the UI retains the exact intent key and refreshes the binding
+before deciding whether to retry or reconcile.
 
-## Safe response model
-
-The `data` property from create, detail, update, and lifecycle responses is
-this projection:
-
-```ts
-interface DatabaseServerView {
-  id: string;
-  name: string;
-  host: string;
-  port: number;
-
-  sslMode: DatabaseServerSslMode;
-  sslRejectUnauthorized: boolean;
-  hasSslConfig: boolean;
-  maintenanceDatabase: string;
-
-  poolMin: number;
-  poolMax: number;
-  connectTimeoutMs: number;
-  statementTimeoutMs: number;
-  idleTimeoutMs: number;
-
-  hasBackupCredentials: boolean;
-  backupCredentialsUsesPrimary: boolean;
-  hasProvisioningCredentials: boolean;
-  runtimeCredentialsConfigured: {
-    coreApp: boolean;
-    crmApp: boolean;
-    tradeApp: boolean;
-    workerApp: boolean;
-  };
-  runtimePrincipalsReady: boolean;
-
-  maxTenants: number;
-  currentTenants: number;
-  status: DatabaseServerStatus;
-
-  countryName?: string;
-  countryIsoCode?: string;
-  region?: string; // compatibility alias equal to countryIsoCode
-
-  createdAt: string; // serialized ISO timestamp
-  updatedAt: string; // serialized ISO timestamp
-}
-```
-
-The response deliberately does **not** contain:
-
-- `driver` — the resource is PostgreSQL-only;
-- primary, runtime, provisioning, or backup usernames/passwords;
-- encrypted credential references;
-- CA, certificate, private key, or SSL passphrase;
-- `utilization`;
-- `isPlacementTarget`;
-- audit actor columns such as `createdBy` and `updatedBy`.
-
-Never fabricate secret values from configuration flags. Secret inputs on an
-edit screen must start blank and mean “replace only if the operator enters a
-new value.”
-
-### Derived UI fields
+## Enums and DTOs
 
 ```ts
-function toDatabaseServerRow(server: DatabaseServerView) {
-  const utilizationRatio =
-    server.maxTenants > 0
-      ? server.currentTenants / server.maxTenants
-      : 0;
+type DatabaseServerStatus = "DRAFT" | "ACTIVE" | "DRAINING" | "OFFLINE";
+type DatabaseServerSslMode = "disable" | "require" | "verify-ca" | "verify-full";
+type BindingStatus =
+  | "PENDING" | "PROVISIONING" | "READY" | "ROTATING"
+  | "DEFERRED" | "RECONCILING" | "DEGRADED" | "DISABLED";
+type CredentialBootstrapStatus =
+  | "PENDING" | "PROVISIONING" | "READY" | "RECONCILING" | "DEGRADED";
+type SystemPrincipalPurpose = "PROVISIONING" | "BACKUP";
 
-  const isPlacementTarget =
-    server.status === "ACTIVE" &&
-    server.currentTenants < server.maxTenants &&
-    server.runtimePrincipalsReady &&
-    server.hasProvisioningCredentials;
-
-  return {
-    ...server,
-    driver: "postgres" as const,
-    utilizationRatio,
-    isPlacementTarget,
-  };
-}
-```
-
-Format `utilizationRatio` as a percentage only in the view. Platform
-utilization must be weighted:
-
-```ts
-const platformUtilization =
-  sumMaxTenants > 0 ? sumCurrentTenants / sumMaxTenants : 0;
-```
-
-Do not average per-server percentages; that produces the wrong result when
-servers have different capacities.
-
-`runtimePrincipalsReady` means all four runtime credentials exist.
-Provisioning eligibility additionally requires `hasProvisioningCredentials`.
-An `ACTIVE` server can therefore still be ineligible for new placement.
-
-`backupCredentialsUsesPrimary` is the display authority for backup fallback.
-When a dedicated backup reference is absent, jobs fall back to primary
-credentials and this flag is still `true`.
-
-## Shared nested input types
-
-```ts
 interface DatabaseServerCredentialsDto {
-  username: string; // trim, length 1..128
-  password: string; // length 1..1024; not trimmed
-}
-
-interface DatabaseServerRuntimeCredentialsDto {
-  coreApp: DatabaseServerCredentialsDto;
-  crmApp: DatabaseServerCredentialsDto;
-  tradeApp: DatabaseServerCredentialsDto;
-  workerApp: DatabaseServerCredentialsDto;
+  username: string; // trimmed, 1..128
+  password: string; // 1..1024; never trim
 }
 
 interface DatabaseServerSslConfigDto {
-  ca?: string; // max 20,000
-  cert?: string; // max 20,000
-  key?: string; // max 20,000
-  passphrase?: string; // max 1,024
+  ca?: string;
+  cert?: string;
+  key?: string;
+  passphrase?: string;
 }
-```
 
-If `runtimeCredentials` is sent, all four nested app credential objects are
-required. Updating it replaces the four runtime logins atomically; there is no
-single-runtime-principal patch DTO.
-
-Do not send an empty nested credential object. Omit the entire optional object
-when it should remain unchanged.
-
-## Register a server
-
-### `POST /api/admin/core/v1/database-servers`
-
-```ts
 interface CreateDatabaseServerDto {
   name: string;
-  driver?: "postgres";
   host: string;
   port?: number;
-
-  credentials?: DatabaseServerCredentialsDto;
-  runtimeCredentials?: DatabaseServerRuntimeCredentialsDto;
-  backupCredentials?: DatabaseServerCredentialsDto;
-  provisioningCredentials?: DatabaseServerCredentialsDto;
-
+  securityAdminCredentials: DatabaseServerCredentialsDto;
   sslMode?: DatabaseServerSslMode;
   sslRejectUnauthorized?: boolean;
   sslConfig?: DatabaseServerSslConfigDto;
   maintenanceDatabase?: string;
-
   poolMin?: number;
   poolMax?: number;
   connectTimeoutMs?: number;
   statementTimeoutMs?: number;
   idleTimeoutMs?: number;
-
   maxTenants: number;
   countryName?: string;
   countryIsoCode?: string;
 }
-```
 
-Validation and normalization:
-
-| Field | Rule |
-|:---|:---|
-| `name` | Required, trimmed, length `1..120`; unique even against soft-deleted rows |
-| `driver` | Optional compatibility field; trimmed/lowercased and must equal `postgres` |
-| `host` | Required, trimmed, non-empty, max `255` |
-| `port` | Optional integer `1..65535`; default `5432` |
-| `credentials` | DTO-optional for compatibility, but service-required; omission returns `DB_SERVER_CREDENTIALS_REQUIRED` |
-| `runtimeCredentials` | Optional; if present, all Core/CRM/Trade/Worker credentials are required and connectivity-checked |
-| `backupCredentials` | Optional; when omitted, the stored backup credential reference initially uses primary credentials |
-| `provisioningCredentials` | Optional dedicated elevated role; connectivity and security posture are checked |
-| `sslMode` | Optional; default `disable` |
-| `sslRejectUnauthorized` | Strict boolean; default `true` |
-| `maintenanceDatabase` | Trimmed, length `1..120`; default `postgres` |
-| `poolMin` | Integer `0..100`; default `0` |
-| `poolMax` | Integer `1..500`; default `10`; must be `>= poolMin` |
-| `connectTimeoutMs` | Integer `1000..60000`; default `10000` |
-| `statementTimeoutMs` | Integer `1000..300000`; default `30000` |
-| `idleTimeoutMs` | Integer `1000..300000`; default `30000` |
-| `maxTenants` | Required integer `1..100000` |
-| `countryName` | Optional, trimmed, max `120` |
-| `countryIsoCode` | Optional, trimmed/uppercased, exactly two ASCII letters |
-
-Strict booleans accept `true`, `false`, `"true"`, `"false"`, `"1"`, and
-`"0"`.
-
-Example:
-
-```json
-{
-  "name": "DB-PRIMARY-EG-01",
-  "driver": "postgres",
-  "host": "db-primary-eg-01.internal",
-  "port": 5432,
-  "credentials": {
-    "username": "control_plane_connection",
-    "password": "<operator-entered-secret>"
-  },
-  "runtimeCredentials": {
-    "coreApp": {
-      "username": "mutakamel_core_runtime",
-      "password": "<operator-entered-secret>"
-    },
-    "crmApp": {
-      "username": "mutakamel_crm_runtime",
-      "password": "<operator-entered-secret>"
-    },
-    "tradeApp": {
-      "username": "mutakamel_trade_runtime",
-      "password": "<operator-entered-secret>"
-    },
-    "workerApp": {
-      "username": "mutakamel_worker_runtime",
-      "password": "<operator-entered-secret>"
-    }
-  },
-  "provisioningCredentials": {
-    "username": "mutakamel_provisioner",
-    "password": "<operator-entered-secret>"
-  },
-  "sslMode": "require",
-  "sslRejectUnauthorized": true,
-  "maintenanceDatabase": "postgres",
-  "poolMin": 0,
-  "poolMax": 10,
-  "connectTimeoutMs": 10000,
-  "statementTimeoutMs": 30000,
-  "idleTimeoutMs": 30000,
-  "maxTenants": 50,
-  "countryName": "Egypt",
-  "countryIsoCode": "EG"
-}
-```
-
-Creation behavior:
-
-1. Checks name uniqueness.
-2. Encrypts secret inputs for persistence.
-3. Validates SSL and pool cross-field rules.
-4. Tests the primary connection.
-5. Tests a distinct backup connection when supplied.
-6. Tests provisioning connectivity and its PostgreSQL role posture when
-   supplied.
-7. Tests every supplied runtime principal and verifies the expected database
-   username.
-8. Saves with `status: "ACTIVE"` and `currentTenants: 0`.
-9. Records a redacted `CREATE` history row.
-
-The standalone connectivity button tests only the primary connection. A green
-result does not prove runtime principals or provisioning posture are valid;
-the create request remains the authoritative full preflight.
-
-### Provisioning credential posture
-
-The dedicated provisioning login must be:
-
-- `LOGIN`;
-- `NOINHERIT`;
-- `NOSUPERUSER`;
-- `CREATEDB`;
-- `NOCREATEROLE`;
-- `NOREPLICATION`;
-- `NOBYPASSRLS`;
-- without role memberships;
-- different from every reserved runtime principal name.
-
-Show the backend failure message next to the provisioning credential section.
-
-## Check connectivity
-
-### `POST /api/admin/core/v1/database-servers/check-connectivity`
-
-```ts
 interface CheckDatabaseServerConnectivityDto {
-  driver?: "postgres";
   host: string;
   port?: number;
-
-  credentials?: DatabaseServerCredentialsDto;
-  runtimeCredentials?: DatabaseServerRuntimeCredentialsDto;
-  provisioningCredentials?: DatabaseServerCredentialsDto;
-  backupCredentials?: DatabaseServerCredentialsDto;
-  username?: string;
-  password?: string;
-
+  securityAdminCredentials: DatabaseServerCredentialsDto;
   sslMode?: DatabaseServerSslMode;
   sslRejectUnauthorized?: boolean;
   sslConfig?: DatabaseServerSslConfigDto;
   maintenanceDatabase?: string;
-
   connectTimeoutMs?: number;
   statementTimeoutMs?: number;
   idleTimeoutMs?: number;
 }
 
-interface DatabaseServerConnectivityResult {
-  connected: boolean;
-  message: string;
-  checks: Array<{
-    principal: "primary" | "provisioning" | "backup" | "coreApp" | "crmApp" | "tradeApp" | "workerApp";
-    connected: boolean;
-    message: string;
-  }>;
-}
-```
-
-Use nested `credentials`. The top-level `username`/`password` pair is a compact
-compatibility form. Nested credentials take precedence if both forms are sent.
-Send every credential group that will be saved. The endpoint probes each group,
-continues after a failure, and returns one safe result per submitted principal.
-
-For a DTO-valid request, connection failure still returns HTTP `200`:
-
-```json
-{
-  "success": true,
-  "data": {
-    "connected": false,
-    "message": "One or more database credential checks failed.",
-    "checks": [
-      { "principal": "primary", "connected": true, "message": "connected" },
-      { "principal": "crmApp", "connected": false, "message": "password authentication failed" }
-    ]
-  },
-  "correlationId": "request-correlation-id",
-  "timestamp": "2026-07-24T12:00:00.000Z"
-}
-```
-
-The service normalizes whitespace and caps the message at 320 characters.
-Malformed DTOs still return HTTP `400`.
-
-Do not persist connectivity passwords, include them in telemetry, or retain
-them after the create/edit form closes.
-
-## List servers
-
-### `GET /api/admin/core/v1/database-servers`
-
-```ts
-interface DatabaseServerQueryDto {
-  page?: number; // integer >= 1; default 1
-  limit?: number; // integer 1..100; default 20
-  sortBy?: "name" | "host" | "currentTenants" | "createdAt";
-  sortDir?: "ASC" | "DESC"; // default ASC
-  search?: string; // max 200
-  status?: DatabaseServerStatus;
-  countryIsoCode?: string; // trimmed, uppercased, max length 2
-  region?: string; // legacy alias; uppercased and truncated to 2
-}
-
-type DatabaseServerListResponse = SuccessResponse<DatabaseServerView[]> & {
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
-};
-```
-
-Search covers `name`, `host`, `countryName`, and `countryIsoCode`.
-
-If `sortBy` is absent, the service uses `createdAt`; the inherited default
-direction is `ASC`. Unsupported sort fields return HTTP `400` with code
-`INVALID_FIELD` and an allowed-field list.
-
-Use `countryIsoCode` in new UI code. Do not send both it and `region`; both
-become filters and conflicting values produce an empty result.
-
-Pagination and filters are server-side. Debounce search, reset `page` to `1`
-when filters change, and use `response.meta.total` and
-`response.meta.totalPages`, not the displayed array length.
-
-## Get one server
-
-### `GET /api/admin/core/v1/database-servers/:id`
-
-Returns `SuccessResponse<DatabaseServerView>`. Missing or soft-deleted IDs
-return an error envelope such as:
-
-```json
-{
-  "success": false,
-  "statusCode": 404,
-  "errorCode": "DB_SERVER_NOT_FOUND",
-  "errorCategory": "NOT_FOUND",
-  "message": "Database server not found.",
-  "correlationId": "request-correlation-id",
-  "timestamp": "2026-07-24T12:00:00.000Z",
-  "path": "/api/v1/admin/database-servers/019f0000-0000-7000-8000-000000000001"
-}
-```
-
-The `id` path parameter must be UUIDv7; an invalid ID is rejected before the
-service lookup.
-
-## Audit history
-
-### `GET /api/admin/core/v1/database-servers/:id/history`
-
-```ts
-interface DatabaseServerHistoryQueryDto {
-  action?: DatabaseServerHistoryAction;
-  limit?: number; // integer 1..100; default 25
-}
-
-type DatabaseServerHistoryValue = string | number | boolean | null;
-
-interface DatabaseServerHistoryChange {
-  field: string;
-  label: string;
-  previousValue: DatabaseServerHistoryValue;
-  newValue: DatabaseServerHistoryValue;
-}
-
-interface DatabaseServerHistoryView {
-  id: string;
-  databaseServerId: string;
-  action: DatabaseServerHistoryAction;
-  serverName: string;
-  changes: DatabaseServerHistoryChange[];
-  actorId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-```
-
-The HTTP response is `SuccessResponse<DatabaseServerHistoryView[]>`.
-`response.data` is ordered newest first. There is no pagination `meta`; the
-query is limit-based.
-
-History rows redact credential and certificate material. They contain labels
-such as “Credentials Source,” “Configured,” or pool/timeout summaries rather
-than secrets.
-
-The endpoint returns only `actorId`; it does not return actor name or email.
-Do not model a `user` object unless the frontend performs a separate authorized
-lookup.
-
-The server must still exist in the normal repository lookup. After a successful
-soft-delete, this endpoint returns `DB_SERVER_NOT_FOUND`.
-
-## Update a server
-
-### `PATCH /api/admin/core/v1/database-servers/:id`
-
-```ts
 interface UpdateDatabaseServerDto {
   name?: string;
   host?: string;
   port?: number;
-
-  credentials?: DatabaseServerCredentialsDto;
-  runtimeCredentials?: DatabaseServerRuntimeCredentialsDto;
-  backupCredentials?: DatabaseServerCredentialsDto;
-  removeBackupCredentials?: boolean;
-
+  securityAdminCredentials?: DatabaseServerCredentialsDto;
   sslMode?: DatabaseServerSslMode;
   sslRejectUnauthorized?: boolean;
   sslConfig?: DatabaseServerSslConfigDto;
   removeSslConfig?: boolean;
   maintenanceDatabase?: string;
-
   poolMin?: number;
   poolMax?: number;
   connectTimeoutMs?: number;
   statementTimeoutMs?: number;
   idleTimeoutMs?: number;
-
-  provisioningCredentials?: DatabaseServerCredentialsDto;
-  removeProvisioningCredentials?: boolean;
-
   maxTenants?: number;
   countryName?: string;
   countryIsoCode?: string;
 }
-```
 
-Validation limits are the same as create except that the current update DTO
-checks `host` only as a string of at most 255 characters. The UI must still
-require a non-empty trimmed host; an empty host otherwise reaches connection
-preflight and fails there instead of as a field-level DTO error.
+interface CredentialCommandDto {
+  expectedCredentialRevision: string; // positive integer string
+  reason: string; // trimmed, 8..500
+}
 
-Additional update rules:
-
-- `maxTenants` cannot be lower than `currentTenants`.
-- Status is read-only here; use lifecycle endpoints.
-- `currentTenants`, `driver`, `region`, response flags, and derived utilization
-  are not writable DTO fields.
-- Send only dirty fields.
-- Connection-affecting changes are tested before the locked write.
-- If the connection basis changes concurrently between preflight and save, the
-  server returns `DB_SERVER_CONNECTION_CHANGED_RETRY`; reload and rebuild the
-  patch.
-- Successful connection changes invalidate cached server pools.
-- Rotating primary credentials also rotates backup credentials when backup was
-  using primary, unless this request explicitly supplies or removes backup
-  credentials.
-
-Do not send a replacement object and its remove flag together. Use exactly one
-intent:
-
-```ts
-backupCredentials       XOR removeBackupCredentials
-sslConfig               XOR removeSslConfig
-provisioningCredentials XOR removeProvisioningCredentials
-```
-
-The DTO does not enforce XOR, but an explicit payload builder prevents
-ambiguous forms.
-
-Example metadata/capacity update:
-
-```json
-{
-  "name": "DB-PRIMARY-EG-01",
-  "maxTenants": 75,
-  "countryName": "Egypt",
-  "countryIsoCode": "EG",
-  "poolMax": 20
+interface UpdateSystemPrincipalRotationDto extends CredentialCommandDto {
+  rotationEnabled?: boolean;
+  rotationIntervalHours?: number; // 24..8760
+  maintenanceWindowStartUtc?: number; // 0..23
+  maintenanceWindowHours?: number; // 1..24
 }
 ```
 
-Example secret rotation:
+Core rejects unknown fields. `provisioningCredentials`, `backupCredentials`,
+their remove flags, and password fallbacks are not valid V1 DTO fields.
 
-```json
-{
-  "credentials": {
-    "username": "control_plane_connection",
-    "password": "<new-operator-entered-secret>"
-  }
+Route params:
+
+- `id`: UUIDv7.
+- `applicationKey`: canonical lowercase key matching `^[a-z][a-z0-9_]{0,63}$`.
+- `purpose`: browser path value `provisioning` or `backup`.
+
+## Safe projections
+
+```ts
+interface SystemPrincipalBindingView {
+  purpose: "PROVISIONING" | "BACKUP";
+  databasePrincipal: "mutakamel_provisioner" | "mutakamel_backup";
+  status: BindingStatus;
+  credentialRevision: string;
+  rotationEnabled: boolean;
+  rotationIntervalHours: number;
+  maintenanceWindowStartUtc: number;
+  maintenanceWindowHours: number;
+  rotationDueAt: string | null;
+  lastRotationAttemptAt: string | null;
+  lastRotationSucceededAt: string | null;
+  retryAt: string | null;
+  safeFailureCode: string | null;
+  operationGeneration: string;
+  hasStagedCandidate: boolean;
+}
+
+interface DatabaseServerView {
+  id: string;
+  deletedAt: string | null;
+  name: string;
+  host: string;
+  port: number;
+  sslMode: DatabaseServerSslMode;
+  sslRejectUnauthorized: boolean;
+  hasSslConfig: boolean;
+  maintenanceDatabase: string;
+  poolMin: number;
+  poolMax: number;
+  connectTimeoutMs: number;
+  statementTimeoutMs: number;
+  idleTimeoutMs: number;
+  hasSecurityAdminCredentials: boolean;
+  hasProvisioningCredentials: boolean;
+  hasBackupCredentials: boolean;
+  credentialBootstrap: {
+    status: CredentialBootstrapStatus;
+    totalPrincipals: number;
+    readyPrincipals: number;
+  };
+  systemPrincipals: SystemPrincipalBindingView[];
+  maxTenants: number;
+  currentTenants: number;
+  status: DatabaseServerStatus;
+  countryName?: string;
+  countryIsoCode?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 ```
 
-The edit form must never send masked placeholders such as `"••••••••"`.
+The compatibility booleans are safe readiness projections; they are not secret
+references. New UI decisions use `credentialBootstrap` and
+`systemPrincipals`.
 
-## Lifecycle commands
+## Registration example
 
-These endpoints do not require a request body and return
-`SuccessResponse<DatabaseServerView>`.
+Preflight request:
 
-### Drain
+```http
+POST /api/admin/core/v1/database-servers/check-connectivity
+x-idempotency-key: 019fc7e0-bcef-727f-90cb-ff6028ed3306
+Content-Type: application/json
 
-`POST /api/admin/core/v1/database-servers/:id/drain`
-
-- Sets `status` to `DRAINING`.
-- Excludes the server from new tenant placement.
-- Existing tenants remain hosted.
-- Invalidates cached server pools.
-
-### Activate
-
-`POST /api/admin/core/v1/database-servers/:id/activate`
-
-- Sets `status` to `ACTIVE`.
-- Requires all four runtime credential references and dedicated provisioning
-  credentials.
-- Missing readiness returns HTTP `422` with
-  `DB_SERVER_RUNTIME_CREDENTIALS_REQUIRED`.
-- This command checks configuration presence; use connectivity testing before
-  activation after infrastructure maintenance.
-
-### Offline
-
-`POST /api/admin/core/v1/database-servers/:id/offline`
-
-- Sets `status` to `OFFLINE`.
-- Excludes the server from placement and marks it operationally unavailable.
-- Existing tenant records remain associated with it.
-
-The state-setting commands are service-level idempotent: requesting the current
-state again leaves the state unchanged.
-
-## Delete
-
-### `DELETE /api/admin/core/v1/database-servers/:id`
-
-Returns HTTP `204` with no response body.
-
-Deletion is allowed only when:
-
-```ts
-(status === "DRAINING" || status === "OFFLINE") &&
-currentTenants === 0
+{
+  "host": "db-primary.internal",
+  "port": 5432,
+  "securityAdminCredentials": {
+    "username": "database_security_admin",
+    "password": "<write-only>"
+  },
+  "sslMode": "verify-full",
+  "sslRejectUnauthorized": true,
+  "sslConfig": { "ca": "<trusted-ca-pem>" },
+  "maintenanceDatabase": "postgres"
+}
 ```
 
-Use a destructive confirmation that names the server. Disable the action from
-the current view when the preconditions are false, but still handle backend
-conflicts because tenant placement/count state can change concurrently.
+Success:
 
-Deletion is soft-delete. Do not add a `DELETED` row or status badge to the
-normal list after success; remove the row or refetch the page.
+```json
+{
+  "success": true,
+  "data": {
+    "connected": true,
+    "message": "connected",
+    "checks": [
+      { "principal": "securityAdmin", "connected": true, "message": "connected" }
+    ]
+  },
+  "correlationId": "019fc7e0-bcef-727f-90cb-ff6028ed3306",
+  "timestamp": "2026-08-03T18:00:00.000Z"
+}
+```
 
-## Companion API for the “Hosted tenants” tab
+Create request uses the same connection fields plus `name`, `maxTenants`, and
+optional location/pool values. Core first validates the supplied security-admin
+connection, then persists the DRAFT with two pending system bindings and all
+eligible Application bindings before attempting generated-role bootstrap. The
+201 response is always secret-free. If a generated bootstrap operation fails,
+the server remains DRAFT and its binding states identify the safe
+retry/reconciliation path.
 
-There is no nested database-server tenants endpoint. Use:
+Only `ACTIVE`, database-backed Applications whose policy enables new-server
+binding are eligible. If no Application is active yet, registration still
+returns the durable DRAFT after completing the two system principals. The
+detail screen explains that blocker and links authorized operators to
+Application Catalogue. After the Applications are activated, the generic
+bootstrap retry idempotently backfills the missing bindings before generating
+their credentials; it never weakens the lifecycle eligibility rule.
+
+## System principal commands
+
+Retry all incomplete initial bindings:
+
+```http
+POST /api/admin/core/v1/database-servers/:id/credential-bootstrap/retry
+x-idempotency-key: <uuidv7>
+Content-Type: application/json
+
+{ "reason": "Retry interrupted initial credential assembly" }
+```
+
+Manual system rotation:
+
+```http
+POST /api/admin/core/v1/database-servers/:id/system-principals/provisioning/credential/regenerate
+x-idempotency-key: <uuidv7>
+Content-Type: application/json
+
+{
+  "expectedCredentialRevision": "4",
+  "reason": "Scheduled security rotation"
+}
+```
+
+Secret-free success data:
+
+```json
+{
+  "databaseServerId": "019fc7e0-bcef-727f-90cb-ff6028ed3306",
+  "purpose": "PROVISIONING",
+  "databasePrincipal": "mutakamel_provisioner",
+  "credentialRevision": "5",
+  "status": "READY"
+}
+```
+
+Policy update:
+
+```json
+{
+  "expectedCredentialRevision": "5",
+  "rotationEnabled": true,
+  "rotationIntervalHours": 720,
+  "maintenanceWindowStartUtc": 1,
+  "maintenanceWindowHours": 2,
+  "reason": "Use the monthly maintenance window"
+}
+```
+
+Worker scans due Application and system bindings every five minutes. It defers
+outside the configured UTC window and while migration, backup, restore, tenant
+provisioning, or a provisioning maintenance lease is active. Its Rabbit
+command contains only IDs, purpose/key, expected revision, observed operation
+generation, action, and timestamp. Core performs the password mutation.
+
+## Lifecycle and recovery
 
 ```text
-GET /api/admin/core/v1/tenants?databaseServerId=<database-server-uuid-v7>
+create DRAFT
+  -> generate system + Application principals
+  -> READY credentialBootstrap
+  -> activate ACTIVE
+
+READY/DEFERRED -> ROTATING -> READY
+                         -> RECONCILING -> READY
+                         -> DEGRADED
 ```
 
-Permission: `admin.tenants.read`.
+Activation fails closed unless both system principals and every required
+Application binding are `READY`. Metadata, connection, and lifecycle changes
+are blocked during mutating credential states. A non-ambiguous pre-mutation
+rotation failure keeps the verified old credential and becomes `DEFERRED`; an
+ambiguous PostgreSQL mutation retains the exact candidate and becomes
+`RECONCILING`.
 
-The response is the canonical paginated envelope: the tenant rows are in
-`data`, and counts/navigation flags are in `meta`. The query parameter is
-UUIDv7-validated. Use the tenant response’s safe `databaseServer` summary if it
-needs to be displayed.
+## Error examples and UI behavior
 
-The tab needs an independent permission state: an admin may have
-`admin.database_servers.read` without `admin.tenants.read`.
+Validation failure:
 
-## Error catalogue
-
-### Gateway errors
-
-| Status | Problem Details `code` | UI behavior |
-|:---:|:---|:---|
-| `400` | `GW.IDEM.MISSING` | Generate and attach a UUIDv7 key |
-| `400` | `GW.IDEM.BAD_VALUE` | Fix the key generator; do not retry unchanged |
-| `409` | `GW.IDEM.IN_FLIGHT` | Show processing state, then refetch |
-| `422` | `GW.IDEM.MISMATCH` | Never reuse a key after request intent changes |
-
-### Core database-server errors
-
-| Status | `errorCode` | Typical trigger | UI behavior |
-|:---:|:---|:---|:---|
-| `400` | Validation error code; inspect `details` | Invalid DTO, enum, UUID, bounds, or unknown field | Map field errors; do not retry unchanged input |
-| `400` | `INVALID_FIELD` | Unsupported list `sortBy` | Reset to a documented sort |
-| `401` | Auth failure | Missing/expired session | Let the shared client refresh once |
-| `403` | Permission denied | Missing endpoint permission | Hide action and show forbidden state on direct access |
-| `404` | `DB_SERVER_NOT_FOUND` | Missing or soft-deleted server | Return to list or show not-found |
-| `409` | `DB_SERVER_NAME_TAKEN` | Duplicate create/update name, including a concurrent race | Mark `name` conflict |
-| `409` | `DB_SERVER_NOT_DRAINED` | Delete while active | Require drain/offline first |
-| `409` | `DB_SERVER_HAS_TENANTS` | Delete with `currentTenants > 0` | Keep dialog open and refresh detail |
-| `409` | `DB_SERVER_CONNECTION_CHANGED_RETRY` | Concurrent connection edit during preflight | Reload, re-enter secrets if needed, retry |
-| `422` | `DB_SERVER_MAX_BELOW_CURRENT` | Capacity below hosted count | Set minimum to current count |
-| `422` | `DB_SERVER_RUNTIME_CREDENTIALS_REQUIRED` | Activate without provisioning and all runtime credentials | Link to credential sections |
-| `422` | `DB_SERVER_CONNECTIVITY_FAILED` | Create/update connection preflight failed | Show returned message beside relevant connection section |
-| `422` | `DB_SERVER_CREDENTIALS_REQUIRED` | Create without primary credentials | Focus primary credentials |
-| `422` | `DB_SERVER_CREDENTIALS_ENCRYPTION_KEY_MISSING` | Backend secret-encryption configuration missing | Non-field operational error; contact platform operator |
-| `422` | `DB_SERVER_SSL_CONFIG_INVALID` | SSL cross-field rule failed | Mark SSL section |
-| `422` | `DB_SERVER_POOL_CONFIG_INVALID` | `poolMax < poolMin` | Mark both pool fields |
-
-Stable validation messages also include:
-
-```text
-DB_SERVER_NAME_INVALID
-DB_SERVER_DRIVER_INVALID
-DB_SERVER_SSL_MODE_INVALID
-DB_SERVER_COUNTRY_ISO_INVALID
+```json
+{
+  "success": false,
+  "statusCode": 400,
+  "errorCode": "COMMON.GENERIC.VALIDATION_FAILED",
+  "errorCategory": "VALIDATION",
+  "message": "Validation failed",
+  "details": {
+    "securityAdminCredentials.password": ["password must be longer than or equal to 1 characters"]
+  },
+  "correlationId": "019fc7e0-bcef-727f-90cb-ff6028ed3306",
+  "timestamp": "2026-08-03T18:01:00.000Z",
+  "path": "/api/v1/admin/database-servers"
+}
 ```
 
-## SSL cross-field rules
+Gateway in-flight response:
 
-- `disable` rejects non-empty certificate configuration.
-- `verify-ca` and `verify-full` require a CA certificate, either already stored
-  or supplied in the request.
-- `cert` requires `key`.
-- `key` requires `cert`.
-- `passphrase` is valid only when `key` is present.
-- Changing `sslMode` to `disable` clears the stored SSL config.
-- An empty replacement SSL config is normalized to no config.
+```json
+{
+  "type": "https://errors.mutakamel.ai/gw/idem/in/flight",
+  "title": "Request is already processing",
+  "status": 409,
+  "code": "GW.IDEM.IN.FLIGHT",
+  "instance": "/api/admin/core/v1/database-servers/:id/credential-bootstrap/retry",
+  "correlationId": "019fc7e0-bcef-727f-90cb-ff6028ed3306"
+}
+```
 
-Expose a passphrase field when the UI supports encrypted client keys; the
-current frontend form has CA/cert/key only.
+Required behavior:
 
-## Permission-gated UI actions
+- `400`: keep the form open and bind `details` paths to fields.
+- `401`: use the coordinated shared refresh path.
+- `403`: show a persistent forbidden state, not an empty state.
+- `409` stale revision/state: refetch before creating a new intent.
+- `409 GW.IDEM.IN.FLIGHT`: preserve the exact key and show processing.
+- `422` connectivity/TLS/posture failure: keep write-only values in active
+  component memory and display the safe message/correlation ID.
+- `RECONCILING`: offer reconcile; do not generate a new candidate.
+- `5xx`: preserve the correlation ID and allow a bounded retry.
+- A definitive Database Server write `4xx` completes that failed intent at
+  Gateway; rotate the key before a later create, soft-delete, or destroy
+  submission so a cached conflict is not replayed.
+  `GW.IDEM.IN_FLIGHT` is not definitive and retains the exact key. Network and
+  `5xx` outcomes also retain the original key because acceptance is unknown.
 
-| UI capability | Permission |
-|:---|:---|
-| View list/detail/history | `admin.database_servers.read` |
-| Register and check connectivity | `admin.database_servers.create` |
-| Edit, drain, activate, offline | `admin.database_servers.update` |
-| Delete | `admin.database_servers.delete` |
-| View hosted tenants | `admin.tenants.read` |
+## Admin Portal implementation
 
-Permissions control visibility and affordances; backend authorization remains
-authoritative.
+The active source:
 
-## Current frontend gaps
+- accepts only security-administrator credentials during registration;
+- supports all four TLS modes and active-memory certificate upload fields;
+- warns before registration that only already-`ACTIVE` eligible Applications
+  receive bindings while preserving the safe empty-DRAFT recovery path;
+- redirects the successful create response to the DRAFT detail screen;
+- renders a unified credential-assembly rail and activation blocker;
+- identifies the zero-active-Application blocker, disables a futile retry, and
+  links authorized operators to Application Catalogue before retry backfills
+  the newly eligible bindings;
+- renders both fixed system principals, revision/state/failure evidence,
+  maintenance-aware hour policies, manual rotation, and reconciliation;
+- retains per-Application add, rotation, and reconciliation controls;
+- exposes list-row soft delete only to administrators holding delete plus
+  critical permissions and only for empty `DRAINING`/`OFFLINE` rows;
+- exposes a `deleted=true` registry filter and shows permanent Destroy only for
+  rows with non-null `deletedAt` and administrators holding delete.hard plus
+  critical permissions;
+- contains no password reveal or one-time-file workflow.
 
-The active hooks and views under `src/app/database-servers/` use real Core
-routes, but still need refactoring:
+Source integration and focused tests are not authenticated browser, live
+PostgreSQL privilege, multi-replica convergence, deployment, or release proof.
 
-1. List/detail response handling remains loose and includes explicit `any`.
-2. Filtering, pagination, and error projection are not consistently modeled as
-   typed server state.
-3. Derived utilization/placement/region fields need one documented adapter;
-   weighted capacity must use totals, not an average of percentages.
-4. Secret replacement inputs must always remain blank unless the operator
-   enters new values; safe detail responses do not return credentials.
-5. History and hosted-tenant failures need independent forbidden/error/retry
-   states.
-6. Permission exposure and caller-owned stable idempotency intents are
-   incomplete.
-7. Connectivity/create/update/lifecycle/delete need broader negative and
-   conflict regression coverage.
-8. Duplicate/inactive legacy code must not become a second route
-   implementation.
+## Source map
 
-## Recommended frontend implementation sequence
+Backend authority:
 
-1. Add exact TypeScript API models and an adapter for derived row fields.
-2. Implement server-side list query/pagination and permission states.
-3. Implement safe detail hydration with blank secret replacement inputs.
-4. Implement history using the exact action/change model.
-5. Implement the hosted-tenants tab through the tenant list filter.
-6. Implement connectivity testing without persisting secrets.
-7. Implement create and update payload builders with cross-field validation.
-8. Implement lifecycle actions and backend-code-specific conflict handling.
-9. Implement guarded deletion and refetch/remove behavior.
-10. Remove mock datasets and duplicate inactive components only after all
-    routes have production loading/error states.
+- `mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
+- `mutakamel-apps/core-app/src/admin/database-servers/`
+- `mutakamel-apps/core-app/packages/database/src/entities/control-plane/`
+- `mutakamel-apps/worker-app/src/modules/cron-jobs/database-application-credential-rotation.scheduler.ts`
 
-## Backend source map
+Frontend integration:
 
-Paths are relative to `C:\mutakamel.ai\frontend`:
-
-- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
-- `../backend/mutakamel-apps/core-app/src/admin/database-servers/database-servers.controller.ts`
-- `../backend/mutakamel-apps/core-app/src/admin/database-servers/database-servers.service.ts`
-- `../backend/mutakamel-apps/core-app/src/admin/database-servers/dto/`
-- `../backend/mutakamel-apps/core-app/src/admin/database-servers/repo/`
-- `../backend/mutakamel-apps/core-app/packages/database/src/entities/control-plane/database-server.entity.ts`
-- `../backend/mutakamel-apps/core-app/packages/database/src/entities/control-plane/database-server-history.entity.ts`
-- `../backend/mutakamel-apps/shared-libs/packages/database/src/dtos/pagination-query.dto.ts`
-- `../backend/mutakamel-apps/shared-libs/packages/database/src/interfaces/paginated-result.interface.ts`
-- `../backend/mutakamel-apps/shared-libs/packages/common/src/interceptors/response-envelope.interceptor.ts`
-- `../backend/mutakamel-apps/shared-libs/packages/common/src/filters/all-exceptions.filter.ts`
+- `src/features/admin/database-servers/types/index.ts`
+- `src/features/admin/database-servers/api/database-servers.api.ts`
+- `src/features/admin/database-servers/hooks/useDatabaseServers.ts`
+- `src/features/admin/database-servers/hooks/useDatabaseServerDetail.ts`
+- `src/features/admin/database-servers/components/CreateDatabaseServerWizard.tsx`
+- `src/features/admin/database-servers/components/SystemPrincipalRotationPolicy.tsx`
+- `src/app/database-servers/[id]/page.tsx`

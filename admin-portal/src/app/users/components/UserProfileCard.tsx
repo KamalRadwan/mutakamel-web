@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import type { AdminUserProfile } from "../types";
 
 export function UserProfileCard({ profile }: { profile?: AdminUserProfile | null }) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { lang, t } = useI18n();
 
   if (!profile) {
@@ -54,14 +55,14 @@ export function UserProfileCard({ profile }: { profile?: AdminUserProfile | null
           </span>
         </div>
 
-        {profile.extensions?.tableDensity && (
+        {Boolean(profile.extensions?.tableDensity) && (
           <div className="flex items-center justify-between py-1">
             <span className="text-slate-500 flex items-center gap-1.5">
               <LayoutGrid className="w-3.5 h-3.5 text-slate-400" />
               {t.users.tableDensity}
             </span>
             <span className="font-semibold text-slate-800 dark:text-slate-200 capitalize">
-              {profile.extensions.tableDensity}
+              {String(profile.extensions?.tableDensity)}
             </span>
           </div>
         )}

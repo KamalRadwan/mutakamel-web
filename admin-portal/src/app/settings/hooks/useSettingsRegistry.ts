@@ -5,6 +5,7 @@ export interface SettingUIMetadata {
   titleEn: string;
   titleAr: string;
   inputType: SettingInputType;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   defaultValue: any;
   descEn: string;
   descAr: string;

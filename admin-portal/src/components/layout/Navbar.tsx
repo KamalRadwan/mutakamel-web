@@ -1,19 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { 
-  Menu, 
-  ShieldCheck, 
-  LayoutDashboard, 
-  Server, 
-  Building2, 
-  Package, 
-  Users, 
-  Shield, 
+import type { ReactNode } from "react";
+import {
+  Menu,
+  ShieldCheck,
+  LayoutDashboard,
+  Building2,
+  Package,
+  Users,
+  Shield,
   ChevronDown,
   HardDrive,
   Database,
-  Network
+  DatabaseBackup,
+  Network,
 } from "lucide-react";
 import { NotificationDropdown } from "./NotificationDropdown";
 import { LanguageToggle } from "./LanguageToggle";
@@ -24,9 +25,10 @@ import { useI18n } from "@/i18n/I18nContext";
 
 export function Navbar(props: UseNavbarProps) {
   const { lang } = useI18n();
-  const { 
-    isLinkActive, 
-    isAdminChildActive, 
+  const {
+    isMobileMenuOpen,
+    isLinkActive,
+    isAdminChildActive,
     isAdminDropdownOpen,
     isInfrastructureChildActive,
     isInfrastructureDropdownOpen,
@@ -34,11 +36,12 @@ export function Navbar(props: UseNavbarProps) {
     closeAdminDropdown,
     toggleInfrastructureDropdown,
     closeInfrastructureDropdown,
-    handleMobileMenuToggle, 
-    handleWebPhoneToggle, 
+    handleMobileMenuToggle,
+    closeMobileMenu,
     navRoutes,
     filteredAdminItems,
-    filteredInfrastructureItems
+    filteredInfrastructureItems,
+    canViewBackup,
   } = useNavbar(props);
 
   return (
@@ -47,7 +50,11 @@ export function Navbar(props: UseNavbarProps) {
         {/* Left (RTL Start): Brand Logo & Mobile Toggle */}
         <div className="flex items-center gap-3 shrink-0">
           <button
+            type="button"
             onClick={handleMobileMenuToggle}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="admin-mobile-navigation"
+            aria-label={lang === "ar" ? "فتح القائمة الرئيسية" : "Open main navigation"}
             className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             title="القائمة الرئيسية"
           >
@@ -100,7 +107,7 @@ export function Navbar(props: UseNavbarProps) {
             </button>
 
             {isInfrastructureDropdownOpen && (
-              <div 
+              <div
                 className="absolute top-full start-0 mt-1 w-48 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl py-1.5 z-40 animate-in fade-in"
                 onMouseLeave={closeInfrastructureDropdown}
               >
@@ -131,6 +138,24 @@ export function Navbar(props: UseNavbarProps) {
             )}
           </div>
 
+          {/* Backup & Restore is a separate operational module. */}
+          {canViewBackup && (
+            <Link
+              href={navRoutes.backup.href}
+              aria-current={isLinkActive(navRoutes.backup.href) ? "page" : undefined}
+              aria-label={navRoutes.backup.label}
+              title={navRoutes.backup.label}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                isLinkActive(navRoutes.backup.href)
+                  ? "bg-cyan-600/25 text-cyan-200 border border-cyan-500/40 shadow-xs font-bold"
+                  : "text-slate-300 hover:text-white hover:bg-slate-800/70"
+              }`}
+            >
+              <DatabaseBackup className="w-4.5 h-4.5 text-cyan-400 shrink-0" />
+              <span className="hidden xl:inline">{navRoutes.backup.label}</span>
+            </Link>
+          )}
+
           {/* Tenants Route */}
           <Link
             href={navRoutes.tenants.href}
@@ -144,17 +169,17 @@ export function Navbar(props: UseNavbarProps) {
             <span>{navRoutes.tenants.label}</span>
           </Link>
 
-          {/* Modules Route */}
+          {/* Application Catalogue Route */}
           <Link
-            href={navRoutes.modules.href}
+            href={navRoutes.applications.href}
             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              isLinkActive(navRoutes.modules.href)
+              isLinkActive(navRoutes.applications.href)
                 ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
                 : "text-slate-300 hover:text-white hover:bg-slate-800/70"
             }`}
           >
             <Package className="w-4.5 h-4.5 text-amber-400 shrink-0" />
-            <span>{navRoutes.modules.label}</span>
+            <span>{navRoutes.applications.label}</span>
           </Link>
 
           {/* Admin Controls Dropdown */}
@@ -173,7 +198,7 @@ export function Navbar(props: UseNavbarProps) {
             </button>
 
             {isAdminDropdownOpen && (
-              <div 
+              <div
                 className="absolute top-full start-0 mt-1 w-48 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl py-1.5 z-40 animate-in fade-in"
                 onMouseLeave={closeAdminDropdown}
               >
@@ -213,6 +238,54 @@ export function Navbar(props: UseNavbarProps) {
           <UserDropdown />
         </div>
       </div>
+
+      {isMobileMenuOpen ? (
+        <nav
+          id="admin-mobile-navigation"
+          aria-label={lang === "ar" ? "التنقل الرئيسي" : "Main navigation"}
+          className="absolute inset-x-0 top-full max-h-[calc(100vh-3.75rem)] overflow-y-auto border-b border-slate-800 bg-slate-950 p-4 shadow-2xl lg:hidden"
+        >
+          <div className="grid gap-2">
+            <MobileNavLink href={navRoutes.dashboard.href} label={navRoutes.dashboard.label} active={isLinkActive(navRoutes.dashboard.href)} onClick={closeMobileMenu} icon={<LayoutDashboard className="size-4 text-blue-400" />} />
+
+            {filteredInfrastructureItems.length ? (
+              <div className="rounded-xl border border-slate-800 p-2">
+                <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">{navRoutes.infrastructureDropdown.label}</p>
+                {filteredInfrastructureItems.map((item) => (
+                  <MobileNavLink key={item.href} href={item.href} label={item.label} active={isLinkActive(item.href)} onClick={closeMobileMenu} icon={item.href.includes("database") ? <Database className="size-4 text-emerald-400" /> : <HardDrive className="size-4 text-blue-400" />} />
+                ))}
+              </div>
+            ) : null}
+
+            {canViewBackup ? <MobileNavLink href={navRoutes.backup.href} label={navRoutes.backup.label} active={isLinkActive(navRoutes.backup.href)} onClick={closeMobileMenu} icon={<DatabaseBackup className="size-4 text-cyan-400" />} /> : null}
+            <MobileNavLink href={navRoutes.tenants.href} label={navRoutes.tenants.label} active={isLinkActive(navRoutes.tenants.href)} onClick={closeMobileMenu} icon={<Building2 className="size-4 text-indigo-400" />} />
+            <MobileNavLink href={navRoutes.applications.href} label={navRoutes.applications.label} active={isLinkActive(navRoutes.applications.href)} onClick={closeMobileMenu} icon={<Package className="size-4 text-amber-400" />} />
+
+            {filteredAdminItems.length ? (
+              <div className="rounded-xl border border-slate-800 p-2">
+                <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">{navRoutes.adminDropdown.label}</p>
+                {filteredAdminItems.map((item) => (
+                  <MobileNavLink key={item.href} href={item.href} label={item.label} active={isLinkActive(item.href)} onClick={closeMobileMenu} icon={item.href.includes("users") ? <Users className="size-4 text-cyan-400" /> : <Shield className="size-4 text-purple-400" />} />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </nav>
+      ) : null}
     </header>
+  );
+}
+
+function MobileNavLink({ href, label, active, onClick, icon }: { href: string; label: string; active: boolean; onClick: () => void; icon: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold ${active ? "bg-cyan-600/20 text-cyan-200" : "text-slate-200 hover:bg-slate-900"}`}
+    >
+      {icon}
+      <span>{label}</span>
+    </Link>
   );
 }

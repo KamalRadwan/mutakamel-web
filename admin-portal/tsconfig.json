@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@mutakamel/webphone": ["../packages/webphone/src/index.ts"]
     }
   },
   "include": [

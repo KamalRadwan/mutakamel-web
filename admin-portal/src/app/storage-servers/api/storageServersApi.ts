@@ -1,11 +1,11 @@
 import { axiosClient } from "@/lib/api/axiosClient";
 import type { SuccessResponse } from "@/types/common";
 import type {
-  StorageServer,
+  StorageServerView,
+  StorageServerList,
   CreateStorageServerDto,
   UpdateStorageServerDto,
-  SetStorageRoutingProfileDto,
-} from "../types";
+} from "@/types/storage-server";
 
 export interface ListStorageServersParams {
   page?: number;
@@ -25,21 +25,21 @@ export async function listStorageServers(params: ListStorageServersParams = {}) 
   if (params.sortBy) query.append("sortBy", params.sortBy);
   if (params.sortDir) query.append("sortDir", params.sortDir);
 
-  const res = await axiosClient.get<SuccessResponse<StorageServer[]>>(
+  const res = await axiosClient.get<SuccessResponse<StorageServerList>>(
     `/api/admin/core/v1/storage-servers?${query.toString()}`
   );
-  return res.data;
+  return res.data.data;
 }
 
 export async function getStorageServer(id: string) {
-  const res = await axiosClient.get<SuccessResponse<StorageServer>>(
+  const res = await axiosClient.get<SuccessResponse<StorageServerView>>(
     `/api/admin/core/v1/storage-servers/${encodeURIComponent(id)}`
   );
   return res.data.data;
 }
 
 export async function createStorageServer(dto: CreateStorageServerDto) {
-  const res = await axiosClient.post<SuccessResponse<StorageServer>>(
+  const res = await axiosClient.post<SuccessResponse<StorageServerView>>(
     "/api/admin/core/v1/storage-servers",
     dto
   );
@@ -47,54 +47,23 @@ export async function createStorageServer(dto: CreateStorageServerDto) {
 }
 
 export async function updateStorageServer(id: string, dto: UpdateStorageServerDto) {
-  const res = await axiosClient.patch<SuccessResponse<StorageServer>>(
+  const res = await axiosClient.patch<SuccessResponse<StorageServerView>>(
     `/api/admin/core/v1/storage-servers/${encodeURIComponent(id)}`,
     dto
   );
   return res.data.data;
 }
 
-export async function requestVerification(id: string) {
-  const res = await axiosClient.post<SuccessResponse<any>>(
-    `/api/admin/core/v1/storage-servers/${encodeURIComponent(id)}/verification-runs`,
-    {}
-  );
-  return res.data.data;
-}
-
-export async function getVerificationRun(id: string, runId: string) {
-  const res = await axiosClient.get<SuccessResponse<any>>(
-    `/api/admin/core/v1/storage-servers/${encodeURIComponent(id)}/verification-runs/${encodeURIComponent(runId)}`
-  );
-  return res.data.data;
-}
-
-export async function setRoutingProfile(id: string, dto: SetStorageRoutingProfileDto) {
-  const res = await axiosClient.patch<SuccessResponse<any>>(
-    `/api/admin/core/v1/storage-servers/${encodeURIComponent(id)}/routing-profile`,
-    dto
-  );
-  return res.data.data;
-}
-
 export async function activateStorageServer(id: string) {
-  const res = await axiosClient.post<SuccessResponse<StorageServer>>(
+  const res = await axiosClient.post<SuccessResponse<StorageServerView>>(
     `/api/admin/core/v1/storage-servers/${encodeURIComponent(id)}/activate`,
     {}
   );
   return res.data.data;
 }
 
-export async function drainStorageServer(id: string) {
-  const res = await axiosClient.post<SuccessResponse<StorageServer>>(
-    `/api/admin/core/v1/storage-servers/${encodeURIComponent(id)}/drain`,
-    {}
-  );
-  return res.data.data;
-}
-
 export async function offlineStorageServer(id: string) {
-  const res = await axiosClient.post<SuccessResponse<StorageServer>>(
+  const res = await axiosClient.post<SuccessResponse<StorageServerView>>(
     `/api/admin/core/v1/storage-servers/${encodeURIComponent(id)}/offline`,
     {}
   );
@@ -106,11 +75,4 @@ export async function deleteStorageServer(id: string) {
     `/api/admin/core/v1/storage-servers/${encodeURIComponent(id)}`
   );
   return res;
-}
-
-export async function getStorageServerHistory(id: string) {
-  const res = await axiosClient.get<SuccessResponse<any[]>>(
-    `/api/admin/core/v1/storage-servers/${encodeURIComponent(id)}/history`
-  );
-  return res.data.data;
 }

@@ -7,25 +7,31 @@
     "build": "next build",
     "start": "next start -p 5001",
     "lint": "eslint",
+    "test": "vitest run",
     "docs:routes": "node scripts/docs/generate-admin-route-inventory.mjs",
     "docs:check": "node scripts/docs/generate-admin-route-inventory.mjs --check && node scripts/docs/check-docs.mjs"
   },
   "dependencies": {
+    "@mutakamel/webphone": "workspace:*",
+    "axios": "^1.19.0",
     "country-state-city": "^3.2.1",
     "jssip": "^3.13.8",
     "lucide-react": "^1.26.0",
     "next": "16.2.11",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "recharts": "^3.10.0"
+    "recharts": "^3.10.0",
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.11",
+    "line": "^0.1.8",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"

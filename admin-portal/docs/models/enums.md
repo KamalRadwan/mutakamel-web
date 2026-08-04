@@ -1,7 +1,7 @@
 # Admin Portal — Enums Reference
 
 Transport values extracted from the current Core common/database packages and
-admin APIs. Last verified: **2026-07-30**.
+admin APIs. Last verified: **2026-08-02**.
 
 Enum values are case-sensitive. Keep translated UI labels separate from these
 wire values and render a safe fallback for unknown additive values.
@@ -107,6 +107,7 @@ enum TeamMembershipRoleEnum {
 ### `DatabaseServerStatusEnum`
 ```typescript
 enum DatabaseServerStatusEnum {
+  DRAFT = 'DRAFT',
   ACTIVE = 'ACTIVE',
   DRAINING = 'DRAINING',
   OFFLINE = 'OFFLINE',
@@ -137,6 +138,23 @@ enum DatabaseServerHistoryAction {
   DELETE = 'DELETE',
 }
 ```
+
+### `DatabaseServerApplicationBindingStatus`
+```typescript
+enum DatabaseServerApplicationBindingStatus {
+  PENDING = 'PENDING',
+  PROVISIONING = 'PROVISIONING',
+  READY = 'READY',
+  ROTATING = 'ROTATING',
+  DEFERRED = 'DEFERRED',
+  RECONCILING = 'RECONCILING',
+  DEGRADED = 'DEGRADED',
+  DISABLED = 'DISABLED',
+}
+```
+
+This status is binding-specific. It must not be replaced with the Database
+Server lifecycle status or the Application lifecycle status.
 
 Database-server history has no generic `LIFECYCLE` action. See the
 [Database Servers Frontend Contract](../api/database-servers.md) for transition
@@ -282,6 +300,54 @@ building UI.
 
 ---
 
+## Application Catalogue Enums
+
+```typescript
+enum ApplicationType {
+  SYSTEM = 'SYSTEM',
+  TENANT = 'TENANT',
+}
+
+enum ApplicationCommercialMode {
+  NON_BILLABLE = 'NON_BILLABLE',
+  INCLUDED = 'INCLUDED',
+  SUBSCRIPTION = 'SUBSCRIPTION',
+}
+
+enum ApplicationCatalogueVisibility {
+  PUBLIC = 'PUBLIC',
+  INTERNAL = 'INTERNAL',
+}
+
+enum ApplicationLifecycleStatus {
+  DRAFT = 'DRAFT',
+  ACTIVE = 'ACTIVE',
+  DEPRECATED = 'DEPRECATED',
+  DISABLED = 'DISABLED',
+}
+
+enum ApplicationDatabaseAccessMode {
+  NONE = 'NONE',
+  TENANT_DATABASE = 'TENANT_DATABASE',
+}
+
+enum ApplicationCommandOperation {
+  CREATE = 'CREATE',
+  UPDATE = 'UPDATE',
+  DELETE = 'DELETE',
+  UPDATE_DATABASE_POLICY = 'UPDATE_DATABASE_POLICY',
+  ACTIVATE = 'ACTIVATE',
+  DEPRECATE = 'DEPRECATE',
+  DISABLE = 'DISABLE',
+}
+```
+
+`COMMERCIAL` is not an `ApplicationType`, and `YEARLY` is not a billing cycle.
+Application identity uses the immutable lowercase `applicationKey`; display
+name changes never change that key.
+
+---
+
 ## Subscription & Billing Enums
 
 ### `BillingCycleEnum`
@@ -293,7 +359,7 @@ enum BillingCycleEnum {
 ```
 
 The catalogue pricing API does not accept `YEARLY`. See the
-[Modules and Catalogue Frontend Contract](../api/catalog.md) for price-ladder
+[Application Catalogue Frontend Contract](../api/catalog.md) for price-ladder
 replacement rules.
 
 ### `SubscriptionStatusEnum`

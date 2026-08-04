@@ -2,7 +2,7 @@
 
 Status: **Current source audit**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-04**
 
 This matrix describes the current working tree. `DONE` means source-integrated,
 not live-authenticated or deployment-verified.
@@ -12,10 +12,11 @@ not live-authenticated or deployment-verified.
 | Domain | Frontend label | Current evidence and remaining boundary |
 | --- | --- | --- |
 | Auth session | `DONE/PARTIAL/BROKEN` | Login, refresh, `/auth/me`, logout are real; accept invite, reset password, logout-all are missing; forgot password is simulated |
-| Dashboard | `DONE/REFACTOR` | Real dashboard endpoint and unavailable states; five report pages are missing |
+| Dashboard | `DONE/SOURCE_INTEGRATED` | Grouped permission-filtered dashboard, 14 report groups, nested unavailable states, stale-response retention; five standalone report pages remain missing |
 | Admin users/WebPhone | `DONE/PARTIAL` | User lifecycle, roles, WebPhone, and call logs use Core; self profile is missing |
 | Roles/permissions | `DONE/PARTIAL/REFACTOR` | Real Core calls; ordinary metadata update must not require the critical permission; RBAC foundation lacks ANY |
-| Database Servers | `DONE/REFACTOR` | CRUD/connectivity/history/lifecycle are real; filtering, error states, metrics, and typing remain weak |
+| Database Servers | `DONE/SOURCE_INTEGRATED` | Typed list/create/detail/edit/history flows, soft delete, deleted-only review, permanent Destroy, provisioning, and per-Application principal controls are implemented; Backup remains an aggregate activation dependency and link to its separate module |
+| Backup & Restore | `DONE/SOURCE_INTEGRATED/RELEASE_BLOCKED` | Separate singular `/backup` module implements overview, Core-backed `mutakamel_backup` access, Worker policies/overrides, runs, allowlisted artifact evidence, restore verification, and promotion. Worker safe-response DTOs and exact non-idempotent start-command recovery remain backend release gates; authenticated runtime evidence is open |
 | Storage Servers | `DONE/PARTIAL/GATED` | Bounded registry/history/verification/lifecycle is real; routing/rotation not exposed; attestation/recovery remain operator-safety gated |
 | Tenants list/detail | `PARTIAL/BROKEN` | Some real calls; nested FQDN/user/subscription/wallet and local lifecycle behavior contain contract defects |
 | Tenant creation | `PARTIAL/BROKEN` | Real Storage placement and quote-route attempts exist, but the quote body does not match Core and identity/plan/database/catalogue/FQDN work remains simulated or hardcoded |
@@ -23,7 +24,7 @@ not live-authenticated or deployment-verified.
 | Tenant operations | `PARTIAL/MISSING` | List/reconciliation foundation exists; operation-specific and managed-provisioning controls are largely absent |
 | Provisioning governance | `MISSING` | 32 Gateway routes; no frontend module |
 | Storage migration | `GATED` | Eight default-off routes; do not expose |
-| Catalogue | `DONE/PARTIAL/REFACTOR` | Main CRUD/grants/pricing/currency/audit are integrated; module delete, global audit, batch rates, and Storage entitlements are absent |
+| Application Catalogue | `DONE/SOURCE_INTEGRATED` | All 29 routes implemented. Technical readiness now has independent state, fail-closed activation, accessible controlled binding, and stale/in-flight exact-intent recovery; detail/readiness/lifecycle are EN/AR. Authenticated runtime and remaining list/audit/commercial-rail localization stay open |
 | Subscriptions | `MISSING/PARTIAL/BROKEN` | Some tenant detail reads; cancellation path is wrong; administration and plan changes are absent |
 | Wallet | `BROKEN/MISSING` | Local credit/debit calls nonexistent APIs; preview/confirm workflow is absent |
 | Payments/reconciliation | `MISSING` | Five Gateway routes; no frontend module |
@@ -50,8 +51,10 @@ not live-authenticated or deployment-verified.
 
 ## Foundation gaps
 
-- `axiosClient.ts` partially normalizes errors but remains loose and auto-owns
-  mutation keys.
+- The shared client now preserves Core, Gateway, and Nest/Worker error evidence
+  and supports explicitly non-replayable writes. Older feature mutations still
+  need migration away from automatically owned keys where their route contract
+  requires caller-owned exact intent.
 - `rbac.ts` lacks `adminCanAny`.
 - `RequirePermission.tsx` supports only one permission.
 - Tenant nested loading uses `Promise.allSettled` and discards independent
@@ -59,6 +62,28 @@ not live-authenticated or deployment-verified.
 - Some pagination still reads `totalItems` instead of `meta.total`.
 - Financial UI still parses authoritative amounts as JavaScript numbers.
 - API paths and projection types remain duplicated through large hooks.
+
+## Database and Backup split
+
+- `/database-servers` owns connection/TLS, lifecycle,
+  `mutakamel_provisioner`, and per-Application principals. It does not render or
+  mutate `mutakamel_backup`.
+- `/backup` is a separate top-level, permission-gated module with child routes
+  `/backup/access`, `/backup/policies`, `/backup/runs`, `/backup/artifacts`, and
+  `/backup/restores`.
+- Worker browser API paths remain plural `/api/admin/worker/v1/backups/*` and
+  `/api/admin/worker/v1/restores/*`; there is no `/backups` frontend route.
+- The Backup Core adapter owns fixed-principal rotation-policy, regenerate, and
+  reconcile calls for `mutakamel_backup` and rejects a mismatched projection.
+- Policy/override writes, deletes, and Core credential commands retain stable
+  exact-intent UUIDv7 keys. Manual backup start, restore start, and restore
+  promotion intentionally send no idempotency key and disable automatic 401
+  replay. Minimal attempt evidence persists across reloads; exact backend
+  command identity for start operations remains a release gate.
+- The UI never renders passwords, storage paths/keys, manifest keys, raw
+  artifact metadata, raw process errors, or raw restore verification payloads.
+  The frontend adapter strips them from application state, but current Worker
+  entity responses still expose them in the browser network response.
 
 ## Gated work
 
@@ -79,6 +104,13 @@ notifications while Admin Realtime lacks complete release/deployment evidence.
 Do not collect/display access keys, secret keys, Ed25519 private keys, raw
 fingerprints, or invented force activation. Keep attestation and recovery
 controls gated until their operator evidence contract is confirmed.
+
+### Backup response and command recovery
+
+Do not describe Backup as production-ready until Worker replaces entity-shaped
+admin responses with explicit safe DTO projections and exposes durable command
+identity/recovery for non-idempotent backup and restore starts. Frontend
+allowlisting is defense in depth, not a substitute for an API boundary.
 
 ## Evidence level for this matrix
 

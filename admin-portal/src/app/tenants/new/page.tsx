@@ -1,23 +1,23 @@
 "use client";
 
 import { Navbar } from "@/components/layout/Navbar";
-import { 
-  Building2, 
-  ArrowLeft, 
-  ArrowRight, 
-  CheckCircle2, 
-  AlertCircle, 
-  Loader2, 
-  User, 
-  Server, 
-  Package, 
-  ShieldCheck, 
-  Globe, 
-  MapPin 
+import {
+  Building2,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  User,
+  Server,
+  Package,
+  ShieldCheck,
+  Globe,
+  MapPin
 } from "lucide-react";
 import { useRegisterTenant } from "./hooks/useRegisterTenant";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatStorageBytes } from "../lib/storage-placement";
+
 
 export default function RegisterTenantWizardPage() {
   const {
@@ -35,9 +35,7 @@ export default function RegisterTenantWizardPage() {
     loadStoragePlacementOptions,
     hasValidStorageSelection,
     isSubmitting,
-    submitError,
     isValidatingIdentity,
-    identityResult,
     isPreviewingPlan,
     provisioningDag,
     handleValidateIdentity,
@@ -152,24 +150,12 @@ export default function RegisterTenantWizardPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Step 1: Identity & Geocoding & Address */}
           {currentStep === 1 && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 relative z-10">
                 <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span>{lang === "ar" ? "الخطوة 1: هويّة المستأجر والدومين الأساسي (Tenant Identity & Address)" : "Step 1: Tenant Identity & FQDN"}</span>
               </h3>
-
-              {identityResult && (
-                <div
-                  className={`p-3 text-xs font-semibold rounded-xl border flex items-center gap-2 ${
-                    identityResult.valid
-                      ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                      : "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800"
-                  }`}
-                >
-                  {identityResult.valid ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-                  <span>{identityResult.message}</span>
-                </div>
-              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -567,9 +553,9 @@ export default function RegisterTenantWizardPage() {
                         <option value="">{lang === "ar" ? "-- اختر السيرفر المطلوب --" : "-- Select Storage Server --"}</option>
                         {storagePlacementOptions.map((option) => (
                           <option key={option.id} value={option.id}>
-                            {option.name} · {option.region} · {option.capacityPercent}% ·{" "}
-                            {formatStorageBytes(option.availableReservationBytes)}{" "}
-                            {lang === "ar" ? "متاح" : "available"}
+                            {option.name} · {option.region} · {option.assignedTenants}{" "}
+                            {lang === "ar" ? "مستأجر(ين)" : "tenants"}{" "}
+                            {option.maxTenants ? `/ ${option.maxTenants}` : ""}
                           </option>
                         ))}
                       </select>
@@ -588,10 +574,10 @@ export default function RegisterTenantWizardPage() {
                         <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px]">
                           <div>
                             <dt className="text-slate-500">
-                              {lang === "ar" ? "الموفر" : "Provider"}
+                              {lang === "ar" ? "اسم الدلو" : "Bucket Name"}
                             </dt>
                             <dd className="font-bold mt-0.5">
-                              {selectedStoragePlacement.provider}
+                              {selectedStoragePlacement.bucketName}
                             </dd>
                           </div>
                           <div>
@@ -604,20 +590,18 @@ export default function RegisterTenantWizardPage() {
                           </div>
                           <div>
                             <dt className="text-slate-500">
-                              {lang === "ar" ? "الاستخدام" : "Capacity"}
+                              {lang === "ar" ? "المستأجرين المعينين" : "Assigned Tenants"}
                             </dt>
                             <dd className="font-bold mt-0.5">
-                              {selectedStoragePlacement.capacityPercent}%
+                              {selectedStoragePlacement.assignedTenants} {selectedStoragePlacement.maxTenants ? `/ ${selectedStoragePlacement.maxTenants}` : ""}
                             </dd>
                           </div>
                           <div>
                             <dt className="text-slate-500">
-                              {lang === "ar" ? "الحجوزات المتاحة" : "Available reservation"}
+                              {lang === "ar" ? "الحالة" : "Status"}
                             </dt>
                             <dd className="font-bold mt-0.5">
-                              {formatStorageBytes(
-                                selectedStoragePlacement.availableReservationBytes,
-                              )}
+                              {selectedStoragePlacement.status}
                             </dd>
                           </div>
                         </dl>
@@ -629,12 +613,12 @@ export default function RegisterTenantWizardPage() {
             </div>
           )}
 
-          {/* Step 4: Modules & Provisioning Preview */}
+          {/* Step 4: Applications & Provisioning Preview */}
           {currentStep === 4 && (
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
                 <Package className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                <span>{lang === "ar" ? "الخطوة 4: موديولات التطبيق ومعاينة الـ Provisioning DAG" : "Step 4: Application Modules & Subscription"}</span>
+                <span>{lang === "ar" ? "الخطوة 4: تطبيقات النظام ومعاينة الـ Provisioning DAG" : "Step 4: Applications & Subscription"}</span>
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -723,18 +707,6 @@ export default function RegisterTenantWizardPage() {
                   </span>
                 </div>
               </div>
-              {submitError && (
-                <div
-                  role="alert"
-                  className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200 flex flex-col gap-1"
-                >
-                  <p className="font-bold flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> {lang === "ar" ? "فشل إنشاء المستأجر" : "Tenant creation failed"}</p>
-                  <p className="mt-1">{submitError.message}</p>
-                  {submitError.correlationId && (
-                    <p className="mt-1 opacity-80 font-mono">Correlation ID: {submitError.correlationId}</p>
-                  )}
-                </div>
-              )}
             </div>
           )}
 

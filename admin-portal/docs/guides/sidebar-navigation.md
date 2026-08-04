@@ -1,7 +1,7 @@
 # Admin Portal Navigation and Permission Mapping
 
-Last verified against the current frontend routes and Core permission
-decorators on **2026-07-30**.
+Last verified against the current frontend routes plus Core and Worker Gateway
+contracts on **2026-08-04**.
 
 Frontend page paths and API paths are different namespaces. Navigation must use
 paths such as `/tenants`; data requests must use paths such as
@@ -12,17 +12,21 @@ paths such as `/tenants`; data requests must use paths such as
 | UI item | Frontend route | Required permission | Current data status |
 |:---|:---|:---|:---|
 | Dashboard | `/dashboard` | `admin.reports.read` | `DONE/REFACTOR` |
-| Database Servers | `/database-servers` | `admin.database_servers.read` | `DONE/REFACTOR` |
+| Database Servers | `/database-servers` | `admin.database_servers.read` | `DONE/SOURCE_INTEGRATED`; provisioning and Application principals only |
+| Backup & Restore | `/backup` | `admin.backups.read` | `DONE/SOURCE_INTEGRATED/RELEASE_BLOCKED`; separate Worker operations and Core Backup-principal access |
 | Storage Servers | `/storage-servers` | `admin.storage_servers.read` | Live bounded registry list/detail subset |
 | Tenants | `/tenants` | `admin.tenants.read` | `PARTIAL/BROKEN` |
-| Modules | `/modules` | `admin.catalog.read` | `DONE/PARTIAL/REFACTOR` |
+| Applications | `/applications-catalogue` | `admin.applications.read` | `PARTIAL/REFACTOR`; list/detail/delete only in active UI |
 | Admin → Users | `/users` | `admin.users.read` | `DONE/PARTIAL` |
 | Admin → Roles | `/roles` | `admin.roles.read` | `DONE/PARTIAL/REFACTOR` |
 | Settings | `/settings` | At least one visible settings permission; individual screens use `admin.settings.read` | `DONE/PARTIAL/REFACTOR` |
 
-The current `Navbar` does not permission-gate these items. When wiring RBAC,
-derive visibility from the `permissions` array returned by
-`GET /api/admin/core/v1/auth/me`.
+The current `Navbar` permission-filters Infrastructure children, Backup &
+Restore, and Admin dropdown children from the `permissions` array returned by
+`GET /api/admin/core/v1/auth/me`. The same filtered destinations are rendered
+in the responsive mobile menu; the hamburger is not a no-op. Direct route
+guards and backend authorization remain authoritative; hiding navigation is not
+an authorization boundary.
 
 ## Current route families
 
@@ -33,6 +37,13 @@ derive visibility from the `permissions` array returned by
 ├─ /database-servers/new
 └─ /database-servers/[id]
 
+/backup
+├─ /backup/access
+├─ /backup/policies
+├─ /backup/runs
+├─ /backup/artifacts
+└─ /backup/restores
+
 /storage-servers
 └─ /storage-servers/[id]
 
@@ -40,8 +51,8 @@ derive visibility from the `permissions` array returned by
 ├─ /tenants/new
 └─ /tenants/[id]
 
-/modules
-└─ /modules/[id]
+/applications-catalogue
+└─ /applications-catalogue/[applicationKey]
 
 /users
 └─ /users/[id]
@@ -61,6 +72,14 @@ derive visibility from the `permissions` array returned by
 See [the integration guide](../frontend-integration-guide.md) for redirect-only
 legacy routes and live/mock status.
 
+`/database-servers` and `/backup` are intentionally separate modules. Database
+Servers owns connection/TLS, lifecycle, `mutakamel_provisioner`, and
+per-Application principals. It can show only an aggregate Backup dependency
+notice and link to `/backup/access?databaseServerId=:id`. Backup & Restore owns
+the `mutakamel_backup` status and credential controls plus Worker policy, run,
+artifact, and restore workflows. The UI route is singular `/backup`; its Worker
+API paths remain plural `/backups` and `/restores`.
+
 ## Backend-ready modules without current pages
 
 These backend capabilities can become navigation groups, but no matching
@@ -75,7 +94,6 @@ frontend page exists yet:
 | Provisioning governance | `/provisioning` | Core `/api/admin/core/v1/provisioning` | Domain-specific `admin.provisioning.*` |
 | Control-plane audit | `/audit` | Core `/api/admin/core/v1/audit` | `admin.audit.read` |
 | Logging | `/logging` | Core `/api/admin/core/v1/logging` | `admin.logging.read` |
-| Backup & Restore | `/backups` | Worker `/api/admin/worker/v1/backups` and `/restores` | `admin.backups.read` |
 
 Wallet, tenant users, provisioning operations, and the future tenant Storage
 Server migration panel are naturally nested under `/tenants/[id]` rather than

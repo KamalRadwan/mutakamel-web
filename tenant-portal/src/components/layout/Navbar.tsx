@@ -7,7 +7,9 @@ import { LanguageToggle } from "./LanguageToggle";
 import { UserDropdown } from "./UserDropdown";
 import { WebPhoneTrigger } from "./WebPhoneTrigger";
 import { WebRTCPhoneWidget } from "./WebRTCPhoneWidget";
+import { CoreNavbarLinks } from "./CoreNavbarLinks";
 import { CrmNavbarLinks } from "./CrmNavbarLinks";
+import { TradeNavbarLinks } from "./TradeNavbarLinks";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { ChevronDown, Calendar } from "lucide-react";
 
@@ -81,11 +83,29 @@ export function Navbar() {
           )}
         </div>
 
-        {/* If active app is CRM, display CRM horizontal nav links in top navbar */}
+        {/* Dynamic Horizontal App Nav Links */}
+        {activeApp.id === "core" && (
+          <>
+            <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 mx-0.5 hidden md:block"></div>
+            <div className="hidden md:block">
+              <CoreNavbarLinks />
+            </div>
+          </>
+        )}
         {activeApp.id === "crm" && (
           <>
-            <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 mx-0.5"></div>
-            <CrmNavbarLinks />
+            <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 mx-0.5 hidden md:block"></div>
+            <div className="hidden md:block">
+              <CrmNavbarLinks />
+            </div>
+          </>
+        )}
+        {activeApp.id === "trade" && (
+          <>
+            <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 mx-0.5 hidden md:block"></div>
+            <div className="hidden md:block">
+              <TradeNavbarLinks />
+            </div>
           </>
         )}
       </div>

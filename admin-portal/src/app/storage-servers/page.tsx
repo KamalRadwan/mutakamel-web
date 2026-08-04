@@ -2,15 +2,18 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Server, Database, Activity, AlertCircle, Plus, Search, Filter, ServerCrash, CheckCircle2, ChevronRight, XCircle, RefreshCw } from "lucide-react";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { Server, Database, Activity, AlertCircle, Plus, Search, Filter, ServerCrash, CheckCircle2, ChevronRight, XCircle, RefreshCw, Check, Key, HardDrive } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useStorageServers } from "./hooks/useStorageServers";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { StorageServersTableSkeleton } from "./components/StorageServersTableSkeleton";
-import { formatBytes } from "@/lib/utils/formatters";
-import type { StorageServer } from "./types";
+import type { StorageServerView } from "@/types/storage-server";
+import { Navbar } from "@/components/layout/Navbar";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 
-function StorageServersDirectory() {
-  const { lang, t } = useI18n();
+export default function StorageServersDirectory() {
+  const { lang } = useI18n();
   const {
     servers,
     isLoading,
@@ -28,7 +31,7 @@ function StorageServersDirectory() {
 
   if (!canRead) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-center h-[calc(100vh-200px)]">
+      <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex flex-col items-center justify-center p-12 text-center">
         <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
           <AlertCircle className="w-8 h-8 text-red-500" />
         </div>
@@ -44,239 +47,293 @@ function StorageServersDirectory() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/50 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
-          <ServerCrash className="w-12 h-12 text-red-500 mb-4" />
-          <h3 className="text-base font-bold text-red-900 dark:text-red-400 mb-2">
-            {lang === "ar" ? "تعذر تحميل الخوادم" : "Failed to load servers"}
-          </h3>
-          <p className="text-sm text-red-600 dark:text-red-400/80 mb-6">
-            {error?.message || (lang === "ar" ? "حدث خطأ غير متوقع." : "An unexpected error occurred.")}
-          </p>
-          <button
-            onClick={() => refresh()}
-            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            {lang === "ar" ? "إعادة المحاولة" : "Retry"}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const activeCount = servers?.filter((s: StorageServerView) => s.status === 'ACTIVE').length || 0;
+  const offlineCount = servers?.filter((s: StorageServerView) => s.status === 'OFFLINE').length || 0;
+  const totalTenants = servers?.reduce((acc: number, s: StorageServerView) => acc + (s.assignedTenants || 0), 0) || 0;
 
-  const activeCount = servers.filter((s: StorageServer) => s.status === 'ACTIVE').length;
-  const offlineCount = servers.filter((s: StorageServer) => s.status === 'OFFLINE').length;
-  const totalTenants = servers.reduce((acc: number, s: StorageServer) => acc + (s.currentTenants || 0), 0);
-  
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Database className="w-6 h-6 text-blue-600 dark:text-blue-500" />
-            {lang === "ar" ? "خوادم التخزين" : "Storage Servers"}
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            {lang === "ar"
-              ? "إدارة ومراقبة بنية التخزين التحتية"
-              : "Manage and monitor storage infrastructure"}
-          </p>
-        </div>
-        
-        {canCreate && (
-          <Link
-            href="/storage-servers/new"
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-sm shadow-blue-600/20"
-          >
-            <Plus className="w-4 h-4" />
-            {lang === "ar" ? "إضافة خادم" : "Add Server"}
-          </Link>
-        )}
-      </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+      <Navbar />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <MetricCard
-          title={lang === "ar" ? "إجمالي الخوادم" : "Total Servers"}
-          value={servers.length}
-          icon={<Server className="w-5 h-5 text-blue-500" />}
-          trend={null}
-        />
-        <MetricCard
-          title={lang === "ar" ? "نشط" : "Active"}
-          value={activeCount}
-          icon={<CheckCircle2 className="w-5 h-5 text-emerald-500" />}
-          trend={null}
-        />
-        <MetricCard
-          title={lang === "ar" ? "غير متصل" : "Offline"}
-          value={offlineCount}
-          icon={<XCircle className="w-5 h-5 text-rose-500" />}
-          trend={null}
-        />
-        <MetricCard
-          title={lang === "ar" ? "إجمالي المستأجرين" : "Total Tenants"}
-          value={totalTenants}
-          icon={<Activity className="w-5 h-5 text-indigo-500" />}
-          trend={null}
-        />
-      </div>
+      <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
+        {/* Header Title Section with Vibrant Gradient Accents */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 rounded-3xl border border-indigo-500/20 shadow-xl">
+          <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/0 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 start-1/3 -mb-10 w-60 h-60 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute top-2.5 start-3" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput)}
-            placeholder={lang === "ar" ? "بحث برمز الخادم أو الاسم..." : "Search by code or name..."}
-            className="w-full ps-9 pe-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 text-slate-900 dark:text-slate-100"
-          />
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <div className="p-3.5 bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 text-white rounded-2xl shadow-lg shadow-indigo-500/30 flex items-center justify-center shrink-0">
+                <HardDrive className="w-7 h-7" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-black tracking-tight text-white">
+                    {lang === "ar" ? "خوادم التخزين السحابي" : "Storage Infrastructure"}
+                  </h1>
+                  <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full">
+                    S3 Object Storage
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-200/80 mt-1 max-w-xl leading-relaxed">
+                  {lang === "ar"
+                    ? "إدارة بنية التخزين السحابي المحمية، تدوير مفاتيح الوصول، ومراقبة سعة المستأجرين"
+                    : "Manage encrypted cloud storage nodes, S3 bucket endpoints, access credentials, and tenant capacity."}
+                </p>
+              </div>
+            </div>
+
+            {canCreate && (
+              <Link
+                href="/storage-servers/new"
+                className="px-5 py-2.5 text-xs font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white rounded-xl shadow-lg shadow-purple-500/25 transition-all transform hover:-translate-y-0.5 flex items-center gap-2 cursor-pointer shrink-0 border border-white/20"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{lang === "ar" ? "إضافة خادم جديد" : "Register Storage Node"}</span>
+              </Link>
+            )}
+          </div>
         </div>
-        
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
-          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80">
-            <Filter className="w-4 h-4" />
+
+        {/* Summary Metrics Cards with Distinct Colorful Glows */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total Servers */}
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-slate-200/80 dark:border-indigo-500/20 shadow-sm hover:shadow-md transition-all">
+            <div className="absolute top-0 end-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                {lang === "ar" ? "إجمالي الخوادم" : "Total Nodes"}
+              </span>
+              <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-200 dark:border-indigo-800/50">
+                <Server className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2 font-mono">
+              {servers?.length || 0}
+            </div>
+            <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1 flex items-center gap-1">
+              <Activity className="w-3 h-3" />
+              <span>{lang === "ar" ? "خوادم مسجلة بالنظام" : "Registered Storage Cluster"}</span>
+            </div>
+          </div>
+
+          {/* Active Servers */}
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-slate-200/80 dark:border-emerald-500/20 shadow-sm hover:shadow-md transition-all">
+            <div className="absolute top-0 end-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                {lang === "ar" ? "خوادم نشطة" : "Active Nodes"}
+              </span>
+              <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2 font-mono flex items-center gap-2">
+              {activeCount}
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
+              {lang === "ar" ? "جاهزة للربط والخدمة" : "Operational & Healthy"}
+            </div>
+          </div>
+
+          {/* Offline Servers */}
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-slate-200/80 dark:border-rose-500/20 shadow-sm hover:shadow-md transition-all">
+            <div className="absolute top-0 end-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                {lang === "ar" ? "غير متصل / مسودة" : "Offline / Draft"}
+              </span>
+              <div className="p-2 bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-200 dark:border-rose-800/50">
+                <ServerCrash className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-2 font-mono">
+              {offlineCount}
+            </div>
+            <div className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1">
+              {lang === "ar" ? "تحتاج تفعيل واختبار" : "Requires Attention"}
+            </div>
+          </div>
+
+          {/* Total Tenants */}
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-sm hover:shadow-md transition-all">
+            <div className="absolute top-0 end-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                {lang === "ar" ? "المستأجرين المربوطين" : "Allocated Tenants"}
+              </span>
+              <div className="p-2 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 rounded-xl border border-purple-200 dark:border-purple-800/50">
+                <Database className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-2 font-mono">
+              {totalTenants}
+            </div>
+            <div className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold mt-1">
+              {lang === "ar" ? "موزعين على خوادم التخزين" : "Active Bucket Allocations"}
+            </div>
+          </div>
+        </div>
+
+        {/* Search & Filter Bar */}
+        <div className="bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 text-indigo-500 absolute top-3.5 start-3.5" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput)}
+              placeholder={lang === "ar" ? "بحث برمز الخادم أو الاسم..." : "Search by code or name..."}
+              className="w-full ps-10 pe-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="bg-transparent font-medium focus:outline-none cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 cursor-pointer"
             >
               <option value="ALL">{lang === "ar" ? "جميع الحالات" : "All Statuses"}</option>
-              <option value="ACTIVE">{lang === "ar" ? "نشط" : "Active"}</option>
-              <option value="DRAFT">{lang === "ar" ? "مسودة" : "Draft"}</option>
-              <option value="DRAINING">{lang === "ar" ? "قيد الاستنزاف" : "Draining"}</option>
-              <option value="OFFLINE">{lang === "ar" ? "غير متصل" : "Offline"}</option>
+              <option value="ACTIVE">{lang === "ar" ? "نشط (ACTIVE)" : "Active (ACTIVE)"}</option>
+              <option value="DRAFT">{lang === "ar" ? "مسودة (DRAFT)" : "Draft (DRAFT)"}</option>
+              <option value="OFFLINE">{lang === "ar" ? "غير متصل (OFFLINE)" : "Offline (OFFLINE)"}</option>
             </select>
-          </div>
-        </div>
-      </div>
 
-      {isLoading ? (
-        <StorageServersTableSkeleton />
-      ) : servers.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 flex flex-col items-center justify-center text-center shadow-2xs">
-          <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
-            <Database className="w-8 h-8 text-slate-400" />
+            <button
+              onClick={() => refresh()}
+              className="p-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 hover:border-indigo-500 text-slate-600 dark:text-slate-300 rounded-xl hover:text-indigo-600 transition-colors"
+              title={lang === "ar" ? "تحديث" : "Refresh"}
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
-            {search || status !== "ALL"
-              ? (lang === "ar" ? "لا توجد نتائج" : "No results found")
-              : (lang === "ar" ? "لا يوجد خوادم تخزين" : "No storage servers")}
-          </h3>
-          <p className="text-sm text-slate-500 max-w-sm mb-6">
-            {search || status !== "ALL"
-              ? (lang === "ar" ? "جرب تعديل مرشحات البحث." : "Try adjusting your search filters.")
-              : (lang === "ar" ? "قم بإضافة خادم جديد للبدء." : "Add a new server to get started.")}
-          </p>
         </div>
-      ) : (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+
+        {/* Dynamic Colorful Table View */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-500 uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">{lang === "ar" ? "الخادم" : "Server"}</th>
-                  <th className="px-4 py-3 font-semibold">{lang === "ar" ? "المنطقة" : "Region"}</th>
-                  <th className="px-4 py-3 font-semibold">{lang === "ar" ? "الحالة" : "Status"}</th>
-                  <th className="px-4 py-3 font-semibold">{lang === "ar" ? "المستأجرين" : "Tenants"}</th>
-                  <th className="px-4 py-3 font-semibold">{lang === "ar" ? "السعة المستخدمة" : "Used Cap."}</th>
-                  <th className="px-4 py-3 font-semibold text-end">{lang === "ar" ? "الإجراءات" : "Actions"}</th>
+            <table className="w-full text-xs text-start">
+              <thead>
+                <tr className="bg-slate-100/70 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-extrabold uppercase tracking-wider">
+                  <th className="py-4 px-5 text-start">{lang === "ar" ? "اسم الخادم" : "Storage Server"}</th>
+                  <th className="py-4 px-5 text-start">{lang === "ar" ? "نقطة النهاية (S3 Endpoint)" : "S3 Endpoint"}</th>
+                  <th className="py-4 px-5 text-start">{lang === "ar" ? "المنطقة / الدلو" : "Region / Bucket"}</th>
+                  <th className="py-4 px-5 text-start">{lang === "ar" ? "سعة المستأجرين" : "Tenant Capacity"}</th>
+                  <th className="py-4 px-5 text-start">{lang === "ar" ? "الحالة" : "Status"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {servers.map((server: StorageServer) => (
-                  <tr
-                    key={server.id}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-800">
-                          <Server className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-900 dark:text-slate-100 text-[13px]">
-                            {server.name}
-                          </div>
-                          <div className="text-[11px] text-slate-500 font-mono">
-                            {server.code}
-                          </div>
-                        </div>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-slate-500">
+                      <div className="flex flex-col items-center gap-2">
+                        <RefreshCw className="w-6 h-6 animate-spin text-indigo-500" />
+                        <span>{lang === "ar" ? "جاري تحميل خوادم التخزين..." : "Loading storage servers..."}</span>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                        {server.region}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={server.status} lang={lang} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium">
-                        <Activity className="w-3.5 h-3.5 text-slate-400" />
-                        {server.currentTenants || 0} / {server.maxTenants}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs font-mono text-slate-600 dark:text-slate-300">
-                      {server.usedCapacityBytes ? formatBytes(parseInt(server.usedCapacityBytes)) : "0 B"}
-                    </td>
-                    <td className="px-4 py-3 text-end">
-                      <Link
-                        href={`/storage-servers/${server.id}`}
-                        className="inline-flex items-center justify-center p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                      >
-                        <ChevronRight className={`w-4 h-4 ${lang === "ar" ? "rotate-180" : ""}`} />
-                      </Link>
                     </td>
                   </tr>
-                ))}
+                ) : error ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-rose-500">
+                      <div className="flex flex-col items-center gap-2">
+                        <AlertCircle className="w-8 h-8 text-rose-500" />
+                        <span className="font-bold">{lang === "ar" ? "فشل تحميل البيانات" : "Failed to load storage servers"}</span>
+                        <button onClick={() => refresh()} className="mt-2 px-4 py-1.5 bg-rose-50 text-rose-600 dark:bg-rose-950/40 rounded-xl font-semibold border border-rose-200 dark:border-rose-900 text-xs">
+                          {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : servers?.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-16 text-center text-slate-400">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-400">
+                          <HardDrive className="w-8 h-8" />
+                        </div>
+                        <span className="font-semibold text-slate-600 dark:text-slate-300">
+                          {search || status !== "ALL"
+                            ? (lang === "ar" ? "لا توجد خوادم مطابقة لفلاتر البحث" : "No storage servers match your criteria")
+                            : (lang === "ar" ? "لم يتم تسجيل أي خوادم تخزين حتى الآن" : "No storage servers registered yet")}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  servers?.map((server: StorageServerView) => (
+                    <tr key={server.id} className="group hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 transition-all">
+                      <td className="py-4 px-5">
+                        <Link
+                          href={`/storage-servers/${server.id}`}
+                          className="group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors inline-block"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                              {server.name}
+                            </span>
+                            {server.isPlatformDefault && (
+                              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[9px] px-2 py-0.5 rounded-full uppercase font-black tracking-wider shadow-xs">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-slate-400 font-mono block mt-0.5">{server.code}</span>
+                        </Link>
+                      </td>
+                      <td className="py-4 px-5 font-mono text-slate-600 dark:text-slate-300">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700/60 font-semibold text-[11px]">
+                            {server.endpoint}
+                          </span>
+                          {!server.credentialsConfigured && (
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300 dark:border-amber-800 rounded-md text-[10px] font-bold flex items-center gap-1" title="Missing S3 Credentials">
+                              <AlertCircle className="w-3 h-3" />
+                              Keys Missing
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="flex items-center gap-1.5 font-medium">
+                          <span className="px-2.5 py-1 bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 rounded-lg border border-purple-200 dark:border-purple-900/60 font-mono text-[11px]">
+                            {server.region}
+                          </span>
+                          <span className="text-slate-400">/</span>
+                          <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 rounded-lg border border-indigo-200 dark:border-indigo-900/60 font-mono text-[11px]">
+                            {server.bucketName}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-24 bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div
+                              className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full"
+                              style={{ width: `${Math.min(100, ((server.assignedTenants || 0) / (server.maxTenants || 10)) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="font-bold text-slate-700 dark:text-slate-300 font-mono">
+                            {server.assignedTenants || 0} / {server.maxTenants === null ? '∞' : server.maxTenants}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-5">
+                        <StatusBadge status={server.status} enumType="db-server" />
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
-      )}
+      </main>
     </div>
-  );
-}
-
-function MetricCard({ title, value, icon, trend }: any) {
-  return (
-    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center gap-3">
-      <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0">
-        {icon}
-      </div>
-      <div>
-        <div className="text-[11px] text-slate-500 font-medium mb-0.5">{title}</div>
-        <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{value}</div>
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status, lang }: { status: string; lang: string }) {
-  const map: Record<string, { cls: string; ar: string; en: string }> = {
-    ACTIVE: { cls: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900", ar: "نشط", en: "Active" },
-    DRAFT: { cls: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900", ar: "مسودة", en: "Draft" },
-    DRAINING: { cls: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-900", ar: "استنزاف", en: "Draining" },
-    OFFLINE: { cls: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900", ar: "غير متصل", en: "Offline" },
-  };
-
-  const c = map[status] || { cls: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700", ar: status, en: status };
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${c.cls}`}>
-      {lang === "ar" ? c.ar : c.en}
-    </span>
-  );
-}
-
-export default function Page() {
-  return (
-    <StorageServersDirectory />
   );
 }

@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { safeStorage } from "@/lib/safeStorage";
 
 export function ThemeToggle() {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    const theme = localStorage.getItem("theme");
+    const theme = safeStorage.getItem("theme");
     const isDarkMode = theme === "dark" || (!theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
     setIsDark(isDarkMode);
     if (isDarkMode) {
@@ -22,10 +23,10 @@ export function ThemeToggle() {
     setIsDark(newDark);
     if (newDark) {
       document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
+      safeStorage.setItem("theme", "dark");
     } else {
       document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
+      safeStorage.setItem("theme", "light");
     }
   };
 

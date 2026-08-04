@@ -18,13 +18,7 @@ import {
   Activity, 
   CreditCard, 
   Wallet, 
-  Lock, 
-  Mail, 
-  Key, 
-  Phone, 
   ShieldAlert, 
-  ShieldCheck, 
-  Network, 
   MapPin, 
   TrendingUp, 
   TrendingDown, 
@@ -42,6 +36,7 @@ import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export default function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const [isSaved, setIsSaved] = useState(false);
   const { user } = useAuth();
   const canDestroyTenant = adminCanAll(user, ADMIN_RBAC_CRITICAL.TENANTS_DESTROY);
   const {
@@ -57,6 +52,14 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     setLedgerDirectionFilter,
     ledgerReasonFilter,
     setLedgerReasonFilter,
+    adjAmount,
+    setAdjAmount,
+    adjCurrency,
+    setAdjCurrency,
+    adjNote,
+    setAdjNote,
+    destroySubscriptionsToggle,
+    setDestroySubscriptionsToggle,
     fqdns,
     usersSummary,
     tenantUsers,
@@ -68,43 +71,15 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     setShowDeletedUsers,
     operations,
     isSubmitting,
-    isSaved,
-    setIsSaved,
     isLoadingDetails,
-    isInviteUserOpen,
-    setIsInviteUserOpen,
     isEditUserOpen,
     setIsEditUserOpen,
-    isResetPasswordOpen,
-    setIsResetPasswordOpen,
-    isChangePasswordOpen,
-    setIsChangePasswordOpen,
-    isWebphoneConfigOpen,
-    setIsWebphoneConfigOpen,
     isAddCreditOpen,
     setIsAddCreditOpen,
     isAddDebitOpen,
     setIsAddDebitOpen,
-    isAddFqdnOpen,
-    setIsAddFqdnOpen,
-    isRoleAssignmentOpen,
-    setIsRoleAssignmentOpen,
-    isOperationDagOpen,
-    setIsOperationDagOpen,
     selectedUserId,
     setSelectedUserId,
-    selectedOperationId,
-    setSelectedOperationId,
-    newFqdnInput,
-    setNewFqdnInput,
-    destroySubscriptionsToggle,
-    setDestroySubscriptionsToggle,
-    adjAmount,
-    setAdjAmount,
-    adjCurrency,
-    setAdjCurrency,
-    adjNote,
-    setAdjNote,
     handleUpdateTenantProfile,
     handleCancelProvisioning,
     handleActivate,
@@ -119,10 +94,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     mockDepartments,
     mockTeams,
     handleDestroyConfirm,
-    handleAddFqdnSubmit,
     handleSetPrimaryFqdn,
-    handleRemoveFqdn,
-    handleCancelSubscription,
     submitCreditAdjustment,
     submitDebitAdjustment,
     onBack,
@@ -131,9 +103,6 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
 
   // Active Destructive Action Modal State
   const [destructiveModalAction, setDestructiveModalAction] = useState<"suspend" | "delete" | "destroy" | null>(null);
-
-  const selectedOpRecord = operations.find((o) => o.id === selectedOperationId);
-  const selectedUserRecord = tenantUsers.find((u) => u.id === selectedUserId);
 
   const confirmDestructiveModal = () => {
     if (!destructiveModalAction) return;
@@ -617,7 +586,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                    {subscription.items.map((it: any) => (
+                    {subscription.items.map((it: ReturnType<typeof JSON.parse>) => (
                       <tr key={it.id}>
                         <td className="py-2.5 font-bold text-slate-900 dark:text-slate-100">{it.moduleName} ({it.moduleKey})</td>
                         <td className="py-2.5 text-blue-600 dark:text-blue-400 font-bold">{it.tierKey}</td>

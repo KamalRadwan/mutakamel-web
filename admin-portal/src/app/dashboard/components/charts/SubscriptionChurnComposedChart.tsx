@@ -33,38 +33,38 @@ export function SubscriptionChurnComposedChart({ data, height = 280 }: Props) {
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
-          <XAxis 
-            dataKey="month" 
-            axisLine={false} 
-            tickLine={false} 
+          <XAxis
+            dataKey="month"
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             className="text-slate-500 dark:text-slate-400"
           />
-          <YAxis 
-            axisLine={false} 
-            tickLine={false} 
+          <YAxis
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             className="text-slate-500 dark:text-slate-400"
           />
           <Tooltip content={<ChartTooltip />} cursor={{ fill: "transparent" }} />
-          <Legend 
-            iconType="circle" 
+          <Legend
+            iconType="circle"
             wrapperStyle={{ fontSize: 11, paddingTop: 10 }}
             formatter={(value) => <span className="text-slate-600 dark:text-slate-300">{value}</span>}
           />
-          
-          <Bar 
-            dataKey="churned" 
-            name={lang === "ar" ? "المشتركين المغادرين" : "Churned"} 
-            fill="#ef4444" 
-            radius={[4, 4, 0, 0]} 
+
+          <Bar
+            dataKey="churned"
+            name={lang === "ar" ? "المشتركين المغادرين" : "Churned"}
+            fill="#ef4444"
+            radius={[4, 4, 0, 0]}
             barSize={20}
           />
-          <Line 
-            type="monotone" 
-            dataKey="newAcquisitions" 
-            name={lang === "ar" ? "مشتركين جدد" : "New Acquisitions"} 
-            stroke="#10b981" 
+          <Line
+            type="monotone"
+            dataKey="newAcquisitions"
+            name={lang === "ar" ? "مشتركين جدد" : "New Acquisitions"}
+            stroke="#10b981"
             strokeWidth={3}
             dot={{ r: 4, fill: "#10b981", strokeWidth: 0 }}
           />

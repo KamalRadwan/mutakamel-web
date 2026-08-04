@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Save, Info, Lock, AlertCircle, Loader2 } from "lucide-react";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { Save, Info, Lock, Loader2 } from "lucide-react";
 import { SettingFieldData } from "../hooks/useSettings";
 import { useToast } from "@/components/ui/ToastContext";
 
@@ -15,21 +16,19 @@ interface SettingFieldProps {
 }
 
 export function SettingField({ setting, lang, onUpdate }: SettingFieldProps) {
-  const { key, value: initialValue, descriptionI18n, uiMeta, readOnly, isSaving, lastSaved, error } = setting;
   const toast = useToast();
-  
+  const { key, value: initialValue, descriptionI18n, uiMeta, readOnly, isSaving } = setting;
+
   const [localValue, setLocalValue] = useState(initialValue);
   const [previousInitialValue, setPreviousInitialValue] =
     useState(initialValue);
-  const [localError, setLocalError] = useState<string | null>(null);
 
   if (previousInitialValue !== initialValue) {
     setPreviousInitialValue(initialValue);
     setLocalValue(initialValue);
-    setLocalError(null);
   }
 
-  const displayedError = localError || error || null;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const hasChanged = localValue !== initialValue;
 
   if (!uiMeta) {
@@ -42,14 +41,16 @@ export function SettingField({ setting, lang, onUpdate }: SettingFieldProps) {
 
   const title = lang === "ar" ? uiMeta.titleAr : uiMeta.titleEn;
 
-  const handleChange = (newVal: string | number | boolean) => {
+  const handleChange = async (newVal: string | number | boolean) => {
     if (readOnly) return;
-    setLocalError(null);
     setLocalValue(newVal);
     try {
-      onUpdate(key, newVal);
+      await onUpdate(key, newVal);
     } catch (err: unknown) {
-      setLocalError(errorText(err) || (lang === "ar" ? "قيمة غير صالحة" : "Invalid value"));
+      toast.error(
+        lang === "ar" ? "قيمة غير صالحة" : "Invalid Value",
+        errorText(err) || (lang === "ar" ? "تعذر حفظ القيمة." : "The value could not be saved."),
+      );
     }
   };
 
@@ -64,7 +65,7 @@ export function SettingField({ setting, lang, onUpdate }: SettingFieldProps) {
   return (
     <div className={`p-5 rounded-2xl border transition-colors ${readOnly ? "bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-800/50"} shadow-2xs group`}>
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        
+
         {/* Left Side: Label and Description */}
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -73,7 +74,7 @@ export function SettingField({ setting, lang, onUpdate }: SettingFieldProps) {
               {readOnly && <Lock className="w-3.5 h-3.5 text-slate-400" />}
             </h3>
           </div>
-          
+
           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl flex items-start gap-1.5 mt-1.5">
             <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
             {lang === "ar" ? descriptionI18n.ar : descriptionI18n.en}
@@ -85,12 +86,6 @@ export function SettingField({ setting, lang, onUpdate }: SettingFieldProps) {
             </p>
           )}
 
-          {displayedError && (
-            <p className="text-[11px] text-red-600 dark:text-red-400 font-medium mt-2 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded w-fit flex items-center gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              {displayedError}
-            </p>
-          )}
         </div>
 
         {/* Right Side: Input and Save Button */}
@@ -166,11 +161,6 @@ export function SettingField({ setting, lang, onUpdate }: SettingFieldProps) {
               <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 animate-pulse">
                 <Save className="w-3.5 h-3.5" />
                 {lang === "ar" ? "جاري الحفظ..." : "Saving..."}
-              </span>
-            ) : lastSaved ? (
-              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 animate-in fade-in zoom-in duration-300">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                {lang === "ar" ? "تم الحفظ بنجاح" : "Saved"}
               </span>
             ) : null}
           </div>

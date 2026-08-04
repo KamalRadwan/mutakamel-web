@@ -2,10 +2,11 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  axiosClient, 
-  withAuthLock, 
-  clearLocalAuthState, 
+import { safeStorage } from "@/lib/safeStorage";
+import {
+  axiosClient,
+  withAuthLock,
+  clearLocalAuthState,
   getStoredSessionMeta,
   readAdminAuthTokenResponse,
   refreshAdminCookieSession,
@@ -56,6 +57,7 @@ function readUserProfile(payload: unknown): UserProfile {
 
   // Ensure permissions are strictly a string array of keys
   const rawPerms = (profile as UserProfile).permissions;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stringPerms = rawPerms.map((p: any) => typeof p === "string" ? p : p.key || p.id).filter(Boolean);
   (profile as UserProfile).permissions = stringPerms;
 
@@ -204,7 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Notify other tabs of new login generation via non-secret localStorage event
         if (typeof window !== "undefined") {
-          localStorage.setItem("admin_global_session_event", loginGeneration);
+          safeStorage.setItem("admin_global_session_event", loginGeneration);
         }
 
         setUser(userProfile);
@@ -212,6 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Default route upon successful login is dashboard
       router.push("/dashboard");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       // Step 7: Clear local auth state and fail closed on any ambiguity or failure
       clearLocalAuthState();
@@ -242,7 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearLocalAuthState();
       setUser(null);
       if (typeof window !== "undefined") {
-        localStorage.setItem("admin_global_logout_event", Date.now().toString());
+        safeStorage.setItem("admin_global_logout_event", Date.now().toString());
       }
       router.push("/login");
     }

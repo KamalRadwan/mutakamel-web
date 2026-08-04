@@ -3,7 +3,7 @@ import type {
   AsteriskIntegrationSettings,
   CreateWebphoneCallLogPayload,
   WebphoneCallLog,
-} from "./types";
+} from "@mutakamel/webphone";
 
 export async function loadMyWebphoneConfig(): Promise<AdminWebphoneConfig> {
   return {

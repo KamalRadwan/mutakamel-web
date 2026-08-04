@@ -7,6 +7,7 @@ import { useMyProfile } from "./hooks/useMyProfile";
 export default function MyProfilePage() {
   const {
     lang,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     profile,
     themeKey,
     setThemeKey,
@@ -16,7 +17,6 @@ export default function MyProfilePage() {
     setTableDensity,
     isLoading,
     isSaving,
-    error,
     hasChanges,
     saveProfile,
   } = useMyProfile();
@@ -69,12 +69,6 @@ export default function MyProfilePage() {
             <span>{isAr ? "حفظ التغييرات" : "Save Preferences"}</span>
           </button>
         </div>
-
-        {error && (
-          <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400">
-            {error}
-          </div>
-        )}
 
         {/* Preferences Form */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs p-6 space-y-6">

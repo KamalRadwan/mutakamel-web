@@ -1,7 +1,7 @@
 "use client";
 
 import { Phone } from "lucide-react";
-import { useWebPhoneTrigger, UseWebPhoneTriggerProps } from "./hooks/useWebPhoneTrigger";
+import { useWebPhoneTrigger, UseWebPhoneTriggerProps } from "@mutakamel/webphone";
 
 export function WebPhoneTrigger(props: UseWebPhoneTriggerProps) {
   const { isConnected, handleToggle, title } = useWebPhoneTrigger(props);

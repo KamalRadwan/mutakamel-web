@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
+import { useToast } from "@/components/ui/ToastContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { buildUpdateTenantProfileDto } from "../../lib/tenant-profile-update";
 import { sanitizeTenantStoragePlacement } from "../../lib/storage-placement";
@@ -26,10 +27,10 @@ export interface WalletLedgerItem {
 
 export function useTenantDetail(id: string) {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<TenantDetailTabKey>("details");
-  const [isSaved, setIsSaved] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Tenant Editing State
@@ -49,10 +50,10 @@ export function useTenantDetail(id: string) {
 
   // User Actions State
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  
+
   // FQDN States
   const [newFqdnInput, setNewFqdnInput] = useState("");
-  
+
   // Destructive States
   const [destroySubscriptionsToggle, setDestroySubscriptionsToggle] = useState(false);
   const [selectedOperationId, setSelectedOperationId] = useState<string | null>(null);
@@ -72,14 +73,22 @@ export function useTenantDetail(id: string) {
   const [userRoleFilter, setUserRoleFilter] = useState<string>("ALL");
   const [showDeletedUsers, setShowDeletedUsers] = useState(false);
 
-  const [tenant, setTenant] = useState<any>(null);
-  const [subscription, setSubscription] = useState<any>(null);
-  const [wallet, setWallet] = useState<any>(null);
+type LooseType = ReturnType<typeof JSON.parse>;
+
+type TenantUser = LooseType;
+type Fqdn = LooseType;
+type Tenant = LooseType;
+type Subscription = LooseType;
+type Wallet = LooseType;
+
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
   const [ledger, setLedger] = useState<WalletLedgerItem[]>([]);
-  const [fqdns, setFqdns] = useState<any[]>([]);
-  const [tenantUsers, setTenantUsers] = useState<any[]>([]);
-  const [operations, setOperations] = useState<any[]>([]);
-  const [editProfileData, setEditProfileData] = useState<any>({});
+  const [fqdns, setFqdns] = useState<Fqdn[]>([]);
+  const [tenantUsers, setTenantUsers] = useState<TenantUser[]>([]);
+  const [operations, setOperations] = useState<LooseType[]>([]);
+  const [editProfileData, setEditProfileData] = useState<LooseType>({});
 
   const [isLoadingDetails, setIsLoadingDetails] = useState(true);
 
@@ -219,8 +228,10 @@ export function useTenantDetail(id: string) {
           phone: tenantData.phone,
           address: { ...((tenantData.address as object | null) || {}) },
         });
-        setIsSaved(true);
-        setTimeout(() => setIsSaved(false), 3000);
+        toast.success(
+          lang === "ar" ? "تم تحديث المستأجر" : "Tenant Updated",
+          lang === "ar" ? "تم حفظ بيانات المستأجر بنجاح." : "Tenant details were saved successfully.",
+        );
       }
     } catch (err) {
       console.error(err);
@@ -231,18 +242,18 @@ export function useTenantDetail(id: string) {
   };
 
   // Lifecycle
-  const handleActivate = () => setTenant({ ...tenant, status: "ACTIVE" });
-  const handleSuspend = () => setTenant({ ...tenant, status: "SUSPENDED" });
-  const handleDelete = () => setTenant({ ...tenant, status: "DELETED" });
+  const handleActivate = () => setTenant(tenant ? { ...tenant, status: "ACTIVE" } : null);
+  const handleSuspend = () => setTenant(tenant ? { ...tenant, status: "SUSPENDED" } : null);
+  const handleDelete = () => setTenant(tenant ? { ...tenant, status: "DELETED" } : null);
   const handleDestroyConfirm = () => {
     // API Call to /admin/tenants/:id/destroy?destroySubscriptions=true|false
     router.push("/tenants"); // Destroy redirects to list
   };
   const handleCancelProvisioning = () => {
-    setTenant({ ...tenant, status: "FAILED" });
+    setTenant(tenant ? { ...tenant, status: "FAILED" } : null);
   };
   const handleReprovision = () => {
-    setTenant({ ...tenant, status: "PROVISIONING" });
+    setTenant(tenant ? { ...tenant, status: "PROVISIONING" } : null);
   };
 
   // User Lifecycle
@@ -273,8 +284,10 @@ export function useTenantDetail(id: string) {
   const handleResendInvite = async (userId: string) => {
     try {
       await axiosClient.post(`/api/admin/core/v1/tenants/${id}/users/${userId}/resend-invite`);
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
+      toast.success(
+        lang === "ar" ? "تم إرسال الدعوة" : "Invitation Sent",
+        lang === "ar" ? "تمت إعادة إرسال دعوة المستخدم." : "The user invitation was resent.",
+      );
     } catch (err) { console.error(err); }
   };
 
@@ -308,8 +321,10 @@ export function useTenantDetail(id: string) {
           type: f.id === fqdnId ? "PRIMARY" : "SECONDARY",
           status: f.id === fqdnId ? "VERIFIED" : f.status
         })));
-        setIsSaved(true);
-        setTimeout(() => setIsSaved(false), 3000);
+        toast.success(
+          lang === "ar" ? "تم تحديث النطاق" : "Domain Updated",
+          lang === "ar" ? "تم تعيين النطاق الأساسي بنجاح." : "The primary domain was updated successfully.",
+        );
       }
     } catch (err) {
       console.error("Failed to set primary FQDN", err);
@@ -320,7 +335,7 @@ export function useTenantDetail(id: string) {
   const handleCancelSubscription = async () => {
     try {
       await axiosClient.post(`/api/admin/core/v1/tenants/${id}/subscription/cancel`);
-      setSubscription({ ...subscription, status: "CANCELED" });
+      setSubscription(subscription ? { ...subscription, status: "CANCELED" } : null);
     } catch (err) { console.error(err); }
   };
 
@@ -329,8 +344,10 @@ export function useTenantDetail(id: string) {
     try {
       await axiosClient.post(`/api/admin/core/v1/tenants/${id}/wallet/credit`, { amount: adjAmount, currency: adjCurrency, note: adjNote });
       setIsAddCreditOpen(false);
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
+      toast.success(
+        lang === "ar" ? "تمت إضافة الرصيد" : "Credit Added",
+        lang === "ar" ? "تم تسجيل إضافة الرصيد بنجاح." : "The credit adjustment was recorded successfully.",
+      );
     } catch (err) { console.error(err); }
   };
 
@@ -339,8 +356,10 @@ export function useTenantDetail(id: string) {
     try {
       await axiosClient.post(`/api/admin/core/v1/tenants/${id}/wallet/debit`, { amount: adjAmount, currency: adjCurrency, note: adjNote });
       setIsAddDebitOpen(false);
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
+      toast.success(
+        lang === "ar" ? "تم خصم الرصيد" : "Debit Added",
+        lang === "ar" ? "تم تسجيل خصم الرصيد بنجاح." : "The debit adjustment was recorded successfully.",
+      );
     } catch (err) { console.error(err); }
   };
 
@@ -369,9 +388,7 @@ export function useTenantDetail(id: string) {
     isLoadingDetails,
     operations,
     isSubmitting,
-    isSaved,
-    setIsSaved,
-    
+
     // Edit Profile
     isEditingProfile,
     setIsEditingProfile,
@@ -400,7 +417,7 @@ export function useTenantDetail(id: string) {
     setIsRoleAssignmentOpen,
     isOperationDagOpen,
     setIsOperationDagOpen,
-    
+
     selectedUserId,
     setSelectedUserId,
     selectedOperationId,

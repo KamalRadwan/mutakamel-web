@@ -15,6 +15,7 @@ export interface AdminRole {
 }
 
 export function useRoles() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const router = useRouter();
   const { lang, t } = useI18n();
   const toast = useToast();
@@ -42,7 +43,7 @@ export function useRoles() {
       if (search) params.set("search", search);
 
       const res = await axiosClient.get(`/api/admin/core/v1/roles?${params.toString()}`);
-      
+
       const payloadData = res.data?.data;
       const payloadMeta = res.data?.meta;
 
@@ -61,9 +62,10 @@ export function useRoles() {
       if (search) {
         fetchedRoles = fetchedRoles.filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
       }
-      
+
       setRoles(fetchedRoles);
       setTotalItems(total);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       toast.error(
         lang === "ar" ? "فشل جلب الأدوار" : "Failed to fetch roles",
@@ -104,6 +106,7 @@ export function useRoles() {
       );
       closeDeleteModal();
       fetchRoles(); // Refresh the list
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       toast.error(
         lang === "ar" ? "فشل الحذف" : "Delete failed",

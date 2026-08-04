@@ -1,102 +1,96 @@
 "use client";
 
-import { useI18n } from "@/i18n/I18nContext";
-import { DashboardTabKey } from "../hooks/useDashboardData";
-
-import { Layout, Building, Server, CreditCard, Calendar } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import {
+  Bell,
+  BookOpen,
+  Building2,
+  CircleDollarSign,
+  ClipboardCheck,
+  CreditCard,
+  Database,
+  Globe2,
+  HardDrive,
+  LayoutDashboard,
+  LineChart,
+  ReceiptText,
+  ShieldCheck,
+  WalletCards,
+} from "lucide-react";
+import { useI18n } from "@/i18n/I18nContext";
+import type { DashboardGroupKey } from "@/types/dashboard";
+import type { DashboardTabKey } from "../hooks/useDashboardData";
+import { getDashboardGroupLabel } from "../utils/dashboard-groups";
 
 interface DashboardTabsNavProps {
   activeTab: DashboardTabKey;
   onTabChange: (tab: DashboardTabKey) => void;
-  sections?: Array<{ key: string; title: string }>;
+  groups: DashboardGroupKey[];
 }
 
-export function DashboardTabsNav({ activeTab, onTabChange, sections = [] }: DashboardTabsNavProps) {
+const GROUP_ICONS: Record<DashboardGroupKey, LucideIcon> = {
+  tenants: Building2,
+  domains: Globe2,
+  subscriptions: ReceiptText,
+  billing: CircleDollarSign,
+  payments: CreditCard,
+  wallets: WalletCards,
+  database: Database,
+  storage: HardDrive,
+  provisioning: LineChart,
+  catalogue: BookOpen,
+  notifications: Bell,
+  usage: LayoutDashboard,
+  security: ShieldCheck,
+  audit: ClipboardCheck,
+};
+
+export function DashboardTabsNav({
+  activeTab,
+  onTabChange,
+  groups,
+}: DashboardTabsNavProps) {
   const { t, lang } = useI18n();
-
-  const sectionLabelMap: Record<string, string> = {
-    overview: t.dashboard.tabs.overview,
-    tenants: t.dashboard.tabs.tenants,
-    databaseServers: t.dashboard.tabs.servers,
-    servers: t.dashboard.tabs.servers,
-    subscriptions: t.dashboard.tabs.subscriptions || (lang === "ar" ? "الاشتراكات" : "Subscriptions"),
-    invoices: t.dashboard.tabs.billing || (lang === "ar" ? "الفواتير" : "Billing"),
-  };
-
-  const fallbackArMap: Record<string, string> = {
-    Tenants: "المستأجرين",
-    "Database Server": "سيرفرات قواعد البيانات",
-    "Database Servers": "سيرفرات قواعد البيانات",
-    Subscriptions: "الاشتراكات",
-    Invoices: "الفواتير",
-  };
-
-  const IconMap: Record<string, LucideIcon> = {
-    overview: Layout,
-    tenants: Building,
-    databaseServers: Server,
-    servers: Server,
-    subscriptions: Calendar,
-    invoices: CreditCard,
-  };
-
-  const IconColorMap: Record<string, string> = {
-    overview: "text-blue-500 dark:text-blue-400",
-    tenants: "text-indigo-500 dark:text-indigo-400",
-    databaseServers: "text-emerald-500 dark:text-emerald-400",
-    servers: "text-emerald-500 dark:text-emerald-400",
-    subscriptions: "text-purple-500 dark:text-purple-400",
-    invoices: "text-amber-500 dark:text-amber-400",
-  };
-
-  const tabs: Array<{
-    key: DashboardTabKey;
-    label: string;
-    icon: LucideIcon;
-    color: string;
-  }> = [
-    { key: "overview", label: t.dashboard.tabs.overview || "نظرة عامة", icon: Layout, color: IconColorMap["overview"] },
-    ...sections.map((sec) => {
-      let label = sectionLabelMap[sec.key];
-      if (!label && lang === "ar") {
-        label = fallbackArMap[sec.title] || sec.title;
-      }
-      return { 
-        key: sec.key, 
-        label: label || sec.title, 
-        icon: IconMap[sec.key] || Layout, 
-        color: IconColorMap[sec.key] || "text-slate-500" 
-      };
-    }),
+  const tabs: Array<{ key: DashboardTabKey; label: string; icon: LucideIcon }> = [
+    {
+      key: "overview",
+      label: t.dashboard.tabs.overview,
+      icon: LayoutDashboard,
+    },
+    ...groups.map((key) => ({
+      key,
+      label: getDashboardGroupLabel(key, lang),
+      icon: GROUP_ICONS[key],
+    })),
   ];
 
   return (
-    <div className="border-b border-slate-200 dark:border-slate-800">
-      <div className="flex items-center gap-1 sm:gap-4 overflow-x-auto pb-px scrollbar-none px-2 sm:px-0">
+    <nav
+      className="sticky top-0 z-10 rounded-2xl border border-slate-200 bg-white/95 px-2 shadow-2xs backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
+      aria-label={lang === "ar" ? "مجموعات تقارير لوحة التحكم" : "Dashboard report groups"}
+    >
+      <div className="flex items-center gap-1 overflow-x-auto py-1.5 scrollbar-none">
         {tabs.map((tab) => {
-          const isActive = activeTab === tab.key;
           const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
           return (
             <button
               key={tab.key}
+              type="button"
               onClick={() => onTabChange(tab.key)}
-              className={`px-4 py-3.5 text-[13px] font-bold rounded-t-xl transition-all cursor-pointer whitespace-nowrap border-b-2 flex flex-col sm:flex-row items-center gap-2 ${
+              aria-current={isActive ? "page" : undefined}
+              className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
                 isActive
-                  ? "border-blue-600 dark:border-blue-400 text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-950/20"
-                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/40"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
               }`}
             >
-              {Icon && (
-                <div className={`rounded-md ${isActive ? "bg-white dark:bg-slate-800 shadow-sm p-1" : "bg-transparent"} ${tab.color}`}>
-                  <Icon className="w-5 h-5 sm:w-4 sm:h-4 mb-1 sm:mb-0" strokeWidth={isActive ? 2.5 : 2} />
-                </div>
-              )}
+              <Icon className="size-4" aria-hidden="true" />
               <span>{tab.label}</span>
             </button>
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }

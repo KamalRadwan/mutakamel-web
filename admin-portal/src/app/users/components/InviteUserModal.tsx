@@ -31,7 +31,6 @@ export function InviteUserModal({
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [rolesForbidden, setRolesForbidden] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadRolesData() {
@@ -41,9 +40,12 @@ export function InviteUserModal({
         const items = res?.data;
         if (Array.isArray(items)) {
           setRoles(items);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } else if ((items as any)?.items) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setRoles((items as any).items);
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         if (err?.response?.status === 403) {
           setRolesForbidden(true);
@@ -63,7 +65,6 @@ export function InviteUserModal({
 
     setIsSubmitting(true);
     setFieldErrors({});
-    setFormError(null);
 
     try {
       await inviteAdminUser({
@@ -83,12 +84,15 @@ export function InviteUserModal({
 
       onSuccess();
       onClose();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       const details = getErrorMessageAndDetails(err, lang);
       if (details.fieldErrors) {
         setFieldErrors(details.fieldErrors);
       }
-      setFormError(details.message);
+      if (!details.fieldErrors || Object.keys(details.fieldErrors).length === 0) {
+        toast.error(lang === "ar" ? "فشل إرسال الدعوة" : "Invitation Failed", details.message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -97,9 +101,13 @@ export function InviteUserModal({
   const isAr = lang === "ar";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-xl relative animate-in zoom-in-95 duration-200">
-        <button
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-md p-4 animate-in fade-in">
+      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl border border-white/20 dark:border-slate-700/50 max-w-lg w-full p-6 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="absolute -top-32 -right-32 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10">
+          <button
           onClick={onClose}
           className="absolute top-4 end-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
         >
@@ -123,12 +131,6 @@ export function InviteUserModal({
         <div className="p-3 mb-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
           {t.users.invitedInfoBanner}
         </div>
-
-        {formError && !Object.keys(fieldErrors).length && (
-          <div className="p-3 mb-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400">
-            {formError}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -271,6 +273,7 @@ export function InviteUserModal({
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

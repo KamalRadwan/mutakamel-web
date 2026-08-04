@@ -2,11 +2,16 @@
 
 import { AlertCircle, DatabaseZap } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { DashboardUnavailableDataset } from "@/types/dashboard";
+import type { DashboardUnavailableReason } from "@/types/dashboard";
+
+interface DashboardUnavailableState {
+  reasonCode?: DashboardUnavailableReason | "PROJECTION_NOT_ACTIVE";
+  message?: string;
+}
 
 interface DashboardDataStateProps {
   title: string;
-  dataset?: DashboardUnavailableDataset;
+  dataset?: DashboardUnavailableState;
   className?: string;
 }
 
@@ -78,13 +83,15 @@ export function EmptyDashboardPanel({
 }
 
 function unavailableMessage(
-  reasonCode: DashboardUnavailableDataset["reasonCode"] | undefined,
+  reasonCode: DashboardUnavailableState["reasonCode"],
 ) {
   switch (reasonCode) {
     case "TARGET_NOT_CONFIGURED":
       return "لم يتم إعداد القيمة المستهدفة في لوحة التحكم بعد.";
     case "HISTORICAL_DATA_NOT_STORED":
       return "لا يحتفظ النظام حاليًا بالسجل التاريخي اللازم لهذا المؤشر.";
+    case "PROJECTION_NOT_ACTIVE":
+      return "عرض البيانات الموثوق لهذا التقرير غير مفعل حاليًا.";
     default:
       return "مصدر البيانات المطلوب غير متصل بواجهة لوحة التحكم حاليًا.";
   }

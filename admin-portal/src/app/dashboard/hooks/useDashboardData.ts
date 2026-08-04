@@ -1,155 +1,103 @@
-import { useState, useEffect, useCallback } from "react";
-import { axiosClient } from "@/lib/api/axiosClient";
-import { DashboardResponse, AdminDashboardQuery } from "@/types/dashboard";
-import { AutoRefreshInterval } from "../components/DashboardHeader";
+import { useCallback, useEffect, useState } from "react";
+import { axiosClient, unwrapCoreData } from "@/lib/api/axiosClient";
+import type {
+  AdminDashboardQuery,
+  DashboardGroupKey,
+  DashboardResponse,
+} from "@/types/dashboard";
+import type { AutoRefreshInterval } from "../components/DashboardHeader";
 
-export type DashboardTabKey = "overview" | "tenants" | "servers" | "billing" | string;
+export type DashboardTabKey = "overview" | DashboardGroupKey;
 export type DateRangePreset = "thisMonth" | "lastMonth" | "custom";
 
-interface DashboardHttpError extends Error {
+export interface DashboardHttpError extends Error {
   response?: {
     status?: number;
+    data?: {
+      message?: string;
+      errorCode?: string;
+      code?: string;
+      correlationId?: string;
+      detail?: string;
+      title?: string;
+      details?: unknown;
+    };
   };
 }
 
 export function useDashboardData() {
   const [activeTab, setActiveTab] = useState<DashboardTabKey>("overview");
   const [rangePreset, setRangePreset] = useState<DateRangePreset>("thisMonth");
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<AutoRefreshInterval>("off");
-  
-  // Custom date range state
-  const [customRange, setCustomRange] = useState<{from?: string; to?: string}>({});
-  
-  // Data state
+  const [autoRefreshInterval, setAutoRefreshInterval] =
+    useState<AutoRefreshInterval>("off");
+  const [customRange, setCustomRange] = useState<{
+    from?: string;
+    to?: string;
+  }>({});
   const [data, setData] = useState<DashboardResponse | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  
-  // Error state
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<DashboardHttpError | null>(null);
-  const [isForbidden, setIsForbidden] = useState<boolean>(false);
-  const [isRateLimited, setIsRateLimited] = useState<boolean>(false);
 
-  const fetchDashboard = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
-    
-    setError(null);
-    setIsForbidden(false);
-    setIsRateLimited(false);
-
-    try {
-      const params: AdminDashboardQuery = {};
-      
-      if (rangePreset === "custom") {
-        if (customRange.from) params.from = customRange.from;
-        if (customRange.to) params.to = customRange.to;
-      } else if (rangePreset === "lastMonth") {
-        const now = new Date();
-        const firstDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-        const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
-        params.from = firstDay.toISOString().split('T')[0];
-        params.to = lastDay.toISOString().split('T')[0];
+  const fetchDashboard = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
       }
+      setError(null);
 
-      const queryParams = new URLSearchParams();
-      if (params.date) queryParams.append("date", params.date);
-      if (params.from) queryParams.append("from", params.from);
-      if (params.to) queryParams.append("to", params.to);
-      
-      const queryString = queryParams.toString();
-      const endpoint = queryString ? `/api/admin/core/v1/dashboard?${queryString}` : '/api/admin/core/v1/dashboard';
-
-      const response = await axiosClient.get<{ data: DashboardResponse }>(endpoint);
-      const resData = response.data.data;
-      
-      // Inject missing analytics payload if backend omits it
-      if (!resData.analytics) {
-        resData.analytics = {
-          subscriptions: {
-            recurringRevenue: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            arrTarget: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            averageCollectedRevenue: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            paymentHealth: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            churnAndAcquisition: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            upcomingRenewals: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            revenueFlow: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            lifetimeValue: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            promotionImpact: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            cohortRetention: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-          } as any,
-          billing: {
-            aging: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            daysSalesOutstanding: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            cashFlow: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            revenueByPurpose: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            paymentProviders: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            paymentFailureReasons: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            refunds: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            taxByCountry: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            renewalForecast: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            usageOverage: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            costBreakdown: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            discountImpact: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            chargebacks: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-          } as any,
-          servers: {
-            nodes: { available: true, data: resData.panels?.databaseCapacity?.items || [] },
-            regions: { available: true, data: resData.overview?.domainHealth?.regions || [] },
-            latency: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-            capacityHistory: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' },
-          } as any,
-          platformHealth: { available: false, reasonCode: 'HISTORICAL_DATA_NOT_STORED', message: '' } as any,
-        };
+      try {
+        const query = buildDashboardQuery(
+          rangePreset,
+          customRange,
+          new Date(),
+        );
+        const searchParams = new URLSearchParams();
+        if (query.date) searchParams.set("date", query.date);
+        if (query.from) searchParams.set("from", query.from);
+        if (query.to) searchParams.set("to", query.to);
+        const search = searchParams.toString();
+        const endpoint = `/api/admin/core/v1/dashboard${
+          search ? `?${search}` : ""
+        }`;
+        const response = await axiosClient.get<unknown>(endpoint);
+        const nextData = unwrapCoreData<DashboardResponse>(response.data);
+        setData(nextData);
+        setActiveTab((currentTab) =>
+          currentTab === "overview" ||
+          nextData.authorizedGroups.includes(currentTab)
+            ? currentTab
+            : "overview",
+        );
+      } catch (errorValue: unknown) {
+        setError(toDashboardHttpError(errorValue));
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
-
-      setData(resData);
-    } catch (errorValue: unknown) {
-      const err: DashboardHttpError =
-        errorValue instanceof Error
-          ? errorValue
-          : new Error("An unexpected dashboard error occurred.");
-      setError(err);
-      const status = err.response?.status;
-      if (status === 403) {
-        setIsForbidden(true);
-      } else if (status === 429) {
-        setIsRateLimited(true);
-      }
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [rangePreset, customRange]);
+    },
+    [customRange, rangePreset],
+  );
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void fetchDashboard();
-    }, 0);
+    const timer = window.setTimeout(() => void fetchDashboard(), 0);
     return () => window.clearTimeout(timer);
   }, [fetchDashboard]);
 
-  // Polling interval timer for Auto-Refresh
   useEffect(() => {
     if (autoRefreshInterval === "off") return;
 
-    let ms = 30000;
-    if (autoRefreshInterval === "60s") ms = 60000;
-    if (autoRefreshInterval === "5m") ms = 300000;
-
-    const timer = setInterval(() => {
-      fetchDashboard(true);
-    }, ms);
-
-    return () => clearInterval(timer);
+    const delay =
+      autoRefreshInterval === "30s"
+        ? 30_000
+        : autoRefreshInterval === "60s"
+          ? 60_000
+          : 300_000;
+    const timer = window.setInterval(() => void fetchDashboard(true), delay);
+    return () => window.clearInterval(timer);
   }, [autoRefreshInterval, fetchDashboard]);
-
-  const handleRefresh = () => {
-    fetchDashboard(true);
-  };
 
   return {
     activeTab,
@@ -164,8 +112,40 @@ export function useDashboardData() {
     isLoading,
     isRefreshing,
     error,
-    isForbidden,
-    isRateLimited,
-    handleRefresh,
+    isForbidden: error?.response?.status === 403,
+    isRateLimited: error?.response?.status === 429,
+    handleRefresh: () => void fetchDashboard(true),
   };
+}
+
+export function buildDashboardQuery(
+  preset: DateRangePreset,
+  customRange: { from?: string; to?: string },
+  now: Date,
+): AdminDashboardQuery {
+  if (preset === "custom") {
+    return {
+      ...(customRange.from ? { from: customRange.from } : {}),
+      ...(customRange.to ? { to: customRange.to } : {}),
+    };
+  }
+  if (preset !== "lastMonth") return {};
+
+  const firstDay = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1),
+  );
+  const lastDay = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0),
+  );
+  return {
+    from: firstDay.toISOString().slice(0, 10),
+    to: lastDay.toISOString().slice(0, 10),
+  };
+}
+
+function toDashboardHttpError(errorValue: unknown): DashboardHttpError {
+  if (errorValue instanceof Error) return errorValue as DashboardHttpError;
+  return new Error(
+    "An unexpected dashboard error occurred.",
+  ) as DashboardHttpError;
 }

@@ -1,42 +1,26 @@
 export const TENANT_CREATE_PERMISSION = "admin.tenants.create";
 const UUID_V7 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const STORAGE_SERVER_STATUSES = [
-  "DRAFT",
-  "ACTIVE",
-  "DRAINING",
-  "OFFLINE",
-] as const;
-const STORAGE_AVAILABILITY_CLASSES = [
-  "DEGRADED_SINGLE_NODE",
-  "SINGLE_NODE_OPERATIONAL",
-  "BACKUP_TARGET_OPERATIONAL",
-  "HA_PRODUCTION_READY",
-] as const;
+const STORAGE_SERVER_STATUSES = ["DRAFT", "ACTIVE", "OFFLINE"] as const;
 
 export interface TenantStoragePlacementOption {
   id: string;
+  code: string;
   name: string;
-  provider: "GARAGE";
   region: string;
+  bucketName: string;
   status: "ACTIVE";
-  availabilityClass: "HA_PRODUCTION_READY";
-  currentTenants: number;
-  retainedTenants: number;
-  reservedTenants: number;
-  maxTenants: number;
-  capacityPercent: number;
-  allocatableCapacityBytes: string;
-  availableReservationBytes: string;
+  maxTenants: number | null;
+  assignedTenants: number;
 }
 
 export interface TenantStorageServerSummary {
   id: string;
+  code: string;
   name: string;
-  provider: "GARAGE";
   region: string;
+  bucketName: string;
   status: (typeof STORAGE_SERVER_STATUSES)[number];
-  availabilityClass: (typeof STORAGE_AVAILABILITY_CLASSES)[number];
 }
 
 export type StoragePlacementState =
@@ -119,43 +103,23 @@ export function sanitizeTenantStoragePlacement<
     storageServerId === null ||
     summary.id !== storageServerId ||
     !isNonEmptyString(summary.name) ||
-    summary.provider !== "GARAGE" ||
+    !isNonEmptyString(summary.code) ||
     !isNonEmptyString(summary.region) ||
-    !isOneOf(summary.status, STORAGE_SERVER_STATUSES) ||
-    !isOneOf(summary.availabilityClass, STORAGE_AVAILABILITY_CLASSES)
+    !isNonEmptyString(summary.bucketName) ||
+    !isOneOf(summary.status, STORAGE_SERVER_STATUSES)
   ) {
     throw new Error("INVALID_TENANT_STORAGE_PLACEMENT_RESPONSE");
   }
 
   result.storageServer = {
-    id: summary.id,
-    name: summary.name,
-    provider: summary.provider,
-    region: summary.region,
-    status: summary.status,
-    availabilityClass: summary.availabilityClass,
+    id: summary.id as string,
+    code: summary.code as string,
+    name: summary.name as string,
+    region: summary.region as string,
+    bucketName: summary.bucketName as string,
+    status: summary.status as (typeof STORAGE_SERVER_STATUSES)[number],
   };
   return result;
-}
-
-export function formatStorageBytes(value: string): string {
-  if (!/^\d+$/.test(value)) return "Unavailable";
-
-  const bytes = BigInt(value);
-  const units = [
-    { label: "PiB", value: BigInt("1125899906842624") },
-    { label: "TiB", value: BigInt("1099511627776") },
-    { label: "GiB", value: BigInt("1073741824") },
-    { label: "MiB", value: BigInt("1048576") },
-    { label: "KiB", value: BigInt("1024") },
-  ] as const;
-
-  const unit = units.find((candidate) => bytes >= candidate.value);
-  if (!unit) return `${bytes.toString()} B`;
-
-  const whole = bytes / unit.value;
-  const fraction = ((bytes % unit.value) * BigInt(10)) / unit.value;
-  return `${whole.toString()}.${fraction.toString()} ${unit.label}`;
 }
 
 function readStoragePlacementOption(
@@ -167,38 +131,25 @@ function readStoragePlacementOption(
     typeof item.id !== "string" ||
     !UUID_V7.test(item.id) ||
     !isNonEmptyString(item.name) ||
-    item.provider !== "GARAGE" ||
+    !isNonEmptyString(item.code) ||
     !isNonEmptyString(item.region) ||
+    !isNonEmptyString(item.bucketName) ||
     item.status !== "ACTIVE" ||
-    item.availabilityClass !== "HA_PRODUCTION_READY" ||
-    !isNonNegativeInteger(item.currentTenants) ||
-    !isNonNegativeInteger(item.retainedTenants) ||
-    !isNonNegativeInteger(item.reservedTenants) ||
-    !isNonNegativeInteger(item.maxTenants) ||
-    typeof item.capacityPercent !== "number" ||
-    !Number.isFinite(item.capacityPercent) ||
-    item.capacityPercent < 0 ||
-    item.capacityPercent > 100 ||
-    !isDecimalString(item.allocatableCapacityBytes) ||
-    !isDecimalString(item.availableReservationBytes)
+    !isNonNegativeInteger(item.assignedTenants) ||
+    (item.maxTenants !== null && !isNonNegativeInteger(item.maxTenants))
   ) {
     throw new Error("INVALID_STORAGE_PLACEMENT_OPTIONS_RESPONSE");
   }
 
   return {
     id: item.id,
+    code: item.code,
     name: item.name,
-    provider: item.provider,
     region: item.region,
+    bucketName: item.bucketName,
     status: item.status,
-    availabilityClass: item.availabilityClass,
-    currentTenants: item.currentTenants,
-    retainedTenants: item.retainedTenants,
-    reservedTenants: item.reservedTenants,
-    maxTenants: item.maxTenants,
-    capacityPercent: item.capacityPercent,
-    allocatableCapacityBytes: item.allocatableCapacityBytes,
-    availableReservationBytes: item.availableReservationBytes,
+    maxTenants: item.maxTenants as number | null,
+    assignedTenants: item.assignedTenants,
   };
 }
 
@@ -217,10 +168,6 @@ function isOneOf<const Values extends readonly string[]>(
   values: Values,
 ): value is Values[number] {
   return typeof value === "string" && values.includes(value);
-}
-
-function isDecimalString(value: unknown): value is string {
-  return typeof value === "string" && /^\d+$/.test(value);
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

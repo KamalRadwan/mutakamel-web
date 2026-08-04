@@ -11,13 +11,15 @@ export interface MappedErrorDetails {
 }
 
 export function getErrorMessageAndDetails(
-  error: any,
+  error: unknown,
   lang: "ar" | "en" = "en"
 ): MappedErrorDetails {
   const code = normalizeErrorCode(error);
-  const data = error?.response?.data;
-  const correlationId = data?.correlationId || error?.correlationId || "";
-  const serverMsg = data?.message || data?.detail || data?.title;
+  const errorObj = error as Record<string, unknown>;
+  const response = errorObj?.response as Record<string, unknown> | undefined;
+  const data = response?.data as Record<string, unknown> | undefined;
+  const correlationId = (data?.correlationId as string) || (errorObj?.correlationId as string) || "";
+  const serverMsg = (data?.message as string) || (data?.detail as string) || (data?.title as string);
 
   const isAr = lang === "ar";
   const fieldErrors: Record<string, string> = {};
@@ -32,7 +34,8 @@ export function getErrorMessageAndDetails(
 
   switch (code) {
     case "MISSING_REQUIRED_PERMISSIONS": {
-      const requiredPerms = data?.details?.permissions?.join(", ");
+      const details = data?.details as Record<string, unknown> | undefined;
+      const requiredPerms = (details?.permissions as string[] | undefined)?.join(", ");
       return {
         code,
         message: isAr

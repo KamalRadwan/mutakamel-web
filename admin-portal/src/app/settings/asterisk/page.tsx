@@ -2,6 +2,7 @@
 
 import { useSettings } from "../hooks/useSettings";
 import { SettingField } from "../components/SettingField";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { AlertCircle, Loader2, Phone, RefreshCw } from "lucide-react";
 
 import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
@@ -13,9 +14,11 @@ export default function AsteriskSettingsPage() {
     isLoading,
     isSaving,
     hasUnsavedChanges,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     loadError,
     updateSetting,
     saveAllSettings,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     refetch,
   } = useSettings("asterisk.");
 
@@ -33,11 +36,11 @@ export default function AsteriskSettingsPage() {
         </div>
       </div>
 
-      <SaveSettingsBanner 
-        hasUnsavedChanges={hasUnsavedChanges} 
-        isSaving={isSaving} 
-        onSave={saveAllSettings} 
-        lang={lang} 
+      <SaveSettingsBanner
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={isSaving}
+        onSave={saveAllSettings}
+        lang={lang}
       />
 
       <div className="space-y-4">
@@ -47,11 +50,11 @@ export default function AsteriskSettingsPage() {
           </div>
         ) : (
           settings.map((setting) => (
-            <SettingField 
-              key={setting.key} 
-              setting={setting} 
-              lang={lang} 
-              onUpdate={updateSetting} 
+            <SettingField
+              key={setting.key}
+              setting={setting}
+              lang={lang}
+              onUpdate={updateSetting}
             />
           ))
         )}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Shield, X, Loader2, Info } from "lucide-react";
 import { useToast } from "@/components/ui/ToastContext";
 import { axiosClient } from "@/lib/api/axiosClient";
@@ -24,24 +25,25 @@ export function CreateRoleModal({ onClose, onSuccess }: { onClose: () => void, o
         name: name.trim(),
         description: description.trim() || undefined,
       });
-      
+
       const newRoleId = res.data?.data?.id;
-      
+
       toast.success(
         lang === "ar" ? "تم الإنشاء" : "Role Created",
         lang === "ar" ? "تم إنشاء الدور بنجاح." : "Role created successfully."
       );
-      
+
       onClose();
       if (onSuccess) onSuccess();
-      
+
       if (newRoleId) {
         router.push(`/roles/${newRoleId}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorPayload = error as { response?: { data?: { message?: string } } };
       toast.error(
         lang === "ar" ? "فشل الإنشاء" : "Creation failed",
-        error?.response?.data?.message || (lang === "ar" ? "حدث خطأ أثناء إنشاء الدور." : "An error occurred while creating the role.")
+        errorPayload?.response?.data?.message || (lang === "ar" ? "حدث خطأ أثناء إنشاء الدور." : "An error occurred while creating the role.")
       );
       setIsSubmitting(false);
     }
@@ -50,7 +52,7 @@ export function CreateRoleModal({ onClose, onSuccess }: { onClose: () => void, o
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-xl relative animate-in zoom-in-95 duration-200">
-        
+
         <button
           onClick={onClose}
           className="absolute top-4 end-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-colors"

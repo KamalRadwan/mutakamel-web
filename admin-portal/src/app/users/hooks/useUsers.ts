@@ -1,4 +1,6 @@
 "use client";
+ 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -60,14 +62,14 @@ export function useUsers() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
-      setPage(1);
+      queueMicrotask(() => setPage(1));
     }, 500);
     return () => clearTimeout(handler);
   }, [search]);
 
   // Reset page on filter change
   useEffect(() => {
-    setPage(1);
+    queueMicrotask(() => setPage(1));
   }, [statusFilter, roleFilter, isSuperAdminFilter, sortBy, sortDir, limit]);
 
   // Fetch roles for filter dropdown
@@ -114,7 +116,7 @@ export function useUsers() {
 
       const userList = Array.isArray(responseData) ? responseData : ((responseData as any)?.items || []);
       setUsers(userList);
-      
+
       const total = meta?.total ?? (responseData as any)?.meta?.total ?? userList.length;
       const totalPgs = meta?.totalPages ?? (responseData as any)?.meta?.totalPages ?? 1;
 
@@ -154,7 +156,9 @@ export function useUsers() {
   }, [page, limit, debouncedSearch, statusFilter, roleFilter, isSuperAdminFilter, sortBy, sortDir, lang, toast]);
 
   useEffect(() => {
-    fetchUsers();
+    queueMicrotask(() => {
+      fetchUsers();
+    });
   }, [fetchUsers]);
 
   const activeModalUser = users.find((u) => u.id === activeModalUserId);
@@ -179,7 +183,7 @@ export function useUsers() {
 
   const confirmModalAction = async () => {
     if (!activeModalUserId || !modalActionType) return;
-    
+
     setIsActionLoading(true);
     try {
       if (modalActionType === "delete") {
@@ -201,7 +205,7 @@ export function useUsers() {
           lang === "ar" ? "تم تنشيط حساب المستخدم بنجاح" : "User activated successfully"
         );
       }
-      
+
       closeModal();
       fetchUsers();
     } catch (err: any) {

@@ -1,4 +1,6 @@
 "use client";
+ 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
@@ -31,16 +33,18 @@ export function useMyProfile() {
       setProfile(data);
       if (data.themeKey) setThemeKey(data.themeKey);
       if (data.language) setLanguage(data.language);
-      if (data.extensions?.tableDensity) setTableDensity(data.extensions.tableDensity);
+      if (data.extensions?.tableDensity) setTableDensity(data.extensions.tableDensity as string);
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to load profile.");
+      const message = err?.response?.data?.message || "Failed to load profile.";
+      setError(message);
+      toast.error(lang === "ar" ? "فشل تحميل الملف الشخصي" : "Profile Load Failed", message);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [lang, toast]);
 
   useEffect(() => {
-    loadMyProfile();
+    queueMicrotask(() => loadMyProfile());
   }, [loadMyProfile]);
 
   const hasChanges = useMemo(() => {

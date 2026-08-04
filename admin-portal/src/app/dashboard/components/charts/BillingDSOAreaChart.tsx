@@ -36,30 +36,30 @@ export function BillingDSOAreaChart({ data, height = 280 }: Props) {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
-          <XAxis 
-            dataKey="month" 
-            axisLine={false} 
-            tickLine={false} 
+          <XAxis
+            dataKey="month"
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             className="text-slate-500 dark:text-slate-400"
           />
-          <YAxis 
-            axisLine={false} 
-            tickLine={false} 
+          <YAxis
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             tickFormatter={(val) => `${val}d`}
             className="text-slate-500 dark:text-slate-400"
           />
           <Tooltip content={<ChartTooltip />} cursor={{ stroke: "#f59e0b", strokeWidth: 1, strokeDasharray: "4 4" }} />
-          
-          <Area 
-            type="monotone" 
-            dataKey="dso" 
-            name={lang === "ar" ? "أيام المبيعات غير المحصلة (DSO)" : "Days Sales Outstanding (DSO)"} 
-            stroke="#f59e0b" 
+
+          <Area
+            type="monotone"
+            dataKey="dso"
+            name={lang === "ar" ? "أيام المبيعات غير المحصلة (DSO)" : "Days Sales Outstanding (DSO)"}
+            stroke="#f59e0b"
             strokeWidth={3}
-            fillOpacity={1} 
-            fill="url(#colorDso)" 
+            fillOpacity={1}
+            fill="url(#colorDso)"
           />
         </AreaChart>
       </ResponsiveContainer>

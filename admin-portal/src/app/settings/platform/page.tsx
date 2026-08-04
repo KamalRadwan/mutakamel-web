@@ -10,18 +10,18 @@ import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
 
 export default function PlatformSettingsPage() {
   const [search, setSearch] = useState("");
-  const { 
-    lang, 
-    settings: platformSettings, 
-    isLoading: isPlatformLoading, 
+  const {
+    lang,
+    settings: platformSettings,
+    isLoading: isPlatformLoading,
     updateSetting: updatePlatformSetting,
     hasUnsavedChanges: platformHasUnsaved,
     isSaving: platformIsSaving,
     saveAllSettings: savePlatformSettings
   } = useSettings("platform.");
-  
-  const { 
-    settings: supportSettings, 
+
+  const {
+    settings: supportSettings,
     isLoading: isSupportLoading,
     updateSetting: updateSupportSetting,
     hasUnsavedChanges: supportHasUnsaved,
@@ -75,11 +75,11 @@ export default function PlatformSettingsPage() {
         <SettingSearch value={search} onChange={setSearch} />
       </div>
 
-      <SaveSettingsBanner 
-        hasUnsavedChanges={hasUnsavedChanges} 
-        isSaving={isSaving} 
-        onSave={handleSaveAll} 
-        lang={lang} 
+      <SaveSettingsBanner
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={isSaving}
+        onSave={handleSaveAll}
+        lang={lang}
       />
 
       <div className="space-y-4">
@@ -93,11 +93,11 @@ export default function PlatformSettingsPage() {
           </div>
         ) : (
           filteredSettings.map((setting) => (
-            <SettingField 
-              key={setting.key} 
-              setting={setting} 
-              lang={lang} 
-              onUpdate={updateSetting} 
+            <SettingField
+              key={setting.key}
+              setting={setting}
+              lang={lang}
+              onUpdate={updateSetting}
             />
           ))
         )}

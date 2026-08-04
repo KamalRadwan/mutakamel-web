@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
-import { 
-  Building2, 
-  Search, 
-  Plus, 
-  Globe, 
-  Server, 
-  ExternalLink, 
-  RotateCcw, 
+import {
+  Building2,
+  Search,
+  Plus,
+  Globe,
+  Server,
+  ExternalLink,
+  RotateCcw,
   Trash2,
   Loader2,
   HardDrive
@@ -31,9 +31,12 @@ export default function TenantsDirectoryPage() {
     setStatusFilter,
     serverFilter,
     setServerFilter,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     page,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     setPage,
     tenants,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     totalItems,
     summaryMetrics,
     activeModalTenant,
@@ -56,40 +59,54 @@ export default function TenantsDirectoryPage() {
       <Navbar />
 
       <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
-        {/* Header Title Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <span>{t.tenants.pageTitle}</span>
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              {t.tenants.pageSubtitle}
-            </p>
-          </div>
+        {/* Header Title Section with Vibrant Cyan/Blue Gradient */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white p-6 rounded-3xl border border-cyan-500/20 shadow-xl">
+          <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-cyan-500/20 via-blue-500/20 to-indigo-500/0 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 start-1/3 -mb-10 w-60 h-60 bg-teal-500/15 rounded-full blur-3xl pointer-events-none" />
 
-          <Link
-            href="/tenants/new"
-            className="px-3.5 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-600/20 transition-colors flex items-center gap-1.5 cursor-pointer ms-auto sm:ms-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t.tenants.registerTenant}</span>
-          </Link>
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <div className="p-3.5 bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-cyan-500/30 flex items-center justify-center shrink-0">
+                <Building2 className="w-7 h-7" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-black tracking-tight text-white">
+                    {t.tenants.pageTitle}
+                  </h1>
+                  <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full">
+                    Multi-Tenant Isolation
+                  </span>
+                </div>
+                <p className="text-xs text-cyan-100/80 mt-1 max-w-xl leading-relaxed">
+                  {t.tenants.pageSubtitle}
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/tenants/new"
+              className="px-5 py-2.5 text-xs font-bold bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white rounded-xl shadow-lg shadow-blue-500/25 transition-all transform hover:-translate-y-0.5 flex items-center gap-2 cursor-pointer shrink-0 border border-white/20"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{t.tenants.registerTenant}</span>
+            </Link>
+          </div>
         </div>
 
         {/* Summary Metrics Bar */}
         <TenantSummary metrics={summaryMetrics} />
 
         {/* Search & Filter Bar */}
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute top-3 start-3" />
+            <Search className="w-4 h-4 text-cyan-500 absolute top-3.5 start-3.5" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t.tenants.searchPlaceholder}
-              className="w-full ps-9 pe-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
+              className="w-full ps-10 pe-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
             />
           </div>
 
@@ -97,7 +114,7 @@ export default function TenantsDirectoryPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500 cursor-pointer"
             >
               <option value="ALL">{t.tenants.allStatuses}</option>
               <option value="ACTIVE">{t.tenants.statusNames.ACTIVE}</option>
@@ -110,7 +127,7 @@ export default function TenantsDirectoryPage() {
             <select
               value={serverFilter}
               onChange={(e) => setServerFilter(e.target.value)}
-              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500 cursor-pointer"
             >
               <option value="ALL">{t.tenants.allServers}</option>
               <option value="srv-eg-01">{t.tenants.servers.srvEg01}</option>
@@ -121,18 +138,18 @@ export default function TenantsDirectoryPage() {
           </div>
         </div>
 
-        {/* High-Density Data Table */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+        {/* Dynamic Colorful Table View */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-start">
               <thead>
-                <tr className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
-                  <th className="py-3 px-4 text-start">{t.tenants.tenantName}</th>
-                  <th className="py-3 px-4 text-start">{t.tenants.primaryFqdn}</th>
-                  <th className="py-3 px-4 text-start">{lang === "ar" ? "البنية التحتية" : "Infrastructure"}</th>
-                  <th className="py-3 px-4 text-start">{t.tenants.subscriptionPlan}</th>
-                  <th className="py-3 px-4 text-start">{t.tenants.status}</th>
-                  <th className="py-3 px-4 text-end">{t.tenants.actions}</th>
+                <tr className="bg-slate-100/70 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-extrabold uppercase tracking-wider">
+                  <th className="py-4 px-5 text-start">{t.tenants.tenantName}</th>
+                  <th className="py-4 px-5 text-start">{t.tenants.primaryFqdn}</th>
+                  <th className="py-4 px-5 text-start">{lang === "ar" ? "البنية التحتية" : "Infrastructure Nodes"}</th>
+                  <th className="py-4 px-5 text-start">{t.tenants.subscriptionPlan}</th>
+                  <th className="py-4 px-5 text-start">{t.tenants.status}</th>
+                  <th className="py-4 px-5 text-end">{t.tenants.actions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -189,7 +206,7 @@ export default function TenantsDirectoryPage() {
                           </div>
                           <div className="flex items-center gap-1.5" title="Storage Server">
                             <HardDrive className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                            <span className="font-mono text-[11px] font-semibold">{ten.storageServerName || "N/A"}</span>
+                            <span className="font-mono text-[11px] font-semibold">{ten.storageServer?.name || ten.storageServerId || "N/A"}</span>
                           </div>
                         </div>
                         <div className="text-[10px] text-slate-400 mt-1">{ten.countryName}</div>

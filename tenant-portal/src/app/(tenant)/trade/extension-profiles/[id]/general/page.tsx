@@ -1,21 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/ToastContext";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { Save, CheckCircle2 } from "lucide-react";
+import { Save } from "lucide-react";
 
 export default function ExtensionGeneralPage() {
+  const toast = useToast();
   const [extensionName, setExtensionName] = useState("ملحق الحسابات والمراجعة المحاسبية الفورية");
   const [pluginId, setPluginId] = useState("ext-acc-auditor");
   const [moduleTarget, setModuleTarget] = useState("trade-app");
   const [version, setVersion] = useState("v2.4.0");
-  const [isSaved, setIsSaved] = useState(false);
 
   const handleInlineSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
+    toast.saved();
   };
 
   return (
@@ -25,12 +25,6 @@ export default function ExtensionGeneralPage() {
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">التعديل المباشر للملحق التوسعي</h2>
           <p className="text-xs text-slate-500">قم بتحديث الاسم والإصدار فورياً</p>
         </div>
-        {isSaved && (
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-            <CheckCircle2 className="w-4 h-4" />
-            تم الحفظ
-          </span>
-        )}
       </div>
 
       <form onSubmit={handleInlineSave} className="space-y-4 max-w-2xl">

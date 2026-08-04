@@ -42,42 +42,42 @@ export function BillingForecastSplineChart({ data, height = 280 }: Props) {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
-          <XAxis 
-            dataKey="month" 
-            axisLine={false} 
-            tickLine={false} 
+          <XAxis
+            dataKey="month"
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             className="text-slate-500 dark:text-slate-400"
           />
-          <YAxis 
-            axisLine={false} 
-            tickLine={false} 
+          <YAxis
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             tickFormatter={(val) => `$${val/1000}k`}
             className="text-slate-500 dark:text-slate-400"
           />
           <Tooltip content={<ChartTooltip />} cursor={{ stroke: "#94a3b8", strokeWidth: 1, strokeDasharray: "4 4" }} />
-          
+
           <ReferenceLine x="Today" stroke="#94a3b8" strokeDasharray="3 3" />
-          
-          <Area 
-            type="monotone" 
-            dataKey="actual" 
-            name={lang === "ar" ? "الإيرادات الفعلية" : "Actual Revenue"} 
-            stroke="#10b981" 
+
+          <Area
+            type="monotone"
+            dataKey="actual"
+            name={lang === "ar" ? "الإيرادات الفعلية" : "Actual Revenue"}
+            stroke="#10b981"
             strokeWidth={3}
-            fillOpacity={1} 
-            fill="url(#colorActual)" 
+            fillOpacity={1}
+            fill="url(#colorActual)"
           />
-          <Area 
-            type="monotone" 
-            dataKey="forecast" 
-            name={lang === "ar" ? "الإيرادات المتوقعة" : "Forecast"} 
-            stroke="#94a3b8" 
+          <Area
+            type="monotone"
+            dataKey="forecast"
+            name={lang === "ar" ? "الإيرادات المتوقعة" : "Forecast"}
+            stroke="#94a3b8"
             strokeDasharray="4 4"
             strokeWidth={3}
-            fillOpacity={1} 
-            fill="url(#colorForecast)" 
+            fillOpacity={1}
+            fill="url(#colorForecast)"
           />
         </AreaChart>
       </ResponsiveContainer>

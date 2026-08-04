@@ -11,12 +11,13 @@ interface SaveSettingsBannerProps {
 }
 
 export function SaveSettingsBanner({ hasUnsavedChanges, isSaving, onSave, lang }: SaveSettingsBannerProps) {
-  const toast = useToast();
+  useToast();
 
   const handleSave = async () => {
     try {
       await onSave();
-    } catch (err: any) {
+     
+    } catch {
       // Errors are handled and toasted centrally inside the hook
     }
   };

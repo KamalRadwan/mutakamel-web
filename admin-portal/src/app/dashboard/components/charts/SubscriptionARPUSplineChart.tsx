@@ -36,30 +36,30 @@ export function SubscriptionARPUSplineChart({ data, height = 280 }: Props) {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
-          <XAxis 
-            dataKey="month" 
-            axisLine={false} 
-            tickLine={false} 
+          <XAxis
+            dataKey="month"
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             className="text-slate-500 dark:text-slate-400"
           />
-          <YAxis 
-            axisLine={false} 
-            tickLine={false} 
+          <YAxis
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             tickFormatter={(val) => `$${val}`}
             className="text-slate-500 dark:text-slate-400"
           />
           <Tooltip content={<ChartTooltip />} cursor={{ stroke: "#8b5cf6", strokeWidth: 1, strokeDasharray: "4 4" }} />
-          
-          <Area 
-            type="monotone" 
-            dataKey="arpu" 
-            name={lang === "ar" ? "متوسط الإيراد لكل مستخدم" : "ARPU"} 
-            stroke="#8b5cf6" 
+
+          <Area
+            type="monotone"
+            dataKey="arpu"
+            name={lang === "ar" ? "متوسط الإيراد لكل مستخدم" : "ARPU"}
+            stroke="#8b5cf6"
             strokeWidth={3}
-            fillOpacity={1} 
-            fill="url(#colorArpu)" 
+            fillOpacity={1}
+            fill="url(#colorArpu)"
           />
         </AreaChart>
       </ResponsiveContainer>

@@ -1,11 +1,12 @@
 # Project Index
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-04**
 
 ## Documentation
 
 - [Documentation contract](../DOCUMENTATION_CONTRACT.md)
 - [API index](../api/README.md)
+- [Backup and Restore contract](../api/backups-restores.md)
 - [Generated 243-route inventory](../generated/admin-core-api-routes.md)
 - [Frontend capability matrix](../audit/frontend-capability-matrix.md)
 - [Documentation coverage](../audit/documentation-coverage.md)
@@ -29,6 +30,18 @@ Last source verification: **2026-07-30**
 | UUID helpers | `src/lib/utils/uuid.ts` |
 | Shared types | `src/types/` |
 | Feature routes | `src/app/` |
+
+## Database and Backup ownership
+
+| Frontend module | Current source ownership |
+| --- | --- |
+| `/database-servers` | Registry, TLS/connectivity, lifecycle, `mutakamel_provisioner`, and per-Application principals under `src/features/admin/database-servers/` |
+| `/backup` | Overview, fixed `mutakamel_backup` access, Worker policies, runs, artifacts, and restores under `src/features/admin/backup/` |
+
+The modules share no feature imports. Database Servers consumes only aggregate
+Backup readiness and links to `/backup/access`. Backup source integration is
+release-blocked until Worker returns explicit safe response DTOs and exposes
+durable recovery identity for non-idempotent start commands.
 
 ## Backend authorities
 

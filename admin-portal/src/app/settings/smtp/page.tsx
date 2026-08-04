@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSmtpSettings } from "./hooks/useSmtpSettings";
-import { Mail, Save, CheckCircle2, Loader2, PlayCircle, Eye, EyeOff, AlertCircle, History, UserCheck } from "lucide-react";
+import { Mail, Save, Loader2, PlayCircle, Eye, EyeOff, History, UserCheck } from "lucide-react";
 
 import { useToast } from "@/components/ui/ToastContext";
 
@@ -18,8 +18,6 @@ export default function SmtpSettingsPage() {
     saveConfig,
     verifyConnection,
     isVerifying,
-    verifyStatus,
-    errorMessage,
     hasUpdatePermission,
   } = useSmtpSettings();
 
@@ -34,6 +32,7 @@ export default function SmtpSettingsPage() {
         lang === "ar" ? "تم حفظ إعدادات البريد" : "SMTP Settings Saved",
         lang === "ar" ? "تمت تحديثات الخادم البريدي بنجاح." : "SMTP Gateway configuration has been updated."
       );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast.error(
         lang === "ar" ? "فشل الحفظ" : "Save Failed",
@@ -53,6 +52,7 @@ export default function SmtpSettingsPage() {
         lang === "ar" ? "تم الاتصال بنجاح" : "Connection Verified",
         lang === "ar" ? "تم الاتصال بخادم البريد الإلكتروني بنجاح." : "SMTP host is reachable and active."
       );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast.error(
         lang === "ar" ? "فشل اختبار الاتصال" : "Verification Failed",
@@ -85,7 +85,7 @@ export default function SmtpSettingsPage() {
               {lang === "ar" ? "اختبار الاتصال" : "Test Connection"}
             </button>
           )}
-          
+
           {hasUpdatePermission && (
             <button
               onClick={onSave}
@@ -99,34 +99,6 @@ export default function SmtpSettingsPage() {
         </div>
       </div>
 
-      {verifyStatus === "success" && (
-        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-start gap-3 animate-in fade-in zoom-in duration-300">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <div>
-            <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-300">
-              {lang === "ar" ? "تم الاتصال بنجاح!" : "Connection Successful!"}
-            </h4>
-            <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
-              {lang === "ar" ? "تم التحقق من خادم SMTP الخاص بك بنجاح، النظام جاهز لإرسال الرسائل." : "Your SMTP server connection was verified successfully. The platform is ready to send emails."}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {verifyStatus === "error" && (
-        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 flex items-start gap-3 animate-in fade-in zoom-in duration-300">
-          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0" />
-          <div>
-            <h4 className="text-sm font-bold text-red-900 dark:text-red-300">
-              {lang === "ar" ? "فشل الاتصال بالخادم" : "Connection Failed"}
-            </h4>
-            <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">
-              {errorMessage || (lang === "ar" ? "تعذر التحقق من خادم SMTP. يرجى مراجعة إعدادات الخادم والاعتمادات." : "Could not verify the SMTP server. Please review your host configuration and credentials.")}
-            </p>
-          </div>
-        </div>
-      )}
-
       {isLoading ? (
         <div className="flex items-center justify-center p-12 text-slate-400">
           <Loader2 className="w-6 h-6 animate-spin" />
@@ -134,7 +106,7 @@ export default function SmtpSettingsPage() {
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
+
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
               <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
                 <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">
@@ -343,7 +315,7 @@ export default function SmtpSettingsPage() {
                           {log.actor}
                         </span>
                       </div>
-                      
+
                       {log.changes && log.changes.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-1.5">
                           {log.changes.map((c, idx) => (

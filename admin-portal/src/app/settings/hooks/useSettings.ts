@@ -32,9 +32,10 @@ export function useSettings(prefix: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string>();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pendingChanges, setPendingChanges] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const hasUpdatePermission = useHasPermission("admin.settings.update");
 
   const fetchSettings = useCallback(async () => {
@@ -90,11 +91,11 @@ export function useSettings(prefix: string) {
     newValue: string | number | boolean,
   ) => {
     validateSettingValue(key, newValue, lang);
-    
+
     setSettings((prev) =>
       prev.map((s) => (s.key === key ? { ...s, value: newValue, error: null } : s))
     );
-    
+
     setPendingChanges((prev) => ({
       ...prev,
       [key]: newValue,
@@ -107,6 +108,7 @@ export function useSettings(prefix: string) {
 
     setIsSaving(true);
     let hasError = false;
+    const failureMessages: string[] = [];
 
     setSettings((prev) =>
       prev.map((s) => (keys.includes(s.key) ? { ...s, isSaving: true, error: null } : s))
@@ -125,7 +127,7 @@ export function useSettings(prefix: string) {
             s.key === key ? { ...s, isSaving: false, lastSaved: new Date(), isDefault: false, value: res.data.data.value } : s
           )
         );
-        
+
         setPendingChanges((prev) => {
           const next = { ...prev };
           delete next[key];
@@ -134,6 +136,7 @@ export function useSettings(prefix: string) {
       } catch (err: unknown) {
         hasError = true;
         const errorMessage = settingErrorMessage(err);
+        failureMessages.push(`${key}: ${errorMessage}`);
         setSettings((prev) =>
           prev.map((s) =>
             s.key === key ? { ...s, isSaving: false, error: errorMessage } : s
@@ -144,7 +147,7 @@ export function useSettings(prefix: string) {
 
     setIsSaving(false);
     if (hasError) {
-      const errorMsg = lang === "ar" ? "فشل حفظ بعض الإعدادات." : "Failed to save some settings.";
+      const errorMsg = failureMessages.join("\n") || (lang === "ar" ? "فشل حفظ بعض الإعدادات." : "Failed to save some settings.");
       toast.error(
         lang === "ar" ? "فشل الحفظ" : "Save Error",
         errorMsg

@@ -22,7 +22,7 @@ export interface AdminUserProfile {
   adminUserId: string;
   themeKey?: string | null;
   language?: string | null;
-  extensions?: Record<string, any> | null;
+  extensions?: Record<string, unknown> | null;
   createdAt?: string;
   updatedAt?: string;
   deletedAt?: string | null;

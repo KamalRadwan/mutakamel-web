@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useCurrencyRates, CurrencyRateView } from "../hooks/useCurrencyRates";
+import { useCurrencyRates } from "../hooks/useCurrencyRates";
 import { Coins, Plus, Edit2, Loader2, RefreshCw, CheckCircle2, XCircle, DollarSign } from "lucide-react";
 
-function formatCurrencyRate(val: string | number): string {
-  const num = typeof val === "number" ? val : parseFloat(val);
-  if (isNaN(num)) return String(val);
-  return num.toFixed(2);
+function formatCurrencyRate(val: string): string {
+  const [whole, fraction = ""] = val.split(".");
+  const compactFraction = fraction.replace(/0+$/, "");
+  return compactFraction ? `${whole}.${compactFraction}` : whole;
 }
 
 export function CurrencyRatesSection() {
@@ -26,22 +26,28 @@ export function CurrencyRatesSection() {
     fetchRates,
     upsertRate,
     toggleRateStatus,
+    batchUpsertRates,
   } = useCurrencyRates();
 
   const [formCurrencyCode, setFormCurrencyCode] = useState("");
   const [formUnitsPerUsd, setFormUnitsPerUsd] = useState("");
   const [formIsActive, setFormIsActive] = useState(true);
+  const [isBatchOpen, setIsBatchOpen] = useState(false);
+  const [batchText, setBatchText] = useState("");
+  const [batchError, setBatchError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (editingRate) {
-      setFormCurrencyCode(editingRate.currencyCode);
-      setFormUnitsPerUsd(formatCurrencyRate(editingRate.currencyUnitsPerUsd));
-      setFormIsActive(editingRate.isActive);
-    } else {
-      setFormCurrencyCode("");
-      setFormUnitsPerUsd("");
-      setFormIsActive(true);
-    }
+    queueMicrotask(() => {
+      if (editingRate) {
+        setFormCurrencyCode(editingRate.currencyCode);
+        setFormUnitsPerUsd(editingRate.currencyUnitsPerUsd);
+        setFormIsActive(editingRate.isActive);
+      } else {
+        setFormCurrencyCode("");
+        setFormUnitsPerUsd("");
+        setFormIsActive(true);
+      }
+    });
   }, [editingRate, isAddModalOpen]);
 
   if (!canRead) return null;
@@ -52,6 +58,25 @@ export function CurrencyRatesSection() {
     if (success) {
       setFormCurrencyCode("");
       setFormUnitsPerUsd("");
+    }
+  };
+
+  const handleBatchSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBatchError(null);
+    try {
+      const rates = batchText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+        const [currencyCode, currencyUnitsPerUsd, active = "true"] = line.split(",").map((part) => part.trim());
+        if (!currencyCode || !currencyUnitsPerUsd) throw new Error("Each line must be CODE,RATE[,ACTIVE].");
+        return { currencyCode, currencyUnitsPerUsd, isActive: active.toLowerCase() !== "false" };
+      });
+      if (!rates.length) throw new Error("Add at least one currency rate.");
+      if (await batchUpsertRates(rates)) {
+        setIsBatchOpen(false);
+        setBatchText("");
+      }
+    } catch (submissionError) {
+      setBatchError(submissionError instanceof Error ? submissionError.message : "Batch rates are invalid.");
     }
   };
 
@@ -88,7 +113,7 @@ export function CurrencyRatesSection() {
           </button>
 
           {canManage && (
-            <button
+            <><button type="button" onClick={() => { setBatchText(rates.map((rate) => `${rate.currencyCode},${rate.currencyUnitsPerUsd},${rate.isActive}`).join("\n")); setIsBatchOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950/30">{lang === "ar" ? "تعديل جماعي" : "Batch edit"}</button><button
               type="button"
               onClick={() => {
                 setEditingRate(null);
@@ -98,7 +123,7 @@ export function CurrencyRatesSection() {
             >
               <Plus className="w-4 h-4" />
               {lang === "ar" ? "إضافة عملة" : "Add Currency Rate"}
-            </button>
+            </button></>
           )}
         </div>
       </div>
@@ -117,14 +142,11 @@ export function CurrencyRatesSection() {
 
       {/* Rates Table / List */}
       <div className="p-5">
+        {error && <div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">{error}</div>}
         {isLoading ? (
           <div className="flex items-center justify-center py-10 text-slate-400">
             <Loader2 className="w-6 h-6 animate-spin me-2" />
             <span className="text-xs">{lang === "ar" ? "جاري تحميل أسعار الصرف..." : "Loading exchange rates..."}</span>
-          </div>
-        ) : error ? (
-          <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs text-center font-medium">
-            {error}
           </div>
         ) : rates.length === 0 ? (
           <div className="text-center py-8">
@@ -282,6 +304,7 @@ export function CurrencyRatesSection() {
           </div>
         </div>
       )}
+      {isBatchOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"><div role="dialog" aria-modal="true" aria-labelledby="batch-rates-title" className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900"><div><h3 id="batch-rates-title" className="text-base font-bold">{lang === "ar" ? "تعديل أسعار الصرف جماعياً" : "Batch edit currency rates"}</h3><p className="mt-1 text-xs text-slate-500">{lang === "ar" ? "سطر لكل عملة: الرمز، السعر، الحالة." : "One line per currency: CODE,RATE,ACTIVE. Omitted currencies stay unchanged."}</p></div><form onSubmit={handleBatchSubmit} className="space-y-4"><textarea value={batchText} onChange={(event) => setBatchText(event.target.value)} rows={10} spellCheck={false} placeholder="EUR,0.9300,true" className="w-full resize-none rounded-xl border border-slate-300 bg-slate-50 p-3 font-mono text-xs outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950" />{batchError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">{batchError}</p>}<div className="flex justify-end gap-2"><button type="button" onClick={() => setIsBatchOpen(false)} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">{lang === "ar" ? "إلغاء" : "Cancel"}</button><button type="submit" disabled={isSaving} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{lang === "ar" ? "حفظ الكل" : "Save batch"}</button></div></form></div></div>}
     </div>
   );
 }

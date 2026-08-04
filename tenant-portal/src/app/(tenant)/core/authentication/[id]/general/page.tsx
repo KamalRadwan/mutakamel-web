@@ -1,20 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/ToastContext";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { Save, CheckCircle2 } from "lucide-react";
+import { Save } from "lucide-react";
 
 export default function AuthenticationGeneralPage() {
+  const toast = useToast();
   const [userEmail, setUserEmail] = useState("admin@tenant.mutakamel.ai");
   const [ipAddress, setIpAddress] = useState("197.38.12.4");
   const [device, setDevice] = useState("Chrome on macOS");
-  const [isSaved, setIsSaved] = useState(false);
 
   const handleInlineSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
+    toast.saved();
   };
 
   return (
@@ -24,12 +24,6 @@ export default function AuthenticationGeneralPage() {
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">التعديل المباشر للجلسة</h2>
           <p className="text-xs text-slate-500">قم بتحديث بيانات ومحددات الجلسة فورياً</p>
         </div>
-        {isSaved && (
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-            <CheckCircle2 className="w-4 h-4" />
-            تم التحديث
-          </span>
-        )}
       </div>
 
       <form onSubmit={handleInlineSave} className="space-y-4 max-w-2xl">

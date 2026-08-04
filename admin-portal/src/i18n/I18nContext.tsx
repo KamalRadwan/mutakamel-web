@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { safeStorage } from "@/lib/safeStorage";
 import { ar, Dictionary } from "./dictionaries/ar";
 import { en } from "./dictionaries/en";
 
@@ -17,18 +18,21 @@ interface I18nContextType {
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Language>("ar");
+  const [lang, setLangState] = useState<Language>(() => {
+    if (typeof window !== "undefined") {
+      return (safeStorage.getItem("app_lang") as Language) || "ar";
+    }
+    return "ar";
+  });
 
   useEffect(() => {
-    const savedLang = (localStorage.getItem("app_lang") as Language) || "ar";
-    setLangState(savedLang);
-    document.documentElement.setAttribute("dir", savedLang === "ar" ? "rtl" : "ltr");
-    document.documentElement.setAttribute("lang", savedLang);
-  }, []);
+    document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
+    document.documentElement.setAttribute("lang", lang);
+  }, [lang]);
 
   const setLang = (newLang: Language) => {
     setLangState(newLang);
-    localStorage.setItem("app_lang", newLang);
+    safeStorage.setItem("app_lang", newLang);
     document.documentElement.setAttribute("dir", newLang === "ar" ? "rtl" : "ltr");
     document.documentElement.setAttribute("lang", newLang);
   };

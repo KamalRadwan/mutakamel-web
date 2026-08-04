@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId, useRef, type KeyboardEvent } from "react";
 import { Trash2, PauseCircle, ShieldAlert, RotateCcw, X, Loader2, CheckCircle2, Lock, Key } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 
@@ -35,16 +35,56 @@ export function DestructiveActionModal({
 }: DestructiveActionModalProps) {
   const { lang } = useI18n();
   const [typedInput, setTypedInput] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const frame = window.requestAnimationFrame(() => {
       setTypedInput("");
-    }
-  }, [isOpen]);
+      const initialTarget = requireNameTyping
+        ? dialogRef.current?.querySelector<HTMLElement>("input:not([disabled])")
+        : dialogRef.current?.querySelector<HTMLElement>(focusableSelector);
+      initialTarget?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus();
+    };
+  }, [isOpen, requireNameTyping]);
 
   if (!isOpen) return null;
 
   const isConfirmed = !requireNameTyping || typedInput.trim().toLowerCase() === targetName.trim().toLowerCase();
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      if (!isSubmitting) onClose();
+      return;
+    }
+    if (event.key !== "Tab" || !dialogRef.current) return;
+    const focusable = Array.from(
+      dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector),
+    );
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const getActionColor = () => {
     switch (actionType) {
@@ -88,10 +128,13 @@ export function DestructiveActionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !isSubmitting) onClose(); }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} onKeyDown={handleKeyDown} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 shadow-2xl relative">
         <button
+          type="button"
           onClick={onClose}
+          disabled={isSubmitting}
+          aria-label={lang === "ar" ? "إغلاق" : "Close"}
           className="absolute top-4 end-4 p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
@@ -102,8 +145,8 @@ export function DestructiveActionModal({
             {getActionIcon()}
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{title}</h3>
-            <p className="text-[11px] text-slate-500">{description}</p>
+            <h3 id={titleId} className="text-sm font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+            <p id={descriptionId} className="text-[11px] text-slate-500">{description}</p>
           </div>
         </div>
 
@@ -182,3 +225,11 @@ export function DestructiveActionModal({
     </div>
   );
 }
+
+const focusableSelector = [
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");

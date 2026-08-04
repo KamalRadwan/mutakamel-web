@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatStorageBytes,
   getStoragePlacementState,
   readStoragePlacementOptions,
   sanitizeTenantStoragePlacement,
@@ -9,18 +8,13 @@ import {
 
 const option = {
   id: "019f0000-0000-7000-8000-000000000030",
-  name: "Primary Garage Cluster",
-  provider: "GARAGE",
-  region: "garage",
+  code: "S3-EGYPT-1",
+  name: "Primary S3 Storage",
+  region: "ME-CAIRO-1",
+  bucketName: "mutakamel-tenants-1",
   status: "ACTIVE",
-  availabilityClass: "HA_PRODUCTION_READY",
-  currentTenants: 10,
-  retainedTenants: 1,
-  reservedTenants: 2,
   maxTenants: 100,
-  capacityPercent: 13,
-  allocatableCapacityBytes: "1099511627776",
-  availableReservationBytes: "536870912000",
+  assignedTenants: 10,
 };
 
 describe("tenant storage placement contract", () => {
@@ -30,7 +24,6 @@ describe("tenant storage placement contract", () => {
       internalEndpoint: "http://storage.internal:3900",
       credentialRef: "env:S3_STORAGE_1_CORE_OPERATION",
       secretAccessKey: "must-not-reach-ui",
-      bucketBindings: [{ bucket: "must-not-reach-ui" }],
     };
     expect(
       readStoragePlacementOptions({
@@ -44,7 +37,6 @@ describe("tenant storage placement contract", () => {
     expect(parsed).not.toHaveProperty("internalEndpoint");
     expect(parsed).not.toHaveProperty("credentialRef");
     expect(parsed).not.toHaveProperty("secretAccessKey");
-    expect(parsed).not.toHaveProperty("bucketBindings");
 
     expect(() =>
       readStoragePlacementOptions({
@@ -112,40 +104,32 @@ describe("tenant storage placement contract", () => {
     ).toBe("empty");
   });
 
-  it("formats decimal byte strings without unsafe Number conversion", () => {
-    expect(formatStorageBytes("1099511627776")).toBe("1.0 TiB");
-    expect(formatStorageBytes("1536")).toBe("1.5 KiB");
-    expect(formatStorageBytes("not-a-number")).toBe("Unavailable");
-  });
-
   it("keeps only the safe read-only storage summary on tenant detail", () => {
     const tenant = sanitizeTenantStoragePlacement({
       id: "019f0000-0000-7000-8000-000000000020",
       storageServerId: option.id,
       storageServer: {
         id: option.id,
+        code: option.code,
         name: option.name,
-        provider: option.provider,
         region: option.region,
+        bucketName: option.bucketName,
         status: option.status,
-        availabilityClass: option.availabilityClass,
         internalEndpoint: "http://storage.internal:3900",
         credentialRef: "env:S3_STORAGE_1_CORE_OPERATION",
-        bucketBindings: [{ bucket: "must-not-reach-ui" }],
       },
     });
 
     expect(tenant.storageServer).toEqual({
       id: option.id,
+      code: option.code,
       name: option.name,
-      provider: option.provider,
       region: option.region,
+      bucketName: option.bucketName,
       status: option.status,
-      availabilityClass: option.availabilityClass,
     });
     expect(tenant.storageServer).not.toHaveProperty("internalEndpoint");
     expect(tenant.storageServer).not.toHaveProperty("credentialRef");
-    expect(tenant.storageServer).not.toHaveProperty("bucketBindings");
     expect(() =>
       sanitizeTenantStoragePlacement({
         storageServerId: option.id,

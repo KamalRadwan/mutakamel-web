@@ -46,7 +46,7 @@ describe("Bilingual RBAC System", () => {
     it("12. Missing display names fall back safely to description and then key", () => {
       const barePerm = { ...mockPermission, nameAr: "", nameEn: "", descriptionI18n: undefined };
       expect(getPermissionName(barePerm, "en")).toBe("Legacy description");
-      
+
       const keyOnlyPerm = { ...barePerm, description: "" };
       expect(getPermissionName(keyOnlyPerm, "en")).toBe("admin.database_servers.update");
     });
@@ -111,6 +111,42 @@ describe("Bilingual RBAC System", () => {
     it("8. A super admin with an empty permission array passes RBAC UI checks", () => {
       expect(adminCan(superAdmin, "admin.database_servers.delete")).toBe(true);
       expect(adminCanAll(superAdmin, ADMIN_RBAC_CRITICAL.DB_SERVERS_DELETE)).toBe(true);
+      expect(adminCanAll(superAdmin, ADMIN_RBAC_CRITICAL.DB_SERVERS_DESTROY)).toBe(true);
+    });
+
+    it("9. Database Server Destroy requires hard-delete and critical permissions", () => {
+      const destroyAdmin: AdminAuthorizationContext = {
+        isSuperAdmin: false,
+        permissions: [
+          "admin.database_servers.delete.hard",
+          "admin.database_servers.critical",
+        ],
+      };
+      expect(
+        adminCanAll(destroyAdmin, ADMIN_RBAC_CRITICAL.DB_SERVERS_DESTROY),
+      ).toBe(true);
+
+      expect(
+        adminCanAll(
+          {
+            ...destroyAdmin,
+            permissions: ["admin.database_servers.delete.hard"],
+          },
+          ADMIN_RBAC_CRITICAL.DB_SERVERS_DESTROY,
+        ),
+      ).toBe(false);
+      expect(
+        adminCanAll(
+          {
+            ...destroyAdmin,
+            permissions: [
+              "admin.database_servers.delete",
+              "admin.database_servers.critical",
+            ],
+          },
+          ADMIN_RBAC_CRITICAL.DB_SERVERS_DESTROY,
+        ),
+      ).toBe(false);
     });
 
     it("10. Worker job and migration controls use their new permission pairs", () => {
@@ -120,13 +156,70 @@ describe("Bilingual RBAC System", () => {
       };
       expect(adminCanAll(workerAdmin, ADMIN_RBAC_CRITICAL.JOBS_MANAGE)).toBe(true);
       expect(adminCanAll(workerAdmin, ADMIN_RBAC_CRITICAL.MIGRATIONS_MANAGE)).toBe(true);
-      
+
       const weakWorkerAdmin: AdminAuthorizationContext = {
         isSuperAdmin: false,
         permissions: ["admin.jobs.manage", "admin.migrations.manage"], // missing critical
       };
       expect(adminCanAll(weakWorkerAdmin, ADMIN_RBAC_CRITICAL.JOBS_MANAGE)).toBe(false);
       expect(adminCanAll(weakWorkerAdmin, ADMIN_RBAC_CRITICAL.MIGRATIONS_MANAGE)).toBe(false);
+    });
+
+    it("13. Backup policy, deletion, and restore commands require their exact critical pairs", () => {
+      const backupAdmin: AdminAuthorizationContext = {
+        isSuperAdmin: false,
+        permissions: [
+          "admin.backups.manage",
+          "admin.backups.delete",
+          "admin.backups.restore",
+          "admin.backups.critical",
+        ],
+      };
+
+      expect(adminCanAll(backupAdmin, ADMIN_RBAC_CRITICAL.BACKUPS_POLICY_MANAGE)).toBe(true);
+      expect(adminCanAll(backupAdmin, ADMIN_RBAC_CRITICAL.BACKUPS_DELETE)).toBe(true);
+      expect(adminCanAll(backupAdmin, ADMIN_RBAC_CRITICAL.BACKUPS_RESTORE)).toBe(true);
+
+      const backupAdminWithoutCritical: AdminAuthorizationContext = {
+        ...backupAdmin,
+        permissions: [
+          "admin.backups.manage",
+          "admin.backups.delete",
+          "admin.backups.restore",
+        ],
+      };
+
+      expect(adminCanAll(backupAdminWithoutCritical, ADMIN_RBAC_CRITICAL.BACKUPS_POLICY_MANAGE)).toBe(false);
+      expect(adminCanAll(backupAdminWithoutCritical, ADMIN_RBAC_CRITICAL.BACKUPS_DELETE)).toBe(false);
+      expect(adminCanAll(backupAdminWithoutCritical, ADMIN_RBAC_CRITICAL.BACKUPS_RESTORE)).toBe(false);
+    });
+
+    it("14. Backup database credential controls keep the Database Server permission boundary", () => {
+      const databaseCredentialAdmin: AdminAuthorizationContext = {
+        isSuperAdmin: false,
+        permissions: [
+          "admin.database_servers.update",
+          "admin.database_servers.credentials.rotate",
+          "admin.database_servers.critical",
+        ],
+      };
+
+      expect(adminCanAll(databaseCredentialAdmin, ADMIN_RBAC_CRITICAL.BACKUP_DB_ROTATION_POLICY_UPDATE)).toBe(true);
+      expect(adminCanAll(databaseCredentialAdmin, ADMIN_RBAC_CRITICAL.BACKUP_DB_CREDENTIAL_REGENERATE)).toBe(true);
+      expect(adminCanAll(databaseCredentialAdmin, ADMIN_RBAC_CRITICAL.BACKUP_DB_CREDENTIAL_RECONCILE)).toBe(true);
+
+      const backupOnlyAdmin: AdminAuthorizationContext = {
+        isSuperAdmin: false,
+        permissions: [
+          "admin.backups.read",
+          "admin.backups.manage",
+          "admin.backups.critical",
+        ],
+      };
+
+      expect(adminCanAll(backupOnlyAdmin, ADMIN_RBAC_CRITICAL.BACKUP_DB_ROTATION_POLICY_UPDATE)).toBe(false);
+      expect(adminCanAll(backupOnlyAdmin, ADMIN_RBAC_CRITICAL.BACKUP_DB_CREDENTIAL_REGENERATE)).toBe(false);
+      expect(adminCanAll(backupOnlyAdmin, ADMIN_RBAC_CRITICAL.BACKUP_DB_CREDENTIAL_RECONCILE)).toBe(false);
     });
   });
 });

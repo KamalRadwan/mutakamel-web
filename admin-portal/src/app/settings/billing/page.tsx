@@ -9,18 +9,18 @@ import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
 import { CurrencyRatesSection } from "./components/CurrencyRatesSection";
 
 export default function BillingSettingsPage() {
-  const { 
-    lang, 
-    settings: billingSettings, 
-    isLoading: isBillingLoading, 
+  const {
+    lang,
+    settings: billingSettings,
+    isLoading: isBillingLoading,
     updateSetting: updateBillingSetting,
     hasUnsavedChanges: billingHasUnsaved,
     isSaving: billingIsSaving,
     saveAllSettings: saveBillingSettings
   } = useSettings("billing.");
-  
-  const { 
-    settings: tenantsSettings, 
+
+  const {
+    settings: tenantsSettings,
     isLoading: isTenantsLoading,
     updateSetting: updateTenantsSetting,
     hasUnsavedChanges: tenantsHasUnsaved,
@@ -57,7 +57,7 @@ export default function BillingSettingsPage() {
         }
       }
     }
-    
+
     if (key === "billing.max_topup_usd") {
       const minSetting = allSettings.find(s => s.key === "billing.min_topup_usd");
       if (minSetting && typeof minSetting.value === "number" && typeof newValue === "number") {
@@ -84,11 +84,11 @@ export default function BillingSettingsPage() {
         </div>
       </div>
 
-      <SaveSettingsBanner 
-        hasUnsavedChanges={hasUnsavedChanges} 
-        isSaving={isSaving} 
-        onSave={handleSaveAll} 
-        lang={lang} 
+      <SaveSettingsBanner
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={isSaving}
+        onSave={handleSaveAll}
+        lang={lang}
       />
 
       <div className="space-y-4">
@@ -98,11 +98,11 @@ export default function BillingSettingsPage() {
           </div>
         ) : (
           allSettings.map((setting) => (
-            <SettingField 
-              key={setting.key} 
-              setting={setting} 
-              lang={lang} 
-              onUpdate={handleUpdate} 
+            <SettingField
+              key={setting.key}
+              setting={setting}
+              lang={lang}
+              onUpdate={handleUpdate}
             />
           ))
         )}

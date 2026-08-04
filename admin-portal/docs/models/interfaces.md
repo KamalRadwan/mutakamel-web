@@ -1,6 +1,6 @@
 # Admin Portal — Key Interfaces & Types
 
-Selected high-use response types. Last verified: **2026-07-30**.
+Selected high-use response types. Last verified: **2026-08-02**.
 
 ---
 
@@ -264,6 +264,7 @@ status. SIP credentials are never returned. See
 ```typescript
 interface DatabaseServerView {
   id: string;
+  deletedAt: string | null;
   name: string;
   host: string;
   port: number;
@@ -276,31 +277,27 @@ interface DatabaseServerView {
   connectTimeoutMs: number;
   statementTimeoutMs: number;
   idleTimeoutMs: number;
+  hasSecurityAdminCredentials: boolean;
   hasBackupCredentials: boolean;
-  backupCredentialsUsesPrimary: boolean;
   hasProvisioningCredentials: boolean;
-  runtimeCredentialsConfigured: {
-    coreApp: boolean;
-    crmApp: boolean;
-    tradeApp: boolean;
-    workerApp: boolean;
-  };
-  runtimePrincipalsReady: boolean;
   maxTenants: number;
   currentTenants: number;
   status: DatabaseServerStatus;
   countryName?: string;
   countryIsoCode?: string;
-  region?: string;
   createdAt: string;
   updatedAt: string;
 }
 ```
 
-The projection contains configuration-presence booleans, never stored
-credentials, credential references, or SSL material. It also does not return
-`driver`, `utilization`, or `isPlacementTarget`; derive those UI fields as
-documented in the
+`deletedAt` is the deletion authority. It is null for ordinary registry rows
+and non-null for rows returned by `GET /database-servers?deleted=true`.
+The projection contains only purpose-specific configuration-presence booleans,
+never stored credentials, Application passwords, credential references, or SSL
+material. Dynamic Application readiness comes from `GET
+/:id/applications`; it is not a fixed four-Application object. The server
+projection also does not return `driver`, `region`, `runtimeCredentials`,
+`utilization`, or `isPlacementTarget`; derive presentation fields as documented in the
 [Database Servers Frontend Contract](../api/database-servers.md).
 
 ### `DatabaseServerHistoryItem`
@@ -327,6 +324,61 @@ interface DatabaseServerHistoryItem {
 The history endpoint returns this as a newest-first array under the canonical
 success envelope’s `data` property. It does not return actor profile data or
 pagination `meta`.
+
+### Application binding and credential receipts
+```typescript
+interface DatabaseServerApplicationBindingView {
+  applicationId: string;
+  applicationKey: string;
+  applicationName: string;
+  databasePrincipal: string;
+  requiredOnDatabaseServer: boolean;
+  status: DatabaseServerApplicationBindingStatus;
+  credentialRevision: string;
+  permissionManifestChecksum: string;
+  policyRevision: string;
+  rotationEnabled: boolean;
+  rotationIntervalHours: number;
+  maintenanceWindowStartUtc: number;
+  maintenanceWindowHours: number;
+  rotationDueAt: string | null;
+  lastRotationAttemptAt: string | null;
+  lastRotationSucceededAt: string | null;
+  retryAt: string | null;
+  safeFailureCode: string | null;
+  operationGeneration: string;
+  hasStagedCandidate: boolean;
+}
+
+interface ApplicationCredentialBootstrapReceiptItem {
+  applicationId: string;
+  applicationKey: string;
+  databasePrincipal: string;
+  credentialRevision: string;
+  permissionManifestChecksum: string;
+  status: 'READY';
+}
+
+interface ApplicationCredentialBootstrapReceipt {
+  databaseServerId: string;
+  applications: ApplicationCredentialBootstrapReceiptItem[];
+  status: 'READY';
+  completedAt: string;
+}
+
+interface ApplicationCredentialMutationReceipt {
+  databaseServerId: string;
+  applicationKey: string;
+  databasePrincipal: string;
+  previousCredentialRevision: string;
+  credentialRevision: string;
+  status: 'READY';
+  invalidatedTenantCount: number;
+}
+```
+
+These projections are secret-free. They never contain an Application password,
+encrypted credential reference, exported file, or recovery value.
 
 ---
 
@@ -484,19 +536,113 @@ portal cannot safely recover the workflow after refresh. See
 
 ---
 
-## Modules and Catalogue Types
+## Application Catalogue Types
 
 ```typescript
-interface ModuleView {
+interface ApplicationManifestEvidenceView {
+  id: string;
+  version: number;
+  checksum: string;
+  schemaVersion: number;
+  contractPackage: string;
+  contractVersion: string;
+  publicationSource: string;
+  publishedAt: string;
+  publishedBy: string;
+  active: boolean;
+}
+
+interface ApplicationDatabasePolicyView {
+  enableOnNewServers: boolean;
+  rotationEnabled: boolean;
+  rotationIntervalHours: number;
+  maintenanceWindowStartUtc: number;
+  maintenanceWindowHours: number;
+  policyRevision: string;
+  updatedAt: string;
+}
+
+type ApplicationTechnicalReadinessReason =
+  | 'COMPONENT_BINDING_REQUIRED'
+  | 'ACTIVE_COMPONENT_REQUIRED'
+  | 'PUBLISHED_RELEASE_REQUIRED'
+  | 'DATABASE_PERMISSION_MANIFEST_REQUIRED'
+  | 'DATABASE_PERMISSION_MANIFEST_INVALID';
+
+interface ApplicationTechnicalComponentView {
+  id: string;
+  key: string;
+  ownerApp: string;
+  workerTarget: `${string}-app`;
+  kind: 'FOUNDATION' | 'MODULE';
+  status: 'ACTIVE' | 'RETIRED';
+  contractVersion: number;
+  required: boolean;
+  activationRequired: boolean;
+  minimumRelease: string | null;
+  latestPublishedRelease: {
+    id: string;
+    releaseVersion: string;
+    manifestVersion: number;
+    manifestChecksum: string;
+    publishedAt: string;
+  } | null;
+}
+
+interface ApplicationTechnicalReadinessView {
+  contractVersion: 1;
+  applicationKey: string;
+  lifecycleStatus: ApplicationLifecycleStatus;
+  technicalDefinitionRevision: string;
+  status: 'READY' | 'NOT_REQUIRED' | 'BLOCKED';
+  activationAllowed: boolean;
+  selectionAllowed: boolean;
+  reasons: ApplicationTechnicalReadinessReason[];
+  checks: {
+    componentBinding: boolean;
+    activeComponents: boolean;
+    publishedReleases: boolean;
+    databasePermissionManifest: boolean;
+  };
+  components: ApplicationTechnicalComponentView[];
+}
+
+interface ApplicationView {
+  contractVersion: 1;
   id: string;
   key: string;
   name: string;
   description: string | null;
   avatarDataUrl: string | null;
   rank: number;
-  isActive: boolean;
+  applicationType: ApplicationType;
+  commercialMode: ApplicationCommercialMode;
+  catalogueVisibility: ApplicationCatalogueVisibility;
+  lifecycleStatus: ApplicationLifecycleStatus;
+  databaseAccessMode: ApplicationDatabaseAccessMode;
+  databasePrincipal: string | null;
+  requiredOnDatabaseServer: boolean;
+  technicalDefinitionRevision: string;
+  catalogueRevision: string;
+  activeManifest: ApplicationManifestEvidenceView | null;
+  databasePolicy: ApplicationDatabasePolicyView;
+  serverSummary: {
+    available: false;
+    reason: 'SERVER_APPLICATION_BINDINGS_NOT_AVAILABLE';
+  };
   createdAt: string;
   updatedAt: string;
+}
+
+interface ApplicationMutationReceipt {
+  contractVersion: 1;
+  operation: ApplicationCommandOperation;
+  applicationId: string;
+  applicationKey: string;
+  lifecycleStatus: ApplicationLifecycleStatus;
+  catalogueRevision: string;
+  policyRevision: string;
+  deleted: boolean;
 }
 
 interface TierView {
@@ -551,14 +697,14 @@ interface CurrencyRateView {
 }
 ```
 
-Catalogue activation is represented by `isActive`; module, tier, and feature
-responses do not contain a general `status`. These flags are independent:
-inactive catalogue rows remain administratively configurable, while the
-materialized tenant policy omits inactive modules, tiers, and features. Grant
-`config` is feature-specific. Keep `unitPrice` and `currencyUnitsPerUsd` as
-decimal strings. The complete DTOs, list envelopes, replacement semantics, and
-UI derivation rules are in the [Modules and Catalogue Frontend
-Contract](../api/catalog.md).
+Application lifecycle is represented by `lifecycleStatus`. Nested tier and
+feature rows still use `isActive`; current Core source serializes their physical
+foreign-key property as `moduleId` even though the public parent routes use
+`/applications/:applicationId`. Do not silently rename a received field in
+documentation or request payloads. Grant `config` is feature-specific. Keep
+`unitPrice` and `currencyUnitsPerUsd` as decimal strings. The complete DTOs,
+list envelopes, replacement semantics, and UI derivation rules are in the
+[Application Catalogue Frontend Contract](../api/catalog.md).
 
 ---
 

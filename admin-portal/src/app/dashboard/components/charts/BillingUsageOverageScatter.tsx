@@ -30,22 +30,22 @@ export function BillingUsageOverageScatter({ data, height = 280 }: Props) {
       <ResponsiveContainer width="100%" height="100%">
         <ScatterChart margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
-          <XAxis 
-            type="number" 
-            dataKey="computeUsage" 
-            name="Usage (GB)" 
-            axisLine={false} 
-            tickLine={false} 
+          <XAxis
+            type="number"
+            dataKey="computeUsage"
+            name="Usage (GB)"
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             className="text-slate-500 dark:text-slate-400"
           />
-          <YAxis 
-            type="number" 
-            dataKey="overageFee" 
-            name="Fee ($)" 
+          <YAxis
+            type="number"
+            dataKey="overageFee"
+            name="Fee ($)"
             tickFormatter={(val) => `$${val}`}
-            axisLine={false} 
-            tickLine={false} 
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             className="text-slate-500 dark:text-slate-400"
           />

@@ -1,17 +1,17 @@
 "use client";
 
-import { 
-  Building2, 
-  Users, 
-  CreditCard, 
-  Server, 
-  ShieldCheck, 
-  ShieldAlert, 
-  Globe, 
-  Trash2, 
-  PauseCircle, 
-  CheckCircle2, 
-  Clock, 
+import {
+  Building2,
+  Users,
+  CreditCard,
+  Server,
+  ShieldCheck,
+  ShieldAlert,
+  Globe,
+  Trash2,
+  PauseCircle,
+  CheckCircle2,
+  Clock,
   Activity,
   XCircle
 } from "lucide-react";
@@ -39,7 +39,7 @@ export function getCardIcon(key: string, label: string) {
   if (k.includes("server") || k.includes("db") || k.includes("database") || k.includes("capacity")) return <Server className="w-4 h-4" />;
   if (k.includes("alert") || k.includes("warn")) return <ShieldAlert className="w-4 h-4" />;
   if (k.includes("country") || k.includes("region") || k.includes("globe")) return <Globe className="w-4 h-4" />;
-  
+
   return <Building2 className="w-4 h-4" />;
 }
 

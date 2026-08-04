@@ -16,11 +16,11 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
-  ShieldAlert,
 } from "lucide-react";
 import { useUsers } from "./hooks/useUsers";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
-import { useUserPermissions } from "./hooks/useUserPermissions";
+import { useUserPermissions, getUserRowPermissions } from "./hooks/useUserPermissions";
+import { useAuth } from "@/context/AuthContext";
 import { InviteUserModal } from "./components/InviteUserModal";
 import { UsersTableSkeleton } from "./components/UsersTableSkeleton";
 import { UsersPermissionDenied } from "./components/UsersPermissionDenied";
@@ -68,6 +68,7 @@ export default function UsersDirectoryPage() {
   } = useUsers();
 
   const permissions = useUserPermissions();
+  const { user: currentUser } = useAuth();
 
   const hasActiveFilters =
     Boolean(search) ||
@@ -295,7 +296,7 @@ export default function UsersDirectoryPage() {
                       </tr>
                     ) : (
                       users.map((usr) => {
-                        const rowPermissions = useUserPermissions(usr.id, usr.status);
+                        const rowPermissions = getUserRowPermissions(currentUser, usr.id, usr.status);
 
                         return (
                           <tr

@@ -9,6 +9,7 @@ import {
   Mail,
   PhoneCall,
   Save,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   CheckCircle2,
   Lock,
   Eye,
@@ -19,7 +20,9 @@ import {
   AlertCircle,
   Loader2,
   Trash2,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   RotateCcw,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   Sliders,
 } from "lucide-react";
 import { useUserDetail } from "../hooks/useUserDetail";
@@ -41,12 +44,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     user,
     isLoading,
     isSaving,
-    lastSaved,
-    error,
-    errorCode,
     notFound,
     permissionDenied,
-    correlationId,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     reload,
 
     firstName,
@@ -97,8 +97,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [showSipPassword, setShowSipPassword] = useState(false);
   const [isEditingWebphone, setIsEditingWebphone] = useState(false);
-  const [showCorrelationTech, setShowCorrelationTech] = useState(false);
-
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100">
@@ -185,11 +183,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {lang === "ar" ? "جاري الحفظ..." : "Saving..."}
               </span>
-            ) : lastSaved ? (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="w-4 h-4" />
-                {lang === "ar" ? "تم الحفظ" : "Saved"}
-              </span>
             ) : null}
 
             {permissions.canSuspend && (
@@ -227,33 +220,13 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        {error && (
-          <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-2xl p-4 text-xs text-rose-700 dark:text-rose-400 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">{error}</span>
-              {correlationId && (
-                <button
-                  onClick={() => setShowCorrelationTech(!showCorrelationTech)}
-                  className="text-[10px] underline font-mono text-rose-500 hover:text-rose-600"
-                >
-                  {showCorrelationTech ? "Hide details" : "Technical info"}
-                </button>
-              )}
-            </div>
-            {showCorrelationTech && correlationId && (
-              <div className="p-2 rounded bg-rose-100/60 dark:bg-rose-900/40 font-mono text-[10px]">
-                correlationId: {correlationId}
-              </div>
-            )}
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: Identity & Metadata & Profile Cards */}
           <div className="space-y-6">
             {/* Identity Profile Card */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
-              <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
+            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs hover:shadow-xl hover:border-blue-500/30 transition-all duration-300 overflow-hidden relative group">
+              <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-colors duration-500" />
+              <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between relative z-10">
                 <h2 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                   <User className="w-4 h-4 text-blue-500" />
                   {t.users.identityProfile}
@@ -381,8 +354,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           {/* Right Column: Roles Assignment & WebPhone Settings */}
           <div className="lg:col-span-2 space-y-6">
             {/* Roles Assignment Card */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
-              <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
+            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs hover:shadow-xl hover:border-indigo-500/30 transition-all duration-300 overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-indigo-500/10 transition-colors duration-500" />
+              <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between relative z-10">
                 <h2 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                   <Shield className="w-4 h-4 text-blue-500" />
                   <span>{lang === "ar" ? "الدور المنسوب (PATCH /roles)" : "Assigned Control Plane Role"}</span>

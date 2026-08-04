@@ -2,17 +2,17 @@
 
 import { useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
+import { useToast } from "@/components/ui/ToastContext";
 
 export function useLogin() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const toast = useToast();
   const [email, setEmail] = useState("admin@tenant.mutakamel.ai");
   const [password, setPassword] = useState("••••••••");
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
-  const [forgotSent, setForgotSent] = useState(false);
 
   const toggleShowPassword = () => setShowPassword((prev) => !prev);
   const toggleRememberMe = () => setRememberMe((prev) => !prev);
@@ -20,7 +20,6 @@ export function useLogin() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setError(null);
     setTimeout(() => {
       setIsSubmitting(false);
       window.location.href = "/";
@@ -29,11 +28,13 @@ export function useLogin() {
 
   const handleForgotPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    setForgotSent(true);
-    setTimeout(() => {
-      setForgotSent(false);
-      setIsForgotModalOpen(false);
-    }, 2000);
+    toast.info(
+      lang === "ar" ? "تم إرسال رابط إعادة التعيين" : "Reset Link Sent",
+      lang === "ar"
+        ? "إذا كان البريد مسجلاً، ستصل إليه تعليمات إعادة تعيين كلمة المرور."
+        : "If the email is registered, password reset instructions will be sent.",
+    );
+    setIsForgotModalOpen(false);
   };
 
   return {
@@ -45,9 +46,7 @@ export function useLogin() {
     rememberMe,
     showPassword,
     isSubmitting,
-    error,
     isForgotModalOpen,
-    forgotSent,
     setIsForgotModalOpen,
     toggleShowPassword,
     toggleRememberMe,

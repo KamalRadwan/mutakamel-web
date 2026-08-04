@@ -1,36 +1,36 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { safeStorage } from "@/lib/safeStorage";
 
 export function useThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const savedTheme = safeStorage.getItem("theme");
+    return savedTheme
+      ? savedTheme === "dark"
+      : document.documentElement.classList.contains("dark");
+  });
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const savedTheme = localStorage.getItem("theme");
-    // If explicit savedTheme exists, use it; otherwise check if dark class is present
-    const isDarkMode = savedTheme 
-      ? savedTheme === "dark" 
-      : document.documentElement.classList.contains("dark");
-
-    setIsDark(isDarkMode);
-    if (isDarkMode) {
+    queueMicrotask(() => setMounted(true));
+    if (isDark) {
       document.documentElement.classList.add("dark");
     } else {
       document.documentElement.classList.remove("dark");
     }
-  }, []);
+  }, [isDark]);
 
   const toggleTheme = () => {
     const nextDark = !isDark;
     setIsDark(nextDark);
     if (nextDark) {
       document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
+      safeStorage.setItem("theme", "dark");
     } else {
       document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
+      safeStorage.setItem("theme", "light");
     }
   };
 

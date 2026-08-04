@@ -30,23 +30,23 @@ export function SubscriptionPromoImpactScatter({ data, height = 280 }: Props) {
       <ResponsiveContainer width="100%" height="100%">
         <ScatterChart margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
-          <XAxis 
-            type="number" 
-            dataKey="discountPercent" 
-            name="Discount" 
+          <XAxis
+            type="number"
+            dataKey="discountPercent"
+            name="Discount"
             unit="%"
-            axisLine={false} 
-            tickLine={false} 
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             className="text-slate-500 dark:text-slate-400"
           />
-          <YAxis 
-            type="number" 
-            dataKey="retentionMonths" 
-            name="Retention" 
+          <YAxis
+            type="number"
+            dataKey="retentionMonths"
+            name="Retention"
             unit="m"
-            axisLine={false} 
-            tickLine={false} 
+            axisLine={false}
+            tickLine={false}
             tick={{ fill: "currentColor", fontSize: 11 }}
             className="text-slate-500 dark:text-slate-400"
           />

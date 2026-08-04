@@ -2,7 +2,7 @@
 
 Status: **Rebuilt source-verified frontend documentation**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-02**
 
 This documentation describes the current Admin Portal source, all
 browser-visible Core Admin capabilities, exact integration defects, required

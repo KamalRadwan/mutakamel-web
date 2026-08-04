@@ -13,7 +13,7 @@ export function SubscriptionTargetGauge({ actualARR, targetARR, height = 250 }: 
     targetARR > 0
       ? Math.min(100, Math.max(0, (actualARR / targetARR) * 100))
       : 0;
-  
+
   // Data for the semi-circle gauge (active vs empty)
   const data = [
     { name: "Achieved", value: percentage },
@@ -21,7 +21,7 @@ export function SubscriptionTargetGauge({ actualARR, targetARR, height = 250 }: 
   ];
 
   // Colors: primary gradient/solid vs empty track
-  const COLORS = ["#10b981", "currentColor"]; 
+  const COLORS = ["#10b981", "currentColor"];
 
   const cx = "50%";
   const cy = "75%";
@@ -44,16 +44,16 @@ export function SubscriptionTargetGauge({ actualARR, targetARR, height = 250 }: 
             stroke="none"
           >
             {data.map((entry, index) => (
-              <Cell 
-                key={`cell-${index}`} 
-                fill={COLORS[index % COLORS.length]} 
+              <Cell
+                key={`cell-${index}`}
+                fill={COLORS[index % COLORS.length]}
                 className={index === 1 ? "text-slate-100 dark:text-slate-800" : ""}
               />
             ))}
           </Pie>
         </PieChart>
       </ResponsiveContainer>
-      
+
       {/* Absolute positioned text in the center */}
       <div className="absolute inset-0 flex flex-col items-center justify-end pb-[10%]">
         <span className="text-3xl font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tighter">

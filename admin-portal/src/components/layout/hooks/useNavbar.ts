@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useContext } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/context/AuthContext";
-import { adminCanAll, adminCan } from "@/lib/auth/rbac";
+import { adminCan } from "@/lib/auth/rbac";
 
 export interface UseNavbarProps {
   onMobileMenuToggle?: () => void;
@@ -24,6 +24,10 @@ export function useNavbar(props: UseNavbarProps = {}) {
     props.onMobileMenuToggle?.();
   };
 
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
   const handleWebPhoneToggle = () => {
     props.onWebPhoneToggle?.();
   };
@@ -37,7 +41,7 @@ export function useNavbar(props: UseNavbarProps = {}) {
   };
 
   const toggleInfrastructureDropdown = () => {
-    setIsInfrastructureDropdownOpen((prev) => !prev);
+    setIsInfrastructureDropdownOpen((previous) => !previous);
   };
 
   const closeInfrastructureDropdown = () => {
@@ -61,7 +65,7 @@ export function useNavbar(props: UseNavbarProps = {}) {
   ];
 
   // Filter based on permissions
-  const filteredAdminItems = rawAdminItems.filter(item => 
+  const filteredAdminItems = rawAdminItems.filter(item =>
     !item.permission || adminCan(auth?.user, item.permission)
   );
 
@@ -70,8 +74,8 @@ export function useNavbar(props: UseNavbarProps = {}) {
     { label: t.nav.storageServers, href: "/storage-servers", permission: "admin.storage_servers.read" },
   ];
 
-  const filteredInfrastructureItems = rawInfrastructureItems.filter(item => 
-    !item.permission || adminCan(auth?.user, item.permission)
+  const filteredInfrastructureItems = rawInfrastructureItems.filter((item) =>
+    adminCan(auth?.user, item.permission)
   );
 
   return {
@@ -80,6 +84,7 @@ export function useNavbar(props: UseNavbarProps = {}) {
     isAdminDropdownOpen,
     isInfrastructureDropdownOpen,
     handleMobileMenuToggle,
+    closeMobileMenu,
     handleWebPhoneToggle,
     toggleAdminDropdown,
     closeAdminDropdown,
@@ -90,6 +95,9 @@ export function useNavbar(props: UseNavbarProps = {}) {
     isInfrastructureChildActive,
     filteredAdminItems,
     filteredInfrastructureItems,
+    canViewDatabaseServers: adminCan(auth?.user, "admin.database_servers.read"),
+    canViewStorageServers: adminCan(auth?.user, "admin.storage_servers.read"),
+    canViewBackup: adminCan(auth?.user, "admin.backups.read"),
     brand: {
       title: t.common.appName,
       subTitle: t.common.adminTag,
@@ -97,9 +105,12 @@ export function useNavbar(props: UseNavbarProps = {}) {
     },
     navRoutes: {
       dashboard: { label: t.nav.dashboard, href: "/dashboard" },
+      infrastructureDropdown: { label: t.nav.infrastructure },
       tenants: { label: t.nav.tenants, href: "/tenants" },
-      modules: { label: t.nav.modules, href: "/modules" },
-      infrastructureDropdown: { label: t.nav.infrastructure || "Infrastructure" },
+      applications: { label: t.nav.applications, href: "/applications-catalogue" },
+      backup: { label: t.nav.backup, href: "/backup" },
+      databaseServers: { label: t.nav.databaseServers, href: "/database-servers" },
+      storageServers: { label: t.nav.storageServers, href: "/storage-servers" },
       adminDropdown: {
         label: t.nav.adminDropdown,
       },

@@ -1,13 +1,13 @@
 import { axiosClient } from "@/lib/api/axiosClient";
 import type { SuccessResponse } from "@/types/common";
-import { asteriskSettingsFromSystemSettings } from "./config";
-import type {
-  AdminWebphoneConfig,
-  ApiSystemSetting,
-  AsteriskIntegrationSettings,
-  CreateWebphoneCallLogPayload,
-  WebphoneCallLog,
-} from "./types";
+import {
+  asteriskSettingsFromSystemSettings,
+  type AdminWebphoneConfig,
+  type AsteriskIntegrationSettings,
+  type CreateWebphoneCallLogPayload,
+  type WebphoneCallLog,
+  type ApiSystemSetting,
+} from "@mutakamel/webphone";
 
 const WEBPHONE_BASE = "/api/admin/core/v1/users/me/webphone";
 

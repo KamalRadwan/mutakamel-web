@@ -31,10 +31,12 @@ export interface ListRolesParams {
   sortDir?: string;
 }
 
-export function normalizeErrorCode(error: any): AdminUserErrorCode | string | null {
-  if (!error) return null;
-  const resData = error?.response?.data;
-  return resData?.errorCode ?? resData?.code ?? error?.errorCode ?? error?.code ?? null;
+export function normalizeErrorCode(error: unknown): AdminUserErrorCode | string | null {
+  if (!error || typeof error !== "object") return null;
+  const errObj = error as Record<string, unknown>;
+  const response = errObj.response as Record<string, unknown> | undefined;
+  const resData = response?.data as Record<string, unknown> | undefined;
+  return (resData?.errorCode as string) ?? (resData?.code as string) ?? (errObj.errorCode as string) ?? (errObj.code as string) ?? null;
 }
 
 export async function listAdminUsers(params: ListUsersParams = {}) {

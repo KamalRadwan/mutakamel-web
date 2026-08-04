@@ -1,14 +1,15 @@
 "use client";
 
 import React from "react";
-import { Clock, ShieldAlert, KeyRound, Calendar, Copy, Check } from "lucide-react";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { Clock, ShieldAlert, KeyRound, Calendar, Copy } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { useState } from "react";
+import { useToast } from "@/components/ui/ToastContext";
 import type { AdminUser } from "../types";
 
 export function UserMetadataCard({ user }: { user: AdminUser }) {
   const { lang, t } = useI18n();
-  const [copiedId, setCopiedId] = useState(false);
+  const toast = useToast();
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return t.users.neverLoggedIn;
@@ -22,10 +23,19 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
     }
   };
 
-  const copyId = () => {
-    navigator.clipboard.writeText(user.id);
-    setCopiedId(true);
-    setTimeout(() => setCopiedId(false), 2000);
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(user.id);
+      toast.success(
+        lang === "ar" ? "تم النسخ" : "Copied",
+        lang === "ar" ? "تم نسخ معرف المستخدم." : "The user ID was copied.",
+      );
+    } catch {
+      toast.error(
+        lang === "ar" ? "فشل النسخ" : "Copy Failed",
+        lang === "ar" ? "تعذر نسخ معرف المستخدم." : "The user ID could not be copied.",
+      );
+    }
   };
 
   return (
@@ -99,7 +109,7 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
               className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded transition-colors cursor-pointer"
               title="Copy ID"
             >
-              {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              <Copy className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

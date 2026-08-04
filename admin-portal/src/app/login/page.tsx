@@ -14,7 +14,6 @@ export default function LoginPage() {
     showPassword,
     isSubmitting,
     isForgotModalOpen,
-    forgotSent,
     setIsForgotModalOpen,
     toggleShowPassword,
     toggleRememberMe,
@@ -159,12 +158,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {forgotSent ? (
-              <div className="p-3 text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl text-center">
-                تم إرسال تعليمات إعادة التعيين إذا كان البريد مُسجلاً في المنصة.
-              </div>
-            ) : (
-              <form onSubmit={handleForgotPassword} className="space-y-3">
+            <form onSubmit={handleForgotPassword} className="space-y-3">
                 <input
                   type="email"
                   value={email}
@@ -187,8 +181,7 @@ export default function LoginPage() {
                     إرسال رابط التعيين
                   </button>
                 </div>
-              </form>
-            )}
+            </form>
           </div>
         </div>
       )}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Frontend Checker"
+  short_description: "Exhaustive frontend audit"
+  default_prompt: "Use $frontend-checker to audit the entire frontend repository and create or update APP_CHECK_RESULT.md without modifying application code."
+policy:
+  allow_implicit_invocation: true

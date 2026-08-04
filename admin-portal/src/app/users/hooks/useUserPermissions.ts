@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
-import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL, type AdminAuthorizationContext } from "@/lib/auth/rbac";
 import type { AdminUserStatus } from "../types";
 
 export interface UserPermissionsResult {
@@ -17,12 +17,11 @@ export interface UserPermissionsResult {
   isCurrentSuperAdmin: boolean;
 }
 
-export function useUserPermissions(
+export function getUserRowPermissions(
+  currentUser: (AdminAuthorizationContext & { id?: string }) | null | undefined,
   targetUserId?: string | null,
   targetStatus?: AdminUserStatus | null
 ): UserPermissionsResult {
-  const { user: currentUser } = useAuth();
-
   const isCurrentSuperAdmin = currentUser?.isSuperAdmin === true;
   const isSelf = Boolean(
     currentUser && targetUserId && currentUser.id === targetUserId
@@ -51,16 +50,9 @@ export function useUserPermissions(
     ADMIN_RBAC_CRITICAL.USERS_UPDATE
   );
 
-  // Status and Self-action Gating
   const isInvited = targetStatus === "INVITED";
-
-  // Cannot suspend or delete self; cannot suspend an INVITED user
   const canSuspend = canSuspendBase && !isSelf && !isInvited && targetStatus === "ACTIVE";
-  
-  // Cannot activate self; cannot activate an INVITED user
   const canActivate = canSuspendBase && !isSelf && !isInvited && targetStatus === "SUSPENDED";
-
-  // Cannot delete self
   const canDelete = canDeleteBase && !isSelf;
 
   return {
@@ -77,4 +69,12 @@ export function useUserPermissions(
     isSelf,
     isCurrentSuperAdmin,
   };
+}
+
+export function useUserPermissions(
+  targetUserId?: string | null,
+  targetStatus?: AdminUserStatus | null
+): UserPermissionsResult {
+  const { user: currentUser } = useAuth();
+  return getUserRowPermissions(currentUser, targetUserId, targetStatus);
 }

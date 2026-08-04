@@ -47,7 +47,7 @@ export function SubscriptionPaymentPieChart({ success, failed, recovered, height
           />
         </PieChart>
       </ResponsiveContainer>
-      
+
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono tracking-tighter">
           {((success / (total || 1)) * 100).toFixed(1)}%

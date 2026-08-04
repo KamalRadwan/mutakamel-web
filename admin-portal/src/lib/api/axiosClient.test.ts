@@ -107,4 +107,121 @@ describe("admin cookie refresh retry", () => {
     expect(storage.getItem("access_token")).toBeNull();
     expect(storage.getItem("admin_session_meta")).not.toContain("accessToken");
   });
+
+  it("does not attach an idempotency key when the route contract opts out", async () => {
+    const storage = new MemoryStorage();
+    vi.stubGlobal("window", {
+      location: { pathname: "/backup", href: "" },
+      dispatchEvent: vi.fn(),
+    });
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("sessionStorage", storage);
+    vi.stubGlobal("crypto", {
+      getRandomValues: (bytes: Uint8Array) => bytes.fill(1),
+    });
+
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(new Headers(init.headers).has("x-idempotency-key")).toBe(false);
+      return new Response(JSON.stringify({ data: { id: "run-1" } }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await customFetch("/api/admin/worker/v1/backups/runs", {
+      method: "POST",
+      body: JSON.stringify({ databaseServerId: "server-1" }),
+      skipAutoIdempotency: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("does not refresh or replay a non-replayable POST after a 401", async () => {
+    const storage = new MemoryStorage();
+    vi.stubGlobal("window", {
+      location: { pathname: "/backup", href: "" },
+      dispatchEvent: vi.fn(),
+    });
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("sessionStorage", storage);
+
+    const requestOptions: RequestInit[] = [];
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      requestOptions.push(init);
+      return new Response(
+        JSON.stringify({
+          type: "https://errors.mutakamel.ai/authentication-required",
+          title: "Authentication required",
+          status: 401,
+          code: "AUTH.SESSION.REQUIRED",
+          correlationId: "019f-non-replayable",
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/problem+json" },
+        },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      customFetch("/api/admin/worker/v1/backups/runs", {
+        method: "POST",
+        body: JSON.stringify({ databaseServerId: "server-1" }),
+        nonReplayable: true,
+        skipAutoIdempotency: true,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        status: 401,
+        data: {
+          errorCode: "AUTH.SESSION.REQUIRED",
+          correlationId: "019f-non-replayable",
+        },
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "/api/admin/worker/v1/backups/runs",
+    );
+    expect(requestOptions[0]).not.toHaveProperty("nonReplayable");
+    expect(requestOptions[0]).not.toHaveProperty("skipAutoIdempotency");
+    expect(new Headers(requestOptions[0]?.headers).has("x-idempotency-key")).toBe(
+      false,
+    );
+  });
+
+  it("keeps automatic idempotency for ordinary mutations", async () => {
+    const storage = new MemoryStorage();
+    vi.stubGlobal("window", {
+      location: { pathname: "/database-servers", href: "" },
+      dispatchEvent: vi.fn(),
+    });
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("sessionStorage", storage);
+    vi.stubGlobal("crypto", {
+      getRandomValues: (bytes: Uint8Array) => bytes.fill(1),
+    });
+
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(new Headers(init.headers).get("x-idempotency-key")).toMatch(
+        /^[0-9a-f-]{36}$/,
+      );
+      return new Response(JSON.stringify({ data: { id: "server-1" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await customFetch("/api/admin/core/v1/database-servers/server-1", {
+      method: "PATCH",
+      body: JSON.stringify({ name: "Primary" }),
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
 });

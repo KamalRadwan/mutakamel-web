@@ -13,8 +13,15 @@ export interface TenantRecord {
   secondaryFqdnsCount: number;
   databaseServerName: string;
   databaseServerId: string;
-  storageServerName?: string;
   storageServerId?: string;
+  storageServer?: {
+    id: string;
+    code: string;
+    name: string;
+    region: string;
+    bucketName: string;
+    status: string;
+  };
   countryName: string;
   countryIsoCode: string;
   planName: string;
@@ -32,7 +39,7 @@ export function useTenants() {
   const [serverFilter, setServerFilter] = useState<string>("ALL");
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
-  
+
   const [tenants, setTenants] = useState<TenantRecord[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -63,7 +70,7 @@ export function useTenants() {
       if (res.data?.success) {
         setTenants(res.data.data || []);
         setTotalItems(res.data.meta?.totalItems || 0);
-        
+
         if (res.data.meta?.summary) {
            setSummaryMetrics(res.data.meta.summary);
         }
@@ -76,7 +83,7 @@ export function useTenants() {
   }, [page, limit, search, statusFilter, serverFilter]);
 
   useEffect(() => {
-    fetchTenants();
+    queueMicrotask(() => fetchTenants());
   }, [fetchTenants]);
 
   const openActivateModal = (ten: TenantRecord) => {
@@ -147,4 +154,3 @@ export function useTenants() {
     isLoading,
   };
 }
-

@@ -7,6 +7,7 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface AxiosResponse<T = any> {
   data: T;
   status: number;
@@ -17,6 +18,18 @@ export interface AxiosResponse<T = any> {
 export interface ApiRequestConfig extends RequestInit {
   /** The caller already owns the auth lock and must handle a 401 directly. */
   skipAuthRefresh?: boolean;
+  /**
+   * Never replay this request automatically. A 401 is returned to the caller
+   * without refreshing the session because the first write may have succeeded
+   * even when its response is not usable.
+   */
+  nonReplayable?: boolean;
+  /**
+   * Some write endpoints are explicitly non-idempotent and reject replay
+   * semantics. Set this only when the route contract declares
+   * `idempotent: false`; ordinary mutations keep the automatic key.
+   */
+  skipAutoIdempotency?: boolean;
 }
 
 export interface SessionTokenMetadata {
@@ -99,9 +112,11 @@ export function unwrapCoreData<T>(payload: unknown): T {
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   reject: (err: any) => void;
 }> = [];
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const processQueue = (error?: any) => {
   failedQueue.forEach((prom) => {
     if (error) {
@@ -231,12 +246,18 @@ export function generateUUIDv7(): string {
   return uuid;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function customFetch<T = any>(
   endpoint: string,
   options: ApiRequestConfig = {},
   isRetry = false
 ): Promise<AxiosResponse<T>> {
-  const { skipAuthRefresh = false, ...requestOptions } = options;
+  const {
+    skipAuthRefresh = false,
+    nonReplayable = false,
+    skipAutoIdempotency = false,
+    ...requestOptions
+  } = options;
 
   // Always relative same-origin URL unless an absolute URL is explicitly passed
   const url = endpoint.startsWith("http")
@@ -250,7 +271,11 @@ export async function customFetch<T = any>(
 
   // Automatically attach x-idempotency-key for mutating requests if not present
   const method = (options.method || "GET").toUpperCase();
-  if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && !headers.has("x-idempotency-key")) {
+  if (
+    !skipAutoIdempotency &&
+    ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
+    !headers.has("x-idempotency-key")
+  ) {
     headers.set("x-idempotency-key", generateUUIDv7());
   }
 
@@ -278,6 +303,7 @@ export async function customFetch<T = any>(
       response.status === 401 &&
       !isRetry &&
       !skipAuthRefresh &&
+      !nonReplayable &&
       !isPublicAuthEndpoint
     ) {
       if (isRefreshing) {
@@ -310,6 +336,7 @@ export async function customFetch<T = any>(
 
         // Retry original request exactly once
         return customFetch<T>(endpoint, options, true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (refreshErr: any) {
         processQueue(refreshErr);
 
@@ -351,6 +378,7 @@ export async function customFetch<T = any>(
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let data: any;
     const text = await response.text();
     try {
@@ -366,6 +394,7 @@ export async function customFetch<T = any>(
       const correlationId = data?.correlationId ?? "";
       const details = data?.details ?? data?.errors ?? undefined;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const err: any = new Error(message);
       err.response = {
         status: response.status,
@@ -410,9 +439,11 @@ export async function customFetch<T = any>(
 }
 
 export const axiosClient = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   get: <T = any>(url: string, config?: ApiRequestConfig) =>
     customFetch<T>(url, { ...config, method: "GET" }),
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   post: <T = any>(url: string, body?: any, config?: ApiRequestConfig) =>
     customFetch<T>(url, {
       ...config,
@@ -420,6 +451,7 @@ export const axiosClient = {
       body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   put: <T = any>(url: string, body?: any, config?: ApiRequestConfig) =>
     customFetch<T>(url, {
       ...config,
@@ -427,6 +459,7 @@ export const axiosClient = {
       body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   patch: <T = any>(url: string, body?: any, config?: ApiRequestConfig) =>
     customFetch<T>(url, {
       ...config,
@@ -434,6 +467,7 @@ export const axiosClient = {
       body: body instanceof FormData ? body : JSON.stringify(body),
     }),
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   delete: <T = any>(url: string, config?: ApiRequestConfig) =>
     customFetch<T>(url, { ...config, method: "DELETE" }),
 };

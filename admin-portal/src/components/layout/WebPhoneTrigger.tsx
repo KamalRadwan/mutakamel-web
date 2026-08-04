@@ -1,7 +1,7 @@
 "use client";
 
 import { Phone } from "lucide-react";
-import { useWebPhoneTrigger, UseWebPhoneTriggerProps } from "./hooks/useWebPhoneTrigger";
+import { useWebPhoneTrigger, UseWebPhoneTriggerProps } from "@mutakamel/webphone";
 
 export function WebPhoneTrigger(props: UseWebPhoneTriggerProps) {
   const { isConnected, handleToggle, title } = useWebPhoneTrigger(props);
@@ -13,7 +13,7 @@ export function WebPhoneTrigger(props: UseWebPhoneTriggerProps) {
       title={title}
     >
       <Phone className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
-      
+
       {/* Connected SIP Status Indicator Dot */}
       <span className="absolute bottom-1.5 end-1.5 flex h-2 w-2">
         <span

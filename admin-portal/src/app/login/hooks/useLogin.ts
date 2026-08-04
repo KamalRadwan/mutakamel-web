@@ -12,7 +12,6 @@ export function useLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [forgotSent, setForgotSent] = useState(false);
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   const { t, lang } = useI18n();
@@ -41,8 +40,9 @@ export function useLogin() {
         lang === "ar" ? "تم تسجيل الدخول بنجاح" : "Login Successful",
         lang === "ar" ? "أهلاً بك في منصة التحكم متكامل." : "Welcome to Mutakamel Control Plane."
       );
-    } catch (err: any) {
-      const errMsg = err?.response?.data?.message || err?.message || (lang === "ar" ? "بيانات الاعتماد غير صالحة" : "Invalid email or password");
+    } catch (err: unknown) {
+      const errorPayload = err as { response?: { data?: { message?: string } }; message?: string };
+      const errMsg = errorPayload?.response?.data?.message || errorPayload?.message || (lang === "ar" ? "بيانات الاعتماد غير صالحة" : "Invalid email or password");
       setError(errMsg);
       toast.error(lang === "ar" ? "خطأ في الدخول" : "Authentication Error", errMsg);
     } finally {
@@ -52,15 +52,13 @@ export function useLogin() {
 
   const handleForgotPassword = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    setForgotSent(true);
-    setTimeout(() => {
-      setIsForgotModalOpen(false);
-      setForgotSent(false);
-      toast.info(
-        lang === "ar" ? "تم إرسال رابط التعيين" : "Reset Link Sent",
-        lang === "ar" ? "راجع بريدك الإلكتروني لإعادة ضبط كلمة المرور." : "Check your inbox for password reset instructions."
-      );
-    }, 1500);
+    toast.info(
+      lang === "ar" ? "تم إرسال رابط التعيين" : "Reset Link Sent",
+      lang === "ar"
+        ? "إذا كان البريد مسجلاً، ستصل إليه تعليمات إعادة تعيين كلمة المرور."
+        : "If the email is registered, password reset instructions will be sent."
+    );
+    setIsForgotModalOpen(false);
   };
 
   return {
@@ -74,7 +72,6 @@ export function useLogin() {
     isSubmitting,
     error,
     isForgotModalOpen,
-    forgotSent,
     setIsForgotModalOpen,
     toggleShowPassword,
     toggleRememberMe,

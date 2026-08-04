@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+import {
+  formatBackupBytes,
+  formatBackupDate,
+  isAmbiguousWriteFailure,
+  shortBackupId,
+} from "./backup-format";
+
+describe("backup presentation safety helpers", () => {
+  it("formats byte counts without exposing storage identifiers", () => {
+    expect(formatBackupBytes("1073741824")).toBe("1.0 GB");
+    expect(formatBackupBytes(null)).toBe("Not available");
+    expect(formatBackupBytes("invalid")).toBe("Not available");
+  });
+
+  it("uses explicit unavailable copy for missing or invalid timestamps", () => {
+    expect(formatBackupDate(null)).toBe("Not available");
+    expect(formatBackupDate("not-a-date")).toBe("Not available");
+  });
+
+  it("shortens identifiers only for visual display", () => {
+    const id = "019f0000-0000-7000-8000-000000000001";
+    expect(shortBackupId(id)).toBe("019f0000…000001");
+    expect(shortBackupId("short-id")).toBe("short-id");
+  });
+
+  it("treats server and network-class failures as ambiguous writes", () => {
+    expect(isAmbiguousWriteFailure(0)).toBe(true);
+    expect(isAmbiguousWriteFailure(500)).toBe(true);
+    expect(isAmbiguousWriteFailure(503)).toBe(true);
+    expect(isAmbiguousWriteFailure(409)).toBe(false);
+    expect(isAmbiguousWriteFailure(422)).toBe(false);
+  });
+});
+

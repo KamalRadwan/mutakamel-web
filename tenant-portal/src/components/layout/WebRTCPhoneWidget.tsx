@@ -21,7 +21,7 @@ import {
 import { useI18n } from '@/i18n/I18nContext';
 import { formatWebphoneLogTime, useWebRTCPhone } from './hooks/useWebRTCPhone';
 import { IncomingCallPopup } from './IncomingCallPopup';
-import type { WebphoneCallLogType, WebphoneConnectionState } from './webphone/types';
+import type { WebphoneCallLogType, WebphoneConnectionState } from '@mutakamel/webphone';
 
 const copy = {
   ar: {

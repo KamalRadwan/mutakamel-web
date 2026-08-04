@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
-import { 
-  ShieldCheck, 
-  Search, 
+import {
+  ShieldCheck,
+  Search,
   Plus,
   Trash2,
   Lock,
@@ -47,39 +47,111 @@ export default function RolesDirectoryPage() {
       <Navbar />
 
       <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
-        {/* Header Title Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              <span>{t.roles.pageTitle}</span>
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              {t.roles.pageSubtitle}
-            </p>
+        {/* Header Title Section with Indigo/Purple Gradient Banner */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-6 rounded-3xl border border-purple-500/20 shadow-xl">
+          <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-purple-500/20 via-indigo-500/20 to-pink-500/0 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <div className="p-3.5 bg-gradient-to-tr from-indigo-500 via-purple-600 to-pink-600 text-white rounded-2xl shadow-lg shadow-purple-500/30 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-7 h-7" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-black tracking-tight text-white">
+                    {t.roles.pageTitle}
+                  </h1>
+                  <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full">
+                    RBAC Manifest
+                  </span>
+                </div>
+                <p className="text-xs text-purple-100/80 mt-1 max-w-xl leading-relaxed">
+                  {t.roles.pageSubtitle}
+                </p>
+              </div>
+            </div>
+
+            {canCreate && (
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-5 py-2.5 text-xs font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white rounded-xl shadow-lg shadow-purple-500/25 transition-all transform hover:-translate-y-0.5 flex items-center gap-2 cursor-pointer shrink-0 border border-white/20"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{t.roles.createRole}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Summary Metrics Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200/80 dark:border-indigo-500/20 shadow-sm hover:shadow-md transition-all">
+            <div className="absolute top-0 end-0 w-20 h-20 bg-indigo-500/10 rounded-full blur-xl pointer-events-none" />
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-bold uppercase tracking-wider">{lang === "ar" ? "إجمالي الأدوار" : "Total Roles"}</span>
+              <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono mt-1">
+              {roles.length}
+            </div>
           </div>
 
-          {canCreate && (
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="px-3.5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md shadow-indigo-600/20 transition-colors flex items-center gap-1.5 cursor-pointer ms-auto sm:ms-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{t.roles.createRole}</span>
-            </button>
-          )}
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-sm hover:shadow-md transition-all">
+            <div className="absolute top-0 end-0 w-20 h-20 bg-purple-500/10 rounded-full blur-xl pointer-events-none" />
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-bold uppercase tracking-wider">{lang === "ar" ? "أدوار النظام" : "System Roles"}</span>
+              <div className="p-1.5 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 rounded-lg">
+                <Lock className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-purple-600 dark:text-purple-400 font-mono mt-1">
+              {roles.filter(r => r.isSystem).length}
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200/80 dark:border-emerald-500/20 shadow-sm hover:shadow-md transition-all">
+            <div className="absolute top-0 end-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-xl pointer-events-none" />
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-bold uppercase tracking-wider">{lang === "ar" ? "أدوار مخصصة" : "Custom Roles"}</span>
+              <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-lg">
+                <Edit2 className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono mt-1">
+              {roles.filter(r => !r.isSystem).length}
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200/80 dark:border-pink-500/20 shadow-sm hover:shadow-md transition-all">
+            <div className="absolute top-0 end-0 w-20 h-20 bg-pink-500/10 rounded-full blur-xl pointer-events-none" />
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-bold uppercase tracking-wider">{lang === "ar" ? "سياسات الوصول" : "Access Policies"}</span>
+              <div className="p-1.5 bg-pink-50 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400 rounded-lg">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-pink-600 dark:text-pink-400 font-mono mt-1 flex items-center gap-2">
+              Active
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Search & Filter Bar */}
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute top-3 start-3" />
+            <Search className="w-4 h-4 text-purple-500 absolute top-3.5 start-3.5" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t.roles.searchPlaceholder}
-              className="w-full ps-9 pe-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-600"
+              className="w-full ps-10 pe-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
             />
           </div>
 
@@ -87,7 +159,7 @@ export default function RolesDirectoryPage() {
             <select
               value={isSystemFilter}
               onChange={(e) => setIsSystemFilter(e.target.value)}
-              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-600 cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer"
             >
               <option value="ALL">{t.roles.allTypes}</option>
               <option value="TRUE">{t.roles.systemRoles}</option>

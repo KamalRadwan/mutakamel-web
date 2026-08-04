@@ -17,9 +17,7 @@ export default function LoginPage() {
     rememberMe,
     showPassword,
     isSubmitting,
-    error,
     isForgotModalOpen,
-    forgotSent,
     setIsForgotModalOpen,
     toggleShowPassword,
     toggleRememberMe,
@@ -61,12 +59,6 @@ export default function LoginPage() {
               أدخل بيانات الحساب للوصول إلى لوحة التحكم والعمليات الخاصة بك
             </p>
           </div>
-
-          {error && (
-            <div className="p-3 text-xs font-medium bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-xl text-center">
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
@@ -153,14 +145,7 @@ export default function LoginPage() {
         title="استعادة كلمة المرور"
         maxWidth="sm"
       >
-        {forgotSent ? (
-          <div className="text-center py-4 space-y-2">
-            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني بنجاح!
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleForgotPassword} className="space-y-4">
+        <form onSubmit={handleForgotPassword} className="space-y-4">
             <p className="text-xs text-slate-500 dark:text-slate-400">
               أدخل بريدك الإلكتروني المسجل وسيتم إرسال رابط لإعادة تعيين كلمة المرور.
             </p>
@@ -178,8 +163,7 @@ export default function LoginPage() {
                 إرسال الرابط
               </Button>
             </div>
-          </form>
-        )}
+        </form>
       </Modal>
 
       <div className="text-center text-[11px] text-slate-400 py-2">

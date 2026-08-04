@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/context/AuthContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { adminCan } from "@/lib/auth/rbac";
+import { useToast } from "@/components/ui/ToastContext";
 import {
   getStoragePlacementState,
   readStoragePlacementOptions,
@@ -16,14 +17,13 @@ import {
 export function useRegisterTenant() {
   const router = useRouter();
   const { t, lang } = useI18n();
+  const toast = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
   const canCreateTenant = adminCan(user, TENANT_CREATE_PERMISSION);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isValidatingIdentity, setIsValidatingIdentity] = useState(false);
-  const [identityResult, setIdentityResult] = useState<{ valid: boolean; message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<{ message: string; correlationId?: string } | null>(null);
   const [isPreviewingPlan, setIsPreviewingPlan] = useState(false);
   const [provisioningDag, setProvisioningDag] = useState<{
     selectionDigest: string;
@@ -154,26 +154,23 @@ export function useRegisterTenant() {
 
   const handleValidateIdentity = async () => {
     setIsValidatingIdentity(true);
-    setIdentityResult(null);
     await new Promise((resolve) => setTimeout(resolve, 600));
     setIsValidatingIdentity(false);
 
     if (formData.name && formData.name.length >= 3) {
-      setIdentityResult({
-        valid: true,
-        message:
-          lang === "ar"
-            ? `الاسم "${formData.name}" متاح، والنطاق ${formData.name}.mutakamel.ai جاهز للتثبيت!`
-            : `Tenant code "${formData.name}" is available. FQDN ${formData.name}.mutakamel.ai is ready!`,
-      });
+      toast.success(
+        lang === "ar" ? "الهوية متاحة" : "Identity Available",
+        lang === "ar"
+          ? `الاسم "${formData.name}" متاح، والنطاق ${formData.name}.mutakamel.ai جاهز للتثبيت!`
+          : `Tenant code "${formData.name}" is available. FQDN ${formData.name}.mutakamel.ai is ready!`,
+      );
     } else {
-      setIdentityResult({
-        valid: false,
-        message:
-          lang === "ar"
-            ? "يرجى كتابة اسم كود للشركة يتكون من 3 أحرف على الأقل بالإنجليزية."
-            : "Please enter a tenant code name of at least 3 English characters.",
-      });
+      toast.error(
+        lang === "ar" ? "هوية غير صالحة" : "Invalid Identity",
+        lang === "ar"
+          ? "يرجى كتابة اسم كود للشركة يتكون من 3 أحرف على الأقل بالإنجليزية."
+          : "Please enter a tenant code name of at least 3 English characters.",
+      );
     }
   };
 
@@ -203,7 +200,6 @@ export function useRegisterTenant() {
     }
 
     setIsSubmitting(true);
-    setSubmitError(null);
 
     try {
       // 1. Fetch Subscription Quote
@@ -264,26 +260,26 @@ export function useRegisterTenant() {
 
       await axiosClient.post("/api/admin/core/v1/tenants", payload);
 
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("global-toast", {
-            detail: {
-              type: "success",
-              title: lang === "ar" ? "تم الإنشاء" : "Created",
-              message:
-                lang === "ar"
-                  ? "تم إنشاء بيئة العمل بنجاح."
-                  : "Tenant created successfully.",
-            },
-          }),
-        );
-      }
+      toast.success(
+        lang === "ar" ? "تم الإنشاء" : "Created",
+        lang === "ar"
+          ? "تم إنشاء بيئة العمل بنجاح."
+          : "Tenant created successfully.",
+      );
       router.push("/tenants");
     } catch (error: unknown) {
-      setSubmitError({
-        message: readApiError(error).message || "An error occurred while creating the tenant.",
-        correlationId: readApiError(error).correlationId,
-      });
+      const apiError = readApiError(error);
+      const message =
+        apiError.message ||
+        (lang === "ar"
+          ? "حدث خطأ أثناء إنشاء المستأجر."
+          : "An error occurred while creating the tenant.");
+      toast.error(
+        lang === "ar" ? "فشل إنشاء المستأجر" : "Tenant Creation Failed",
+        apiError.correlationId
+          ? `${message}\nCorrelation ID: ${apiError.correlationId}`
+          : message,
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -317,9 +313,7 @@ export function useRegisterTenant() {
     loadStoragePlacementOptions,
     hasValidStorageSelection,
     isSubmitting,
-    submitError,
     isValidatingIdentity,
-    identityResult,
     isPreviewingPlan,
     provisioningDag,
     handleValidateIdentity,

@@ -2,11 +2,12 @@
 
 import { use } from "react";
 import { Navbar } from "@/components/layout/Navbar";
-import { 
+import {
   ArrowLeft,
   ArrowRight,
   ShieldAlert,
   Save,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   CheckCircle2,
   Lock,
   Search,
@@ -21,7 +22,7 @@ import { getPermissionName } from "@/lib/auth/rbac";
 
 export default function RoleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  
+
   const {
     lang,
     router,
@@ -37,7 +38,6 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
     assignedPermissions,
     catalogueLength,
     isSaving,
-    lastSaved,
     isLoading,
     handleMetadataBlur,
     togglePermission,
@@ -106,11 +106,6 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800">
                 <Save className="w-4 h-4 animate-pulse" />
                 {lang === "ar" ? "جاري الحفظ تلقائياً..." : "Saving automatically..."}
-              </span>
-            ) : lastSaved ? (
-              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
-                <CheckCircle2 className="w-4 h-4" />
-                {lang === "ar" ? "تم الحفظ تلقائياً" : "Saved automatically"}
               </span>
             ) : null}
           </div>
@@ -207,12 +202,12 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                 <span>{lang === "ar" ? "مصفوفة الصلاحيات المطلقة" : "Permissions Matrix"}</span>
               </h2>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                {isReadOnly 
+                {isReadOnly
                   ? (lang === "ar" ? "العرض فقط — الصلاحيات المحددة ثابتة لهذا الدور." : "Read-only mode — permissions are fixed for this role.")
                   : (lang === "ar" ? "يتم حفظ تغييرات التحديد تلقائياً." : "Selections are saved automatically.")}
               </p>
             </div>
-            
+
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <div className="relative w-full sm:w-72">
                 <Search className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -253,8 +248,8 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                         onClick={() => toggleGroup(groupName, !isAllChecked)}
                         className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                       >
-                        {isAllChecked 
-                          ? (lang === "ar" ? "إلغاء تحديد الكل" : "Deselect All") 
+                        {isAllChecked
+                          ? (lang === "ar" ? "إلغاء تحديد الكل" : "Deselect All")
                           : (lang === "ar" ? "تحديد الكل" : "Select All")}
                       </button>
                     )}
@@ -270,8 +265,8 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                         <label
                           key={p.id}
                           className={`flex items-start justify-between p-3.5 rounded-xl border transition-all ${
-                            isChecked 
-                              ? "bg-indigo-50/60 border-indigo-300 dark:bg-indigo-950/30 dark:border-indigo-800/80 shadow-2xs" 
+                            isChecked
+                              ? "bg-indigo-50/60 border-indigo-300 dark:bg-indigo-950/30 dark:border-indigo-800/80 shadow-2xs"
                               : "bg-slate-50/40 border-slate-200/80 dark:bg-slate-800/20 dark:border-slate-800"
                           } ${!isReadOnly ? "cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-600" : "opacity-90"}`}
                         >
@@ -298,8 +293,8 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                               className="sr-only"
                             />
                             <div className={`block w-9 h-5 rounded-full transition-colors ${
-                              isChecked 
-                                ? (isSuperAdmin ? "bg-amber-500" : "bg-indigo-600") 
+                              isChecked
+                                ? (isSuperAdmin ? "bg-amber-500" : "bg-indigo-600")
                                 : "bg-slate-300 dark:bg-slate-700"
                             }`}></div>
                             <div className={`absolute start-0.5 top-0.5 bg-white w-4 h-4 rounded-full transition-transform flex items-center justify-center ${
@@ -323,4 +318,3 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
     </div>
   );
 }
-

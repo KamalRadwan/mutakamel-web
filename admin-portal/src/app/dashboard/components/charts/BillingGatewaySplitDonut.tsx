@@ -44,7 +44,7 @@ export function BillingGatewaySplitDonut({ data, height = 250 }: Props) {
           />
         </PieChart>
       </ResponsiveContainer>
-      
+
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-mono tracking-tighter">
           {total.toLocaleString()}

@@ -52,8 +52,8 @@ export function SubscriptionRetentionGrid({ data, height = 280 }: Props) {
               </div>
               <div className="flex-1 flex gap-1">
                 {row.retentionRates.map((rate, j) => (
-                  <div 
-                    key={j} 
+                  <div
+                    key={j}
                     className={`flex-1 rounded flex items-center justify-center font-mono py-1.5 transition-colors hover:opacity-80 cursor-default ${getHeatmapColor(rate)}`}
                     title={`Month ${j}: ${rate}% retention`}
                   >

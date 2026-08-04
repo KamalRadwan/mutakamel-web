@@ -1,7 +1,6 @@
 "use client";
 
 import { Navbar } from "@/components/layout/Navbar";
-import { Sidebar } from "@/components/layout/Sidebar";
 import { useI18n } from "@/i18n/I18nContext";
 import { 
   Users, 
@@ -47,10 +46,7 @@ export default function DashboardPage() {
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#090d16]">
       <Navbar />
 
-      <div className="flex flex-1">
-        <Sidebar />
-
-        <main className="flex-1 w-full p-3 md:p-4 space-y-6">
+      <main className="flex-1 w-full p-4 space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
@@ -126,7 +122,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </main>
-      </div>
     </div>
   );
 }

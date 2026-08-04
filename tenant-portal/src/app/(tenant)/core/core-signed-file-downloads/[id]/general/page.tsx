@@ -1,22 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/ToastContext";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { Save, CheckCircle2 } from "lucide-react";
+import { Save } from "lucide-react";
 
 export default function CoreSignedFileGeneralPage() {
+  const toast = useToast();
   const [bucket, setBucket] = useState("invoices");
   const [filename, setFilename] = useState("INV-2026-001.pdf");
   const [year, setYear] = useState("2026");
   const [month, setMonth] = useState("07");
-  const [isSaved, setIsSaved] = useState(false);
 
   const handleInlineSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
+    toast.saved();
   };
 
   return (
@@ -26,12 +26,6 @@ export default function CoreSignedFileGeneralPage() {
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">التعديل المباشر والتفاصيل العامة</h2>
           <p className="text-xs text-slate-500">يمكنك تعديل بيانات الرابط وتحديث الحاوية مباشرة بدون فتح نوافذ خارجية</p>
         </div>
-        {isSaved && (
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full animate-fade-in">
-            <CheckCircle2 className="w-4 h-4" />
-            تم حفظ التغييرات بنجاح
-          </span>
-        )}
       </div>
 
       <form onSubmit={handleInlineSave} className="space-y-4 max-w-2xl">

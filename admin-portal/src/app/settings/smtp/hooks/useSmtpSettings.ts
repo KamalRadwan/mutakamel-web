@@ -1,4 +1,6 @@
 "use client";
+ 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useCallback } from "react";
 import { useI18n } from "@/i18n/I18nContext";
@@ -61,8 +63,6 @@ export function useSmtpSettings() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verifyStatus, setVerifyStatus] = useState<"idle" | "success" | "error">("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetchConfig = useCallback(async () => {
     setIsLoading(true);
@@ -102,7 +102,7 @@ export function useSmtpSettings() {
   }, []);
 
   useEffect(() => {
-    fetchConfig();
+    queueMicrotask(() => fetchConfig());
   }, [fetchConfig]);
 
   const handleUpdate = (field: keyof SmtpConfigState, value: any) => {
@@ -111,7 +111,6 @@ export function useSmtpSettings() {
 
   const saveConfig = async (password?: string) => {
     setIsSaving(true);
-    setErrorMessage(null);
 
     const payload: Record<string, any> = {
       fromAddress: config.fromAddress,
@@ -148,7 +147,7 @@ export function useSmtpSettings() {
       if (err?.response?.data) {
         msg = err.response.data.message || err.response.data.title || err.response.data.detail || msg;
       }
-      setErrorMessage(msg);
+      throw new Error(msg);
     } finally {
       setIsSaving(false);
     }
@@ -156,24 +155,19 @@ export function useSmtpSettings() {
 
   const verifyConnection = async () => {
     setIsVerifying(true);
-    setVerifyStatus("idle");
-    setErrorMessage(null);
-
     try {
       await axiosClient.post<SuccessResponse<any>>(
         `/api/admin/core/v1/system-settings/email/verify-connection`,
         undefined // Explicitly no body
       );
 
-      setVerifyStatus("success");
       fetchConfig();
     } catch (err: any) {
-      setVerifyStatus("error");
       let msg = "Connection verification failed";
       if (err?.response?.data) {
         msg = err.response.data.message || err.response.data.title || err.response.data.detail || msg;
       }
-      setErrorMessage(msg);
+      throw new Error(msg);
     } finally {
       setIsVerifying(false);
     }
@@ -186,12 +180,10 @@ export function useSmtpSettings() {
     isLoading,
     isSaving,
     lastSaved,
-    errorMessage,
     handleUpdate,
     saveConfig,
     verifyConnection,
     isVerifying,
-    verifyStatus,
     refetch: fetchConfig,
     hasUpdatePermission,
   };

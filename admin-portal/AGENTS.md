@@ -13,7 +13,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
   screen. For dashboard work, also read `docs/api/dashboard.md`; for
   database-server work, read `docs/api/database-servers.md`; for module,
   feature, tier, pricing, or managed-currency work, read
-  `docs/api/catalog.md`; for tenant work, read `docs/api/tenants.md` and the
+  `docs/api/catalog.md`; for backup or restore work, read
+  `docs/api/backups-restores.md`; for tenant work, read `docs/api/tenants.md` and the
   nested `docs/api/tenant-users.md` and `docs/api/tenant-operations.md`
   contracts relevant to the screen; for platform, auth, billing, notification,
   Asterisk, or SMTP settings work, read `docs/api/system-settings.md`.
@@ -31,8 +32,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
   in the owning backend controller/DTO/service. Frontend mock objects and
   endpoint comments are design fixtures, not API evidence.
 - **Integration Status**: Authentication, dashboard, admin users/roles,
-  Database Servers, bounded Storage Servers, Catalogue, and settings contain
-  substantial real Core integration. Tenants remain partial and
+  Database Servers, the separate Backup module, bounded Storage Servers,
+  Catalogue, and settings contain substantial real integration. Backup source
+  integration remains release-gated by Worker safe-response projections and
+  exact non-idempotent command recovery. Tenants remain partial and
   contract-breaking; several operational modules are missing. Use
   `docs/audit/frontend-capability-matrix.md` for the current source boundary.
   Do not treat source integration as authenticated runtime or deployment
@@ -42,6 +45,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
   the coordinated single refresh retry. Browser feature code must not read or
   attach JWT bearer tokens or introduce raw `fetch` paths that bypass session
   handling.
+  Routes explicitly documented as non-idempotent and non-replayable must opt
+  out of both automatic idempotency-key injection and the automatic 401
+  refresh replay. Persist only minimal, non-secret attempt evidence until the
+  operator resolves an ambiguous outcome.
   Core success payloads are under `data`; paginated responses also use `meta`,
   while Core failures expose `errorCode` and Gateway Problem Details expose
   `code`. Normalize both without discarding `correlationId`.

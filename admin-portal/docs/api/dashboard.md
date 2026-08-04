@@ -1,399 +1,176 @@
-# Admin Dashboard API
+# Admin Dashboard API Contract
 
-Status: **Verified backend contract; frontend DONE/REFACTOR**
+Status: **Frontend source-integrated with grouped backend contract**
 
-Last source verification: **2026-07-30**
+This contract is the blueprint for how the `/api/admin/core/v1/dashboard` endpoint must be consumed by the frontend.
 
-Verified against the current `core-app` controller, query DTO, service response
-types, active frontend integration, and API Gateway route contract.
+## 1. API
 
-## Route and authorization
+Browser endpoint: `GET /api/admin/core/v1/dashboard`
+Core internal controller: `GET /admin/dashboard`
 
-| Concern | Contract |
-|:---|:---|
-| Browser-facing route | `GET /api/admin/core/v1/dashboard` |
-| Core upstream route | `GET /api/v1/admin/dashboard` |
-| Controller | `AdminDashboardController` |
-| Guard | `AdminGuard` |
-| Permission | `admin.reports.read` |
-| Gateway class | `READ_HEAVY` |
-| Response envelope | Canonical Core success envelope; the dashboard object is in `data` |
+The browser must call the Gateway endpoint, never Core directly.
 
-Frontend code must call the browser-facing API Gateway route. `/admin/dashboard`
-is only the Nest controller-relative route and must not be called from the
-browser.
+Authentication:
+- Admin Bearer access token.
+- Same-origin request through the web application.
+- Include credentials for the admin refresh-cookie flow.
+- Endpoint access requires `admin.reports.read`.
 
-## Query DTO
-
-`AdminDashboardQueryDto` accepts only these optional fields:
-
-```ts
-interface AdminDashboardQuery {
-  date?: string;
-  from?: string;
-  to?: string;
-}
-```
-
-Validation and range behavior:
-
-- Every supplied value must pass `@IsDateString()`. Prefer the unambiguous
-  `YYYY-MM-DD` form for date pickers.
-- A date-only `date` selects one UTC calendar day and overrides both `from` and
-  `to`.
-- With both `from` and `to`, the range starts at `from` and ends at `to`.
-- With only `from` or only `to`, a date-only value is treated as a single UTC
-  day. A lone full timestamp currently produces an empty range and HTTP `422`,
-  so the UI should not send that form.
-- With no query, the backend returns the current UTC calendar month.
-- Date-only `to` is inclusive: the backend internally advances to the next UTC
-  day and exposes the inclusive end as `23:59:59.999Z`.
-- A full-timestamp `to` is used as the exclusive query boundary; the response
-  reports one millisecond earlier as the inclusive `range.to`.
-- A full timestamp supplied as `date` currently produces HTTP `422`; use
-  `YYYY-MM-DD` for the single-day control.
-- `from` later than `to` returns HTTP `422` with code
-  `DASHBOARD_RANGE_INVALID`.
-- Invalid date strings or unknown query keys are rejected by the global strict
-  validation pipe with HTTP `400`.
-
-Examples:
-
-```text
+Example request:
+```http
 GET /api/admin/core/v1/dashboard
-GET /api/admin/core/v1/dashboard?date=2026-07-24
-GET /api/admin/core/v1/dashboard?from=2026-07-01&to=2026-07-24
+Accept: application/json
+Authorization: Bearer <admin-access-token>
 ```
 
-Do not send `date` together with a UI-visible custom range. Although the server
-accepts it, `date` silently takes precedence and can make the selected filters
-look incorrect.
+Example with a single date:
+`GET /api/admin/core/v1/dashboard?date=2026-08-02`
 
-## Response types
+Example with a custom range:
+`GET /api/admin/core/v1/dashboard?from=2026-08-01&to=2026-08-31`
+
+No idempotency key is required because this is a read-only GET request.
+
+Date behavior:
+- `date` selects a single reporting day.
+- `date` overrides `from` and `to`.
+- `from` is inclusive.
+- Date-only `to` is treated as the inclusive final day.
+- Internally, the backend uses an exclusive range-end boundary.
+- The default range is the current UTC month.
+- Invalid or reversed ranges return HTTP 422 with `DASHBOARD_RANGE_INVALID`.
+
+## 2. Success and Error Envelopes
+
+Do not invent a universal `{ status, code, data }` JSON envelope.
+
+Successful Core responses have this body:
+```json
+{
+  "success": true,
+  "data": {},
+  "correlationId": "string",
+  "timestamp": "ISO-8601"
+}
+```
+The HTTP status is `response.status`, normally 200.
+There is no success-body `status` field.
+There is no success-body `code` field.
+
+Core-originated error body (uses `statusCode` and `errorCode`):
+```json
+{
+  "success": false,
+  "statusCode": 422,
+  "errorCode": "DASHBOARD_RANGE_INVALID",
+  "errorCategory": "VALIDATION",
+  "message": "The dashboard \"from\" date must be before or equal to the \"to\" date.",
+  "details": {},
+  "correlationId": "uuid-v7",
+  "timestamp": "ISO-8601 timestamp",
+  "path": "/api/v1/admin/dashboard"
+}
+```
+
+Gateway-originated errors use RFC 7807 Problem Details (uses `status` and `code`):
+```json
+{
+  "type": "https://errors.mutakamel.ai/gw/auth/forbidden",
+  "title": "Forbidden",
+  "status": 403,
+  "code": "GW.AUTH.FORBIDDEN",
+  "detail": "Optional safe detail",
+  "instance": "/api/admin/core/v1/dashboard",
+  "correlationId": "uuid-v7",
+  "errors": {}
+}
+```
+
+The API client must support both error contracts.
+
+## 3. Permission Model
+
+`admin.reports.read` allows the administrator to call the endpoint.
+Each dashboard group additionally requires its exact permission:
+- tenants: `admin.reports.tenants`
+- domains: `admin.reports.domains`
+- subscriptions: `admin.reports.subscriptions`
+- billing: `admin.reports.billing`
+- payments: `admin.reports.payments`
+- wallets: `admin.reports.wallets`
+- database: `admin.reports.database-server`
+- storage: `admin.reports.storage`
+- provisioning: `admin.reports.provisioning`
+- catalogue: `admin.reports.catalogue`
+- notifications: `admin.reports.notifications`
+- usage: `admin.reports.usage`
+- security: `admin.reports.security`
+- audit: `admin.reports.audit`
+
+Authorization rules:
+- Platform Super Admin receives every group.
+- Ordinary administrators receive only explicitly assigned groups.
+- Unauthorized providers are not queried.
+- Unauthorized top-level groups are omitted from the response.
+- A missing group means the user is not authorized.
+- A present group with `available: false` means the user is authorized, but its authoritative data projection is unavailable.
+- Never treat a missing group as a zero-value group.
+- Never show an unauthorized group as disabled or empty.
+
+## 4. Root Dashboard Contract
+
+`authorizedGroups` is the authoritative list of groups available to this administrator.
 
 ```ts
-type DashboardMetricKind = "integer" | "money" | "percent" | "ratio";
-type DashboardRangeGranularity = "day" | "month";
-type DashboardMetricTone =
-  | "amber"
-  | "blue"
-  | "cyan"
-  | "green"
-  | "purple"
-  | "red";
-
-interface DashboardMetric {
-  key: string;
-  label: string;
-  value: number | string;
-  kind: DashboardMetricKind;
-  description: string;
-  tone: DashboardMetricTone;
-}
-
-interface DashboardBreakdownItem {
-  key: string;
-  label: string;
-  value: number;
-  ratio: number; // normalized 0..1, not 0..100
-  tone: DashboardMetricTone;
-  description?: string;
-}
-
-interface DashboardResponse {
+type AdminDashboardData = {
   asOf: string;
+  authorizedGroups: DashboardGroupKey[];
+
   range: {
     from: string;
     to: string;
     label: string;
-    granularity: DashboardRangeGranularity;
+    granularity: "day" | "month";
   };
 
-  sections: Array<{
-    key: "tenants" | "databaseServers" | "subscriptions" | "invoices";
-    title: string;
-    cards: DashboardMetric[];
-  }>;
+  // Compatibility projections retained during migration.
+  sections: DashboardSection[];
+  panels: DashboardPanels;
+  overview: DashboardOverview;
 
-  panels: {
-    tenantStatus: {
-      title: string;
-      subtitle: string;
-      items: Array<{
-        key: string;
-        label: string;
-        count: number;
-        description: string;
-        ratio: number; // normalized 0..1
-        tone: DashboardMetricTone;
-      }>;
-    };
-    databaseCapacity: {
-      title: string;
-      subtitle: string;
-      items: Array<{
-        id: string;
-        name: string;
-        metadata: string;
-        status: string;
-        countryName: string;
-        countryIsoCode: string;
-        currentTenants: number;
-        maxTenants: number;
-        utilization: number; // normalized 0..1
-        tone: DashboardMetricTone;
-      }>;
-    };
-  };
-
-  overview: {
-    kpis: DashboardMetric[];
-    tenantLifecycle: {
-      total: number;
-      current: number;
-      deleted: number;
-      items: DashboardBreakdownItem[];
-      stats: DashboardMetric[];
-    };
-    databaseHealth: {
-      capacity: {
-        current: number;
-        maximum: number;
-        utilization: number; // normalized 0..1
-      };
-      stats: DashboardMetric[];
-    };
-    subscriptionStatus: {
-      total: number;
-      items: DashboardBreakdownItem[];
-      stats: DashboardMetric[];
-    };
-    billingSummary: {
-      totalAmount: number;
-      collectedRatio: number; // normalized 0..1
-      items: DashboardBreakdownItem[];
-    };
-    domainHealth: {
-      totalDomains: number;
-      verifiedDomains: number;
-      fullyVerified: number;
-      invalidDomains: number;
-      countries: number;
-      regions: Array<{
-        key: string;
-        countryName: string;
-        countryIsoCode: string;
-        count: number;
-        ratio: number; // normalized 0..1
-        tone: DashboardMetricTone;
-      }>;
-      actionRequired: boolean;
-      message: string;
-    };
-    tenantBillingGrowth: {
-      year: number;
-      currencyCode: string; // current backend value: "USD"
-      granularity: DashboardRangeGranularity;
-      points: Array<{
-        month: string; // formatted bucket label; may represent a day
-        tenants: number;
-        collected: number;
-      }>;
-    };
-    recentTenants: {
-      items: Array<{
-        id: string;
-        name: string;
-        status: string; // humanized label, not a raw TenantStatusEnum value
-        plan: string; // humanized subscription status + " Plan", or "No Plan"
-        createdAt: string;
-      }>;
-    };
-  };
-
-  analytics: {
-    subscriptions: {
-      recurringRevenue: DashboardDataset<{
-        currencyCode: "USD";
-        monthlyRecurringRevenue: number;
-        annualRecurringRevenue: number;
-        byBillingCycle: DashboardNamedValue[];
-      }>;
-      arrTarget: DashboardDataset<unknown>;
-      averageCollectedRevenue: DashboardDataset<{
-        currencyCode: "USD";
-        points: DashboardTimeSeriesPoint[];
-      }>;
-      paymentHealth: DashboardDataset<DashboardNamedValue[]>;
-      churnAndAcquisition: DashboardDataset<{
-        points: DashboardDualTimeSeriesPoint[];
-      }>;
-      upcomingRenewals: DashboardDataset<{
-        windowDays: 90;
-        points: DashboardTimeSeriesPoint[];
-      }>;
-      revenueFlow: DashboardUnavailableDataset;
-      lifetimeValue: DashboardUnavailableDataset;
-      promotionImpact: DashboardUnavailableDataset;
-      cohortRetention: DashboardUnavailableDataset;
-    };
-    billing: {
-      aging: DashboardDataset<{
-        currencyCode: "USD";
-        items: DashboardNamedValue[];
-      }>;
-      daysSalesOutstanding: DashboardDataset<{
-        unit: "days";
-        points: DashboardTimeSeriesPoint[];
-      }>;
-      cashFlow: DashboardDataset<{
-        currencyCode: "USD";
-        points: DashboardDualTimeSeriesPoint[];
-      }>;
-      revenueByPurpose: DashboardDataset<{
-        currencyCode: "USD";
-        items: DashboardNamedValue[];
-      }>;
-      paymentProviders: DashboardDataset<DashboardNamedValue[]>;
-      paymentFailureReasons: DashboardDataset<DashboardNamedValue[]>;
-      refunds: DashboardDataset<{
-        currencyCode: "USD";
-        points: DashboardTimeSeriesPoint[];
-      }>;
-      taxByCountry: DashboardDataset<{
-        currencyCode: "USD";
-        items: DashboardNamedValue[];
-      }>;
-      renewalForecast: DashboardDataset<{
-        currencyCode: "USD";
-        windowDays: 90;
-        points: DashboardTimeSeriesPoint[];
-      }>;
-      usageOverage: DashboardUnavailableDataset;
-      costBreakdown: DashboardUnavailableDataset;
-      discountImpact: DashboardUnavailableDataset;
-      chargebacks: DashboardUnavailableDataset;
-    };
-    servers: {
-      nodes: DashboardDataset<DatabaseCapacityItem[]>;
-      regions: DashboardDataset<DashboardRegionItem[]>;
-      latency: DashboardUnavailableDataset;
-      capacityHistory: DashboardUnavailableDataset;
-    };
-    platformHealth: DashboardUnavailableDataset;
-  };
-}
+  // Permission-filtered group objects.
+  tenants?: DashboardGroup;
+  domains?: DashboardGroup;
+  subscriptions?: DashboardGroup;
+  billing?: DashboardGroup;
+  payments?: DashboardGroup;
+  wallets?: DashboardGroup;
+  database?: DashboardGroup;
+  storage?: DashboardGroup;
+  provisioning?: DashboardGroup;
+  catalogue?: DashboardGroup;
+  notifications?: DashboardGroup;
+  usage?: DashboardGroup;
+  security?: DashboardGroup;
+  audit?: DashboardGroup;
+};
 ```
 
-Every advanced dataset uses a discriminated availability envelope:
+## 5. Implementation Rules
 
-```ts
-type DashboardDataset<T> =
-  | { available: true; data: T }
-  | {
-      available: false;
-      reasonCode:
-        | "SOURCE_NOT_CONFIGURED"
-        | "HISTORICAL_DATA_NOT_STORED"
-        | "TARGET_NOT_CONFIGURED";
-      message: string;
-    };
-```
-
-An unavailable dataset is not an authoritative zero. The frontend must show its
-unavailable state and must not substitute generated, fixed, or random values.
-
-The literal section keys above are the keys currently emitted by the service,
-but the frontend should still render `sections` dynamically so additive cards
-do not require a UI release.
-
-## UI mapping
-
-| Dashboard view | Backend source | UI notes |
-|:---|:---|:---|
-| Main KPI cards | `overview.kpis` | Format by `kind`; never infer formatting from `key` |
-| Tenant lifecycle | `overview.tenantLifecycle` | Render `items`; multiply `ratio` by 100 only at presentation time |
-| Tenant status panel | `panels.tenantStatus` | The backend omits zero-count statuses except for its empty-state fallback |
-| Database capacity | `panels.databaseCapacity.items` | `utilization` is `0..1`; `status` and country fields are safe report fields. Host and port are intentionally excluded |
-| Database health summary | `overview.databaseHealth` | Use the separate `capacity` and `stats` fields |
-| Subscription status | `overview.subscriptionStatus` | Use for subscription cards/charts |
-| Billing | `overview.billingSummary` | Currency amounts are numeric; use `tenantBillingGrowth.currencyCode` when formatting the growth series |
-| Domain health | `overview.domainHealth` | Use `actionRequired` for the alert state and `message` as server-authored supporting text |
-| Growth chart | `overview.tenantBillingGrowth.points` | The property is named `month` even when granularity is `day` |
-| Recent tenants | `overview.recentTenants.items` | No `companyName` is returned by this endpoint |
-| Subscription analytics | `analytics.subscriptions` | MRR/ARR and renewal forecast include USD subscriptions only; payment charts are transaction counts |
-| Billing analytics | `analytics.billing` | Financial series use settlement USD, or original totals only when the original currency is USD |
-| Server analytics | `analytics.servers` | Nodes and regions are current snapshots; latency and capacity history are explicitly unavailable |
-| Platform health | `analytics.platformHealth` | Unavailable until an observability/telemetry source is connected |
-
-### Metric formatting
-
-```ts
-function formatDashboardMetric(
-  metric: DashboardMetric,
-  currencyCode = "USD",
-): string {
-  if (metric.kind === "money" && typeof metric.value === "number") {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currencyCode,
-    }).format(metric.value);
-  }
-
-  if (metric.kind === "percent" && typeof metric.value === "number") {
-    return new Intl.NumberFormat(undefined, {
-      style: "percent",
-      maximumFractionDigits: 1,
-    }).format(metric.value);
-  }
-
-  return String(metric.value);
-}
-```
-
-`ratio` metrics may contain a preformatted string such as `"45 / 200"`, while
-ratio fields inside capacity and breakdown objects are numeric `0..1` values.
-
-## Current frontend integration status
-
-`src/app/dashboard/hooks/useDashboardData.ts` calls the browser-facing endpoint
-through the shared HTTP client. Overview, tenant, subscription, billing, and
-server views consume the typed response directly.
-
-- No dashboard chart generates random or fixed business values.
-- KPI cards do not synthesize historical sparklines.
-- Custom dates send date-only `from` and `to` query values.
-- Advanced panels render the API-provided unavailable reason when a source or
-  historical projection does not exist.
-- Server cards show only report-safe metadata; host and port remain on the
-  separately permissioned database-server API.
-
-### Snapshot and range semantics
-
-- Current tenant/subscription status and server capacity are snapshots as of
-  `asOf`; they are not filtered to records created in the range.
-- Event series (creation, cancellation, invoice issue/due/payment/refund) use
-  the selected range.
-- `tenantLifecycle.deleted` is an all-time soft-deleted count.
-- Receivables aging is a current snapshot grouped by `due_at`.
-- Upcoming renewals and their USD value use the next 90 days from `asOf`.
-
-## Error handling
-
-| Status | UI behavior |
-|:---|:---|
-| `400` | Mark the date filter invalid; do not retry unchanged input |
-| `401` | Let the shared client perform its single coordinated refresh, then redirect to login if refresh fails |
-| `403` | Show a permission-denied state and hide dashboard navigation when `admin.reports.read` is absent |
-| `422` | Show the backend range message next to the date controls |
-| `429` | Preserve the last successful dashboard and offer a delayed manual retry |
-| `5xx` / network | Keep stale data if available, identify it as stale, and provide retry |
-
-## Backend source map
-
-Paths below are relative to `C:\mutakamel.ai\frontend`:
-
-- `../backend/mutakamel-apps/core-app/src/admin/admin-dashboard/admin-dashboard.controller.ts`
-- `../backend/mutakamel-apps/core-app/src/admin/admin-dashboard/dto/admin-dashboard-query.dto.ts`
-- `../backend/mutakamel-apps/core-app/src/admin/admin-dashboard/admin-dashboard.service.ts`
-- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
+1. Use `body.data.authorizedGroups` as the authoritative navigation/filter list.
+2. Access groups with `body.data[groupKey]`.
+3. If a group property is absent, treat it as unauthorized.
+4. If `available === false`, render an unavailable-data state using `reasonCode` and `message`.
+5. Do not convert unavailable data to zero.
+6. Render cards from each group’s `cards` array.
+7. Render alert counts from only the groups present in the response.
+8. Preserve unknown breakdown keys rather than crashing on new statuses.
+9. Format ratios and percentages as values between 0 and 1.
+10. Keep decimal money strings intact (never parse canonical USD money values into JavaScript `number`).
+11. Do not use `sections`, `panels`, or `overview` as the long-term data authority. They remain compatibility projections during migration.
+12. Never expose or request storage credentials, database credentials, infrastructure endpoints, audit identities, raw errors, or provider evidence.
+13. Do not infer runtime health from ACTIVE/OFFLINE registry values.
+14. Do not add a health group in this implementation.
+15. Do not create a `/v2` endpoint or a second dashboard endpoint.

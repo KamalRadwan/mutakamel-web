@@ -1,25 +1,21 @@
+ 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   getStorageServer,
   updateStorageServer,
   activateStorageServer,
-  drainStorageServer,
   offlineStorageServer,
   deleteStorageServer,
-  requestVerification,
-  setRoutingProfile,
-  getStorageServerHistory,
 } from "../api/storageServersApi";
-import type { StorageServer, UpdateStorageServerDto, SetStorageRoutingProfileDto } from "../types";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
-import { ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+import type { StorageServerView, UpdateStorageServerDto } from "@/types/storage-server";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export function useStorageServerDetail(id: string | null) {
   const { user } = useAuth();
 
-  const [server, setServer] = useState<StorageServer | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
+  const [server, setServer] = useState<StorageServerView | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<any>(null);
 
@@ -37,30 +33,19 @@ export function useStorageServerDetail(id: string | null) {
     }
   }, [user, id]);
 
-  const fetchHistory = useCallback(async () => {
-    if (!user || !id) return;
-    try {
-      const data = await getStorageServerHistory(id);
-      setHistory(data);
-    } catch (err: any) {
-      // non-fatal
-    }
-  }, [user, id]);
-
   useEffect(() => {
-    fetchServer();
-    fetchHistory();
-  }, [fetchServer, fetchHistory]);
+    queueMicrotask(() => fetchServer());
+  }, [fetchServer]);
 
   // RBAC checks
   const canRead = user ? adminCan(user, "admin.storage_servers.read") : false;
-  
-  const canUpdate = user 
-    ? adminCanAll(user, ADMIN_RBAC_CRITICAL.STORAGE_SERVERS_UPDATE) 
+
+  const canUpdate = user
+    ? adminCanAll(user, ADMIN_RBAC_CRITICAL.STORAGE_SERVERS_UPDATE)
     : false;
-    
-  const canDelete = user 
-    ? adminCanAll(user, ADMIN_RBAC_CRITICAL.STORAGE_SERVERS_DELETE) 
+
+  const canDelete = user
+    ? adminCanAll(user, ADMIN_RBAC_CRITICAL.STORAGE_SERVERS_DELETE)
     : false;
 
   const handleUpdate = useCallback(
@@ -68,58 +53,45 @@ export function useStorageServerDetail(id: string | null) {
       if (!canUpdate || !id) throw new Error("Missing permissions or ID");
       const updated = await updateStorageServer(id, dto);
       setServer(updated);
-      fetchHistory();
       return updated;
     },
-    [id, canUpdate, fetchHistory]
+    [id, canUpdate]
   );
 
   const handleActivate = useCallback(async () => {
     if (!canUpdate || !id) throw new Error("Missing permissions or ID");
-    const updated = await activateStorageServer(id);
-    setServer(updated);
-    fetchHistory();
-    return updated;
-  }, [id, canUpdate, fetchHistory]);
-
-  const handleDrain = useCallback(async () => {
-    if (!canUpdate || !id) throw new Error("Missing permissions or ID");
-    const updated = await drainStorageServer(id);
-    setServer(updated);
-    fetchHistory();
-    return updated;
-  }, [id, canUpdate, fetchHistory]);
+    try {
+      const updated = await activateStorageServer(id);
+      setServer(updated);
+      return updated;
+    } catch (err: any) {
+      // Refresh the server state to capture lastConnectionTestErrorCode from the backend
+      await fetchServer();
+      throw err;
+    }
+  }, [id, canUpdate, fetchServer]);
 
   const handleOffline = useCallback(async () => {
     if (!canUpdate || !id) throw new Error("Missing permissions or ID");
     const updated = await offlineStorageServer(id);
     setServer(updated);
-    fetchHistory();
     return updated;
-  }, [id, canUpdate, fetchHistory]);
+  }, [id, canUpdate]);
 
   const handleDelete = useCallback(async () => {
     if (!canDelete || !id) throw new Error("Missing permissions or ID");
     await deleteStorageServer(id);
-    fetchHistory();
-  }, [id, canDelete, fetchHistory]);
+  }, [id, canDelete]);
 
-  const handleVerify = useCallback(async () => {
+  const handleMakePlatformDefault = useCallback(async () => {
     if (!canUpdate || !id) throw new Error("Missing permissions or ID");
-    await requestVerification(id);
-    fetchHistory();
-  }, [id, canUpdate, fetchHistory]);
-
-  const handleSetRouting = useCallback(async (dto: SetStorageRoutingProfileDto) => {
-    if (!canUpdate || !id) throw new Error("Missing permissions or ID");
-    await setRoutingProfile(id, dto);
-    fetchServer();
-    fetchHistory();
-  }, [id, canUpdate, fetchServer, fetchHistory]);
+    const updated = await updateStorageServer(id, { isPlatformDefault: true });
+    setServer(updated);
+    return updated;
+  }, [id, canUpdate]);
 
   return {
     server,
-    history,
     isLoading,
     error,
     canRead,
@@ -127,11 +99,9 @@ export function useStorageServerDetail(id: string | null) {
     canDelete,
     handleUpdate,
     handleActivate,
-    handleDrain,
     handleOffline,
     handleDelete,
-    handleVerify,
-    handleSetRouting,
+    handleMakePlatformDefault,
     refresh: fetchServer,
   };
 }

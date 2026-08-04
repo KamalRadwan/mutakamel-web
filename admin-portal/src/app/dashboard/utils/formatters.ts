@@ -4,18 +4,27 @@ export function formatDashboardMetric(
   metric: DashboardMetric | { kind: string; value: string | number },
   currencyCode = "USD",
 ): string {
-  if (metric.kind === "money" && typeof metric.value === "number") {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currencyCode,
-    }).format(metric.value);
+  if (metric.kind === "money") {
+    const strVal = String(metric.value);
+    const parts = strVal.split(".");
+    const integerPart = parts[0] || "0";
+    const decimalPart = parts[1] ? `.${parts[1]}` : "";
+    
+    // Format the integer part cleanly
+    const formattedInt = new Intl.NumberFormat(undefined).format(BigInt(integerPart));
+    
+    if (currencyCode === "USD") {
+      return `$${formattedInt}${decimalPart}`;
+    }
+    return `${formattedInt}${decimalPart} ${currencyCode}`;
   }
 
-  if (metric.kind === "percent" && typeof metric.value === "number") {
+  if (metric.kind === "percent" || metric.kind === "ratio") {
+    const num = typeof metric.value === "string" ? parseFloat(metric.value) : metric.value;
     return new Intl.NumberFormat(undefined, {
       style: "percent",
       maximumFractionDigits: 1,
-    }).format(metric.value);
+    }).format(num);
   }
 
   return String(metric.value);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useEffect } from "react";
@@ -21,6 +21,7 @@ interface ToastContextType {
     error: (title: string, message?: string, duration?: number) => void;
     info: (title: string, message?: string, duration?: number) => void;
     warning: (title: string, message?: string, duration?: number) => void;
+    saved: () => void;
   };
   removeToast: (id: string) => void;
 }
@@ -37,8 +38,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const addToast = useCallback(
     (type: ToastType, title: string, message?: string, duration = 4000) => {
-      const id = Math.random().toString(36).substring(2, 9);
-      setToasts((prev) => [...prev, { id, type, title, message, duration }]);
+      const id = typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 9);
+      setToasts((prev) => [...prev.slice(-4), { id, type, title, message, duration }]);
 
       if (duration > 0) {
         setTimeout(() => {
@@ -49,12 +52,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [removeToast]
   );
 
-  const toast = {
+  const toast = useMemo(() => ({
     success: (title: string, message?: string, duration?: number) => addToast("success", title, message, duration),
     error: (title: string, message?: string, duration?: number) => addToast("error", title, message, duration),
     info: (title: string, message?: string, duration?: number) => addToast("info", title, message, duration),
     warning: (title: string, message?: string, duration?: number) => addToast("warning", title, message, duration),
-  };
+    saved: () => addToast(
+      "success",
+      lang === "ar" ? "تم الحفظ" : "Saved",
+      lang === "ar" ? "تم حفظ التغييرات بنجاح." : "Your changes have been saved successfully.",
+    ),
+  }), [addToast, lang]);
 
   useEffect(() => {
     const handleGlobalToast = (e: CustomEvent) => {
@@ -71,13 +79,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
       {/* Global Toast Container */}
       <div
-        className={`fixed top-4 z-50 flex flex-col gap-2.5 max-w-sm w-full px-4 pointer-events-none transition-all ${
-          lang === "ar" ? "left-4" : "right-4"
-        }`}
+        aria-live="polite"
+        aria-relevant="additions"
+        className="fixed top-4 z-50 flex flex-col gap-2.5 max-w-sm w-[calc(100%-2rem)] pointer-events-none transition-all end-4"
       >
         {toasts.map((t) => (
           <div
             key={t.id}
+            role={t.type === "error" ? "alert" : "status"}
             className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border shadow-xl backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-4 duration-300 ${
               t.type === "success"
                 ? "bg-emerald-50/95 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-100"
@@ -97,12 +106,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
             <div className="flex-1 min-w-0">
               <h4 className="text-xs font-bold leading-tight">{t.title}</h4>
-              {t.message && <p className="text-[11px] opacity-90 mt-1 leading-relaxed">{t.message}</p>}
+              {t.message && <p className="text-xs opacity-90 mt-1 leading-relaxed whitespace-pre-line">{t.message}</p>}
             </div>
 
             <button
               onClick={() => removeToast(t.id)}
-              className="shrink-0 p-1 rounded-lg opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+              aria-label={lang === "ar" ? "إغلاق الإشعار" : "Dismiss notification"}
+              className="shrink-0 grid size-11 place-items-center -m-2 rounded-xl opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>

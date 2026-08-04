@@ -1,20 +1,21 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { listStorageServers, createStorageServer } from "../api/storageServersApi";
-import type { StorageServer, CreateStorageServerDto } from "../types";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
-import { ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+import type { StorageServerView, StorageServerList, StorageServerStatus, CreateStorageServerDto } from "@/types/storage-server";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export function useStorageServers() {
   const { user } = useAuth();
-  
+
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
 
-  const [servers, setServers] = useState<StorageServer[]>([]);
-  const [meta, setMeta] = useState<any>(null);
+  const [servers, setServers] = useState<StorageServerView[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<any>(null);
 
@@ -31,8 +32,8 @@ export function useStorageServers() {
         sortBy: "createdAt",
         sortDir: "DESC",
       });
-      setServers(res.data as StorageServer[]);
-      setMeta(res.meta);
+      setServers(res.items);
+      setTotalItems(res.total);
     } catch (err: any) {
       setError(err);
     } finally {
@@ -41,13 +42,13 @@ export function useStorageServers() {
   }, [user, page, limit, search, status]);
 
   useEffect(() => {
-    fetchData();
+    queueMicrotask(() => fetchData());
   }, [fetchData]);
 
   const canRead = user ? adminCan(user, "admin.storage_servers.read") : false;
-  
+
   // Create requires base create + critical
-  const canCreate = user 
+  const canCreate = user
     ? adminCanAll(user, ADMIN_RBAC_CRITICAL.STORAGE_SERVERS_CREATE)
     : false;
 
@@ -63,7 +64,7 @@ export function useStorageServers() {
 
   return {
     servers,
-    meta,
+    totalItems,
     isLoading,
     error,
     page,

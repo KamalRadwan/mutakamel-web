@@ -2,7 +2,7 @@
 
 Complete inventory of NestJS Guards, Custom Decorators, and RBAC Permission Keys used across the Admin Portal backend (`core-app`).
 
-Last source verification: **2026-07-30**.
+Last source verification: **2026-08-02**.
 
 ---
 
@@ -52,7 +52,21 @@ authoritative for its exact route permissions.
 
 ### 5. Dashboard & Reports (`admin.reports.*`)
 - **Guard**: `AdminGuard`
-- `admin.reports.read` — Access dashboard KPI tiles and all report views (Overview, Tenants, DB Servers, Billing, Provisioning)
+- `admin.reports.read` — Open the dashboard endpoint; does not grant any report group by itself
+- `admin.reports.tenants` — Tenant report group
+- `admin.reports.domains` — Domain verification report group
+- `admin.reports.subscriptions` — Subscription report group
+- `admin.reports.billing` — Billing and receivables report group
+- `admin.reports.payments` — Payment and refund report group
+- `admin.reports.wallets` — Canonical wallet report group
+- `admin.reports.database-server` — Database Server report group
+- `admin.reports.storage` — Storage Server report group
+- `admin.reports.provisioning` — Provisioning report group
+- `admin.reports.catalogue` — Application Catalogue report group
+- `admin.reports.notifications` — Notification delivery report group
+- `admin.reports.usage` — Usage report group; current backend projection is unavailable
+- `admin.reports.security` — Administrator security report group
+- `admin.reports.audit` — Control-plane audit report group
 
 ### 6. Tenants Control (`admin.tenants.*`)
 - **Guard**: `AdminGuard`
@@ -109,7 +123,13 @@ authoritative for its exact route permissions.
 - `admin.database_servers.read` — List database hosts, view capacity, audit history
 - `admin.database_servers.create` — Register new database server, check connectivity
 - `admin.database_servers.update` — Update capacity/connection, drain, activate, set offline
-- `admin.database_servers.delete` — Delete database server host
+- `admin.database_servers.delete` — Soft-delete an eligible database server host
+- `admin.database_servers.delete.hard` — Permanently destroy a soft-deleted database server
+- `admin.database_servers.critical` — Required with bootstrap, configuration, lifecycle, and delete commands
+- `admin.database_servers.credentials.rotate` — Required with `.critical` for manual regeneration and reconciliation
+
+There is no `admin.database_servers.credentials.export` permission. Database
+Application passwords are never returned to administrators or browsers.
 
 ### 13. Storage Servers (`admin.storage_servers.*`)
 - **Guard**: `AdminGuard`
@@ -154,12 +174,24 @@ workflow. See
 All three settings mutations are also Gateway `WRITE_SENSITIVE` routes and
 require an `x-idempotency-key` UUIDv7.
 
-### 17. Catalogue & Billing Currency (`admin.catalog.*` & `admin.billing.*`)
+### 17. Application Catalogue (`admin.applications.*`, `admin.catalog.*`, and `admin.billing.*`)
 - **Guard**: `AdminGuard`
-- `admin.catalog.read` — View modules, tiers, features, price brackets, currency rates
-- `admin.catalog.manage` — Create/update/reorder modules, tiers, features, tier-feature grants, price tiers
-- `admin.catalog.destroy` — Delete catalogue modules
-- `admin.billing.currency.manage` — Update currency exchange rates
+- `admin.applications.read` — List/read Applications, safe database-manifest evidence, and derived technical readiness
+- `admin.applications.create` — Register a DRAFT Application
+- `admin.applications.update` — Update mutable Application metadata
+- `admin.applications.delete` — Delete an eligible unused DRAFT Application; requires `admin.applications.critical`
+- `admin.applications.critical` — Required with technical primary-component binding, database-policy, lifecycle, and delete commands
+- `admin.catalog.read` — Read tiers, features, tier-feature grants, price ladders, managed currency rates, and catalogue audit
+- `admin.catalog.manage` — Create tiers/features; update/delete tier/feature and replace grants/price ladders when paired with `admin.catalog.critical`
+- `admin.catalog.critical` — Required with tier/feature update/delete, grant replacement, price-ladder replacement, and currency-rate mutation
+- `admin.catalog.destroy` — Still present in the permission seed, but no current Application Catalogue V1 Gateway route consumes it
+- `admin.billing.currency.manage` — Upsert individual or batched managed currency rates; requires `admin.catalog.critical`
+
+Application metadata update requires only `admin.applications.update`.
+Database-policy update and activate/deprecate/disable require
+`admin.applications.update` plus `admin.applications.critical`. There is no
+public `/modules` CRUD contract, and the portal must not invent an action merely
+because the unconsumed `admin.catalog.destroy` seed key still exists.
 
 ### 18. Notifications (`admin.notifications.*`)
 - **Guard**: `AdminGuard`
@@ -190,7 +222,7 @@ type AdminPermission = {
 ### Authorization Rules:
 1. **Never authorize by localized names**: Component guards (`RequirePermission`, `adminCan`) MUST strictly authorize using the immutable `key`.
 2. **Critical Action Pairs**: Destructive and highly sensitive operations require a `.critical` pair.
-   - E.g., deleting a database server requires **both** `["admin.database_servers.delete", "admin.database_servers.critical"]`.
+   - Soft-deleting a database server requires **both** `["admin.database_servers.delete", "admin.database_servers.critical"]`; permanent Destroy requires `["admin.database_servers.delete.hard", "admin.database_servers.critical"]`.
    - Storage registration requires **both** `["admin.storage_servers.create", "admin.storage_servers.critical"]`; storage update/lifecycle/verification/recovery-evidence mutation requires **both** `["admin.storage_servers.update", "admin.storage_servers.critical"]`; deletion requires **both** `["admin.storage_servers.delete", "admin.storage_servers.critical"]`.
    - Tenant Storage Server migration mutations require their exact
      `admin.storage_migrations.*` action permission together with

@@ -4,14 +4,14 @@ import { Bell, CheckCheck, CheckCircle2, AlertCircle, Info, ArrowUpRight } from 
 import { useNotificationDropdown } from "./hooks/useNotificationDropdown";
 
 export function NotificationDropdown() {
-  const { 
+  const {
     t,
-    isOpen, 
-    unreadCount, 
-    notifications, 
-    toggleOpen, 
-    close, 
-    markAllRead 
+    isOpen,
+    unreadCount,
+    notifications,
+    toggleOpen,
+    close,
+    markAllRead
   } = useNotificationDropdown();
 
   return (
@@ -99,7 +99,7 @@ export function NotificationDropdown() {
 
             {/* Footer */}
             <div className="p-2.5 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800 text-center">
-              <button 
+              <button
                 onClick={close}
                 className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
               >

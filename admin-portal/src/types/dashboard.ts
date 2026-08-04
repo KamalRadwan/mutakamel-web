@@ -8,6 +8,41 @@ export type DashboardMetricTone =
   | "purple"
   | "red";
 
+export const DASHBOARD_GROUP_KEYS = [
+  "tenants",
+  "domains",
+  "subscriptions",
+  "billing",
+  "payments",
+  "wallets",
+  "database",
+  "storage",
+  "provisioning",
+  "catalogue",
+  "notifications",
+  "usage",
+  "security",
+  "audit",
+] as const;
+
+export type DashboardGroupKey = (typeof DASHBOARD_GROUP_KEYS)[number];
+
+export type DashboardGroupPermission =
+  | "admin.reports.tenants"
+  | "admin.reports.domains"
+  | "admin.reports.subscriptions"
+  | "admin.reports.billing"
+  | "admin.reports.payments"
+  | "admin.reports.wallets"
+  | "admin.reports.database-server"
+  | "admin.reports.storage"
+  | "admin.reports.provisioning"
+  | "admin.reports.catalogue"
+  | "admin.reports.notifications"
+  | "admin.reports.usage"
+  | "admin.reports.security"
+  | "admin.reports.audit";
+
 export interface DashboardMetric {
   key: string;
   label: string;
@@ -16,6 +51,47 @@ export interface DashboardMetric {
   description: string;
   tone: DashboardMetricTone;
 }
+
+export interface DashboardGroupAlert {
+  key: string;
+  severity: "info" | "warning" | "critical";
+  count: number;
+  message: string;
+}
+
+export interface DashboardAvailableGroup {
+  key: DashboardGroupKey;
+  permission: DashboardGroupPermission;
+  available: true;
+  asOf: string;
+  snapshot: Record<string, unknown>;
+  period: Record<string, unknown>;
+  breakdowns: Record<string, unknown>;
+  alerts: DashboardGroupAlert[];
+  cards: DashboardMetric[];
+}
+
+export interface DashboardUnavailableGroup {
+  key: DashboardGroupKey;
+  permission: DashboardGroupPermission;
+  available: false;
+  asOf: string;
+  reasonCode:
+    | "SOURCE_NOT_CONFIGURED"
+    | "HISTORICAL_DATA_NOT_STORED"
+    | "PROJECTION_NOT_ACTIVE";
+  message: string;
+  alerts: DashboardGroupAlert[];
+  cards: DashboardMetric[];
+}
+
+export type DashboardGroup =
+  | DashboardAvailableGroup
+  | DashboardUnavailableGroup;
+
+export type DashboardGroups = Partial<
+  Record<DashboardGroupKey, DashboardGroup>
+>;
 
 export type DashboardUnavailableReason =
   | "HISTORICAL_DATA_NOT_STORED"
@@ -87,8 +163,9 @@ export interface DashboardRegionItem {
   tone: DashboardMetricTone;
 }
 
-export interface DashboardResponse {
+export interface DashboardResponse extends DashboardGroups {
   asOf: string;
+  authorizedGroups: DashboardGroupKey[];
   range: {
     from: string;
     to: string;
@@ -180,7 +257,7 @@ export interface DashboardResponse {
     };
   };
 
-  analytics: {
+  analytics?: {
     subscriptions: {
       recurringRevenue: DashboardDataset<{
         currencyCode: "USD";
