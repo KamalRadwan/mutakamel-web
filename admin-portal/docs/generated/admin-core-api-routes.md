@@ -3,26 +3,26 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-07-30T11:48:29.010Z**
+Generated at: **2026-08-05T09:52:58.131Z**
 
-Frontend revision: `236bb35e6637+dirty`
+Frontend revision: `625295f8ddcc+dirty`
 
-Backend revision: `8420c6df9b33+dirty`
+Backend revision: `48898351dbde+dirty`
 
 ## Coverage
 
-This inventory contains **243** browser-visible Core Admin routes.
+This inventory contains **232** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
 
 | Route class | Routes |
 | --- | ---: |
-| AUTHENTICATED | 82 |
+| AUTHENTICATED | 79 |
 | PUBLIC | 6 |
-| READ_HEAVY | 22 |
-| WRITE_SENSITIVE | 133 |
-| **Total** | **243** |
+| READ_HEAVY | 21 |
+| WRITE_SENSITIVE | 126 |
+| **Total** | **232** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -31,27 +31,25 @@ Machine-readable source:
 
 | Gateway route-key domain | Routes |
 | --- | ---: |
+| applications | 13 |
 | audit | 2 |
 | auth | 8 |
-| catalog | 26 |
+| catalog | 17 |
 | dashboard | 1 |
-| database-servers | 10 |
+| database-servers | 20 |
 | invoices | 7 |
 | logging | 6 |
 | notifications | 14 |
 | payments | 5 |
 | permissions | 1 |
-| provisioning | 32 |
+| provisioning | 31 |
 | reports | 5 |
 | roles | 6 |
-| storage-attestation-keys | 4 |
-| storage-recovery-destinations | 2 |
-| storage-recovery-policies | 3 |
-| storage-servers | 13 |
+| storage-servers | 7 |
 | subscriptions | 8 |
 | system-settings | 7 |
 | tenant-fqdns | 1 |
-| tenants | 61 |
+| tenants | 52 |
 | users | 15 |
 | wallets | 6 |
 
@@ -59,6 +57,24 @@ Machine-readable source:
 
 | Method | Canonical Gateway path | Class | Idempotent | Permission mode | Permissions | Route key |
 | --- | --- | --- | --- | --- | --- | --- |
+| GET | `/api/admin/core/v1/applications` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.list` |
+| POST | `/api/admin/core/v1/applications` | WRITE_SENSITIVE | yes | ALL | admin.applications.create | `core.admin.applications.create` |
+| GET | `/api/admin/core/v1/applications/:applicationId/audit` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.applications.audit` |
+| GET | `/api/admin/core/v1/applications/:applicationId/features` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.features.list` |
+| POST | `/api/admin/core/v1/applications/:applicationId/features` | WRITE_SENSITIVE | no | ALL | admin.catalog.manage | `core.admin.catalog.features.create` |
+| GET | `/api/admin/core/v1/applications/:applicationId/tiers` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.tiers.list` |
+| POST | `/api/admin/core/v1/applications/:applicationId/tiers` | WRITE_SENSITIVE | no | ALL | admin.catalog.manage | `core.admin.catalog.tiers.create` |
+| DELETE | `/api/admin/core/v1/applications/:applicationKey` | WRITE_SENSITIVE | yes | ALL | admin.applications.delete + admin.applications.critical | `core.admin.applications.delete` |
+| GET | `/api/admin/core/v1/applications/:applicationKey` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.get` |
+| PATCH | `/api/admin/core/v1/applications/:applicationKey` | WRITE_SENSITIVE | yes | ALL | admin.applications.update | `core.admin.applications.update` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/activate` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.activate` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/database-manifests` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.database-manifests.list` |
+| PATCH | `/api/admin/core/v1/applications/:applicationKey/database-policy` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.database-policy.update` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/deprecate` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.deprecate` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/disable` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.disable` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/publish` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.publish` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.technical-provisioning.get` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning/primary-component` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.technical-provisioning.primary-component.create` |
 | GET | `/api/admin/core/v1/audit` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.list` |
 | GET | `/api/admin/core/v1/audit/entities/:entityType/:entityId` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.entity-history` |
 | POST | `/api/admin/core/v1/auth/accept-invite` | PUBLIC | no | ALL | — | `core.admin.auth.accept-invite` |
@@ -80,9 +96,19 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/database-servers/:id` | AUTHENTICATED | yes | ALL | admin.database_servers.read | `core.admin.database-servers.get` |
 | PATCH | `/api/admin/core/v1/database-servers/:id` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.update + admin.database_servers.critical | `core.admin.database-servers.update` |
 | POST | `/api/admin/core/v1/database-servers/:id/activate` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.update + admin.database_servers.critical | `core.admin.database-servers.activate` |
+| GET | `/api/admin/core/v1/database-servers/:id/applications` | AUTHENTICATED | yes | ALL | admin.database_servers.read | `core.admin.database-servers.applications.list` |
+| POST | `/api/admin/core/v1/database-servers/:id/applications/:applicationKey/bootstrap` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.update + admin.database_servers.critical | `core.admin.database-servers.application.bootstrap` |
+| POST | `/api/admin/core/v1/database-servers/:id/applications/:applicationKey/credential/reconcile` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.credentials.rotate + admin.database_servers.critical | `core.admin.database-servers.application-credential.reconcile` |
+| POST | `/api/admin/core/v1/database-servers/:id/applications/:applicationKey/credential/regenerate` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.credentials.rotate + admin.database_servers.critical | `core.admin.database-servers.application-credential.regenerate` |
+| POST | `/api/admin/core/v1/database-servers/:id/credential-bootstrap/retry` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.create + admin.database_servers.critical | `core.admin.database-servers.credential-bootstrap.retry` |
+| DELETE | `/api/admin/core/v1/database-servers/:id/destroy` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.delete.hard + admin.database_servers.critical | `core.admin.database-servers.destroy` |
 | POST | `/api/admin/core/v1/database-servers/:id/drain` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.update + admin.database_servers.critical | `core.admin.database-servers.drain` |
 | GET | `/api/admin/core/v1/database-servers/:id/history` | AUTHENTICATED | yes | ALL | admin.database_servers.read | `core.admin.database-servers.history` |
 | POST | `/api/admin/core/v1/database-servers/:id/offline` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.update + admin.database_servers.critical | `core.admin.database-servers.offline` |
+| GET | `/api/admin/core/v1/database-servers/:id/system-principals` | AUTHENTICATED | yes | ALL | admin.database_servers.read | `core.admin.database-servers.system-principals.list` |
+| POST | `/api/admin/core/v1/database-servers/:id/system-principals/:purpose/credential/reconcile` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.credentials.rotate + admin.database_servers.critical | `core.admin.database-servers.system-principal.credential.reconcile` |
+| POST | `/api/admin/core/v1/database-servers/:id/system-principals/:purpose/credential/regenerate` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.credentials.rotate + admin.database_servers.critical | `core.admin.database-servers.system-principal.credential.regenerate` |
+| PATCH | `/api/admin/core/v1/database-servers/:id/system-principals/:purpose/rotation-policy` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.update + admin.database_servers.critical | `core.admin.database-servers.system-principal.rotation-policy.update` |
 | POST | `/api/admin/core/v1/database-servers/check-connectivity` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.create | `core.admin.database-servers.check-connectivity` |
 | DELETE | `/api/admin/core/v1/features/:id` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage + admin.catalog.critical | `core.admin.catalog.features.delete` |
 | PATCH | `/api/admin/core/v1/features/:id` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage + admin.catalog.critical | `core.admin.catalog.features.update` |
@@ -99,17 +125,6 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/logging/level-overrides/effective` | AUTHENTICATED | yes | ALL | admin.logging.read | `core.admin.logging.level-overrides.effective` |
 | GET | `/api/admin/core/v1/logging/level-overrides/history` | AUTHENTICATED | yes | ALL | admin.logging.read | `core.admin.logging.level-overrides.history` |
 | GET | `/api/admin/core/v1/logging/level-overrides/live` | AUTHENTICATED | no | ALL | admin.logging.read + admin.logging.critical | `core.admin.logging.live` |
-| GET | `/api/admin/core/v1/modules` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.modules.list` |
-| POST | `/api/admin/core/v1/modules` | WRITE_SENSITIVE | no | ALL | admin.catalog.manage | `core.admin.catalog.modules.create` |
-| DELETE | `/api/admin/core/v1/modules/:id` | WRITE_SENSITIVE | yes | ALL | admin.catalog.destroy + admin.catalog.critical | `core.admin.catalog.modules.delete` |
-| GET | `/api/admin/core/v1/modules/:id` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.modules.get` |
-| PATCH | `/api/admin/core/v1/modules/:id` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage + admin.catalog.critical | `core.admin.catalog.modules.update` |
-| PATCH | `/api/admin/core/v1/modules/:id/rank` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage | `core.admin.catalog.modules.reorder` |
-| GET | `/api/admin/core/v1/modules/:moduleId/audit` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.modules.audit` |
-| GET | `/api/admin/core/v1/modules/:moduleId/features` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.features.list` |
-| POST | `/api/admin/core/v1/modules/:moduleId/features` | WRITE_SENSITIVE | no | ALL | admin.catalog.manage | `core.admin.catalog.features.create` |
-| GET | `/api/admin/core/v1/modules/:moduleId/tiers` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.tiers.list` |
-| POST | `/api/admin/core/v1/modules/:moduleId/tiers` | WRITE_SENSITIVE | no | ALL | admin.catalog.manage | `core.admin.catalog.tiers.create` |
 | GET | `/api/admin/core/v1/notifications` | AUTHENTICATED | yes | ALL | admin.notifications.read | `core.admin.notifications.get` |
 | DELETE | `/api/admin/core/v1/notifications/:id` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.by.id.delete` |
 | POST | `/api/admin/core/v1/notifications/:id/ack` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.by.id.ack.post` |
@@ -160,7 +175,6 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/provisioning/releases` | READ_HEAVY | yes | ALL | admin.provisioning.releases.read | `core.admin.provisioning.releases.list` |
 | GET | `/api/admin/core/v1/provisioning/releases/:releaseId` | READ_HEAVY | yes | ALL | admin.provisioning.releases.read | `core.admin.provisioning.releases.get` |
 | POST | `/api/admin/core/v1/provisioning/releases/:releaseId/retire` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.releases.retire + admin.provisioning.critical | `core.admin.provisioning.releases.retire` |
-| GET | `/api/admin/core/v1/provisioning/v1-retirement` | READ_HEAVY | yes | ALL | admin.provisioning.v1-retirement.read | `core.admin.provisioning.v1-retirement.get` |
 | GET | `/api/admin/core/v1/reports/billing` | READ_HEAVY | yes | ALL | admin.reports.read | `core.admin.reports.billing` |
 | GET | `/api/admin/core/v1/reports/overview` | READ_HEAVY | yes | ALL | admin.reports.read | `core.admin.reports.overview` |
 | GET | `/api/admin/core/v1/reports/provisioning` | READ_HEAVY | yes | ALL | admin.reports.read | `core.admin.reports.provisioning` |
@@ -172,28 +186,13 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/roles/:id` | AUTHENTICATED | yes | ALL | admin.roles.read | `core.admin.roles.get` |
 | PATCH | `/api/admin/core/v1/roles/:id` | WRITE_SENSITIVE | yes | ALL | admin.roles.update | `core.admin.roles.update` |
 | PATCH | `/api/admin/core/v1/roles/:id/permissions` | WRITE_SENSITIVE | yes | ALL | admin.roles.update + admin.roles.critical | `core.admin.roles.permissions.set` |
-| GET | `/api/admin/core/v1/storage-attestation-keys` | AUTHENTICATED | yes | ALL | admin.storage_servers.read | `core.admin.storage-attestation-keys.list` |
-| POST | `/api/admin/core/v1/storage-attestation-keys` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-attestation-keys.create` |
-| POST | `/api/admin/core/v1/storage-attestation-keys/:id/promote` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-attestation-keys.promote` |
-| POST | `/api/admin/core/v1/storage-attestation-keys/:id/revoke` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-attestation-keys.revoke` |
-| GET | `/api/admin/core/v1/storage-recovery-destinations` | AUTHENTICATED | yes | ALL | admin.storage_servers.read | `core.admin.storage-recovery-destinations.list` |
-| POST | `/api/admin/core/v1/storage-recovery-destinations` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-recovery-destinations.create` |
 | GET | `/api/admin/core/v1/storage-servers` | AUTHENTICATED | yes | ALL | admin.storage_servers.read | `core.admin.storage-servers.list` |
 | POST | `/api/admin/core/v1/storage-servers` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.create + admin.storage_servers.critical | `core.admin.storage-servers.create` |
 | DELETE | `/api/admin/core/v1/storage-servers/:id` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.delete + admin.storage_servers.critical | `core.admin.storage-servers.delete` |
 | GET | `/api/admin/core/v1/storage-servers/:id` | AUTHENTICATED | yes | ALL | admin.storage_servers.read | `core.admin.storage-servers.get` |
 | PATCH | `/api/admin/core/v1/storage-servers/:id` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.update` |
 | POST | `/api/admin/core/v1/storage-servers/:id/activate` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.activate` |
-| POST | `/api/admin/core/v1/storage-servers/:id/drain` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.drain` |
-| GET | `/api/admin/core/v1/storage-servers/:id/history` | AUTHENTICATED | yes | ALL | admin.storage_servers.read | `core.admin.storage-servers.history` |
 | POST | `/api/admin/core/v1/storage-servers/:id/offline` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.offline` |
-| POST | `/api/admin/core/v1/storage-servers/:id/principals/:principal/credential-roles/:credentialRole/rotations` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.principal-rotations.create` |
-| GET | `/api/admin/core/v1/storage-servers/:id/recovery-policy` | AUTHENTICATED | yes | ALL | admin.storage_servers.read | `core.admin.storage-recovery-policies.get` |
-| POST | `/api/admin/core/v1/storage-servers/:id/recovery-policy/revoke` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-recovery-policies.revoke` |
-| POST | `/api/admin/core/v1/storage-servers/:id/recovery-policy/verifications` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-recovery-policies.verify` |
-| PATCH | `/api/admin/core/v1/storage-servers/:id/routing-profile` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.routing-profile.set` |
-| POST | `/api/admin/core/v1/storage-servers/:id/verification-runs` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.verification-runs.create` |
-| GET | `/api/admin/core/v1/storage-servers/:id/verification-runs/:runId` | AUTHENTICATED | yes | ALL | admin.storage_servers.read | `core.admin.storage-servers.verification-runs.get` |
 | GET | `/api/admin/core/v1/subscriptions` | AUTHENTICATED | yes | ALL | admin.subscriptions.read | `core.admin.subscriptions.list` |
 | POST | `/api/admin/core/v1/subscriptions/:id/plan-change-previews` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.update | `core.admin.subscriptions.v2.plan-change-previews.create` |
 | POST | `/api/admin/core/v1/subscriptions/:id/plan-change-previews/:previewId/apply` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.update + admin.subscriptions.critical | `core.admin.subscriptions.v2.plan-change-previews.apply` |
@@ -247,23 +246,14 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/tenants/:tenantId/payments` | AUTHENTICATED | yes | ALL | admin.wallet.read | `core.admin.payments.by-tenant.list` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/provisioning-state/components` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.provisioning-state.components.list` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/provisioning-state/seeds` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.provisioning-state.seeds.list` |
-| POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/operations/add-module` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.add-module + admin.provisioning.critical | `core.admin.tenants.provisioning.operations.add-module` |
+| POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/operations/add-application` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.add-application + admin.provisioning.critical | `core.admin.tenants.provisioning.operations.add-application` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/operations/decommission` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.decommission + admin.provisioning.critical | `core.admin.tenants.provisioning.operations.decommission` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/operations/repair` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.repair + admin.provisioning.critical | `core.admin.tenants.provisioning.operations.repair` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/provisioning/prerequisite-evidence` | READ_HEAVY | yes | ALL | admin.provisioning.prerequisites.read | `core.admin.tenants.provisioning.prerequisite-evidence.list` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/prerequisite-requests` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.prerequisites.request + admin.provisioning.critical | `core.admin.tenants.provisioning.prerequisite-requests.create` |
-| POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/reconcile` | WRITE_SENSITIVE | yes | ALL | admin.tenants.reprovision + admin.tenants.critical + admin.provisioning.critical | `core.admin.tenants.provisioning.reconcile` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/seed-conflicts/:seedStateId/resolve` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.conflicts.resolve + admin.provisioning.critical | `core.admin.tenants.provisioning.seed-conflicts.resolve` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/provisioning/updates` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.provisioning.updates.list` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/updates/apply` | WRITE_SENSITIVE | yes | ALL | admin.tenants.reprovision + admin.tenants.critical + admin.provisioning.critical | `core.admin.tenants.provisioning.updates.apply` |
-| POST | `/api/admin/core/v1/tenants/:tenantId/storage-migrations` | WRITE_SENSITIVE | yes | ALL | admin.storage_migrations.create + admin.storage_migrations.critical | `core.admin.tenants.storage-migrations.create` |
-| GET | `/api/admin/core/v1/tenants/:tenantId/storage-migrations/:migrationId` | AUTHENTICATED | yes | ALL | admin.storage_migrations.read | `core.admin.tenants.storage-migrations.get` |
-| POST | `/api/admin/core/v1/tenants/:tenantId/storage-migrations/:migrationId/cancel` | WRITE_SENSITIVE | yes | ALL | admin.storage_migrations.manage + admin.storage_migrations.critical | `core.admin.tenants.storage-migrations.cancel` |
-| POST | `/api/admin/core/v1/tenants/:tenantId/storage-migrations/:migrationId/finalize` | WRITE_SENSITIVE | yes | ALL | admin.storage_migrations.finalize + admin.storage_migrations.critical | `core.admin.tenants.storage-migrations.finalize` |
-| POST | `/api/admin/core/v1/tenants/:tenantId/storage-migrations/:migrationId/post-cutover/:operationId/cancel` | WRITE_SENSITIVE | yes | ALL | admin.storage_migrations.post_cutover.cancel + admin.storage_migrations.critical | `core.admin.tenants.storage-migrations.post-cutover.cancel` |
-| POST | `/api/admin/core/v1/tenants/:tenantId/storage-migrations/:migrationId/post-cutover/:operationId/retry` | WRITE_SENSITIVE | yes | ALL | admin.storage_migrations.post_cutover.retry + admin.storage_migrations.critical | `core.admin.tenants.storage-migrations.post-cutover.retry` |
-| POST | `/api/admin/core/v1/tenants/:tenantId/storage-migrations/:migrationId/retry` | WRITE_SENSITIVE | yes | ALL | admin.storage_migrations.manage + admin.storage_migrations.critical | `core.admin.tenants.storage-migrations.retry` |
-| POST | `/api/admin/core/v1/tenants/:tenantId/storage-migrations/:migrationId/rollback` | WRITE_SENSITIVE | yes | ALL | admin.storage_migrations.rollback + admin.storage_migrations.critical | `core.admin.tenants.storage-migrations.rollback` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/subscription` | AUTHENTICATED | yes | ALL | admin.subscriptions.read | `core.admin.subscriptions.v2.get` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/subscription` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.create + admin.subscriptions.critical | `core.admin.subscriptions.v2.seed` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/subscription/items` | AUTHENTICATED | yes | ALL | admin.subscriptions.read | `core.admin.subscriptions.v2.items.list` |
@@ -278,9 +268,6 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/tenants/validate-identity` | AUTHENTICATED | yes | ALL | admin.tenants.create | `core.admin.tenants.validate-identity` |
 | DELETE | `/api/admin/core/v1/tiers/:id` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage + admin.catalog.critical | `core.admin.catalog.tiers.delete` |
 | PATCH | `/api/admin/core/v1/tiers/:id` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage + admin.catalog.critical | `core.admin.catalog.tiers.update` |
-| DELETE | `/api/admin/core/v1/tiers/:id/storage-entitlement` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage + admin.catalog.critical | `core.admin.catalog.tier-storage-entitlement.delete` |
-| GET | `/api/admin/core/v1/tiers/:id/storage-entitlement` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.tier-storage-entitlement.get` |
-| PATCH | `/api/admin/core/v1/tiers/:id/storage-entitlement` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage + admin.catalog.critical | `core.admin.catalog.tier-storage-entitlement.set` |
 | GET | `/api/admin/core/v1/tiers/:tierId/features` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.tier-features.list` |
 | PATCH | `/api/admin/core/v1/tiers/:tierId/features` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage + admin.catalog.critical | `core.admin.catalog.tier-features.set` |
 | GET | `/api/admin/core/v1/tiers/:tierId/price-tiers` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.catalog.price-tiers.list` |

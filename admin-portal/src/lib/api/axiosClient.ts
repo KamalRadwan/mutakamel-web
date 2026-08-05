@@ -4,6 +4,7 @@ import {
   getAuthErrorStatus,
   isDefinitiveAuthFailure,
 } from "../auth/sessionRefresh";
+import { generateUUIDv7 } from "../utils/uuid";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -220,31 +221,7 @@ export async function refreshAdminCookieSession(
   return refreshTokens;
 }
 
-export function generateUUIDv7(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
 
-  const ms = Date.now();
-  const high = Math.floor(ms / 0x100000000);
-  const low = ms % 0x100000000;
-
-  bytes[0] = (high >> 8) & 0xff;
-  bytes[1] = high & 0xff;
-  bytes[2] = (low >> 24) & 0xff;
-  bytes[3] = (low >> 16) & 0xff;
-  bytes[4] = (low >> 8) & 0xff;
-  bytes[5] = low & 0xff;
-
-  bytes[6] = (bytes[6] & 0x0f) | 0x70;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-  let uuid = "";
-  for (let i = 0; i < 16; i++) {
-    uuid += bytes[i].toString(16).padStart(2, "0");
-    if (i === 3 || i === 5 || i === 7 || i === 9) uuid += "-";
-  }
-  return uuid;
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function customFetch<T = any>(

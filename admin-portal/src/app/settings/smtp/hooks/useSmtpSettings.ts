@@ -61,11 +61,13 @@ export function useSmtpSettings() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [hasFetchError, setHasFetchError] = useState(false);
 
   const [isVerifying, setIsVerifying] = useState(false);
 
   const fetchConfig = useCallback(async () => {
     setIsLoading(true);
+    setHasFetchError(false);
     try {
       const [configRes, auditRes] = await Promise.all([
         axiosClient.get<SuccessResponse<any>>(`/api/admin/core/v1/system-settings/email`),
@@ -95,6 +97,7 @@ export function useSmtpSettings() {
       }
     } catch (err) {
       console.error("Failed to fetch SMTP settings or audit logs", err);
+      setHasFetchError(true);
       setAuditLogs([]);
     } finally {
       setIsLoading(false);
@@ -186,5 +189,6 @@ export function useSmtpSettings() {
     isVerifying,
     refetch: fetchConfig,
     hasUpdatePermission,
+    hasFetchError,
   };
 }

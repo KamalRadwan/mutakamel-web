@@ -8,6 +8,7 @@ import {
   UpdateApplicationDto,
   UpdateApplicationDatabasePolicyDto,
   ApplicationLifecycleCommandDto,
+  PublishApplicationDto,
   ApplicationManifestEvidenceView,
   ApplicationTechnicalReadinessView,
   CreateApplicationProvisioningBindingDto,
@@ -48,7 +49,7 @@ function toQueryString(query?: object): string {
 }
 
 export const applicationsApi = {
-  // --- 10 Application Identity & Lifecycle Routes ---
+  // --- Application Identity, Publication & Lifecycle Routes ---
   list: async (query?: ApplicationListQueryDto) => {
     const qs = toQueryString(query);
     const response = await axiosClient.get<SuccessResponse<ApplicationView[]>>(`${BASE_URL}${qs}`);
@@ -109,6 +110,15 @@ export const applicationsApi = {
   updateDatabasePolicy: async (applicationKey: string, data: UpdateApplicationDatabasePolicyDto, idempotencyKey: string) => {
     const response = await axiosClient.patch<SuccessResponse<ApplicationMutationReceipt>>(
       `${BASE_URL}/${encodeURIComponent(applicationKey)}/database-policy`,
+      data,
+      { headers: { "x-idempotency-key": idempotencyKey } }
+    );
+    return extractCoreData(response);
+  },
+
+  publish: async (applicationKey: string, data: PublishApplicationDto, idempotencyKey: string) => {
+    const response = await axiosClient.post<SuccessResponse<ApplicationMutationReceipt>>(
+      `${BASE_URL}/${encodeURIComponent(applicationKey)}/publish`,
       data,
       { headers: { "x-idempotency-key": idempotencyKey } }
     );

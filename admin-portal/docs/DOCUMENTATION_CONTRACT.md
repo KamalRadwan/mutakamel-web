@@ -92,7 +92,7 @@ Files under `docs/generated/` are source-derived inventories. They must:
 - be reproducible without editing backend source;
 - contain transport evidence only, not hand-written implementation claims.
 
-The generated Admin inventory is exhaustive for the 243 Core Admin Gateway
+The generated Admin inventory is exhaustive for the 232 Core Admin Gateway
 routes. Domain guides add DTO and behavior context.
 
 ## Definition of done for one documented feature

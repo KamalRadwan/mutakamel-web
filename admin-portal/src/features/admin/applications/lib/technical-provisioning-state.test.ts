@@ -5,6 +5,7 @@ import {
   classifyTechnicalProvisioningError,
   getActivationReadinessState,
   shouldReconcileTechnicalProvisioning,
+  type ApplicationPublicationEvidence,
 } from "./technical-provisioning-state";
 
 function error(
@@ -21,20 +22,37 @@ function error(
 
 const readiness = (activationAllowed: boolean): ApplicationTechnicalReadinessView => ({
   contractVersion: 1,
+  applicationId: "019f0000-0000-7000-8000-000000000001",
   applicationKey: "crm",
+  runtimeTarget: "crm-app",
+  commercialMode: "SUBSCRIPTION",
+  catalogueVisibility: "PUBLIC",
   lifecycleStatus: "DRAFT",
+  publicationStatus: "PUBLISHED",
   technicalDefinitionRevision: "2",
   status: activationAllowed ? "READY" : "BLOCKED",
   activationAllowed,
-  selectionAllowed: activationAllowed,
+  selectionAllowed: false,
+  selectionBlockers: ["APPLICATION_LIFECYCLE_NOT_ACTIVE"],
   reasons: activationAllowed ? [] : ["PUBLISHED_RELEASE_REQUIRED"],
   checks: {
+    runtimeTarget: true,
     componentBinding: true,
     activeComponents: true,
     publishedReleases: activationAllowed,
+    minimumReleases: true,
     databasePermissionManifest: true,
   },
   components: [],
+});
+
+const publication = (
+  overrides: Partial<ApplicationPublicationEvidence> = {},
+): ApplicationPublicationEvidence => ({
+  publicationStatus: "PUBLISHED",
+  publishedAt: "2026-08-05T10:00:00.000Z",
+  publishedBy: "019f0000-0000-7000-8000-000000000002",
+  ...overrides,
 });
 
 describe("technical provisioning command recovery", () => {
@@ -72,14 +90,38 @@ describe("technical provisioning command recovery", () => {
 
 describe("activation readiness", () => {
   it("fails closed while loading, unavailable, or blocked", () => {
-    expect(getActivationReadinessState(null, true, false)).toBe("LOADING");
-    expect(getActivationReadinessState(null, false, true)).toBe("UNAVAILABLE");
-    expect(getActivationReadinessState(readiness(false), false, false)).toBe("BLOCKED");
+    expect(getActivationReadinessState(null, true, false, null)).toBe("LOADING");
+    expect(getActivationReadinessState(null, false, true, publication())).toBe("UNAVAILABLE");
+    expect(getActivationReadinessState(readiness(false), false, false, publication())).toBe("BLOCKED");
   });
 
-  it("allows activation only from an authoritative allowed projection", () => {
-    expect(getActivationReadinessState(readiness(true), false, false)).toBe("ALLOWED");
-    expect(getActivationReadinessState(readiness(true), false, true)).toBe("UNAVAILABLE");
+  it("requires an attributable published revision as well as technical readiness", () => {
+    expect(getActivationReadinessState(readiness(true), false, false, publication())).toBe("ALLOWED");
+    expect(
+      getActivationReadinessState(
+        { ...readiness(true), publicationStatus: "UNPUBLISHED" },
+        false,
+        false,
+        publication(),
+      ),
+    ).toBe("BLOCKED");
+    expect(
+      getActivationReadinessState(
+        readiness(true),
+        false,
+        false,
+        publication({ publicationStatus: "UNPUBLISHED", publishedAt: null, publishedBy: null }),
+      ),
+    ).toBe("BLOCKED");
+    expect(
+      getActivationReadinessState(
+        readiness(true),
+        false,
+        false,
+        publication({ publishedBy: null }),
+      ),
+    ).toBe("BLOCKED");
+    expect(getActivationReadinessState(readiness(true), false, true, publication())).toBe("UNAVAILABLE");
   });
 });
 

@@ -16,7 +16,7 @@ not mean frontend parity or deployment completion.
 3. [Frontend integration guide](frontend-integration-guide.md)
 4. [Frontend capability matrix](audit/frontend-capability-matrix.md)
 5. [API domain index](api/README.md)
-6. [Generated 243-route inventory](generated/admin-core-api-routes.md)
+6. [Generated 232-route inventory](generated/admin-core-api-routes.md)
 7. [Known gaps](ai/KNOWN_GAPS.md)
 8. [Implementation playbook](ai/IMPLEMENTATION_PLAYBOOK.md)
 9. [Test matrix](ai/TEST_MATRIX.md)
@@ -62,7 +62,7 @@ Do not store JWT access or refresh tokens in browser-readable storage.
 ## Current route evidence
 
 The Gateway Core route table contains 443 routes across all masters. Exactly
-243 have `core.admin.*` route keys and canonical Admin browser paths. Of those,
+232 have `core.admin.*` route keys and canonical Admin browser paths. Of those,
 133 are write-sensitive and one uses explicit ANY permissions.
 
 The generated inventory is transport evidence only. Controller/DTO behavior

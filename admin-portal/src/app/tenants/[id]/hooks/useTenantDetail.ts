@@ -46,7 +46,6 @@ export function useTenantDetail(id: string) {
   const [isAddDebitOpen, setIsAddDebitOpen] = useState(false);
   const [isAddFqdnOpen, setIsAddFqdnOpen] = useState(false);
   const [isRoleAssignmentOpen, setIsRoleAssignmentOpen] = useState(false);
-  const [isOperationDagOpen, setIsOperationDagOpen] = useState(false);
 
   // User Actions State
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -56,7 +55,6 @@ export function useTenantDetail(id: string) {
 
   // Destructive States
   const [destroySubscriptionsToggle, setDestroySubscriptionsToggle] = useState(false);
-  const [selectedOperationId, setSelectedOperationId] = useState<string | null>(null);
 
   // Wallet Adjustment Form States
   const [adjAmount, setAdjAmount] = useState("");
@@ -179,29 +177,6 @@ type Wallet = LooseType;
     return true;
   });
 
-  // Mock Org Catalogues
-  const mockBranches = [
-    { id: "b-cairo", name: "الفرع الرئيسي - القاهرة", code: "CAI" },
-    { id: "b-alex", name: "فرع الإسكندرية", code: "ALX" },
-  ];
-  const mockDepartments = [
-    { id: "d-exec", name: "الإدارة التنفيذية", code: "EXEC", branchId: "b-cairo" },
-    { id: "d-sales", name: "المبيعات المركزية", code: "SALES", branchId: "b-cairo" },
-    { id: "d-it", name: "تقنية المعلومات", code: "IT", branchId: "b-cairo" },
-    { id: "d-hr", name: "الموارد البشرية", code: "HR", branchId: "b-cairo" },
-  ];
-  const mockTeams = [
-    { id: "t-b2b", name: "مبيعات الشركات", code: "B2B", departmentId: "d-sales" },
-    { id: "t-b2c", name: "مبيعات التجزئة", code: "B2C", departmentId: "d-sales" },
-  ];
-  const mockRoles = [
-    { id: "r-super", name: "Super Admin", description: "وصول كامل للنظام" },
-    { id: "r-sales", name: "Sales Manager", description: "إدارة فريق المبيعات" },
-    { id: "r-crm", name: "CRM User", description: "مستخدم لنظام العملاء" },
-    { id: "r-hr", name: "HR Rep", description: "إدارة شؤون الموظفين" },
-  ];
-
-
   // Handlers
   const handleUpdateTenantProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,20 +216,7 @@ type Wallet = LooseType;
     }
   };
 
-  // Lifecycle
-  const handleActivate = () => setTenant(tenant ? { ...tenant, status: "ACTIVE" } : null);
-  const handleSuspend = () => setTenant(tenant ? { ...tenant, status: "SUSPENDED" } : null);
-  const handleDelete = () => setTenant(tenant ? { ...tenant, status: "DELETED" } : null);
-  const handleDestroyConfirm = () => {
-    // API Call to /admin/tenants/:id/destroy?destroySubscriptions=true|false
-    router.push("/tenants"); // Destroy redirects to list
-  };
-  const handleCancelProvisioning = () => {
-    setTenant(tenant ? { ...tenant, status: "FAILED" } : null);
-  };
-  const handleReprovision = () => {
-    setTenant(tenant ? { ...tenant, status: "PROVISIONING" } : null);
-  };
+
 
   // User Lifecycle
   const handleSuspendUser = async (userId: string) => {
@@ -420,8 +382,6 @@ type Wallet = LooseType;
 
     selectedUserId,
     setSelectedUserId,
-    selectedOperationId,
-    setSelectedOperationId,
     newFqdnInput,
     setNewFqdnInput,
     destroySubscriptionsToggle,
@@ -435,20 +395,7 @@ type Wallet = LooseType;
     setAdjNote,
     adjReason,
     setAdjReason,
-
-    // Organization Catalogs
-    mockBranches,
-    mockDepartments,
-    mockTeams,
-    mockRoles,
-
     // Handlers
-    handleActivate,
-    handleSuspend,
-    handleDelete,
-    handleDestroyConfirm,
-    handleCancelProvisioning,
-    handleReprovision,
     handleAddFqdnSubmit,
     handleRemoveFqdn,
     handleSetPrimaryFqdn,
@@ -460,6 +407,7 @@ type Wallet = LooseType;
     handleDeleteUser,
     handleRestoreUser,
     handleResendInvite,
+
     onBack: () => router.push("/tenants"),
   };
 }

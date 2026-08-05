@@ -1,5 +1,8 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
-import type { ApplicationTechnicalReadinessView } from "../types";
+import type {
+  ApplicationTechnicalReadinessView,
+  ApplicationView,
+} from "../types";
 
 export type TechnicalProvisioningErrorKind =
   | "STALE"
@@ -13,6 +16,11 @@ export type ActivationReadinessState =
   | "UNAVAILABLE"
   | "BLOCKED"
   | "ALLOWED";
+
+export type ApplicationPublicationEvidence = Pick<
+  ApplicationView,
+  "publicationStatus" | "publishedAt" | "publishedBy"
+>;
 
 export function classifyTechnicalProvisioningError(
   error: NormalizedApiError,
@@ -38,9 +46,18 @@ export function getActivationReadinessState(
   readiness: ApplicationTechnicalReadinessView | null,
   isLoading: boolean,
   hasError: boolean,
+  publication: ApplicationPublicationEvidence | null,
 ): ActivationReadinessState {
   if (isLoading && !readiness) return "LOADING";
   if (hasError || !readiness) return "UNAVAILABLE";
+  if (
+    readiness.publicationStatus !== "PUBLISHED" ||
+    publication?.publicationStatus !== "PUBLISHED" ||
+    !publication.publishedAt ||
+    !publication.publishedBy
+  ) {
+    return "BLOCKED";
+  }
   return readiness.activationAllowed ? "ALLOWED" : "BLOCKED";
 }
 

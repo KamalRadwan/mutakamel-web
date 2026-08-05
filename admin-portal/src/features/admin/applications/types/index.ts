@@ -15,6 +15,10 @@ export type ApplicationLifecycleStatus =
   | "DEPRECATED"
   | "DISABLED";
 
+export type ApplicationPublicationStatus =
+  | "UNPUBLISHED"
+  | "PUBLISHED";
+
 export type ApplicationDatabaseAccessMode =
   | "NONE"
   | "TENANT_DATABASE";
@@ -22,6 +26,7 @@ export type ApplicationDatabaseAccessMode =
 export type ApplicationCommandOperation =
   | "CREATE"
   | "UPDATE"
+  | "PUBLISH"
   | "DELETE"
   | "UPDATE_DATABASE_POLICY"
   | "ACTIVATE"
@@ -56,17 +61,31 @@ export interface ApplicationManifestEvidenceView {
 }
 
 export type ApplicationTechnicalReadinessReason =
+  | "RUNTIME_TARGET_REQUIRED"
   | "COMPONENT_BINDING_REQUIRED"
   | "ACTIVE_COMPONENT_REQUIRED"
   | "PUBLISHED_RELEASE_REQUIRED"
+  | "MINIMUM_RELEASE_NOT_SATISFIED"
   | "DATABASE_PERMISSION_MANIFEST_REQUIRED"
   | "DATABASE_PERMISSION_MANIFEST_INVALID";
+
+export type ApplicationTechnicalReadinessStatus =
+  | "READY"
+  | "NOT_REQUIRED"
+  | "BLOCKED";
+
+export type ApplicationSelectionBlocker =
+  | "APPLICATION_LIFECYCLE_NOT_ACTIVE"
+  | "APPLICATION_NOT_PUBLISHED"
+  | "APPLICATION_NOT_PUBLIC"
+  | "APPLICATION_NON_BILLABLE"
+  | "TECHNICAL_READINESS_BLOCKED";
 
 export interface ApplicationTechnicalComponentView {
   id: string;
   key: string;
   ownerApp: string;
-  workerTarget: `${string}-app`;
+  workerTarget: string | null;
   kind: "FOUNDATION" | "MODULE";
   status: "ACTIVE" | "RETIRED";
   contractVersion: number;
@@ -84,17 +103,25 @@ export interface ApplicationTechnicalComponentView {
 
 export interface ApplicationTechnicalReadinessView {
   contractVersion: 1;
+  applicationId: string;
   applicationKey: string;
+  runtimeTarget: string | null;
+  commercialMode: ApplicationCommercialMode;
+  catalogueVisibility: ApplicationCatalogueVisibility;
   lifecycleStatus: ApplicationLifecycleStatus;
+  publicationStatus: ApplicationPublicationStatus;
   technicalDefinitionRevision: string;
-  status: "READY" | "NOT_REQUIRED" | "BLOCKED";
+  status: ApplicationTechnicalReadinessStatus;
   activationAllowed: boolean;
   selectionAllowed: boolean;
+  selectionBlockers: ApplicationSelectionBlocker[];
   reasons: ApplicationTechnicalReadinessReason[];
   checks: {
+    runtimeTarget: boolean;
     componentBinding: boolean;
     activeComponents: boolean;
     publishedReleases: boolean;
+    minimumReleases: boolean;
     databasePermissionManifest: boolean;
   };
   components: ApplicationTechnicalComponentView[];
@@ -102,6 +129,7 @@ export interface ApplicationTechnicalReadinessView {
 
 export interface CreateApplicationProvisioningBindingDto {
   expectedTechnicalDefinitionRevision: string;
+  componentKey: string;
   contractVersion: number;
   reason: string;
 }
@@ -128,6 +156,11 @@ export interface ApplicationView {
   commercialMode: ApplicationCommercialMode;
   catalogueVisibility: ApplicationCatalogueVisibility;
   lifecycleStatus: ApplicationLifecycleStatus;
+  runtimeTarget: string | null;
+  publicationStatus: ApplicationPublicationStatus;
+  publicationRevision: string;
+  publishedAt: string | null;
+  publishedBy: string | null;
   databaseAccessMode: ApplicationDatabaseAccessMode;
   databasePrincipal: string | null;
   requiredOnDatabaseServer: boolean;
@@ -149,6 +182,9 @@ export interface ApplicationMutationReceipt {
   applicationId: string;
   applicationKey: string;
   lifecycleStatus: ApplicationLifecycleStatus;
+  runtimeTarget: string | null;
+  publicationStatus: ApplicationPublicationStatus;
+  publicationRevision: string;
   catalogueRevision: string;
   policyRevision: string;
   deleted: boolean;
@@ -164,6 +200,7 @@ export interface ApplicationListQueryDto {
   commercialMode?: ApplicationCommercialMode;
   catalogueVisibility?: ApplicationCatalogueVisibility;
   lifecycleStatus?: ApplicationLifecycleStatus;
+  publicationStatus?: ApplicationPublicationStatus;
   databaseAccessMode?: ApplicationDatabaseAccessMode;
 }
 
@@ -188,6 +225,12 @@ export interface UpdateApplicationDto {
 
 export interface ApplicationLifecycleCommandDto {
   expectedCatalogueRevision: string;
+  reason: string; // non-empty, max 256
+}
+
+export interface PublishApplicationDto {
+  expectedCatalogueRevision: string;
+  expectedPublicationRevision: string;
   reason: string; // non-empty, max 256
 }
 

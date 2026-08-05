@@ -94,14 +94,14 @@ export default function RolesDirectoryPage() {
               </div>
             </div>
             <div className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono mt-1">
-              {roles.length}
+              {totalItems}
             </div>
           </div>
 
           <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-sm hover:shadow-md transition-all">
             <div className="absolute top-0 end-0 w-20 h-20 bg-purple-500/10 rounded-full blur-xl pointer-events-none" />
             <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-              <span className="text-xs font-bold uppercase tracking-wider">{lang === "ar" ? "أدوار النظام" : "System Roles"}</span>
+              <span className="text-xs font-bold uppercase tracking-wider">{lang === "ar" ? "أدوار النظام (المعروضة)" : "System Roles (Visible)"}</span>
               <div className="p-1.5 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 rounded-lg">
                 <Lock className="w-4 h-4" />
               </div>
@@ -114,7 +114,7 @@ export default function RolesDirectoryPage() {
           <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200/80 dark:border-emerald-500/20 shadow-sm hover:shadow-md transition-all">
             <div className="absolute top-0 end-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-xl pointer-events-none" />
             <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-              <span className="text-xs font-bold uppercase tracking-wider">{lang === "ar" ? "أدوار مخصصة" : "Custom Roles"}</span>
+              <span className="text-xs font-bold uppercase tracking-wider">{lang === "ar" ? "أدوار مخصصة (المعروضة)" : "Custom Roles (Visible)"}</span>
               <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-lg">
                 <Edit2 className="w-4 h-4" />
               </div>

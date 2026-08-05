@@ -24,12 +24,6 @@ export function useRegisterTenant() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isValidatingIdentity, setIsValidatingIdentity] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isPreviewingPlan, setIsPreviewingPlan] = useState(false);
-  const [provisioningDag, setProvisioningDag] = useState<{
-    selectionDigest: string;
-    components: string[];
-    stepsCount: number;
-  } | null>(null);
   const [storagePlacementOptions, setStoragePlacementOptions] = useState<
     TenantStoragePlacementOption[]
   >([]);
@@ -174,25 +168,21 @@ export function useRegisterTenant() {
     }
   };
 
-  const handlePreviewPlan = async () => {
-    setIsPreviewingPlan(true);
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    setIsPreviewingPlan(false);
-    setProvisioningDag({
-      selectionDigest: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      components: [
-        "core.foundation.seed.organization",
-        "core.identity.tenant.owner",
-        "crm.database.schema.migrations",
-        "trade.database.schema.migrations",
-        "worker.queue.subscribers",
-      ],
-      stepsCount: 12,
-    });
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.companyName || !formData.industry || !formData.timezone || !formData.name) {
+      toast.error(
+        lang === "ar" ? "بيانات ناقصة" : "Missing fields",
+        lang === "ar"
+          ? "يرجى استكمال البيانات الأساسية (اسم الشركة، النشاط، المنطقة الزمنية) قبل المتابعة."
+          : "Please fill in the required fields (Company Name, Industry, Timezone) before proceeding."
+      );
+      setCurrentStep(1);
+      return;
+    }
+
     if (!hasValidStorageSelection) {
       setShowStorageSelectionError(true);
       setCurrentStep(3);
@@ -314,10 +304,7 @@ export function useRegisterTenant() {
     hasValidStorageSelection,
     isSubmitting,
     isValidatingIdentity,
-    isPreviewingPlan,
-    provisioningDag,
     handleValidateIdentity,
-    handlePreviewPlan,
     handleSubmit,
     nextStep,
     prevStep,

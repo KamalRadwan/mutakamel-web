@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastContext";
+import { axiosClient } from "@/lib/api/axiosClient";
 
 export function useLogin() {
   const [email, setEmail] = useState("");
@@ -52,13 +53,29 @@ export function useLogin() {
 
   const handleForgotPassword = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    toast.info(
-      lang === "ar" ? "تم إرسال رابط التعيين" : "Reset Link Sent",
-      lang === "ar"
-        ? "إذا كان البريد مسجلاً، ستصل إليه تعليمات إعادة تعيين كلمة المرور."
-        : "If the email is registered, password reset instructions will be sent."
-    );
-    setIsForgotModalOpen(false);
+    if (!email) {
+      toast.error(lang === "ar" ? "خطأ" : "Error", lang === "ar" ? "يرجى إدخال البريد الإلكتروني" : "Please enter your email");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      await axiosClient.post("/api/admin/core/v1/auth/forgot-password", { email });
+      toast.info(
+        lang === "ar" ? "تم إرسال رابط التعيين" : "Reset Link Sent",
+        lang === "ar"
+          ? "إذا كان البريد مسجلاً، ستصل إليه تعليمات إعادة تعيين كلمة المرور."
+          : "If the email is registered, password reset instructions will be sent."
+      );
+      setIsForgotModalOpen(false);
+    } catch (err: unknown) {
+      toast.error(
+        lang === "ar" ? "تعذر الإرسال" : "Failed to Send",
+        lang === "ar" ? "حدث خطأ أثناء الاتصال بالخادم." : "Could not communicate with the server."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return {

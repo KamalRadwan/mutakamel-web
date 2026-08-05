@@ -13,11 +13,9 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', 'date-fns', 'recharts'],
   },
-  typescript: {
-    ignoreBuildErrors: true, // save RAM during dev
-  },
+
   async rewrites() {
-    // if (!isDev) return []; // Removed to allow proxying in production too
+    if (!isDev) return [];
 
     return [
       {

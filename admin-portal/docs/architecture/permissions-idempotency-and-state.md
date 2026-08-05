@@ -7,7 +7,7 @@ Last source verification: **2026-07-30**
 ## Permission semantics
 
 A permission list joined with `+` requires ALL permissions. The FQDN validation
-route is the single explicit ANY-permission route in the current 243-route
+route is the single explicit ANY-permission route in the current 232-route
 Admin Core inventory.
 
 ```ts

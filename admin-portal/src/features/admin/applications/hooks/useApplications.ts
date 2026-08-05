@@ -13,6 +13,7 @@ import {
   ApplicationCatalogueVisibility,
   ApplicationLifecycleStatus,
   ApplicationDatabaseAccessMode,
+  ApplicationPublicationStatus,
 } from "../types";
 
 export function useApplications() {
@@ -32,6 +33,7 @@ export function useApplications() {
   const [commercialFilter, setCommercialFilter] = useState<ApplicationCommercialMode | "ALL">("ALL");
   const [visibilityFilter, setVisibilityFilter] = useState<ApplicationCatalogueVisibility | "ALL">("ALL");
   const [lifecycleFilter, setLifecycleFilter] = useState<ApplicationLifecycleStatus | "ALL">("ALL");
+  const [publicationFilter, setPublicationFilter] = useState<ApplicationPublicationStatus | "ALL">("ALL");
   const [dbAccessFilter, setDbAccessFilter] = useState<ApplicationDatabaseAccessMode | "ALL">("ALL");
 
   const [meta, setMeta] = useState({
@@ -62,6 +64,7 @@ export function useApplications() {
         ...(commercialFilter !== "ALL" ? { commercialMode: commercialFilter } : {}),
         ...(visibilityFilter !== "ALL" ? { catalogueVisibility: visibilityFilter } : {}),
         ...(lifecycleFilter !== "ALL" ? { lifecycleStatus: lifecycleFilter } : {}),
+        ...(publicationFilter !== "ALL" ? { publicationStatus: publicationFilter } : {}),
         ...(dbAccessFilter !== "ALL" ? { databaseAccessMode: dbAccessFilter } : {}),
       };
       const response = await applicationsApi.list(query);
@@ -76,7 +79,7 @@ export function useApplications() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, debouncedSearch, typeFilter, commercialFilter, visibilityFilter, lifecycleFilter, dbAccessFilter, toast]);
+  }, [page, limit, debouncedSearch, typeFilter, commercialFilter, visibilityFilter, lifecycleFilter, publicationFilter, dbAccessFilter, toast]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -132,6 +135,8 @@ export function useApplications() {
     setVisibilityFilter,
     lifecycleFilter,
     setLifecycleFilter,
+    publicationFilter,
+    setPublicationFilter,
     dbAccessFilter,
     setDbAccessFilter,
     meta,

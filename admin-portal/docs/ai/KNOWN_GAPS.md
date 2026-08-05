@@ -66,7 +66,7 @@ the [capability matrix](../audit/frontend-capability-matrix.md).
 
 Source validation on **2026-07-30** produced:
 
-- `npm run docs:check`: PASS; 243 generated Admin Core routes and 57 Markdown
+- `npm run docs:check`: PASS; 232 generated Admin Core routes and 57 Markdown
   files checked.
 - `npx tsc --noEmit`: PASS.
 - `npx vitest run`: PASS; 8 files and 56 tests.

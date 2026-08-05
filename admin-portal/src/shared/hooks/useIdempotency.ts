@@ -1,26 +1,32 @@
 import { useRef, useCallback } from "react";
-import { v7 as uuidv7 } from "uuid";
+import { generateUUIDv7 } from "@/lib/utils/uuid";
 
 /**
  * A hook to manage UUIDv7 idempotency keys for API mutations.
  */
 export function useIdempotency() {
-  const keyRef = useRef<string>(uuidv7());
+  const keyRef = useRef<string>(generateUUIDv7());
   const hashRef = useRef<string | null>(null);
 
   const hashPayload = (payload: unknown) => {
+    let str = "";
     try {
-      return JSON.stringify(payload);
+      str = JSON.stringify(payload);
     } catch {
-      return String(payload);
+      str = String(payload);
     }
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash * 33) ^ str.charCodeAt(i);
+    }
+    return (hash >>> 0).toString(16);
   };
 
-  const getIdempotencyKey = useCallback((currentPayload: unknown) => {
-    const currentHash = hashPayload(currentPayload);
+  const getIdempotencyKey = useCallback((intentParts: unknown) => {
+    const currentHash = hashPayload(intentParts);
 
     if (hashRef.current !== null && hashRef.current !== currentHash) {
-      keyRef.current = uuidv7();
+      keyRef.current = generateUUIDv7();
     }
 
     hashRef.current = currentHash;
@@ -28,7 +34,7 @@ export function useIdempotency() {
   }, []);
 
   const resetKey = useCallback(() => {
-    keyRef.current = uuidv7();
+    keyRef.current = generateUUIDv7();
     hashRef.current = null;
   }, []);
 

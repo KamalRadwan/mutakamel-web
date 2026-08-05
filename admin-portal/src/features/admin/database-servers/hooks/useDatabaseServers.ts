@@ -121,6 +121,7 @@ export function useDatabaseServers() {
     try {
       const key = getIdempotencyKey(dto);
       const result = await databaseServersApi.checkConnectivity(dto, key);
+      resetKey();
       return result;
     } catch (err) {
       const normalized = normalizeApiError(err);

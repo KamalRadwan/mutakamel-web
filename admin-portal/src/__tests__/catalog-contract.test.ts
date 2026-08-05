@@ -8,7 +8,7 @@ vi.mock("@/lib/api/axiosClient");
 
 const asAxiosResponse = (value: unknown) => value as AxiosResponse<unknown>;
 
-describe("Application Catalogue API Contract Tests (27 Routes)", () => {
+describe("Application Catalogue API Contract Tests (30 Routes)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
@@ -137,6 +137,7 @@ describe("Application Catalogue API Contract Tests (27 Routes)", () => {
     await applicationsApi.update("crm", { expectedCatalogueRevision: "1", name: "CRM" }, key);
     await applicationsApi.delete("crm", "1", "Unused draft", key);
     await applicationsApi.updateDatabasePolicy("crm", { expectedPolicyRevision: "1", rotationEnabled: true, reason: "Enable rotation" }, key);
+    await applicationsApi.publish("crm", { expectedCatalogueRevision: "2", expectedPublicationRevision: "1", reason: "Publish verified revision" }, key);
     await applicationsApi.activate("crm", "1", "Activate", key);
     await applicationsApi.deprecate("crm", { expectedCatalogueRevision: "2", reason: "Deprecate" }, key);
     await applicationsApi.disable("crm", { expectedCatalogueRevision: "3", reason: "Disable" }, key);
@@ -161,6 +162,11 @@ describe("Application Catalogue API Contract Tests (27 Routes)", () => {
     expect(axiosClient.get).toHaveBeenCalledWith("/api/admin/core/v1/applications/app-1/audit?page=1");
     expect(axiosClient.post).toHaveBeenCalledWith("/api/admin/core/v1/applications/app-1/tiers", { key: "basic", name: "Basic" });
     expect(axiosClient.post).toHaveBeenCalledWith("/api/admin/core/v1/applications/app-1/features", { key: "crm.leads", name: "Leads" });
+    expect(axiosClient.post).toHaveBeenCalledWith(
+      "/api/admin/core/v1/applications/crm/publish",
+      { expectedCatalogueRevision: "2", expectedPublicationRevision: "1", reason: "Publish verified revision" },
+      { headers: { "x-idempotency-key": key } }
+    );
     expect(axiosClient.patch).toHaveBeenCalledWith("/api/admin/core/v1/tiers/tier-1", { name: "Basic Plus" }, { headers: { "x-idempotency-key": key } });
     expect(axiosClient.patch).toHaveBeenCalledWith("/api/admin/core/v1/features/feature-1", { name: "Lead management" }, { headers: { "x-idempotency-key": key } });
     expect(axiosClient.get).toHaveBeenCalledWith("/api/admin/core/v1/tiers/tier-1/features");

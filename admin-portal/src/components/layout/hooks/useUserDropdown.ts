@@ -10,9 +10,9 @@ export function useUserDropdown() {
   const { user, logout } = useAuth();
 
   const currentAdmin = {
-    firstName: user?.firstName || t.common.adminUser.split(" ")[0] || "Mona",
-    lastName: user?.lastName || t.common.adminUser.split(" ")[1] || "Ali",
-    email: user?.email || "mona.ali@mutakamel.ai",
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    email: user?.email || "",
     tier: user?.isSuperAdmin ? "SUPER_ADMIN" : "ADMIN",
     roleName: user?.role?.name || t.common.superAdminRole,
   };

@@ -7,7 +7,7 @@ Last source verification: **2026-08-04**
 - [Documentation contract](../DOCUMENTATION_CONTRACT.md)
 - [API index](../api/README.md)
 - [Backup and Restore contract](../api/backups-restores.md)
-- [Generated 243-route inventory](../generated/admin-core-api-routes.md)
+- [Generated 232-route inventory](../generated/admin-core-api-routes.md)
 - [Frontend capability matrix](../audit/frontend-capability-matrix.md)
 - [Documentation coverage](../audit/documentation-coverage.md)
 - [HTTP/error contract](../architecture/http-and-error-contract.md)

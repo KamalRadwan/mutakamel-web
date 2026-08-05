@@ -9,7 +9,7 @@ Last source verification: **2026-07-30**
 | Scope | Routes | Coverage |
 | --- | ---: | --- |
 | Core route table, all masters | 443 | Source context only |
-| Core Admin browser routes | 243 | Complete generated inventory |
+| Core Admin browser routes | 232 | Complete generated inventory |
 | Write-sensitive Admin routes | 133 | Complete generated inventory |
 | Explicit ANY-permission Admin routes | 1 | FQDN validation |
 
@@ -54,5 +54,5 @@ the entire generated table.
 - Source verification does not establish authenticated runtime or deployment.
 - The working trees may be dirty; generated metadata records revisions and
   `+dirty` state.
-- Worker backup/restore routes remain outside the 243 Core Admin count and have
+- Worker backup/restore routes remain outside the 232 Core Admin count and have
   their own guide.

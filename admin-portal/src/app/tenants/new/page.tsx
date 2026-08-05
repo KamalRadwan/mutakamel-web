@@ -36,10 +36,8 @@ export default function RegisterTenantWizardPage() {
     hasValidStorageSelection,
     isSubmitting,
     isValidatingIdentity,
-    isPreviewingPlan,
-    provisioningDag,
+    isValidatingIdentity,
     handleValidateIdentity,
-    handlePreviewPlan,
     handleSubmit,
     nextStep,
     prevStep,
@@ -645,29 +643,7 @@ export default function RegisterTenantWizardPage() {
                 </div>
               </div>
 
-              {/* Provisioning DAG Preview Button */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={handlePreviewPlan}
-                  disabled={isPreviewingPlan}
-                  className="px-4 py-2 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 rounded-xl hover:bg-amber-100 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-                >
-                  {isPreviewingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
-                  <span>{lang === "ar" ? "معاينة خطة التجهيز (Preview Provisioning DAG)" : "Preview Provisioning DAG Plan"}</span>
-                </button>
 
-                {provisioningDag && (
-                  <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 text-xs font-mono">
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{lang === "ar" ? `✓ تم التحقق من مكونات الـ DAG: (${provisioningDag.stepsCount} خطوات متسلسلة)` : `✓ Provisioning DAG Plan Validated: (${provisioningDag.stepsCount} steps)`}</span>
-                    <ul className="space-y-1 text-slate-600 dark:text-slate-300 text-[11px] list-disc list-inside">
-                      {provisioningDag.components.map((comp, idx) => (
-                        <li key={idx}>{comp}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
             </div>
           )}
 

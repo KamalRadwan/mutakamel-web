@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSmtpSettings } from "./hooks/useSmtpSettings";
-import { Mail, Save, Loader2, PlayCircle, Eye, EyeOff, History, UserCheck } from "lucide-react";
+import { Mail, Save, Loader2, PlayCircle, Eye, EyeOff, History, UserCheck, AlertTriangle } from "lucide-react";
 
 import { useToast } from "@/components/ui/ToastContext";
 
@@ -19,6 +19,7 @@ export default function SmtpSettingsPage() {
     verifyConnection,
     isVerifying,
     hasUpdatePermission,
+    hasFetchError,
   } = useSmtpSettings();
 
   const [passwordInput, setPasswordInput] = useState("");
@@ -102,6 +103,20 @@ export default function SmtpSettingsPage() {
       {isLoading ? (
         <div className="flex items-center justify-center p-12 text-slate-400">
           <Loader2 className="w-6 h-6 animate-spin" />
+        </div>
+      ) : hasFetchError ? (
+        <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-3">
+          <div className="p-3 bg-rose-100 dark:bg-rose-900/50 rounded-full text-rose-600 dark:text-rose-400">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-rose-900 dark:text-rose-100">
+            {lang === "ar" ? "تعذر تحميل إعدادات مزود البريد" : "SMTP Configuration Unavailable"}
+          </h3>
+          <p className="text-sm text-rose-700 dark:text-rose-300 max-w-md">
+            {lang === "ar" 
+              ? "فشل النظام في استرداد بيانات الخادم البريدي. هذا قد يشير إلى عطل حرج، ولن يتم إرسال أي رسائل." 
+              : "The system failed to retrieve the SMTP gateway configuration. This indicates a critical fault and emails will not be dispatched."}
+          </p>
         </div>
       ) : (
         <div className="space-y-6">

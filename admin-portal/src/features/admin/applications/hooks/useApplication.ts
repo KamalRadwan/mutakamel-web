@@ -9,6 +9,7 @@ import {
   UpdateApplicationDatabasePolicyDto,
   ApplicationLifecycleCommandDto,
   ApplicationManifestEvidenceView,
+  PublishApplicationDto,
 } from "../types";
 
 export function useApplication(applicationKey: string) {
@@ -71,6 +72,16 @@ export function useApplication(applicationKey: string) {
       { onSuccessMessage: "Database policy updated.", onSuccess: fetchApplication }
     );
 
+  const publishApplication = (dto: PublishApplicationDto) =>
+    mutate(
+      dto,
+      (key) => applicationsApi.publish(applicationKey, dto, key),
+      {
+        onSuccessMessage: "Application revision published.",
+        onSuccess: fetchApplication,
+      },
+    );
+
   const activateApplication = (expectedCatalogueRevision: string, reason: string) => {
     const payload = { expectedCatalogueRevision, reason };
     return mutate(
@@ -118,6 +129,7 @@ export function useApplication(applicationKey: string) {
     fetchManifests,
     updateApplication,
     updateDatabasePolicy,
+    publishApplication,
     activateApplication,
     deprecateApplication,
     disableApplication,

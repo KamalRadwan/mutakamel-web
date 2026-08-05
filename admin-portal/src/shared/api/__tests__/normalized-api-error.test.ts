@@ -3,7 +3,16 @@ import {
   normalizeApiError,
   type NormalizedApiError,
 } from '../normalized-api-error';
-import { AxiosError, AxiosHeaders } from 'axios';
+class MockAxiosError extends Error {
+  isAxiosError = true;
+  response: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(message: string, code: string, config: any, request: any, response: any) {
+    super(message);
+    this.name = 'AxiosError';
+    this.response = response;
+  }
+}
 
 describe('normalized-api-error', () => {
   it('normalizes a CoreErrorResponse correctly', () => {
@@ -18,7 +27,7 @@ describe('normalized-api-error', () => {
       path: '/api/test'
     };
 
-    const axiosError = new AxiosError(
+    const axiosError = new MockAxiosError(
       'Request failed with status code 422',
       'ERR_BAD_REQUEST',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,7 +38,7 @@ describe('normalized-api-error', () => {
         statusText: 'Unprocessable Entity',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         config: {} as any,
-        headers: new AxiosHeaders(),
+        headers: new Headers(),
         data: errorData
       }
     );
@@ -52,7 +61,7 @@ describe('normalized-api-error', () => {
       correlationId: 'gw-corr-id'
     };
 
-    const axiosError = new AxiosError(
+    const axiosError = new MockAxiosError(
       'Request failed with status code 409',
       'ERR_BAD_REQUEST',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -63,7 +72,7 @@ describe('normalized-api-error', () => {
         statusText: 'Conflict',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         config: {} as any,
-        headers: new AxiosHeaders(),
+        headers: new Headers(),
         data: errorData
       }
     );

@@ -17,6 +17,7 @@ import type {
 } from "../types";
 
 interface LinkPrimaryComponentInput {
+  componentKey: string;
   contractVersion: number;
   reason: string;
 }
@@ -121,7 +122,13 @@ export function useApplicationTechnicalProvisioning(
         if (shouldReconcileTechnicalProvisioning(kind)) {
           reconciled = await fetchReadiness();
         }
-        if (reconciled?.components.length) {
+        if (
+          reconciled?.components.some(
+            (component) =>
+              component.key === dto.componentKey &&
+              component.contractVersion === dto.contractVersion,
+          )
+        ) {
           pendingIntent.current = null;
           setHasPendingIntent(false);
           resetKey();
@@ -161,11 +168,12 @@ export function useApplicationTechnicalProvisioning(
   );
 
   const linkPrimaryComponent = useCallback(
-    async ({ contractVersion, reason }: LinkPrimaryComponentInput) => {
+    async ({ componentKey, contractVersion, reason }: LinkPrimaryComponentInput) => {
       if (!readiness) return false;
       return executeBinding({
         expectedTechnicalDefinitionRevision:
           readiness.technicalDefinitionRevision,
+        componentKey,
         contractVersion,
         reason,
       });

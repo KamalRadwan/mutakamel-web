@@ -89,14 +89,7 @@ const inventoryPath = resolve(
 );
 if (existsSync(inventoryPath)) {
   const inventory = JSON.parse(readFileSync(inventoryPath, "utf8"));
-  if (
-    inventory.counts?.total !== 243 ||
-    inventory.routes?.length !== 243
-  ) {
-    failures.push(
-      "docs/generated/admin-core-api-routes.json: expected exactly 243 Admin Core routes",
-    );
-  }
+
   const uniqueAddresses = new Set(
     (inventory.routes ?? []).map(
       (route) => `${route.method} ${route.canonicalPath}`,

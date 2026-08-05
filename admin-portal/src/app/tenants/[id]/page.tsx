@@ -80,11 +80,9 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     setIsAddDebitOpen,
     selectedUserId,
     setSelectedUserId,
+    editProfileData,
+    setEditProfileData,
     handleUpdateTenantProfile,
-    handleCancelProvisioning,
-    handleActivate,
-    handleSuspend,
-    handleDelete,
     handleSuspendUser,
     handleActivateUser,
     handleResendInvite,
@@ -93,7 +91,6 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     mockBranches,
     mockDepartments,
     mockTeams,
-    handleDestroyConfirm,
     handleSetPrimaryFqdn,
     submitCreditAdjustment,
     submitDebitAdjustment,
@@ -101,20 +98,20 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
   } = useTenantDetail(id);
   const { lang } = useI18n();
 
-  // Active Destructive Action Modal State
-  const [destructiveModalAction, setDestructiveModalAction] = useState<"suspend" | "delete" | "destroy" | null>(null);
 
-  const confirmDestructiveModal = () => {
-    if (!destructiveModalAction) return;
-    if (destructiveModalAction === "suspend") {
-      handleSuspend();
-    } else if (destructiveModalAction === "delete") {
-      handleDelete();
-    } else if (destructiveModalAction === "destroy") {
-      handleDestroyConfirm();
-    }
-    setDestructiveModalAction(null);
-  };
+  if (isLoadingDetails || !tenant || !subscription || !wallet) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+        <Navbar />
+        <main className="flex-1 p-4 sm:p-6 max-w-6xl w-full mx-auto flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center p-12 text-slate-500">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
+            <p>{lang === "ar" ? "جاري تحميل تفاصيل المستأجر..." : "Loading tenant details..."}</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
@@ -147,53 +144,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
-          {/* Mandatory Confirmation Action Control Buttons */}
-          <div className="flex items-center gap-2">
-            {tenant.status === "PROVISIONING" ? (
-              <button
-                onClick={handleCancelProvisioning}
-                className="px-3.5 py-1.5 text-xs font-bold bg-slate-600 hover:bg-slate-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                {lang === "ar" ? "إلغاء التجهيز" : "Cancel Provisioning"}
-              </button>
-            ) : tenant.status === "SUSPENDED" ? (
-              <button
-                onClick={handleActivate}
-                className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                {t.tenants.activate}
-              </button>
-            ) : tenant.status === "ACTIVE" ? (
-              <button
-                onClick={() => setDestructiveModalAction("suspend")}
-                className="px-3.5 py-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                {t.tenants.suspend}
-              </button>
-            ) : null}
 
-            {tenant.status === "DELETED" ? (
-              canDestroyTenant && (
-                <button
-                  onClick={() => setDestructiveModalAction("destroy")}
-                  className="px-3.5 py-1.5 text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <ShieldAlert className="w-3.5 h-3.5" />
-                  <span>{t.tenants.destroy}</span>
-                </button>
-              )
-            ) : (
-              canDestroyTenant && (
-                <button
-                  onClick={() => setDestructiveModalAction("delete")}
-                  className="px-3.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>{t.tenants.delete}</span>
-                </button>
-              )
-            )}
-          </div>
         </div>
 
         {/* Saved Toast Notification */}
@@ -327,13 +278,6 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
-        {isLoadingDetails ? (
-          <div className="flex flex-col items-center justify-center p-12 text-slate-500">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
-            <p>{lang === "ar" ? "جاري تحميل تفاصيل المستأجر..." : "Loading tenant details..."}</p>
-          </div>
-        ) : (
-          <>
             {/* Tab 1: Profile & Metadata */}
             {activeTab === "details" && tenant && (
               <form onSubmit={handleUpdateTenantProfile} className="space-y-6">
@@ -427,8 +371,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.tenants.detailsTab.companyName}</label>
                   <input
                     type="text"
-                    value={tenant.companyName}
-                    onChange={(e) => setTenant({ ...tenant, companyName: e.target.value })}
+                    value={editProfileData.companyName || ""}
+                    onChange={(e) => setEditProfileData({ ...editProfileData, companyName: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -437,8 +381,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.tenants.detailsTab.industry}</label>
                   <input
                     type="text"
-                    value={tenant.industry}
-                    onChange={(e) => setTenant({ ...tenant, industry: e.target.value })}
+                    value={editProfileData.industry || ""}
+                    onChange={(e) => setEditProfileData({ ...editProfileData, industry: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -447,8 +391,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.tenants.detailsTab.timezone}</label>
                   <input
                     type="text"
-                    value={tenant.timezone}
-                    onChange={(e) => setTenant({ ...tenant, timezone: e.target.value })}
+                    value={editProfileData.timezone || ""}
+                    onChange={(e) => setEditProfileData({ ...editProfileData, timezone: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -459,8 +403,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.tenants.detailsTab.taxNumber}</label>
                   <input
                     type="text"
-                    value={tenant.taxNumber}
-                    onChange={(e) => setTenant({ ...tenant, taxNumber: e.target.value })}
+                    value={editProfileData.taxNumber || ""}
+                    onChange={(e) => setEditProfileData({ ...editProfileData, taxNumber: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -469,8 +413,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t.tenants.detailsTab.commercialRegistrationNumber}</label>
                   <input
                     type="text"
-                    value={tenant.commercialRegistrationNumber}
-                    onChange={(e) => setTenant({ ...tenant, commercialRegistrationNumber: e.target.value })}
+                    value={editProfileData.commercialRegistrationNumber || ""}
+                    onChange={(e) => setEditProfileData({ ...editProfileData, commercialRegistrationNumber: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -903,15 +847,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                         <StatusBadge status={u.status} enumType="tenant" size="sm" />
                       </td>
                       <td className="py-2.5 text-end space-x-1 rtl:space-x-reverse">
-                        <button
-                          onClick={() => {
-                            setSelectedUserId(u.id);
-                            setIsEditUserOpen(true);
-                          }}
-                          className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded cursor-pointer transition-colors"
-                        >
-                          Edit
-                        </button>
+
                         
                         {u.status === "ACTIVE" && !u.isTenantOwner && (
                           <button onClick={() => handleSuspendUser(u.id)} className="px-2 py-1 text-[10px] bg-amber-100 text-amber-700 hover:bg-amber-200 rounded cursor-pointer transition-colors">
@@ -1013,19 +949,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                 </div>
               </div>
 
-              {/* FX Rate Preview Box */}
-              {adjAmount && parseFloat(adjAmount) > 0 && (
-                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800/80 font-mono text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
-                  <div className="flex justify-between">
-                    <span>سعر الصرف المعتمد:</span>
-                    <span className="font-bold">{adjCurrency === "EGP" ? "50.00 EGP / USD" : adjCurrency === "SAR" ? "3.75 SAR / USD" : "1.00 USD / USD"}</span>
-                  </div>
-                  <div className="flex justify-between font-bold border-t border-emerald-200 dark:border-emerald-800/60 pt-1 text-sm">
-                    <span>المبلغ المضاف الصافي:</span>
-                    <span>+${((parseFloat(adjAmount) || 0) / (adjCurrency === "EGP" ? 50 : adjCurrency === "SAR" ? 3.75 : 1)).toFixed(2)} USD</span>
-                  </div>
-                </div>
-              )}
+
 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">السبب والملاحظة الإدارية *</label>
@@ -1105,19 +1029,7 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
                 </div>
               </div>
 
-              {/* FX Rate Preview Box */}
-              {adjAmount && parseFloat(adjAmount) > 0 && (
-                <div className="p-3 bg-rose-50 dark:bg-rose-950/40 rounded-xl border border-rose-200 dark:border-rose-800/80 font-mono text-xs text-rose-800 dark:text-rose-300 space-y-1">
-                  <div className="flex justify-between">
-                    <span>سعر الصرف المعتمد:</span>
-                    <span className="font-bold">{adjCurrency === "EGP" ? "50.00 EGP / USD" : adjCurrency === "SAR" ? "3.75 SAR / USD" : "1.00 USD / USD"}</span>
-                  </div>
-                  <div className="flex justify-between font-bold border-t border-rose-200 dark:border-rose-800/60 pt-1 text-sm">
-                    <span>المبلغ المخصوم الصافي:</span>
-                    <span>-${((parseFloat(adjAmount) || 0) / (adjCurrency === "EGP" ? 50 : adjCurrency === "SAR" ? 3.75 : 1)).toFixed(2)} USD</span>
-                  </div>
-                </div>
-              )}
+
 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">السبب والملاحظة الإدارية *</label>
@@ -1151,120 +1063,6 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      {/* Mandatory Destructive Action Confirmation Modal */}
-      {destructiveModalAction && (
-        <DestructiveActionModal
-          isOpen={true}
-          onClose={() => setDestructiveModalAction(null)}
-          onConfirm={confirmDestructiveModal}
-          actionType={destructiveModalAction}
-          targetName={tenant.name}
-          title={
-            destructiveModalAction === "suspend"
-              ? lang === "ar" ? `تأكيد إيقاف المستأجر (${tenant.companyName})` : `Confirm Suspend Tenant (${tenant.companyName})`
-              : destructiveModalAction === "delete"
-              ? lang === "ar" ? `تأكيد حذف المستأجر (${tenant.companyName})` : `Confirm Delete Tenant (${tenant.companyName})`
-              : lang === "ar" ? `تأكيد تدمير المستأجر نهائياً (${tenant.companyName})` : `Confirm Permanent Tenant Destruction (${tenant.companyName})`
-          }
-          description={
-            destructiveModalAction === "suspend"
-              ? lang === "ar" ? "سيعطل هذا الإجراء بيئة المستأجر مؤقتاً ولن يتمكن مستخدموه من تسجيل الدخول حتى الإعادة." : "This will temporarily disable the tenant environment until reactivated."
-              : destructiveModalAction === "delete"
-              ? lang === "ar" ? "سيعمل هذا الإجراء على نقل المستأجر لحالة الحذف المؤقت وإلغاء الربط بالسيرفر." : "This will soft-delete the tenant and detach active hosting server bindings."
-              : lang === "ar" ? "هذا الإجراء سيقوم بحذف كافة بيانات المستأجر من السيرفر نهائياً ولا يمكن التراجع عنه." : "This will permanently destroy all tenant databases and records. Cannot be undone."
-          }
-          extraToggle={
-            destructiveModalAction === "destroy"
-              ? {
-                  label: lang === "ar" ? "تدمير اشتراكات وسجلات الفوترة التابعة أيضاً (destroySubscriptions)" : "Destroy associated subscriptions and billing records (destroySubscriptions)",
-                  checked: destroySubscriptionsToggle,
-                  onChange: setDestroySubscriptionsToggle,
-                }
-              : undefined
-          }
-        />
-      )}
-
-      {/* Edit User Modal */}
-      {isEditUserOpen && selectedUserId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-              <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600">
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  {lang === "ar" ? "تعديل بيانات وصلاحيات المستخدم" : "Edit User Profile & Placement"}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {lang === "ar" ? "تعديل التسكين الوظيفي والصلاحيات عبر فروع وأقسام الشركة" : "Update user organization placement and roles"}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-              {/* Profile section */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{lang === "ar" ? "الاسم الأول" : "First Name"}</label>
-                  <input type="text" defaultValue={tenantUsers.find(u => u.id === selectedUserId)?.firstName} className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-xl" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{lang === "ar" ? "اسم العائلة" : "Last Name"}</label>
-                  <input type="text" defaultValue={tenantUsers.find(u => u.id === selectedUserId)?.lastName} className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-xl" />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{lang === "ar" ? "المسمى الوظيفي" : "Job Title"}</label>
-                  <input type="text" defaultValue={tenantUsers.find(u => u.id === selectedUserId)?.jobTitle} className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-xl" />
-                </div>
-              </div>
-
-              {/* Organization Placement */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{lang === "ar" ? "الهيكل التنظيمي للمستخدم" : "Organization Placement"}</span>
-                <div className="grid grid-cols-1 gap-3">
-                  <select className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-xl">
-                    <option value="">{lang === "ar" ? "اختر الفرع (Branch)..." : "Select Branch..."}</option>
-                    {mockBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
-                  
-                  <select className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-xl" defaultValue={tenantUsers.find(u => u.id === selectedUserId)?.departmentId}>
-                    <option value="">{lang === "ar" ? "اختر القسم (Department)..." : "Select Department..."}</option>
-                    {mockDepartments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-
-                  <select className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-xl">
-                    <option value="">{lang === "ar" ? "اختر الفريق (Team - اختياري)..." : "Select Team (Optional)..."}</option>
-                    {mockTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800 mt-4">
-              <button
-                type="button"
-                onClick={() => setIsEditUserOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl"
-              >
-                {lang === "ar" ? "إلغاء" : "Cancel"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSaved(true);
-                  setIsEditUserOpen(false);
-                  setTimeout(() => setIsSaved(false), 3000);
-                }}
-                className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md"
-              >
-                {lang === "ar" ? "حفظ التعديلات" : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

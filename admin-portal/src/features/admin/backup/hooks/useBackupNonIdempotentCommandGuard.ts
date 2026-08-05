@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { v7 as uuidv7 } from "uuid";
+import { generateUUIDv7 } from "@/lib/utils/uuid";
 import {
   BACKUP_NON_IDEMPOTENT_GUARD_CHANGE_EVENT,
   BACKUP_NON_IDEMPOTENT_GUARD_STORAGE_KEY,
@@ -88,7 +88,7 @@ export function useBackupNonIdempotentCommandGuard() {
           kind,
           targetId,
           issuedAt: new Date().toISOString(),
-          localCommandId: uuidv7(),
+          localCommandId: generateUUIDv7(),
           status: "IN_FLIGHT",
         };
         writeBackupNonIdempotentCommandAttempt(
