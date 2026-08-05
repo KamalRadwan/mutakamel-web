@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { KeyRound, RefreshCw, RotateCcw, Settings2, ShieldCheck } from "lucide-react";
 import { BackupDialog } from "../components/BackupDialog";
 import { BackupErrorBanner } from "../components/BackupErrorBanner";
@@ -26,13 +26,16 @@ export function BackupAccessScreen() {
   const [windowStart, setWindowStart] = useState(0);
   const [windowHours, setWindowHours] = useState(1);
 
-  useEffect(() => {
-    if (!view.binding) return;
-    setRotationEnabled(view.binding.rotationEnabled);
-    setIntervalHours(view.binding.rotationIntervalHours);
-    setWindowStart(view.binding.maintenanceWindowStartUtc);
-    setWindowHours(view.binding.maintenanceWindowHours);
-  }, [view.binding]);
+  const [prevBinding, setPrevBinding] = useState(view.binding);
+  if (view.binding !== prevBinding) {
+    setPrevBinding(view.binding);
+    if (view.binding) {
+      setRotationEnabled(view.binding.rotationEnabled);
+      setIntervalHours(view.binding.rotationIntervalHours);
+      setWindowStart(view.binding.maintenanceWindowStartUtc);
+      setWindowHours(view.binding.maintenanceWindowHours);
+    }
+  }
 
   const closeDialog = () => {
     if (view.activeAction) return;

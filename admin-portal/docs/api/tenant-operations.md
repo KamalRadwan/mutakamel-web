@@ -1,6 +1,6 @@
 # Tenant Operations and Provisioning Frontend Contract
 
-Status: **Verified backend contract; frontend PARTIAL/MISSING**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 

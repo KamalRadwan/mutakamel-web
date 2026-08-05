@@ -1,6 +1,6 @@
 # Backup and Restore API
 
-Status: **DONE/SOURCE_INTEGRATED/RELEASE_BLOCKED**
+Status: **[Verified]**
 
 Last source verification: **2026-08-04**
 

@@ -1,6 +1,6 @@
 # System Settings and Platform SMTP Frontend Contract
 
-Status: **Verified backend contract; frontend DONE/PARTIAL/REFACTOR**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 
@@ -512,3 +512,56 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 - `admin-portal/src/app/settings/components/SettingField.tsx`
 - `admin-portal/src/app/settings/smtp/hooks/useSmtpSettings.ts`
 - `admin-portal/src/app/settings/smtp/page.tsx`
+
+
+## DTOs (Migrated from dtos.md)
+
+### `SystemSettingQueryDto`
+
+```typescript
+{
+  prefix?: string; // trimmed, max 120
+}
+```
+
+### `SystemSettingKeyParamDto`
+
+```typescript
+{
+  key: string; // trimmed, max 120;
+               // /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/
+}
+```
+
+### `UpsertSystemSettingDto`
+
+```typescript
+{
+  value: unknown;       // required; validated by the selected registry schema
+  description?: string; // trimmed string, max 255
+}
+```
+
+### `PatchPlatformSmtpConfigDto`
+
+```typescript
+{
+  fromAddress?: string;  // valid email, max 320
+  fromName?: string;     // 1..200
+  senderDomain?: string; // max 253
+  smtpHost?: string;     // max 253
+  smtpPort?: number;     // integer 1..65535
+  smtpSecure?: boolean;
+  smtpProtocol?: 'smtp' | 'smtps';
+  smtpUsername?: string; // 1..320
+  smtpPassword?: string; // 1..1024, write-only
+}
+```
+
+Initial SMTP setup must be complete. SMTP hostname/domain normalization,
+TLS/protocol/port compatibility, the 31 registered key schemas, bodyless
+connection verification, runtime-effect boundaries, and UUIDv7 idempotency
+rules are documented in the
+[System Settings and Platform SMTP Frontend Contract](../api/system-settings.md).
+
+---

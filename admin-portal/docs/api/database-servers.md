@@ -1,6 +1,6 @@
 # Database Servers Frontend Contract
 
-Status: **Source-integrated; authenticated runtime verification remains open**
+Status: **[Verified]**
 
 Last source verification: **2026-08-04**
 
@@ -514,3 +514,112 @@ Frontend integration:
 - `src/features/admin/database-servers/components/CreateDatabaseServerWizard.tsx`
 - `src/features/admin/database-servers/components/SystemPrincipalRotationPolicy.tsx`
 - `src/app/database-servers/[id]/page.tsx`
+
+
+## DTOs (Migrated from dtos.md)
+
+```typescript
+interface DatabaseServerCredentialsDto {
+  username: string;
+  password: string;
+}
+
+interface DatabaseServerSslConfigDto {
+  ca?: string;
+  cert?: string;
+  key?: string;
+  passphrase?: string;
+}
+
+interface CreateDatabaseServerDto {
+  name: string;
+  host: string;
+  port?: number;
+  securityAdminCredentials: DatabaseServerCredentialsDto;
+  sslMode?: DatabaseServerSslMode;
+  sslRejectUnauthorized?: boolean;
+  sslConfig?: DatabaseServerSslConfigDto;
+  maintenanceDatabase?: string;
+  poolMin?: number;
+  poolMax?: number;
+  connectTimeoutMs?: number;
+  statementTimeoutMs?: number;
+  idleTimeoutMs?: number;
+  maxTenants: number;
+  countryName?: string;
+  countryIsoCode?: string;
+}
+
+type CheckDatabaseServerConnectivityDto = Omit<
+  CreateDatabaseServerDto,
+  'name' | 'poolMin' | 'poolMax' | 'maxTenants' | 'countryName' | 'countryIsoCode'
+>;
+
+interface UpdateDatabaseServerDto {
+  name?: string;
+  host?: string;
+  port?: number;
+  securityAdminCredentials?: DatabaseServerCredentialsDto;
+  sslMode?: DatabaseServerSslMode;
+  sslRejectUnauthorized?: boolean;
+  sslConfig?: DatabaseServerSslConfigDto;
+  removeSslConfig?: boolean;
+  maintenanceDatabase?: string;
+  poolMin?: number;
+  poolMax?: number;
+  connectTimeoutMs?: number;
+  statementTimeoutMs?: number;
+  idleTimeoutMs?: number;
+  maxTenants?: number;
+  countryName?: string;
+  countryIsoCode?: string;
+}
+
+interface RetryDatabaseServerCredentialBootstrapDto {
+  reason: string;
+}
+
+interface UpdateDatabaseServerSystemPrincipalRotationDto {
+  expectedCredentialRevision: string;
+  rotationEnabled?: boolean;
+  rotationIntervalHours?: number;
+  maintenanceWindowStartUtc?: number;
+  maintenanceWindowHours?: number;
+  reason: string;
+}
+
+interface BootstrapDatabaseServerApplicationDto {
+  expectedCatalogueRevision: string;
+  expectedPolicyRevision: string;
+  reason: string;
+}
+
+interface ApplicationDatabaseCredentialCommandDto {
+  expectedCredentialRevision: string;
+  reason: string;
+}
+
+interface DatabaseServerQueryDto {
+  page?: number;
+  limit?: number;
+  sortBy?: 'name' | 'host' | 'currentTenants' | 'createdAt';
+  sortDir?: 'ASC' | 'DESC';
+  search?: string;
+  status?: DatabaseServerStatus;
+  countryIsoCode?: string;
+  deleted?: boolean; // true returns only soft-deleted servers
+}
+
+interface DatabaseServerHistoryQueryDto {
+  action?: DatabaseServerHistoryAction;
+  limit?: number;
+}
+```
+
+Credential and SSL values are write-only. Optional credential objects must be
+omitted unless both username and password are present. Application passwords
+are generated inside Core and are never accepted or returned by these DTOs.
+Use the verified [Database Servers Frontend Contract](../api/database-servers.md)
+for exact bounds, cross-field rules, receipts, and lifecycle preconditions.
+
+---

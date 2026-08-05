@@ -6,8 +6,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import type { AdminUserProfile } from "../types";
 
 export function UserProfileCard({ profile }: { profile?: AdminUserProfile | null }) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { lang, t } = useI18n();
+  const { t } = useI18n();
 
   if (!profile) {
     return (

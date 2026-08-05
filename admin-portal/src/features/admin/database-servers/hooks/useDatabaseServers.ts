@@ -47,11 +47,7 @@ export function useDatabaseServers() {
     activeServers: servers.filter(s => s.status === "ACTIVE").length,
     drainingServers: servers.filter(s => s.status === "DRAINING").length,
     offlineServers: servers.filter(s => s.status === "OFFLINE").length,
-    maxCapacity: servers.reduce((acc, s) => acc + s.maxTenants, 0),
-    totalTenantsPlaced: servers.reduce((acc, s) => acc + s.currentTenants, 0),
-    platformUtilizationRatio: servers.reduce((acc, s) => acc + s.maxTenants, 0) > 0
-      ? servers.reduce((acc, s) => acc + s.currentTenants, 0) / servers.reduce((acc, s) => acc + s.maxTenants, 0)
-      : 0,
+
   };
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { safeStorage } from "@/lib/safeStorage";
 import { ar, Dictionary } from "./dictionaries/ar";
 import { en } from "./dictionaries/en";

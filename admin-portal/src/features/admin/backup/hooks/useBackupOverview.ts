@@ -59,7 +59,8 @@ export function useBackupOverview() {
   }, []);
 
   useEffect(() => {
-    void refreshWorker();
+    const timer = setTimeout(() => { void refreshWorker(); }, 0);
+    return () => clearTimeout(timer);
   }, [refreshWorker]);
 
   const refreshAccess = useCallback(async () => {
@@ -93,8 +94,9 @@ export function useBackupOverview() {
   }, [canReadDatabaseAccess, serverContext.selectedServerId]);
 
   useEffect(() => {
-    void refreshAccess();
+    const timer = setTimeout(() => { void refreshAccess(); }, 0);
     return () => {
+      clearTimeout(timer);
       accessRequestGeneration.current += 1;
     };
   }, [refreshAccess]);

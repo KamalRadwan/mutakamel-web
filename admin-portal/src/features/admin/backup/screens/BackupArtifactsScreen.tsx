@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArchiveRestore, FileArchive, Filter, RefreshCw, Trash2 } from "lucide-react";
 import { BackupArtifactStatus, type BackupArtifact } from "../types";
 import { BackupErrorBanner } from "../components/BackupErrorBanner";
@@ -22,11 +22,13 @@ export function BackupArtifactsScreen() {
   const [tenantId, setTenantId] = useState(view.query.tenantId ?? "");
   const [deletingArtifact, setDeletingArtifact] = useState<BackupArtifact | null>(null);
 
-  useEffect(() => {
+  const [prevQuery, setPrevQuery] = useState(view.query);
+  if (view.query !== prevQuery) {
+    setPrevQuery(view.query);
     setRunId(view.query.runId ?? "");
     setDatabaseServerId(view.query.databaseServerId ?? "");
     setTenantId(view.query.tenantId ?? "");
-  }, [view.query]);
+  }
 
   const invalidUuid = [runId, databaseServerId, tenantId].some((value) => value && !uuidPattern.test(value));
 

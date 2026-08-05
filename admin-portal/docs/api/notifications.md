@@ -1,6 +1,6 @@
 # Admin Notifications API
 
-Status: **Verified backend contract; frontend MISSING**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 

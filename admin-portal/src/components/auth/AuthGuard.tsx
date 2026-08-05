@@ -31,5 +31,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Prevent protected children from mounting before unauthenticated redirect
+  if (!isAuthenticated && pathname !== "/login") {
+    return null;
+  }
+
   return <>{children}</>;
 }

@@ -40,11 +40,15 @@ export function useBackupRuns() {
   const refreshGenerationRef = useRef(0);
   const guardAttemptRef = useRef(commandGuard.attempt);
   const reconciliationGenerationRef = useRef(0);
-  guardAttemptRef.current = commandGuard.attempt;
+  const [prevRouteDb, setPrevRouteDb] = useState(routeDatabaseServerId);
+  if (routeDatabaseServerId !== prevRouteDb) {
+    setPrevRouteDb(routeDatabaseServerId);
+    setDatabaseServerId(routeDatabaseServerId);
+  }
 
   useEffect(() => {
-    setDatabaseServerId(routeDatabaseServerId);
-  }, [routeDatabaseServerId]);
+    guardAttemptRef.current = commandGuard.attempt;
+  }, [commandGuard.attempt]);
 
   const refresh = useCallback(async () => {
     const refreshGeneration = ++refreshGenerationRef.current;
@@ -83,7 +87,8 @@ export function useBackupRuns() {
   }, [canReadServers, databaseServerId, status]);
 
   useEffect(() => {
-    void refresh();
+    const timer = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(timer);
   }, [refresh]);
 
   const reconcileBackupStartAttempt = useCallback(
@@ -128,14 +133,17 @@ export function useBackupRuns() {
 
   useEffect(() => {
     const attempt = commandGuard.attempt;
-    if (!attempt || attempt.kind !== "BACKUP_START") {
-      reconciliationGenerationRef.current += 1;
-      setReconciliationRuns([]);
-      setReconciliationError(null);
-      setIsReconcilingAttempt(false);
-      return;
-    }
-    void reconcileBackupStartAttempt(attempt);
+    const timer = setTimeout(() => {
+      if (!attempt || attempt.kind !== "BACKUP_START") {
+        reconciliationGenerationRef.current += 1;
+        setReconciliationRuns([]);
+        setReconciliationError(null);
+        setIsReconcilingAttempt(false);
+        return;
+      }
+      void reconcileBackupStartAttempt(attempt);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [
     commandGuard.attempt,
     reconcileBackupStartAttempt,

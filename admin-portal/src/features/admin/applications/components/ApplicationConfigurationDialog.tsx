@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { AlertTriangle, Loader2, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import type { ApplicationView, UpdateApplicationDatabasePolicyDto, UpdateApplicationDto } from "../types";
 
@@ -85,6 +85,15 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
         </header>
         <form onSubmit={submit} className="space-y-4 p-5">
           {mode === "metadata" ? <>
+            {application.publicationStatus === "PUBLISHED" && (
+              <div role="note" className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="text-xs font-black">{copy.publicationInvalidationTitle}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed">{copy.publicationInvalidationDescription}</p>
+                </div>
+              </div>
+            )}
             <Field label={copy.name}><input required maxLength={128} value={name} onChange={(event) => setName(event.target.value)} className="field" /></Field>
             <Field label={copy.description}><textarea rows={3} maxLength={512} value={description} onChange={(event) => setDescription(event.target.value)} className="field resize-none" /></Field>
             <div className="grid gap-4 sm:grid-cols-2">

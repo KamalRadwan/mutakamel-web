@@ -33,6 +33,8 @@ export default function ApplicationsPage() {
     setVisibilityFilter,
     lifecycleFilter,
     setLifecycleFilter,
+    publicationFilter,
+    setPublicationFilter,
     dbAccessFilter,
     setDbAccessFilter,
     meta,
@@ -155,21 +157,17 @@ export default function ApplicationsPage() {
             <div className="absolute top-0 end-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Active Catalogue
+                Published Active
               </span>
               <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
                 <AppWindow className="w-4 h-4" />
               </div>
             </div>
             <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2 font-mono flex items-center gap-2">
-              {applications?.filter(a => a.lifecycleStatus === 'ACTIVE').length || 0}
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
+              {applications?.filter(a => a.lifecycleStatus === "ACTIVE" && a.publicationStatus === "PUBLISHED").length || 0}
             </div>
             <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
-              Live & Deployable Services
+              Current page · readiness remains separate
             </div>
           </div>
         </div>
@@ -186,11 +184,12 @@ export default function ApplicationsPage() {
               className="w-full ps-10 pe-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
             />
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
             <Filter value={typeFilter} onChange={setTypeFilter} label="Type" options={["ALL", "SYSTEM", "TENANT"]} />
             <Filter value={commercialFilter} onChange={setCommercialFilter} label="Commercial" options={["ALL", "NON_BILLABLE", "INCLUDED", "SUBSCRIPTION"]} />
             <Filter value={visibilityFilter} onChange={setVisibilityFilter} label="Visibility" options={["ALL", "PUBLIC", "INTERNAL"]} />
             <Filter value={lifecycleFilter} onChange={setLifecycleFilter} label="Lifecycle" options={["ALL", "DRAFT", "ACTIVE", "DEPRECATED", "DISABLED"]} />
+            <Filter value={publicationFilter} onChange={setPublicationFilter} label="Publication" options={["ALL", "UNPUBLISHED", "PUBLISHED"]} />
             <Filter value={dbAccessFilter} onChange={setDbAccessFilter} label="DB access" options={["ALL", "NONE", "TENANT_DATABASE"]} />
           </div>
         </div>
@@ -205,21 +204,22 @@ export default function ApplicationsPage() {
                   <th className="py-4 px-5 text-start">Key</th>
                   <th className="py-4 px-5 text-start">Type</th>
                   <th className="py-4 px-5 text-start">DB Access Mode</th>
-                  <th className="py-4 px-5 text-start">Status</th>
+                  <th className="py-4 px-5 text-start">Publication</th>
+                  <th className="py-4 px-5 text-start">Lifecycle</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-500 font-medium">Loading applications...</td>
+                    <td colSpan={6} className="py-12 text-center text-slate-500 font-medium">Loading applications...</td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-rose-500 font-bold"><p>{error}</p><button type="button" onClick={() => void refresh()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-xs text-white"><RefreshCw className="h-3.5 w-3.5" />Retry</button></td>
+                    <td colSpan={6} className="py-12 text-center text-rose-500 font-bold"><p>{error}</p><button type="button" onClick={() => void refresh()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-xs text-white"><RefreshCw className="h-3.5 w-3.5" />Retry</button></td>
                   </tr>
                 ) : applications.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-16 text-center text-slate-400 font-semibold">No applications found</td>
+                    <td colSpan={6} className="py-16 text-center text-slate-400 font-semibold">No applications found</td>
                   </tr>
                 ) : (
                   applications.map((app) => (
@@ -256,6 +256,15 @@ export default function ApplicationsPage() {
                             : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
                         }`}>
                           {app.databaseAccessMode}
+                        </span>
+                      </td>
+                      <td className="py-4 px-5">
+                        <span className={`inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-bold ${
+                          app.publicationStatus === "PUBLISHED"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+                        }`}>
+                          {app.publicationStatus}
                         </span>
                       </td>
                       <td className="py-4 px-5">

@@ -16,14 +16,10 @@ export function useBackupServerOptions(enabled = true) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const requestGenerationRef = useRef(0);
-  const requestedServerIdRef = useRef(requestedServerId);
-  requestedServerIdRef.current = requestedServerId;
 
   const refresh = useCallback(async () => {
     const requestGeneration = ++requestGenerationRef.current;
-    const isCurrentRequest = () =>
-      requestGeneration === requestGenerationRef.current &&
-      requestedServerId === requestedServerIdRef.current;
+    const isCurrentRequest = () => requestGeneration === requestGenerationRef.current;
     if (!enabled) {
       setServers([]);
       setSelectedServerId("");
@@ -58,7 +54,8 @@ export function useBackupServerOptions(enabled = true) {
   }, [enabled, requestedServerId]);
 
   useEffect(() => {
-    void refresh();
+    const timer = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(timer);
   }, [refresh]);
 
   const routeSelectionPending = resolvedRequestedServerId !== requestedServerId;

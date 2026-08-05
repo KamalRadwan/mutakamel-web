@@ -1,6 +1,6 @@
 # Admin Dashboard API Contract
 
-Status: **Frontend source-integrated with grouped backend contract**
+Status: **[Verified]**
 
 This contract is the blueprint for how the `/api/admin/core/v1/dashboard` endpoint must be consumed by the frontend.
 
@@ -174,3 +174,24 @@ type AdminDashboardData = {
 13. Do not infer runtime health from ACTIVE/OFFLINE registry values.
 14. Do not add a health group in this implementation.
 15. Do not create a `/v2` endpoint or a second dashboard endpoint.
+
+
+## DTOs (Migrated from dtos.md)
+
+### `AdminDashboardQueryDto`
+```typescript
+{
+  date?: string; // @IsOptional, @IsDateString; overrides from/to
+  from?: string; // @IsOptional, @IsDateString
+  to?: string;   // @IsOptional, @IsDateString
+}
+```
+
+- No fields selects the current UTC calendar month.
+- Supplying only `from` or only `to` selects a single day when the value is
+  `YYYY-MM-DD`; a lone full timestamp currently produces HTTP `422`.
+- An invalid or reversed range is rejected. See
+  [the dashboard contract](../api/dashboard.md) for exact range semantics and
+  response types.
+
+---

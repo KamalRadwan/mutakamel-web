@@ -1,6 +1,6 @@
 # Storage Servers API Contract Verification
 
-**Status:** `DONE` (Frontend implementation complete - Standalone S3 Architecture)
+Status: **[Verified]**
 **Owning Backend App:** `core-app`
 **Owning Controller:** `storage-servers.controller.ts`
 **Frontend App:** `admin-portal`
@@ -34,3 +34,34 @@
 - Strict adherence to idempotency keys is managed internally via `axiosClient` interceptors (or wrapper).
 - Destructive actions (offline, delete) are strictly gated by `.critical` permissions in the hooks using `adminCanAll`.
 - Connection testing happens implicitly during activation. `lastConnectionTestErrorCode` provides feedback on failures.
+
+
+## DTOs (Migrated from dtos.md)
+
+Storage Server registration, base update, full routing-profile replacement,
+principal-reference rotation, verification, lifecycle, attestation-key, and
+source-bound recovery-evidence DTOs are documented in the verified
+[Storage Servers Frontend Contract](../api/storage-servers.md).
+
+Important shared constraints:
+
+- all Storage Server and attestation-key mutations require UUIDv7
+  `x-idempotency-key`;
+- create/update endpoint URLs are absolute and credential-free, and the public
+  endpoint is HTTPS;
+- routing profile is a full replacement with an
+  `expectedBindingRevision`, four distinct mandatory class buckets, nine
+  principal references, and six attestation key IDs;
+- principal references match exact `env:S3_<PREFIX>_<PRINCIPAL>_<ROLE>`
+  suffixes and are never secret material;
+- rotation, verification, lifecycle, key promotion, and delete requests have
+  no body where the API contract says none;
+- recovery-destination registration accepts a write-only
+  `env:STORAGE_RECOVERY_*` locator, while policy verification is
+  revision-fenced and requires a trusted source-bound evidence package;
+- recovery evidence uses canonical millisecond UTC timestamps, distinct
+  lowercase SHA-256 digests, and three distinct administration boundaries;
+- no DTO accepts an access key, secret key, Ed25519 private key, raw
+  fingerprint, or force-activation flag.
+
+---

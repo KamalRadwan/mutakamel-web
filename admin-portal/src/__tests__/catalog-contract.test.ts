@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { applicationsApi } from "@/features/admin/applications/api/applications.api";
 import { axiosClient } from "@/lib/api/axiosClient";
-import { generateUUIDv7 } from "@/shared/utils/idempotency";
+import { generateUUIDv7 } from "@/lib/utils/uuid";
 import type { AxiosResponse } from "@/lib/api/axiosClient";
 
 vi.mock("@/lib/api/axiosClient");
@@ -38,6 +38,9 @@ describe("Application Catalogue API Contract Tests (30 Routes)", () => {
           applicationId: "app-1",
           applicationKey: "crm",
           lifecycleStatus: "DRAFT",
+          runtimeTarget: null,
+          publicationStatus: "UNPUBLISHED",
+          publicationRevision: "1",
           catalogueRevision: "1",
           policyRevision: "1",
           deleted: false

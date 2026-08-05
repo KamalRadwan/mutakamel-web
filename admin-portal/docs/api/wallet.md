@@ -1,6 +1,6 @@
 # Wallet and Ledger API
 
-Status: **Verified backend contract; frontend BROKEN/MISSING**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 

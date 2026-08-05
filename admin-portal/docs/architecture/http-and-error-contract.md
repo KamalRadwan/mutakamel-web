@@ -1,6 +1,6 @@
 # HTTP and Error Contract
 
-Status: **Verified current transport contract**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 
@@ -78,7 +78,7 @@ interface NormalizedApiError {
   status: number;
   code: string;
   message: string;
-  fieldErrors?: Record<string, string[]>;
+  details?: Record<string, string[]>;
   correlationId?: string;
   source: "CORE" | "GATEWAY" | "TRANSPORT";
 }

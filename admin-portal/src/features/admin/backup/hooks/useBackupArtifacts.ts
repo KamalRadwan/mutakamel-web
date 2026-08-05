@@ -67,7 +67,8 @@ export function useBackupArtifacts() {
   }, [canReadServers, query]);
 
   useEffect(() => {
-    void refresh();
+    const timer = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(timer);
   }, [refresh]);
 
   const deleteArtifact = async (artifactId: string) => {

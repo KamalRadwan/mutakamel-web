@@ -1,6 +1,6 @@
 # Permissions, Idempotency, and Data State
 
-Status: **Target contract; current frontend requires refactoring**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 

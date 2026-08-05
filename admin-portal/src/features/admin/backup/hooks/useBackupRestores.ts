@@ -46,7 +46,9 @@ export function useBackupRestores() {
   const refreshGenerationRef = useRef(0);
   const guardAttemptRef = useRef(commandGuard.attempt);
   const reconciliationGenerationRef = useRef(0);
-  guardAttemptRef.current = commandGuard.attempt;
+  useEffect(() => {
+    guardAttemptRef.current = commandGuard.attempt;
+  }, [commandGuard.attempt]);
 
   const refresh = useCallback(async () => {
     const refreshGeneration = ++refreshGenerationRef.current;
@@ -86,7 +88,8 @@ export function useBackupRestores() {
   }, [canReadServers, query]);
 
   useEffect(() => {
-    void refresh();
+    const timer = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(timer);
   }, [refresh]);
 
   const reconcileRestoreAttempt = useCallback(
@@ -149,19 +152,22 @@ export function useBackupRestores() {
 
   useEffect(() => {
     const attempt = commandGuard.attempt;
-    if (
-      !attempt ||
-      (attempt.kind !== "RESTORE_START" &&
-        attempt.kind !== "RESTORE_PROMOTE")
-    ) {
-      reconciliationGenerationRef.current += 1;
-      setReconciliationRestores([]);
-      setReconciliationArtifactFound(null);
-      setReconciliationError(null);
-      setIsReconcilingAttempt(false);
-      return;
-    }
-    void reconcileRestoreAttempt(attempt);
+    const timer = setTimeout(() => {
+      if (
+        !attempt ||
+        (attempt.kind !== "RESTORE_START" &&
+          attempt.kind !== "RESTORE_PROMOTE")
+      ) {
+        reconciliationGenerationRef.current += 1;
+        setReconciliationRestores([]);
+        setReconciliationArtifactFound(null);
+        setReconciliationError(null);
+        setIsReconcilingAttempt(false);
+        return;
+      }
+      void reconcileRestoreAttempt(attempt);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [commandGuard.attempt, reconcileRestoreAttempt]);
 
   const handleNonIdempotentError = async (

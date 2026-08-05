@@ -60,21 +60,21 @@ export function useApplication(applicationKey: string) {
 
   const updateApplication = (dto: UpdateApplicationDto) =>
     mutate(
-      dto,
+      { operation: "UPDATE", applicationKey, dto },
       (key) => applicationsApi.update(applicationKey, dto, key),
       { onSuccessMessage: "Application updated successfully.", onSuccess: fetchApplication }
     );
 
   const updateDatabasePolicy = (dto: UpdateApplicationDatabasePolicyDto) =>
     mutate(
-      dto,
+      { operation: "UPDATE_DATABASE_POLICY", applicationKey, dto },
       (key) => applicationsApi.updateDatabasePolicy(applicationKey, dto, key),
       { onSuccessMessage: "Database policy updated.", onSuccess: fetchApplication }
     );
 
   const publishApplication = (dto: PublishApplicationDto) =>
     mutate(
-      dto,
+      { operation: "PUBLISH", applicationKey, dto },
       (key) => applicationsApi.publish(applicationKey, dto, key),
       {
         onSuccessMessage: "Application revision published.",
@@ -85,7 +85,7 @@ export function useApplication(applicationKey: string) {
   const activateApplication = (expectedCatalogueRevision: string, reason: string) => {
     const payload = { expectedCatalogueRevision, reason };
     return mutate(
-      payload,
+      { operation: "ACTIVATE", applicationKey, dto: payload },
       (key) => applicationsApi.activate(applicationKey, expectedCatalogueRevision, reason, key),
       { onSuccessMessage: "Application activated.", onSuccess: fetchApplication }
     );
@@ -93,14 +93,14 @@ export function useApplication(applicationKey: string) {
 
   const deprecateApplication = (dto: ApplicationLifecycleCommandDto) =>
     mutate(
-      dto,
+      { operation: "DEPRECATE", applicationKey, dto },
       (key) => applicationsApi.deprecate(applicationKey, dto, key),
       { onSuccessMessage: "Application deprecated.", onSuccess: fetchApplication }
     );
 
   const disableApplication = (dto: ApplicationLifecycleCommandDto) =>
     mutate(
-      dto,
+      { operation: "DISABLE", applicationKey, dto },
       (key) => applicationsApi.disable(applicationKey, dto, key),
       { onSuccessMessage: "Application disabled.", onSuccess: fetchApplication }
     );
@@ -108,7 +108,7 @@ export function useApplication(applicationKey: string) {
   const deleteApplication = (expectedCatalogueRevision: string, reason: string) => {
     const payload = { expectedCatalogueRevision, reason };
     return mutate(
-      payload,
+      { operation: "DELETE", applicationKey, dto: payload },
       async (key) => {
         await applicationsApi.delete(applicationKey, expectedCatalogueRevision, reason, key);
         return true;

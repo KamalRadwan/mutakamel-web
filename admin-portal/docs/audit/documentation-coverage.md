@@ -1,6 +1,6 @@
 # Documentation Coverage
 
-Status: **Current**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 

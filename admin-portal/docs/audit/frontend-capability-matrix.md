@@ -1,8 +1,10 @@
 # Frontend Capability Matrix
 
-Status: **Current source audit**
+Status: **[Verified]**
 
 Last source verification: **2026-08-04**
+
+Application Catalogue row reverified: **2026-08-05**.
 
 This matrix describes the current working tree. `DONE` means source-integrated,
 not live-authenticated or deployment-verified.
@@ -24,7 +26,7 @@ not live-authenticated or deployment-verified.
 | Tenant operations | `PARTIAL/MISSING` | List/reconciliation foundation exists; operation-specific and managed-provisioning controls are largely absent |
 | Provisioning governance | `MISSING` | 32 Gateway routes; no frontend module |
 | Storage migration | `GATED` | Eight default-off routes; do not expose |
-| Application Catalogue | `DONE/SOURCE_INTEGRATED` | All 29 routes implemented. Technical readiness now has independent state, fail-closed activation, accessible controlled binding, and stale/in-flight exact-intent recovery; detail/readiness/lifecycle are EN/AR. Authenticated runtime and remaining list/audit/commercial-rail localization stay open |
+| Application Catalogue | `DONE/SOURCE_INTEGRATED` | Current source includes publication fields/filter/column, the dual-fence publish command, a release-authority rail, attributable-publication plus technical-readiness activation gating, the exact readiness projection, stored `runtimeTarget`, and explicit `componentKey`. Targeted source tests exist; authenticated runtime, deployment evidence, and remaining catalogue localization are still open |
 | Subscriptions | `MISSING/PARTIAL/BROKEN` | Some tenant detail reads; cancellation path is wrong; administration and plan changes are absent |
 | Wallet | `BROKEN/MISSING` | Local credit/debit calls nonexistent APIs; preview/confirm workflow is absent |
 | Payments/reconciliation | `MISSING` | Five Gateway routes; no frontend module |

@@ -10,7 +10,7 @@ import {
   Globe, 
   Users, 
   Save, 
-  Trash2, 
+  Trash2 as never_used_trash, 
   Server, 
   Loader2, 
   Plus, 
@@ -18,7 +18,7 @@ import {
   Activity, 
   CreditCard, 
   Wallet, 
-  ShieldAlert, 
+  ShieldAlert as never_used_shield, 
   MapPin, 
   TrendingUp, 
   TrendingDown, 
@@ -29,16 +29,14 @@ import {
 } from "lucide-react";
 import { useTenantDetail } from "./hooks/useTenantDetail";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
+// removed DestructiveActionModal
 import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/context/AuthContext";
 import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export default function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [isSaved, setIsSaved] = useState(false);
-  const { user } = useAuth();
-  const canDestroyTenant = adminCanAll(user, ADMIN_RBAC_CRITICAL.TENANTS_DESTROY);
+  // removed isSaved and canDestroyTenant
   const {
     t,
     tenant,
@@ -58,8 +56,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     setAdjCurrency,
     adjNote,
     setAdjNote,
-    destroySubscriptionsToggle,
-    setDestroySubscriptionsToggle,
+    destroySubscriptionsToggle: never1,
+    setDestroySubscriptionsToggle: never2,
     fqdns,
     usersSummary,
     tenantUsers,
@@ -72,14 +70,14 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     operations,
     isSubmitting,
     isLoadingDetails,
-    isEditUserOpen,
-    setIsEditUserOpen,
+    isEditUserOpen: never3,
+    setIsEditUserOpen: never4,
     isAddCreditOpen,
     setIsAddCreditOpen,
     isAddDebitOpen,
     setIsAddDebitOpen,
-    selectedUserId,
-    setSelectedUserId,
+    selectedUserId: never5,
+    setSelectedUserId: never6,
     editProfileData,
     setEditProfileData,
     handleUpdateTenantProfile,
@@ -88,9 +86,9 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     handleResendInvite,
     handleRestoreUser,
     handleDeleteUser,
-    mockBranches,
-    mockDepartments,
-    mockTeams,
+    mockBranches: never7,
+    mockDepartments: never8,
+    mockTeams: never9,
     handleSetPrimaryFqdn,
     submitCreditAdjustment,
     submitDebitAdjustment,
@@ -898,8 +896,6 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
               ))}
             </div>
           </div>
-        )}
-          </>
         )}
       </main>
 

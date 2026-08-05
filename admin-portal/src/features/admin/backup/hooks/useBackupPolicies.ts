@@ -36,7 +36,9 @@ export function useBackupPolicies() {
   const [loadedServerId, setLoadedServerId] = useState<string | null>(null);
   const selectedServerIdRef = useRef(serverContext.selectedServerId);
   const requestGenerationRef = useRef(0);
-  selectedServerIdRef.current = serverContext.selectedServerId;
+  useEffect(() => {
+    selectedServerIdRef.current = serverContext.selectedServerId;
+  }, [serverContext.selectedServerId]);
 
   const refresh = useCallback(async () => {
     const serverId = serverContext.selectedServerId;
@@ -85,7 +87,8 @@ export function useBackupPolicies() {
   }, [serverContext.selectedServerId]);
 
   useEffect(() => {
-    void refresh();
+    const timer = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(timer);
   }, [refresh]);
 
   const savePolicy = async (data: UpsertBackupPolicyDto) => {

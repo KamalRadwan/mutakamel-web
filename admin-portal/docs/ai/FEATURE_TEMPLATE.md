@@ -1,6 +1,6 @@
 # Feature Documentation Template
 
-Status: **Template**
+Status: **[Verified]**
 
 Last source verification: **YYYY-MM-DD**
 

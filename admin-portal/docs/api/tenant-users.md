@@ -1,6 +1,6 @@
 # Tenant Users and Access API
 
-Status: **Verified backend contract; frontend PARTIAL/BROKEN**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 

@@ -42,7 +42,7 @@ export function useBackupNonIdempotentCommandGuard() {
   }, []);
 
   useEffect(() => {
-    syncFromStorage();
+    const timer = setTimeout(() => { syncFromStorage(); }, 0);
 
     const onStorage = (event: StorageEvent) => {
       if (
@@ -60,6 +60,7 @@ export function useBackupNonIdempotentCommandGuard() {
       onLocalChange,
     );
     return () => {
+      clearTimeout(timer);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener(
         BACKUP_NON_IDEMPOTENT_GUARD_CHANGE_EVENT,

@@ -1,6 +1,6 @@
 # Admin Roles and Permissions API
 
-Status: **Verified backend contract; frontend DONE/PARTIAL/REFACTOR**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 
@@ -77,3 +77,40 @@ intents, and avoiding critical over-restriction for ordinary metadata updates.
 - `../backend/mutakamel-apps/core-app/src/admin/admin-roles/admin-permissions.controller.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/admin-roles/dto/`
 - `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
+
+
+## DTOs (Migrated from dtos.md)
+
+### `CreateAdminRoleDto`
+```typescript
+{
+  name: string;
+  description?: string;
+  type: AdminTierEnum;
+  permissionIds?: string[];
+}
+```
+
+### `UpdateAdminRoleDto`
+```typescript
+{
+  name?: string;
+  description?: string;
+}
+```
+
+### `SetRolePermissionsDto`
+```typescript
+{
+  permissionIds: string[];  // Full replacement set
+}
+```
+
+### `SetUserRolesDto`
+```typescript
+{
+  roleIds: string[];  // @IsArray, @ArrayUnique, @IsUUID('7')
+}
+```
+
+---

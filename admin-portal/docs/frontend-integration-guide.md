@@ -1,16 +1,19 @@
 # Admin Portal Frontend Integration Guide
 
-Status: **Current source integration guide**
+Status: **[Verified]**
 
 Last source verification: **2026-08-04**
+
+Application Catalogue integration reverified: **2026-08-05**.
 
 ## Scope
 
 This guide connects the current Admin Portal source to the Core and Worker
-Admin Gateway contracts. It does not claim full parity, authenticated runtime success,
-release readiness, or deployment. The checked generated route inventory still
-describes the removed `/modules` contract and must be regenerated before its
-route count can be used as current evidence.
+Admin Gateway contracts. It does not claim full parity, authenticated runtime
+success, release readiness, or deployment. The checked generated inventory
+contains the canonical Application publish route and no `/modules` root, but a
+route inventory remains transport evidence rather than frontend-completion or
+runtime evidence.
 
 Read the [documentation contract](DOCUMENTATION_CONTRACT.md) and
 [AI Start Here](ai/START_HERE.md) before changing a server-backed feature.
@@ -66,8 +69,8 @@ See [Source of Truth](ai/SOURCE_OF_TRUTH.md).
 | `/tenants` | `PARTIAL/BROKEN`: real foundation mixed with weak types/local behaviors | [Tenants](api/tenants.md) |
 | `/tenants/new` | `PARTIAL/BROKEN`: real quote/Storage placement foundation; simulated/hardcoded sequence remains | [Tenants](api/tenants.md) |
 | `/tenants/[id]` | `PARTIAL/BROKEN`: real detail mixed with wrong routes/methods, mock catalogues, and local wallet/lifecycle | [Tenants](api/tenants.md), [Tenant users](api/tenant-users.md), [Operations](api/tenant-operations.md) |
-| `/applications-catalogue` | `DONE/SOURCE_INTEGRATED`: real Application list/create/filtering, totals, retry, and global catalogue audit; authenticated runtime evidence remains | [Application Catalogue](api/catalog.md) |
-| `/applications-catalogue/[applicationKey]` | `DONE/SOURCE_INTEGRATED`: real detail, independently loaded fail-closed technical readiness, accessible controlled primary-component dialog, stable-intent stale/in-flight recovery, manifests, metadata/policy/lifecycle, tiers, features, grants, price ladders, and paginated audit; the detail/readiness/lifecycle surfaces are EN/AR, while the commercial control rail and authenticated runtime evidence remain open | [Application Catalogue](api/catalog.md) |
+| `/applications-catalogue` | `DONE/SOURCE_INTEGRATED`: real list/create/filtering includes independent publication state and its column, totals, retry, and global catalogue audit; authenticated runtime evidence remains open | [Application Catalogue](api/catalog.md) |
+| `/applications-catalogue/[applicationKey]` | `DONE/SOURCE_INTEGRATED`: real detail includes the release-authority rail, dual-fence publish flow, attributable-publication plus technical-readiness activation gate, exact readiness projection, stored runtime target, explicit component binding, stable-intent recovery, manifests, metadata/policy/lifecycle, and commercial controls; authenticated runtime evidence remains open | [Application Catalogue](api/catalog.md) |
 | `/users` | `DONE/PARTIAL`: real user list/invite/lifecycle; error/state hardening remains | [Users](api/users.md) |
 | `/users/[id]` | `DONE/PARTIAL`: real user/roles/WebPhone; self profile is separate and missing | [Users](api/users.md) |
 | `/roles` | `DONE/PARTIAL/REFACTOR`: real roles/permissions; ordinary metadata permission must remain non-critical | [Roles](api/roles-permissions.md) |
@@ -79,6 +82,27 @@ subscriptions, invoices, payments/reconciliation, control-plane audit, logging,
 real notifications, or self-profile/auth completion. Managed currency list,
 single-rate update, and transactional batch update remain under
 `/settings/billing`.
+
+## Application Catalogue release authority
+
+The browser must render three independent states: lifecycle, publication, and
+technical readiness. `runtimeTarget` is signed/stored identity and must never
+be reconstructed as `${applicationKey}-app`.
+
+- List reads support a `publicationStatus=UNPUBLISHED|PUBLISHED` filter and
+  must show publication separately from lifecycle.
+- `POST /api/admin/core/v1/applications/:applicationKey/publish` requires
+  `admin.applications.update` plus `admin.applications.critical`, a caller-owned
+  UUIDv7 idempotency key, both current revision fences, and a reason.
+- Metadata edits invalidate an existing publication and never auto-publish.
+- Activation requires attributable publication plus technical
+  `activationAllowed`; new selection uses complete `selectionAllowed`.
+- Existing installed runtime may retain a `PUBLISHED` `ACTIVE` or `DEPRECATED`
+  Application. Deprecation must not be presented as automatic tenant removal.
+
+Current frontend source adopts these fields and actions. That establishes
+source integration only; it is not authenticated runtime, deployment, or
+release-readiness proof.
 
 ## Database and Backup module boundary
 

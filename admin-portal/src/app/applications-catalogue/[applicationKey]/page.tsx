@@ -12,6 +12,8 @@ import { ApplicationCatalogueWorkspace } from "@/features/admin/applications/com
 import { ApplicationConfigurationDialog } from "@/features/admin/applications/components/ApplicationConfigurationDialog";
 import { ApplicationLifecycleDialog, type ApplicationLifecycleAction } from "@/features/admin/applications/components/ApplicationLifecycleDialog";
 import { ApplicationPrimaryComponentDialog } from "@/features/admin/applications/components/ApplicationPrimaryComponentDialog";
+import { ApplicationPublishDialog } from "@/features/admin/applications/components/ApplicationPublishDialog";
+import { ApplicationReleaseAuthorityRail } from "@/features/admin/applications/components/ApplicationReleaseAuthorityRail";
 import { ApplicationTechnicalProvisioningPanel } from "@/features/admin/applications/components/ApplicationTechnicalProvisioningPanel";
 import { useApplication } from "@/features/admin/applications/hooks/useApplication";
 import { useApplicationTechnicalProvisioning } from "@/features/admin/applications/hooks/useApplicationTechnicalProvisioning";
@@ -32,6 +34,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   const [lifecycleAction, setLifecycleAction] = useState<ApplicationLifecycleAction | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [bindingOpen, setBindingOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
 
   const canEditMetadata = adminCanAll(user, ["admin.applications.update"]);
   const canLifecycle = adminCanAll(user, ["admin.applications.update", "admin.applications.critical"]);
@@ -48,6 +51,11 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
     technical.readiness,
     technical.isLoading,
     technical.error !== null,
+    {
+      publicationStatus: application.publicationStatus,
+      publishedAt: application.publishedAt,
+      publishedBy: application.publishedBy,
+    },
   );
   const lifecycleOptions: ApplicationLifecycleAction[] = application.lifecycleStatus === "DRAFT"
     ? ["activate", "disable"]
@@ -99,6 +107,16 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
         </div>
       </header>
 
+      <ApplicationReleaseAuthorityRail
+        application={application}
+        readiness={technical.readiness}
+        isReadinessLoading={technical.isLoading}
+        hasReadinessError={technical.error !== null}
+        canPublish={canLifecycle}
+        isPublishing={detail.isMutating}
+        onPublish={() => setPublishOpen(true)}
+      />
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Fact label={t.applications.detail.facts.applicationType} value={application.applicationType} tone="violet" />
         <Fact label={t.applications.detail.facts.commercialMode} value={application.commercialMode} tone="amber" />
@@ -135,7 +153,18 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
 
     <ApplicationConfigurationDialog mode={configurationMode} application={application} isSubmitting={detail.isMutating} onClose={() => setConfigurationMode(null)} onUpdateMetadata={detail.updateApplication} onUpdatePolicy={detail.updateDatabasePolicy} />
     <ApplicationLifecycleDialog action={lifecycleAction} currentStatus={application.lifecycleStatus} isSubmitting={detail.isMutating} onClose={() => setLifecycleAction(null)} onConfirm={runLifecycle} />
-    <ApplicationPrimaryComponentDialog isOpen={bindingOpen} applicationKey={application.key} technicalDefinitionRevision={technical.readiness?.technicalDefinitionRevision ?? application.technicalDefinitionRevision} isSubmitting={technical.isLinking} commandError={technical.commandError} canRetryExactIntent={technical.hasPendingIntent} onClose={() => setBindingOpen(false)} onConfirm={(contractVersion, reason) => technical.linkPrimaryComponent({ contractVersion, reason })} onRetryExactIntent={technical.retryPendingIntent} onClearCommandError={technical.clearCommandError} />
+    <ApplicationPublishDialog
+      isOpen={publishOpen}
+      application={application}
+      isSubmitting={detail.isMutating}
+      onClose={() => setPublishOpen(false)}
+      onConfirm={async (dto) => {
+        const result = await detail.publishApplication(dto);
+        await technical.refresh();
+        return result;
+      }}
+    />
+    <ApplicationPrimaryComponentDialog isOpen={bindingOpen} applicationKey={application.key} runtimeTarget={technical.readiness?.runtimeTarget ?? application.runtimeTarget} technicalDefinitionRevision={technical.readiness?.technicalDefinitionRevision ?? application.technicalDefinitionRevision} isSubmitting={technical.isLinking} commandError={technical.commandError} canRetryExactIntent={technical.hasPendingIntent} onClose={() => setBindingOpen(false)} onConfirm={(componentKey, contractVersion, reason) => technical.linkPrimaryComponent({ componentKey, contractVersion, reason })} onRetryExactIntent={technical.retryPendingIntent} onClearCommandError={technical.clearCommandError} />
     <DestructiveActionModal isOpen={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={() => { void detail.deleteApplication(application.catalogueRevision, t.applications.detail.deleteReason).then(() => router.push("/applications-catalogue")); }} title={t.applications.detail.deleteTitle} description={t.applications.detail.deleteDescription} targetName={application.name} actionType="delete" requireNameTyping isSubmitting={detail.isMutating} />
   </PageFrame>;
 }

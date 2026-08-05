@@ -1,6 +1,6 @@
 # Floating Admin WebPhone
 
-Production integration status: **live**. Last verified against the Gateway,
+Status: **[Verified]**
 Core, `mutakamel-web-app`, and Admin Portal source on **2026-07-25**.
 
 The component is mounted once in the authenticated root layout and is hidden
@@ -15,8 +15,8 @@ when the current admin has no enabled WebPhone configuration.
 | Latest call logs | `GET /api/admin/core/v1/users/me/webphone/call-logs` | Any authenticated admin | Hydrates the Log tab with up to 50 newest calls |
 | Create call log | `POST /api/admin/core/v1/users/me/webphone/call-logs` | Any authenticated admin | Persists one ended, failed, declined, answered, or unanswered call |
 
-All calls use the shared authenticated client, Core success envelopes, Bearer
-authentication, refresh cookies, and the canonical Gateway paths above.
+All calls use the shared authenticated client, Core success envelopes,
+refresh cookies, and the canonical Gateway paths above.
 
 ## SIP and WebRTC implementation
 

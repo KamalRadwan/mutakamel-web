@@ -1,13 +1,14 @@
 # Application Catalogue V1 Frontend Contract
 
-Status: **Source-integrated; authenticated runtime evidence remains open**
+Status: **[Verified]**
 
-Last source verification: **2026-08-02**
+Last source verification: **2026-08-05**
 
 This is the Admin Portal implementation contract for the Application Catalogue:
-Application identity and lifecycle, database policy and safe manifest evidence,
-tiers, features, tier-feature grants, graduated USD price ladders, managed
-billing currency rates, and immutable catalogue audit.
+Application identity, independent publication and lifecycle, immutable runtime
+target evidence, technical readiness, database policy and safe manifest
+evidence, tiers, features, tier-feature grants, graduated USD price ladders,
+managed billing currency rates, and immutable catalogue audit.
 
 The public/domain root is **Application**, not Module. The physical PostgreSQL
 tables still include names such as `modules`, `module_tiers`, and `module_id`.
@@ -111,12 +112,16 @@ reuse it only when retrying the same method, path, query, actor, and body.
 
 Source installs four Application roots:
 
-| Key | Name | Rank | Type | Commercial mode | Visibility | Database principal |
-|:---|:---|---:|:---|:---|:---|:---|
-| `core` | Core Workspace | 1 | `SYSTEM` | `INCLUDED` | `PUBLIC` | `mutakamel_core_app` |
-| `crm` | CRM | 2 | `TENANT` | `SUBSCRIPTION` | `PUBLIC` | `mutakamel_crm_app` |
-| `trade` | Trade | 3 | `TENANT` | `SUBSCRIPTION` | `PUBLIC` | `mutakamel_trade_app` |
-| `worker` | Worker | 4 | `SYSTEM` | `NON_BILLABLE` | `INTERNAL` | `mutakamel_worker_app` |
+| Key | Runtime target | Name | Rank | Type | Commercial mode | Visibility | Database principal |
+|:---|:---|:---|---:|:---|:---|:---|:---|
+| `core` | `core-app` | Core Workspace | 1 | `SYSTEM` | `INCLUDED` | `PUBLIC` | `mutakamel_core_app` |
+| `crm` | `crm-app` | CRM | 2 | `TENANT` | `SUBSCRIPTION` | `PUBLIC` | `mutakamel_crm_app` |
+| `trade` | `trade-app` | Trade | 3 | `TENANT` | `SUBSCRIPTION` | `PUBLIC` | `mutakamel_trade_app` |
+| `worker` | `worker-app` | Worker | 4 | `SYSTEM` | `NON_BILLABLE` | `INTERNAL` | `mutakamel_worker_app` |
+
+The root seed creates missing rows as `DRAFT` and `UNPUBLISHED`. Those seed
+defaults are not live-state evidence. Publication remains an explicit,
+administrator-attributed command.
 
 Seeded features:
 
@@ -151,6 +156,7 @@ type ApplicationLifecycleStatus =
   | "ACTIVE"
   | "DEPRECATED"
   | "DISABLED";
+type ApplicationPublicationStatus = "UNPUBLISHED" | "PUBLISHED";
 type ApplicationDatabaseAccessMode = "NONE" | "TENANT_DATABASE";
 type ApplicationManifestPublicationSource = "MIGRATION" | "SIGNED_API";
 type BillingCycle = "MONTHLY" | "ANNUAL";
@@ -159,7 +165,7 @@ type ApplicationComponentKind = "FOUNDATION" | "MODULE";
 type ApplicationComponentStatus = "ACTIVE" | "RETIRED";
 ```
 
-Application command operations are `CREATE`, `UPDATE`, `DELETE`,
+Application command operations are `CREATE`, `UPDATE`, `PUBLISH`, `DELETE`,
 `UPDATE_DATABASE_POLICY`, `ACTIVATE`, `DEPRECATE`, and `DISABLE`.
 
 Audit entity types are `MODULE`, `MODULE_ORDER`, `APPLICATION`, `TIER`,
@@ -195,32 +201,49 @@ interface ApplicationDatabasePolicyView {
 }
 
 type ApplicationTechnicalReadinessReason =
+  | "RUNTIME_TARGET_REQUIRED"
   | "COMPONENT_BINDING_REQUIRED"
   | "ACTIVE_COMPONENT_REQUIRED"
   | "PUBLISHED_RELEASE_REQUIRED"
+  | "MINIMUM_RELEASE_NOT_SATISFIED"
   | "DATABASE_PERMISSION_MANIFEST_REQUIRED"
   | "DATABASE_PERMISSION_MANIFEST_INVALID";
 
+type ApplicationSelectionBlocker =
+  | "APPLICATION_LIFECYCLE_NOT_ACTIVE"
+  | "APPLICATION_NOT_PUBLISHED"
+  | "APPLICATION_NOT_PUBLIC"
+  | "APPLICATION_NON_BILLABLE"
+  | "TECHNICAL_READINESS_BLOCKED";
+
 interface ApplicationTechnicalReadinessView {
   contractVersion: 1;
+  applicationId: string;
   applicationKey: string;
+  runtimeTarget: string | null;
+  commercialMode: ApplicationCommercialMode;
+  catalogueVisibility: ApplicationCatalogueVisibility;
   lifecycleStatus: ApplicationLifecycleStatus;
+  publicationStatus: ApplicationPublicationStatus;
   technicalDefinitionRevision: string;
   status: "READY" | "NOT_REQUIRED" | "BLOCKED";
   activationAllowed: boolean;
   selectionAllowed: boolean;
+  selectionBlockers: ApplicationSelectionBlocker[];
   reasons: ApplicationTechnicalReadinessReason[];
   checks: {
+    runtimeTarget: boolean;
     componentBinding: boolean;
     activeComponents: boolean;
     publishedReleases: boolean;
+    minimumReleases: boolean;
     databasePermissionManifest: boolean;
   };
   components: Array<{
     id: string;
     key: string;
     ownerApp: string;
-    workerTarget: `${string}-app`;
+    workerTarget: string | null;
     kind: "FOUNDATION" | "MODULE";
     status: "ACTIVE" | "RETIRED";
     contractVersion: number;
@@ -249,6 +272,11 @@ interface ApplicationView {
   commercialMode: ApplicationCommercialMode;
   catalogueVisibility: ApplicationCatalogueVisibility;
   lifecycleStatus: ApplicationLifecycleStatus;
+  runtimeTarget: string | null;
+  publicationStatus: ApplicationPublicationStatus;
+  publicationRevision: string;
+  publishedAt: string | null;
+  publishedBy: string | null;
   databaseAccessMode: ApplicationDatabaseAccessMode;
   databasePrincipal: string | null;
   requiredOnDatabaseServer: boolean;
@@ -269,6 +297,7 @@ interface ApplicationMutationReceipt {
   operation:
     | "CREATE"
     | "UPDATE"
+    | "PUBLISH"
     | "UPDATE_DATABASE_POLICY"
     | "ACTIVATE"
     | "DEPRECATE"
@@ -277,9 +306,12 @@ interface ApplicationMutationReceipt {
   applicationId: string;
   applicationKey: string;
   lifecycleStatus: ApplicationLifecycleStatus;
+  runtimeTarget: string | null;
+  publicationStatus: ApplicationPublicationStatus;
+  publicationRevision: string;
   catalogueRevision: string;
   policyRevision: string;
-  deleted: false;
+  deleted: boolean;
 }
 
 interface TierView {
@@ -356,6 +388,7 @@ interface ApplicationListQueryDto {
   commercialMode?: ApplicationCommercialMode;
   catalogueVisibility?: ApplicationCatalogueVisibility;
   lifecycleStatus?: ApplicationLifecycleStatus;
+  publicationStatus?: ApplicationPublicationStatus;
   databaseAccessMode?: ApplicationDatabaseAccessMode;
 }
 
@@ -383,6 +416,12 @@ interface ApplicationLifecycleCommandDto {
   reason: string; // trimmed, non-empty, max 256
 }
 
+interface PublishApplicationDto {
+  expectedCatalogueRevision: string;
+  expectedPublicationRevision: string;
+  reason: string; // trimmed, non-empty, max 256
+}
+
 interface UpdateApplicationDatabasePolicyDto {
   expectedPolicyRevision: string;
   enableOnNewServers?: boolean;
@@ -395,6 +434,7 @@ interface UpdateApplicationDatabasePolicyDto {
 
 interface CreateApplicationProvisioningBindingDto {
   expectedTechnicalDefinitionRevision: string; // positive integer string
+  componentKey: string; // canonical component key, max 96
   contractVersion: number; // integer 1..2,147,483,647
   reason: string; // trimmed, non-empty, max 256
 }
@@ -402,6 +442,10 @@ interface CreateApplicationProvisioningBindingDto {
 
 Application update and policy update require at least one actual writable
 field. Delete carries `expectedCatalogueRevision` and `reason` in the query.
+Publishing is independently fenced by the exact current catalogue and
+publication revisions. A metadata update to a published Application changes it
+to `UNPUBLISHED`, advances the publication revision, and clears
+`publishedAt`/`publishedBy`; it never auto-publishes the new revision.
 
 ### Tiers and features
 
@@ -487,39 +531,62 @@ returned with four fractional digits.
 
 ## Exact endpoint matrix
 
-| # | Method and browser path | Permission | HTTP success | Idempotency |
-|---:|:---|:---|:---:|:---:|
-| 1 | `GET /applications` | `admin.applications.read` | 200 | No |
-| 2 | `GET /applications/:applicationKey` | `admin.applications.read` | 200 | No |
-| 3 | `GET /applications/:applicationKey/database-manifests` | `admin.applications.read` | 200 | No |
-| 4 | `GET /applications/:applicationKey/technical-provisioning` | `admin.applications.read` | 200 | No |
-| 5 | `POST /applications/:applicationKey/technical-provisioning/primary-component` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
-| 6 | `POST /applications` | `admin.applications.create` | 201 | Yes |
-| 7 | `PATCH /applications/:applicationKey` | `admin.applications.update` | 200 | Yes |
-| 8 | `DELETE /applications/:applicationKey` | `admin.applications.delete` + `admin.applications.critical` | 204 | Yes |
-| 9 | `PATCH /applications/:applicationKey/database-policy` | `admin.applications.update` + `admin.applications.critical` | 200 | Yes |
-| 10 | `POST /applications/:applicationKey/activate` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
-| 11 | `POST /applications/:applicationKey/deprecate` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
-| 12 | `POST /applications/:applicationKey/disable` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
-| 13 | `GET /catalog/audit` | `admin.catalog.read` | 200 | No |
-| 14 | `GET /applications/:applicationId/audit` | `admin.catalog.read` | 200 | No |
-| 15 | `POST /applications/:applicationId/tiers` | `admin.catalog.manage` | 201 | No |
-| 16 | `GET /applications/:applicationId/tiers` | `admin.catalog.read` | 200 | No |
-| 17 | `PATCH /tiers/:id` | `admin.catalog.manage` + `admin.catalog.critical` | 200 | Yes |
-| 18 | `DELETE /tiers/:id` | `admin.catalog.manage` + `admin.catalog.critical` | 204 | Yes |
-| 19 | `POST /applications/:applicationId/features` | `admin.catalog.manage` | 201 | No |
-| 20 | `GET /applications/:applicationId/features` | `admin.catalog.read` | 200 | No |
-| 21 | `PATCH /features/:id` | `admin.catalog.manage` + `admin.catalog.critical` | 200 | Yes |
-| 22 | `DELETE /features/:id` | `admin.catalog.manage` + `admin.catalog.critical` | 204 | Yes |
-| 23 | `GET /tiers/:tierId/features` | `admin.catalog.read` | 200 | No |
-| 24 | `PATCH /tiers/:tierId/features` | `admin.catalog.manage` + `admin.catalog.critical` | 200 | Yes |
-| 25 | `GET /tiers/:tierId/price-tiers` | `admin.catalog.read` | 200 | No |
-| 26 | `PATCH /tiers/:tierId/price-tiers` | `admin.catalog.manage` + `admin.catalog.critical` | 200 | Yes |
-| 27 | `GET /billing/currency-rates` | `admin.catalog.read` | 200 | No |
-| 28 | `PATCH /billing/currency-rates` | `admin.billing.currency.manage` + `admin.catalog.critical` | 200 | Yes |
-| 29 | `PATCH /billing/currency-rates/:currencyCode` | `admin.billing.currency.manage` + `admin.catalog.critical` | 200 | Yes |
+| Method and browser path | Permission | HTTP success | Idempotency |
+|:---|:---|:---:|:---:|
+| `GET /applications` | `admin.applications.read` | 200 | No |
+| `GET /applications/:applicationKey` | `admin.applications.read` | 200 | No |
+| `GET /applications/:applicationKey/database-manifests` | `admin.applications.read` | 200 | No |
+| `GET /applications/:applicationKey/technical-provisioning` | `admin.applications.read` | 200 | No |
+| `POST /applications/:applicationKey/technical-provisioning/primary-component` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
+| `POST /applications` | `admin.applications.create` | 201 | Yes |
+| `PATCH /applications/:applicationKey` | `admin.applications.update` | 200 | Yes |
+| `DELETE /applications/:applicationKey` | `admin.applications.delete` + `admin.applications.critical` | 204 | Yes |
+| `PATCH /applications/:applicationKey/database-policy` | `admin.applications.update` + `admin.applications.critical` | 200 | Yes |
+| `POST /applications/:applicationKey/publish` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
+| `POST /applications/:applicationKey/activate` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
+| `POST /applications/:applicationKey/deprecate` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
+| `POST /applications/:applicationKey/disable` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
+| `GET /catalog/audit` | `admin.catalog.read` | 200 | No |
+| `GET /applications/:applicationId/audit` | `admin.catalog.read` | 200 | No |
+| `POST /applications/:applicationId/tiers` | `admin.catalog.manage` | 201 | No |
+| `GET /applications/:applicationId/tiers` | `admin.catalog.read` | 200 | No |
+| `PATCH /tiers/:id` | `admin.catalog.manage` + `admin.catalog.critical` | 200 | Yes |
+| `DELETE /tiers/:id` | `admin.catalog.manage` + `admin.catalog.critical` | 204 | Yes |
+| `POST /applications/:applicationId/features` | `admin.catalog.manage` | 201 | No |
+| `GET /applications/:applicationId/features` | `admin.catalog.read` | 200 | No |
+| `PATCH /features/:id` | `admin.catalog.manage` + `admin.catalog.critical` | 200 | Yes |
+| `DELETE /features/:id` | `admin.catalog.manage` + `admin.catalog.critical` | 204 | Yes |
+| `GET /tiers/:tierId/features` | `admin.catalog.read` | 200 | No |
+| `PATCH /tiers/:tierId/features` | `admin.catalog.manage` + `admin.catalog.critical` | 200 | Yes |
+| `GET /tiers/:tierId/price-tiers` | `admin.catalog.read` | 200 | No |
+| `PATCH /tiers/:tierId/price-tiers` | `admin.catalog.manage` + `admin.catalog.critical` | 200 | Yes |
+| `GET /billing/currency-rates` | `admin.catalog.read` | 200 | No |
+| `PATCH /billing/currency-rates` | `admin.billing.currency.manage` + `admin.catalog.critical` | 200 | Yes |
+| `PATCH /billing/currency-rates/:currencyCode` | `admin.billing.currency.manage` + `admin.catalog.critical` | 200 | Yes |
 
 Every abbreviated path in the table is relative to `/api/admin/core/v1`.
+
+### Release authority UI contract
+
+Lifecycle, publication, and technical readiness are independent evidence. The
+Application list must expose separate lifecycle and publication columns and a
+`publicationStatus` filter. The detail view must show `runtimeTarget`,
+publication status/revision, and attributable `publishedAt`/`publishedBy`.
+
+- `PUBLISH` is an explicit critical action. It uses both current revision
+  fences, requires a reason, and never changes lifecycle state.
+- `ACTIVATE` is available only when an attributable publication exists and
+  technical `activationAllowed` is true. `activationAllowed` alone is not a
+  publication check.
+- Metadata editing a published Application must warn that the current release
+  authority will be invalidated. The returned/refetched `UNPUBLISHED` state is
+  authoritative; the browser must never publish automatically.
+- New commercial selection requires `selectionAllowed=true`, which represents
+  `ACTIVE`, `PUBLISHED`, `PUBLIC`, commercial eligibility, and technical
+  readiness. Existing installed runtime may retain a `PUBLISHED` Application
+  whose lifecycle is `ACTIVE` or `DEPRECATED`.
+- “Release authority” or “deployable” must never be inferred from lifecycle,
+  an active manifest, or a published component release alone.
 
 ### Technical provisioning examples
 
@@ -536,17 +603,29 @@ GET /api/admin/core/v1/applications/hr/technical-provisioning HTTP/1.1
   "success": true,
   "data": {
     "contractVersion": 1,
+    "applicationId": "019f0000-0000-7000-8000-000000000010",
     "applicationKey": "hr",
+    "runtimeTarget": "hr-runtime",
+    "commercialMode": "SUBSCRIPTION",
+    "catalogueVisibility": "PUBLIC",
     "lifecycleStatus": "DRAFT",
+    "publicationStatus": "UNPUBLISHED",
     "technicalDefinitionRevision": "2",
     "status": "BLOCKED",
     "activationAllowed": false,
     "selectionAllowed": false,
+    "selectionBlockers": [
+      "APPLICATION_LIFECYCLE_NOT_ACTIVE",
+      "APPLICATION_NOT_PUBLISHED",
+      "TECHNICAL_READINESS_BLOCKED"
+    ],
     "reasons": ["PUBLISHED_RELEASE_REQUIRED"],
     "checks": {
+      "runtimeTarget": true,
       "componentBinding": true,
       "activeComponents": true,
       "publishedReleases": false,
+      "minimumReleases": true,
       "databasePermissionManifest": true
     },
     "components": [
@@ -554,7 +633,7 @@ GET /api/admin/core/v1/applications/hr/technical-provisioning HTTP/1.1
         "id": "019f0000-0000-7000-8000-000000000020",
         "key": "hr",
         "ownerApp": "hr",
-        "workerTarget": "hr-app",
+        "workerTarget": "hr-runtime",
         "kind": "MODULE",
         "status": "ACTIVE",
         "contractVersion": 1,
@@ -570,8 +649,12 @@ GET /api/admin/core/v1/applications/hr/technical-provisioning HTTP/1.1
 }
 ```
 
-The DRAFT-only binding command derives the primary component key from the
-immutable Application key and derives Worker routing as `<ownerApp>-app`.
+The DRAFT-only binding command accepts an explicit canonical `componentKey`.
+It never accepts a Worker target. Core reads Worker routing from the signed,
+stored immutable `runtimeTarget`; the browser must not derive that target from
+the Application key or display name. When `runtimeTarget` is null, readiness
+reports `RUNTIME_TARGET_REQUIRED` and component binding remains blocked until
+the separate signed technical-package adoption gate is satisfied.
 
 ```http
 POST /api/admin/core/v1/applications/hr/technical-provisioning/primary-component HTTP/1.1
@@ -580,6 +663,7 @@ Content-Type: application/json
 
 {
   "expectedTechnicalDefinitionRevision": "1",
+  "componentKey": "hr",
   "contractVersion": 1,
   "reason": "Link the HR runtime component"
 }
@@ -594,6 +678,9 @@ Content-Type: application/json
     "applicationId": "019f0000-0000-7000-8000-000000000010",
     "applicationKey": "hr",
     "lifecycleStatus": "DRAFT",
+    "runtimeTarget": "hr-runtime",
+    "publicationStatus": "UNPUBLISHED",
+    "publicationRevision": "1",
     "catalogueRevision": "1",
     "policyRevision": "1",
     "deleted": false,
@@ -601,7 +688,7 @@ Content-Type: application/json
       "componentId": "019f0000-0000-7000-8000-000000000020",
       "componentKey": "hr",
       "ownerApp": "hr",
-      "workerTarget": "hr-app",
+      "workerTarget": "hr-runtime",
       "contractVersion": 1
     }
   },
@@ -611,13 +698,15 @@ Content-Type: application/json
 ```
 
 Relevant conflicts are `APPLICATION_TECHNICAL_PROVISIONING_NOT_READY`,
+`APPLICATION_RUNTIME_TARGET_REQUIRED`,
 `APPLICATION_TECHNICAL_DEFINITION_REVISION_STALE`,
 `APPLICATION_TECHNICAL_BINDING_REQUIRES_DRAFT`,
 `APPLICATION_COMPONENT_ALREADY_BOUND`, and
 `APPLICATION_COMPONENT_KEY_TAKEN`. The UI must refetch the projection after a
 successful command or any ambiguous/in-flight outcome. Activation remains
-disabled when the projection is unavailable or `activationAllowed` is false;
-Core independently enforces the same condition.
+disabled unless the Application has an attributable `PUBLISHED` revision and
+the projection is available with `activationAllowed=true`; Core independently
+enforces both gates.
 
 ## Route contracts and full examples
 
@@ -650,6 +739,11 @@ Response — HTTP `200`:
     "commercialMode": "SUBSCRIPTION",
     "catalogueVisibility": "PUBLIC",
     "lifecycleStatus": "ACTIVE",
+    "runtimeTarget": "crm-app",
+    "publicationStatus": "PUBLISHED",
+    "publicationRevision": "2",
+    "publishedAt": "2026-08-02T10:30:00.000Z",
+    "publishedBy": "019f0000-0000-7000-8000-000000000099",
     "databaseAccessMode": "TENANT_DATABASE",
     "databasePrincipal": "mutakamel_crm_app",
     "requiredOnDatabaseServer": true,
@@ -725,6 +819,11 @@ Response — HTTP `200`:
     "commercialMode": "SUBSCRIPTION",
     "catalogueVisibility": "PUBLIC",
     "lifecycleStatus": "ACTIVE",
+    "runtimeTarget": "crm-app",
+    "publicationStatus": "PUBLISHED",
+    "publicationRevision": "2",
+    "publishedAt": "2026-08-02T10:30:00.000Z",
+    "publishedBy": "019f0000-0000-7000-8000-000000000099",
     "databaseAccessMode": "TENANT_DATABASE",
     "databasePrincipal": "mutakamel_crm_app",
     "requiredOnDatabaseServer": true,
@@ -826,6 +925,9 @@ Response — HTTP `201`:
     "applicationId": "019f0000-0000-7000-8000-000000000005",
     "applicationKey": "hr",
     "lifecycleStatus": "DRAFT",
+    "runtimeTarget": null,
+    "publicationStatus": "UNPUBLISHED",
+    "publicationRevision": "1",
     "catalogueRevision": "1",
     "policyRevision": "1",
     "deleted": false
@@ -835,7 +937,7 @@ Response — HTTP `201`:
 }
 ```
 
-Create cannot accept a principal or manifest. The draft starts with
+Create cannot accept a `runtimeTarget`, principal, or manifest. The draft starts with
 `databaseAccessMode=NONE` and disabled new-server/rotation policy.
 
 ### 5. Update Application metadata
@@ -865,6 +967,9 @@ Response — HTTP `200`:
     "applicationId": "019f0000-0000-7000-8000-000000000005",
     "applicationKey": "hr",
     "lifecycleStatus": "DRAFT",
+    "runtimeTarget": null,
+    "publicationStatus": "UNPUBLISHED",
+    "publicationRevision": "1",
     "catalogueRevision": "2",
     "policyRevision": "1",
     "deleted": false
@@ -873,6 +978,12 @@ Response — HTTP `200`:
   "timestamp": "2026-08-02T12:00:00.000Z"
 }
 ```
+
+If the edited Application was `PUBLISHED`, the same transaction changes it to
+`UNPUBLISHED`, advances `publicationRevision`, clears
+`publishedAt`/`publishedBy`, and advances `catalogueRevision`. The UI must warn
+before this invalidation, then render the returned/refetched state and require a
+separate publish command.
 
 ### 6. Delete an unused catalogue-only draft
 
@@ -919,6 +1030,9 @@ Response — HTTP `200`:
     "applicationId": "019f0000-0000-7000-8000-000000000002",
     "applicationKey": "crm",
     "lifecycleStatus": "ACTIVE",
+    "runtimeTarget": "crm-app",
+    "publicationStatus": "PUBLISHED",
+    "publicationRevision": "2",
     "catalogueRevision": "2",
     "policyRevision": "2",
     "deleted": false
@@ -931,17 +1045,61 @@ Response — HTTP `200`:
 Rotation or new-server enablement requires an active database Application with
 an active manifest.
 
-### 8. Activate an Application
+### 8. Publish an Application revision
 
-Request:
+Publication establishes independent, attributable release authority. It does
+not activate the Application and does not replace technical readiness checks.
 
 ```http
-POST /api/admin/core/v1/applications/hr/activate HTTP/1.1
+POST /api/admin/core/v1/applications/hr/publish HTTP/1.1
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a005
 Content-Type: application/json
 
 {
   "expectedCatalogueRevision": "2",
+  "expectedPublicationRevision": "1",
+  "reason": "Commercial and technical review approved."
+}
+```
+
+Response — HTTP `201`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "contractVersion": 1,
+    "operation": "PUBLISH",
+    "applicationId": "019f0000-0000-7000-8000-000000000005",
+    "applicationKey": "hr",
+    "lifecycleStatus": "DRAFT",
+    "runtimeTarget": "hr-runtime",
+    "publicationStatus": "PUBLISHED",
+    "publicationRevision": "2",
+    "catalogueRevision": "3",
+    "policyRevision": "1",
+    "deleted": false
+  },
+  "correlationId": "019f0000-0000-7000-8000-000000009001",
+  "timestamp": "2026-08-05T12:00:00.000Z"
+}
+```
+
+Core rejects either stale revision, a `DISABLED` Application, and an already
+published current revision. Refetch the Application after success to obtain
+database-owned `publishedAt` and authenticated `publishedBy` evidence.
+
+### 9. Activate an Application
+
+Request:
+
+```http
+POST /api/admin/core/v1/applications/hr/activate HTTP/1.1
+x-idempotency-key: 019f0000-0000-7000-8000-00000000a006
+Content-Type: application/json
+
+{
+  "expectedCatalogueRevision": "3",
   "reason": "Technical release and manifest validation completed."
 }
 ```
@@ -957,7 +1115,10 @@ Response — HTTP `201`:
     "applicationId": "019f0000-0000-7000-8000-000000000005",
     "applicationKey": "hr",
     "lifecycleStatus": "ACTIVE",
-    "catalogueRevision": "3",
+    "runtimeTarget": "hr-runtime",
+    "publicationStatus": "PUBLISHED",
+    "publicationRevision": "2",
+    "catalogueRevision": "4",
     "policyRevision": "1",
     "deleted": false
   },
@@ -967,14 +1128,16 @@ Response — HTTP `201`:
 ```
 
 Allowed transitions are `DRAFT -> ACTIVE` and `DEPRECATED -> ACTIVE`.
+Activation additionally requires attributable `PUBLISHED` state and technical
+`activationAllowed=true`; publication alone is insufficient.
 
-### 9. Deprecate an Application
+### 10. Deprecate an Application
 
 Request:
 
 ```http
 POST /api/admin/core/v1/applications/crm/deprecate HTTP/1.1
-x-idempotency-key: 019f0000-0000-7000-8000-00000000a006
+x-idempotency-key: 019f0000-0000-7000-8000-00000000a007
 Content-Type: application/json
 
 {
@@ -994,6 +1157,9 @@ Response — HTTP `201`:
     "applicationId": "019f0000-0000-7000-8000-000000000002",
     "applicationKey": "crm",
     "lifecycleStatus": "DEPRECATED",
+    "runtimeTarget": "crm-app",
+    "publicationStatus": "PUBLISHED",
+    "publicationRevision": "2",
     "catalogueRevision": "3",
     "policyRevision": "2",
     "deleted": false
@@ -1006,13 +1172,13 @@ Response — HTTP `201`:
 Allowed transition: `ACTIVE -> DEPRECATED`. Leaving ACTIVE disables
 `enableOnNewServers` and may advance `policyRevision`.
 
-### 10. Disable an Application
+### 11. Disable an Application
 
 Request:
 
 ```http
 POST /api/admin/core/v1/applications/crm/disable HTTP/1.1
-x-idempotency-key: 019f0000-0000-7000-8000-00000000a007
+x-idempotency-key: 019f0000-0000-7000-8000-00000000a008
 Content-Type: application/json
 
 {
@@ -1032,6 +1198,9 @@ Response — HTTP `201`:
     "applicationId": "019f0000-0000-7000-8000-000000000002",
     "applicationKey": "crm",
     "lifecycleStatus": "DISABLED",
+    "runtimeTarget": "crm-app",
+    "publicationStatus": "PUBLISHED",
+    "publicationRevision": "2",
     "catalogueRevision": "4",
     "policyRevision": "2",
     "deleted": false
@@ -1044,7 +1213,7 @@ Response — HTTP `201`:
 Allowed transitions are `ACTIVE -> DISABLED` and
 `DEPRECATED -> DISABLED`. DISABLED has no reactivation transition in V1.
 
-### 11. List global catalogue audit
+### 12. List global catalogue audit
 
 Request:
 
@@ -1093,7 +1262,7 @@ Response — HTTP `200`:
 Filters: `entityType`, `action`, UUIDv7 `actorAdminId`, ISO `from`, and ISO
 `to`. `to` is exclusive. Audit sorting is newest first.
 
-### 12. List Application-scoped audit
+### 13. List Application-scoped audit
 
 Request:
 
@@ -1142,7 +1311,7 @@ Response — HTTP `200`:
 The path parameter is Application UUIDv7, not `applicationKey`. The response
 retains `moduleId` as the current legacy wire field.
 
-### 13. Create a tier
+### 14. Create a tier
 
 Request:
 
@@ -1183,7 +1352,7 @@ Response — HTTP `201`:
 No idempotency header is accepted as a contract requirement for this
 non-idempotent create. Rank is assigned after the current maximum.
 
-### 14. List Application tiers
+### 15. List Application tiers
 
 Request:
 
@@ -1217,7 +1386,7 @@ Response — HTTP `200`:
 Complete bounded list, maximum 100, sorted by rank. A valid unknown
 Application UUID currently produces `data: []`.
 
-### 15. Update a tier
+### 16. Update a tier
 
 Request:
 
@@ -1259,7 +1428,7 @@ Response — HTTP `200`:
 `(moduleId, rank)` is unique. There is no atomic tier reorder endpoint; do not
 implement a multi-request swap that may partially succeed.
 
-### 16. Delete a tier
+### 17. Delete a tier
 
 Request:
 
@@ -1274,7 +1443,7 @@ Response — HTTP `204`: **no response body**.
 A tier referenced by a subscription returns `TIER_IN_USE`; deactivate it
 instead.
 
-### 17. Create a feature
+### 18. Create a feature
 
 Request:
 
@@ -1317,7 +1486,7 @@ No idempotency header is required. The service does not enforce that the
 feature key prefix matches the parent Application key; the UI should enforce
 that product convention.
 
-### 18. List Application features
+### 19. List Application features
 
 Request:
 
@@ -1351,7 +1520,7 @@ Response — HTTP `200`:
 Complete bounded list, maximum 200, sorted by rank then key. A valid unknown
 Application UUID currently produces `data: []`.
 
-### 19. Update a feature
+### 20. Update a feature
 
 Request:
 
@@ -1390,7 +1559,7 @@ Response — HTTP `200`:
 }
 ```
 
-### 20. Delete a feature
+### 21. Delete a feature
 
 Request:
 
@@ -1405,7 +1574,7 @@ Response — HTTP `204`: **no response body**.
 The frontend must refetch feature and grant state after deletion. Existing
 grant rows are not an alternative authorization authority.
 
-### 21. List a tier's feature grants
+### 22. List a tier's feature grants
 
 Request:
 
@@ -1436,7 +1605,7 @@ Response — HTTP `200`:
 The response does not join feature names or keys. Join it to the parent
 Application feature list by `featureId`.
 
-### 22. Replace a tier's complete feature grants
+### 23. Replace a tier's complete feature grants
 
 Request:
 
@@ -1477,7 +1646,7 @@ Response — HTTP `200`:
 This is a complete replacement; `features: []` revokes all grants. Send one
 independent command and idempotency key per changed tier.
 
-### 23. List price ladders
+### 24. List price ladders
 
 Request:
 
@@ -1509,7 +1678,7 @@ Response — HTTP `200`:
 Omit `billingCycle` to receive both ladders. The current controller does not
 runtime-validate this query parameter; constrain the UI to `MONTHLY|ANNUAL`.
 
-### 24. Replace one complete price ladder
+### 25. Replace one complete price ladder
 
 Request:
 
@@ -1563,7 +1732,7 @@ An identical canonical ladder preserves IDs and timestamps. A changed ladder
 soft-deletes the old rows and creates new IDs; replace local state from the
 response. Never convert money through JavaScript `number`.
 
-### 25. List managed currency rates
+### 26. List managed currency rates
 
 Request:
 
@@ -1590,7 +1759,7 @@ Response — HTTP `200`:
 
 The list includes active and inactive non-USD rows, sorted by currency code.
 
-### 26. Batch upsert managed currency rates
+### 27. Batch upsert managed currency rates
 
 Request:
 
@@ -1625,7 +1794,7 @@ This is a transactional batch upsert, not a complete replacement. Omitted
 currencies remain unchanged. The response contains only supplied rows; refetch
 the list when the screen needs the complete catalogue.
 
-### 27. Upsert one managed currency rate
+### 28. Upsert one managed currency rate
 
 Request:
 
@@ -1661,30 +1830,39 @@ rate revision, even if the submitted values are unchanged.
 
 ## Lifecycle, security, and commercial invariants
 
-1. Application `key` and database principal are immutable protocol identity;
-   display name is never routing or credential identity.
+1. Application `key`, stored `runtimeTarget`, and database principal are
+   immutable protocol identity; display name is never routing, Worker target,
+   or credential identity.
 2. `SYSTEM` cannot use `SUBSCRIPTION`. A public SYSTEM Application must use
    `INCLUDED`.
 3. A database-enabled Application cannot become ACTIVE without its fixed
    principal and a valid active manifest.
 4. Manifest responses expose evidence only, never raw grants, SQL, passwords,
    or secret references.
-5. Application updates use `catalogueRevision`; policy updates use
+5. Application updates use `catalogueRevision`; publication uses both
+   `catalogueRevision` and `publicationRevision`; policy updates use
    `policyRevision`. Stale writes fail closed.
-6. Disabling/deprecating an Application prevents new selection and disables
-   new-server enablement; it does not silently remove existing tenant data.
-7. Tier/feature/grant/price configuration is independent. Admin screens must
+6. Mutable metadata changes invalidate an existing publication, advance its
+   revision, clear attribution, and require explicit re-publication. Neither
+   metadata update nor lifecycle transition auto-publishes.
+7. Activation requires attributable `PUBLISHED` state plus technical
+   readiness. New selection requires `ACTIVE`, `PUBLISHED`, `PUBLIC`,
+   commercial eligibility, and technical readiness.
+8. Deprecation prevents new selection but preserves an installed
+   `PUBLISHED` runtime authority. Installed runtime accepts only `ACTIVE` or
+   `DEPRECATED`; `DRAFT`, `DISABLED`, or `UNPUBLISHED` is not valid authority.
+9. Tier/feature/grant/price configuration is independent. Admin screens must
    show each active state explicitly and must not infer entitlement merely from
    the presence of a row.
-8. Grant replacement and price replacement are whole-resource commands, not
+10. Grant replacement and price replacement are whole-resource commands, not
    incremental patches.
-9. Prices and currency rates are exact decimal strings. Do not use
+11. Prices and currency rates are exact decimal strings. Do not use
    `parseFloat`, locale-formatted numbers, or binary floating-point state to
    build requests.
-10. Currency rate means quote-currency units per USD. USD remains fixed.
-11. All permission pairs in the matrix use ALL semantics. UI hiding is not an
+12. Currency rate means quote-currency units per USD. USD remains fixed.
+13. All permission pairs in the matrix use ALL semantics. UI hiding is not an
    authorization boundary.
-12. A `403` is not an empty list. Preserve forbidden, validation, conflict,
+14. A `403` is not an empty list. Preserve forbidden, validation, conflict,
    in-flight, unavailable, and retry states separately.
 
 ## Error catalogue for frontend handling
@@ -1694,6 +1872,10 @@ Application errors:
 - `APPLICATION_NOT_FOUND`
 - `APPLICATION_KEY_TAKEN`
 - `APPLICATION_UPDATE_EMPTY`
+- `APPLICATION_PUBLICATION_REVISION_STALE`
+- `APPLICATION_ALREADY_PUBLISHED`
+- `APPLICATION_PUBLICATION_REQUIRED`
+- `APPLICATION_DISABLED`
 - `APPLICATION_POLICY_UPDATE_EMPTY`
 - `APPLICATION_CATALOGUE_REVISION_STALE`
 - `APPLICATION_POLICY_REVISION_STALE`
@@ -1705,6 +1887,12 @@ Application errors:
 - `APPLICATION_DATABASE_ROTATION_NOT_READY`
 - `APPLICATION_POLICY_UNCHANGED`
 - `APPLICATION_LIFECYCLE_TRANSITION_INVALID`
+- `APPLICATION_RUNTIME_TARGET_REQUIRED`
+- `APPLICATION_TECHNICAL_BINDING_REQUIRES_DRAFT`
+- `APPLICATION_COMPONENT_ALREADY_BOUND`
+- `APPLICATION_COMPONENT_KEY_TAKEN`
+- `APPLICATION_TECHNICAL_PROVISIONING_NOT_READY`
+- `APPLICATION_SELECTION_NOT_ALLOWED`
 - `APPLICATION_MANIFEST_REQUIRED`
 - `APPLICATION_MANIFEST_NOT_FOUND`
 - `APPLICATION_MANIFEST_SHAPE_INVALID`
@@ -1755,33 +1943,36 @@ visible action with this unused legacy permission.
 
 ## Current frontend implementation and remaining gates
 
-Implemented in active source:
+Implemented in active frontend source:
 
-- the Application list wires create, full enum filters, real totals, error
+- the Application list wires create, all documented filters including
+  publication, independent lifecycle/publication columns, real totals, error
   retry, and the global audit route;
 - Application detail exposes metadata and database-policy revision-fenced
   editing, reasoned lifecycle commands, DRAFT-only deletion, and manifest
   evidence with independent retry state;
-- Application detail renders the fail-closed technical-readiness projection,
-  derives the owner/Worker routing chain, and loads it independently from
-  identity and manifest state;
-- the DRAFT-only primary-component metadata command uses an accessible EN/AR
-  dialog, exposes only contract version and audit reason, preserves one UUIDv7
-  key for an exact retry, refreshes on stale/in-flight/ambiguous outcomes, and
-  never accepts SQL, migrations, secrets, or an arbitrary Worker target;
-- activation fails closed while readiness is loading, unavailable, forbidden,
-  or blocked, then refetches technical state after every lifecycle command;
+- Application detail independently loads a technical-readiness projection and
+  implements stable-intent stale/in-flight recovery for the primary-component
+  command;
+- Application detail renders the release-authority rail, publishes with both
+  revision fences and a caller-owned UUIDv7 intent, warns that published
+  metadata edits invalidate publication, and gates activation on attributable
+  publication plus technical readiness;
+- readiness uses the exact fields, reasons, checks, and selection blockers;
+  primary-component binding displays stored `runtimeTarget`, blocks while it is
+  absent, and submits explicit `componentKey` without deriving Worker routing;
 - the commercial control rail implements tiers, features, complete entitlement
   replacement, contiguous monthly/annual USD ladders, and paginated
   Application-scoped audit;
-- all 29 clients use the canonical Gateway paths and exact PATCH/POST/DELETE
+- implemented clients use canonical Gateway paths and exact PATCH/POST/DELETE
   semantics, including non-idempotent tier/feature creation;
 - managed currencies support single and transactional batch upsert, decimal
   strings, caller-owned UUIDv7 keys, both required permissions, and normalized
   Core/Gateway errors;
-- contract tests cover the complete route surface rather than only list/detail.
+- targeted contract, API-client, and readiness-state tests encode the current
+  publication and runtime-target source behavior.
 
-Remaining gates:
+Remaining runtime and localization gates:
 
 - authenticated browser E2E still needs to prove permission denial, revision
   conflict, replay/in-flight recovery, and successful mutation refetch against

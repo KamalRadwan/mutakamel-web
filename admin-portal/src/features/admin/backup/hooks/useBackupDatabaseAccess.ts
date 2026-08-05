@@ -32,7 +32,9 @@ export function useBackupDatabaseAccess() {
   const [bindingServerId, setBindingServerId] = useState<string | null>(null);
   const selectedServerIdRef = useRef(serverContext.selectedServerId);
   const requestGenerationRef = useRef(0);
-  selectedServerIdRef.current = serverContext.selectedServerId;
+  useEffect(() => {
+    selectedServerIdRef.current = serverContext.selectedServerId;
+  }, [serverContext.selectedServerId]);
 
   const refreshBinding = useCallback(async () => {
     const serverId = serverContext.selectedServerId;
@@ -71,7 +73,8 @@ export function useBackupDatabaseAccess() {
   }, [canRead, serverContext.selectedServerId]);
 
   useEffect(() => {
-    void refreshBinding();
+    const timer = setTimeout(() => { void refreshBinding(); }, 0);
+    return () => clearTimeout(timer);
   }, [refreshBinding]);
 
   const updatePolicy = async (

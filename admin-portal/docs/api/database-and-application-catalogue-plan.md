@@ -1,15 +1,17 @@
 # Database Servers and Application Catalogue Documentation Plan
 
-Status: **Documentation-only plan completed; implementation tracked in the linked domain guides**
+Status: **[Verified]**
 
-Last source verification: **2026-08-02**
+Last source verification: **2026-08-05**
 
 ## Objective and boundary
 
 This plan covers documentation for exactly two Admin Portal domains:
 
 1. Database Servers, including dynamic per-Application bindings and secret-free credential operations.
-2. Application Catalogue V1, including Application identity, lifecycle, database policy, manifests, tiers, features, grants, graduated pricing, audit, and managed currency rates.
+2. Application Catalogue V1, including Application identity, publication,
+   lifecycle, technical readiness, database policy, manifests, tiers, features,
+   grants, graduated pricing, audit, and managed currency rates.
 
 It does not authorize frontend feature implementation, backend changes, route changes, generated-route baseline acceptance, package publication, migrations, or deployment. Backend and Gateway source are the contract authority; current frontend code is evidence only for implementation status and gaps.
 
@@ -38,11 +40,11 @@ Static contract data to document:
 
 ### Application Catalogue V1
 
-The implemented public browser contract now contains 29 routes:
+The implemented public browser contract now contains 30 routes:
 
-- 12 Application-root routes for list, detail, manifests, derived technical
-  readiness, controlled primary-component binding, create, update, delete,
-  database policy, activate, deprecate, and disable;
+- 13 Application-root routes for list, detail, manifests, technical readiness,
+  controlled primary-component binding, create, update, delete, database
+  policy, publish, activate, deprecate, and disable;
 - 4 tier routes;
 - 4 feature routes;
 - 2 tier-feature grant routes;
@@ -52,14 +54,16 @@ The implemented public browser contract now contains 29 routes:
 
 Static contract data to document:
 
-- Application type, commercial mode, visibility, lifecycle, database-access,
-  command-operation, and billing-cycle enums;
+- Application type, commercial mode, visibility, lifecycle, publication,
+  database-access, command-operation, and billing-cycle enums;
 - Application, policy, manifest, mutation receipt, tier, feature, grant,
   price-bracket, currency-rate, and audit projections;
 - every Application, tier, feature, grant, pricing, audit, and currency DTO;
 - `admin.applications.*`, `admin.catalog.*`, and billing-currency permissions;
-- revision fencing, lifecycle invariants, immutable Application key and
-  database identity, durable idempotency, and full replacement semantics;
+- catalogue/publication/policy revision fencing, attributable publication,
+  publication-aware activation and tenant selection, immutable Application
+  key and stored runtime target, durable idempotency, and full replacement
+  semantics;
 - the distinction between public `Application` terminology and internal
   physical `modules`, `module_tiers`, and `module_id` storage names.
 
@@ -69,35 +73,33 @@ Static contract data to document:
 | --- | --- | --- | --- |
 | Database route client | All 15 routes exist | All 15 methods exist in the active API client | Document full contract and separate API coverage from UI coverage |
 | Database UI | Full server and credential operations are available | List/create/detail/lifecycle/bulk bootstrap/rotate/reconcile render | Record missing edit, history rendering, Add Application UI, independent error states, and runtime evidence |
-| Application identity client | 10 routes exist | All 10 methods exist | Document exact DTOs and note that several methods are hook-only |
-| Application identity UI | Full lifecycle/policy/manifests available | List/detail/delete render; create is not wired; manifests and most mutations are not rendered | Mark `PARTIAL`; do not call the catalogue UI complete |
-| Tiers | Four routes exist | No active API client, types, hook, or screen | Document as `MISSING` frontend functionality |
-| Features | Four routes exist | No active API client, hook, or screen | Document as `MISSING` |
-| Tier grants | Two routes exist | No active integration | Document as `MISSING` |
-| Pricing | Two routes exist | No active integration | Document as `MISSING` |
-| Catalogue audit | Two routes exist | No active integration | Document as `MISSING` |
-| Currency rates | Three routes exist | List and single upsert are under Billing settings; batch upsert is absent | Document split ownership and the missing batch action |
+| Application root client | All 13 routes exist | All 13 methods exist, including publish and explicit primary-component binding | Document exact DTOs, permissions, revision fences, and idempotency |
+| Application root UI | Publication, lifecycle, policy, readiness, and manifests are independent authorities | List/detail/create/filter/publish/lifecycle/policy/readiness/manifests render; activation fails closed | Keep authenticated runtime evidence separate from source integration |
+| Tiers | Four routes exist | API, hooks, and commercial control rail are integrated | Document current source integration |
+| Features | Four routes exist | API, hooks, and commercial control rail are integrated | Document current source integration |
+| Tier grants | Two routes exist | Complete-replacement UI is integrated | Document full-replacement semantics |
+| Pricing | Two routes exist | Monthly/annual ladder UI is integrated | Document exact decimal-string behavior |
+| Catalogue audit | Two routes exist | Global and Application-scoped audit UI are integrated | Document pagination and evidence boundaries |
+| Currency rates | Three routes exist | List, single upsert, and batch upsert are integrated | Document exact permissions and decimal strings |
 | Legacy Modules UI | `/admin/modules` public routes are removed | Old `/modules` pages are deleted; `src/types/module.ts` is unused legacy source | Remove stale documentation claims and use `/applications-catalogue` |
 
-Confirmed frontend defects that documentation must retain as gaps:
+Current Application Catalogue evidence must still retain these boundaries:
 
-- Application search reads a debounced value that is never updated.
-- The summary compares `ApplicationType` to invalid value `COMMERCIAL`; the
-  valid enum is `SYSTEM | TENANT`.
-- Application query serialization and the unused create modal contain weak
-  casts.
-- Manifests are fetched but not rendered; their errors are reduced to a
-  console warning.
-- Database history is fetched but not rendered.
-- Database edit and single-Application bootstrap have API/hook foundations but
-  no active controls.
+- source integration and focused tests are not authenticated browser evidence;
+- lifecycle, publication, technical readiness, and tenant-selection
+  eligibility must never be collapsed into one status;
+- `componentKey` is submitted explicitly and `runtimeTarget`/Worker routing is
+  read from server authority, never reconstructed from an Application name;
+- metadata changes invalidate publication and never auto-publish;
+- remaining catalogue localization, deployment, and operational release gates
+  stay explicit.
 
 ## Documentation implementation matrix
 
 | Document | Required change |
 | --- | --- |
 | `docs/api/database-servers.md` | Cover all 15 routes with permissions, status, idempotency, exact DTOs/enums, request examples, complete success envelopes, 204 behavior, errors, security boundary, and frontend gaps |
-| `docs/api/catalog.md` | Replace stale Modules contract with one coherent Application Catalogue V1 guide covering all 29 routes and both technical and commercial halves |
+| `docs/api/catalog.md` | Maintain one coherent Application Catalogue V1 guide covering all 30 routes and both technical and commercial halves |
 | `docs/models/enums.md` | Add exact Application and binding enums; retain billing-cycle and Database Server enums |
 | `docs/models/interfaces.md` | Add Application/policy/manifest/receipt models and complete Database/binding/commercial projections |
 | `docs/models/dtos.md` | Add Application, Database Server, tier, feature, grant, price, currency, audit, and parameter DTO validation |
@@ -107,9 +109,9 @@ Confirmed frontend defects that documentation must retain as gaps:
 | `docs/audit/frontend-capability-matrix.md` | Separate Application identity partial integration from missing commercial catalogue UI |
 | `docs/guides/sidebar-navigation.md` | Replace stale Modules navigation with Application Catalogue navigation |
 
-Generated route inventory is not changed by this plan. Its repository-wide
-baseline drift requires a separate full route audit and is outside these two
-domain documents.
+The generated Admin Core route inventory is current at 232 routes. It remains
+transport evidence; controller, DTO, service, and test source remain the
+behavioral authority.
 
 ## API example standard
 
@@ -149,7 +151,7 @@ Gateway Problem Details contain `status` and `code`.
 2. Compare backend routes and static contracts with active frontend code and
    Markdown.
 3. Replace the Database Servers guide with the complete 15-route contract.
-4. Replace the stale Modules guide with the complete 27-route Application
+4. Replace the stale Modules guide with the complete 30-route Application
    Catalogue V1 contract.
 5. Update shared static-model, RBAC, navigation, integration, index, and
    capability documents.
@@ -159,7 +161,7 @@ Gateway Problem Details contain `status` and `code`.
 
 ## Acceptance criteria
 
-- All 15 Database Server and all 29 Application Catalogue routes appear once
+- All 15 Database Server and all 30 Application Catalogue routes appear once
   with exact canonical browser paths.
 - Every route has method, status, permission, idempotency, request, and full
   response evidence.

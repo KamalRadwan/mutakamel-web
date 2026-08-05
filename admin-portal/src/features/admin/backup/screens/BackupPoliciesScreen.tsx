@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { RefreshCw, Settings2, SlidersHorizontal, Undo2 } from "lucide-react";
 import { BackupCompressionAlgorithm, type BackupDatabaseConfig } from "../types";
 import { BackupDialog } from "../components/BackupDialog";
@@ -29,18 +29,21 @@ export function BackupPoliciesScreen() {
   const [overrideCompression, setOverrideCompression] = useState("inherit");
   const [overrideAlgorithm, setOverrideAlgorithm] = useState("inherit");
 
-  useEffect(() => {
-    if (!view.policy) return;
-    setEnabled(view.policy.enabled);
-    setCronExpression(view.policy.cronExpression);
-    setTimezone(view.policy.timezone);
-    setRetentionDays(view.policy.retentionDays === null ? "" : String(view.policy.retentionDays));
-    setServerConcurrency(view.policy.serverConcurrency);
-    setTenantConcurrency(view.policy.tenantConcurrency);
-    setDefaultBackupEnabled(view.policy.defaultBackupEnabled);
-    setDefaultCompressionEnabled(view.policy.defaultCompressionEnabled);
-    setDefaultAlgorithm(view.policy.defaultCompressionAlgorithm);
-  }, [view.policy]);
+  const [prevPolicy, setPrevPolicy] = useState(view.policy);
+  if (view.policy !== prevPolicy) {
+    setPrevPolicy(view.policy);
+    if (view.policy) {
+      setEnabled(view.policy.enabled);
+      setCronExpression(view.policy.cronExpression);
+      setTimezone(view.policy.timezone);
+      setRetentionDays(view.policy.retentionDays === null ? "" : String(view.policy.retentionDays));
+      setServerConcurrency(view.policy.serverConcurrency);
+      setTenantConcurrency(view.policy.tenantConcurrency);
+      setDefaultBackupEnabled(view.policy.defaultBackupEnabled);
+      setDefaultCompressionEnabled(view.policy.defaultCompressionEnabled);
+      setDefaultAlgorithm(view.policy.defaultCompressionAlgorithm);
+    }
+  }
 
   const openOverride = (database: BackupDatabaseConfig) => {
     setEditingDatabase(database);

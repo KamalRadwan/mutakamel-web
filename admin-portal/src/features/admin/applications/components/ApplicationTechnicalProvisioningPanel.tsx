@@ -17,6 +17,7 @@ import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type {
   ApplicationTechnicalReadinessReason,
   ApplicationTechnicalReadinessView,
+  ApplicationSelectionBlocker,
 } from "../types";
 
 interface Props {
@@ -43,16 +44,31 @@ export function ApplicationTechnicalProvisioningPanel({
   const { t, dir } = useI18n();
   const copy = t.applications.technicalProvisioning;
   const reasonLabels: Record<ApplicationTechnicalReadinessReason, string> = {
+    RUNTIME_TARGET_REQUIRED: copy.reasons.runtimeTargetRequired,
     COMPONENT_BINDING_REQUIRED: copy.reasons.componentBindingRequired,
     ACTIVE_COMPONENT_REQUIRED: copy.reasons.activeComponentRequired,
     PUBLISHED_RELEASE_REQUIRED: copy.reasons.publishedReleaseRequired,
+    MINIMUM_RELEASE_NOT_SATISFIED: copy.reasons.minimumReleaseNotSatisfied,
     DATABASE_PERMISSION_MANIFEST_REQUIRED:
       copy.reasons.databasePermissionManifestRequired,
     DATABASE_PERMISSION_MANIFEST_INVALID:
       copy.reasons.databasePermissionManifestInvalid,
   };
+  const selectionLabels: Record<ApplicationSelectionBlocker, string> = {
+    APPLICATION_LIFECYCLE_NOT_ACTIVE:
+      copy.selectionBlockers.applicationLifecycleNotActive,
+    APPLICATION_NOT_PUBLISHED:
+      copy.selectionBlockers.applicationNotPublished,
+    APPLICATION_NOT_PUBLIC: copy.selectionBlockers.applicationNotPublic,
+    APPLICATION_NON_BILLABLE:
+      copy.selectionBlockers.applicationNonBillable,
+    TECHNICAL_READINESS_BLOCKED:
+      copy.selectionBlockers.technicalReadinessBlocked,
+  };
   const showBindingAction =
-    readiness?.lifecycleStatus === "DRAFT" && readiness.components.length === 0;
+    readiness?.lifecycleStatus === "DRAFT" &&
+    Boolean(readiness.runtimeTarget) &&
+    readiness.components.length === 0;
 
   return (
     <section
@@ -111,15 +127,22 @@ export function ApplicationTechnicalProvisioningPanel({
                   </div>
                 </div>
               </div>
-              <code className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200" dir="ltr">
-                {applicationKey}
-              </code>
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200" dir="ltr">
+                  {applicationKey}
+                </code>
+                <code className="rounded-lg bg-cyan-50 px-2.5 py-1.5 text-[11px] font-bold text-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200" dir="ltr">
+                  {copy.workerTarget}: {readiness.runtimeTarget ?? copy.notAdopted}
+                </code>
+              </div>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <Check label={copy.checks.runtimeTarget} value={readiness.checks.runtimeTarget} icon={Route} passed={copy.passed} blocked={copy.blocked} />
               <Check label={copy.checks.componentBinding} value={readiness.checks.componentBinding} icon={Boxes} passed={copy.passed} blocked={copy.blocked} />
               <Check label={copy.checks.activeComponents} value={readiness.checks.activeComponents} icon={CheckCircle2} passed={copy.passed} blocked={copy.blocked} />
               <Check label={copy.checks.publishedReleases} value={readiness.checks.publishedReleases} icon={PackageCheck} passed={copy.passed} blocked={copy.blocked} />
+              <Check label={copy.checks.minimumReleases} value={readiness.checks.minimumReleases} icon={PackageCheck} passed={copy.passed} blocked={copy.blocked} />
               <Check label={copy.checks.permissionManifest} value={readiness.checks.databasePermissionManifest} icon={LockKeyhole} passed={copy.passed} blocked={copy.blocked} />
             </div>
 
@@ -132,6 +155,20 @@ export function ApplicationTechnicalProvisioningPanel({
                   </li>
                 ))}
               </ul>
+            )}
+
+            {readiness.selectionBlockers.length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+                <h3 className="text-xs font-black">{copy.selectionTitle}</h3>
+                <ul className="mt-2 grid gap-2 text-[11px] text-slate-600 sm:grid-cols-2 dark:text-slate-300">
+                  {readiness.selectionBlockers.map((item) => (
+                    <li key={item} className="flex gap-2">
+                      <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      <span>{selectionLabels[item]}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {readiness.components.map((component) => (
@@ -156,7 +193,7 @@ export function ApplicationTechnicalProvisioningPanel({
                   <ArrowRight className={`mx-auto hidden h-4 w-4 text-cyan-500 sm:block ${dir === "rtl" ? "rotate-180" : ""}`} />
                   <ChainStep label={copy.componentKey} value={component.key} />
                   <ArrowRight className={`mx-auto hidden h-4 w-4 text-cyan-500 sm:block ${dir === "rtl" ? "rotate-180" : ""}`} />
-                  <ChainStep label={copy.workerTarget} value={component.workerTarget} />
+                  <ChainStep label={copy.workerTarget} value={component.workerTarget ?? copy.notAdopted} />
                   <ArrowRight className={`mx-auto hidden h-4 w-4 text-cyan-500 sm:block ${dir === "rtl" ? "rotate-180" : ""}`} />
                   <ChainStep label={copy.release} value={component.latestPublishedRelease?.releaseVersion ?? copy.pending} />
                 </div>

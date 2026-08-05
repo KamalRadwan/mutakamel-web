@@ -8,12 +8,17 @@ import { useApplicationPrimaryComponentDialog } from "../hooks/useApplicationPri
 interface Props {
   isOpen: boolean;
   applicationKey: string;
+  runtimeTarget: string | null;
   technicalDefinitionRevision: string;
   isSubmitting: boolean;
   commandError: NormalizedApiError | null;
   canRetryExactIntent: boolean;
   onClose: () => void;
-  onConfirm: (contractVersion: number, reason: string) => Promise<boolean>;
+  onConfirm: (
+    componentKey: string,
+    contractVersion: number,
+    reason: string,
+  ) => Promise<boolean>;
   onRetryExactIntent: () => Promise<boolean>;
   onClearCommandError: () => void;
 }
@@ -21,6 +26,7 @@ interface Props {
 export function ApplicationPrimaryComponentDialog({
   isOpen,
   applicationKey,
+  runtimeTarget,
   technicalDefinitionRevision,
   isSubmitting,
   commandError,
@@ -34,6 +40,8 @@ export function ApplicationPrimaryComponentDialog({
   const {
     dialogRef,
     initialFocusRef,
+    componentKey,
+    setComponentKey,
     contractVersion,
     setContractVersion,
     reason,
@@ -106,24 +114,42 @@ export function ApplicationPrimaryComponentDialog({
           <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-900 dark:bg-cyan-950/20">
             <div className="flex items-center gap-2 text-xs font-black text-cyan-950 dark:text-cyan-100">
               <ShieldCheck className="h-4 w-4" />
-              {t.applications.technicalProvisioning.derivedMapping}
+              {t.applications.technicalProvisioning.authoritativeMapping}
             </div>
             <dl className="mt-3 grid gap-3 text-[11px] sm:grid-cols-2">
               <Mapping label={t.applications.technicalProvisioning.applicationKey} value={applicationKey} />
-              <Mapping label={t.applications.technicalProvisioning.componentKey} value={applicationKey} />
               <Mapping label={t.applications.technicalProvisioning.ownerApplication} value={applicationKey} />
-              <Mapping label={t.applications.technicalProvisioning.workerTarget} value={`${applicationKey}-app`} />
+              <Mapping
+                label={t.applications.technicalProvisioning.workerTarget}
+                value={runtimeTarget ?? t.applications.technicalProvisioning.notAdopted}
+              />
             </dl>
             <p className="mt-3 text-[11px] leading-relaxed text-cyan-800 dark:text-cyan-300">
               {t.applications.technicalProvisioning.safeBoundary}
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
+          <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              {t.applications.technicalProvisioning.componentKey}
+              <input
+                ref={initialFocusRef}
+                type="text"
+                required
+                maxLength={96}
+                value={componentKey}
+                onChange={(event) => setComponentKey(event.target.value)}
+                placeholder={t.applications.technicalProvisioning.componentKeyPlaceholder}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                dir="ltr"
+                className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 dark:border-slate-700 dark:bg-slate-950"
+              />
+            </label>
             <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
               {t.applications.technicalProvisioning.contractVersion}
               <input
-                ref={initialFocusRef}
                 type="number"
                 min={1}
                 step={1}
@@ -133,7 +159,7 @@ export function ApplicationPrimaryComponentDialog({
                 className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 dark:border-slate-700 dark:bg-slate-950"
               />
             </label>
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 sm:col-span-2">
               {t.applications.technicalProvisioning.changeReason}
               <textarea
                 required

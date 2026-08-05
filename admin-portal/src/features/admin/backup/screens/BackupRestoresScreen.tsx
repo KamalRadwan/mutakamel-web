@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ArchiveRestore, CheckCircle2, Play, RefreshCw, ShieldAlert } from "lucide-react";
 import { RestoreRunStatus, type RestoreRun } from "../types";
@@ -17,7 +17,7 @@ export function BackupRestoresScreen() {
   const { lang } = useI18n();
   const isArabic = lang === "ar";
   const view = useBackupRestores();
-  const handledArtifactRequest = useRef<string | null>(null);
+  const [handledArtifactRequest, setHandledArtifactRequest] = useState<string | undefined>();
   const [tenantId, setTenantId] = useState("");
   const [status, setStatus] = useState<RestoreRunStatus | "">("");
   const [startOpen, setStartOpen] = useState(false);
@@ -28,9 +28,8 @@ export function BackupRestoresScreen() {
   const [promotionReason, setPromotionReason] = useState("");
   const [confirmationText, setConfirmationText] = useState("");
 
-  useEffect(() => {
-    if (view.isLoading || handledArtifactRequest.current === view.requestedArtifactId) return;
-    handledArtifactRequest.current = view.requestedArtifactId;
+  if (!view.isLoading && handledArtifactRequest !== view.requestedArtifactId) {
+    setHandledArtifactRequest(view.requestedArtifactId);
     setStartOpen(false);
     setArtifactId("");
     setTargetDatabaseName("");
@@ -43,7 +42,7 @@ export function BackupRestoresScreen() {
       setArtifactId(requestedArtifact.id);
       setStartOpen(true);
     }
-  }, [view.artifacts, view.isLoading, view.requestedArtifactId]);
+  }
 
   const openStart = () => {
     const requestedArtifact = view.artifacts.find(

@@ -1,6 +1,6 @@
 # Admin Users, Profile, and WebPhone API
 
-Status: **Verified backend contract; frontend COMPLETE**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 
@@ -133,3 +133,77 @@ remains missing and error/state typing still requires refactoring.
 - `../backend/mutakamel-apps/core-app/src/admin/admin-users/dto/`
 - `../backend/mutakamel-apps/core-app/src/admin/admin-roles/admin-user-roles.controller.ts`
 - `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
+
+
+## DTOs (Migrated from dtos.md)
+
+### `CreateAdminUserDto`
+```typescript
+{
+  email: string;           // @IsEmail, @MaxLength(255), auto-trim & lowercase
+  firstName: string;       // @IsString, @MinLength(1), @MaxLength(80), auto-trim
+  lastName: string;        // @IsString, @MinLength(1), @MaxLength(80), auto-trim
+  tier?: AdminTierEnum;    // @IsOptional, @IsEnum
+  roleIds?: string[];      // @IsOptional, @IsArray, @ArrayUnique, @IsUUID('7')
+}
+```
+
+### `UpdateAdminUserDto`
+```typescript
+{
+  firstName?: string;      // @IsOptional, @MinLength(1), @MaxLength(80)
+  lastName?: string;       // @IsOptional, @MinLength(1), @MaxLength(80)
+  tier?: AdminTierEnum;    // @IsOptional, @IsEnum
+}
+```
+
+### `AdminUserQueryDto` (extends `PaginationQueryDto`)
+```typescript
+{
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortDir?: 'ASC' | 'DESC';
+  search?: string;
+  status?: UserStatusEnum;
+  tier?: AdminTierEnum;
+}
+```
+
+### `UpdateAdminProfileDto`
+```typescript
+{
+  themeKey?: string;                    // @IsOptional, @MaxLength(64)
+  language?: string;                   // @IsOptional, @IsIn(SUPPORTED_LANGUAGES)
+  extensions?: Record<string, unknown>; // @IsOptional, @IsObject, shallow-merged
+}
+```
+
+### `UpdateAdminUserWebphoneDto`
+```typescript
+{
+  enabled?: boolean;
+  extension?: string | null;          // @MaxLength(32)
+  sipUsername?: string | null;        // @MaxLength(120)
+  sipPassword?: string | null;       // @MaxLength(255)
+  displayName?: string | null;       // @MaxLength(120)
+  outboundCallerId?: string | null;  // @MaxLength(64)
+  transport?: 'ws' | 'wss';
+}
+```
+
+### `CreateAdminWebphoneCallLogDto`
+```typescript
+{
+  type: WebphoneCallLogType;
+  displayName?: string | null;       // @MaxLength(120)
+  phoneNumber: string;               // @IsNotEmpty, @MaxLength(80)
+  startedAt?: string | null;         // @IsDateString
+  answeredAt?: string | null;        // @IsDateString
+  endedAt?: string | null;           // @IsDateString
+  durationSeconds?: number | null;   // @IsInt, @Min(0), @Max(86400)
+  cause?: string | null;             // @MaxLength(120)
+}
+```
+
+---

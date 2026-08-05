@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { safeStorage } from "@/lib/safeStorage";
+import { safeStorage, safeSessionStorage } from "@/lib/safeStorage";
 import {
   axiosClient,
   withAuthLock,
@@ -129,8 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const storedToken = sessionStorage.getItem("admin_session_meta");
-        const storedUser = sessionStorage.getItem("user_profile");
+        const storedToken = safeSessionStorage.getItem("admin_session_meta");
+        const storedUser = safeSessionStorage.getItem("user_profile");
 
         if (storedToken && storedUser) {
           setUser(readUserProfile(JSON.parse(storedUser)));
@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const { data } = await axiosClient.get("/api/admin/core/v1/auth/me");
           const userProfile = readUserProfile(data);
           setUser(userProfile);
-          sessionStorage.setItem("user_profile", JSON.stringify(userProfile));
+          safeSessionStorage.setItem("user_profile", JSON.stringify(userProfile));
         } else {
           setUser(null);
         }
@@ -201,8 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           cookieRevision: 1,
         };
 
-        sessionStorage.setItem("admin_session_meta", JSON.stringify(sessionMeta));
-        sessionStorage.setItem("user_profile", JSON.stringify(userProfile));
+        safeSessionStorage.setItem("admin_session_meta", JSON.stringify(sessionMeta));
+        safeSessionStorage.setItem("user_profile", JSON.stringify(userProfile));
 
         // Notify other tabs of new login generation via non-secret localStorage event
         if (typeof window !== "undefined") {
@@ -241,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ).catch(() => {});
       });
     } finally {
-      // Clear sessionStorage access token & all local session metadata in a finally block
+      // Clear safeSessionStorage access token & all local session metadata in a finally block
       clearLocalAuthState();
       setUser(null);
       if (typeof window !== "undefined") {

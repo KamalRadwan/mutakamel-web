@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { Clock, ShieldAlert, KeyRound, Calendar, Copy } from "lucide-react";
+import { Clock, ShieldAlert, Calendar, Copy } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
 import type { AdminUser } from "../types";

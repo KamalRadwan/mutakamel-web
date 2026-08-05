@@ -5,6 +5,7 @@ import {
   isDefinitiveAuthFailure,
 } from "../auth/sessionRefresh";
 import { generateUUIDv7 } from "../utils/uuid";
+import { safeSessionStorage, safeStorage } from "../safeStorage";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -144,8 +145,8 @@ export async function withAuthLock<T>(callback: () => Promise<T>): Promise<T> {
 export function getStoredSessionMeta(): SessionTokenMetadata | null {
   if (typeof window === "undefined") return null;
   try {
-    sessionStorage.removeItem("access_token");
-    const raw = sessionStorage.getItem("admin_session_meta");
+    safeSessionStorage.removeItem("access_token");
+    const raw = safeSessionStorage.getItem("admin_session_meta");
     if (!raw) return null;
 
     const metadata = JSON.parse(raw) as SessionTokenMetadata & {
@@ -153,7 +154,7 @@ export function getStoredSessionMeta(): SessionTokenMetadata | null {
     };
     if ("accessToken" in metadata) {
       delete metadata.accessToken;
-      sessionStorage.setItem("admin_session_meta", JSON.stringify(metadata));
+      safeSessionStorage.setItem("admin_session_meta", JSON.stringify(metadata));
     }
 
     return metadata;
@@ -165,14 +166,20 @@ export function getStoredSessionMeta(): SessionTokenMetadata | null {
 /** Utility to safely clear all local auth data and fail closed */
 export function clearLocalAuthState() {
   if (typeof window === "undefined") return;
-  sessionStorage.removeItem("access_token");
-  sessionStorage.removeItem("admin_session_meta");
-  sessionStorage.removeItem("user_profile");
+  safeSessionStorage.removeItem("access_token");
+  safeSessionStorage.removeItem("admin_session_meta");
+  safeSessionStorage.removeItem("user_profile");
 }
 
 function removeLegacyBrowserAccessToken() {
   if (typeof window === "undefined") return;
   getStoredSessionMeta();
+  safeSessionStorage.removeItem("auth-token");
+  safeSessionStorage.removeItem("access_token");
+  safeSessionStorage.removeItem("refresh_token");
+  safeStorage.removeItem("auth-token");
+  safeStorage.removeItem("access_token");
+  safeStorage.removeItem("refresh_token");
 }
 
 export async function refreshAdminCookieSession(
@@ -215,7 +222,7 @@ export async function refreshAdminCookieSession(
       expiresIn: refreshTokens.expiresIn || storedMeta.expiresIn,
       cookieRevision: (storedMeta.cookieRevision || 0) + 1,
     };
-    sessionStorage.setItem("admin_session_meta", JSON.stringify(updatedMeta));
+    safeSessionStorage.setItem("admin_session_meta", JSON.stringify(updatedMeta));
   }
 
   return refreshTokens;

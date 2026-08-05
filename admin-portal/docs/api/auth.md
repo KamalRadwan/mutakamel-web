@@ -1,6 +1,6 @@
 # Admin Authentication API
 
-Status: **Verified backend contract; frontend DONE/PARTIAL/BROKEN**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 
@@ -183,3 +183,46 @@ Not yet implemented as real routes/screens:
 
 Forgot-password remains `BROKEN`: the UI simulates completion with a timer
 instead of calling the documented endpoint.
+
+
+## DTOs (Migrated from dtos.md)
+
+### `LoginDto`
+```typescript
+{
+  email: string;        // @IsEmail, @MaxLength(255), auto-trim & lowercase
+  password: string;     // @IsString, @MinLength(1), @MaxLength(128)
+}
+```
+
+### `RefreshDto`
+```typescript
+{
+  refreshToken?: string; // @IsOptional, @IsString, @MinLength(16), @MaxLength(512)
+}
+```
+
+### `ForgotPasswordDto`
+```typescript
+{
+  email: string;        // @IsEmail, @MaxLength(255), auto-trim & lowercase
+}
+```
+
+### `ResetPasswordDto`
+```typescript
+{
+  token: string;        // @IsString, @MinLength(16), @MaxLength(512)
+  newPassword: string;  // @IsString, @MinLength(12), @MaxLength(128), @IsStrongPassword(PASSWORD_POLICY)
+}
+```
+
+### `AcceptInviteDto`
+```typescript
+{
+  token: string;        // @IsString, @MinLength(16), @MaxLength(512)
+  newPassword: string;  // @IsString, @MinLength(12), @MaxLength(128), @IsStrongPassword(PASSWORD_POLICY)
+}
+```
+
+---

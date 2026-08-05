@@ -538,7 +538,11 @@ portal cannot safely recover the workflow after refresh. See
 
 ## Application Catalogue Types
 
+Catalogue section verified against Core source: **2026-08-05**.
+
 ```typescript
+type ApplicationPublicationStatus = 'UNPUBLISHED' | 'PUBLISHED';
+
 interface ApplicationManifestEvidenceView {
   id: string;
   version: number;
@@ -563,17 +567,26 @@ interface ApplicationDatabasePolicyView {
 }
 
 type ApplicationTechnicalReadinessReason =
+  | 'RUNTIME_TARGET_REQUIRED'
   | 'COMPONENT_BINDING_REQUIRED'
   | 'ACTIVE_COMPONENT_REQUIRED'
   | 'PUBLISHED_RELEASE_REQUIRED'
+  | 'MINIMUM_RELEASE_NOT_SATISFIED'
   | 'DATABASE_PERMISSION_MANIFEST_REQUIRED'
   | 'DATABASE_PERMISSION_MANIFEST_INVALID';
+
+type ApplicationSelectionBlocker =
+  | 'APPLICATION_LIFECYCLE_NOT_ACTIVE'
+  | 'APPLICATION_NOT_PUBLISHED'
+  | 'APPLICATION_NOT_PUBLIC'
+  | 'APPLICATION_NON_BILLABLE'
+  | 'TECHNICAL_READINESS_BLOCKED';
 
 interface ApplicationTechnicalComponentView {
   id: string;
   key: string;
   ownerApp: string;
-  workerTarget: `${string}-app`;
+  workerTarget: string | null;
   kind: 'FOUNDATION' | 'MODULE';
   status: 'ACTIVE' | 'RETIRED';
   contractVersion: number;
@@ -591,17 +604,25 @@ interface ApplicationTechnicalComponentView {
 
 interface ApplicationTechnicalReadinessView {
   contractVersion: 1;
+  applicationId: string;
   applicationKey: string;
+  runtimeTarget: string | null;
+  commercialMode: ApplicationCommercialMode;
+  catalogueVisibility: ApplicationCatalogueVisibility;
   lifecycleStatus: ApplicationLifecycleStatus;
+  publicationStatus: ApplicationPublicationStatus;
   technicalDefinitionRevision: string;
   status: 'READY' | 'NOT_REQUIRED' | 'BLOCKED';
   activationAllowed: boolean;
   selectionAllowed: boolean;
+  selectionBlockers: ApplicationSelectionBlocker[];
   reasons: ApplicationTechnicalReadinessReason[];
   checks: {
+    runtimeTarget: boolean;
     componentBinding: boolean;
     activeComponents: boolean;
     publishedReleases: boolean;
+    minimumReleases: boolean;
     databasePermissionManifest: boolean;
   };
   components: ApplicationTechnicalComponentView[];
@@ -619,6 +640,11 @@ interface ApplicationView {
   commercialMode: ApplicationCommercialMode;
   catalogueVisibility: ApplicationCatalogueVisibility;
   lifecycleStatus: ApplicationLifecycleStatus;
+  runtimeTarget: string | null;
+  publicationStatus: ApplicationPublicationStatus;
+  publicationRevision: string;
+  publishedAt: string | null;
+  publishedBy: string | null;
   databaseAccessMode: ApplicationDatabaseAccessMode;
   databasePrincipal: string | null;
   requiredOnDatabaseServer: boolean;
@@ -634,12 +660,25 @@ interface ApplicationView {
   updatedAt: string;
 }
 
+type ApplicationCommandOperation =
+  | 'CREATE'
+  | 'UPDATE'
+  | 'PUBLISH'
+  | 'DELETE'
+  | 'UPDATE_DATABASE_POLICY'
+  | 'ACTIVATE'
+  | 'DEPRECATE'
+  | 'DISABLE';
+
 interface ApplicationMutationReceipt {
   contractVersion: 1;
   operation: ApplicationCommandOperation;
   applicationId: string;
   applicationKey: string;
   lifecycleStatus: ApplicationLifecycleStatus;
+  runtimeTarget: string | null;
+  publicationStatus: ApplicationPublicationStatus;
+  publicationRevision: string;
   catalogueRevision: string;
   policyRevision: string;
   deleted: boolean;
@@ -697,8 +736,14 @@ interface CurrencyRateView {
 }
 ```
 
-Application lifecycle is represented by `lifecycleStatus`. Nested tier and
-feature rows still use `isActive`; current Core source serializes their physical
+Application lifecycle and publication are independent. `activationAllowed`
+describes technical readiness only; activation additionally requires an
+attributable `PUBLISHED` Application. `selectionAllowed` is the complete new
+selection predicate. The `runtimeTarget` and each component `workerTarget` are
+stored/read projections and must never be derived from the Application key.
+
+Nested tier and feature rows still use `isActive`; current Core source
+serializes their physical
 foreign-key property as `moduleId` even though the public parent routes use
 `/applications/:applicationId`. Do not silently rename a received field in
 documentation or request payloads. Grant `config` is feature-specific. Keep

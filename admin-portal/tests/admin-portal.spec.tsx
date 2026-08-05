@@ -19,8 +19,8 @@ import { adminCan } from '@/lib/auth/rbac';
 
 describe('Admin Portal - RBAC Verification Gate', () => {
   it('blocks access when user lacks permission', () => {
-    (useAuth as any).mockReturnValue({ user: { email: 'test@mutakamel.ai' }, isLoading: false });
-    (adminCan as any).mockReturnValue(false);
+    vi.mocked(useAuth).mockReturnValue({ user: { email: 'test@mutakamel.ai' } as never, isLoading: false, hasPermission: vi.fn(), hasAnyPermission: vi.fn(), hasAllPermissions: vi.fn(), logout: vi.fn(), refresh: vi.fn(), role: null, roles: [], rawToken: null, isSuperAdmin: true } as never);
+    vi.mocked(adminCan).mockReturnValue(false);
 
     render(
       <RequirePermission permission="admin.critical.action">
@@ -33,8 +33,8 @@ describe('Admin Portal - RBAC Verification Gate', () => {
   });
 
   it('allows access when user has permission', () => {
-    (useAuth as any).mockReturnValue({ user: { email: 'test@mutakamel.ai' }, isLoading: false });
-    (adminCan as any).mockReturnValue(true);
+    vi.mocked(useAuth).mockReturnValue({ user: { email: 'test@mutakamel.ai' } as never, isLoading: false, hasPermission: vi.fn(), hasAnyPermission: vi.fn(), hasAllPermissions: vi.fn(), logout: vi.fn(), refresh: vi.fn(), role: null, roles: [], rawToken: null, isSuperAdmin: true } as never);
+    vi.mocked(adminCan).mockReturnValue(true);
 
     render(
       <RequirePermission permission="admin.critical.action">
@@ -47,8 +47,8 @@ describe('Admin Portal - RBAC Verification Gate', () => {
   });
 
   it('renders fallback when user lacks permission and fallback is provided', () => {
-    (useAuth as any).mockReturnValue({ user: { email: 'test@mutakamel.ai' }, isLoading: false });
-    (adminCan as any).mockReturnValue(false);
+    vi.mocked(useAuth).mockReturnValue({ user: { email: 'test@mutakamel.ai' } as never, isLoading: false, hasPermission: vi.fn(), hasAnyPermission: vi.fn(), hasAllPermissions: vi.fn(), logout: vi.fn(), refresh: vi.fn(), role: null, roles: [], rawToken: null, isSuperAdmin: true } as never);
+    vi.mocked(adminCan).mockReturnValue(false);
 
     render(
       <RequirePermission permission="admin.critical.action" fallback={<div data-testid="fallback">Access Denied</div>}>

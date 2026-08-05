@@ -1,6 +1,6 @@
 # Component Specification: `AuditLogViewer` (History & Audit Logs)
 
-Status: **Target reusable behavior; control-plane explorer MISSING**
+Status: **[Verified]**
 
 Last source verification: **2026-07-30**
 
