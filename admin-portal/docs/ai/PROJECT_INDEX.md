@@ -1,13 +1,13 @@
 # Project Index
 
-Last source verification: **2026-08-04**
+Last source verification: **2026-08-05**
 
 ## Documentation
 
 - [Documentation contract](../DOCUMENTATION_CONTRACT.md)
 - [API index](../api/README.md)
 - [Backup and Restore contract](../api/backups-restores.md)
-- [Generated 232-route inventory](../generated/admin-core-api-routes.md)
+- [Generated 235-route inventory](../generated/admin-core-api-routes.md)
 - [Frontend capability matrix](../audit/frontend-capability-matrix.md)
 - [Documentation coverage](../audit/documentation-coverage.md)
 - [HTTP/error contract](../architecture/http-and-error-contract.md)
@@ -31,17 +31,27 @@ Last source verification: **2026-08-04**
 | Shared types | `src/types/` |
 | Feature routes | `src/app/` |
 
-## Database and Backup ownership
+## Infrastructure and Backup ownership
 
 | Frontend module | Current source ownership |
 | --- | --- |
-| `/database-servers` | Registry, TLS/connectivity, lifecycle, `mutakamel_provisioner`, and per-Application principals under `src/features/admin/database-servers/` |
+| `/database-servers` | Registry, TLS/connectivity, constrained PostgreSQL security-admin posture, lifecycle, `mutakamel_provisioner`, and per-Application principals under `src/features/admin/database-servers/` |
+| `/storage-servers` | Registry, write-only Garage/S3 registration, lifecycle, durable safe probes, connection-evidence freshness, and placement policy under `src/features/admin/storage-servers/` |
 | `/backup` | Overview, fixed `mutakamel_backup` access, Worker policies, runs, artifacts, and restores under `src/features/admin/backup/` |
 
-The modules share no feature imports. Database Servers consumes only aggregate
-Backup readiness and links to `/backup/access`. Backup source integration is
-release-blocked until Worker returns explicit safe response DTOs and exposes
-durable recovery identity for non-idempotent start commands.
+The modules share no feature imports. Storage route files are routing-only;
+their API, state, validation, and screens live in the feature directory.
+Database Servers consumes only aggregate
+Backup readiness and links to `/backup/access`. Worker safe response DTOs and
+durable actor/intent-bound command identity are source-integrated. Package/schema
+adoption plus authenticated runtime and deployment evidence remain release
+gates.
+
+Storage Server list/detail reads are abortable and generation-fenced. Every
+write has a caller-owned stable UUIDv7 intent. The UI separates lifecycle from
+connection evidence: manual probes do not change lifecycle, evidence is valid
+for 24 hours, and the displayed automatic cadence is the Worker-owned 12-hour
+schedule. Tenant-create placement strips endpoint, bucket, and credentials.
 
 ## Backend authorities
 

@@ -2,12 +2,18 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-04**
+Last source verification: **2026-08-06**
 
 This is the browser-facing Database Servers V1 contract. API Gateway is the
 browser authority; Core owns registration, PostgreSQL role administration,
 credential encryption, activation readiness, reconciliation, and audit.
 Worker is the only automatic-rotation scheduler.
+
+Registration supports **PostgreSQL major version 16 only**
+(`server_version_num >= 160000 && < 170000`). PostgreSQL 15 and 17+ fail the
+connectivity/posture check because the current backup/restore client is pinned
+to PostgreSQL 16. The Admin Portal states this exact requirement before the
+operator submits credentials; it must not describe the contract as “16+”.
 
 ## Security model
 
@@ -16,9 +22,22 @@ and password. Core generates and encrypts all other passwords:
 
 | Purpose | Fixed principal | Authority |
 | --- | --- | --- |
-| Tenant database creation and migrations | `mutakamel_provisioner` | Core generates; Worker resolves per operation |
+| Tenant database creation and migrations | `mutakamel_provisioner` | Core generates with `CREATEDB`; Worker resolves per operation |
 | Backup and restore reads | `mutakamel_backup` | Core generates; Worker resolves per operation |
 | Application runtime access | Application Catalogue `databasePrincipal` | Core generates one per Application |
+
+The submitted PostgreSQL security administrator must have `LOGIN`, `CREATEDB`,
+and `CREATEROLE`. Connectivity/posture validation rejects `SUPERUSER`,
+`REPLICATION`, and `BYPASSRLS`. No unexpected membership may provide effective
+`INHERIT` or `SET` access; `ADMIN`-only membership edges to roles Core
+already generated are expected when the server is checked again. Core creates
+`mutakamel_provisioner` with `CREATEDB`, `mutakamel_backup`, and the eligible
+Application roles. This model does not grant `pg_read_all_data`.
+
+The submitted username is trimmed and must match
+`^(?!pg_)[a-z_][a-z0-9_]{0,62}$`: 1–63 lowercase letters, digits, or
+underscores, beginning with a lowercase letter or underscore and never with
+the PostgreSQL-reserved `pg_` prefix.
 
 Passwords never appear in an HTTP response, broker command, audit value,
 download, browser storage, UI fixture, analytics event, or log. The portal may
@@ -133,6 +152,11 @@ before deciding whether to retry or reconcile.
 
 ## Enums and DTOs
 
+Local development can use `sslMode: "disable"`. In production, Core rejects a
+security-administrator connectivity attempt before opening a PostgreSQL socket
+unless the request resolves to `verify-full`, certificate verification remains
+enabled, and an explicit trusted CA is present.
+
 ```ts
 type DatabaseServerStatus = "DRAFT" | "ACTIVE" | "DRAINING" | "OFFLINE";
 type DatabaseServerSslMode = "disable" | "require" | "verify-ca" | "verify-full";
@@ -144,7 +168,7 @@ type CredentialBootstrapStatus =
 type SystemPrincipalPurpose = "PROVISIONING" | "BACKUP";
 
 interface DatabaseServerCredentialsDto {
-  username: string; // trimmed, 1..128
+  username: string; // trimmed, /^(?!pg_)[a-z_][a-z0-9_]{0,62}$/
   password: string; // 1..1024; never trim
 }
 
@@ -285,8 +309,11 @@ interface DatabaseServerView {
 ```
 
 The compatibility booleans are safe readiness projections; they are not secret
-references. New UI decisions use `credentialBootstrap` and
-`systemPrincipals`.
+references. Core's wire projection contains both fixed system principals. The
+Database Servers adapter retains only `PROVISIONING`; `/backup` owns the
+`BACKUP` principal detail and commands. Database activation still consumes the
+aggregate `credentialBootstrap` and `hasBackupCredentials` dependency evidence
+without duplicating Backup lifecycle controls.
 
 ## Registration example
 
@@ -330,7 +357,7 @@ Success:
 
 Create request uses the same connection fields plus `name`, `maxTenants`, and
 optional location/pool values. Core first validates the supplied security-admin
-connection, then persists the DRAFT with two pending system bindings and all
+connection and exact PostgreSQL role posture above, then persists the DRAFT with two pending system bindings and all
 eligible Application bindings before attempting generated-role bootstrap. The
 201 response is always secret-free. If a generated bootstrap operation fails,
 the server remains DRAFT and its binding states identify the safe
@@ -475,6 +502,9 @@ Required behavior:
 The active source:
 
 - accepts only security-administrator credentials during registration;
+- explains and enforces the exact `LOGIN + CREATEDB + CREATEROLE` posture,
+  forbidden elevated attributes, `ADMIN`-only generated-role membership
+  boundary, generated principals, and absence of `pg_read_all_data`;
 - supports all four TLS modes and active-memory certificate upload fields;
 - warns before registration that only already-`ACTIVE` eligible Applications
   receive bindings while preserving the safe empty-DRAFT recovery path;
@@ -483,14 +513,27 @@ The active source:
 - identifies the zero-active-Application blocker, disables a futile retry, and
   links authorized operators to Application Catalogue before retry backfills
   the newly eligible bindings;
-- renders both fixed system principals, revision/state/failure evidence,
-  maintenance-aware hour policies, manual rotation, and reconciliation;
+- renders only the fixed provisioning principal with its revision,
+  state/failure evidence, maintenance-aware hour policy, manual rotation, and
+  reconciliation; Backup owns the equivalent `mutakamel_backup` UI;
 - retains per-Application add, rotation, and reconciliation controls;
 - exposes list-row soft delete only to administrators holding delete plus
   critical permissions and only for empty `DRAINING`/`OFFLINE` rows;
 - exposes a `deleted=true` registry filter and shows permanent Destroy only for
   rows with non-null `deletedAt` and administrators holding delete.hard plus
   critical permissions;
+- binds list rows and delete/destroy confirmations to the exact server-side
+  filter/query generation that loaded them. Switching between current and
+  deleted views clears dialogs immediately, aborts the previous request, and
+  prevents a delayed row from exposing or executing Destroy;
+- binds detail, Application bindings, history, lifecycle commands, and
+  credential-dialog revision snapshots to the loaded route `id`. An A response
+  or dialog cannot be committed or submitted after navigation to server B;
+  a late mutation callback owned by A cannot start reconciliation that aborts
+  or replaces B's current detail load;
+- rotates command keys after definitive `4xx` rejections, retains exact keys
+  for Gateway in-flight/network/`5xx` outcomes, and reconciles through a fresh
+  server read before another lifecycle decision;
 - contains no password reveal or one-time-file workflow.
 
 Source integration and focused tests are not authenticated browser, live

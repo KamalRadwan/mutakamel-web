@@ -1,225 +1,112 @@
-# Storage Server Modal and Edit-Mode Contract
+# Storage Server Screens and Dialogs
 
-Last source verification: **2026-07-30**.
+Last source verification: **2026-08-05**
 
-This component specification complements the authoritative
-[Storage Servers API contract](../api/storage-servers.md). It defines the
-frontend behavior for:
+This specification complements the authoritative
+[Storage Servers API contract](../api/storage-servers.md).
 
-- the **Add Storage Server** modal opened from `/storage-servers`;
-- the base-configuration edit mode embedded in `/storage-servers/[id]`;
-- critical confirmations for routing, verification, lifecycle, attestation
-  keys, credential-reference rotation, recovery evidence, and deletion.
+## Route ownership
 
-It does not define a separate `/storage-servers/new` or
-`/storage-servers/[id]/edit` route.
+The routing files are intentionally thin:
 
-Current implementation status: the add modal, embedded base-configuration edit
-mode, verification/lifecycle/delete confirmations, dirty-state protection,
-permission gates, bilingual direction-aware UI, and same-intent UUIDv7 retry
-handling are implemented. Routing-profile, principal-rotation, attestation,
-and recovery evidence modals remain intentionally unavailable.
+- `/storage-servers` renders the registry screen;
+- `/storage-servers/new` renders the registration screen;
+- `/storage-servers/[id]` renders the operational detail screen;
+- `/storage-servers/layout.tsx` supplies the portal navigation and shell.
 
-It also does not define a tenant migration modal. The backend has a separate
-eight-route fenced migration authority with four-app write-drain
-acknowledgements, copy verification, rollback, and finalization. That feature
-is default-off, operationally gated, and currently lacks the public read model
-needed for refresh-safe frontend control. Do not add “move tenants here”,
-“rollback migration”, or “finalize retained source” actions from this
-component contract. See
-[Tenant Storage Server Migrations](../api/tenant-storage-migrations.md).
+Product behavior, API calls, mutation state, and UI are owned by
+`src/features/admin/storage-servers`. Do not restore API clients or hooks below
+`src/app/storage-servers`.
 
-## Add modal
+## Registry screen
 
-Open the modal only when the current admin has both:
+The screen provides:
 
-- `admin.storage_servers.create`;
-- `admin.storage_servers.critical`.
+- debounced server-side search;
+- server-side lifecycle filter and sorting;
+- truthful page/total metadata and previous/next controls;
+- explicit “on this page” labels for derived active/fresh counts;
+- lifecycle and connection evidence as separate columns;
+- safe failure code and last-test timestamp;
+- keyboard-labelled refresh and pagination controls.
 
-Submit with `POST /api/admin/core/v1/storage-servers`.
+An `ACTIVE` row is not automatically described as healthy. Freshness requires
+`connectionEvidenceFresh` and `PASSED` evidence.
 
-Permissions:
-`admin.storage_servers.create` + `admin.storage_servers.critical`.
+## Registration screen
 
-The form maps exactly to `CreateStorageServerDto`. It contains only:
+Registration is a dedicated route, not a one-time credential download flow.
+The form contains exactly the create DTO fields: immutable code, name, HTTPS
+endpoint, region, bucket, optional tenant limit, access-key ID, and secret key.
 
-- code and name;
-- internal and public endpoints;
-- region and placement role;
-- desired node, zone, and replication-factor targets;
-- tenant limit;
-- warning and critical capacity percentages;
-- the fixed path-style value `true`.
+Client validation rejects endpoint credentials, path, query, fragment, and
+plain HTTP. Server validation remains authoritative. Credential values live
+only in component memory, use password-manager-safe autocomplete attributes,
+and are never displayed after submission.
 
-The modal must not contain access keys, secret keys, bucket configuration,
-principal references, attestation private keys, or an activation switch.
+Success redirects to the new `DRAFT` detail. Copy must say that registration
+saved encrypted configuration; it must not claim the connection was tested.
+The screen owns one UUIDv7 for the exact submitted intent and retains it across
+coordinated `401`, network failure, `5xx`, or an in-progress response. Core's
+durable registration command can replay or recover the same preallocated DRAFT
+after Gateway-cache loss; the UI must not manufacture another ID or rotate the
+key merely because the first response was unknown.
 
-Both endpoint fields accept origins only: no credentials, non-root path, query,
-or fragment. Public storage requires HTTPS. Internal HTTPS may use a DNS name;
-internal plain HTTP is limited to localhost, loopback, or an RFC1918 IPv4
-literal.
+## Detail screen
 
-Keep these states explicit:
+The detail screen separates three concerns:
 
-- pristine;
-- dirty;
-- field validation;
-- submitting;
-- Gateway idempotency in flight;
-- duplicate identity conflict;
-- server validation failure;
-- ambiguous outcome requiring catalogue refetch;
-- success.
+1. lifecycle (`DRAFT`, `ACTIVE`, `OFFLINE`);
+2. connection evidence (`NOT_TESTED`, `PASSED`, `FAILED` plus freshness);
+3. placement policy (active plus fresh evidence).
 
-Generate one UUIDv7 `x-idempotency-key` when the admin confirms. Reuse it only
-for an exact retry while the outcome remains unknown. On confirmed success,
-clear form state, close the modal, refetch the list, and expose a link to the
-new detail route.
+The 24-hour evidence rail displays last test, expiry, next 12-hour automatic
+probe due time, and safe failure code. It also states that Worker schedules the
+check while Core performs it.
 
-Closing a dirty modal requires confirmation. Never retain field values in
-browser storage.
+Actions:
 
-## Detail edit mode
+- “Run connection test” is independent and does not change lifecycle;
+- “Test & activate” appears for `DRAFT`/`OFFLINE`;
+- “Take offline” appears for non-default `ACTIVE` servers and requires
+  confirmation;
+- “Make platform default” is enabled only for non-default `ACTIVE` servers
+  with fresh successful evidence;
+- delete is enabled only for non-default, unassigned `DRAFT`/`OFFLINE` rows;
+- credential rotation is disabled for assigned servers until `OFFLINE`.
 
-The detail screen owns one server query. Entering edit mode copies only these
-fields:
+Connection edits explain that changing endpoint/region/bucket/credentials
+invalidates evidence and returns the server to `DRAFT`. When an assigned server
+is not `OFFLINE`, connection inputs are disabled but safe metadata/capacity
+updates remain possible; Core rechecks all invariants under lock.
 
-```text
-name
-internalEndpoint
-publicEndpoint
-region
-placementRole
-desiredNodeCount
-desiredZoneCount
-requiredReplicationFactor
-maxTenants
-warningPercent
-criticalPercent
-```
+## Dialog behavior
 
-The following remain read-only:
+- Critical offline/delete actions use accessible confirmations.
+- Edit/credential dialogs keep values only in memory and never prefill current
+  credentials.
+- Mutation controls are disabled while a command is in flight.
+- Success closes the dialog and renders the authoritative returned/refetched
+  state.
+- Ambiguous failures retain the exact UUIDv7 key for an unchanged retry.
+- Definitive validation/state failures rotate the key before a changed intent.
+- Errors preserve the normalized message and correlation ID when available.
 
-```text
-id
-code
-provider
-forcePathStyle
-configRevision
-bindingRevision
-readinessRevision
-status
-availabilityClass
-healthStatus
-all tenant counters
-all observed topology
-all capacity observations
-createdAt
-updatedAt
-```
+## Accessibility and bilingual behavior
 
-Edit mode requires:
+- Use logical `start`/`end` spacing and direction-aware back arrows.
+- Keep wire enums untranslated in select values.
+- Every icon-only button has an accessible label.
+- Loading, error, empty, probe result, and forbidden states use text, not color
+  or animation alone.
+- Progress exposes `role=progressbar` and numeric ARIA values.
+- Toasts are secondary feedback; persistent lifecycle/evidence remains on the
+  page.
 
-- `admin.storage_servers.update`;
-- `admin.storage_servers.critical`;
-- a freshly loaded status of `DRAFT` or `OFFLINE`;
-- zero current, retained, and reserved tenants; and
-- zero visible active reserved capacity.
+## Focused tests
 
-These client checks improve clarity only. The safe response omits retained and
-reserved capacity counters, so Core's transaction-locked empty-server check
-remains authoritative and can return a conflict after a concurrent or hidden
-capacity change.
-
-Submit only changed keys with
-`PATCH /api/admin/core/v1/storage-servers/:id`. The DTO has no optimistic
-concurrency field. Refetch before editing and after every success, conflict, or
-ambiguous response. Cancel restores the last server response.
-
-Permissions:
-`admin.storage_servers.update` + `admin.storage_servers.critical`.
-
-## Full routing-profile replacement
-
-Routing configuration is not a normal detail edit. Open it as a separate
-critical flow from the detail route.
-
-The current backend has no safe read endpoint for bucket names, credential
-references, or selected attestation key IDs. Therefore this form:
-
-- starts empty;
-- requires all four mandatory class buckets;
-- requires all nine principal reference slots;
-- requires all six attestation-key selections;
-- obtains `expectedBindingRevision` from the latest server detail;
-- clearly labels the operation as a full replacement;
-- never caches or redisplays submitted references.
-
-Do not prefill from environment variables or the previous submission.
-
-## Critical confirmation rules
-
-| Intent | Confirmation evidence |
-|:---|:---|
-| Replace routing profile | Server name/code, current binding revision, full-replacement warning |
-| Rotate principal material | Server name, exact principal/role, out-of-band secret-store rotation acknowledgement |
-| Start verification | Server name, current revision triplet, 15-minute run expiry |
-| Activate | Server name and server-authoritative production-readiness warning |
-| Drain | Server name and statement that new tenant placement stops |
-| Offline | Server name, zero current/retained/reserved tenant counters, and zero visible active reserved capacity |
-| Promote attestation key | Principal, key ID, validity window |
-| Revoke attestation key | Principal, key ID, uppercase reason, affected-server readiness invalidation |
-| Register recovery destination | Destination code/name, immutable boundary, write-only credential-locator warning |
-| Verify recovery policy | Source and online server IDs/revisions, destination revision, evidence expiry, trusted-package acknowledgement |
-| Revoke recovery policy | Source server, current evidence revision, readiness-invalidation warning |
-| Delete | Server code/name, zero current/retained/reserved tenant counters, and zero visible active reserved capacity |
-
-Every confirmation:
-
-- is permission-gated;
-- creates a fresh UUIDv7 idempotency key;
-- disables duplicate submission;
-- preserves the exact key for an ambiguous retry;
-- refetches authoritative state before another action.
-
-Do not use a generic success toast as the only feedback for verification or
-lifecycle operations. Render the resulting server/run state.
-
-Recovery verification is not a free-form modal built from the normal detail
-response. That response omits the deployment identities and evidence package.
-Enable this critical flow only when the trusted operator-evidence acquisition
-contract described in the API document is available; never invent, reuse, or
-client-compute evidence hashes.
-
-## Accessibility and internationalization
-
-- Trap focus while a modal is open and restore focus to the invoking action.
-- Associate validation messages with their exact inputs.
-- Expose pending state with text, not animation alone.
-- Use logical direction-aware layout properties.
-- Keep wire enum values separate from translated labels.
-- Do not place endpoint or credential-reference text in automatically copied
-  telemetry or analytics attributes.
-
-## Test matrix
-
-Cover:
-
-- both required permission combinations and read-only behavior;
-- create success, validation, duplicate, forbidden, and ambiguous retry;
-- dirty close/cancel;
-- base edit field allowlist and unchanged-field omission;
-- edit blocked by status or tenant counters;
-- URL credential/query/fragment rejection;
-- topology and warning/critical cross-field validation;
-- routing-profile completeness and stale binding revision;
-- each supported principal/credential-role pair and unsupported pairs;
-- verification pending/pass/fail/expired;
-- recovery destination registration, policy-not-configured, verify/revoke
-  revision conflicts, evidence expiry, and absent trusted evidence packages;
-- every lifecycle precondition;
-- delete counter gates;
-- exact idempotency-key reuse only for the same intent;
-- no secret or private-key persistence.
-- no tenant-migration action while the migration read-model and release gates
-  remain open.
+Cover URL origin validation, API query/header serialization, safe probe result
+shape, ambiguous/definitive idempotency behavior, and storage-placement
+projection stripping. A browser E2E should additionally exercise keyboard
+focus, dark/light, RTL/LTR, delayed list responses, failed probes on an
+`ACTIVE` row, and an activation revision conflict.

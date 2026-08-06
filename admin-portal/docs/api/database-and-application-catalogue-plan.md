@@ -40,11 +40,12 @@ Static contract data to document:
 
 ### Application Catalogue V1
 
-The implemented public browser contract now contains 30 routes:
+The implemented public browser contract now contains 31 routes:
 
-- 13 Application-root routes for list, detail, manifests, technical readiness,
-  controlled primary-component binding, create, update, delete, database
-  policy, publish, activate, deprecate, and disable;
+- 14 Application-root routes for list, detail, manifests, technical readiness,
+  deterministic technical-identity adoption, controlled primary-component
+  binding, create, update, delete, database policy, publish, activate,
+  deprecate, and disable;
 - 4 tier routes;
 - 4 feature routes;
 - 2 tier-feature grant routes;
@@ -73,8 +74,8 @@ Static contract data to document:
 | --- | --- | --- | --- |
 | Database route client | All 15 routes exist | All 15 methods exist in the active API client | Document full contract and separate API coverage from UI coverage |
 | Database UI | Full server and credential operations are available | List/create/detail/lifecycle/bulk bootstrap/rotate/reconcile render | Record missing edit, history rendering, Add Application UI, independent error states, and runtime evidence |
-| Application root client | All 13 routes exist | All 13 methods exist, including publish and explicit primary-component binding | Document exact DTOs, permissions, revision fences, and idempotency |
-| Application root UI | Publication, lifecycle, policy, readiness, and manifests are independent authorities | List/detail/create/filter/publish/lifecycle/policy/readiness/manifests render; activation fails closed | Keep authenticated runtime evidence separate from source integration |
+| Application root client | All 14 routes exist | All 14 methods exist, including deterministic technical adoption, derived primary-component binding, and publish | Document exact DTOs, permissions, revision fences, and idempotency |
+| Application root UI | Publication, lifecycle, policy, readiness, and manifests are independent authorities | List/detail/create/filter/adoption/binding/publish/lifecycle/policy/readiness/manifests render; activation fails closed | Keep authenticated runtime evidence separate from source integration |
 | Tiers | Four routes exist | API, hooks, and commercial control rail are integrated | Document current source integration |
 | Features | Four routes exist | API, hooks, and commercial control rail are integrated | Document current source integration |
 | Tier grants | Two routes exist | Complete-replacement UI is integrated | Document full-replacement semantics |
@@ -88,8 +89,9 @@ Current Application Catalogue evidence must still retain these boundaries:
 - source integration and focused tests are not authenticated browser evidence;
 - lifecycle, publication, technical readiness, and tenant-selection
   eligibility must never be collapsed into one status;
-- `componentKey` is submitted explicitly and `runtimeTarget`/Worker routing is
-  read from server authority, never reconstructed from an Application name;
+- the browser submits no runtime target, principal, component key, or contract
+  version; Core derives them during fenced DRAFT adoption/binding and the UI
+  treats the returned/refetched server projection as authority;
 - metadata changes invalidate publication and never auto-publish;
 - remaining catalogue localization, deployment, and operational release gates
   stay explicit.
@@ -99,7 +101,7 @@ Current Application Catalogue evidence must still retain these boundaries:
 | Document | Required change |
 | --- | --- |
 | `docs/api/database-servers.md` | Cover all 15 routes with permissions, status, idempotency, exact DTOs/enums, request examples, complete success envelopes, 204 behavior, errors, security boundary, and frontend gaps |
-| `docs/api/catalog.md` | Maintain one coherent Application Catalogue V1 guide covering all 30 routes and both technical and commercial halves |
+| `docs/api/catalog.md` | Maintain one coherent Application Catalogue V1 guide covering all 31 routes and both technical and commercial halves |
 | `docs/models/enums.md` | Add exact Application and binding enums; retain billing-cycle and Database Server enums |
 | `docs/models/interfaces.md` | Add Application/policy/manifest/receipt models and complete Database/binding/commercial projections |
 | `docs/models/dtos.md` | Add Application, Database Server, tier, feature, grant, price, currency, audit, and parameter DTO validation |
@@ -109,7 +111,7 @@ Current Application Catalogue evidence must still retain these boundaries:
 | `docs/audit/frontend-capability-matrix.md` | Separate Application identity partial integration from missing commercial catalogue UI |
 | `docs/guides/sidebar-navigation.md` | Replace stale Modules navigation with Application Catalogue navigation |
 
-The generated Admin Core route inventory is current at 232 routes. It remains
+The generated Admin Core route inventory is current at 235 routes. It remains
 transport evidence; controller, DTO, service, and test source remain the
 behavioral authority.
 
@@ -161,7 +163,7 @@ Gateway Problem Details contain `status` and `code`.
 
 ## Acceptance criteria
 
-- All 15 Database Server and all 30 Application Catalogue routes appear once
+- All 15 Database Server and all 31 Application Catalogue routes appear once
   with exact canonical browser paths.
 - Every route has method, status, permission, idempotency, request, and full
   response evidence.

@@ -26,6 +26,7 @@ export type ApplicationDatabaseAccessMode =
 export type ApplicationCommandOperation =
   | "CREATE"
   | "UPDATE"
+  | "ADOPT_TECHNICAL_PACKAGE"
   | "PUBLISH"
   | "DELETE"
   | "UPDATE_DATABASE_POLICY"
@@ -129,9 +130,19 @@ export interface ApplicationTechnicalReadinessView {
 
 export interface CreateApplicationProvisioningBindingDto {
   expectedTechnicalDefinitionRevision: string;
-  componentKey: string;
-  contractVersion: number;
   reason: string;
+}
+
+export interface AdoptApplicationTechnicalPackageDto {
+  expectedTechnicalDefinitionRevision: string;
+  reason: string;
+}
+
+export interface ApplicationTechnicalIdentityView {
+  runtimeTarget: string;
+  primaryComponentKey: string;
+  databasePrincipal: string;
+  contractVersion: 1;
 }
 
 export interface ApplicationDatabasePolicyView {
@@ -183,11 +194,22 @@ export interface ApplicationMutationReceipt {
   applicationKey: string;
   lifecycleStatus: ApplicationLifecycleStatus;
   runtimeTarget: string | null;
+  databaseAccessMode: ApplicationDatabaseAccessMode;
+  databasePrincipal: string | null;
+  technicalDefinitionRevision: string;
   publicationStatus: ApplicationPublicationStatus;
   publicationRevision: string;
   catalogueRevision: string;
   policyRevision: string;
   deleted: boolean;
+  technicalIdentity?: ApplicationTechnicalIdentityView;
+  technicalProvisioning?: {
+    componentId: string;
+    componentKey: string;
+    ownerApp: string;
+    workerTarget: string;
+    contractVersion: 1;
+  };
 }
 
 export interface ApplicationListQueryDto {

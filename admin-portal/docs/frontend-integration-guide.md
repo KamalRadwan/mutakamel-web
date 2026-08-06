@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-04**
+Last source verification: **2026-08-05**
 
 Application Catalogue integration reverified: **2026-08-05**.
 
@@ -56,21 +56,22 @@ See [Source of Truth](ai/SOURCE_OF_TRUTH.md).
 | `/login` | `DONE/PARTIAL/BROKEN`: login/refresh/me/logout real; forgot password simulated; accept/reset/logout-all absent | [Auth](api/auth.md) |
 | `/dashboard` | `DONE/SOURCE_INTEGRATED`: grouped permission-filtered dashboard with 14 report groups and unavailable states; standalone report modules remain absent | [Dashboard](api/dashboard.md), [Reports](api/reports.md) |
 | `/database-servers` | `DONE/SOURCE_INTEGRATED`: real typed list/filter/pagination, permission-aware soft delete, deleted-only review, and separately permissioned permanent Destroy | [Database Servers](api/database-servers.md) |
-| `/database-servers/new` | `DONE/SOURCE_INTEGRATED`: accepts only the write-only security-admin and TLS material, then starts server-side service and Application credential assembly; generated access is not returned to the browser | [Database Servers](api/database-servers.md) |
+| `/database-servers/new` | `DONE/SOURCE_INTEGRATED`: accepts only the write-only security-admin and TLS material; explains the required `LOGIN + CREATEDB + CREATEROLE` non-superuser posture, no effective `INHERIT`/`SET` memberships, and expected `ADMIN`-only generated-role edges; then starts server-side `mutakamel_provisioner`, `mutakamel_backup`, and Application-role assembly without `pg_read_all_data` or returning generated access | [Database Servers](api/database-servers.md) |
 | `/database-servers/[id]` | `DONE/SOURCE_INTEGRATED`: provisioning and Application principals, maintenance-aware rotation, retry/reconciliation, history, and fail-closed activation; a zero-active-Application blocker links to Application Catalogue before retry; Backup is represented only by an aggregate dependency notice linking to `/backup/access` | [Database Servers](api/database-servers.md) |
-| `/backup` | `DONE/SOURCE_INTEGRATED/RELEASE_BLOCKED`: separate protection-chain overview; Worker safe-response DTOs and exact start-command recovery remain backend gates | [Backup and Restore](api/backups-restores.md) |
+| `/backup` | `DONE/SOURCE_INTEGRATED/RELEASE_BLOCKED`: separate protection-chain overview; Worker safe-response DTOs, durable command identity, and browser minimal reload recovery are source-integrated, while package adoption, migrated runtime, and authenticated browser evidence remain release gates | [Backup and Restore](api/backups-restores.md) |
 | `/backup/access` | `DONE/SOURCE_INTEGRATED`: Core-backed fixed `mutakamel_backup` status, hour-based rotation policy, secret-free regeneration, and exact-candidate reconciliation | [Backup and Restore](api/backups-restores.md) |
 | `/backup/policies` | `DONE/SOURCE_INTEGRATED`: Worker policy and per-database override editor with exact critical permission pairs | [Backup and Restore](api/backups-restores.md) |
 | `/backup/runs` | `DONE/SOURCE_INTEGRATED`: bounded Worker run history, manual start, deletion, and ambiguous-outcome reconciliation | [Backup and Restore](api/backups-restores.md) |
 | `/backup/artifacts` | `DONE/SOURCE_INTEGRATED`: bounded safe artifact evidence, critical deletion, and restore hand-off without storage-path exposure | [Backup and Restore](api/backups-restores.md) |
 | `/backup/restores` | `DONE/SOURCE_INTEGRATED`: isolated restore tests, verification-presence status, and separately confirmed critical promotion | [Backup and Restore](api/backups-restores.md) |
-| `/storage-servers` | `DONE/PARTIAL`: live bounded registry; critical advanced controls intentionally absent | [Storage Servers](api/storage-servers.md) |
-| `/storage-servers/[id]` | `DONE/PARTIAL/GATED`: detail/edit/history/verification/lifecycle live; recovery/attestation gated | [Storage Servers](api/storage-servers.md) |
+| `/storage-servers` | `DONE/SOURCE_INTEGRATED`: server-backed search/filter/sort/pagination, truthful totals, lifecycle plus fresh-evidence columns, and stable write identities | [Storage Servers](api/storage-servers.md) |
+| `/storage-servers/new` | `DONE/SOURCE_INTEGRATED`: credential-free HTTPS origin validation and write-only Garage/S3 credentials; success creates a DRAFT and does not claim connectivity | [Storage Servers](api/storage-servers.md) |
+| `/storage-servers/[id]` | `DONE/SOURCE_INTEGRATED`: lifecycle activation is separate from durable manual probe, 24-hour evidence rail and 12-hour Worker cadence are explicit, and maintenance/default/delete gates match Core | [Storage Servers](api/storage-servers.md) |
 | `/tenants` | `PARTIAL/BROKEN`: real foundation mixed with weak types/local behaviors | [Tenants](api/tenants.md) |
-| `/tenants/new` | `PARTIAL/BROKEN`: real quote/Storage placement foundation; simulated/hardcoded sequence remains | [Tenants](api/tenants.md) |
+| `/tenants/new` | `DONE/PARTIAL/SOURCE_INTEGRATED`: real identity availability is bound to current name/company input; one no-store `GET /tenants/create-options` snapshot under `admin.tenants.create` supplies authoritative Applications/readiness/tiers, provisioning preview, Application-aware Database placement, and explicit bucket-free Storage placement; quote accepts ANY `admin.catalog.read` or `admin.tenants.create`; submit-time wizard locking, live draft fences, minimal status-only ambiguous-outcome recovery, exact create shape, and PROVISIONING redirect are integrated; no tenant DTO or PII is persisted for replay; authenticated runtime evidence remains open | [Tenants](api/tenants.md) |
 | `/tenants/[id]` | `PARTIAL/BROKEN`: real detail mixed with wrong routes/methods, mock catalogues, and local wallet/lifecycle | [Tenants](api/tenants.md), [Tenant users](api/tenant-users.md), [Operations](api/tenant-operations.md) |
 | `/applications-catalogue` | `DONE/SOURCE_INTEGRATED`: real list/create/filtering includes independent publication state and its column, totals, retry, and global catalogue audit; authenticated runtime evidence remains open | [Application Catalogue](api/catalog.md) |
-| `/applications-catalogue/[applicationKey]` | `DONE/SOURCE_INTEGRATED`: real detail includes the release-authority rail, dual-fence publish flow, attributable-publication plus technical-readiness activation gate, exact readiness projection, stored runtime target, explicit component binding, stable-intent recovery, manifests, metadata/policy/lifecycle, and commercial controls; authenticated runtime evidence remains open | [Application Catalogue](api/catalog.md) |
+| `/applications-catalogue/[applicationKey]` | `DONE/SOURCE_INTEGRATED`: real detail includes request-ownership fences, keyboard-modal critical dialogs, the release-authority rail, dual-fence publish flow, attributable-publication plus technical-readiness activation gate, exact readiness projection, deterministic DRAFT technical-identity adoption, derived component binding, stable mutation intents, non-replayed create recovery, manifests, metadata/policy/lifecycle, and commercial controls; authenticated runtime evidence remains open | [Application Catalogue](api/catalog.md) |
 | `/users` | `DONE/PARTIAL`: real user list/invite/lifecycle; error/state hardening remains | [Users](api/users.md) |
 | `/users/[id]` | `DONE/PARTIAL`: real user/roles/WebPhone; self profile is separate and missing | [Users](api/users.md) |
 | `/roles` | `DONE/PARTIAL/REFACTOR`: real roles/permissions; ordinary metadata permission must remain non-critical | [Roles](api/roles-permissions.md) |
@@ -86,8 +87,11 @@ single-rate update, and transactional batch update remain under
 ## Application Catalogue release authority
 
 The browser must render three independent states: lifecycle, publication, and
-technical readiness. `runtimeTarget` is signed/stored identity and must never
-be reconstructed as `${applicationKey}-app`.
+technical readiness. While the Application is `DRAFT`, Core's adoption command
+derives and stores `${applicationKey}-app`, `mutakamel_<key>_app`, and
+`app.<key>`. The UI may preview that deterministic identity, but it must treat
+the command receipt and refetched readiness projection as authoritative and
+must never substitute a locally derived value during execution.
 
 - List reads support a `publicationStatus=UNPUBLISHED|PUBLISHED` filter and
   must show publication separately from lifecycle.
@@ -95,6 +99,9 @@ be reconstructed as `${applicationKey}-app`.
   `admin.applications.update` plus `admin.applications.critical`, a caller-owned
   UUIDv7 idempotency key, both current revision fences, and a reason.
 - Metadata edits invalidate an existing publication and never auto-publish.
+- Adoption and primary-component binding are distinct critical UUIDv7 intents;
+  each accepts only its current revision fence and reason. An ambiguous or
+  in-flight response is reconciled by refetching before a fresh key is issued.
 - Activation requires attributable publication plus technical
   `activationAllowed`; new selection uses complete `selectionAllowed`.
 - Existing installed runtime may retain a `PUBLISHED` `ACTIVE` or `DEPRECATED`
@@ -142,9 +149,12 @@ The current tenant detail hook contains the following confirmed defects:
 | Calls wallet credit/debit routes | Preview and confirm wallet adjustment |
 | Uses mock access catalogues | Load role/branch/department/team APIs independently |
 
-Tenant creation also contains hardcoded database IDs, hardcoded
-module/tier choices, `YEARLY`, simulated identity validation, simulated
-provisioning preview, and incomplete FQDN/reverse-geocode behavior.
+Tenant creation no longer contains hardcoded Database Server, Application, or
+tier choices. One no-store create-options snapshot, authorized by
+`admin.tenants.create`, provides the mutually consistent candidate set and
+provisioning preview; quote authorization accepts ANY `admin.catalog.read` or
+`admin.tenants.create`. Identity/FQDN validation remains simulated and must be
+replaced before runtime readiness is claimed.
 
 ## Shared HTTP contract
 
@@ -180,8 +190,9 @@ field errors and `correlationId`. See
 - Send `credentials: "include"` and `x-auth-cookie-mode: 1`.
 - Store only non-secret session timing/generation and validated profile data.
 - Coordinate one refresh across callers and retry a protected request once.
-- Explicitly non-replayable backup/restore writes are the exception: return the
-  first `401` to the caller and never refresh then repeat that request.
+- Backup start, restore start, and restore promotion participate in the single
+  coordinated refresh retry with their original UUIDv7 key and exact body;
+  Worker returns the accepted run instead of dispatching a duplicate effect.
 - Only definitive refresh `401/403` clears the session.
 - Never treat isolated unauthenticated `/auth/me` as failed-login evidence.
 
@@ -223,14 +234,25 @@ still processing or unknown.
 Treat `GW.IDEM.IN_FLIGHT` as processing/reconcile. Treat mismatch/reuse errors
 as client defects.
 
-Backup policy/override writes, Worker delete commands, and Core Backup-principal
-credential commands retain stable caller-owned UUIDv7 keys for the exact
-intent. Manual backup start, restore start, and restore promotion are explicitly
-non-idempotent: suppress automatic key injection, prevent duplicate submission,
-persist minimal non-secret attempt evidence across reloads, and review
-target-scoped Worker evidence before retry. Do not attach an idempotency key or
-automatic authentication/transport retry to those three commands. Exact
-server-side identity/recovery for start commands remains a release gate.
+Backup policy/override writes, Worker delete commands, Core Backup-principal
+credential commands, manual backup start, restore start, and restore promotion
+retain stable caller-owned UUIDv7 keys for the exact intent. The three run
+commands are Gateway `WRITE_SENSITIVE` with upstream transport retry disabled;
+the browser must still reuse the same key and body after an authentication
+refresh or ambiguous outcome. Worker durably binds actor, operation, SHA-256
+intent fingerprint, and accepted run before dispatch, returning the original
+run on an exact retry and rejecting key reuse for another actor or intent.
+Before dispatch, the three run-command screens store only a tab-scoped key,
+route, SHA-256 intent digest, safe resource identity, and timestamp. They do
+not persist the body, audit reason, target database, or confirmation text.
+After reload the operator must inspect Worker history and re-enter the exact
+original values; a changed digest is blocked, and unavailable storage prevents
+dispatch.
+
+Tenant create deliberately uses status-only recovery instead: the tab retains
+only the key, immutable public tenant name, and timestamp. An ambiguous outcome
+locks the wizard and permits only an authoritative exact-name status lookup;
+the sensitive create DTO is never persisted or automatically replayed.
 
 ## Data-state and numeric rules
 
@@ -255,8 +277,9 @@ must still stop returning those fields in its HTTP response before release.
 - Admin Realtime is not activated; notification UX falls back to REST polling.
 - Storage attestation/recovery remains gated until its operator-safe evidence
   contract is confirmed.
-- Backup production readiness remains gated until Worker exposes explicit safe
-  response DTOs and durable command identity/recovery for non-idempotent starts.
+- Backup safe projections and durable command identity are source-integrated.
+  Production readiness still requires Worker database-package adoption, live
+  schema execution, and authenticated runtime/deployment evidence.
 
 ## Implementation order
 

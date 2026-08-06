@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { DatabaseBackup, Play, RefreshCw, Trash2 } from "lucide-react";
 import { BackupRunStatus, type BackupRun } from "../types";
 import { BackupDialog } from "../components/BackupDialog";
@@ -26,7 +25,11 @@ export function BackupRunsScreen() {
   const [deletingRun, setDeletingRun] = useState<BackupRun | null>(null);
 
   const openStart = () => {
-    setStartServerId(view.databaseServerId || view.servers[0]?.id || "");
+    setStartServerId(
+      view.pendingCommandAttempt?.resource.kind === "DATABASE_SERVER"
+        ? view.pendingCommandAttempt.resource.id
+        : view.databaseServerId || view.servers[0]?.id || "",
+    );
     setReason("");
     setTenantConcurrency(2);
     setStartOpen(true);
@@ -38,33 +41,22 @@ export function BackupRunsScreen() {
         eyebrow={isArabic ? "تنفيذ Worker" : "Worker execution"}
         title={isArabic ? "عمليات النسخ الاحتياطي" : "Backup runs"}
         description={isArabic
-          ? "متابعة العمليات المجدولة واليدوية. بدء العملية غير قابل للتكرار التلقائي عند انقطاع الاتصال."
-          : "Track scheduled and manual executions. Start commands are never auto-replayed after an ambiguous connection failure."}
+          ? "تابع العمليات المجدولة واليدوية. إعادة إرسال نفس الطلب تستخدم هوية أمر ثابتة وتعيد العملية الأصلية."
+          : "Track scheduled and manual executions. Retrying the same request keeps one command identity and returns the original run."}
         actions={view.canStart ? (
-          <button type="button" onClick={openStart} disabled={view.commandGuardBlocked} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-700 px-4 text-sm font-bold text-white hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" onClick={openStart} disabled={Boolean(view.activeAction)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-700 px-4 text-sm font-bold text-white hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50">
             <Play className="size-4" aria-hidden="true" />{isArabic ? "بدء نسخة يدوية" : "Start manual backup"}
           </button>
         ) : undefined}
       />
 
-      {view.unknownOutcome ? (
-        <section role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          <h2 className="font-bold">{view.unknownOutcome.kind === "BACKUP_START" ? (isArabic ? "أمر بدء النسخ ما زال غير محسوم" : "Backup start command remains unresolved") : (isArabic ? "يوجد أمر حماية بيانات غير محسوم" : "Another data-protection command is unresolved")}</h2>
-          <p className="mt-2 text-sm leading-6">{view.unknownOutcome.kind === "BACKUP_START" ? (isArabic ? "أُعيدت قراءة عمليات الخادم بدون فلتر حالة، لكن المتصفح لا يعتبر أي عملية دليلاً تلقائيًا على قبول هذا الأمر." : "Runs for the target server were reread without a status filter, but the browser never treats a matching run as automatic proof that this command was accepted.") : (isArabic ? "يجب حسم أمر الاستعادة من شاشة الاستعادة قبل بدء نسخة جديدة." : "Resolve the restore command from the Restore screen before starting another backup.")}</p>
-          <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-3"><div><dt className="font-semibold opacity-70">{isArabic ? "الحالة" : "Guard status"}</dt><dd className="font-mono font-bold">{view.unknownOutcome.status}</dd></div><div><dt className="font-semibold opacity-70">{isArabic ? "وقت الإصدار" : "Issued"}</dt><dd className="font-mono">{formatBackupDate(view.unknownOutcome.issuedAt, isArabic ? "ar-EG" : "en-US")}</dd></div><div><dt className="font-semibold opacity-70">{isArabic ? "معرف الأمر المحلي" : "Local command ID"}</dt><dd className="break-all font-mono">{view.unknownOutcome.localCommandId}</dd></div></dl>
-          {view.ambiguousError?.correlationId ? <p className="mt-2 text-xs">Correlation ID: <code>{view.ambiguousError.correlationId}</code></p> : null}
-          {view.unknownOutcome.kind === "BACKUP_START" ? (
-            <div className="mt-4 rounded-xl border border-amber-300/70 bg-white/60 p-4 dark:bg-slate-950/40">
-              <p className="text-xs font-bold uppercase tracking-wider">{isArabic ? "قراءة Worker المرجعية للخادم" : "Authoritative Worker read for the target server"}</p>
-              {view.isReconcilingAttempt ? <p className="mt-2 text-sm">{isArabic ? "جارٍ تحديث القراءة المرجعية…" : "Refreshing authoritative evidence…"}</p> : view.reconciliationError ? <p className="mt-2 text-sm text-rose-700 dark:text-rose-300">{view.reconciliationError.message}</p> : view.reconciliationRuns.length === 0 ? <p className="mt-2 text-sm">{isArabic ? "لم تُرجع القراءة الحالية أي عملية لهذا الخادم." : "The current read returned no runs for this server."}</p> : <ul className="mt-2 space-y-2">{view.reconciliationRuns.slice(0, 5).map((run) => <li key={run.id} className="flex flex-wrap items-center justify-between gap-2 text-xs"><code>{shortBackupId(run.id)}</code><span>{run.status}</span><span>{formatBackupDate(run.startedAt, isArabic ? "ar-EG" : "en-US")}</span></li>)}</ul>}
-              <p className="mt-3 text-xs leading-5 opacity-80">{isArabic ? "هذه القراءة تساعد المراجعة فقط ولا تحدد هوية الأمر المسبب للعملية." : "This read supports operator review only; it cannot identify which command created a run."}</p>
-            </div>
-          ) : <Link href="/backup/restores" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-amber-900 px-4 text-sm font-bold text-white dark:bg-amber-200 dark:text-amber-950">{isArabic ? "فتح شاشة الاستعادة" : "Open Restore"}</Link>}
-          {view.unknownOutcome.kind === "BACKUP_START" ? <button type="button" onClick={view.acknowledgeUnknownOutcome} disabled={view.isReconcilingAttempt || Boolean(view.reconciliationError)} className="mt-4 min-h-11 rounded-xl bg-amber-900 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-200 dark:text-amber-950">{isArabic ? "أكد أنني راجعت حالة Worker الموثوقة — امسح القفل" : "I verified authoritative Worker state — clear lock"}</button> : null}
+      {view.retryableCommandError || view.pendingCommandAttempt ? (
+        <section role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          <h2 className="font-bold">{isArabic ? "هناك أمر نسخ لم تُحسم نتيجته" : "A backup command still has an unknown outcome"}</h2>
+          <p className="mt-2 text-sm leading-6">{isArabic ? "يحتفظ هذا التبويب بالمفتاح وبصمة غير قابلة للقراءة فقط، ولا يخزن سبب التدقيق. افحص سجل العمليات ثم أعد إدخال القيم الأصلية حرفيًا إذا احتجت لإعادة المحاولة؛ لن يُقبل طلب مختلف بنفس المفتاح." : "This tab retains only the key and a non-readable intent digest; it does not store the audit reason. Check the run history, then re-enter the exact original values if a retry is needed. A different request will not be sent with that key."}</p>
+          {view.retryableCommandError?.correlationId ? <p className="mt-2 text-xs">Correlation ID: <code>{view.retryableCommandError.correlationId}</code></p> : null}
         </section>
       ) : null}
-
-      {view.commandGuardError ? <section role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm font-semibold text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{isArabic ? "الحماية الدائمة للأوامر غير متاحة؛ تم تعطيل أوامر البدء." : view.commandGuardError}</section> : null}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_auto] lg:items-end">
@@ -103,7 +95,7 @@ export function BackupRunsScreen() {
         </section>
       )}
 
-      <BackupDialog open={startOpen} title={isArabic ? "بدء نسخة احتياطية يدوية" : "Start manual backup"} description={isArabic ? "يُحفظ قفل دائم قبل إرسال الأمر ولا يُعاد الإرسال تلقائيًا." : "A durable browser lock is saved before this non-replayable command is sent."} confirmLabel={isArabic ? "بدء العملية" : "Start run"} onClose={() => { if (!view.activeAction) setStartOpen(false); }} onConfirm={() => void view.startRun({ databaseServerId: startServerId, reason: reason.trim(), tenantConcurrency }).then((run) => { if (run) setStartOpen(false); }).catch(() => undefined)} isSubmitting={view.activeAction === "start"} confirmDisabled={view.commandGuardBlocked || !uuidV7Pattern.test(startServerId) || !reason.trim() || reason.length > 500 || tenantConcurrency < 1 || tenantConcurrency > 10}>
+      <BackupDialog open={startOpen} title={isArabic ? "بدء نسخة احتياطية يدوية" : "Start manual backup"} description={isArabic ? "تُحفظ هوية الأمر وبصمة الطلب فقط داخل هذا التبويب حتى تُحسم النتيجة؛ لا يُحفظ سبب التدقيق." : "The command identity and request digest stay in this tab until the outcome is known; the audit reason is not stored."} confirmLabel={isArabic ? "بدء العملية" : "Start run"} onClose={() => { if (!view.activeAction) setStartOpen(false); }} onConfirm={() => void view.startRun({ databaseServerId: startServerId, reason: reason.trim(), tenantConcurrency }).then((run) => { if (run) setStartOpen(false); }).catch(() => undefined)} isSubmitting={view.activeAction === "start"} confirmDisabled={!uuidV7Pattern.test(startServerId) || !reason.trim() || reason.length > 500 || tenantConcurrency < 1 || tenantConcurrency > 10}>
         {view.canReadServers ? <BackupServerSelect label={isArabic ? "الخادم" : "Database server"} value={startServerId} servers={view.servers} onChange={setStartServerId} placeholder={isArabic ? "اختر خادم قاعدة بيانات" : "Select a database server"} /> : <label className="block"><span className={labelClass}>{isArabic ? "معرف خادم قاعدة البيانات" : "Database server ID"}</span><input value={startServerId} onChange={(event) => setStartServerId(event.target.value.trim())} placeholder="UUIDv7" className={inputClass} /><span className="mt-2 block text-xs text-slate-500">{isArabic ? "يمكن تنفيذ الأمر بالمعرف دون كشف سجل الخوادم." : "The command can be authorized by ID without exposing the server registry."}</span></label>}
         <label className="block"><span className={labelClass}>{isArabic ? "التزامن" : "Tenant concurrency"}</span><input type="number" min={1} max={10} value={tenantConcurrency} onChange={(event) => setTenantConcurrency(Number(event.target.value))} className={inputClass} /></label>
         <label className="block"><span className={labelClass}>{isArabic ? "سبب موثق" : "Audit reason"}</span><textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={4} className={`${inputClass} py-3`} /></label>

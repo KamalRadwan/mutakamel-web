@@ -29,7 +29,20 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
   const [formError, setFormError] = useState<string | null>(null);
 
   const selectedTier = catalogue.tiers.find((tier) => tier.id === catalogue.selectedTierId) ?? null;
+  const tierContextReady =
+    selectedTier !== null && catalogue.loadedTierId === selectedTier.id;
   const grantedIds = useMemo(() => selectedGrantIds, [selectedGrantIds]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setDialog(null);
+      setDeleteTarget(null);
+      setFormError(null);
+      setSelectedGrantIds(new Set());
+      setGrantConfig({});
+      setBrackets([{ minUsers: 1, maxUsers: null, unitPrice: "0.0000" }]);
+    });
+  }, [applicationId]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -52,7 +65,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
   }
 
   const saveGrants = async () => {
-    if (!selectedTier) return;
+    if (!selectedTier || !tierContextReady) return;
     setFormError(null);
     try {
       const features = catalogue.features
@@ -90,7 +103,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
   };
 
   const validateAndSavePrices = async () => {
-    if (!selectedTier) return;
+    if (!selectedTier || !tierContextReady) return;
     setFormError(null);
     for (let index = 0; index < brackets.length; index += 1) {
       const row = brackets[index];
@@ -140,6 +153,19 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
         </div>
       )}
 
+      {catalogue.pendingCreateAttempt ? (
+        <div role="status" className="m-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <p className="font-bold">Previous {catalogue.pendingCreateAttempt.kind} create outcome is unknown.</p>
+          <p className="mt-1">The portal will only inspect the authoritative catalogue; it will not replay this non-idempotent create automatically.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => void catalogue.recoverPendingCreateAttempt()} disabled={Boolean(catalogue.pendingAction)} className="rounded-lg border border-amber-300 bg-white px-3 py-2 font-bold text-amber-900 disabled:opacity-50 dark:border-amber-800 dark:bg-slate-900 dark:text-amber-200">Check catalogue result</button>
+            {catalogue.pendingCreateAttempt.absenceConfirmed ? (
+              <button type="button" onClick={catalogue.clearAbsentPendingCreateAttempt} disabled={Boolean(catalogue.pendingAction)} className="rounded-lg border border-slate-300 px-3 py-2 font-bold disabled:opacity-50 dark:border-slate-700">Accept authoritative absence</button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <div className="p-5">
         {catalogue.isLoading ? (
           <div className="flex min-h-44 items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading catalogue…</div>
@@ -169,7 +195,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                 })}
               </div>
             )}
-            {selectedTier && canMutate && <button type="button" onClick={() => void saveGrants()} disabled={Boolean(catalogue.pendingAction)} className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-violet-500 disabled:opacity-50">Replace complete entitlement set</button>}
+            {selectedTier && canMutate && <button type="button" onClick={() => void saveGrants()} disabled={Boolean(catalogue.pendingAction) || !tierContextReady} className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-violet-500 disabled:opacity-50">Replace complete entitlement set</button>}
           </div>
         ) : tab === "pricing" ? (
           <div className="space-y-4">
@@ -177,7 +203,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
               <TierSelector tiers={catalogue.tiers} selected={catalogue.selectedTierId} onChange={catalogue.setSelectedTierId} />
               <select value={cycle} onChange={(event) => setCycle(event.target.value as BillingCycle)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold dark:border-slate-700 dark:bg-slate-950"><option value="MONTHLY">Monthly</option><option value="ANNUAL">Annual</option></select>
             </div>
-            {!selectedTier ? <EmptyState text="Create a tier before defining pricing." /> : (
+            {!selectedTier ? <EmptyState text="Create a tier before defining pricing." /> : !tierContextReady ? <Loading /> : (
               <div className="space-y-3">
                 {brackets.map((row, index) => (
                   <div key={index} className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_auto] dark:border-slate-800">
@@ -187,7 +213,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                     {canMutate && brackets.length > 1 && <button type="button" aria-label="Remove bracket" onClick={() => setBrackets((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="self-end rounded-lg p-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"><Trash2 className="h-4 w-4" /></button>}
                   </div>
                 ))}
-                {canMutate && <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setBrackets((current) => { const previous = current[current.length - 1]; const previousMax = previous.maxUsers ?? previous.minUsers; return [...current.map((item, index) => index === current.length - 1 ? { ...item, maxUsers: previousMax } : item), { minUsers: previousMax + 1, maxUsers: null, unitPrice: previous.unitPrice }]; })} className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><Plus className="me-1 inline h-3.5 w-3.5" />Add bracket</button><button type="button" onClick={() => void validateAndSavePrices()} disabled={Boolean(catalogue.pendingAction)} className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-500 disabled:opacity-50">Replace {cycle.toLowerCase()} ladder</button></div>}
+                {canMutate && <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setBrackets((current) => { const previous = current[current.length - 1]; const previousMax = previous.maxUsers ?? previous.minUsers; return [...current.map((item, index) => index === current.length - 1 ? { ...item, maxUsers: previousMax } : item), { minUsers: previousMax + 1, maxUsers: null, unitPrice: previous.unitPrice }]; })} className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><Plus className="me-1 inline h-3.5 w-3.5" />Add bracket</button><button type="button" onClick={() => void validateAndSavePrices()} disabled={Boolean(catalogue.pendingAction) || !tierContextReady} className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-500 disabled:opacity-50">Replace {cycle.toLowerCase()} ladder</button></div>}
               </div>
             )}
           </div>

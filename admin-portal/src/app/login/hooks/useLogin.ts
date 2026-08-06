@@ -68,7 +68,7 @@ export function useLogin() {
           : "If the email is registered, password reset instructions will be sent."
       );
       setIsForgotModalOpen(false);
-    } catch (err: unknown) {
+    } catch {
       toast.error(
         lang === "ar" ? "تعذر الإرسال" : "Failed to Send",
         lang === "ar" ? "حدث خطأ أثناء الاتصال بالخادم." : "Could not communicate with the server."

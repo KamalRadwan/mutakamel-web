@@ -1,16 +1,15 @@
 "use client";
 
-import { use, useState } from "react";
+import { use } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { 
   Building2, 
   ArrowLeft, 
   ArrowRight, 
-  CheckCircle2, 
+  CheckCircle2,
   Globe, 
   Users, 
   Save, 
-  Trash2 as never_used_trash, 
   Server, 
   Loader2, 
   Plus, 
@@ -18,7 +17,6 @@ import {
   Activity, 
   CreditCard, 
   Wallet, 
-  ShieldAlert as never_used_shield, 
   MapPin, 
   TrendingUp, 
   TrendingDown, 
@@ -31,12 +29,9 @@ import { useTenantDetail } from "./hooks/useTenantDetail";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 // removed DestructiveActionModal
 import { useI18n } from "@/i18n/I18nContext";
-import { useAuth } from "@/context/AuthContext";
-import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export default function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  // removed isSaved and canDestroyTenant
   const {
     t,
     tenant,
@@ -56,8 +51,6 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     setAdjCurrency,
     adjNote,
     setAdjNote,
-    destroySubscriptionsToggle: never1,
-    setDestroySubscriptionsToggle: never2,
     fqdns,
     usersSummary,
     tenantUsers,
@@ -70,14 +63,10 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     operations,
     isSubmitting,
     isLoadingDetails,
-    isEditUserOpen: never3,
-    setIsEditUserOpen: never4,
     isAddCreditOpen,
     setIsAddCreditOpen,
     isAddDebitOpen,
     setIsAddDebitOpen,
-    selectedUserId: never5,
-    setSelectedUserId: never6,
     editProfileData,
     setEditProfileData,
     handleUpdateTenantProfile,
@@ -86,9 +75,6 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
     handleResendInvite,
     handleRestoreUser,
     handleDeleteUser,
-    mockBranches: never7,
-    mockDepartments: never8,
-    mockTeams: never9,
     handleSetPrimaryFqdn,
     submitCreditAdjustment,
     submitDebitAdjustment,
@@ -144,14 +130,6 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
 
 
         </div>
-
-        {/* Saved Toast Notification */}
-        {isSaved && (
-          <div className="p-3 text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center gap-2 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>{lang === "ar" ? "تم حفظ تعديلات المستأجر بنجاح!" : "Tenant details updated successfully!"}</span>
-          </div>
-        )}
 
         {/* Top Metric Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">

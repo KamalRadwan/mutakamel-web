@@ -163,8 +163,16 @@ describe("Application Catalogue API Contract Tests (30 Routes)", () => {
     expect(axiosClient.get).toHaveBeenCalledWith("/api/admin/core/v1/applications/crm/database-manifests");
     expect(axiosClient.get).toHaveBeenCalledWith("/api/admin/core/v1/catalog/audit?page=1");
     expect(axiosClient.get).toHaveBeenCalledWith("/api/admin/core/v1/applications/app-1/audit?page=1");
-    expect(axiosClient.post).toHaveBeenCalledWith("/api/admin/core/v1/applications/app-1/tiers", { key: "basic", name: "Basic" });
-    expect(axiosClient.post).toHaveBeenCalledWith("/api/admin/core/v1/applications/app-1/features", { key: "crm.leads", name: "Leads" });
+    expect(axiosClient.post).toHaveBeenCalledWith(
+      "/api/admin/core/v1/applications/app-1/tiers",
+      { key: "basic", name: "Basic" },
+      { skipAutoIdempotency: true, nonReplayable: true },
+    );
+    expect(axiosClient.post).toHaveBeenCalledWith(
+      "/api/admin/core/v1/applications/app-1/features",
+      { key: "crm.leads", name: "Leads" },
+      { skipAutoIdempotency: true, nonReplayable: true },
+    );
     expect(axiosClient.post).toHaveBeenCalledWith(
       "/api/admin/core/v1/applications/crm/publish",
       { expectedCatalogueRevision: "2", expectedPublicationRevision: "1", reason: "Publish verified revision" },

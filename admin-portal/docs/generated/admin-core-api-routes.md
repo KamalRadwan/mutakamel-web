@@ -3,26 +3,26 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-08-05T09:52:58.131Z**
+Generated at: **2026-08-05T22:02:18.741Z**
 
-Frontend revision: `625295f8ddcc+dirty`
+Frontend revision: `adb263e0cda1+dirty`
 
 Backend revision: `48898351dbde+dirty`
 
 ## Coverage
 
-This inventory contains **232** browser-visible Core Admin routes.
+This inventory contains **235** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
 
 | Route class | Routes |
 | --- | ---: |
-| AUTHENTICATED | 79 |
+| AUTHENTICATED | 80 |
 | PUBLIC | 6 |
 | READ_HEAVY | 21 |
-| WRITE_SENSITIVE | 126 |
-| **Total** | **232** |
+| WRITE_SENSITIVE | 128 |
+| **Total** | **235** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -31,7 +31,7 @@ Machine-readable source:
 
 | Gateway route-key domain | Routes |
 | --- | ---: |
-| applications | 13 |
+| applications | 14 |
 | audit | 2 |
 | auth | 8 |
 | catalog | 17 |
@@ -45,11 +45,11 @@ Machine-readable source:
 | provisioning | 31 |
 | reports | 5 |
 | roles | 6 |
-| storage-servers | 7 |
+| storage-servers | 8 |
 | subscriptions | 8 |
 | system-settings | 7 |
 | tenant-fqdns | 1 |
-| tenants | 52 |
+| tenants | 53 |
 | users | 15 |
 | wallets | 6 |
 
@@ -74,6 +74,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/applications/:applicationKey/disable` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.disable` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/publish` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.publish` |
 | GET | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.technical-provisioning.get` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning/adopt` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.technical-provisioning.adopt` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning/primary-component` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.technical-provisioning.primary-component.create` |
 | GET | `/api/admin/core/v1/audit` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.list` |
 | GET | `/api/admin/core/v1/audit/entities/:entityType/:entityId` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.entity-history` |
@@ -193,11 +194,12 @@ Machine-readable source:
 | PATCH | `/api/admin/core/v1/storage-servers/:id` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.update` |
 | POST | `/api/admin/core/v1/storage-servers/:id/activate` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.activate` |
 | POST | `/api/admin/core/v1/storage-servers/:id/offline` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.offline` |
+| POST | `/api/admin/core/v1/storage-servers/:id/probe` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.probe` |
 | GET | `/api/admin/core/v1/subscriptions` | AUTHENTICATED | yes | ALL | admin.subscriptions.read | `core.admin.subscriptions.list` |
 | POST | `/api/admin/core/v1/subscriptions/:id/plan-change-previews` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.update | `core.admin.subscriptions.v2.plan-change-previews.create` |
 | POST | `/api/admin/core/v1/subscriptions/:id/plan-change-previews/:previewId/apply` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.update + admin.subscriptions.critical | `core.admin.subscriptions.v2.plan-change-previews.apply` |
 | POST | `/api/admin/core/v1/subscriptions/:tenantId/cancel` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.cancel + admin.subscriptions.critical | `core.admin.subscriptions.cancel` |
-| POST | `/api/admin/core/v1/subscriptions/quote` | AUTHENTICATED | yes | ALL | admin.catalog.read | `core.admin.subscriptions.v2.quote` |
+| POST | `/api/admin/core/v1/subscriptions/quote` | AUTHENTICATED | yes | ANY | admin.catalog.read OR admin.tenants.create | `core.admin.subscriptions.v2.quote` |
 | GET | `/api/admin/core/v1/system-settings` | AUTHENTICATED | yes | ALL | admin.settings.read | `core.admin.system-settings.list` |
 | GET | `/api/admin/core/v1/system-settings/:key` | AUTHENTICATED | yes | ALL | admin.settings.read | `core.admin.system-settings.get` |
 | PUT | `/api/admin/core/v1/system-settings/:key` | WRITE_SENSITIVE | yes | ALL | admin.settings.update + admin.settings.critical | `core.admin.system-settings.upsert` |
@@ -261,6 +263,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/tenants/:tenantId/wallet/adjustments` | WRITE_SENSITIVE | yes | ALL | admin.wallet.manage + admin.wallet.critical | `core.admin.wallets.adjustments.create` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/wallet/adjustments/preview` | WRITE_SENSITIVE | yes | ALL | admin.wallet.manage | `core.admin.wallets.adjustments.preview` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/wallet/ledger` | AUTHENTICATED | yes | ALL | admin.wallet.read | `core.admin.wallets.by-tenant.ledger` |
+| GET | `/api/admin/core/v1/tenants/create-options` | AUTHENTICATED | yes | ALL | admin.tenants.create | `core.admin.tenants.create-options.list` |
 | GET | `/api/admin/core/v1/tenants/database-placement-options` | AUTHENTICATED | yes | ALL | admin.tenants.create | `core.admin.tenants.database-placement-options.list` |
 | POST | `/api/admin/core/v1/tenants/provisioning-plans` | AUTHENTICATED | yes | ALL | admin.tenants.create | `core.admin.tenants.provisioning-plans.preview` |
 | POST | `/api/admin/core/v1/tenants/reverse-geocode` | AUTHENTICATED | yes | ALL | admin.tenants.create | `core.admin.tenants.reverse-geocode` |

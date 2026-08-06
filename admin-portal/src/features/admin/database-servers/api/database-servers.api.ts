@@ -64,29 +64,35 @@ function toQueryString(query?: object): string {
   return serialized ? `?${serialized}` : "";
 }
 
+function getWithSignal<T>(url: string, signal?: AbortSignal) {
+  return signal
+    ? axiosClient.get<T>(url, { signal })
+    : axiosClient.get<T>(url);
+}
+
 export const databaseServersApi = {
-  list: async (query?: DatabaseServerQueryDto) => {
+  list: async (query?: DatabaseServerQueryDto, signal?: AbortSignal) => {
     const qs = toQueryString(query);
-    const response = await axiosClient.get<SuccessResponse<DatabaseServerWireView[]>>(`${BASE_URL}${qs}`);
+    const response = await getWithSignal<SuccessResponse<DatabaseServerWireView[]>>(`${BASE_URL}${qs}`, signal);
     return {
       data: extractCoreData(response).map(toDatabaseServerView),
       meta: extractCoreMeta(response)
     };
   },
 
-  get: async (id: string) => {
-    const response = await axiosClient.get<SuccessResponse<DatabaseServerWireView>>(`${BASE_URL}/${id}`);
+  get: async (id: string, signal?: AbortSignal) => {
+    const response = await getWithSignal<SuccessResponse<DatabaseServerWireView>>(`${BASE_URL}/${id}`, signal);
     return toDatabaseServerView(extractCoreData(response));
   },
 
-  getHistory: async (id: string, query?: DatabaseServerHistoryQueryDto) => {
+  getHistory: async (id: string, query?: DatabaseServerHistoryQueryDto, signal?: AbortSignal) => {
     const qs = toQueryString(query);
-    const response = await axiosClient.get<SuccessResponse<DatabaseServerHistoryView[]>>(`${BASE_URL}/${id}/history${qs}`);
+    const response = await getWithSignal<SuccessResponse<DatabaseServerHistoryView[]>>(`${BASE_URL}/${id}/history${qs}`, signal);
     return extractCoreData(response);
   },
 
-  listApplications: async (id: string) => {
-    const response = await axiosClient.get<SuccessResponse<DatabaseServerApplicationBindingView[]>>(`${BASE_URL}/${id}/applications`);
+  listApplications: async (id: string, signal?: AbortSignal) => {
+    const response = await getWithSignal<SuccessResponse<DatabaseServerApplicationBindingView[]>>(`${BASE_URL}/${id}/applications`, signal);
     return extractCoreData(response);
   },
 

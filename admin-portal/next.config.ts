@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const isDev = process.env.NODE_ENV === "development";
 
 // In dev, proxy /api/* to the local backend so cookies are same-origin and

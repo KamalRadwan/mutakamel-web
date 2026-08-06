@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, AppWindow, ArrowLeft, FileCheck, Loader2, Pencil, Settings, Shield, Trash2 } from "lucide-react";
@@ -33,8 +33,18 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   const [configurationMode, setConfigurationMode] = useState<"metadata" | "policy" | null>(null);
   const [lifecycleAction, setLifecycleAction] = useState<ApplicationLifecycleAction | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [bindingOpen, setBindingOpen] = useState(false);
+  const [technicalDialog, setTechnicalDialog] = useState<"ADOPT" | "BIND" | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setConfigurationMode(null);
+      setLifecycleAction(null);
+      setDeleteOpen(false);
+      setTechnicalDialog(null);
+      setPublishOpen(false);
+    });
+  }, [applicationKey]);
 
   const canEditMetadata = adminCanAll(user, ["admin.applications.update"]);
   const canLifecycle = adminCanAll(user, ["admin.applications.update", "admin.applications.critical"]);
@@ -126,13 +136,15 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
 
       <ApplicationTechnicalProvisioningPanel
         applicationKey={application.key}
+        databasePrincipal={application.databasePrincipal}
         readiness={technical.readiness}
         error={technical.error}
         isLoading={technical.isLoading}
         isRefreshing={technical.isRefreshing}
         canManage={canLifecycle}
         onRetry={() => void technical.refresh()}
-        onOpenBinding={() => setBindingOpen(true)}
+        onOpenAdoption={() => setTechnicalDialog("ADOPT")}
+        onOpenBinding={() => setTechnicalDialog("BIND")}
       />
 
       <section className="grid gap-5 lg:grid-cols-[1fr_1.25fr]">
@@ -164,7 +176,23 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
         return result;
       }}
     />
-    <ApplicationPrimaryComponentDialog isOpen={bindingOpen} applicationKey={application.key} runtimeTarget={technical.readiness?.runtimeTarget ?? application.runtimeTarget} technicalDefinitionRevision={technical.readiness?.technicalDefinitionRevision ?? application.technicalDefinitionRevision} isSubmitting={technical.isLinking} commandError={technical.commandError} canRetryExactIntent={technical.hasPendingIntent} onClose={() => setBindingOpen(false)} onConfirm={(componentKey, contractVersion, reason) => technical.linkPrimaryComponent({ componentKey, contractVersion, reason })} onRetryExactIntent={technical.retryPendingIntent} onClearCommandError={technical.clearCommandError} />
+    <ApplicationPrimaryComponentDialog
+      isOpen={technicalDialog !== null}
+      mode={technicalDialog ?? "ADOPT"}
+      applicationKey={application.key}
+      runtimeTarget={technical.readiness?.runtimeTarget ?? application.runtimeTarget}
+      databasePrincipal={application.databasePrincipal}
+      technicalDefinitionRevision={technical.readiness?.technicalDefinitionRevision ?? application.technicalDefinitionRevision}
+      isSubmitting={technicalDialog === "ADOPT" ? technical.isAdopting : technical.isLinking}
+      commandError={technical.commandError}
+      canRetryExactIntent={technical.pendingIntentKind === technicalDialog}
+      onClose={() => setTechnicalDialog(null)}
+      onConfirm={(reason) => technicalDialog === "ADOPT"
+        ? technical.adoptTechnicalPackage(reason)
+        : technical.linkPrimaryComponent(reason)}
+      onRetryExactIntent={technical.retryPendingIntent}
+      onClearCommandError={technical.clearCommandError}
+    />
     <DestructiveActionModal isOpen={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={() => { void detail.deleteApplication(application.catalogueRevision, t.applications.detail.deleteReason).then(() => router.push("/applications-catalogue")); }} title={t.applications.detail.deleteTitle} description={t.applications.detail.deleteDescription} targetName={application.name} actionType="delete" requireNameTyping isSubmitting={detail.isMutating} />
   </PageFrame>;
 }

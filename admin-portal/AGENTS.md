@@ -32,10 +32,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
   in the owning backend controller/DTO/service. Frontend mock objects and
   endpoint comments are design fixtures, not API evidence.
 - **Integration Status**: Authentication, dashboard, admin users/roles,
-  Database Servers, the separate Backup module, bounded Storage Servers,
-  Catalogue, and settings contain substantial real integration. Backup source
-  integration remains release-gated by Worker safe-response projections and
-  exact non-idempotent command recovery. Tenants remain partial and
+  Database Servers, the separate Backup module, and Storage Servers with
+  server-backed registry controls, independent safe probes, and explicit
+  evidence freshness,
+  Catalogue, and settings contain substantial real integration. Backup safe
+  projections and exact durable command recovery are source-integrated, while
+  package/schema adoption and authenticated runtime remain release gates.
+  Tenants remain partial and
   contract-breaking; several operational modules are missing. Use
   `docs/audit/frontend-capability-matrix.md` for the current source boundary.
   Do not treat source integration as authenticated runtime or deployment

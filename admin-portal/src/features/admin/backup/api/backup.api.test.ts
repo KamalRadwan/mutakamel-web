@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { deleteMock, getMock, postMock, putMock } = vi.hoisted(() => ({
+const { deleteMock, getMock, patchMock, postMock } = vi.hoisted(() => ({
   deleteMock: vi.fn(),
   getMock: vi.fn(),
+  patchMock: vi.fn(),
   postMock: vi.fn(),
-  putMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api/axiosClient", () => ({
   axiosClient: {
     delete: deleteMock,
     get: getMock,
+    patch: patchMock,
     post: postMock,
-    put: putMock,
   },
 }));
 
@@ -31,8 +31,8 @@ describe("backup Worker API", () => {
   beforeEach(() => {
     deleteMock.mockReset();
     getMock.mockReset();
+    patchMock.mockReset();
     postMock.mockReset();
-    putMock.mockReset();
   });
 
   it("serializes policy filters without dropping false", async () => {
@@ -73,13 +73,13 @@ describe("backup Worker API", () => {
       defaultCompressionAlgorithm: "gzip" as const,
     };
     const policy = { id: POLICY_ID, databaseServerId: SERVER_ID, ...dto };
-    putMock.mockResolvedValue(workerResponse(policy));
+    patchMock.mockResolvedValue(workerResponse(policy));
 
     await expect(
       backupApi.upsertPolicy(SERVER_ID, dto, IDEMPOTENCY_KEY),
     ).resolves.toEqual(policy);
 
-    expect(putMock).toHaveBeenCalledWith(
+    expect(patchMock).toHaveBeenCalledWith(
       `/api/admin/worker/v1/backups/policies/${SERVER_ID}`,
       dto,
       { headers: { "x-idempotency-key": IDEMPOTENCY_KEY } },
@@ -99,7 +99,7 @@ describe("backup Worker API", () => {
 
     const dto = { backupEnabled: false, compressionEnabled: null };
     const override = { id: POLICY_ID, tenantId: TENANT_ID, ...dto };
-    putMock.mockResolvedValueOnce(workerResponse(override));
+    patchMock.mockResolvedValueOnce(workerResponse(override));
 
     await expect(
       backupApi.upsertDatabaseOverride(
@@ -109,7 +109,7 @@ describe("backup Worker API", () => {
         IDEMPOTENCY_KEY,
       ),
     ).resolves.toEqual(override);
-    expect(putMock).toHaveBeenCalledWith(
+    expect(patchMock).toHaveBeenCalledWith(
       `/api/admin/worker/v1/backups/policies/${SERVER_ID}/databases/${TENANT_ID}`,
       dto,
       { headers: { "x-idempotency-key": IDEMPOTENCY_KEY } },
@@ -127,7 +127,7 @@ describe("backup Worker API", () => {
     );
   });
 
-  it("starts a backup without an idempotency key or automatic key injection", async () => {
+  it("starts a backup with the caller-owned stable command key", async () => {
     const dto = {
       databaseServerId: SERVER_ID,
       reason: "Operator requested a bounded manual backup",
@@ -143,16 +143,14 @@ describe("backup Worker API", () => {
       failedTenants: 0,
       skippedTenants: 0,
       reason: dto.reason,
+      hasFailure: true,
+      failureCode: "WORKER.BACKUP.RUN_FAILED",
       startedAt: "2026-08-04T10:00:00.000Z",
       finishedAt: null,
-      storagePrefix: "internal/backups/server",
-      manifestKey: "internal/backups/server/manifest.json",
-      summary: { internal: true },
-      error: "C:\\internal\\backup failed",
     };
     postMock.mockResolvedValue(workerResponse(run));
 
-    const result = await backupApi.startRun(dto);
+    const result = await backupApi.startRun(dto, IDEMPOTENCY_KEY);
     expect(result).toEqual({
       id: RUN_ID,
       databaseServerId: SERVER_ID,
@@ -164,6 +162,7 @@ describe("backup Worker API", () => {
       skippedTenants: 0,
       reason: dto.reason,
       hasFailure: true,
+      failureCode: "WORKER.BACKUP.RUN_FAILED",
       startedAt: "2026-08-04T10:00:00.000Z",
       finishedAt: null,
     });
@@ -175,9 +174,8 @@ describe("backup Worker API", () => {
     expect(postMock).toHaveBeenCalledWith(
       "/api/admin/worker/v1/backups/runs",
       dto,
-      { nonReplayable: true, skipAutoIdempotency: true },
+      { headers: { "x-idempotency-key": IDEMPOTENCY_KEY } },
     );
-    expect(postMock.mock.calls[0]?.[2]).not.toHaveProperty("headers");
   });
 
   it("serializes run and artifact filters and keeps delete keys stable", async () => {
@@ -193,11 +191,10 @@ describe("backup Worker API", () => {
         sizeBytes: null,
         sha256: null,
         compressionAlgorithm: "gzip",
+        hasFailure: true,
+        failureCode: "WORKER.BACKUP.ARTIFACT_FAILED",
         startedAt: "2026-08-04T10:00:00.000Z",
         finishedAt: "2026-08-04T10:01:00.000Z",
-        storageKey: "internal/artifact.tar.gz",
-        metadata: { internal: true },
-        error: "C:\\internal\\pg_dump failed",
       }]));
 
     await backupApi.listRuns({
@@ -240,7 +237,7 @@ describe("backup Worker API", () => {
     );
   });
 
-  it("uses the canonical non-idempotent restore start and promote routes", async () => {
+  it("uses caller-owned stable command keys for restore start and promotion", async () => {
     const startDto = {
       artifactId: ARTIFACT_ID,
       targetDatabaseName: "tenant_restore_1",
@@ -255,16 +252,17 @@ describe("backup Worker API", () => {
       targetDatabaseName: startDto.targetDatabaseName,
       status: "VERIFIED",
       reason: startDto.reason,
+      hasVerification: true,
+      hasFailure: true,
+      failureCode: "WORKER.RESTORE.RUN_FAILED",
       startedAt: "2026-08-04T10:00:00.000Z",
       finishedAt: "2026-08-04T10:03:00.000Z",
       promotedAt: null,
       promoteReason: null,
-      verification: { tables: ["secret_internal_table"] },
-      error: "C:\\internal\\restore warning",
     };
     postMock.mockResolvedValue(workerResponse(restore));
 
-    const started = await backupApi.startRestore(startDto);
+    const started = await backupApi.startRestore(startDto, IDEMPOTENCY_KEY);
     expect(started).toMatchObject({
       id: RUN_ID,
       artifactId: ARTIFACT_ID,
@@ -277,7 +275,7 @@ describe("backup Worker API", () => {
       1,
       "/api/admin/worker/v1/restores/runs",
       startDto,
-      { nonReplayable: true, skipAutoIdempotency: true },
+      { headers: { "x-idempotency-key": IDEMPOTENCY_KEY } },
     );
 
     const promoteDto = {
@@ -285,18 +283,14 @@ describe("backup Worker API", () => {
       confirmationText: startDto.targetDatabaseName,
     };
     await expect(
-      backupApi.promoteRestore(RUN_ID, promoteDto),
+      backupApi.promoteRestore(RUN_ID, promoteDto, IDEMPOTENCY_KEY),
     ).resolves.toMatchObject({ id: RUN_ID, hasVerification: true, hasFailure: true });
     expect(postMock).toHaveBeenNthCalledWith(
       2,
       `/api/admin/worker/v1/restores/runs/${RUN_ID}/promote`,
       promoteDto,
-      { nonReplayable: true, skipAutoIdempotency: true },
+      { headers: { "x-idempotency-key": IDEMPOTENCY_KEY } },
     );
-
-    for (const call of postMock.mock.calls) {
-      expect(call[2]).not.toHaveProperty("headers");
-    }
   });
 
   it("reads individual backup and restore runs from their owning families", async () => {

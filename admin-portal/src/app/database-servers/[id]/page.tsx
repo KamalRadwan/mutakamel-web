@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import {
   ArrowLeft,
@@ -30,6 +30,10 @@ import { AddDatabaseApplicationDialog } from "@/features/admin/database-servers/
 import { SystemPrincipalRotationPolicy } from "@/features/admin/database-servers/components/SystemPrincipalRotationPolicy";
 import type { DatabaseServerProvisioningPrincipalBindingView } from "@/features/admin/database-servers/types";
 import { needsActiveApplicationBindingBackfill } from "@/features/admin/database-servers/lib/registration-state";
+import {
+  normalizeApiError,
+  type NormalizedApiError,
+} from "@/shared/api/normalized-api-error";
 
 type LifecycleAction = "activate" | "drain" | "offline";
 
@@ -87,6 +91,20 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
   const [isAddApplicationOpen, setIsAddApplicationOpen] = useState(false);
   const [lifecycleAction, setLifecycleAction] = useState<LifecycleAction | null>(null);
   const [isLifecycleSubmitting, setIsLifecycleSubmitting] = useState(false);
+  const [lifecycleError, setLifecycleError] =
+    useState<NormalizedApiError | null>(null);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setIsEditModalOpen(false);
+      setIsDeleteModalOpen(false);
+      setIsAddApplicationOpen(false);
+      setLifecycleAction(null);
+      setLifecycleError(null);
+      setIsDeleting(false);
+      setIsLifecycleSubmitting(false);
+    });
+  }, [id]);
 
   if (isLoading) {
     return (
@@ -142,13 +160,14 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
   const handleLifecycleConfirm = async () => {
     if (!lifecycleAction) return;
     setIsLifecycleSubmitting(true);
+    setLifecycleError(null);
     try {
       if (lifecycleAction === "activate") await activateServer();
       if (lifecycleAction === "drain") await drainServer();
       if (lifecycleAction === "offline") await offlineServer();
       setLifecycleAction(null);
-    } catch {
-      // The hook exposes the normalized failure through the shared toast.
+    } catch (caught) {
+      setLifecycleError(normalizeApiError(caught));
     } finally {
       setIsLifecycleSubmitting(false);
     }
@@ -181,7 +200,10 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
             />
             <DestructiveActionModal
               isOpen={lifecycleAction !== null}
-              onClose={() => setLifecycleAction(null)}
+              onClose={() => {
+                setLifecycleAction(null);
+                setLifecycleError(null);
+              }}
               onConfirm={() => void handleLifecycleConfirm()}
               title={lifecycleAction === "activate" ? "Activate Database Server" : lifecycleAction === "drain" ? "Drain Database Server" : "Take Database Server Offline"}
               description={lifecycleAction === "activate" ? "This server becomes eligible for new tenant placement." : lifecycleAction === "drain" ? "New tenant placement stops while existing tenants remain assigned." : "The server becomes unavailable for placement and connection operations."}
@@ -192,6 +214,38 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
             />
           </>
         )}
+
+        {lifecycleError ? (
+          <section
+            role="alert"
+            className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-950 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="font-bold">{lifecycleError.message}</p>
+                <p className="mt-1 font-mono text-xs">{lifecycleError.errorCode}</p>
+                {lifecycleError.details ? (
+                  <ul className="mt-3 space-y-1 text-xs leading-5">
+                    {Object.entries(lifecycleError.details).flatMap(
+                      ([field, values]) =>
+                        values.map((value) => (
+                          <li key={`${field}:${value}`} className="break-words font-mono">
+                            {field}: {value}
+                          </li>
+                        )),
+                    )}
+                  </ul>
+                ) : null}
+                {lifecycleError.correlationId ? (
+                  <p className="mt-2 text-xs">
+                    Correlation ID: <code>{lifecycleError.correlationId}</code>
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         {/* Header Hero Banner with Rich Colors */}
         <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-6 rounded-3xl border border-blue-500/20 shadow-xl">
@@ -233,17 +287,17 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                 </button>
               )}
               {canUpdate && server.status !== "ACTIVE" && (
-                <button onClick={() => setLifecycleAction("activate")} disabled={server.credentialBootstrap.status !== "READY"} title={server.credentialBootstrap.status === "READY" ? "Activate server" : activeApplicationBindingsMissing ? "Activate the required Applications, then retry registration setup" : "Credential assembly must be READY before activation"} className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-xl text-xs font-black flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/25 border border-white/20 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40">
+                <button onClick={() => { setLifecycleError(null); setLifecycleAction("activate"); }} disabled={server.credentialBootstrap.status !== "READY"} title={server.credentialBootstrap.status === "READY" ? "Activate server" : activeApplicationBindingsMissing ? "Publish and activate the required Applications, then retry registration setup" : "Credential assembly must be READY before activation"} className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-xl text-xs font-black flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/25 border border-white/20 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40">
                   <Play className="w-4 h-4" /> Activate Server
                 </button>
               )}
               {canUpdate && server.status === "ACTIVE" && (
-                <button onClick={() => setLifecycleAction("drain")} className="px-4 py-2.5 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-2 transition-all border border-amber-400/30 backdrop-blur-md cursor-pointer">
+                <button onClick={() => { setLifecycleError(null); setLifecycleAction("drain"); }} className="px-4 py-2.5 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-2 transition-all border border-amber-400/30 backdrop-blur-md cursor-pointer">
                   <StopCircle className="w-4 h-4 text-amber-400" /> Drain Connections
                 </button>
               )}
               {canUpdate && server.status !== "OFFLINE" && (
-                <button onClick={() => setLifecycleAction("offline")} className="px-4 py-2.5 bg-slate-500/20 text-slate-200 hover:bg-slate-500/30 rounded-xl text-xs font-bold flex items-center gap-2 transition-all border border-slate-400/30 backdrop-blur-md cursor-pointer">
+                <button onClick={() => { setLifecycleError(null); setLifecycleAction("offline"); }} className="px-4 py-2.5 bg-slate-500/20 text-slate-200 hover:bg-slate-500/30 rounded-xl text-xs font-bold flex items-center gap-2 transition-all border border-slate-400/30 backdrop-blur-md cursor-pointer">
                   <PowerOff className="w-4 h-4 text-slate-400" /> Take Offline
                 </button>
               )}
@@ -274,8 +328,8 @@ export default function DatabaseServerDetailPage({ params }: { params: Promise<{
                 <div className="flex items-start gap-3">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
                   <div>
-                    <p className="text-sm font-bold">Active Application bindings are required</p>
-                    <p className="mt-1 text-xs leading-5 text-blue-800 dark:text-blue-300">Activate the eligible database-backed Applications in Application Catalogue, then return here and retry registration setup. Core will backfill their fixed principals without exposing passwords.</p>
+                    <p className="text-sm font-bold">ACTIVE + PUBLISHED Application bindings are required</p>
+                    <p className="mt-1 text-xs leading-5 text-blue-800 dark:text-blue-300">Publish and activate the eligible database-backed Applications in Application Catalogue, then return here and retry registration setup. Core will backfill their fixed principals without exposing passwords.</p>
                   </div>
                 </div>
                 {canReadApplications && (

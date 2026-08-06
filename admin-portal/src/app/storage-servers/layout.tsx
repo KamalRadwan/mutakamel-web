@@ -1,0 +1,13 @@
+import type { ReactNode } from "react";
+import { Navbar } from "@/components/layout/Navbar";
+
+export default function StorageServersLayout({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100">
+      <Navbar />
+      <main className="mx-auto w-full max-w-7xl flex-1 p-4 sm:p-6">
+        {children}
+      </main>
+    </div>
+  );
+}

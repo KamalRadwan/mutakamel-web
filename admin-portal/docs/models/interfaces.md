@@ -663,6 +663,7 @@ interface ApplicationView {
 type ApplicationCommandOperation =
   | 'CREATE'
   | 'UPDATE'
+  | 'ADOPT_TECHNICAL_PACKAGE'
   | 'PUBLISH'
   | 'DELETE'
   | 'UPDATE_DATABASE_POLICY'
@@ -682,6 +683,19 @@ interface ApplicationMutationReceipt {
   catalogueRevision: string;
   policyRevision: string;
   deleted: boolean;
+  technicalIdentity?: {
+    runtimeTarget: string;
+    databasePrincipal: string;
+    primaryComponentKey: string;
+    contractVersion: 1;
+  };
+  technicalProvisioning?: {
+    componentId: string;
+    componentKey: string;
+    ownerApp: string;
+    workerTarget: string;
+    contractVersion: 1;
+  };
 }
 
 interface TierView {

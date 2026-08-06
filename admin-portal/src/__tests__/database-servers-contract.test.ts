@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { databaseServersApi } from "@/features/admin/database-servers/api/database-servers.api";
 import { axiosClient } from "@/lib/api/axiosClient";
-import { generateUUIDv7 } from "@/shared/utils/idempotency";
+import { generateUUIDv7 } from "@/lib/utils/uuid";
 import type { CheckDatabaseServerConnectivityDto, CreateDatabaseServerDto } from "@/features/admin/database-servers/types";
 import type { AxiosResponse } from "@/lib/api/axiosClient";
 
@@ -43,7 +43,7 @@ describe("Database Servers API Contract Tests (15 Routes)", () => {
     const dto = {
       host: "10.0.0.1",
       port: 5432,
-      securityAdminCredentials: { username: "postgres", password: "secret" }
+      securityAdminCredentials: { username: "mutakamel_security_admin", password: "secret" }
     };
     const result = await databaseServersApi.checkConnectivity(dto satisfies CheckDatabaseServerConnectivityDto, key);
 
@@ -69,7 +69,7 @@ describe("Database Servers API Contract Tests (15 Routes)", () => {
       name: "PG Replica",
       host: "10.0.0.2",
       maxTenants: 100,
-      securityAdminCredentials: { username: "postgres", password: "secret" }
+      securityAdminCredentials: { username: "mutakamel_security_admin", password: "secret" }
     };
     const result = await databaseServersApi.create(dto satisfies CreateDatabaseServerDto, key);
 

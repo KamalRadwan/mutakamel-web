@@ -12,6 +12,7 @@ import {
   ApplicationManifestEvidenceView,
   ApplicationTechnicalReadinessView,
   CreateApplicationProvisioningBindingDto,
+  AdoptApplicationTechnicalPackageDto,
   TierView,
   CreateTierDto,
   UpdateTierDto,
@@ -48,6 +49,12 @@ function toQueryString(query?: object): string {
   return serialized ? `?${serialized}` : "";
 }
 
+function getWithSignal<T>(url: string, signal?: AbortSignal) {
+  return signal
+    ? axiosClient.get<T>(url, { signal })
+    : axiosClient.get<T>(url);
+}
+
 export const applicationsApi = {
   // --- Application Identity, Publication & Lifecycle Routes ---
   list: async (query?: ApplicationListQueryDto) => {
@@ -59,13 +66,13 @@ export const applicationsApi = {
     };
   },
 
-  get: async (applicationKey: string) => {
-    const response = await axiosClient.get<SuccessResponse<ApplicationView>>(`${BASE_URL}/${encodeURIComponent(applicationKey)}`);
+  get: async (applicationKey: string, signal?: AbortSignal) => {
+    const response = await getWithSignal<SuccessResponse<ApplicationView>>(`${BASE_URL}/${encodeURIComponent(applicationKey)}`, signal);
     return extractCoreData(response);
   },
 
-  getManifests: async (applicationKey: string) => {
-    const response = await axiosClient.get<SuccessResponse<ApplicationManifestEvidenceView[]>>(`${BASE_URL}/${encodeURIComponent(applicationKey)}/database-manifests`);
+  getManifests: async (applicationKey: string, signal?: AbortSignal) => {
+    const response = await getWithSignal<SuccessResponse<ApplicationManifestEvidenceView[]>>(`${BASE_URL}/${encodeURIComponent(applicationKey)}/database-manifests`, signal);
     return extractCoreData(response);
   },
 
@@ -116,6 +123,19 @@ export const applicationsApi = {
     return extractCoreData(response);
   },
 
+  adoptTechnicalPackage: async (
+    applicationKey: string,
+    data: AdoptApplicationTechnicalPackageDto,
+    idempotencyKey: string
+  ) => {
+    const response = await axiosClient.post<SuccessResponse<ApplicationMutationReceipt>>(
+      `${BASE_URL}/${encodeURIComponent(applicationKey)}/technical-provisioning/adopt`,
+      data,
+      { headers: { "x-idempotency-key": idempotencyKey } }
+    );
+    return extractCoreData(response);
+  },
+
   publish: async (applicationKey: string, data: PublishApplicationDto, idempotencyKey: string) => {
     const response = await axiosClient.post<SuccessResponse<ApplicationMutationReceipt>>(
       `${BASE_URL}/${encodeURIComponent(applicationKey)}/publish`,
@@ -160,15 +180,16 @@ export const applicationsApi = {
   },
 
   // --- 4 Tier Routes ---
-  listTiers: async (applicationId: string) => {
-    const response = await axiosClient.get<SuccessResponse<TierView[]>>(`${BASE_URL}/${encodeURIComponent(applicationId)}/tiers`);
+  listTiers: async (applicationId: string, signal?: AbortSignal) => {
+    const response = await getWithSignal<SuccessResponse<TierView[]>>(`${BASE_URL}/${encodeURIComponent(applicationId)}/tiers`, signal);
     return extractCoreData(response);
   },
 
   createTier: async (applicationId: string, data: CreateTierDto) => {
     const response = await axiosClient.post<SuccessResponse<TierView>>(
       `${BASE_URL}/${encodeURIComponent(applicationId)}/tiers`,
-      data
+      data,
+      { skipAutoIdempotency: true, nonReplayable: true },
     );
     return extractCoreData(response);
   },
@@ -189,15 +210,16 @@ export const applicationsApi = {
   },
 
   // --- 4 Feature Routes ---
-  listFeatures: async (applicationId: string) => {
-    const response = await axiosClient.get<SuccessResponse<FeatureView[]>>(`${BASE_URL}/${encodeURIComponent(applicationId)}/features`);
+  listFeatures: async (applicationId: string, signal?: AbortSignal) => {
+    const response = await getWithSignal<SuccessResponse<FeatureView[]>>(`${BASE_URL}/${encodeURIComponent(applicationId)}/features`, signal);
     return extractCoreData(response);
   },
 
   createFeature: async (applicationId: string, data: CreateFeatureDto) => {
     const response = await axiosClient.post<SuccessResponse<FeatureView>>(
       `${BASE_URL}/${encodeURIComponent(applicationId)}/features`,
-      data
+      data,
+      { skipAutoIdempotency: true, nonReplayable: true },
     );
     return extractCoreData(response);
   },
@@ -218,9 +240,10 @@ export const applicationsApi = {
   },
 
   // --- 2 Tier-Feature Grant Routes ---
-  getTierGrants: async (tierId: string) => {
-    const response = await axiosClient.get<SuccessResponse<TierFeatureGrantView[]>>(
-      `${TIER_BASE_URL}/${encodeURIComponent(tierId)}/features`
+  getTierGrants: async (tierId: string, signal?: AbortSignal) => {
+    const response = await getWithSignal<SuccessResponse<TierFeatureGrantView[]>>(
+      `${TIER_BASE_URL}/${encodeURIComponent(tierId)}/features`,
+      signal,
     );
     return extractCoreData(response);
   },
@@ -235,10 +258,11 @@ export const applicationsApi = {
   },
 
   // --- 2 Graduated Price Ladder Routes ---
-  getPriceLadder: async (tierId: string, billingCycle?: BillingCycle) => {
+  getPriceLadder: async (tierId: string, billingCycle?: BillingCycle, signal?: AbortSignal) => {
     const qs = billingCycle ? `?billingCycle=${encodeURIComponent(billingCycle)}` : "";
-    const response = await axiosClient.get<SuccessResponse<PriceTierView[]>>(
-      `${TIER_BASE_URL}/${encodeURIComponent(tierId)}/price-tiers${qs}`
+    const response = await getWithSignal<SuccessResponse<PriceTierView[]>>(
+      `${TIER_BASE_URL}/${encodeURIComponent(tierId)}/price-tiers${qs}`,
+      signal,
     );
     return extractCoreData(response);
   },
@@ -259,10 +283,11 @@ export const applicationsApi = {
     return extractCoreData(response);
   },
 
-  getApplicationAudit: async (applicationId: string, query?: CatalogueAuditQueryDto) => {
+  getApplicationAudit: async (applicationId: string, query?: CatalogueAuditQueryDto, signal?: AbortSignal) => {
     const qs = toQueryString(query);
-    const response = await axiosClient.get<SuccessResponse<CatalogueAuditPageView>>(
-      `${BASE_URL}/${encodeURIComponent(applicationId)}/audit${qs}`
+    const response = await getWithSignal<SuccessResponse<CatalogueAuditPageView>>(
+      `${BASE_URL}/${encodeURIComponent(applicationId)}/audit${qs}`,
+      signal,
     );
     return extractCoreData(response);
   },

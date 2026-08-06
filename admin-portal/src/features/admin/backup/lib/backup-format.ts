@@ -32,3 +32,14 @@ export function shortBackupId(value: string): string {
 export function isAmbiguousWriteFailure(status: number): boolean {
   return status === 0 || status >= 500;
 }
+
+export function shouldRetainBackupCommandKey(error: {
+  httpStatus: number;
+  errorCode: string;
+}): boolean {
+  return (
+    error.httpStatus === 401 ||
+    isAmbiguousWriteFailure(error.httpStatus) ||
+    error.errorCode === "GW.IDEM.IN_FLIGHT"
+  );
+}

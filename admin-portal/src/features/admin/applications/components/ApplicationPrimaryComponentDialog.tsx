@@ -4,29 +4,30 @@ import { Boxes, Loader2, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import { useApplicationPrimaryComponentDialog } from "../hooks/useApplicationPrimaryComponentDialog";
+import { deriveTechnicalIdentityPreview } from "../lib/technical-provisioning-state";
 
 interface Props {
   isOpen: boolean;
+  mode: "ADOPT" | "BIND";
   applicationKey: string;
   runtimeTarget: string | null;
+  databasePrincipal: string | null;
   technicalDefinitionRevision: string;
   isSubmitting: boolean;
   commandError: NormalizedApiError | null;
   canRetryExactIntent: boolean;
   onClose: () => void;
-  onConfirm: (
-    componentKey: string,
-    contractVersion: number,
-    reason: string,
-  ) => Promise<boolean>;
+  onConfirm: (reason: string) => Promise<boolean>;
   onRetryExactIntent: () => Promise<boolean>;
   onClearCommandError: () => void;
 }
 
 export function ApplicationPrimaryComponentDialog({
   isOpen,
+  mode,
   applicationKey,
   runtimeTarget,
+  databasePrincipal,
   technicalDefinitionRevision,
   isSubmitting,
   commandError,
@@ -40,10 +41,6 @@ export function ApplicationPrimaryComponentDialog({
   const {
     dialogRef,
     initialFocusRef,
-    componentKey,
-    setComponentKey,
-    contractVersion,
-    setContractVersion,
     reason,
     setReason,
     validationError,
@@ -59,6 +56,8 @@ export function ApplicationPrimaryComponentDialog({
   });
 
   if (!isOpen) return null;
+  const identity = deriveTechnicalIdentityPreview(applicationKey);
+  const isAdoption = mode === "ADOPT";
 
   const isRecoverable =
     commandError?.errorCode === "GW.IDEM.IN_FLIGHT" ||
@@ -89,21 +88,31 @@ export function ApplicationPrimaryComponentDialog({
         <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-950 px-5 py-4 text-white dark:border-slate-800">
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300">
-              {t.applications.technicalProvisioning.bindingEyebrow}
+              {isAdoption
+                ? t.applications.technicalProvisioning.adoptionEyebrow
+                : t.applications.technicalProvisioning.bindingEyebrow}
             </p>
             <h2 id="primary-component-title" className="mt-1 flex items-center gap-2 text-sm font-black">
               <Boxes className="h-4 w-4" />
-              {t.applications.technicalProvisioning.bindingTitle}
+              {isAdoption
+                ? t.applications.technicalProvisioning.adoptionTitle
+                : t.applications.technicalProvisioning.bindingTitle}
             </h2>
             <p id="primary-component-description" className="mt-1 text-xs leading-relaxed text-slate-300">
-              {t.applications.technicalProvisioning.bindingDescription}
+              {isAdoption
+                ? t.applications.technicalProvisioning.adoptionDescription
+                : t.applications.technicalProvisioning.bindingDescription}
             </p>
           </div>
           <button
             type="button"
             onClick={close}
             disabled={isSubmitting}
-            aria-label={t.applications.technicalProvisioning.closeDialog}
+            aria-label={
+              isAdoption
+                ? t.applications.technicalProvisioning.closeAdoptionDialog
+                : t.applications.technicalProvisioning.closeDialog
+            }
             className="grid size-11 shrink-0 place-items-center rounded-xl text-slate-300 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-50"
           >
             <X className="h-4 w-4" />
@@ -118,10 +127,17 @@ export function ApplicationPrimaryComponentDialog({
             </div>
             <dl className="mt-3 grid gap-3 text-[11px] sm:grid-cols-2">
               <Mapping label={t.applications.technicalProvisioning.applicationKey} value={applicationKey} />
-              <Mapping label={t.applications.technicalProvisioning.ownerApplication} value={applicationKey} />
               <Mapping
                 label={t.applications.technicalProvisioning.workerTarget}
-                value={runtimeTarget ?? t.applications.technicalProvisioning.notAdopted}
+                value={isAdoption ? identity.runtimeTarget : (runtimeTarget ?? identity.runtimeTarget)}
+              />
+              <Mapping
+                label={t.applications.technicalProvisioning.databasePrincipal}
+                value={isAdoption ? identity.databasePrincipal : (databasePrincipal ?? identity.databasePrincipal)}
+              />
+              <Mapping
+                label={t.applications.technicalProvisioning.componentKey}
+                value={identity.primaryComponentKey}
               />
             </dl>
             <p className="mt-3 text-[11px] leading-relaxed text-cyan-800 dark:text-cyan-300">
@@ -129,39 +145,11 @@ export function ApplicationPrimaryComponentDialog({
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
+          <div>
             <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-              {t.applications.technicalProvisioning.componentKey}
-              <input
-                ref={initialFocusRef}
-                type="text"
-                required
-                maxLength={96}
-                value={componentKey}
-                onChange={(event) => setComponentKey(event.target.value)}
-                placeholder={t.applications.technicalProvisioning.componentKeyPlaceholder}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                dir="ltr"
-                className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 dark:border-slate-700 dark:bg-slate-950"
-              />
-            </label>
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-              {t.applications.technicalProvisioning.contractVersion}
-              <input
-                type="number"
-                min={1}
-                step={1}
-                required
-                value={contractVersion}
-                onChange={(event) => setContractVersion(event.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 dark:border-slate-700 dark:bg-slate-950"
-              />
-            </label>
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 sm:col-span-2">
               {t.applications.technicalProvisioning.changeReason}
               <textarea
+                ref={initialFocusRef}
                 required
                 maxLength={256}
                 rows={3}
@@ -215,8 +203,12 @@ export function ApplicationPrimaryComponentDialog({
             >
               {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {isSubmitting
-                ? t.applications.technicalProvisioning.linking
-                : t.applications.technicalProvisioning.linkComponent}
+                ? isAdoption
+                  ? t.applications.technicalProvisioning.adopting
+                  : t.applications.technicalProvisioning.linking
+                : isAdoption
+                  ? t.applications.technicalProvisioning.adoptIdentity
+                  : t.applications.technicalProvisioning.linkComponent}
             </button>
           </footer>
         </form>

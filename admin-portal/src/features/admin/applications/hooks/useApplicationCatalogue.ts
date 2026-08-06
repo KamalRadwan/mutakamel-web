@@ -1,8 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/ToastContext";
+import { safeSessionStorage } from "@/lib/safeStorage";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
+import { shouldRotateWriteCommandKey } from "@/shared/api/write-command-recovery";
 import { useIdempotency } from "@/shared/hooks/useIdempotency";
 import { applicationsApi } from "../api/applications.api";
+import {
+  findCatalogueCreateResult,
+  isAmbiguousCatalogueCreateError,
+  readPendingCatalogueCreateAttempt,
+  type PendingCatalogueCreateAttempt,
+} from "../lib/catalogue-create-recovery";
 import type {
   BillingCycle,
   CatalogueAuditPageView,
@@ -19,174 +27,409 @@ import type {
 } from "../types";
 
 type ResourceError = string | null;
+const PENDING_CREATE_STORAGE_KEY = "admin.catalogue.pending-create";
 
 export function useApplicationCatalogue(applicationId: string | null) {
   const toast = useToast();
   const { getIdempotencyKey, resetKey } = useIdempotency();
+  const applicationIdRef = useRef(applicationId);
+  const selectedTierIdRef = useRef<string | null>(null);
+  const catalogueGeneration = useRef(0);
+  const tierGeneration = useRef(0);
+  const auditGeneration = useRef(0);
+  const catalogueAbort = useRef<AbortController | null>(null);
+  const tierAbort = useRef<AbortController | null>(null);
+  const auditAbort = useRef<AbortController | null>(null);
+
   const [tiers, setTiers] = useState<TierView[]>([]);
   const [features, setFeatures] = useState<FeatureView[]>([]);
-  const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
+  const [loadedApplicationId, setLoadedApplicationId] = useState<string | null>(null);
+  const [selectedTierId, setSelectedTierIdState] = useState<string | null>(null);
+  const [loadedTierId, setLoadedTierId] = useState<string | null>(null);
   const [grants, setGrants] = useState<TierFeatureGrantView[]>([]);
   const [prices, setPrices] = useState<PriceTierView[]>([]);
   const [audit, setAudit] = useState<CatalogueAuditPageView | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isTierLoading, setIsTierLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [pendingCreateAttempt, setPendingCreateAttemptState] =
+    useState<PendingCatalogueCreateAttempt | null>(null);
   const [catalogueError, setCatalogueError] = useState<ResourceError>(null);
   const [tierDetailError, setTierDetailError] = useState<ResourceError>(null);
   const [auditError, setAuditError] = useState<ResourceError>(null);
 
-  const reportError = useCallback((error: unknown, setError: (message: string) => void) => {
-    const normalized = normalizeApiError(error);
-    const correlation = normalized.correlationId ? ` · ${normalized.correlationId}` : "";
-    const message = `${normalized.message}${correlation}`;
-    setError(message);
-    toast.error("Action failed", message);
-    return normalized;
-  }, [toast]);
+  const setPendingCreateAttempt = useCallback(
+    (attempt: PendingCatalogueCreateAttempt | null) => {
+      setPendingCreateAttemptState(attempt);
+      if (attempt) {
+        safeSessionStorage.setItem(PENDING_CREATE_STORAGE_KEY, JSON.stringify(attempt));
+      } else {
+        safeSessionStorage.removeItem(PENDING_CREATE_STORAGE_KEY);
+      }
+    },
+    [],
+  );
+
+  const reportError = useCallback(
+    (error: unknown, setError: (message: string) => void) => {
+      const normalized = normalizeApiError(error);
+      const correlation = normalized.correlationId
+        ? ` · ${normalized.correlationId}`
+        : "";
+      const message = `${normalized.message}${correlation}`;
+      setError(message);
+      toast.error("Action failed", message);
+      return normalized;
+    },
+    [toast],
+  );
+
+  const commitSelectedTier = useCallback((tierId: string | null) => {
+    selectedTierIdRef.current = tierId;
+    tierGeneration.current += 1;
+    tierAbort.current?.abort();
+    setSelectedTierIdState(tierId);
+    setLoadedTierId(null);
+    setGrants([]);
+    setPrices([]);
+  }, []);
 
   const loadCatalogue = useCallback(async () => {
-    if (!applicationId) return;
+    const requestedApplicationId = applicationId;
+    if (!requestedApplicationId) return null;
+    const generation = ++catalogueGeneration.current;
+    catalogueAbort.current?.abort();
+    const controller = new AbortController();
+    catalogueAbort.current = controller;
     setIsLoading(true);
     setCatalogueError(null);
+
     const [tierResult, featureResult] = await Promise.allSettled([
-      applicationsApi.listTiers(applicationId),
-      applicationsApi.listFeatures(applicationId),
+      applicationsApi.listTiers(requestedApplicationId, controller.signal),
+      applicationsApi.listFeatures(requestedApplicationId, controller.signal),
     ]);
-
-    if (tierResult.status === "fulfilled") {
-      setTiers(tierResult.value);
-      setSelectedTierId((current) =>
-        current && tierResult.value.some((tier) => tier.id === current)
-          ? current
-          : tierResult.value[0]?.id ?? null,
-      );
+    if (
+      generation !== catalogueGeneration.current ||
+      controller.signal.aborted ||
+      applicationIdRef.current !== requestedApplicationId
+    ) {
+      return null;
     }
+
+    if (tierResult.status === "fulfilled") setTiers(tierResult.value);
     if (featureResult.status === "fulfilled") setFeatures(featureResult.value);
-
-    const failure = tierResult.status === "rejected"
-      ? tierResult.reason
-      : featureResult.status === "rejected"
-        ? featureResult.reason
-        : null;
-    if (failure) {
-      const normalized = normalizeApiError(failure);
-      setCatalogueError(normalized.message);
+    if (tierResult.status === "fulfilled" && featureResult.status === "fulfilled") {
+      setLoadedApplicationId(requestedApplicationId);
+      const current =
+        selectedTierIdRef.current &&
+        tierResult.value.some((tier) => tier.id === selectedTierIdRef.current)
+          ? selectedTierIdRef.current
+          : tierResult.value[0]?.id ?? null;
+      if (current !== selectedTierIdRef.current) commitSelectedTier(current);
+      setIsLoading(false);
+      return { tiers: tierResult.value, features: featureResult.value };
     }
+
+    const failure =
+      tierResult.status === "rejected"
+        ? tierResult.reason
+        : featureResult.status === "rejected"
+          ? featureResult.reason
+          : null;
+    if (failure) setCatalogueError(normalizeApiError(failure).message);
+    setLoadedApplicationId(null);
     setIsLoading(false);
-  }, [applicationId]);
+    return null;
+  }, [applicationId, commitSelectedTier]);
 
   const loadTierDetails = useCallback(async (tierId: string | null) => {
-    if (!tierId) {
+    const requestedApplicationId = applicationIdRef.current;
+    const generation = ++tierGeneration.current;
+    tierAbort.current?.abort();
+    const controller = new AbortController();
+    tierAbort.current = controller;
+    if (!tierId || !requestedApplicationId) {
+      setLoadedTierId(null);
       setGrants([]);
       setPrices([]);
+      setIsTierLoading(false);
       return;
     }
     setIsTierLoading(true);
     setTierDetailError(null);
     const [grantResult, priceResult] = await Promise.allSettled([
-      applicationsApi.getTierGrants(tierId),
-      applicationsApi.getPriceLadder(tierId),
+      applicationsApi.getTierGrants(tierId, controller.signal),
+      applicationsApi.getPriceLadder(tierId, undefined, controller.signal),
     ]);
+    if (
+      generation !== tierGeneration.current ||
+      controller.signal.aborted ||
+      applicationIdRef.current !== requestedApplicationId ||
+      selectedTierIdRef.current !== tierId
+    ) {
+      return;
+    }
     if (grantResult.status === "fulfilled") setGrants(grantResult.value);
     if (priceResult.status === "fulfilled") setPrices(priceResult.value);
-    const failure = grantResult.status === "rejected"
-      ? grantResult.reason
-      : priceResult.status === "rejected"
-        ? priceResult.reason
-        : null;
+    const failure =
+      grantResult.status === "rejected"
+        ? grantResult.reason
+        : priceResult.status === "rejected"
+          ? priceResult.reason
+          : null;
     if (failure) setTierDetailError(normalizeApiError(failure).message);
+    setLoadedTierId(
+      grantResult.status === "fulfilled" && priceResult.status === "fulfilled"
+        ? tierId
+        : null,
+    );
     setIsTierLoading(false);
   }, []);
 
   const loadAudit = useCallback(async (page = 1) => {
-    if (!applicationId) return;
+    const requestedApplicationId = applicationId;
+    if (!requestedApplicationId) return;
+    const generation = ++auditGeneration.current;
+    auditAbort.current?.abort();
+    const controller = new AbortController();
+    auditAbort.current = controller;
     setAuditError(null);
     try {
-      setAudit(await applicationsApi.getApplicationAudit(applicationId, { page, limit: 20 }));
+      const next = await applicationsApi.getApplicationAudit(
+        requestedApplicationId,
+        { page, limit: 20 },
+        controller.signal,
+      );
+      if (
+        generation === auditGeneration.current &&
+        !controller.signal.aborted &&
+        applicationIdRef.current === requestedApplicationId
+      ) {
+        setAudit(next);
+      }
     } catch (error) {
-      setAuditError(normalizeApiError(error).message);
+      if (
+        generation === auditGeneration.current &&
+        !controller.signal.aborted &&
+        applicationIdRef.current === requestedApplicationId
+      ) {
+        setAuditError(normalizeApiError(error).message);
+      }
     }
   }, [applicationId]);
 
   useEffect(() => {
+    applicationIdRef.current = applicationId;
+    const stored = readPendingCatalogueCreateAttempt(
+      safeSessionStorage.getItem(PENDING_CREATE_STORAGE_KEY),
+    );
     queueMicrotask(() => {
+      setLoadedApplicationId(null);
+      setLoadedTierId(null);
+      setTiers([]);
+      setFeatures([]);
+      setGrants([]);
+      setPrices([]);
+      setAudit(null);
+      setPendingAction(null);
+      setCatalogueError(null);
+      setTierDetailError(null);
+      setAuditError(null);
+      setPendingCreateAttemptState(
+        stored?.applicationId === applicationId ? stored : null,
+      );
       void loadCatalogue();
       void loadAudit();
     });
-  }, [loadAudit, loadCatalogue]);
+    return () => {
+      catalogueAbort.current?.abort();
+      tierAbort.current?.abort();
+      auditAbort.current?.abort();
+    };
+  }, [applicationId, loadAudit, loadCatalogue]);
 
   useEffect(() => {
-    queueMicrotask(() => { void loadTierDetails(selectedTierId); });
+    queueMicrotask(() => void loadTierDetails(selectedTierId));
   }, [loadTierDetails, selectedTierId]);
 
-  const runMutation = async <T,>(action: string, payload: unknown, operation: (key: string) => Promise<T>, message: string) => {
+  const setSelectedTierId = useCallback(
+    (tierId: string) => commitSelectedTier(tierId || null),
+    [commitSelectedTier],
+  );
+
+  const runMutation = async <T,>(
+    action: string,
+    payload: unknown,
+    operation: (key: string) => Promise<T>,
+    message: string,
+  ) => {
+    const requestedApplicationId = applicationId;
+    if (!requestedApplicationId || applicationIdRef.current !== requestedApplicationId) {
+      throw new Error("APPLICATION_CONTEXT_CHANGED");
+    }
     setPendingAction(action);
     setCatalogueError(null);
     try {
-      const result = await operation(getIdempotencyKey({ action, applicationId, payload }));
+      const result = await operation(
+        getIdempotencyKey({ action, applicationId: requestedApplicationId, payload }),
+      );
       resetKey();
-      toast.success("Saved", message);
-      await loadCatalogue();
-      await loadAudit();
+      if (applicationIdRef.current === requestedApplicationId) {
+        toast.success("Saved", message);
+        await Promise.all([loadCatalogue(), loadAudit()]);
+      }
       return result;
     } catch (error) {
-      throw reportError(error, setCatalogueError);
+      const normalized = normalizeApiError(error);
+      if (shouldRotateWriteCommandKey(normalized)) resetKey();
+      if (applicationIdRef.current === requestedApplicationId) {
+        await Promise.allSettled([loadCatalogue(), loadAudit()]);
+        reportError(normalized, setCatalogueError);
+      }
+      throw normalized;
     } finally {
-      setPendingAction(null);
+      if (applicationIdRef.current === requestedApplicationId) setPendingAction(null);
     }
   };
 
+  const recoverPendingCreateAttempt = useCallback(async () => {
+    const attempt = pendingCreateAttempt;
+    if (!attempt || attempt.applicationId !== applicationIdRef.current) return null;
+    setPendingAction(`${attempt.kind}:recover`);
+    try {
+      const snapshot = await loadCatalogue();
+      if (!snapshot || applicationIdRef.current !== attempt.applicationId) return null;
+      const recovered = findCatalogueCreateResult(
+        attempt,
+        snapshot.tiers,
+        snapshot.features,
+      );
+      if (recovered) {
+        setPendingCreateAttempt(null);
+        if (attempt.kind === "tier") commitSelectedTier(recovered.id);
+        toast.success("Create reconciled", `${recovered.name} already exists and is now loaded.`);
+        await loadAudit();
+        return recovered;
+      }
+      setPendingCreateAttempt({ ...attempt, absenceConfirmed: true });
+      return null;
+    } finally {
+      if (applicationIdRef.current === attempt.applicationId) setPendingAction(null);
+    }
+  }, [commitSelectedTier, loadAudit, loadCatalogue, pendingCreateAttempt, setPendingCreateAttempt, toast]);
+
+  const clearAbsentPendingCreateAttempt = useCallback(() => {
+    if (pendingCreateAttempt?.absenceConfirmed) setPendingCreateAttempt(null);
+  }, [pendingCreateAttempt, setPendingCreateAttempt]);
+
   const createTier = async (dto: CreateTierDto) => {
-    if (!applicationId) return;
+    const requestedApplicationId = applicationId;
+    if (!requestedApplicationId) return;
+    if (pendingCreateAttempt) throw new Error("Resolve the previous create outcome before sending another create request.");
     setPendingAction("tier:create");
     try {
-      const tier = await applicationsApi.createTier(applicationId, dto);
-      toast.success("Tier created", `${tier.name} is ready to configure.`);
-      await loadCatalogue();
-      await loadAudit();
-      setSelectedTierId(tier.id);
+      const tier = await applicationsApi.createTier(requestedApplicationId, dto);
+      if (applicationIdRef.current === requestedApplicationId) {
+        toast.success("Tier created", `${tier.name} is ready to configure.`);
+        await Promise.all([loadCatalogue(), loadAudit()]);
+        commitSelectedTier(tier.id);
+      }
       return tier;
     } catch (error) {
-      throw reportError(error, setCatalogueError);
+      const normalized = normalizeApiError(error);
+      if (applicationIdRef.current !== requestedApplicationId) throw normalized;
+      if (isAmbiguousCatalogueCreateError(normalized)) {
+        const attempt: PendingCatalogueCreateAttempt = {
+          applicationId: requestedApplicationId,
+          kind: "tier",
+          resourceKey: dto.key,
+          absenceConfirmed: false,
+        };
+        setPendingCreateAttempt(attempt);
+        const snapshot = await loadCatalogue();
+        const recovered = snapshot
+          ? findCatalogueCreateResult(attempt, snapshot.tiers, snapshot.features)
+          : null;
+        if (recovered) {
+          setPendingCreateAttempt(null);
+          commitSelectedTier(recovered.id);
+          toast.success("Create reconciled", `${recovered.name} was created and is now loaded.`);
+          return recovered as TierView;
+        }
+        if (snapshot) setPendingCreateAttempt({ ...attempt, absenceConfirmed: true });
+      }
+      throw reportError(normalized, setCatalogueError);
     } finally {
-      setPendingAction(null);
+      if (applicationIdRef.current === requestedApplicationId) setPendingAction(null);
     }
   };
 
   const createFeature = async (dto: CreateFeatureDto) => {
-    if (!applicationId) return;
+    const requestedApplicationId = applicationId;
+    if (!requestedApplicationId) return;
+    if (pendingCreateAttempt) throw new Error("Resolve the previous create outcome before sending another create request.");
     setPendingAction("feature:create");
     try {
-      const feature = await applicationsApi.createFeature(applicationId, dto);
-      toast.success("Feature created", `${feature.name} is available for tier grants.`);
-      await loadCatalogue();
-      await loadAudit();
+      const feature = await applicationsApi.createFeature(requestedApplicationId, dto);
+      if (applicationIdRef.current === requestedApplicationId) {
+        toast.success("Feature created", `${feature.name} is available for tier grants.`);
+        await Promise.all([loadCatalogue(), loadAudit()]);
+      }
       return feature;
     } catch (error) {
-      throw reportError(error, setCatalogueError);
+      const normalized = normalizeApiError(error);
+      if (applicationIdRef.current !== requestedApplicationId) throw normalized;
+      if (isAmbiguousCatalogueCreateError(normalized)) {
+        const attempt: PendingCatalogueCreateAttempt = {
+          applicationId: requestedApplicationId,
+          kind: "feature",
+          resourceKey: dto.key,
+          absenceConfirmed: false,
+        };
+        setPendingCreateAttempt(attempt);
+        const snapshot = await loadCatalogue();
+        const recovered = snapshot
+          ? findCatalogueCreateResult(attempt, snapshot.tiers, snapshot.features)
+          : null;
+        if (recovered) {
+          setPendingCreateAttempt(null);
+          toast.success("Create reconciled", `${recovered.name} was created and is now loaded.`);
+          return recovered as FeatureView;
+        }
+        if (snapshot) setPendingCreateAttempt({ ...attempt, absenceConfirmed: true });
+      }
+      throw reportError(normalized, setCatalogueError);
     } finally {
-      setPendingAction(null);
+      if (applicationIdRef.current === requestedApplicationId) setPendingAction(null);
     }
   };
 
+  const isCurrentApplication = loadedApplicationId === applicationId;
+  const isCurrentTier = isCurrentApplication && loadedTierId === selectedTierId;
+  const visiblePrices = isCurrentTier ? prices : [];
+
   return {
-    tiers,
-    features,
-    grants,
-    prices,
-    audit,
-    selectedTierId,
+    tiers: isCurrentApplication ? tiers : [],
+    features: isCurrentApplication ? features : [],
+    grants: isCurrentTier ? grants : [],
+    prices: visiblePrices,
+    audit: isCurrentApplication ? audit : null,
+    loadedApplicationId,
+    loadedTierId,
+    selectedTierId: isCurrentApplication ? selectedTierId : null,
     setSelectedTierId,
     isLoading,
     isTierLoading,
     pendingAction,
+    pendingCreateAttempt,
     catalogueError,
     tierDetailError,
     auditError,
     loadCatalogue,
     loadTierDetails,
     loadAudit,
+    recoverPendingCreateAttempt,
+    clearAbsentPendingCreateAttempt,
     createTier,
     updateTier: (tierId: string, dto: UpdateTierDto) =>
       runMutation(`tier:update:${tierId}`, dto, (key) => applicationsApi.updateTier(tierId, dto, key), "Tier updated."),
@@ -197,21 +440,18 @@ export function useApplicationCatalogue(applicationId: string | null) {
       runMutation(`feature:update:${featureId}`, dto, (key) => applicationsApi.updateFeature(featureId, dto, key), "Feature updated."),
     deleteFeature: (featureId: string) =>
       runMutation(`feature:delete:${featureId}`, null, (key) => applicationsApi.deleteFeature(featureId, key), "Feature deleted."),
-    replaceGrants: (tierId: string, dto: SetTierFeaturesDto) =>
-      runMutation(`grants:replace:${tierId}`, dto, async (key) => {
-        const result = await applicationsApi.replaceTierGrants(tierId, dto, key);
-        setGrants(result);
-        return result;
-      }, "Tier feature grants replaced."),
-    replacePrices: (tierId: string, dto: SetPriceTiersDto) =>
-      runMutation(`prices:replace:${tierId}:${dto.billingCycle}`, dto, async (key) => {
-        const result = await applicationsApi.replacePriceLadder(tierId, dto, key);
-        setPrices((current) => [
-          ...current.filter((row) => row.billingCycle !== dto.billingCycle),
-          ...result,
-        ]);
-        return result;
-      }, `${dto.billingCycle === "MONTHLY" ? "Monthly" : "Annual"} price ladder replaced.`),
-    pricesFor: (cycle: BillingCycle) => prices.filter((row) => row.billingCycle === cycle),
+    replaceGrants: (tierId: string, dto: SetTierFeaturesDto) => {
+      if (tierId !== selectedTierIdRef.current || tierId !== loadedTierId) {
+        return Promise.reject(new Error("TIER_CONTEXT_CHANGED"));
+      }
+      return runMutation(`grants:replace:${tierId}`, dto, (key) => applicationsApi.replaceTierGrants(tierId, dto, key), "Tier feature grants replaced.");
+    },
+    replacePrices: (tierId: string, dto: SetPriceTiersDto) => {
+      if (tierId !== selectedTierIdRef.current || tierId !== loadedTierId) {
+        return Promise.reject(new Error("TIER_CONTEXT_CHANGED"));
+      }
+      return runMutation(`prices:replace:${tierId}:${dto.billingCycle}`, dto, (key) => applicationsApi.replacePriceLadder(tierId, dto, key), `${dto.billingCycle === "MONTHLY" ? "Monthly" : "Annual"} price ladder replaced.`);
+    },
+    pricesFor: (cycle: BillingCycle) => visiblePrices.filter((row) => row.billingCycle === cycle),
   };
 }

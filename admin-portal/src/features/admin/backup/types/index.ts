@@ -63,7 +63,7 @@ export interface BackupPolicy {
   enabled: boolean;
   cronExpression: string;
   timezone: string;
-  retentionDays: number | null;
+  retentionDays: number;
   serverConcurrency: number;
   tenantConcurrency: number;
   defaultBackupEnabled: boolean;
@@ -106,6 +106,7 @@ export interface BackupRun {
   skippedTenants: number;
   reason: string | null;
   hasFailure: boolean;
+  failureCode: string | null;
   startedAt: string;
   finishedAt: string | null;
 }
@@ -121,6 +122,7 @@ export interface BackupArtifact {
   sha256: string | null;
   compressionAlgorithm: BackupCompressionAlgorithm;
   hasFailure: boolean;
+  failureCode: string | null;
   startedAt: string;
   finishedAt: string | null;
 }
@@ -136,6 +138,7 @@ export interface RestoreRun {
   hasVerification: boolean;
   reason: string | null;
   hasFailure: boolean;
+  failureCode: string | null;
   startedAt: string;
   finishedAt: string | null;
   promotedAt: string | null;
@@ -151,7 +154,7 @@ export interface UpsertBackupPolicyDto {
   enabled: boolean;
   cronExpression: string;
   timezone: string;
-  retentionDays?: number | null;
+  retentionDays?: number;
   serverConcurrency: number;
   tenantConcurrency: number;
   defaultBackupEnabled: boolean;

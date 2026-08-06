@@ -22,6 +22,37 @@ export type ApplicationPublicationEvidence = Pick<
   "publicationStatus" | "publishedAt" | "publishedBy"
 >;
 
+export interface ApplicationTechnicalIdentityPreview {
+  runtimeTarget: string;
+  databasePrincipal: string;
+  primaryComponentKey: string;
+  contractVersion: 1;
+}
+
+export function deriveTechnicalIdentityPreview(
+  applicationKey: string,
+): ApplicationTechnicalIdentityPreview {
+  const normalizedKey = applicationKey.trim().toLowerCase();
+  return {
+    runtimeTarget: `${normalizedKey.replaceAll("_", "-")}-app`,
+    databasePrincipal: `mutakamel_${normalizedKey}_app`,
+    primaryComponentKey: `app.${normalizedKey}`,
+    contractVersion: 1,
+  };
+}
+
+export function canLinkPrimaryComponent(
+  readiness: ApplicationTechnicalReadinessView | null,
+): boolean {
+  return Boolean(
+    readiness?.lifecycleStatus === "DRAFT" &&
+      readiness.runtimeTarget &&
+      readiness.components.length === 0 &&
+      !readiness.checks.componentBinding &&
+      readiness.reasons.includes("COMPONENT_BINDING_REQUIRED"),
+  );
+}
+
 export function classifyTechnicalProvisioningError(
   error: NormalizedApiError,
 ): TechnicalProvisioningErrorKind {

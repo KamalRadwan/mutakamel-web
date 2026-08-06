@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { databaseServersApi } from "../api/database-servers.api";
 import { useIdempotency } from "@/shared/hooks/useIdempotency";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
@@ -21,6 +21,12 @@ export function useDatabaseServers() {
   const [servers, setServers] = useState<DatabaseServerView[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadedQueryIdentity, setLoadedQueryIdentity] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
+  const requestAbort = useRef<AbortController | null>(null);
+  const queryIdentityRef = useRef("");
+  const deleteQueryIdentityRef = useRef<string | null>(null);
+  const destroyQueryIdentityRef = useRef<string | null>(null);
 
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -34,6 +40,17 @@ export function useDatabaseServers() {
   const [serverPendingDestroy, setServerPendingDestroy] = useState<DatabaseServerView | null>(null);
   const [destroyingServerId, setDestroyingServerId] = useState<string | null>(null);
 
+  const currentQueryIdentity = JSON.stringify({
+    page,
+    limit,
+    debouncedSearch,
+    statusFilter,
+    countryFilter,
+    deletionFilter,
+  });
+  const visibleServers =
+    loadedQueryIdentity === currentQueryIdentity ? servers : [];
+
   const [meta, setMeta] = useState({
     total: 0,
     totalPages: 0,
@@ -44,9 +61,9 @@ export function useDatabaseServers() {
   // Derived metrics logic can stay purely visual based on the list items
   const summaryMetrics = {
     totalServers: meta.total,
-    activeServers: servers.filter(s => s.status === "ACTIVE").length,
-    drainingServers: servers.filter(s => s.status === "DRAINING").length,
-    offlineServers: servers.filter(s => s.status === "OFFLINE").length,
+    activeServers: visibleServers.filter(s => s.status === "ACTIVE").length,
+    drainingServers: visibleServers.filter(s => s.status === "DRAINING").length,
+    offlineServers: visibleServers.filter(s => s.status === "OFFLINE").length,
 
   };
 
@@ -63,7 +80,23 @@ export function useDatabaseServers() {
     setPage(1);
   }, [statusFilter, countryFilter, deletionFilter]);
 
+  useEffect(() => {
+    queryIdentityRef.current = currentQueryIdentity;
+    requestGeneration.current += 1;
+    requestAbort.current?.abort();
+    queueMicrotask(() => {
+      setServerPendingDelete(null);
+      setServerPendingDestroy(null);
+      setLoadedQueryIdentity(null);
+    });
+  }, [currentQueryIdentity]);
+
   const fetchServers = useCallback(async () => {
+    const requestedQueryIdentity = currentQueryIdentity;
+    const generation = ++requestGeneration.current;
+    requestAbort.current?.abort();
+    const controller = new AbortController();
+    requestAbort.current = controller;
     setIsLoading(true);
     setError(null);
     try {
@@ -76,23 +109,39 @@ export function useDatabaseServers() {
         ...(deletionFilter === "DELETED" ? { deleted: true } : {}),
       };
 
-      const response = await databaseServersApi.list(query);
+      const response = await databaseServersApi.list(query, controller.signal);
+      if (
+        generation !== requestGeneration.current ||
+        controller.signal.aborted ||
+        queryIdentityRef.current !== requestedQueryIdentity
+      ) {
+        return;
+      }
       setServers(response.data);
+      setLoadedQueryIdentity(requestedQueryIdentity);
       if (response.meta) {
         setMeta(response.meta);
       }
     } catch (err) {
+      if (
+        generation !== requestGeneration.current ||
+        controller.signal.aborted ||
+        queryIdentityRef.current !== requestedQueryIdentity
+      ) {
+        return;
+      }
       const normalized = normalizeApiError(err);
       setError(normalized.message);
       toast.error("Error", normalized.message);
     } finally {
-      setIsLoading(false);
+      if (generation === requestGeneration.current) setIsLoading(false);
     }
-  }, [page, limit, debouncedSearch, statusFilter, countryFilter, deletionFilter, toast]);
+  }, [page, limit, debouncedSearch, statusFilter, countryFilter, deletionFilter, toast, currentQueryIdentity]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchServers();
+    return () => requestAbort.current?.abort();
   }, [fetchServers]);
 
   const createServer = async (dto: CreateDatabaseServerDto) => {
@@ -121,12 +170,20 @@ export function useDatabaseServers() {
       return result;
     } catch (err) {
       const normalized = normalizeApiError(err);
+      if (shouldResetDatabaseServerWriteKey(normalized)) resetKey();
       throw normalized;
     }
   };
 
   const openSoftDelete = (server: DatabaseServerView) => {
+    if (
+      deletionFilter !== "CURRENT" ||
+      loadedQueryIdentity !== currentQueryIdentity ||
+      !visibleServers.some((item) => item.id === server.id) ||
+      server.deletedAt !== null
+    ) return;
     setServerPendingDestroy(null);
+    deleteQueryIdentityRef.current = currentQueryIdentity;
     setServerPendingDelete(server);
   };
 
@@ -135,7 +192,14 @@ export function useDatabaseServers() {
   };
 
   const openDestroy = (server: DatabaseServerView) => {
+    if (
+      deletionFilter !== "DELETED" ||
+      loadedQueryIdentity !== currentQueryIdentity ||
+      !visibleServers.some((item) => item.id === server.id) ||
+      server.deletedAt === null
+    ) return;
     setServerPendingDelete(null);
+    destroyQueryIdentityRef.current = currentQueryIdentity;
     setServerPendingDestroy(server);
   };
 
@@ -145,7 +209,13 @@ export function useDatabaseServers() {
 
   const confirmSoftDelete = async () => {
     const server = serverPendingDelete;
-    if (!server || deletingServerId) return;
+    if (
+      !server ||
+      deletingServerId ||
+      deleteQueryIdentityRef.current !== queryIdentityRef.current ||
+      deletionFilter !== "CURRENT" ||
+      !visibleServers.some((item) => item.id === server.id)
+    ) return;
 
     setDeletingServerId(server.id);
     try {
@@ -166,6 +236,7 @@ export function useDatabaseServers() {
         resetKey();
       }
       toast.error(lang === "ar" ? "فشل الحذف" : "Delete failed", normalized.message);
+      await fetchServers();
       throw normalized;
     } finally {
       setDeletingServerId(null);
@@ -174,7 +245,14 @@ export function useDatabaseServers() {
 
   const confirmDestroy = async () => {
     const server = serverPendingDestroy;
-    if (!server || destroyingServerId) return;
+    if (
+      !server ||
+      destroyingServerId ||
+      destroyQueryIdentityRef.current !== queryIdentityRef.current ||
+      deletionFilter !== "DELETED" ||
+      server.deletedAt === null ||
+      !visibleServers.some((item) => item.id === server.id)
+    ) return;
 
     setDestroyingServerId(server.id);
     try {
@@ -201,13 +279,14 @@ export function useDatabaseServers() {
         lang === "ar" ? "فشل الإتلاف" : "Destroy failed",
         normalized.message,
       );
+      await fetchServers();
     } finally {
       setDestroyingServerId(null);
     }
   };
 
   return {
-    servers,
+    servers: visibleServers,
     isLoading,
     error,
     page,

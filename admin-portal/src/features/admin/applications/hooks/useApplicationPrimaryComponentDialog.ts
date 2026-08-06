@@ -5,11 +5,7 @@ interface Options {
   isOpen: boolean;
   isSubmitting: boolean;
   onClose: () => void;
-  onConfirm: (
-    componentKey: string,
-    contractVersion: number,
-    reason: string,
-  ) => Promise<boolean>;
+  onConfirm: (reason: string) => Promise<boolean>;
   onClearCommandError: () => void;
 }
 
@@ -30,10 +26,8 @@ export function useApplicationPrimaryComponentDialog({
 }: Options) {
   const { t } = useI18n();
   const dialogRef = useRef<HTMLElement>(null);
-  const initialFocusRef = useRef<HTMLInputElement>(null);
+  const initialFocusRef = useRef<HTMLTextAreaElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
-  const [componentKey, setComponentKey] = useState("");
-  const [contractVersion, setContractVersion] = useState("1");
   const [reason, setReason] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -43,8 +37,6 @@ export function useApplicationPrimaryComponentDialog({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     queueMicrotask(() => {
-      setComponentKey("");
-      setContractVersion("1");
       setReason("");
       setValidationError(null);
       onClearCommandError();
@@ -88,47 +80,20 @@ export function useApplicationPrimaryComponentDialog({
   const submit = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
-      const normalizedComponentKey = componentKey.trim();
-      if (
-        !/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_-]*)*$/.test(
-          normalizedComponentKey,
-        ) ||
-        normalizedComponentKey.length > 96
-      ) {
-        setValidationError(
-          t.applications.technicalProvisioning.componentKeyError,
-        );
-        return;
-      }
-      const parsedVersion = Number(contractVersion);
-      if (!Number.isInteger(parsedVersion) || parsedVersion < 1) {
-        setValidationError(
-          t.applications.technicalProvisioning.contractVersionError,
-        );
-        return;
-      }
       if (!reason.trim()) {
         setValidationError(t.applications.technicalProvisioning.reasonError);
         return;
       }
       setValidationError(null);
-      const completed = await onConfirm(
-        normalizedComponentKey,
-        parsedVersion,
-        reason.trim(),
-      );
+      const completed = await onConfirm(reason.trim());
       if (completed) onClose();
     },
-    [componentKey, contractVersion, onClose, onConfirm, reason, t],
+    [onClose, onConfirm, reason, t],
   );
 
   return {
     dialogRef,
     initialFocusRef,
-    componentKey,
-    setComponentKey,
-    contractVersion,
-    setContractVersion,
     reason,
     setReason,
     validationError,

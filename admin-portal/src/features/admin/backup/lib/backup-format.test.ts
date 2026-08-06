@@ -3,6 +3,7 @@ import {
   formatBackupBytes,
   formatBackupDate,
   isAmbiguousWriteFailure,
+  shouldRetainBackupCommandKey,
   shortBackupId,
 } from "./backup-format";
 
@@ -11,6 +12,24 @@ describe("backup presentation safety helpers", () => {
     expect(formatBackupBytes("1073741824")).toBe("1.0 GB");
     expect(formatBackupBytes(null)).toBe("Not available");
     expect(formatBackupBytes("invalid")).toBe("Not available");
+  });
+
+  it("retains the exact command key only while the outcome can still be replayed", () => {
+    expect(
+      shouldRetainBackupCommandKey({ httpStatus: 500, errorCode: "HTTP_500" }),
+    ).toBe(true);
+    expect(
+      shouldRetainBackupCommandKey({ httpStatus: 401, errorCode: "HTTP_401" }),
+    ).toBe(true);
+    expect(
+      shouldRetainBackupCommandKey({
+        httpStatus: 409,
+        errorCode: "GW.IDEM.IN_FLIGHT",
+      }),
+    ).toBe(true);
+    expect(
+      shouldRetainBackupCommandKey({ httpStatus: 422, errorCode: "INVALID" }),
+    ).toBe(false);
   });
 
   it("uses explicit unavailable copy for missing or invalid timestamps", () => {

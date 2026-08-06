@@ -5,18 +5,7 @@ export function formatDashboardMetric(
   currencyCode = "USD",
 ): string {
   if (metric.kind === "money") {
-    const strVal = String(metric.value);
-    const parts = strVal.split(".");
-    const integerPart = parts[0] || "0";
-    const decimalPart = parts[1] ? `.${parts[1]}` : "";
-    
-    // Format the integer part cleanly
-    const formattedInt = new Intl.NumberFormat(undefined).format(BigInt(integerPart));
-    
-    if (currencyCode === "USD") {
-      return `$${formattedInt}${decimalPart}`;
-    }
-    return `${formattedInt}${decimalPart} ${currencyCode}`;
+    return `${currencyCode} ${String(metric.value)}`;
   }
 
   if (metric.kind === "percent" || metric.kind === "ratio") {

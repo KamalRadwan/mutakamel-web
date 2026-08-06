@@ -2,10 +2,13 @@ import { useState } from "react";
 import { useIdempotency } from "@/shared/hooks/useIdempotency";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
 import { useToast } from "@/components/ui/ToastContext";
+import { shouldRotateWriteCommandKey } from "@/shared/api/write-command-recovery";
 
 export interface ActionMutationOptions<TResult> {
   onSuccessMessage?: string;
-  onSuccess?: (result: TResult) => void;
+  onSuccess?: (result: TResult) => void | Promise<void>;
+  /** Refetch authoritative state after a rejected or ambiguous command. */
+  onErrorReconcile?: () => void | Promise<void>;
 }
 
 export function useActionMutation() {
@@ -27,11 +30,17 @@ export function useActionMutation() {
       }
       resetKey();
       if (options?.onSuccess) {
-        options.onSuccess(result);
+        await options.onSuccess(result);
       }
       return result;
     } catch (err) {
       const normalized = normalizeApiError(err);
+      if (shouldRotateWriteCommandKey(normalized)) {
+        resetKey();
+      }
+      if (options?.onErrorReconcile) {
+        await options.onErrorReconcile();
+      }
       toast.error("Error", normalized.message);
       throw normalized;
     } finally {

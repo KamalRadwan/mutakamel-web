@@ -1,6 +1,6 @@
 # Test and Validation Matrix
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-05**
 
 ## Domain API minimum
 
@@ -31,11 +31,32 @@ For each domain module, cover applicable cases:
 6. Wallet adjustment previews before confirmation.
 7. Tenant create uses `ANNUAL`, never `YEARLY`.
 8. Tenant create never submits hardcoded database IDs.
-9. Tenant profile PATCH never sends `storageServerId`.
-10. `403` never renders as empty.
-11. Pagination uses `meta.total`.
-12. Financial strings remain strings.
-13. Exact retry preserves its original UUIDv7 idempotency key.
+9. Database placement receives the exact selected `applicationKeys` and a
+   changed Application set clears the prior database selection.
+10. Tenant create loads Applications, technical selection evidence, and active
+    tiers through one `GET /tenants/create-options` request under only
+    `admin.tenants.create`; `403`, malformed, and unavailable responses never
+    render as an empty catalogue or trigger broad-API fallback.
+11. Tenant-create quote authorization accepts logical ANY of
+    `admin.tenants.create` and `admin.catalog.read`; the wizard does not require
+    the latter permission.
+12. Quote sends UUIDv7 `items`; create sends the matching keys only inside the
+    nested `subscription.items` shape.
+13. Core/Worker foundation components are server-derived preview evidence,
+    never user-selectable Applications.
+14. Tenant profile PATCH never sends `storageServerId`.
+15. `403` never renders as empty.
+16. Pagination uses `meta.total`.
+17. Financial strings remain strings.
+18. Exact retry preserves its original UUIDv7 idempotency key.
+19. Backup start, restore start, and restore promotion send caller-owned UUIDv7
+    keys and retain them for ambiguous/authentication retries of the exact body.
+20. A changed backup/restore intent receives a new key; a definitive completion
+    resets the prior key.
+21. Backup policy and per-tenant override upserts use `PATCH`; no `PUT` alias
+    exists in Worker, Gateway, or frontend source.
+22. Public artifact reads stay bounded while internal run purge is exhaustive
+    beyond 500 artifacts.
 
 ## Validation commands
 

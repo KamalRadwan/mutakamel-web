@@ -11,7 +11,6 @@ const option = {
   code: "S3-EGYPT-1",
   name: "Primary S3 Storage",
   region: "ME-CAIRO-1",
-  bucketName: "mutakamel-tenants-1",
   status: "ACTIVE",
   maxTenants: 100,
   assignedTenants: 10,
@@ -24,6 +23,7 @@ describe("tenant storage placement contract", () => {
       internalEndpoint: "http://storage.internal:3900",
       credentialRef: "env:S3_STORAGE_1_CORE_OPERATION",
       secretAccessKey: "must-not-reach-ui",
+      bucketName: "must-not-reach-placement-ui",
     };
     expect(
       readStoragePlacementOptions({
@@ -37,6 +37,7 @@ describe("tenant storage placement contract", () => {
     expect(parsed).not.toHaveProperty("internalEndpoint");
     expect(parsed).not.toHaveProperty("credentialRef");
     expect(parsed).not.toHaveProperty("secretAccessKey");
+    expect(parsed).not.toHaveProperty("bucketName");
 
     expect(() =>
       readStoragePlacementOptions({
@@ -113,7 +114,7 @@ describe("tenant storage placement contract", () => {
         code: option.code,
         name: option.name,
         region: option.region,
-        bucketName: option.bucketName,
+        bucketName: "mutakamel-tenants-1",
         status: option.status,
         internalEndpoint: "http://storage.internal:3900",
         credentialRef: "env:S3_STORAGE_1_CORE_OPERATION",
@@ -125,7 +126,7 @@ describe("tenant storage placement contract", () => {
       code: option.code,
       name: option.name,
       region: option.region,
-      bucketName: option.bucketName,
+      bucketName: "mutakamel-tenants-1",
       status: option.status,
     });
     expect(tenant.storageServer).not.toHaveProperty("internalEndpoint");

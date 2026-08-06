@@ -32,7 +32,7 @@ describe("Application technical provisioning API", () => {
       contractVersion: 1,
       applicationId: "019f0000-0000-7000-8000-000000000001",
       applicationKey: "hr",
-      runtimeTarget: "people-runtime",
+      runtimeTarget: null,
       commercialMode: "SUBSCRIPTION",
       catalogueVisibility: "PUBLIC",
       lifecycleStatus: "DRAFT",
@@ -61,11 +61,46 @@ describe("Application technical provisioning API", () => {
     );
   });
 
-  it("links only controlled component metadata with an idempotency key", async () => {
+  it("adopts the deterministic technical identity with an idempotency key", async () => {
     const dto = {
       expectedTechnicalDefinitionRevision: "1",
-      componentKey: "hr.schema",
+      reason: "Adopt the signed HR package identity",
+    };
+    const receipt = {
       contractVersion: 1,
+      operation: "ADOPT_TECHNICAL_PACKAGE",
+      applicationKey: "hr",
+      technicalIdentity: {
+        runtimeTarget: "hr-app",
+        primaryComponentKey: "app.hr",
+        databasePrincipal: "mutakamel_hr_app",
+        contractVersion: 1,
+      },
+    };
+    postMock.mockResolvedValue(envelope(receipt));
+
+    await expect(
+      applicationsApi.adoptTechnicalPackage(
+        "hr",
+        dto,
+        "019f0000-0000-7000-8000-000000000001",
+      ),
+    ).resolves.toEqual(receipt);
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/admin/core/v1/applications/hr/technical-provisioning/adopt",
+      dto,
+      {
+        headers: {
+          "x-idempotency-key": "019f0000-0000-7000-8000-000000000001",
+        },
+      },
+    );
+    expect(JSON.stringify(postMock.mock.calls[0]?.[1])).not.toMatch(/sql|password|secret/i);
+  });
+
+  it("links only the revision and audit reason with an idempotency key", async () => {
+    const dto = {
+      expectedTechnicalDefinitionRevision: "2",
       reason: "Link the HR runtime component",
     };
     const receipt = {
@@ -107,7 +142,7 @@ describe("Application technical provisioning API", () => {
       applicationId: "019f0000-0000-7000-8000-000000000001",
       applicationKey: "hr",
       lifecycleStatus: "DRAFT",
-      runtimeTarget: "people-runtime",
+      runtimeTarget: "hr-app",
       publicationStatus: "PUBLISHED",
       publicationRevision: "4",
       catalogueRevision: "8",
@@ -135,6 +170,40 @@ describe("Application technical provisioning API", () => {
 
     expect(getMock).toHaveBeenCalledWith(
       "/api/admin/core/v1/applications?publicationStatus=PUBLISHED"
+    );
+  });
+
+  it("never auto-keys or replays non-idempotent tier and feature creates", async () => {
+    const tier = { id: "tier-1", key: "business", name: "Business" };
+    const feature = { id: "feature-1", key: "crm.email", name: "Email" };
+    postMock
+      .mockResolvedValueOnce(envelope(tier))
+      .mockResolvedValueOnce(envelope(feature));
+
+    await applicationsApi.createTier("application-1", {
+      key: "business",
+      name: "Business",
+      color: "#3b82f6",
+      isActive: true,
+    });
+    await applicationsApi.createFeature("application-1", {
+      key: "crm.email",
+      name: "Email",
+      isActive: true,
+      rank: 0,
+    });
+
+    expect(postMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/admin/core/v1/applications/application-1/tiers",
+      expect.any(Object),
+      { skipAutoIdempotency: true, nonReplayable: true },
+    );
+    expect(postMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/admin/core/v1/applications/application-1/features",
+      expect.any(Object),
+      { skipAutoIdempotency: true, nonReplayable: true },
     );
   });
 });

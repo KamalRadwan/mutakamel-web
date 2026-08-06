@@ -105,8 +105,12 @@ reuse it only when retrying the same method, path, query, actor, and body.
   currency writes have durable Core command evidence.
 - Tier/feature update and delete require Gateway idempotency, but do not have
   equivalent durable Core command rows.
-- Tier and feature creation are intentionally non-idempotent; disable duplicate
-  submission and refetch by the unique key after an ambiguous response.
+- Tier and feature creation are intentionally non-idempotent. Their client
+  explicitly disables automatic idempotency headers and coordinated `401`
+  replay. It stores only `{applicationId, kind, resourceKey}` attempt evidence,
+  blocks another create after an ambiguous `401`/network/`5xx`, and reconciles
+  through an authoritative tier/feature refetch by immutable key. The portal
+  never resubmits that create automatically.
 
 ## Seeded catalogue
 
@@ -165,8 +169,9 @@ type ApplicationComponentKind = "FOUNDATION" | "MODULE";
 type ApplicationComponentStatus = "ACTIVE" | "RETIRED";
 ```
 
-Application command operations are `CREATE`, `UPDATE`, `PUBLISH`, `DELETE`,
-`UPDATE_DATABASE_POLICY`, `ACTIVATE`, `DEPRECATE`, and `DISABLE`.
+Application command operations are `CREATE`, `UPDATE`,
+`ADOPT_TECHNICAL_PACKAGE`, `PUBLISH`, `DELETE`, `UPDATE_DATABASE_POLICY`,
+`ACTIVATE`, `DEPRECATE`, and `DISABLE`.
 
 Audit entity types are `MODULE`, `MODULE_ORDER`, `APPLICATION`, `TIER`,
 `FEATURE`, `TIER_FEATURE_GRANTS`, `PRICE_LADDER`, and
@@ -297,6 +302,7 @@ interface ApplicationMutationReceipt {
   operation:
     | "CREATE"
     | "UPDATE"
+    | "ADOPT_TECHNICAL_PACKAGE"
     | "PUBLISH"
     | "UPDATE_DATABASE_POLICY"
     | "ACTIVATE"
@@ -312,6 +318,19 @@ interface ApplicationMutationReceipt {
   catalogueRevision: string;
   policyRevision: string;
   deleted: boolean;
+  technicalIdentity?: {
+    runtimeTarget: string;
+    databasePrincipal: string;
+    primaryComponentKey: string;
+    contractVersion: 1;
+  };
+  technicalProvisioning?: {
+    componentId: string;
+    componentKey: string;
+    ownerApp: string;
+    workerTarget: string;
+    contractVersion: 1;
+  };
 }
 
 interface TierView {
@@ -432,12 +451,13 @@ interface UpdateApplicationDatabasePolicyDto {
   reason: string; // trimmed, non-empty, max 256
 }
 
-interface CreateApplicationProvisioningBindingDto {
+interface AdoptApplicationTechnicalPackageDto {
   expectedTechnicalDefinitionRevision: string; // positive integer string
-  componentKey: string; // canonical component key, max 96
-  contractVersion: number; // integer 1..2,147,483,647
   reason: string; // trimmed, non-empty, max 256
 }
+
+type CreateApplicationProvisioningBindingDto =
+  AdoptApplicationTechnicalPackageDto;
 ```
 
 Application update and policy update require at least one actual writable
@@ -537,6 +557,7 @@ returned with four fractional digits.
 | `GET /applications/:applicationKey` | `admin.applications.read` | 200 | No |
 | `GET /applications/:applicationKey/database-manifests` | `admin.applications.read` | 200 | No |
 | `GET /applications/:applicationKey/technical-provisioning` | `admin.applications.read` | 200 | No |
+| `POST /applications/:applicationKey/technical-provisioning/adopt` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
 | `POST /applications/:applicationKey/technical-provisioning/primary-component` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
 | `POST /applications` | `admin.applications.create` | 201 | Yes |
 | `PATCH /applications/:applicationKey` | `admin.applications.update` | 200 | Yes |
@@ -605,7 +626,7 @@ GET /api/admin/core/v1/applications/hr/technical-provisioning HTTP/1.1
     "contractVersion": 1,
     "applicationId": "019f0000-0000-7000-8000-000000000010",
     "applicationKey": "hr",
-    "runtimeTarget": "hr-runtime",
+    "runtimeTarget": "hr-app",
     "commercialMode": "SUBSCRIPTION",
     "catalogueVisibility": "PUBLIC",
     "lifecycleStatus": "DRAFT",
@@ -631,9 +652,9 @@ GET /api/admin/core/v1/applications/hr/technical-provisioning HTTP/1.1
     "components": [
       {
         "id": "019f0000-0000-7000-8000-000000000020",
-        "key": "hr",
+        "key": "app.hr",
         "ownerApp": "hr",
-        "workerTarget": "hr-runtime",
+        "workerTarget": "hr-app",
         "kind": "MODULE",
         "status": "ACTIVE",
         "contractVersion": 1,
@@ -649,12 +670,62 @@ GET /api/admin/core/v1/applications/hr/technical-provisioning HTTP/1.1
 }
 ```
 
-The DRAFT-only binding command accepts an explicit canonical `componentKey`.
-It never accepts a Worker target. Core reads Worker routing from the signed,
-stored immutable `runtimeTarget`; the browser must not derive that target from
-the Application key or display name. When `runtimeTarget` is null, readiness
-reports `RUNTIME_TARGET_REQUIRED` and component binding remains blocked until
-the separate signed technical-package adoption gate is satisfied.
+When `runtimeTarget` is null, the detail UI first offers the DRAFT-only
+technical-adoption command. The browser may preview the deterministic identity,
+but the Core receipt and refetched readiness projection are authoritative.
+
+```http
+POST /api/admin/core/v1/applications/hr/technical-provisioning/adopt HTTP/1.1
+x-idempotency-key: 019f0000-0000-7000-8000-000000000002
+Content-Type: application/json
+
+{
+  "expectedTechnicalDefinitionRevision": "1",
+  "reason": "Adopt the reviewed HR technical identity"
+}
+```
+
+Core derives `hr-app`, `mutakamel_hr_app`, `app.hr`, and contract version `1`.
+The request cannot select a runtime target, database principal, component key,
+credential, SQL, or migration content. Exact-intent retries reuse the same
+UUIDv7 key; ambiguous or in-flight outcomes are reconciled by refetching the
+readiness projection before the UI offers another intent.
+
+```json
+{
+  "success": true,
+  "data": {
+    "contractVersion": 1,
+    "operation": "ADOPT_TECHNICAL_PACKAGE",
+    "applicationId": "019f0000-0000-7000-8000-000000000010",
+    "applicationKey": "hr",
+    "lifecycleStatus": "DRAFT",
+    "runtimeTarget": "hr-app",
+    "publicationStatus": "UNPUBLISHED",
+    "publicationRevision": "1",
+    "catalogueRevision": "2",
+    "policyRevision": "1",
+    "deleted": false,
+    "technicalIdentity": {
+      "runtimeTarget": "hr-app",
+      "databasePrincipal": "mutakamel_hr_app",
+      "primaryComponentKey": "app.hr",
+      "contractVersion": 1
+    }
+  },
+  "correlationId": "019f0000-0000-7000-8000-000000000001",
+  "timestamp": "2026-08-05T12:00:00.000Z"
+}
+```
+
+After adoption, the separate DRAFT-only binding command applies only when the
+authoritative readiness projection reports `COMPONENT_BINDING_REQUIRED`. Core
+binds the already-derived primary component and reads Worker routing from the
+stored immutable `runtimeTarget`; execution must not reconstruct that target
+from the display name or another mutable value. An unbound `SYSTEM`
+Application such as Worker intentionally owns no tenant schema or migration
+component, so the UI must not offer this command and Core rejects a direct or
+stale submission with `409 APPLICATION_COMPONENT_BINDING_NOT_REQUIRED`.
 
 ```http
 POST /api/admin/core/v1/applications/hr/technical-provisioning/primary-component HTTP/1.1
@@ -662,9 +733,7 @@ x-idempotency-key: 019f0000-0000-7000-8000-000000000002
 Content-Type: application/json
 
 {
-  "expectedTechnicalDefinitionRevision": "1",
-  "componentKey": "hr",
-  "contractVersion": 1,
+  "expectedTechnicalDefinitionRevision": "2",
   "reason": "Link the HR runtime component"
 }
 ```
@@ -678,7 +747,7 @@ Content-Type: application/json
     "applicationId": "019f0000-0000-7000-8000-000000000010",
     "applicationKey": "hr",
     "lifecycleStatus": "DRAFT",
-    "runtimeTarget": "hr-runtime",
+    "runtimeTarget": "hr-app",
     "publicationStatus": "UNPUBLISHED",
     "publicationRevision": "1",
     "catalogueRevision": "1",
@@ -686,9 +755,9 @@ Content-Type: application/json
     "deleted": false,
     "technicalProvisioning": {
       "componentId": "019f0000-0000-7000-8000-000000000020",
-      "componentKey": "hr",
+      "componentKey": "app.hr",
       "ownerApp": "hr",
-      "workerTarget": "hr-runtime",
+      "workerTarget": "hr-app",
       "contractVersion": 1
     }
   },
@@ -700,6 +769,9 @@ Content-Type: application/json
 Relevant conflicts are `APPLICATION_TECHNICAL_PROVISIONING_NOT_READY`,
 `APPLICATION_RUNTIME_TARGET_REQUIRED`,
 `APPLICATION_TECHNICAL_DEFINITION_REVISION_STALE`,
+`APPLICATION_TECHNICAL_ADOPTION_REQUIRES_DRAFT`,
+`APPLICATION_TECHNICAL_IDENTITY_ALREADY_ADOPTED`,
+`APPLICATION_TECHNICAL_IDENTITY_TAKEN`,
 `APPLICATION_TECHNICAL_BINDING_REQUIRES_DRAFT`,
 `APPLICATION_COMPONENT_ALREADY_BOUND`, and
 `APPLICATION_COMPONENT_KEY_TAKEN`. The UI must refetch the projection after a
@@ -1073,7 +1145,7 @@ Response — HTTP `201`:
     "applicationId": "019f0000-0000-7000-8000-000000000005",
     "applicationKey": "hr",
     "lifecycleStatus": "DRAFT",
-    "runtimeTarget": "hr-runtime",
+    "runtimeTarget": "hr-app",
     "publicationStatus": "PUBLISHED",
     "publicationRevision": "2",
     "catalogueRevision": "3",
@@ -1115,7 +1187,7 @@ Response — HTTP `201`:
     "applicationId": "019f0000-0000-7000-8000-000000000005",
     "applicationKey": "hr",
     "lifecycleStatus": "ACTIVE",
-    "runtimeTarget": "hr-runtime",
+    "runtimeTarget": "hr-app",
     "publicationStatus": "PUBLISHED",
     "publicationRevision": "2",
     "catalogueRevision": "4",
@@ -1889,6 +1961,7 @@ Application errors:
 - `APPLICATION_LIFECYCLE_TRANSITION_INVALID`
 - `APPLICATION_RUNTIME_TARGET_REQUIRED`
 - `APPLICATION_TECHNICAL_BINDING_REQUIRES_DRAFT`
+- `APPLICATION_COMPONENT_BINDING_NOT_REQUIRED`
 - `APPLICATION_COMPONENT_ALREADY_BOUND`
 - `APPLICATION_COMPONENT_KEY_TAKEN`
 - `APPLICATION_TECHNICAL_PROVISIONING_NOT_READY`
@@ -1952,20 +2025,36 @@ Implemented in active frontend source:
   editing, reasoned lifecycle commands, DRAFT-only deletion, and manifest
   evidence with independent retry state;
 - Application detail independently loads a technical-readiness projection and
-  implements stable-intent stale/in-flight recovery for the primary-component
-  command;
+  implements separate stable-intent stale/in-flight recovery for deterministic
+  technical adoption and primary-component binding;
 - Application detail renders the release-authority rail, publishes with both
   revision fences and a caller-owned UUIDv7 intent, warns that published
   metadata edits invalidate publication, and gates activation on attributable
   publication plus technical readiness;
 - readiness uses the exact fields, reasons, checks, and selection blockers;
-  primary-component binding displays stored `runtimeTarget`, blocks while it is
-  absent, and submits explicit `componentKey` without deriving Worker routing;
+  the UI previews Core's deterministic identity, adopts it while `DRAFT`, then
+  binds the derived primary component only when Core reports
+  `COMPONENT_BINDING_REQUIRED`, without submitting a routing target, principal,
+  component key, or contract version; unbound `SYSTEM` Applications remain
+  component-free;
 - the commercial control rail implements tiers, features, complete entitlement
   replacement, contiguous monthly/annual USD ladders, and paginated
   Application-scoped audit;
+- Application, catalogue, audit, and selected-tier reads are abortable and
+  identity/generation fenced. Each Application detail route instance also owns
+  an immutable in-memory token, so a delayed Application A response or mutation
+  reconciliation cannot overwrite/abort Application B, and an older A command
+  cannot claim a later A route instance after an A-to-B-to-A navigation.
+  Route changes close resource and lifecycle dialogs before another command can
+  be submitted;
 - implemented clients use canonical Gateway paths and exact PATCH/POST/DELETE
-  semantics, including non-idempotent tier/feature creation;
+  semantics, including non-replayed tier/feature creation with explicit
+  ambiguity recovery;
+- idempotent writes rotate their command key after a definitive `4xx`, retain
+  it for `GW.IDEM.IN_FLIGHT`, network, and `5xx` outcomes, and refetch
+  authoritative state before the next operator decision;
+- lifecycle and catalogue-resource dialogs own focus, trap Tab, support Escape
+  and backdrop dismissal while idle, lock body scroll, and restore the opener;
 - managed currencies support single and transactional batch upsert, decimal
   strings, caller-owned UUIDv7 keys, both required permissions, and normalized
   Core/Gateway errors;

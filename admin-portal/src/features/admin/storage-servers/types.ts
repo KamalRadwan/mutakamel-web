@@ -1,6 +1,10 @@
 export type StorageServerStatus = "DRAFT" | "ACTIVE" | "OFFLINE";
-
 export type StorageConnectionTestStatus = "NOT_TESTED" | "PASSED" | "FAILED";
+export type StorageServerSortField =
+  | "name"
+  | "createdAt"
+  | "updatedAt"
+  | "lastConnectionTestedAt";
 
 export interface StorageCredentialsDto {
   accessKeyId: string;
@@ -27,6 +31,21 @@ export interface UpdateStorageServerDto {
   isPlatformDefault?: boolean;
 }
 
+export interface ProbeStorageServerDto {
+  expectedConfigRevision: number;
+}
+
+export interface StorageServerProbeResult {
+  contractVersion: 1;
+  commandId: string;
+  storageServerId: string;
+  configRevision: number;
+  lifecycleStatus: StorageServerStatus;
+  outcome: "PASSED" | "FAILED" | "SKIPPED";
+  testedAt: string | null;
+  errorCode: string | null;
+}
+
 export interface StorageServerView {
   id: string;
   code: string;
@@ -43,6 +62,9 @@ export interface StorageServerView {
   lastConnectionTestStatus: StorageConnectionTestStatus;
   lastConnectionTestedAt: string | null;
   lastConnectionTestErrorCode: string | null;
+  connectionEvidenceFresh: boolean;
+  connectionEvidenceExpiresAt: string | null;
+  nextAutomaticProbeDueAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,4 +72,16 @@ export interface StorageServerView {
 export interface StorageServerList {
   items: StorageServerView[];
   total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface StorageServerListQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: StorageServerStatus;
+  sortBy?: StorageServerSortField;
+  sortDir?: "ASC" | "DESC";
 }

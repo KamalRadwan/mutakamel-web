@@ -29,6 +29,19 @@ class MemoryStorage implements Storage {
   }
 }
 
+function stubBrowserStorage(pathname: string, sessionStorage: Storage) {
+  const localStorage = new MemoryStorage();
+
+  vi.stubGlobal("window", {
+    location: { pathname, href: "" },
+    dispatchEvent: vi.fn(),
+    sessionStorage,
+    localStorage,
+  });
+  vi.stubGlobal("sessionStorage", sessionStorage);
+  vi.stubGlobal("localStorage", localStorage);
+}
+
 describe("admin cookie refresh retry", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -51,12 +64,8 @@ describe("admin cookie refresh retry", () => {
       }),
     );
 
-    vi.stubGlobal("window", {
-      location: { pathname: "/users", href: "" },
-      dispatchEvent: vi.fn(),
-    });
+    stubBrowserStorage("/users", storage);
     vi.stubGlobal("navigator", {});
-    vi.stubGlobal("sessionStorage", storage);
     vi.stubGlobal("crypto", {
       getRandomValues: (bytes: Uint8Array) => bytes.fill(1),
     });
@@ -110,12 +119,8 @@ describe("admin cookie refresh retry", () => {
 
   it("does not attach an idempotency key when the route contract opts out", async () => {
     const storage = new MemoryStorage();
-    vi.stubGlobal("window", {
-      location: { pathname: "/backup", href: "" },
-      dispatchEvent: vi.fn(),
-    });
+    stubBrowserStorage("/backup", storage);
     vi.stubGlobal("navigator", {});
-    vi.stubGlobal("sessionStorage", storage);
     vi.stubGlobal("crypto", {
       getRandomValues: (bytes: Uint8Array) => bytes.fill(1),
     });
@@ -140,12 +145,8 @@ describe("admin cookie refresh retry", () => {
 
   it("does not refresh or replay a non-replayable POST after a 401", async () => {
     const storage = new MemoryStorage();
-    vi.stubGlobal("window", {
-      location: { pathname: "/backup", href: "" },
-      dispatchEvent: vi.fn(),
-    });
+    stubBrowserStorage("/backup", storage);
     vi.stubGlobal("navigator", {});
-    vi.stubGlobal("sessionStorage", storage);
 
     const requestOptions: RequestInit[] = [];
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
@@ -196,12 +197,8 @@ describe("admin cookie refresh retry", () => {
 
   it("keeps automatic idempotency for ordinary mutations", async () => {
     const storage = new MemoryStorage();
-    vi.stubGlobal("window", {
-      location: { pathname: "/database-servers", href: "" },
-      dispatchEvent: vi.fn(),
-    });
+    stubBrowserStorage("/database-servers", storage);
     vi.stubGlobal("navigator", {});
-    vi.stubGlobal("sessionStorage", storage);
     vi.stubGlobal("crypto", {
       getRandomValues: (bytes: Uint8Array) => bytes.fill(1),
     });

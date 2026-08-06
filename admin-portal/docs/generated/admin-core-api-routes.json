@@ -1,30 +1,30 @@
 {
   "metadata": {
-    "generatedAt": "2026-08-05T09:52:58.131Z",
+    "generatedAt": "2026-08-05T22:02:18.741Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "625295f8ddcc+dirty",
+    "frontendRevision": "adb263e0cda1+dirty",
     "backendRevision": "48898351dbde+dirty",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
   },
   "counts": {
-    "total": 232,
+    "total": 235,
     "byMethod": {
-      "GET": 94,
-      "POST": 96,
+      "GET": 95,
+      "POST": 98,
       "DELETE": 15,
       "PATCH": 24,
       "PUT": 3
     },
     "byRouteClass": {
-      "AUTHENTICATED": 79,
-      "WRITE_SENSITIVE": 126,
+      "AUTHENTICATED": 80,
+      "WRITE_SENSITIVE": 128,
       "PUBLIC": 6,
       "READ_HEAVY": 21
     },
     "byDomain": {
-      "applications": 13,
+      "applications": 14,
       "catalog": 17,
       "audit": 2,
       "auth": 8,
@@ -38,17 +38,17 @@
       "provisioning": 31,
       "reports": 5,
       "roles": 6,
-      "storage-servers": 7,
+      "storage-servers": 8,
       "subscriptions": 8,
       "system-settings": 7,
       "tenant-fqdns": 1,
-      "tenants": 52,
+      "tenants": 53,
       "wallets": 6,
       "users": 15
     }
   },
   "sourceHashes": {
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "3001e660f76db71f583b04caf20d0c0707849e45ea2b0d94a82dc01a61872f72",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "690783a5bd1e670a6be6be49f9128cbcccc47db9bb4b1936b47c43f20ef4603c",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "a4b5f00eceb33085c98d155909c842f8a16e56fb31583cd7ae81f332a95dc4f6"
   },
   "routes": [
@@ -349,6 +349,24 @@
     },
     {
       "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/applications/:applicationKey/technical-provisioning/adopt",
+      "upstreamPath": "/api/v1/admin/applications/:applicationKey/technical-provisioning/adopt",
+      "routeKey": "core.admin.applications.technical-provisioning.adopt",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.applications.update",
+        "admin.applications.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": "CORE.ADMIN.APPLICATIONS.TECHNICAL_PROVISIONING.ADOPT"
+    },
+    {
+      "method": "POST",
       "canonicalPath": "/api/admin/core/v1/applications/:applicationKey/technical-provisioning/primary-component",
       "upstreamPath": "/api/v1/admin/applications/:applicationKey/technical-provisioning/primary-component",
       "routeKey": "core.admin.applications.technical-provisioning.primary-component.create",
@@ -630,15 +648,15 @@
       "routeKey": "core.admin.database-servers.create",
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": true,
-      "idempotencyMode": null,
+      "idempotencyMode": "WRITE_SENSITIVE",
       "requiredPermissions": [
         "admin.database_servers.create"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
-      "domainIdempotencyOperation": null
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "domainIdempotencyOperation": "CORE.ADMIN.DATABASE_SERVERS.REGISTER"
     },
     {
       "method": "DELETE",
@@ -655,7 +673,7 @@
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -690,7 +708,7 @@
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -708,7 +726,7 @@
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -833,7 +851,7 @@
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -868,7 +886,7 @@
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -949,7 +967,7 @@
       "routeKey": "core.admin.database-servers.check-connectivity",
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": true,
-      "idempotencyMode": null,
+      "idempotencyMode": "WRITE_SENSITIVE",
       "requiredPermissions": [
         "admin.database_servers.create"
       ],
@@ -2298,7 +2316,7 @@
       "routeKey": "core.admin.storage-servers.create",
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": true,
-      "idempotencyMode": null,
+      "idempotencyMode": "WRITE_SENSITIVE",
       "requiredPermissions": [
         "admin.storage_servers.create",
         "admin.storage_servers.critical"
@@ -2306,8 +2324,8 @@
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": "NEVER",
-      "domainIdempotencyOperation": null
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "domainIdempotencyOperation": "CORE.ADMIN.STORAGE_SERVERS.REGISTER"
     },
     {
       "method": "DELETE",
@@ -2316,7 +2334,7 @@
       "routeKey": "core.admin.storage-servers.delete",
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": true,
-      "idempotencyMode": null,
+      "idempotencyMode": "WRITE_SENSITIVE",
       "requiredPermissions": [
         "admin.storage_servers.delete",
         "admin.storage_servers.critical"
@@ -2351,7 +2369,7 @@
       "routeKey": "core.admin.storage-servers.update",
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": true,
-      "idempotencyMode": null,
+      "idempotencyMode": "WRITE_SENSITIVE",
       "requiredPermissions": [
         "admin.storage_servers.update",
         "admin.storage_servers.critical"
@@ -2369,7 +2387,7 @@
       "routeKey": "core.admin.storage-servers.activate",
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": true,
-      "idempotencyMode": null,
+      "idempotencyMode": "WRITE_SENSITIVE",
       "requiredPermissions": [
         "admin.storage_servers.update",
         "admin.storage_servers.critical"
@@ -2387,7 +2405,25 @@
       "routeKey": "core.admin.storage-servers.offline",
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": true,
-      "idempotencyMode": null,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.storage_servers.update",
+        "admin.storage_servers.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/storage-servers/:id/probe",
+      "upstreamPath": "/api/v1/admin/storage-servers/:id/probe",
+      "routeKey": "core.admin.storage-servers.probe",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
       "requiredPermissions": [
         "admin.storage_servers.update",
         "admin.storage_servers.critical"
@@ -2477,9 +2513,10 @@
       "idempotent": true,
       "idempotencyMode": "NONE",
       "requiredPermissions": [
-        "admin.catalog.read"
+        "admin.catalog.read",
+        "admin.tenants.create"
       ],
-      "requiredPermissionsMode": "ALL",
+      "requiredPermissionsMode": "ANY",
       "bodyLimitClass": "DEFAULT_JSON",
       "timeoutClass": "DEFAULT",
       "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
@@ -3589,6 +3626,23 @@
       "bodyLimitClass": null,
       "timeoutClass": null,
       "transportRetryMode": null,
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "GET",
+      "canonicalPath": "/api/admin/core/v1/tenants/create-options",
+      "upstreamPath": "/api/v1/admin/tenants/create-options",
+      "routeKey": "core.admin.tenants.create-options.list",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [
+        "admin.tenants.create"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
       "domainIdempotencyOperation": null
     },
     {

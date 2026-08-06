@@ -3,23 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { backupApi, backupDatabaseAccessApi } from "../api";
-import type {
-  BackupArtifact,
-  BackupDatabaseServerOption,
-  PromoteRestoreRunDto,
-  RestoreRun,
-  RestoreRunListQuery,
+import {
   RestoreRunStatus,
-  StartRestoreRunDto,
+  type BackupArtifact,
+  type BackupDatabaseServerOption,
+  type PromoteRestoreRunDto,
+  type RestoreRun,
+  type RestoreRunListQuery,
+  type StartRestoreRunDto,
 } from "../types";
 import { useAuth } from "@/context/AuthContext";
 import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
-import { normalizeApiError, type NormalizedApiError } from "@/shared/api/normalized-api-error";
+import {
+  normalizeApiError,
+  type NormalizedApiError,
+} from "@/shared/api/normalized-api-error";
+import { usePersistedCommandAttempt } from "@/shared/hooks/usePersistedCommandAttempt";
 import { useToast } from "@/components/ui/ToastContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { isAmbiguousWriteFailure } from "../lib/backup-format";
-import { useBackupNonIdempotentCommandGuard } from "./useBackupNonIdempotentCommandGuard";
-import type { BackupNonIdempotentCommandAttempt } from "./non-idempotent-command-guard";
+import { shouldRetainBackupCommandKey } from "../lib/backup-format";
 
 export function useBackupRestores() {
   const { user } = useAuth();
@@ -28,7 +30,16 @@ export function useBackupRestores() {
   const searchParams = useSearchParams();
   const canReadServers = adminCan(user, "admin.database_servers.read");
   const canRestore = adminCanAll(user, ADMIN_RBAC_CRITICAL.BACKUPS_RESTORE);
-  const commandGuard = useBackupNonIdempotentCommandGuard();
+  const restoreStartCommand = usePersistedCommandAttempt(
+    "admin.backup.pending.start-restore.v1",
+    "/api/admin/worker/v1/restores/runs",
+  );
+  const restorePromotionCommand = usePersistedCommandAttempt(
+    "admin.backup.pending.promote-restore.v1",
+    "/api/admin/worker/v1/restores/runs/:runId/promote",
+  );
+  const pendingPromotionAttempt = restorePromotionCommand.pendingAttempt;
+  const clearPendingPromotionAttempt = restorePromotionCommand.clear;
   const [servers, setServers] = useState<BackupDatabaseServerOption[]>([]);
   const [artifacts, setArtifacts] = useState<BackupArtifact[]>([]);
   const [restores, setRestores] = useState<RestoreRun[]>([]);
@@ -36,19 +47,12 @@ export function useBackupRestores() {
   const requestedArtifactId = searchParams.get("artifactId") ?? "";
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<NormalizedApiError | null>(null);
-  const [enrichmentWarning, setEnrichmentWarning] = useState<NormalizedApiError | null>(null);
+  const [enrichmentWarning, setEnrichmentWarning] =
+    useState<NormalizedApiError | null>(null);
   const [activeAction, setActiveAction] = useState<string | null>(null);
-  const [ambiguousError, setAmbiguousError] = useState<NormalizedApiError | null>(null);
-  const [reconciliationRestores, setReconciliationRestores] = useState<RestoreRun[]>([]);
-  const [reconciliationArtifactFound, setReconciliationArtifactFound] = useState<boolean | null>(null);
-  const [reconciliationError, setReconciliationError] = useState<NormalizedApiError | null>(null);
-  const [isReconcilingAttempt, setIsReconcilingAttempt] = useState(false);
+  const [retryableCommandError, setRetryableCommandError] =
+    useState<NormalizedApiError | null>(null);
   const refreshGenerationRef = useRef(0);
-  const guardAttemptRef = useRef(commandGuard.attempt);
-  const reconciliationGenerationRef = useRef(0);
-  useEffect(() => {
-    guardAttemptRef.current = commandGuard.attempt;
-  }, [commandGuard.attempt]);
 
   const refresh = useCallback(async () => {
     const refreshGeneration = ++refreshGenerationRef.current;
@@ -58,9 +62,15 @@ export function useBackupRestores() {
     const serverEnrichment = canReadServers
       ? backupDatabaseAccessApi.listServers().then(
           (data) => ({ ok: true as const, data }),
-          (caught: unknown) => ({ ok: false as const, error: normalizeApiError(caught) }),
+          (caught: unknown) => ({
+            ok: false as const,
+            error: normalizeApiError(caught),
+          }),
         )
-      : Promise.resolve({ ok: true as const, data: [] as BackupDatabaseServerOption[] });
+      : Promise.resolve({
+          ok: true as const,
+          data: [] as BackupDatabaseServerOption[],
+        });
 
     try {
       const [nextRestores, nextArtifacts] = await Promise.all([
@@ -69,7 +79,9 @@ export function useBackupRestores() {
       ]);
       if (refreshGeneration !== refreshGenerationRef.current) return;
       setRestores(nextRestores);
-      setArtifacts(nextArtifacts.filter((artifact) => artifact.status === "COMPLETED"));
+      setArtifacts(
+        nextArtifacts.filter((artifact) => artifact.status === "COMPLETED"),
+      );
     } catch (caught) {
       if (refreshGeneration !== refreshGenerationRef.current) return;
       setError(normalizeApiError(caught));
@@ -88,153 +100,97 @@ export function useBackupRestores() {
   }, [canReadServers, query]);
 
   useEffect(() => {
-    const timer = setTimeout(() => { void refresh(); }, 0);
+    const timer = setTimeout(() => {
+      void refresh();
+    }, 0);
     return () => clearTimeout(timer);
   }, [refresh]);
 
-  const reconcileRestoreAttempt = useCallback(
-    async (attempt: BackupNonIdempotentCommandAttempt) => {
-      const generation = ++reconciliationGenerationRef.current;
-      if (
-        attempt.kind !== "RESTORE_START" &&
-        attempt.kind !== "RESTORE_PROMOTE"
-      ) {
-        setReconciliationRestores([]);
-        setReconciliationArtifactFound(null);
-        setReconciliationError(null);
-        setIsReconcilingAttempt(false);
-        return;
-      }
-
-      setIsReconcilingAttempt(true);
-      setReconciliationError(null);
-      try {
-        let authoritativeRestores: RestoreRun[];
-        let artifactFound: boolean | null = null;
-        if (attempt.kind === "RESTORE_PROMOTE") {
-          authoritativeRestores = [await backupApi.getRestore(attempt.targetId)];
-        } else {
-          const availableArtifacts = await backupApi.listArtifacts();
-          const targetArtifact = availableArtifacts.find(
-            (artifact) => artifact.id === attempt.targetId,
-          );
-          artifactFound = Boolean(targetArtifact);
-          authoritativeRestores = targetArtifact
-            ? await backupApi.listRestores({ tenantId: targetArtifact.tenantId })
-            : [];
-        }
-
-        if (
-          generation !== reconciliationGenerationRef.current ||
-          guardAttemptRef.current?.localCommandId !== attempt.localCommandId
-        ) return;
-        setReconciliationRestores(authoritativeRestores);
-        setReconciliationArtifactFound(artifactFound);
-      } catch (caught) {
-        if (
-          generation !== reconciliationGenerationRef.current ||
-          guardAttemptRef.current?.localCommandId !== attempt.localCommandId
-        ) return;
-        setReconciliationError(normalizeApiError(caught));
-        setReconciliationRestores([]);
-        setReconciliationArtifactFound(null);
-      } finally {
-        if (
-          generation === reconciliationGenerationRef.current &&
-          guardAttemptRef.current?.localCommandId === attempt.localCommandId
-        ) {
-          setIsReconcilingAttempt(false);
-        }
-      }
-    },
-    [],
-  );
-
   useEffect(() => {
-    const attempt = commandGuard.attempt;
-    const timer = setTimeout(() => {
-      if (
-        !attempt ||
-        (attempt.kind !== "RESTORE_START" &&
-          attempt.kind !== "RESTORE_PROMOTE")
-      ) {
-        reconciliationGenerationRef.current += 1;
-        setReconciliationRestores([]);
-        setReconciliationArtifactFound(null);
-        setReconciliationError(null);
-        setIsReconcilingAttempt(false);
-        return;
-      }
-      void reconcileRestoreAttempt(attempt);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [commandGuard.attempt, reconcileRestoreAttempt]);
+    const acceptedPromotion = pendingPromotionAttempt;
+    if (
+      acceptedPromotion?.resource.kind === "RESTORE_RUN" &&
+      restores.some(
+        (restore) =>
+          restore.id === acceptedPromotion.resource.id &&
+          restore.status === RestoreRunStatus.PROMOTED,
+      )
+    ) {
+      clearPendingPromotionAttempt();
+    }
+  }, [clearPendingPromotionAttempt, pendingPromotionAttempt, restores]);
 
-  const handleNonIdempotentError = async (
-    attempt: BackupNonIdempotentCommandAttempt,
-    caught: unknown,
+  const handleCommandError = (
+    normalized: NormalizedApiError,
+    clearAttempt: () => void,
   ) => {
-    const normalized = normalizeApiError(caught);
-    if (isAmbiguousWriteFailure(normalized.httpStatus)) {
-      const unknownAttempt = { ...attempt, status: "UNKNOWN" as const };
-      guardAttemptRef.current = unknownAttempt;
-      commandGuard.markUnknown(attempt.localCommandId);
-      setAmbiguousError(normalized);
-      await reconcileRestoreAttempt(unknownAttempt);
-      await refresh();
+    if (shouldRetainBackupCommandKey(normalized)) {
+      setRetryableCommandError(normalized);
       toast.warning(
-        lang === "ar" ? "نتيجة أمر الاستعادة غير مؤكدة" : "Restore command outcome is unknown",
-        lang === "ar" ? "راجع القراءة المرجعية من Worker قبل مسح قفل الأمر." : "Review the authoritative Worker read before clearing the command lock.",
-        0,
+        lang === "ar" ? "يمكن إعادة محاولة نفس أمر الاستعادة بأمان" : "The same restore command can be retried safely",
+        lang === "ar"
+          ? "يظل مفتاح الأمر ثابتًا حتى يعيد Worker نفس عملية الاستعادة."
+          : "The command key remains stable so Worker returns the same restore run.",
       );
     } else {
-      commandGuard.clear(attempt.localCommandId);
-      guardAttemptRef.current = null;
+      clearAttempt();
       setError(normalized);
-      toast.error(lang === "ar" ? "فشل أمر الاستعادة" : "Restore command failed", normalized.message);
+      toast.error(
+        lang === "ar" ? "فشل أمر الاستعادة" : "Restore command failed",
+        normalized.message,
+      );
     }
-    throw normalized;
   };
 
   const startRestore = async (data: StartRestoreRunDto) => {
-    if (activeAction || commandGuard.isBlocked) return;
-    const attempt = commandGuard.begin("RESTORE_START", data.artifactId);
-    if (!attempt) return;
-    guardAttemptRef.current = attempt;
+    if (activeAction) return;
     setActiveAction("start");
     setError(null);
-    setAmbiguousError(null);
+    setRetryableCommandError(null);
     try {
-      const run = await backupApi.startRestore(data);
-      commandGuard.clear(attempt.localCommandId);
-      guardAttemptRef.current = null;
+      const key = await restoreStartCommand.prepare(
+        { action: "start-restore-run", ...data },
+        { kind: "BACKUP_ARTIFACT", id: data.artifactId },
+      );
+      const run = await backupApi.startRestore(data, key);
+      restoreStartCommand.clear();
       await refresh();
-      toast.success(lang === "ar" ? "بدأ اختبار الاستعادة" : "Restore test started", run.id);
+      toast.success(
+        lang === "ar" ? "بدأ اختبار الاستعادة" : "Restore test started",
+        run.id,
+      );
       return run;
     } catch (caught) {
-      return handleNonIdempotentError(attempt, caught);
+      const normalized = normalizeApiError(caught);
+      handleCommandError(normalized, restoreStartCommand.clear);
+      throw normalized;
     } finally {
       setActiveAction(null);
     }
   };
 
   const promoteRestore = async (runId: string, data: PromoteRestoreRunDto) => {
-    if (activeAction || commandGuard.isBlocked) return;
-    const attempt = commandGuard.begin("RESTORE_PROMOTE", runId);
-    if (!attempt) return;
-    guardAttemptRef.current = attempt;
+    if (activeAction) return;
     setActiveAction(`promote:${runId}`);
     setError(null);
-    setAmbiguousError(null);
+    setRetryableCommandError(null);
     try {
-      const run = await backupApi.promoteRestore(runId, data);
-      commandGuard.clear(attempt.localCommandId);
-      guardAttemptRef.current = null;
+      const key = await restorePromotionCommand.prepare(
+        { action: "promote-restore-run", runId, ...data },
+        { kind: "RESTORE_RUN", id: runId },
+      );
+      const run = await backupApi.promoteRestore(runId, data, key);
+      restorePromotionCommand.clear();
       await refresh();
-      toast.success(lang === "ar" ? "تمت ترقية الاستعادة" : "Restore promoted", run.id);
+      toast.success(
+        lang === "ar" ? "تمت ترقية الاستعادة" : "Restore promoted",
+        run.id,
+      );
       return run;
     } catch (caught) {
-      return handleNonIdempotentError(attempt, caught);
+      const normalized = normalizeApiError(caught);
+      handleCommandError(normalized, restorePromotionCommand.clear);
+      throw normalized;
     } finally {
       setActiveAction(null);
     }
@@ -246,35 +202,19 @@ export function useBackupRestores() {
     servers,
     requestedArtifactId,
     query,
-    setQuery: (tenantId: string, status: RestoreRunStatus | "") => setQuery({ ...(tenantId ? { tenantId } : {}), ...(status ? { status } : {}) }),
+    setQuery: (tenantId: string, status: RestoreRunStatus | "") =>
+      setQuery({
+        ...(tenantId ? { tenantId } : {}),
+        ...(status ? { status } : {}),
+      }),
     canRestore,
     isLoading,
     error,
     enrichmentWarning,
+    retryableCommandError,
+    pendingStartAttempt: restoreStartCommand.pendingAttempt,
+    pendingPromotionAttempt,
     activeAction,
-    unknownOutcome: commandGuard.attempt,
-    ambiguousError,
-    reconciliationRestores,
-    reconciliationArtifactFound,
-    reconciliationError,
-    isReconcilingAttempt,
-    commandGuardError: commandGuard.storageError,
-    commandGuardBlocked: commandGuard.isBlocked,
-    acknowledgeUnknownOutcome: () => {
-      const attempt = commandGuard.attempt;
-      if (
-        !attempt ||
-        (attempt.kind !== "RESTORE_START" &&
-          attempt.kind !== "RESTORE_PROMOTE")
-      ) return;
-      if (commandGuard.clear(attempt.localCommandId)) {
-        guardAttemptRef.current = null;
-        setAmbiguousError(null);
-        setReconciliationRestores([]);
-        setReconciliationArtifactFound(null);
-        setReconciliationError(null);
-      }
-    },
     refresh,
     startRestore,
     promoteRestore,

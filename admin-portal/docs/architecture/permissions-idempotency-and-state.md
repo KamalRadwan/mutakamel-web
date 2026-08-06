@@ -7,7 +7,7 @@ Last source verification: **2026-07-30**
 ## Permission semantics
 
 A permission list joined with `+` requires ALL permissions. The FQDN validation
-route is the single explicit ANY-permission route in the current 232-route
+route is the single explicit ANY-permission route in the current 235-route
 Admin Core inventory.
 
 ```ts
@@ -41,6 +41,14 @@ For a write-sensitive mutation:
 The current shared interceptor auto-generates a new key for a mutation that
 does not supply one. That is a transport safety net, not sufficient intent
 ownership.
+
+For reload-sensitive high-impact commands, persist only a route-specific,
+tab-scoped recovery marker before the POST: key, canonical route, a SHA-256
+intent digest, safe resource identity, and timestamp. Never persist the DTO,
+secret, audit reason, confirmation text, or tenant PII. Reuse requires an exact
+digest match; a changed intent or unavailable browser storage fails closed.
+Where a command cannot be safely reconstructed, use authoritative read-only
+status recovery and block replay instead of persisting its sensitive body.
 
 ## Required API states
 

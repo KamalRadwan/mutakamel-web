@@ -8,7 +8,6 @@ export interface TenantStoragePlacementOption {
   code: string;
   name: string;
   region: string;
-  bucketName: string;
   status: "ACTIVE";
   maxTenants: number | null;
   assignedTenants: number;
@@ -133,7 +132,6 @@ function readStoragePlacementOption(
     !isNonEmptyString(item.name) ||
     !isNonEmptyString(item.code) ||
     !isNonEmptyString(item.region) ||
-    !isNonEmptyString(item.bucketName) ||
     item.status !== "ACTIVE" ||
     !isNonNegativeInteger(item.assignedTenants) ||
     (item.maxTenants !== null && !isNonNegativeInteger(item.maxTenants))
@@ -146,7 +144,6 @@ function readStoragePlacementOption(
     code: item.code,
     name: item.name,
     region: item.region,
-    bucketName: item.bucketName,
     status: item.status,
     maxTenants: item.maxTenants as number | null,
     assignedTenants: item.assignedTenants,

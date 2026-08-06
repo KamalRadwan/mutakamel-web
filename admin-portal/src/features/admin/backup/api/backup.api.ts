@@ -22,87 +22,6 @@ const RESTORE_BASE_URL = "/api/admin/worker/v1/restores";
 
 type QueryValue = boolean | number | string | null | undefined;
 
-type BackupRunWire = Omit<BackupRun, "hasFailure"> & {
-  policyId: string | null;
-  scheduledAt: string | null;
-  storagePrefix: string;
-  manifestKey: string | null;
-  summary: unknown | null;
-  requestedBy: string | null;
-  error: unknown | null;
-  provisioningRequestId: string | null;
-  provisioningOperationId: string | null;
-};
-
-type BackupArtifactWire = Omit<BackupArtifact, "hasFailure"> & {
-  storageKey: string | null;
-  metadata: unknown | null;
-  error: unknown | null;
-};
-
-type RestoreRunWire = Omit<RestoreRun, "hasFailure" | "hasVerification"> & {
-  verification: unknown | null;
-  requestedBy: string | null;
-  error: unknown | null;
-};
-
-function hasRecordedValue(value: unknown): boolean {
-  return value !== null && value !== undefined && value !== "";
-}
-
-function toBackupRun(run: BackupRunWire): BackupRun {
-  return {
-    id: run.id,
-    databaseServerId: run.databaseServerId,
-    trigger: run.trigger,
-    status: run.status,
-    totalTenants: run.totalTenants,
-    succeededTenants: run.succeededTenants,
-    failedTenants: run.failedTenants,
-    skippedTenants: run.skippedTenants,
-    reason: run.reason,
-    hasFailure: hasRecordedValue(run.error),
-    startedAt: run.startedAt,
-    finishedAt: run.finishedAt,
-  };
-}
-
-function toBackupArtifact(artifact: BackupArtifactWire): BackupArtifact {
-  return {
-    id: artifact.id,
-    runId: artifact.runId,
-    databaseServerId: artifact.databaseServerId,
-    tenantId: artifact.tenantId,
-    databaseName: artifact.databaseName,
-    status: artifact.status,
-    sizeBytes: artifact.sizeBytes,
-    sha256: artifact.sha256,
-    compressionAlgorithm: artifact.compressionAlgorithm,
-    hasFailure: hasRecordedValue(artifact.error),
-    startedAt: artifact.startedAt,
-    finishedAt: artifact.finishedAt,
-  };
-}
-
-function toRestoreRun(run: RestoreRunWire): RestoreRun {
-  return {
-    id: run.id,
-    artifactId: run.artifactId,
-    tenantId: run.tenantId,
-    databaseServerId: run.databaseServerId,
-    sourceDatabaseName: run.sourceDatabaseName,
-    targetDatabaseName: run.targetDatabaseName,
-    status: run.status,
-    hasVerification: hasRecordedValue(run.verification),
-    reason: run.reason,
-    hasFailure: hasRecordedValue(run.error),
-    startedAt: run.startedAt,
-    finishedAt: run.finishedAt,
-    promotedAt: run.promotedAt,
-    promoteReason: run.promoteReason,
-  };
-}
-
 function toQueryString(query?: object): string {
   if (!query) return "";
 
@@ -125,11 +44,6 @@ function idempotentWrite(idempotencyKey: string) {
   };
 }
 
-const nonIdempotentWrite = {
-  nonReplayable: true,
-  skipAutoIdempotency: true,
-} as const;
-
 export const backupApi = {
   listPolicies: async (query?: BackupPolicyListQuery) => {
     const response = await axiosClient.get<BackupPolicy[]>(
@@ -150,7 +64,7 @@ export const backupApi = {
     data: UpsertBackupPolicyDto,
     idempotencyKey: string,
   ) => {
-    const response = await axiosClient.put<BackupPolicy>(
+    const response = await axiosClient.patch<BackupPolicy>(
       `${BACKUP_BASE_URL}/policies/${encodeURIComponent(databaseServerId)}`,
       data,
       idempotentWrite(idempotencyKey),
@@ -171,7 +85,7 @@ export const backupApi = {
     data: UpsertBackupDatabaseOverrideDto,
     idempotencyKey: string,
   ) => {
-    const response = await axiosClient.put<BackupDatabaseOverride>(
+    const response = await axiosClient.patch<BackupDatabaseOverride>(
       `${BACKUP_BASE_URL}/policies/${encodeURIComponent(databaseServerId)}/databases/${encodeURIComponent(tenantId)}`,
       data,
       idempotentWrite(idempotencyKey),
@@ -190,27 +104,27 @@ export const backupApi = {
     );
   },
 
-  startRun: async (data: StartBackupRunDto) => {
-    const response = await axiosClient.post<BackupRunWire>(
+  startRun: async (data: StartBackupRunDto, idempotencyKey: string) => {
+    const response = await axiosClient.post<BackupRun>(
       `${BACKUP_BASE_URL}/runs`,
       data,
-      nonIdempotentWrite,
+      idempotentWrite(idempotencyKey),
     );
-    return toBackupRun(response.data);
+    return response.data;
   },
 
   listRuns: async (query?: BackupRunListQuery) => {
-    const response = await axiosClient.get<BackupRunWire[]>(
+    const response = await axiosClient.get<BackupRun[]>(
       `${BACKUP_BASE_URL}/runs${toQueryString(query)}`,
     );
-    return response.data.map(toBackupRun);
+    return response.data;
   },
 
   getRun: async (runId: string) => {
-    const response = await axiosClient.get<BackupRunWire>(
+    const response = await axiosClient.get<BackupRun>(
       `${BACKUP_BASE_URL}/runs/${encodeURIComponent(runId)}`,
     );
-    return toBackupRun(response.data);
+    return response.data;
   },
 
   deleteRun: async (runId: string, idempotencyKey: string) => {
@@ -221,10 +135,10 @@ export const backupApi = {
   },
 
   listArtifacts: async (query?: BackupArtifactListQuery) => {
-    const response = await axiosClient.get<BackupArtifactWire[]>(
+    const response = await axiosClient.get<BackupArtifact[]>(
       `${BACKUP_BASE_URL}/artifacts${toQueryString(query)}`,
     );
-    return response.data.map(toBackupArtifact);
+    return response.data;
   },
 
   deleteArtifact: async (artifactId: string, idempotencyKey: string) => {
@@ -234,35 +148,42 @@ export const backupApi = {
     );
   },
 
-  startRestore: async (data: StartRestoreRunDto) => {
-    const response = await axiosClient.post<RestoreRunWire>(
+  startRestore: async (
+    data: StartRestoreRunDto,
+    idempotencyKey: string,
+  ) => {
+    const response = await axiosClient.post<RestoreRun>(
       `${RESTORE_BASE_URL}/runs`,
       data,
-      nonIdempotentWrite,
+      idempotentWrite(idempotencyKey),
     );
-    return toRestoreRun(response.data);
+    return response.data;
   },
 
   listRestores: async (query?: RestoreRunListQuery) => {
-    const response = await axiosClient.get<RestoreRunWire[]>(
+    const response = await axiosClient.get<RestoreRun[]>(
       `${RESTORE_BASE_URL}/runs${toQueryString(query)}`,
     );
-    return response.data.map(toRestoreRun);
+    return response.data;
   },
 
   getRestore: async (runId: string) => {
-    const response = await axiosClient.get<RestoreRunWire>(
+    const response = await axiosClient.get<RestoreRun>(
       `${RESTORE_BASE_URL}/runs/${encodeURIComponent(runId)}`,
     );
-    return toRestoreRun(response.data);
+    return response.data;
   },
 
-  promoteRestore: async (runId: string, data: PromoteRestoreRunDto) => {
-    const response = await axiosClient.post<RestoreRunWire>(
+  promoteRestore: async (
+    runId: string,
+    data: PromoteRestoreRunDto,
+    idempotencyKey: string,
+  ) => {
+    const response = await axiosClient.post<RestoreRun>(
       `${RESTORE_BASE_URL}/runs/${encodeURIComponent(runId)}/promote`,
       data,
-      nonIdempotentWrite,
+      idempotentWrite(idempotencyKey),
     );
-    return toRestoreRun(response.data);
+    return response.data;
   },
 };

@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-04**
+Last source verification: **2026-08-05**
 
 Application Catalogue row reverified: **2026-08-05**.
 
@@ -18,15 +18,15 @@ not live-authenticated or deployment-verified.
 | Admin users/WebPhone | `DONE/PARTIAL` | User lifecycle, roles, WebPhone, and call logs use Core; self profile is missing |
 | Roles/permissions | `DONE/PARTIAL/REFACTOR` | Real Core calls; ordinary metadata update must not require the critical permission; RBAC foundation lacks ANY |
 | Database Servers | `DONE/SOURCE_INTEGRATED` | Typed list/create/detail/edit/history flows, soft delete, deleted-only review, permanent Destroy, provisioning, and per-Application principal controls are implemented; Backup remains an aggregate activation dependency and link to its separate module |
-| Backup & Restore | `DONE/SOURCE_INTEGRATED/RELEASE_BLOCKED` | Separate singular `/backup` module implements overview, Core-backed `mutakamel_backup` access, Worker policies/overrides, runs, allowlisted artifact evidence, restore verification, and promotion. Worker safe-response DTOs and exact non-idempotent start-command recovery remain backend release gates; authenticated runtime evidence is open |
-| Storage Servers | `DONE/PARTIAL/GATED` | Bounded registry/history/verification/lifecycle is real; routing/rotation not exposed; attestation/recovery remain operator-safety gated |
+| Backup & Restore | `DONE/SOURCE_INTEGRATED/RELEASE_BLOCKED` | Separate singular `/backup` module implements overview, Core-backed `mutakamel_backup` access, Worker policies/overrides, runs, allowlisted artifact evidence, restore verification, and promotion. Durable actor/intent-bound command identity now protects start and promotion retries; Worker database-package adoption plus authenticated runtime/deployment evidence remain open |
+| Storage Servers | `DONE/SOURCE_INTEGRATED` | Thin routes delegate to one feature module with server-backed registry controls, write-only registration, independent durable probes, explicit 24-hour freshness/12-hour scheduling evidence, lifecycle/default/maintenance/delete gates, and stable UUIDv7 write intents; authenticated Garage/runtime evidence remains open |
 | Tenants list/detail | `PARTIAL/BROKEN` | Some real calls; nested FQDN/user/subscription/wallet and local lifecycle behavior contain contract defects |
-| Tenant creation | `PARTIAL/BROKEN` | Real Storage placement and quote-route attempts exist, but the quote body does not match Core and identity/plan/database/catalogue/FQDN work remains simulated or hardcoded |
+| Tenant creation | `DONE/PARTIAL/SOURCE_INTEGRATED` | Real identity availability is bound to the current normalized name/company input; one no-store `GET /tenants/create-options` snapshot under `admin.tenants.create` replaces hardcoded Database/Application/tier choices and supplies readiness, tiers, provisioning preview, Application-aware Database placement, and explicit bucket-free Storage placement; quote permits ANY catalog-read or tenant-create authority; exact create DTO and stable UUIDv7 recovery are integrated; authenticated runtime proof remains open |
 | Tenant users/access | `PARTIAL/BROKEN` | Some real user calls; lifecycle methods and access catalogues are wrong/mock |
 | Tenant operations | `PARTIAL/MISSING` | List/reconciliation foundation exists; operation-specific and managed-provisioning controls are largely absent |
 | Provisioning governance | `MISSING` | 32 Gateway routes; no frontend module |
 | Storage migration | `GATED` | Eight default-off routes; do not expose |
-| Application Catalogue | `DONE/SOURCE_INTEGRATED` | Current source includes publication fields/filter/column, the dual-fence publish command, a release-authority rail, attributable-publication plus technical-readiness activation gating, the exact readiness projection, stored `runtimeTarget`, and explicit `componentKey`. Targeted source tests exist; authenticated runtime, deployment evidence, and remaining catalogue localization are still open |
+| Application Catalogue | `DONE/SOURCE_INTEGRATED` | Current source includes publication fields/filter/column, the dual-fence publish command, a release-authority rail, attributable-publication plus technical-readiness activation gating, the exact readiness projection, deterministic DRAFT technical-identity adoption, derived primary-component binding, and separate stable-intent reconciliation. Targeted source tests exist; authenticated runtime and deployment evidence are still open |
 | Subscriptions | `MISSING/PARTIAL/BROKEN` | Some tenant detail reads; cancellation path is wrong; administration and plan changes are absent |
 | Wallet | `BROKEN/MISSING` | Local credit/debit calls nonexistent APIs; preview/confirm workflow is absent |
 | Payments/reconciliation | `MISSING` | Five Gateway routes; no frontend module |
@@ -47,7 +47,6 @@ not live-authenticated or deployment-verified.
 | Subscription cancellation | Calls nested tenant route | `POST /subscriptions/:tenantId/cancel` |
 | Wallet adjustment | Calls `/wallet/credit` and `/wallet/debit` | Preview then confirm with separate UUIDv7 intents |
 | Access catalogues | Mock branch/department/team/role arrays | Use permission-specific access routes |
-| Tenant creation | Sends undocumented `modules` to quote, then uses hardcoded `srv-*`, `YEARLY`, timers, and selections | Send Core `items`, use the source-verified sequence, and use `ANNUAL` |
 | Forgot password | Timer-only behavior | Real auth route |
 | Notifications | Static hook data | REST inbox/config/preferences/actions |
 
@@ -77,15 +76,14 @@ not live-authenticated or deployment-verified.
   `/api/admin/worker/v1/restores/*`; there is no `/backups` frontend route.
 - The Backup Core adapter owns fixed-principal rotation-policy, regenerate, and
   reconcile calls for `mutakamel_backup` and rejects a mismatched projection.
-- Policy/override writes, deletes, and Core credential commands retain stable
-  exact-intent UUIDv7 keys. Manual backup start, restore start, and restore
-  promotion intentionally send no idempotency key and disable automatic 401
-  replay. Minimal attempt evidence persists across reloads; exact backend
-  command identity for start operations remains a release gate.
+- Policy/override writes, deletes, Core credential commands, manual backup
+  start, restore start, and restore promotion retain stable exact-intent UUIDv7
+  keys. Coordinated authentication refresh and ambiguous operator retries reuse
+  the same key/body; Worker returns the original accepted run.
 - The UI never renders passwords, storage paths/keys, manifest keys, raw
   artifact metadata, raw process errors, or raw restore verification payloads.
-  The frontend adapter strips them from application state, but current Worker
-  entity responses still expose them in the browser network response.
+  Worker safe projections enforce the network boundary and frontend
+  allowlisting remains defense in depth.
 
 ## Gated work
 
@@ -109,10 +107,12 @@ controls gated until their operator evidence contract is confirmed.
 
 ### Backup response and command recovery
 
-Do not describe Backup as production-ready until Worker replaces entity-shaped
-admin responses with explicit safe DTO projections and exposes durable command
-identity/recovery for non-idempotent backup and restore starts. Frontend
-allowlisting is defense in depth, not a substitute for an API boundary.
+Worker now maps admin responses to explicit safe projections and persists
+actor/intent-bound command identity before backup start, restore start, and
+restore promotion effects. The frontend retains the exact UUIDv7 across
+ambiguous retries and removes the former acknowledgement/lock workaround.
+Production status remains blocked on package/schema adoption and authenticated
+runtime/deployment evidence; frontend allowlisting remains defense in depth.
 
 ## Evidence level for this matrix
 

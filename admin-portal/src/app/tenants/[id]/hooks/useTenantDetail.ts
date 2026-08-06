@@ -377,8 +377,6 @@ type Wallet = LooseType;
     setIsAddFqdnOpen,
     isRoleAssignmentOpen,
     setIsRoleAssignmentOpen,
-    isOperationDagOpen,
-    setIsOperationDagOpen,
 
     selectedUserId,
     setSelectedUserId,

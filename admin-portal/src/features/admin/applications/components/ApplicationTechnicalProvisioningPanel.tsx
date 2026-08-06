@@ -19,26 +19,34 @@ import type {
   ApplicationTechnicalReadinessView,
   ApplicationSelectionBlocker,
 } from "../types";
+import {
+  canLinkPrimaryComponent,
+  deriveTechnicalIdentityPreview,
+} from "../lib/technical-provisioning-state";
 
 interface Props {
   applicationKey: string;
+  databasePrincipal: string | null;
   readiness: ApplicationTechnicalReadinessView | null;
   error: NormalizedApiError | null;
   isLoading: boolean;
   isRefreshing: boolean;
   canManage: boolean;
   onRetry: () => void;
+  onOpenAdoption: () => void;
   onOpenBinding: () => void;
 }
 
 export function ApplicationTechnicalProvisioningPanel({
   applicationKey,
+  databasePrincipal,
   readiness,
   error,
   isLoading,
   isRefreshing,
   canManage,
   onRetry,
+  onOpenAdoption,
   onOpenBinding,
 }: Props) {
   const { t, dir } = useI18n();
@@ -65,10 +73,10 @@ export function ApplicationTechnicalProvisioningPanel({
     TECHNICAL_READINESS_BLOCKED:
       copy.selectionBlockers.technicalReadinessBlocked,
   };
-  const showBindingAction =
-    readiness?.lifecycleStatus === "DRAFT" &&
-    Boolean(readiness.runtimeTarget) &&
-    readiness.components.length === 0;
+  const identity = deriveTechnicalIdentityPreview(applicationKey);
+  const showAdoptionAction =
+    readiness?.lifecycleStatus === "DRAFT" && !readiness.runtimeTarget;
+  const showBindingAction = canLinkPrimaryComponent(readiness);
 
   return (
     <section
@@ -137,6 +145,27 @@ export function ApplicationTechnicalProvisioningPanel({
               </div>
             </div>
 
+            <div className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-900 dark:bg-cyan-950/20">
+              <div className="grid items-center gap-2 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]" dir="ltr">
+                <ChainStep label={copy.applicationKey} value={applicationKey} />
+                <ArrowRight className="mx-auto hidden h-4 w-4 text-cyan-500 sm:block" />
+                <ChainStep
+                  label={copy.workerTarget}
+                  value={readiness.runtimeTarget ?? identity.runtimeTarget}
+                />
+                <ArrowRight className="mx-auto hidden h-4 w-4 text-cyan-500 sm:block" />
+                <ChainStep
+                  label={copy.databasePrincipal}
+                  value={databasePrincipal ?? identity.databasePrincipal}
+                />
+                <ArrowRight className="mx-auto hidden h-4 w-4 text-cyan-500 sm:block" />
+                <ChainStep label={copy.componentKey} value={identity.primaryComponentKey} />
+              </div>
+              <p className="mt-3 text-[11px] text-cyan-800 dark:text-cyan-300">
+                {readiness.runtimeTarget ? copy.identityAuthoritative : copy.identityPreview}
+              </p>
+            </div>
+
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               <Check label={copy.checks.runtimeTarget} value={readiness.checks.runtimeTarget} icon={Route} passed={copy.passed} blocked={copy.blocked} />
               <Check label={copy.checks.componentBinding} value={readiness.checks.componentBinding} icon={Boxes} passed={copy.passed} blocked={copy.blocked} />
@@ -200,6 +229,27 @@ export function ApplicationTechnicalProvisioningPanel({
                 <p className="mt-3 text-[11px] text-slate-500">{copy.noCredential}</p>
               </article>
             ))}
+
+            {showAdoptionAction && (
+              <div className="flex flex-col justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 sm:flex-row sm:items-center dark:border-violet-900 dark:bg-violet-950/20">
+                <div>
+                  <h3 className="text-xs font-black text-violet-950 dark:text-violet-100">{copy.adoptionCalloutTitle}</h3>
+                  <p className="mt-1 text-[11px] leading-relaxed text-violet-800 dark:text-violet-300">{copy.adoptionCalloutDescription}</p>
+                  {!canManage && (
+                    <p className="mt-2 font-mono text-[10px] text-amber-700 dark:text-amber-300">{copy.permissionRequired}</p>
+                  )}
+                </div>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={onOpenAdoption}
+                    className="min-h-11 shrink-0 rounded-xl bg-violet-700 px-4 py-2 text-xs font-bold text-white hover:bg-violet-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                  >
+                    {copy.adoptIdentity}
+                  </button>
+                )}
+              </div>
+            )}
 
             {showBindingAction && (
               <div className="flex flex-col justify-between gap-3 rounded-xl border border-cyan-200 bg-cyan-50 p-4 sm:flex-row sm:items-center dark:border-cyan-900 dark:bg-cyan-950/20">

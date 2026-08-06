@@ -29,7 +29,7 @@ export type DatabaseServerApplicationBindingStatus =
   | "DISABLED";
 
 export interface DatabaseServerCredentialsDto {
-  username: string; // trimmed, 1..128
+  username: string; // trimmed, /^(?!pg_)[a-z_][a-z0-9_]{0,62}$/
   password: string; // 1..1024, do not trim
 }
 

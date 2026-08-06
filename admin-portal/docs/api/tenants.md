@@ -3,7 +3,7 @@
 Verified against the current API Gateway route contracts, Core controllers,
 DTOs, services, repositories, entities, subscription quoting, provisioning
 contracts, error catalogue, and active Admin Portal screens on
-**2026-07-30**.
+**2026-08-05**.
 
 This is the implementation contract for `/tenants`, `/tenants/new`, and the
 tenant-detail shell. It covers identity validation, creation, list/detail,
@@ -22,15 +22,15 @@ permissioned nested resources.
 | Entity identifiers | UUIDv7 |
 | Active frontend routes | `/tenants`, `/tenants/new`, `/tenants/[id]` |
 | Legacy frontend routes | `/tenant` and `/tenant/new` redirect to the plural family; `/tenant/[id]` currently loses the id and redirects to `/tenants` |
-| Current integration | Partial real list/detail/create foundation mixed with contract-breaking routes, DTOs, simulated validation/planning, hardcoded selections, and local transitions |
+| Current integration | `/tenants/new` now uses the real identity-availability endpoint, one least-privilege tenant-create Application/readiness/tier snapshot, Application-aware database placement, Storage placement, provisioning preview, quote, and explicit UUIDv7 placement IDs. List/detail remain partial. |
 
 The Gateway currently exposes exactly **69** routes whose browser paths start
 with `/api/admin/core/v1/tenants`. They are divided as follows:
 
 | Family | Count | Detailed reference |
 |:---|---:|:---|
-| Tenant creation, registry, lifecycle, and FQDNs | 18 | This document |
-| Operation history and tenant-scoped provisioning | 16 | [Tenant Operations and Provisioning](tenant-operations.md) |
+| Tenant creation, registry, lifecycle, and FQDNs | 19 | This document |
+| Operation history and tenant-scoped provisioning | 15 | [Tenant Operations and Provisioning](tenant-operations.md) |
 | Tenant users and access catalogues | 18 | [Tenant Users](tenant-users.md) |
 | Subscription and billing summary | 4 | [Subscriptions](subscriptions.md), [Invoices](invoices.md) |
 | Wallet, ledger, adjustments, and payments | 5 | [Wallet and Ledger](wallet.md) |
@@ -70,7 +70,8 @@ generated for one mutation intent.
 | Method and browser path | Permission | Success | Idempotency key | Purpose |
 |:---|:---|:---:|:---:|:---|
 | `POST /api/admin/core/v1/tenants/validate-identity` | `admin.tenants.create` | `200` | No | Check name and company-name availability |
-| `GET /api/admin/core/v1/tenants/database-placement-options` | `admin.tenants.create` | `200` | No | List currently eligible manual-placement servers |
+| `GET /api/admin/core/v1/tenants/create-options` | `admin.tenants.create` | `200` | No | Load one consistent, bounded Application/readiness/active-tier projection |
+| `GET /api/admin/core/v1/tenants/database-placement-options?applicationKeys=crm,trade` | `admin.tenants.create` | `200` | No | List servers ready for the exact selected Applications |
 | `GET /api/admin/core/v1/tenants/storage-placement-options` | `admin.tenants.create` | `200` | No | List the safe, production-ready Storage Servers eligible for explicit placement |
 | `POST /api/admin/core/v1/tenants/reverse-geocode` | `admin.tenants.create` | `200` | No | Convert coordinates to a canonical address suggestion |
 | `POST /api/admin/core/v1/tenants/provisioning-plans` | `admin.tenants.create` | `200` | No | Preview the dependency-expanded provisioning DAG |
@@ -180,6 +181,25 @@ semantics. An exact tenant-create retry can return the originally created
 tenant even after its single-use quote was consumed. `storageServerId` is part
 of the durable create-command fingerprint. Changing the selected Storage
 Server is a new intent and requires a new UUIDv7 idempotency key.
+
+The create wizard locks every editable control and step transition as soon as
+submission starts. It fingerprints the live draft, rechecks ownership after
+the quote returns, and rechecks again immediately before the create POST. A
+changed draft is never sent with the quote or command identity captured for an
+older draft.
+
+Immediately before the create POST, the browser stores only a tab-scoped
+status-recovery marker: UUIDv7 key, immutable public tenant name, and save time.
+It does not store the create DTO, company/owner/contact data, quote, Database or
+Storage selection, or subscription lines. Failure to store that marker blocks
+the POST. Success clears it. An ambiguous response keeps it and disables all
+new tenant-create submissions in that tab. Recovery is read-only and requires
+`admin.tenants.read`: the UI performs an exact-name check against the
+authoritative tenant list, projects only `id`, `name`, and `status`, then clears
+the marker and redirects when a row exists. No row, a forbidden read, or an
+unavailable response keeps the marker and never triggers an automatic replay.
+Because the DTO is intentionally not persisted, reload cannot reconstruct or
+resend the original tenant-create command.
 
 ## Transport enums
 
@@ -328,14 +348,15 @@ other operational configuration.
 The wizard is a server-priced, asynchronous provisioning workflow:
 
 ```text
-catalogue selections
-  -> identity/FQDN/database-placement checks
-  -> explicit Storage Server selection
-  -> provisioning-plan preview
+identity and company details
+  -> load one no-store tenant-create Application/readiness/active-tier snapshot
+  -> select Application/tier/seats and preview the server-derived plan
+  -> load database placement with exact applicationKeys
+  -> explicitly select returned Database and Storage UUIDv7 targets
   -> subscription quote
-  -> POST tenant with quoteId + storageServerId + UUIDv7 command key
+  -> POST tenant with quoteId + nested subscription + placement IDs + UUIDv7 command key
   -> tenant returned as PROVISIONING
-  -> poll operation/detail until terminal state
+  -> redirect to the returned tenant id and observe asynchronous provisioning
 ```
 
 The preview is evidence for the UI only. Creation rebuilds and pins its own
@@ -385,6 +406,12 @@ HTTP `200` is returned even when a value is unavailable; inspect `data.valid`
 and each field. This endpoint does not guarantee that every possible secondary
 FQDN is available.
 
+The active wizard binds successful evidence to the normalized current
+`name + companyName` fingerprint. Editing either field invalidates the evidence
+and prevents leaving step 1 or creating the tenant until the real endpoint is
+called again. Late validation responses are generation/identity fenced and
+cannot validate changed input.
+
 The tenant name is immutable after creation and generates the platform-owned
 primary domain `<name>.mutakamel.ai`.
 
@@ -428,9 +455,68 @@ DNS checks in the browser. A secondary FQDN may still be submitted during
 creation before DNS propagation; it remains non-routable until scheduled Core
 verification marks it `VALID`.
 
-### 3. Load manual database placement options
+### 3. Load tenant-create Application options
 
-`GET /api/admin/core/v1/tenants/database-placement-options`
+`GET /api/admin/core/v1/tenants/create-options`
+
+Permission: `admin.tenants.create`.
+
+```ts
+type TenantCreateSelectionBlocker =
+  | "APPLICATION_LIFECYCLE_NOT_ACTIVE"
+  | "APPLICATION_NOT_PUBLISHED"
+  | "APPLICATION_NOT_PUBLIC"
+  | "APPLICATION_NON_BILLABLE"
+  | "TECHNICAL_READINESS_BLOCKED";
+
+type TenantCreateReadinessReason =
+  | "RUNTIME_TARGET_REQUIRED"
+  | "COMPONENT_BINDING_REQUIRED"
+  | "ACTIVE_COMPONENT_REQUIRED"
+  | "PUBLISHED_RELEASE_REQUIRED"
+  | "MINIMUM_RELEASE_NOT_SATISFIED"
+  | "DATABASE_PERMISSION_MANIFEST_REQUIRED"
+  | "DATABASE_PERMISSION_MANIFEST_INVALID";
+
+interface TenantCreateOptionsView {
+  contractVersion: 1;
+  applications: Array<{
+    applicationId: string; // UUIDv7
+    key: string;           // immutable Application key
+    name: string;
+    description: string | null;
+    rank: number;
+    commercialMode: "INCLUDED" | "SUBSCRIPTION";
+    technicalDefinitionRevision: string; // positive bigint; never Number(...)
+    selectionAllowed: boolean;
+    selectionBlockers: TenantCreateSelectionBlocker[];
+    readinessReasons: TenantCreateReadinessReason[];
+    catalogueReasons: Array<"ACTIVE_TIER_REQUIRED">;
+    tiers: Array<{
+      id: string; // UUIDv7
+      key: string;
+      name: string;
+      rank: number;
+    }>;
+  }>;
+}
+```
+
+The response is wrapped under `data`, carries
+`Cache-Control: private, no-store`, and is read from one `REPEATABLE READ`
+snapshot. Core returns only ACTIVE, PUBLISHED, PUBLIC Tenant Applications in
+INCLUDED or SUBSCRIPTION commercial modes, caps the projection at 100, batches
+active tiers, and fails closed when the cap or readiness identity is invalid.
+
+Use only entries with `selectionAllowed: true`; show the returned blockers and
+reasons for disabled entries. Treat an empty array as an authoritative empty
+catalogue, but treat `403`, `5xx`, or a malformed/unknown contract as a blocking
+error. Do not fall back to broad Application Catalogue, readiness, or tier APIs,
+and do not derive Application or tier identities from display names.
+
+### 4. Load Application-aware database placement options
+
+`GET /api/admin/core/v1/tenants/database-placement-options?applicationKeys=crm,trade`
 
 Permission: `admin.tenants.create`.
 
@@ -449,15 +535,17 @@ interface TenantCreateDatabasePlacementOptionsView {
 }
 ```
 
-This is a bounded object under `data`, not a paginated response. It contains
-only active servers that have spare capacity and every required provisioning
-and runtime credential. Items are sorted by name.
+This is a bounded object under `data`, not a paginated response. Pass the exact
+deduplicated selected Application keys. A returned server is active, has spare
+capacity, has both fixed system principals ready, and has ready current
+bindings for all mandatory and selected Applications. Refetch this list when
+the Application-key set changes and clear any previous database selection.
 
-For automatic placement, omit `databaseServerId`. Core selects an eligible
-server in the chosen country with the most spare capacity. For manual
-placement, send the selected UUIDv7. Do not send `placementMode`.
+The Admin Portal V1 requires an explicit returned UUIDv7 and sends it as
+`databaseServerId`. It never sends `placementMode`, never displays the complete
+Database Server registry, and never creates a local or fake server id.
 
-### 4. Load and select Storage Server placement
+### 5. Load and select Storage Server placement
 
 `GET /api/admin/core/v1/tenants/storage-placement-options`
 
@@ -466,84 +554,32 @@ Permission: `admin.tenants.create`.
 ```ts
 interface TenantCreateStoragePlacementOptionsView {
   items: Array<{
-    id: string;
+    id: string;            // UUIDv7
+    code: string;
     name: string;
-    provider: "GARAGE";
     region: string;
     status: "ACTIVE";
-    availabilityClass: "HA_PRODUCTION_READY";
-    currentTenants: number;
-    retainedTenants: number;
-    reservedTenants: number;
-    maxTenants: number;
-    capacityPercent: number;
-    allocatableCapacityBytes: string;
-    availableReservationBytes: string;
+    assignedTenants: number;
+    maxTenants: number | null;
   }>;
   total: number;
 }
 ```
 
-The response carries `Cache-Control: private, no-store` and is a bounded object
-under `data`, not a paginated envelope. It
-contains at most 200 eligible rows sorted by name. It deliberately omits:
+The response carries `Cache-Control: private, no-store` and is a bounded
+object under `data`. Current source returns only active, non-deleted servers
+with encrypted credentials, spare capacity, and a successful connection test
+no older than 24 hours. Core locks and revalidates the selected row during
+creation.
 
-- internal and public endpoints;
-- bucket names and class bindings;
-- credential references and credential material;
-- topology-member and encrypted-volume details;
-- recovery-destination details.
+The projection intentionally omits the physical bucket and all endpoint or
+credential data. The browser parser copies only the fields above and discards any unexpected
+operational or secret-bearing properties. The administrator must explicitly
+select one returned UUIDv7. There is no automatic Storage placement, hidden
+default, fallback, or client-side substitution.
 
-Every returned row is currently `ACTIVE`, `GENERAL`,
-`HA_PRODUCTION_READY`, healthy, below the critical capacity threshold, and
-backed by current topology, encrypted-volume, bucket,
-principal-verification, and recovery evidence. Capacity observations and
-topology snapshots must be no older than 15 minutes, and the independent
-isolated-restore evidence must be no older than 180 days. Core re-locks and
-revalidates the selected row during creation, so a listed row can still become
-ineligible before submission.
 
-The admin must explicitly select exactly one item and submit its UUIDv7 as
-`storageServerId`. There is no automatic Storage Server placement, hidden
-default, fallback, or client-side substitution. An empty list is a blocking
-state: keep the form draft, explain that no production-ready storage target is
-available, and do not enable tenant creation.
-
-Byte counters are decimal strings and require `BigInt`-safe formatting. The
-numeric `capacityPercent` is display evidence only; do not use it to re-create
-Core's eligibility rules.
-
-Example response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "items": [
-      {
-        "id": "019f0000-0000-7000-8000-000000000030",
-        "name": "Primary Garage Cluster",
-        "provider": "GARAGE",
-        "region": "garage",
-        "status": "ACTIVE",
-        "availabilityClass": "HA_PRODUCTION_READY",
-        "currentTenants": 12,
-        "retainedTenants": 1,
-        "reservedTenants": 0,
-        "maxTenants": 100,
-        "capacityPercent": 28.5,
-        "allocatableCapacityBytes": "1099511627776",
-        "availableReservationBytes": "824633720832"
-      }
-    ],
-    "total": 1
-  },
-  "correlationId": "019f0000-0000-7000-8000-000000000090",
-  "timestamp": "2026-07-28T08:00:00.000Z"
-}
-```
-
-### 5. Reverse-geocode an optional map selection
+### 6. Reverse-geocode an optional map selection
 
 `POST /api/admin/core/v1/tenants/reverse-geocode`
 
@@ -575,7 +611,7 @@ Treat this as an editable suggestion, not an irreversible selection. Core
 caches coordinate results and serializes outbound provider calls. A missing or
 incomplete address is `422`; provider failure is `502` or `503`.
 
-### 6. Preview provisioning
+### 7. Preview provisioning
 
 `POST /api/admin/core/v1/tenants/provisioning-plans`
 
@@ -586,34 +622,60 @@ interface PreviewTenantProvisioningDto {
   moduleKeys: string[];
 }
 
-interface TenantProvisioningSelectionPreviewV2 {
-  contractVersion: 2;
-  selectedModuleKeys: string[];
+interface TenantProvisioningSelectionPreview {
+  contractVersion: 1;
+  selectedApplicationKeys: string[];
   selectionDigest: string;
-  components: TenantProvisioningComponentPlanV2[];
-  steps: TenantProvisioningStepPlanV2[];
-  prerequisites?: TenantProvisioningPrerequisitePlanV2[];
+  components: Array<{
+    componentId: string;
+    componentKey: string;
+    ownerApp: string;
+    selectionSource: "FOUNDATION" | "ENTITLEMENT" | "DEPENDENCY";
+    dependsOnComponentKeys: string[];
+    required: boolean;
+    activationRequired: boolean;
+    releaseId: string;
+    releaseVersion: string;
+    manifestVersion: number;
+    manifestChecksum: string;
+    schemaTarget: string;
+    schemaChecksum?: string;
+    seedPacks: Array<{ key: string; version: string; policy: string; checksum?: string }>;
+  }>;
+  steps: Array<{
+    stepKey: string;
+    componentKey?: string;
+    kind: string;
+    required: boolean;
+    activationRequired: boolean;
+    dependsOn: string[];
+    targetVersion?: string;
+    targetChecksum?: string;
+  }>;
 }
 ```
 
 `moduleKeys` is normalized to lowercase, must contain 1–50 unique strings, and
 each key must match `^[a-z][a-z0-9_-]{0,63}$`. The service also requires each
 selected module to be active and have a valid published component/release
-catalogue. Foundation and dependency components are expanded automatically.
+catalogue. Core and Worker foundations are never selected by the browser;
+foundation and dependency components are expanded automatically by Core.
 
 Render component and step arrays from the response. The current frontend’s
 three-field `components: string[]`/`stepsCount` mock loses important dependency,
 release, checksum, seed, and activation evidence.
 
-### 7. Obtain the subscription quote
+### 8. Obtain the subscription quote
 
 Tenant creation requires a short-lived quote from a route outside the tenant
 prefix:
 
 `POST /api/admin/core/v1/subscriptions/quote`
 
-Permission: `admin.catalog.read`. This route is an authenticated read-like
-POST and does not require an idempotency header.
+Permission: either `admin.catalog.read` or `admin.tenants.create` (`ANY`). This
+route is an authenticated read-like POST and does not require an idempotency
+header. The tenant-create wizard uses `admin.tenants.create`; standalone
+catalogue/pricing surfaces may use `admin.catalog.read`.
 
 ```ts
 interface QuoteSubscriptionDto {
@@ -651,17 +713,18 @@ catalogue contract; quote with IDs, then create with the corresponding
 creating admin when an actor id is stored, and can be consumed once. Re-quote
 after any module, tier, seat, cycle, or price change.
 
-The creation page therefore needs both `admin.tenants.create` and
-`admin.catalog.read`. A user lacking catalogue read cannot complete the
-server-priced wizard.
+The complete creation page requires only `admin.tenants.create`. Its composite
+create-options projection supplies Application identity, technical readiness,
+and active tiers, while the quote route accepts the same permission. Missing
+permission is a blocking forbidden state, never an empty catalogue.
 
-### 8. Create the tenant
+### 9. Create the tenant
 
 `POST /api/admin/core/v1/tenants`
 
 Permission: `admin.tenants.create`.
 
-Preferred request shape:
+Canonical Admin Portal V1 request shape:
 
 ```ts
 interface CreateTenantDto {
@@ -678,7 +741,7 @@ interface CreateTenantDto {
   address: TenantAddress;
   taxNumber?: string;
   commercialRegistrationNumber?: string;
-  databaseServerId?: string;
+  databaseServerId: string;
   storageServerId: string;
   ownerEmail: string;
   ownerFirstName: string;
@@ -691,21 +754,23 @@ interface CreateTenantDto {
   sendInvitation?: boolean;
   ownerActive?: boolean;
   locale?: string;
-  billingCycle: BillingCycleEnum;
-  currencyCode?: "USD";
-  trialDays?: number;
-  modules: Array<{
-    moduleKey: string;
-    tierKey: string;
-    seats: number;
-  }>;
+  subscription: {
+    billingCycle: "MONTHLY" | "ANNUAL";
+    currencyCode: "USD";
+    trialDays?: number;
+    items: Array<{
+      moduleKey: string;
+      tierKey: string;
+      seats: number;
+    }>;
+  };
 }
 ```
 
-The DTO also accepts a legacy nested `subscription` object and legacy
-`allowedUsers`/`addons` fields. New frontend code should use one canonical
-shape and must not send `allowedUsers` or `addons`: provisioning derives seats
-and module access from the priced module lines.
+The Admin Portal sends only this nested subscription shape. It does not send
+overlapping top-level billing fields, `modules`, `allowedUsers`, `addons`, or
+`placementMode`. Quote uses Application/tier UUIDv7 IDs; create uses the exact
+corresponding immutable keys retained in the same selection state.
 
 Detailed validation:
 
@@ -723,7 +788,7 @@ Detailed validation:
 | `phone` | Optional, max 32, digits/parentheses/plus/hyphen/space/dot |
 | `address` | Required nested object; each property optional and trimmed |
 | `taxNumber`, `commercialRegistrationNumber` | Optional, max 64 |
-| `databaseServerId` | Optional UUIDv7; omission means automatic placement |
+| `databaseServerId` | Required by Admin Portal V1; UUIDv7 selected from the exact Application-aware options |
 | `storageServerId` | Required UUIDv7 selected from the safe Storage Server placement options; no default/failover |
 | `ownerEmail` | Email, max 255, trim/lowercase |
 | `ownerFirstName`, `ownerLastName` | Required trimmed string, 1–80 |
@@ -800,12 +865,12 @@ The operation is transactional. Core:
 - stores secondary FQDNs as pending;
 - creates the subscription, wallet, access-policy snapshot, operation, and
   provisioning attempt;
-- publishes the immutable V2 plan through the outbox.
+- publishes the immutable provisioning plan through the outbox.
 
 Physical database creation, migrations, seeds, owner creation/invitation, and
 the final transition to `ACTIVE` are asynchronous. Do not optimistically mark
 the returned tenant active. Core creates no S3 folder marker: tenant storage
-namespaces are virtual and are derived by the Storage V2 runtime from the
+namespaces are virtual and are derived by the Storage runtime from the
 persisted assignment.
 
 ## Tenant directory
@@ -1100,8 +1165,9 @@ so the UI should not show a “set primary” action.
 | UI capability | Permission |
 |:---|:---|
 | Register wizard shell | `admin.tenants.create` |
+| Load tenant-create Applications, readiness, and active tiers | `admin.tenants.create` |
 | Load/select database and Storage Server placement options | `admin.tenants.create` |
-| Read selectable modules/tiers and obtain quote | `admin.catalog.read` |
+| Obtain the tenant-create subscription quote | `admin.tenants.create` (`admin.catalog.read` is an alternate permission for catalogue consumers) |
 | Read directory/detail/operations | `admin.tenants.read` |
 | Edit profile | `admin.tenants.update` |
 | Suspend/activate | `admin.tenants.suspend` + `admin.tenants.critical` |
@@ -1180,61 +1246,39 @@ Operation-command errors are detailed in
 
 ## Current frontend gaps
 
-The active implementation under `src/app/tenants/` is a partial,
-contract-breaking prototype:
+The `/tenants/new` authoritative catalogue and placement slice is
+source-integrated:
 
-1. The directory and detail hooks perform some real requests, but they use
-   loose/invented response types, suppress errors to the console, and do not
-   implement permission, forbidden, conflict, or independent error states.
-2. List lifecycle, retry, and delete issue incorrect or incomplete operations
-   and still apply optimistic local assumptions.
-3. The list type uses invalid `FAILED`; the transport value is
-   `PROVISIONING_FAILED`.
-4. The list invents `code`, `primaryFqdn`, `planName`, and direct `seats`
-   fields.
-5. Summary cards count local mock/page rows; no tenant aggregate endpoint
-   exists.
-6. Mock database-server ids such as `srv-eg-01` fail UUIDv7 validation.
-7. The creation wizard calls the quote and tenant-create routes, but its quote
-   body uses undocumented `{ modules: ... }` instead of
-   `QuoteSubscriptionDto.items` with real module/tier UUIDv7 values. It also
-   hardcodes the `business` tier and reports success/redirects without tracking
-   the returned provisioning operation. Its Storage Server step is live and
-   permission-aware.
-8. It sends flattened address fields instead of required nested `address`.
-9. It invents `placementMode`, `selectedModules`, and `YEARLY`.
-10. It selects currency `EGP`, although subscription pricing/settlement is
-    fixed to `USD`.
-11. It sends aggregate `allowedUsers`; real access comes from per-module
-    `tierKey` and `seats`.
-12. Identity and plan preview handlers are delays with fabricated success.
-13. The mocked plan loses release, dependency, checksum, seed, prerequisite,
-    and activation evidence.
-14. Detail reads are partial, while lifecycle/destruction actions remain
-    simulated or use incomplete states. Profile save now uses `PATCH`, sends
-    `expectedUpdatedAt`, whitelists only `UpdateTenantDto` profile fields, and
-    replaces the detail view with the returned server projection.
-15. FQDN rows use invented `domain`, `type`, and `VERIFIED` fields instead of
-    `fqdn`, `isPrimary`, and `validationStatus`.
-16. The detail page offers primary changes that are locked for normal generated
-    platform domains.
-17. Operations use invalid types/statuses such as `TENANT_PROVISIONING`,
-    `MODULE_ENABLEMENT`, and `COMPLETED`.
-18. Subscription cancellation writes invalid `CANCELED` instead of
-    `CANCELLED`.
-19. Wallet amounts and rates are JavaScript numbers with hard-coded FX
-    arithmetic rather than server decimal strings and preview/commit evidence.
-20. Mutations fall back to interceptor-generated UUIDv7 keys; exact retry does
-    not consistently retain one caller-owned intent key.
-21. Loading, empty, independent forbidden-tab, validation, stale-update,
-    conflict, in-flight, replay, and terminal provisioning states are absent.
-22. The list model still uses a flattened optional Storage Server name, but
-    detail now renders the safe nested `storageServer` projection and stable
-    `storageServerId`.
-23. Existing-tenant detail/edit now keeps storage placement read-only and
-    excludes it from profile updates. The eight dedicated migration routes are
-    default-off and remain unexposed because the frontend-safe revision,
-    current-migration, and post-cutover-operation read model is incomplete.
+- candidate Applications come from the ACTIVE, PUBLISHED, PUBLIC Tenant
+  catalogue for INCLUDED and SUBSCRIPTION commercial modes;
+- every candidate is fail-closed against its technical
+  `selectionAllowed` projection and active tiers;
+- Core/Worker foundations are shown only when returned by the provisioning
+  preview;
+- database placement refetches with the exact selected `applicationKeys`;
+- Database and Storage selections accept only returned UUIDv7 values;
+- quote sends UUIDv7 `items`, while create sends the matching keys in one
+  nested `subscription` object;
+- ambiguous create outcomes retain only a minimal status-recovery marker and
+  block a new submit; no tenant DTO or PII is persisted for replay;
+- success remains `PROVISIONING` and redirects with the returned tenant id.
+
+Identity availability is now source-integrated through the canonical endpoint,
+strict response parser, field-level evidence, and input-fingerprint fence.
+Ambiguous tenant-create outcomes preserve only the UUIDv7 key, immutable public
+tenant name, and save time in tab-scoped storage. The wizard uses read-only
+exact-name status recovery and does not reconstruct or replay the create body
+after reload. The primary FQDN is derived from the validated immutable tenant
+name; secondary-FQDN validation remains its separate documented workflow.
+
+The least-privilege composite create-options call and identity flow still need
+authenticated runtime and browser proof against the migrated development
+database.
+
+The tenant directory and detail areas remain partial: their lifecycle, nested
+access, FQDN, subscription, wallet, and operation behavior must be corrected
+independently. Source integration is not authenticated runtime or deployment
+proof.
 
 ## Recommended implementation sequence
 

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type { ApplicationTechnicalReadinessView } from "../types";
 import {
+  canLinkPrimaryComponent,
   classifyTechnicalProvisioningError,
+  deriveTechnicalIdentityPreview,
   getActivationReadinessState,
   shouldReconcileTechnicalProvisioning,
   type ApplicationPublicationEvidence,
@@ -56,6 +58,14 @@ const publication = (
 });
 
 describe("technical provisioning command recovery", () => {
+  it("previews the same deterministic identity that Core returns authoritatively", () => {
+    expect(deriveTechnicalIdentityPreview("people_ops")).toEqual({
+      runtimeTarget: "people-ops-app",
+      databasePrincipal: "mutakamel_people_ops_app",
+      primaryComponentKey: "app.people_ops",
+      contractVersion: 1,
+    });
+  });
   it("refetches stale, in-flight, and ambiguous outcomes", () => {
     const stale = classifyTechnicalProvisioningError(
       error("APPLICATION_TECHNICAL_DEFINITION_REVISION_STALE"),
@@ -85,6 +95,69 @@ describe("technical provisioning command recovery", () => {
     expect(terminal).toBe("TERMINAL");
     expect(shouldReconcileTechnicalProvisioning(forbidden)).toBe(false);
     expect(shouldReconcileTechnicalProvisioning(terminal)).toBe(false);
+  });
+});
+
+describe("primary component command eligibility", () => {
+  it("allows only an authoritative missing TENANT component", () => {
+    const tenant: ApplicationTechnicalReadinessView = {
+      ...readiness(false),
+      reasons: [
+        "COMPONENT_BINDING_REQUIRED",
+        "ACTIVE_COMPONENT_REQUIRED",
+        "PUBLISHED_RELEASE_REQUIRED",
+      ],
+      checks: {
+        ...readiness(false).checks,
+        componentBinding: false,
+        activeComponents: false,
+      },
+    };
+
+    expect(canLinkPrimaryComponent(tenant)).toBe(true);
+  });
+
+  it("does not invent a component for an unbound ready SYSTEM Application", () => {
+    const worker: ApplicationTechnicalReadinessView = {
+      ...readiness(true),
+      applicationKey: "worker",
+      runtimeTarget: "worker-app",
+      reasons: [],
+      checks: {
+        ...readiness(true).checks,
+        componentBinding: true,
+      },
+    };
+
+    expect(canLinkPrimaryComponent(worker)).toBe(false);
+  });
+
+  it("fails closed when a component is already present", () => {
+    const tenant: ApplicationTechnicalReadinessView = {
+      ...readiness(false),
+      reasons: [
+        "COMPONENT_BINDING_REQUIRED",
+        "ACTIVE_COMPONENT_REQUIRED",
+        "PUBLISHED_RELEASE_REQUIRED",
+      ],
+      components: [
+        {
+          id: "019f0000-0000-7000-8000-000000000003",
+          key: "app.crm",
+          ownerApp: "crm",
+          workerTarget: "crm-app",
+          kind: "MODULE" as const,
+          status: "ACTIVE" as const,
+          activationRequired: true,
+          required: true,
+          minimumRelease: null,
+          contractVersion: 1,
+          latestPublishedRelease: null,
+        },
+      ],
+    };
+
+    expect(canLinkPrimaryComponent(tenant)).toBe(false);
   });
 });
 

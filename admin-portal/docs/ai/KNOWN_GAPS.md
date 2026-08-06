@@ -18,8 +18,10 @@ the [capability matrix](../audit/frontend-capability-matrix.md).
   confirmation.
 - Tenant destroy and some provisioning controls report local success without
   authoritative completion.
-- Tenant creation simulates identity/plan work, uses hardcoded database IDs,
-  hardcoded catalogue selections, and `YEARLY`.
+- Tenant creation now uses authoritative Application/readiness/tier, plan,
+  Database, Storage, quote, and create contracts. Identity/FQDN validation is
+  still simulated. Candidate discovery also needs three permissions and an
+  N+1 readiness/tier sequence until Core exposes a safe composite projection.
 - Forgot password is simulated.
 - Navbar notifications are static.
 

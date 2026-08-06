@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import type {
   CreateFeatureDto,
@@ -8,6 +8,7 @@ import type {
   UpdateFeatureDto,
   UpdateTierDto,
 } from "../types";
+import { useAccessibleDialog } from "@/shared/hooks/useAccessibleDialog";
 
 type Resource = TierView | FeatureView;
 
@@ -38,6 +39,14 @@ export function CatalogueResourceDialog({
   const [color, setColor] = useState("#3b82f6");
   const [isActive, setIsActive] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const { dialogRef, onKeyDown, onBackdropMouseDown } = useAccessibleDialog({
+    open: isOpen,
+    onClose,
+    isSubmitting,
+    initialFocusSelector: "input",
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,21 +86,21 @@ export function CatalogueResourceDialog({
       }
       onClose();
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : "The change could not be saved.");
+      setError(readSubmissionMessage(submissionError, "The change could not be saved."));
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-      <section role="dialog" aria-modal="true" aria-labelledby="catalogue-resource-title" className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+    <div role="presentation" onMouseDown={onBackdropMouseDown} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} onKeyDown={onKeyDown} className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
         <header className="flex items-start justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
           <div>
-            <h2 id="catalogue-resource-title" className="text-sm font-black text-slate-950 dark:text-white">
+            <h2 id={titleId} className="text-sm font-black text-slate-950 dark:text-white">
               {resource ? "Edit" : "Create"} {isFeature ? "feature" : "tier"}
             </h2>
-            <p className="mt-1 text-xs text-slate-500">Keys are protocol identity and cannot be changed later.</p>
+            <p id={descriptionId} className="mt-1 text-xs text-slate-500">Keys are protocol identity and cannot be changed later.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} disabled={isSubmitting} aria-label="Close" className="grid size-11 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
         </header>
         <form onSubmit={submit} className="space-y-4 p-5">
           {!resource && (
@@ -140,4 +149,12 @@ export function CatalogueResourceDialog({
       </section>
     </div>
   );
+}
+
+function readSubmissionMessage(value: unknown, fallback: string) {
+  if (value instanceof Error) return value.message;
+  if (value && typeof value === "object" && "message" in value && typeof value.message === "string") {
+    return value.message;
+  }
+  return fallback;
 }

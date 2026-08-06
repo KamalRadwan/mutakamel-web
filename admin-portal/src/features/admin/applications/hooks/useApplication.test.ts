@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublishApplicationDto } from "../types";
 
@@ -53,6 +53,9 @@ describe("useApplication publication intent", () => {
       reason: "Approve the reviewed catalogue revision",
     };
     const { result } = renderHook(() => useApplication("crm"));
+    await waitFor(() =>
+      expect(result.current.loadedApplicationKey).toBe("crm"),
+    );
 
     await act(async () => {
       await result.current.publishApplication(dto);
@@ -71,6 +74,73 @@ describe("useApplication publication intent", () => {
       "crm",
       dto,
       "019f0000-0000-7000-8000-000000000099",
+    );
+  });
+
+  it("ignores an A response that resolves after route identity B", async () => {
+    let resolveA!: (value: unknown) => void;
+    let resolveB!: (value: unknown) => void;
+    getMock
+      .mockReturnValueOnce(new Promise((resolve) => { resolveA = resolve; }))
+      .mockReturnValueOnce(new Promise((resolve) => { resolveB = resolve; }));
+    getManifestsMock.mockResolvedValue([]);
+
+    const { result, rerender } = renderHook(
+      ({ applicationKey }) => useApplication(applicationKey),
+      { initialProps: { applicationKey: "crm" } },
+    );
+    await waitFor(() => expect(getMock).toHaveBeenCalledWith("crm", expect.any(AbortSignal)));
+    rerender({ applicationKey: "trade" });
+    await waitFor(() => expect(getMock).toHaveBeenCalledWith("trade", expect.any(AbortSignal)));
+
+    await act(async () => resolveB({ key: "trade", name: "Trade" }));
+    await waitFor(() => expect(result.current.application).toMatchObject({ key: "trade" }));
+    await act(async () => resolveA({ key: "crm", name: "CRM" }));
+    expect(result.current.application).toMatchObject({ key: "trade" });
+    expect(result.current.loadedApplicationKey).toBe("trade");
+  });
+
+  it("does not let an A mutation reconciliation abort the B detail request", async () => {
+    let resolveB!: (value: unknown) => void;
+    getMock
+      .mockResolvedValueOnce({ key: "crm", name: "CRM" })
+      .mockReturnValueOnce(new Promise((resolve) => { resolveB = resolve; }));
+
+    const { result, rerender } = renderHook(
+      ({ applicationKey }) => useApplication(applicationKey),
+      { initialProps: { applicationKey: "crm" } },
+    );
+    await waitFor(() =>
+      expect(result.current.loadedApplicationKey).toBe("crm"),
+    );
+
+    const dto: PublishApplicationDto = {
+      expectedCatalogueRevision: "7",
+      expectedPublicationRevision: "3",
+      reason: "Approve the reviewed catalogue revision",
+    };
+    await act(async () => {
+      await result.current.publishApplication(dto);
+    });
+    const options = mutateMock.mock.calls.at(-1)?.[2] as {
+      onSuccess?: (result: unknown) => void | Promise<void>;
+    };
+
+    rerender({ applicationKey: "trade" });
+    await waitFor(() =>
+      expect(getMock).toHaveBeenCalledWith("trade", expect.any(AbortSignal)),
+    );
+    const bSignal = getMock.mock.calls.at(-1)?.[1] as AbortSignal;
+
+    await act(async () => {
+      await options.onSuccess?.(undefined);
+    });
+
+    expect(getMock).toHaveBeenCalledTimes(2);
+    expect(bSignal.aborted).toBe(false);
+    await act(async () => resolveB({ key: "trade", name: "Trade" }));
+    await waitFor(() =>
+      expect(result.current.application).toMatchObject({ key: "trade" }),
     );
   });
 });

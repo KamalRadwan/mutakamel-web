@@ -36,7 +36,7 @@ export function BackupPoliciesScreen() {
       setEnabled(view.policy.enabled);
       setCronExpression(view.policy.cronExpression);
       setTimezone(view.policy.timezone);
-      setRetentionDays(view.policy.retentionDays === null ? "" : String(view.policy.retentionDays));
+      setRetentionDays(String(view.policy.retentionDays));
       setServerConcurrency(view.policy.serverConcurrency);
       setTenantConcurrency(view.policy.tenantConcurrency);
       setDefaultBackupEnabled(view.policy.defaultBackupEnabled);
@@ -67,7 +67,9 @@ export function BackupPoliciesScreen() {
     cronExpression.length <= 120 &&
     timezone.trim().length > 0 &&
     timezone.length <= 80 &&
-    (retentionDays === "" || (Number(retentionDays) >= 1 && Number(retentionDays) <= 3650)) &&
+    retentionDays !== "" &&
+    Number(retentionDays) >= 1 &&
+    Number(retentionDays) <= 3650 &&
     serverConcurrency >= 1 && serverConcurrency <= 10 &&
     tenantConcurrency >= 1 && tenantConcurrency <= 10;
 
@@ -111,7 +113,7 @@ export function BackupPoliciesScreen() {
               <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm font-bold dark:border-slate-700"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} disabled={!view.canManage} />{isArabic ? "تفعيل السياسة" : "Policy enabled"}</label>
               <Field label={isArabic ? "تعبير Cron" : "Cron expression"}><input value={cronExpression} onChange={(event) => setCronExpression(event.target.value)} disabled={!view.canManage} maxLength={120} className={inputClass} /></Field>
               <Field label={isArabic ? "المنطقة الزمنية" : "Timezone"}><input value={timezone} onChange={(event) => setTimezone(event.target.value)} disabled={!view.canManage} maxLength={80} className={inputClass} /></Field>
-              <Field label={isArabic ? "الاحتفاظ بالأيام" : "Retention days"}><input type="number" min={1} max={3650} value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} disabled={!view.canManage} className={inputClass} placeholder={isArabic ? "بدون حذف" : "No expiry"} /></Field>
+              <Field label={isArabic ? "الاحتفاظ بالأيام" : "Retention days"}><input type="number" min={1} max={3650} value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} disabled={!view.canManage} className={inputClass} placeholder="30" /></Field>
               <Field label={isArabic ? "تزامن الخادم" : "Server concurrency"}><input type="number" min={1} max={10} value={serverConcurrency} onChange={(event) => setServerConcurrency(Number(event.target.value))} disabled={!view.canManage} className={inputClass} /></Field>
               <Field label={isArabic ? "تزامن العملاء" : "Tenant concurrency"}><input type="number" min={1} max={10} value={tenantConcurrency} onChange={(event) => setTenantConcurrency(Number(event.target.value))} disabled={!view.canManage} className={inputClass} /></Field>
               <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm font-bold dark:border-slate-700"><input type="checkbox" checked={defaultBackupEnabled} onChange={(event) => setDefaultBackupEnabled(event.target.checked)} disabled={!view.canManage} />{isArabic ? "النسخ افتراضيًا" : "Backup by default"}</label>
@@ -121,7 +123,7 @@ export function BackupPoliciesScreen() {
 
             {view.canManage ? (
               <div className="mt-6 flex justify-end">
-                <button type="button" disabled={!policyValid || !view.ownsSelectedServerState || view.activeAction === "policy"} onClick={() => void view.savePolicy({ enabled, cronExpression: cronExpression.trim(), timezone: timezone.trim(), retentionDays: retentionDays === "" ? null : Number(retentionDays), serverConcurrency, tenantConcurrency, defaultBackupEnabled, defaultCompressionEnabled, defaultCompressionAlgorithm: defaultAlgorithm }).catch(() => undefined)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-700 px-5 text-sm font-bold text-white hover:bg-cyan-800 disabled:opacity-50"><Settings2 className="size-4" aria-hidden="true" />{isArabic ? "حفظ السياسة" : "Save policy"}</button>
+                <button type="button" disabled={!policyValid || !view.ownsSelectedServerState || view.activeAction === "policy"} onClick={() => void view.savePolicy({ enabled, cronExpression: cronExpression.trim(), timezone: timezone.trim(), retentionDays: Number(retentionDays), serverConcurrency, tenantConcurrency, defaultBackupEnabled, defaultCompressionEnabled, defaultCompressionAlgorithm: defaultAlgorithm }).catch(() => undefined)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-700 px-5 text-sm font-bold text-white hover:bg-cyan-800 disabled:opacity-50"><Settings2 className="size-4" aria-hidden="true" />{isArabic ? "حفظ السياسة" : "Save policy"}</button>
               </div>
             ) : null}
           </section>
