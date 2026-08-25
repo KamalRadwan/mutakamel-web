@@ -1,11 +1,11 @@
 # Tenant template platform API
 
 > **Contract status:** Current except the two production-readiness routes explicitly marked unavailable below
-> **Last verified:** 2026-07-25
+> **Last verified:** 2026-08-25
 > **Backend owner:** Core (`core-app`)
 > **Canonical browser prefix:** `/api/tenant/core/v1/templates`
 > **Controller-relative prefix:** `/templates`
-> **Tenant Portal status:** Planned. The legacy template designer is live and extensive under `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/template-designer`.
+> **Tenant Portal status:** Planned. A dated 2026-07-25 inventory referenced a consolidated template designer, but that `mutakamel-web-app` workspace is absent from the current checkout and is not live-runtime evidence.
 > **Documentation:** Hand-written and source-verified; not generated.
 
 Business letters are a separate consumer documented in [business-letters.md](business-letters.md).
@@ -16,11 +16,11 @@ Business letters are a separate consumer documented in [business-letters.md](bus
 - Controller: `../backend/mutakamel-apps/core-app/src/tenant/template-platform/template-platform.controller.ts`
 - DTOs/service/errors: `../backend/mutakamel-apps/core-app/src/tenant/template-platform`
 - Registry/schema: `../backend/mutakamel-apps/core-app/src/tenant/template-platform/registry`
-- Legacy clients: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/template-designer/api`
+- Historical consolidated-client reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/template-designer/api`
 
 ## Security and shared command protocol
 
-Every route requires:
+Except for the public email-asset read documented below, every route requires:
 
 - tenant JWT and a verified host matching its tenant;
 - current session/subscription;
@@ -28,7 +28,7 @@ Every route requires:
 - the listed permission;
 - authorized tenant/company/branch scope. Gateway classifies template scope as optional company/branch and Core re-authorizes the resource.
 
-All IDs are UUIDv7. Core rejects unknown fields. Cursor values are opaque and query-bound. Reads return the standard Core JSON envelope; cursor pages remain inside `data`. Sensitive/draft/preview reads use `Cache-Control: no-store, private` where set by the controller.
+The public email-asset read requires a verified tenant host but no tenant JWT, feature entitlement, or permission. All IDs are UUIDv7. Core rejects unknown fields. Cursor values are opaque and query-bound. JSON reads return the standard Core envelope; cursor pages remain inside `data`. The three content/artifact routes documented below instead stream raw bytes. Sensitive/draft/preview reads use `Cache-Control: no-store, private` where set by the controller.
 
 Every command (create/update/archive/publish/asset/assignment/PDF) requires `X-Idempotency-Key` UUIDv7 through Gateway/Core. Reuse a key only for the identical payload and preconditions. Replays can include `Idempotency-Replayed: true`. The browser must not send the internal fingerprint header; Gateway creates it.
 
@@ -77,7 +77,8 @@ Safe create example:
 
 ```http
 POST /api/tenant/core/v1/templates
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 X-Idempotency-Key: 019f9871-fd40-7680-bfbb-fd535b5880c8
 
@@ -119,6 +120,7 @@ List/search supports assignment scope tuple, search/code/type/output/layout/life
 | `POST /api/tenant/core/v1/templates/:templateId/preview/email` | `templates.preview` | Read-like, no-store |
 | `POST /api/tenant/core/v1/templates/:templateId/preview/pdf` | `templates.preview` | Idempotent async job |
 | `GET /api/tenant/core/v1/templates/preview-jobs/:jobId` | `templates.preview` | Poll, no-store |
+| `GET /api/tenant/core/v1/templates/preview-jobs/:jobId/artifact` | `templates.preview` | Completed, unexpired PDF bytes; attachment, private/no-store |
 
 Key DTOs:
 
@@ -140,6 +142,8 @@ PDF preview is asynchronous; poll its returned job. HTML/email preview returns u
 | `GET /api/tenant/core/v1/templates/assets` | `templates.read` | Cursor/filter list |
 | `POST /api/tenant/core/v1/templates/assets` | `templates.assets.manage` | Strict multipart upload |
 | `GET /api/tenant/core/v1/templates/assets/:assetId` | `templates.read` | ETag, private/no-store |
+| `GET /api/tenant/core/v1/templates/assets/:assetId/content` | `templates.read` | Reauthorized PNG/JPEG bytes; inline, private/no-store |
+| `GET /api/tenant/core/v1/templates/public-assets/:assetId` | Public, verified tenant host | Active `EMAIL_PUBLIC` PNG/JPEG rendition; inline, public cache for 300 seconds |
 | `DELETE /api/tenant/core/v1/templates/assets/:assetId` | `templates.assets.manage` | `204`, namespaced ETag + idempotency |
 
 Asset upload contains exactly two parts: one `file` and one string `metadata`. File limit is 5 MiB; accepted declared metadata MIME is `image/png|image/jpeg`. Metadata JSON is maximum 16,384 UTF-8 bytes and allows only:
@@ -147,6 +151,8 @@ Asset upload contains exactly two parts: one `file` and one string `metadata`. F
 `definitionId?`, `assetType`, `deliveryClass`, `fileName` (1–255), `declaredMimeType`, `expectedRawSha256` (64 lowercase hex), and `confirmPublicEmailDelivery?`.
 
 `EMAIL_PUBLIC` requires literal `confirmPublicEmailDelivery:true`; it must not be sent for `PRIVATE_ONLY`. Content is verified server-side. Expected upload errors include `CORE.TEMPLATE.ASSET.UPLOAD_INVALID` and `CORE.TEMPLATE.ASSET.EMAIL_PUBLIC_NOT_ALLOWED`.
+
+The authenticated content route rechecks `templates.read` scope and the stored checksum. The public route exposes only an active, ready `EMAIL_PUBLIC` rendition and returns `404` for private, retired, or unavailable assets. The preview artifact route rechecks `templates.preview` scope and streams only a completed, unexpired, checksum-verified PDF; an expired or incomplete artifact returns `CORE.TEMPLATE.PREVIEW.ARTIFACT_EXPIRED`. All three routes set an exact content type and length, `X-Content-Type-Options: nosniff`, and a sanitized `Content-Disposition`; none returns a Storage URL or object reference.
 
 ## Assignments
 

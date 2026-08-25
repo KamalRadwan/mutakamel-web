@@ -13,7 +13,7 @@ interface CreateModalProps {
 }
 
 export function CreateBusinessLettersModal({ isOpen, onClose, onSubmit }: CreateModalProps) {
-  const [letterNumber, setLetterNumber] = useState(`LTR-2026-${Math.floor(100 + Math.random() * 900)}`);
+  const [letterNumber, setLetterNumber] = useState("");
   const [subject, setSubject] = useState("");
   const [recipient, setRecipient] = useState("");
   const [templateType, setTemplateType] = useState("خطاب رسمي موجه");

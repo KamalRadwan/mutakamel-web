@@ -5,7 +5,7 @@
 > **Backend owner:** Core (`core-app`)
 > **Canonical browser prefixes:** `/api/tenant/core/v1/wallet`, `/api/tenant/core/v1/payments`
 > **Controller-relative prefixes:** `/tenant/wallet`, `/tenant/payments`
-> **Tenant Portal status:** Planned. The legacy billing area has a live partial payment-history client.
+> **Tenant Portal status:** Planned. A dated consolidated-frontend inventory recorded a partial payment-history client; that workspace is absent from the current checkout and does not prove live behavior.
 > **Documentation:** Hand-written and source-verified; not generated.
 
 ## Source of truth
@@ -14,7 +14,7 @@
 - Wallet controller/service: `../backend/mutakamel-apps/core-app/src/admin/wallet/wallet.controller.ts`, `../backend/mutakamel-apps/core-app/src/admin/wallet/wallet.service.ts`, and `../backend/mutakamel-apps/core-app/src/admin/wallet/ledger.service.ts`
 - Payment controller/service/DTO: `../backend/mutakamel-apps/core-app/src/tenant/payments`
 - Database enums: `../backend/mutakamel-apps/core-app/packages/database/src/entities/control-plane`
-- Legacy client: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/billing`
+- Historical consolidated-client reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/billing`
 
 ## Security and routes
 

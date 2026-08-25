@@ -32,7 +32,7 @@ export function CreateTradeCatalogUomChannelsModal({ isOpen, onClose, onSubmit }
         <Select
           label="النوع Type"
           value={type}
-          onChange={(e) => setType(e.target.value as any)}
+          onChange={(e) => setType(e.target.value as typeof type)}
           options={[
             { label: "وحدة قياس (Unit of Measure)", value: "uom" },
             { label: "كتالوج منتجات (Catalog)", value: "catalog" },

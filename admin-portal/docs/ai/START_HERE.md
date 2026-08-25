@@ -1,12 +1,12 @@
 # AI Start Here
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
 ## Mission
 
-Bring `admin-portal` into source-verified parity with browser-visible Core
-Admin APIs while preserving working behavior and reporting backend/release
-gates truthfully.
+Maintain `admin-portal` source parity with all 240 browser-visible Core Admin
+APIs while preserving working behavior and reporting authenticated-runtime,
+deployment, Worker, mobile-auth, and release gates truthfully.
 
 Do not edit backend files from an Admin Portal task.
 
@@ -30,8 +30,8 @@ Do not edit backend files from an Admin Portal task.
 - Admin Portal runs on port `5001`.
 - Browser calls use `/api/admin/core/v1/*` or the explicitly documented Worker
   prefix; never call Core directly.
-- Protected requests use the shared client, `credentials: "include"`, and
-  `x-auth-cookie-mode: 1`.
+- Protected requests use the shared client and `credentials: "include"`; the
+  server infers the browser channel from trusted request metadata.
 - Never store JWT access or refresh tokens in browser-readable storage.
 - Preserve Core success envelopes and normalize Core/Gateway errors without
   discarding `correlationId`.

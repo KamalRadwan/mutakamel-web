@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
 Owner: **Core**
 
@@ -41,8 +41,11 @@ the selected report.
 
 ## Current frontend status
 
-The Dashboard uses its own real endpoint, but there are no report routes,
-domain client modules, or operator pages for these five APIs.
+`/reports` source-integrates all five standalone report reads through typed
+domain clients, shared validated filters, exact permission gates, independent
+loading/empty/forbidden/unavailable states, bilingual copy, and focused tests.
+The Dashboard remains a separate grouped overview. Authenticated runtime and
+deployment verification remain separate gates.
 
 ## Source map
 

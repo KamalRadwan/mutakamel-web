@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/ToastContext";
+import { adminCan } from "@/lib/auth/rbac";
 
 export function useUserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { user, logout } = useAuth();
+  const toast = useToast();
 
   const currentAdmin = {
     firstName: user?.firstName || "",
@@ -22,13 +25,26 @@ export function useUserDropdown() {
 
   const handleLogout = async () => {
     close();
-    await logout();
+    try {
+      await logout();
+    } catch {
+      toast.error(
+        lang === "ar" ? "تعذر تسجيل الخروج" : "Sign-out failed",
+        lang === "ar"
+          ? "لم تُنهَ الجلسة على الخادم. ما زلت مسجلاً للدخول ويمكنك المحاولة مرة أخرى."
+          : "The server session was not ended. You remain signed in and can try again.",
+      );
+    }
   };
+  const canViewRoles = adminCan(user, "admin.roles.read");
+  const canViewSettings = adminCan(user, "admin.settings.read");
 
   return {
     t,
     isOpen,
     currentAdmin,
+    canViewRoles,
+    canViewSettings,
     toggleOpen,
     close,
     handleLogout,

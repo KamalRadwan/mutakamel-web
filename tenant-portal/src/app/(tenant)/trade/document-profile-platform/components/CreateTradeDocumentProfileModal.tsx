@@ -31,7 +31,7 @@ export function CreateTradeDocumentProfileModal({ isOpen, onClose, onSubmit }: C
         <Select
           label="فئة المستند Document Category"
           value={documentCategory}
-          onChange={(e) => setDocumentCategory(e.target.value as any)}
+          onChange={(e) => setDocumentCategory(e.target.value as typeof documentCategory)}
           options={[
             { label: "فاتورة ضريبية (Tax Invoice)", value: "tax_invoice" },
             { label: "بيان جمركي (Customs Declaration)", value: "customs_declaration" },
@@ -42,7 +42,7 @@ export function CreateTradeDocumentProfileModal({ isOpen, onClose, onSubmit }: C
         <Select
           label="مرحلة الربط مع هيئة الزكاة (ZATCA)"
           value={zatcaPhase}
-          onChange={(e) => setZatcaPhase(e.target.value as any)}
+          onChange={(e) => setZatcaPhase(e.target.value as typeof zatcaPhase)}
           options={[
             { label: "Phase 1 (توليد QR فقط)", value: "Phase 1" },
             { label: "Phase 2 Clearance (الفسح المسبق)", value: "Phase 2 Clearance" },

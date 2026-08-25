@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, GitBranch, CheckCircle2, Layers } from "lucide-react";
+import { Eye, Trash2, GitBranch } from "lucide-react";
 import { useTradeWorkflowVersions, WorkflowVersionItem } from "./hooks/useTradeWorkflowVersions";
 import { CreateTradeWorkflowVersionsModal } from "./components/CreateTradeWorkflowVersionsModal";
 import { DeleteTradeWorkflowVersionsConfirmModal } from "./components/DeleteTradeWorkflowVersionsConfirmModal";
 
 export default function TradeWorkflowVersionsPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

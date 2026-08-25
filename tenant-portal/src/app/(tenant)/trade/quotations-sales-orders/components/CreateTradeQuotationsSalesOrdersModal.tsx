@@ -33,7 +33,7 @@ export function CreateTradeQuotationsSalesOrdersModal({ isOpen, onClose, onSubmi
         <Select
           label="نوع المستند"
           value={type}
-          onChange={(e) => setType(e.target.value as any)}
+          onChange={(e) => setType(e.target.value as typeof type)}
           options={[
             { label: "أمر بيع مؤكد (Sales Order)", value: "sales_order" },
             { label: "عرض سعر مبيعات (Sales Quotation)", value: "sales_quotation" },

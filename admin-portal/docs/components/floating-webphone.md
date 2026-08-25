@@ -1,7 +1,9 @@
 # Floating Admin WebPhone
 
 Status: **[Verified]**
-Core, `mutakamel-web-app`, and Admin Portal source on **2026-07-25**.
+Core and the current Admin Portal source were verified on **2026-07-25**. The
+historically referenced backend `mutakamel-web-app` path is absent from the
+current checkout and is not present-day implementation evidence.
 
 The component is mounted once in the authenticated root layout and is hidden
 when the current admin has no enabled WebPhone configuration.

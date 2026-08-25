@@ -24,11 +24,17 @@ import {
   TENANT_CREATE_PERMISSION,
   type TenantStoragePlacementOption,
 } from "../../lib/storage-placement";
-import { axiosClient } from "@/lib/api/axiosClient";
+import {
+  axiosClient,
+  getAdminAuthHandling,
+  getApiRequestOutcome,
+} from "@/lib/api/axiosClient";
 import { tenantRegistrationApi } from "../api/tenant-registration.api";
 import {
   buildTenantSubscriptionLines,
+  getCanonicalCountrySelection,
   getTenantRegistrationLoadState,
+  isCanonicalCountrySelection,
   isTenantIdentityEvidenceCurrent,
   shouldRetainTenantCreateIntent,
   tenantIdentityFingerprint,
@@ -78,6 +84,7 @@ export function useRegisterTenant() {
     null,
   );
   const submissionLockRef = useRef(false);
+  const submissionAbort = useRef<AbortController | null>(null);
   const createRecoveryAbort = useRef<AbortController | null>(null);
 
   const [applicationCandidates, setApplicationCandidates] = useState<
@@ -129,21 +136,25 @@ export function useRegisterTenant() {
     name: "",
     companyName: "",
     industry: "Retail & E-commerce",
-    countryName: "مصر (Egypt)",
-    countryIsoCode: "EG",
-    timezone: "Africa/Cairo",
-    phoneCountryCode: "+20",
+    countryName: "",
+    countryIsoCode: "",
+    timezone: "",
+    phoneCountryCode: "",
     phone: "",
     taxNumber: "",
     commercialRegistrationNumber: "",
     street: "",
     city: "",
     state: "",
+    district: "",
+    buildingNo: "",
     postalCode: "",
+    landmark: "",
+    formattedAddress: "",
     ownerEmail: "",
     ownerFirstName: "",
     ownerLastName: "",
-    ownerPhoneCountryCode: "+20",
+    ownerPhoneCountryCode: "",
     ownerPhone: "",
     ownerJobTitle: "",
     ownerLanguage: "ar",
@@ -154,6 +165,36 @@ export function useRegisterTenant() {
     billingCycle: "MONTHLY" as TenantBillingCycle,
     trialDays: 14,
   });
+
+  const countryTimezoneOptions = useMemo(
+    () =>
+      getCanonicalCountrySelection(formData.countryIsoCode)?.timezones ?? [],
+    [formData.countryIsoCode],
+  );
+
+  const selectCountry = useCallback((countryIsoCode: string) => {
+    const nextCountry = getCanonicalCountrySelection(countryIsoCode);
+    if (!nextCountry) return false;
+    setFormData((current) => {
+      const previousCountry = getCanonicalCountrySelection(
+        current.countryIsoCode,
+      );
+      const shouldUpdateOwnerCallingCode =
+        current.ownerPhoneCountryCode.length === 0 ||
+        current.ownerPhoneCountryCode === previousCountry?.callingCode;
+      return {
+        ...current,
+        countryName: nextCountry.countryName,
+        countryIsoCode: nextCountry.countryIsoCode,
+        timezone: nextCountry.timezones[0] ?? "",
+        phoneCountryCode: nextCountry.callingCode,
+        ownerPhoneCountryCode: shouldUpdateOwnerCallingCode
+          ? nextCountry.callingCode
+          : current.ownerPhoneCountryCode,
+      };
+    });
+    return true;
+  }, []);
 
   const loadApplicationCandidates = useCallback(async () => {
     const generation = ++applicationRequestGeneration.current;
@@ -227,6 +268,7 @@ export function useRegisterTenant() {
     () => () => {
       applicationRequestGeneration.current += 1;
       applicationRequestAbort.current?.abort();
+      submissionAbort.current?.abort();
       createRecoveryAbort.current?.abort();
     },
     [],
@@ -325,10 +367,9 @@ export function useRegisterTenant() {
 
     setIsLoadingDatabasePlacement(true);
     try {
-      const options =
-        await tenantRegistrationApi.listDatabasePlacementOptions(
-          selectedApplicationKeys,
-        );
+      const options = await tenantRegistrationApi.listDatabasePlacementOptions(
+        selectedApplicationKeys,
+      );
       if (generation !== databaseRequestGeneration.current) return;
       setDatabasePlacementOptions(options);
     } catch (caught) {
@@ -414,8 +455,7 @@ export function useRegisterTenant() {
     [databasePlacementOptions, formData.databaseServerId],
   );
   const hasValidDatabaseSelection =
-    databasePlacementState === "ready" &&
-    selectedDatabasePlacement !== null;
+    databasePlacementState === "ready" && selectedDatabasePlacement !== null;
 
   const loadStoragePlacementOptions = useCallback(async () => {
     const generation = ++storageRequestGeneration.current;
@@ -495,8 +535,7 @@ export function useRegisterTenant() {
     [formData.storageServerId, storagePlacementOptions],
   );
   const hasValidStorageSelection =
-    storagePlacementState === "ready" &&
-    selectedStoragePlacement !== null;
+    storagePlacementState === "ready" && selectedStoragePlacement !== null;
 
   const draftFingerprint = useMemo(
     () =>
@@ -548,14 +587,18 @@ export function useRegisterTenant() {
     setIdentityValidationError(null);
     setIdentityValidationEvidence(null);
     try {
-      const result = await tenantRegistrationApi.validateIdentity({
-        name: formData.name,
-        companyName: formData.companyName,
-      }, controller.signal);
+      const result = await tenantRegistrationApi.validateIdentity(
+        {
+          name: formData.name,
+          companyName: formData.companyName,
+        },
+        controller.signal,
+      );
       if (
         generation !== identityRequestGeneration.current ||
         controller.signal.aborted ||
-        fingerprint !== tenantIdentityFingerprint(formData.name, formData.companyName)
+        fingerprint !==
+          tenantIdentityFingerprint(formData.name, formData.companyName)
       ) {
         return;
       }
@@ -572,7 +615,10 @@ export function useRegisterTenant() {
         );
       }
     } catch (caught) {
-      if (generation !== identityRequestGeneration.current || controller.signal.aborted) {
+      if (
+        generation !== identityRequestGeneration.current ||
+        controller.signal.aborted
+      ) {
         return;
       }
       const error = normalizeApiError(caught);
@@ -593,7 +639,9 @@ export function useRegisterTenant() {
     if (submissionLockRef.current || isSubmitting) return;
     if (pendingCreateRecovery) {
       toast.warning(
-        lang === "ar" ? "احسم أمر الإنشاء السابق" : "Resolve the previous create command",
+        lang === "ar"
+          ? "احسم أمر الإنشاء السابق"
+          : "Resolve the previous create command",
         lang === "ar"
           ? "افحص حالة المستأجر المحفوظة قبل إرسال أمر إنشاء جديد."
           : "Check the retained tenant status before sending another create command.",
@@ -613,8 +661,8 @@ export function useRegisterTenant() {
     if (
       !formData.companyName ||
       !formData.industry ||
-      !formData.timezone ||
-      !formData.name
+      !formData.name ||
+      !isCanonicalCountrySelection(formData)
     ) {
       toast.error(
         lang === "ar" ? "بيانات ناقصة" : "Missing fields",
@@ -634,9 +682,7 @@ export function useRegisterTenant() {
       !formData.ownerJobTitle.trim()
     ) {
       toast.error(
-        lang === "ar"
-          ? "بيانات المالك ناقصة"
-          : "Owner details are incomplete",
+        lang === "ar" ? "بيانات المالك ناقصة" : "Owner details are incomplete",
         lang === "ar"
           ? "أكمل بيانات المالك المطلوبة قبل المتابعة."
           : "Complete all required owner fields before continuing.",
@@ -658,6 +704,9 @@ export function useRegisterTenant() {
 
     const submittedFingerprint = draftFingerprint;
     let commandWasSent = false;
+    submissionAbort.current?.abort();
+    const submissionController = new AbortController();
+    submissionAbort.current = submissionController;
     submissionLockRef.current = true;
     setIsSubmitting(true);
     setCreateRecoveryError(null);
@@ -665,6 +714,7 @@ export function useRegisterTenant() {
       const quote = await tenantRegistrationApi.quote(
         selectedApplicationLines,
         formData.billingCycle,
+        submissionController.signal,
       );
       if (
         !isTenantCreateDraftCurrent(
@@ -675,7 +725,9 @@ export function useRegisterTenant() {
         throw new Error("TENANT_CREATE_DRAFT_CHANGED");
       }
       if (Date.parse(quote.expiresAt) <= Date.now()) {
-        throw new Error("The subscription quote expired before tenant creation.");
+        throw new Error(
+          "The subscription quote expired before tenant creation.",
+        );
       }
       const command: TenantCreateCommand = {
         quoteId: quote.quoteId,
@@ -690,14 +742,20 @@ export function useRegisterTenant() {
         address: {
           ...(formData.city.trim() ? { city: formData.city } : {}),
           ...(formData.state.trim() ? { state: formData.state } : {}),
+          ...(formData.district.trim() ? { district: formData.district } : {}),
           ...(formData.postalCode.trim()
             ? { postalCode: formData.postalCode }
             : {}),
           ...(formData.street.trim() ? { street1: formData.street } : {}),
+          ...(formData.buildingNo.trim()
+            ? { buildingNo: formData.buildingNo }
+            : {}),
+          ...(formData.landmark.trim() ? { landmark: formData.landmark } : {}),
+          ...(formData.formattedAddress.trim()
+            ? { formattedAddress: formData.formattedAddress }
+            : {}),
         },
-        ...(formData.taxNumber.trim()
-          ? { taxNumber: formData.taxNumber }
-          : {}),
+        ...(formData.taxNumber.trim() ? { taxNumber: formData.taxNumber } : {}),
         ...(formData.commercialRegistrationNumber.trim()
           ? {
               commercialRegistrationNumber:
@@ -752,6 +810,7 @@ export function useRegisterTenant() {
         command,
         idempotencyKey,
       );
+      if (submissionController.signal.aborted) return;
       clearPendingTenantCreateStatusAttempt();
       setPendingCreateRecovery(null);
       setCreateRecoveryError(null);
@@ -764,7 +823,11 @@ export function useRegisterTenant() {
       );
       router.push(`/tenants/${createdTenant.id}`);
     } catch (caught) {
-      if (caught instanceof Error && caught.message === "TENANT_CREATE_DRAFT_CHANGED") {
+      if (submissionController.signal.aborted) return;
+      if (
+        caught instanceof Error &&
+        caught.message === "TENANT_CREATE_DRAFT_CHANGED"
+      ) {
         resetKey();
         toast.warning(
           lang === "ar" ? "تغيرت بيانات الإنشاء" : "Create draft changed",
@@ -774,27 +837,54 @@ export function useRegisterTenant() {
         );
         return;
       }
+      const adminAuthHandling = getAdminAuthHandling(caught);
+      const requestOutcome = getApiRequestOutcome(caught);
       const error = normalizeApiError(caught);
       const retainStatusEvidence =
-        commandWasSent && shouldRetainTenantCreateIntent(error);
+        commandWasSent &&
+        (requestOutcome === "settled-before-session-change" ||
+          (adminAuthHandling !== "repair-degraded" &&
+            shouldRetainTenantCreateIntent(error)));
       if (!retainStatusEvidence) {
         clearPendingTenantCreateStatusAttempt();
         setPendingCreateRecovery(null);
         resetKey();
       }
+      // Session termination and permission denial already have authoritative
+      // global UI. A retained-but-degraded repair is intentionally surfaced
+      // once here because the business operation did not complete.
+      if (
+        adminAuthHandling === "session-ended" ||
+        adminAuthHandling === "permission-denied"
+      ) {
+        return;
+      }
+      const message =
+        adminAuthHandling === "repair-degraded"
+          ? lang === "ar"
+            ? "تعذر استعادة التفويض لهذا الطلب. احتفظنا بالجلسة؛ حاول مرة أخرى."
+            : "We couldn't restore authorization for this request. Your session was kept; try again."
+          : error.message;
       toast.error(
-        lang === "ar" ? "فشل إنشاء المستأجر" : "Tenant creation failed",
+        commandWasSent
+          ? lang === "ar"
+            ? "فشل إنشاء المستأجر"
+            : "Tenant creation failed"
+          : lang === "ar"
+            ? "تعذر الحصول على عرض السعر"
+            : "Quote request failed",
         [
-          error.message,
+          message,
           error.errorCode ? `Code: ${error.errorCode}` : null,
-          error.correlationId
-            ? `Correlation ID: ${error.correlationId}`
-            : null,
+          error.correlationId ? `Correlation ID: ${error.correlationId}` : null,
         ]
           .filter(Boolean)
           .join("\n"),
       );
     } finally {
+      if (submissionAbort.current === submissionController) {
+        submissionAbort.current = null;
+      }
       submissionLockRef.current = false;
       setIsSubmitting(false);
     }
@@ -848,9 +938,7 @@ export function useRegisterTenant() {
       setCreateRecoveryError(
         [
           error.message,
-          error.correlationId
-            ? `Correlation ID: ${error.correlationId}`
-            : null,
+          error.correlationId ? `Correlation ID: ${error.correlationId}` : null,
         ]
           .filter(Boolean)
           .join("\n"),
@@ -873,6 +961,18 @@ export function useRegisterTenant() {
       setCurrentStep(1);
       return;
     }
+    if (next > 1 && !isCanonicalCountrySelection(formData)) {
+      toast.error(
+        lang === "ar"
+          ? "الدولة والمنطقة الزمنية مطلوبتان"
+          : "Country and timezone required",
+        lang === "ar"
+          ? "اختر دولة من السجل المعتمد ثم اختر منطقة زمنية تابعة لها."
+          : "Choose a country from the canonical registry and one of its timezones.",
+      );
+      setCurrentStep(1);
+      return;
+    }
     if (
       next > 3 &&
       (!hasValidApplicationSelection || provisioningPreviewState !== "ready")
@@ -881,10 +981,7 @@ export function useRegisterTenant() {
       setCurrentStep(3);
       return;
     }
-    if (
-      next > 4 &&
-      (!hasValidDatabaseSelection || !hasValidStorageSelection)
-    ) {
+    if (next > 4 && (!hasValidDatabaseSelection || !hasValidStorageSelection)) {
       setShowDatabaseSelectionError(!hasValidDatabaseSelection);
       setShowStorageSelectionError(!hasValidStorageSelection);
       setCurrentStep(4);
@@ -899,6 +996,8 @@ export function useRegisterTenant() {
     goToStep,
     formData,
     setFormData,
+    selectCountry,
+    countryTimezoneOptions,
     canCreateTenant,
     applicationCandidates,
     applicationSelections,

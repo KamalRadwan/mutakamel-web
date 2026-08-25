@@ -1,12 +1,13 @@
-# System Settings and Platform SMTP Frontend Contract
+# System Settings, Platform SMTP, Fatal Alerts, and Storage Runtime
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-25**
 
 Verified against the current API Gateway route contracts, Core controller,
-DTOs, registry, services, entities, SMTP verifier, runtime consumers, and
-Admin Portal settings screens.
+DTOs, registry, services, entities, migrations, SMTP verifier, the private
+Core-to-Realtime configuration contract, runtime consumers, and Admin Portal
+settings screens.
 
 This is the implementation contract for:
 
@@ -16,10 +17,13 @@ This is the implementation contract for:
 - `/settings/notifications`
 - `/settings/asterisk`
 - `/settings/smtp`
+- `/settings/fatal-alerts`
+- `/settings/storage`
 
 It covers the DB-backed typed settings registry and the separate platform SMTP
-singleton. Tenant workspace/email settings are different tenant-portal APIs
-and are outside this Admin Portal contract.
+Realtime fatal-alert, and storage-runtime singletons. Tenant workspace/email
+settings are different tenant-portal APIs and are outside this Admin Portal
+contract.
 
 ## Ownership and route inventory
 
@@ -30,12 +34,12 @@ and are outside this Admin Portal contract.
 | Core upstream prefix | `/api/v1/admin` |
 | Guard | `AdminGuard` |
 | Read permission | `admin.settings.read` |
-| Mutation permission | Generic PUT and SMTP PATCH: `admin.settings.update` + `admin.settings.critical`; SMTP verification: `admin.settings.update` |
+| Mutation permission | Generic PUT, SMTP PATCH, fatal-alert PATCH, and storage-runtime PATCH: `admin.settings.update` + `admin.settings.critical`; SMTP verification: `admin.settings.update` |
 | Generic registry keys | 31 |
-| Gateway method/path contracts | 7 |
-| Current Admin Portal integration | Generic settings and Asterisk are live; SMTP is partially integrated and retains the gaps below |
+| Gateway method/path contracts | 11 |
+| Current Admin Portal integration | All eleven routes are source-integrated, including exact by-key reload, settings, Asterisk, SMTP, fatal-alert switching, storage-runtime controls, and verification states |
 
-The Gateway exposes exactly these seven method/path contracts:
+The Gateway exposes exactly these eleven method/path contracts:
 
 | Method and canonical browser path | Permission | Success | UUIDv7 key | Purpose |
 |:---|:---|:---:|:---:|:---|
@@ -46,6 +50,10 @@ The Gateway exposes exactly these seven method/path contracts:
 | `PATCH /api/admin/core/v1/system-settings/email` | `admin.settings.update` + `admin.settings.critical` | `200` | Yes | Configure or update the platform SMTP singleton |
 | `GET /api/admin/core/v1/system-settings/email/audit` | `admin.settings.read` | `200` | No | Read the latest 25 redacted SMTP audit entries |
 | `POST /api/admin/core/v1/system-settings/email/verify-connection` | `admin.settings.update` | `201` | Yes | Authenticate against the saved SMTP server without sending mail |
+| `GET /api/admin/core/v1/system-settings/fatal-alerts` | `admin.settings.read` | `200` | No | Read the safe Core-owned Realtime fatal-alert configuration |
+| `PATCH /api/admin/core/v1/system-settings/fatal-alerts` | `admin.settings.update` + `admin.settings.critical` | `200` | Yes | Configure or enable/disable Realtime fatal-alert delivery |
+| `GET /api/admin/core/v1/system-settings/storage-runtime` | `admin.settings.read` | `200` | No | Read only storage enablement, key state, broker readiness, and update time |
+| `PATCH /api/admin/core/v1/system-settings/storage-runtime` | `admin.settings.update` + `admin.settings.critical` | `200` | Yes | Enable/disable the runtime or generate/rotate its server-side key |
 
 Every mutation is `WRITE_SENSITIVE` at the Gateway. Send
 `x-idempotency-key: <UUIDv7>`, including the bodyless connection test and the
@@ -66,7 +74,8 @@ interface SuccessResponse<T> {
 ```
 
 The generic setting list and SMTP audit are direct arrays under `data`. They
-are not paginated and have no `meta`.
+are not paginated and have no `meta`. Fatal-alert and storage-runtime responses
+use the same Core envelope. They never return stored token or key material.
 
 The browser can receive either Core or Gateway errors:
 
@@ -417,6 +426,117 @@ responses. `CONNECTION_VERIFIED` entries have an empty `changes` array.
 There is no generic system-setting audit endpoint in this module; this audit
 route is SMTP-only.
 
+## Realtime fatal alerts
+
+This singleton is independent of both the generic 31-key registry and the SMTP
+singleton. Core is the only database authority; Realtime never connects to
+PostgreSQL and does not read `FATAL_ALERT_*` environment variables.
+
+### Read configuration
+
+`GET /api/admin/core/v1/system-settings/fatal-alerts`
+
+```ts
+interface RealtimeFatalAlertConfig {
+  configured: boolean;
+  enabled: boolean;
+  revision: number | null;
+  webhookUrl: string | null;
+  webhookTokenConfigured: boolean;
+  timeoutMs: number;
+  updatedAt: string | null;
+}
+```
+
+Before initial setup, Core returns `configured: false`, `enabled: false`, a
+`null` revision/URL/timestamp, `webhookTokenConfigured: false`, and the safe
+default timeout `5000`. Plaintext and encrypted token material are never
+returned to an administrator.
+
+### Configure or switch delivery
+
+`PATCH /api/admin/core/v1/system-settings/fatal-alerts`
+
+```ts
+interface PatchRealtimeFatalAlertConfigDto {
+  enabled?: boolean;
+  webhookUrl?: string;   // HTTP(S), max 2048, no embedded credentials
+  webhookToken?: string; // 1..2048 UTF-8 bytes, write-only
+  timeoutMs?: number;    // integer 1..120000
+}
+```
+
+- Send at least one field and a UUIDv7 `x-idempotency-key`.
+- Initial enablement requires both URL and token.
+- Omitted values retain their saved state; enabling an existing configuration
+  does not require resending its token.
+- Core normalizes the URL, encrypts the token with AES-256-GCM using a
+  purpose-bound subkey, serializes updates under a row lock, increments the
+  revision, and audits the row through the control-plane audit trigger.
+- Disabling retains the encrypted configuration for later re-enable, but the
+  private runtime response contains `null` URL/token while disabled.
+- Realtime authenticates to Core over the private service contract, refreshes
+  every 30 seconds, and atomically replaces its in-memory sink. A failed
+  refresh retains the last valid state and does not crash the process.
+
+## Storage runtime
+
+This singleton controls whether application storage credential decryption is
+available. Core owns the generated encryption key and the database state. The
+Admin Portal never accepts, receives, displays, logs, or stores raw key
+material.
+
+### Read configuration
+
+`GET /api/admin/core/v1/system-settings/storage-runtime`
+
+```ts
+interface StorageRuntimeConfig {
+  enabled: boolean;
+  configured: boolean;
+  brokerConfigured: boolean;
+  updatedAt: string | null;
+}
+```
+
+The response projection is closed to these four fields. `brokerConfigured` is
+only a secret-free readiness boolean for Core's three pairwise storage-runtime
+broker secrets; no secret value, name, or raw key is returned. An enabled
+runtime must always have its storage key configured, while
+`brokerConfigured: false` can truthfully expose restart/configuration drift on
+an already-enabled runtime.
+
+### Generate, rotate, or switch the runtime
+
+`PATCH /api/admin/core/v1/system-settings/storage-runtime`
+
+```ts
+interface PatchStorageRuntimeConfigDto {
+  enabled?: boolean;
+  rotateKey?: boolean;
+}
+```
+
+- Send at least one field and a UUIDv7 `x-idempotency-key`.
+- The Portal sends `rotateKey: true` for the explicit key action; there is no
+  key input.
+- `rotateKey: true` generates the initial key when unconfigured and atomically
+  rotates the key when already configured.
+- Enabling requires both an already configured key and
+  `brokerConfigured: true`. Generating a key does not enable the runtime
+  automatically.
+- The Portal disables a new enable action and shows a clear warning while Core
+  reports `brokerConfigured: false`; it still permits disabling an already
+  enabled runtime. Core remains the authoritative mutation guard.
+- Disabling denies new route resolution and therefore new storage operations.
+  It does not revoke an operation already resolved or a previously issued
+  signed URL, whose configured maximum lifetime is one hour. Emergency
+  immediate cutoff requires revoking/rotating the provider credential.
+- The Portal presents a separate enable/disable switch and an explicit
+  confirmation before generate/rotate.
+- The Portal retains an idempotency key only when retrying the exact same
+  ambiguous mutation intent.
+
 ## Error catalogue
 
 | HTTP | Code | Frontend behavior |
@@ -432,57 +552,44 @@ route is SMTP-only.
 | `422` | `PLATFORM_SMTP_CONFIG_INVALID` | Show the returned SMTP cross-field message |
 | `400` | `PLATFORM_SMTP_CONNECTION_VERIFICATION_BODY_FORBIDDEN` | Retry with no body |
 | `503` | `SMTP_CONNECTION_VERIFICATION_FAILED` | Keep settings saved but show verification failure |
+| `400` | `REALTIME_FATAL_ALERT_CONFIG_EMPTY_PATCH` | Require at least one changed field |
+| `422` | `REALTIME_FATAL_ALERT_CONFIG_INVALID` | Show the URL/token/enablement validation message |
+| `409` | `CORE.STORAGE_RUNTIME.NOT_CONFIGURED` | Generate a server-side key before enabling the runtime |
+| `409` | `CORE.STORAGE.RUNTIME_AUTH_NOT_CONFIGURED` | Configure pairwise runtime broker authentication before enabling storage |
 | `503/504` | Gateway/Core availability or timeout | Do not simulate success |
 
 DTO validation errors, authentication failures, permission failures, and rate
 limits use the shared Core/Gateway error shapes.
 
-## Current Admin Portal gaps
+## Current Admin Portal evidence
 
-The generic settings and Asterisk pages now use canonical Gateway paths, the
-shared authenticated client, Core envelopes, real loading/error states,
-mutation-response values, optimistic rollback by refetch, and
-consumer-required Asterisk JSON validation. Remaining material gaps are:
+The settings pages use canonical Gateway paths, the shared authenticated
+client, strict Core-envelope readers, exact list and by-key reads, and
+caller-owned UUIDv7 keys for saves and verification. Current UI behavior:
 
-1. Controls are not proactively gated by `admin.settings.read` and
-   `admin.settings.update`; they currently surface backend `403` responses.
-2. The shared client generates UUIDv7 keys automatically, but an exact mutation
-   retry after a refresh must retain the original key rather than create a new
-   user intent.
-3. SMTP initializes some form defaults before the read completes instead of
-   preserving the all-null unconfigured projection exactly.
-4. SMTP read failures clear audit rows but do not expose a distinct load error.
-5. SMTP adapters still use broad `any` types and do not preserve every error
-   code, validation-detail field, and correlation id.
-6. The UI presents registry descriptions such as maintenance mode and token
-   TTLs as effective even where current runtime code does not consume them.
-7. Forbidden, retry/in-flight, and some empty/read-only states remain
-   incomplete outside the Asterisk page.
+1. Gates reads with `admin.settings.read`, generic/SMTP/fatal-alert/storage
+   saves with update plus critical, and SMTP verification with its exact
+   permission.
+2. Distinguishes loading, forbidden, unavailable, malformed, empty, read-only,
+   saving, saved, and failed states while preserving code/correlation evidence.
+3. Enforces key-specific constraints, Asterisk JSON validation, and the billing
+   minimum/maximum invariant both during editing and at the save boundary.
+4. Keeps SMTP unknown until the authoritative read settles, represents an
+   unconfigured server without sample credentials, and keeps password input
+   write-only.
+5. Blocks connection verification while displayed fields differ from saved
+   Core state, then tests the saved configuration with a bodyless request.
+6. Reconciles mutation responses and uses authoritative reload after ambiguous
+   or failed saves.
+7. Keeps the fatal-alert token write-only and presents a dedicated persisted
+   enable/disable switch with explicit configured/revision/update evidence.
+8. Renders only `enabled`, `configured`, `brokerConfigured`, and `updatedAt`
+   for storage runtime, blocks new enablement until both safe readiness signals
+   pass, and confirmation-gates key generation or rotation without ever
+   handling key or broker-secret values.
 
-## Frontend implementation checklist
-
-1. Move every request to the shared authenticated client and canonical Gateway
-   paths.
-2. Model the Core success envelope and normalize both error shapes.
-3. Gate pages with `admin.settings.read` and mutations with
-   `admin.settings.update`.
-4. Use one UUIDv7 key per save/test intent and preserve it for exact retries.
-5. Keep the 31-key UI schema synchronized with the backend registry until a
-   schema endpoint exists.
-6. Render `isDefault` and `readOnly` honestly; do not claim a reset action that
-   the API does not provide.
-7. Validate strict types, key-specific constraints, JSON text, and the
-   top-up min/max pair before saving.
-8. Use mutation responses as the new source of truth and roll back failed
-   optimistic values.
-9. Represent unconfigured SMTP with null/empty form fields, not sample
-   credentials.
-10. Keep the password write-only, omit it when unchanged, save before testing,
-    and send no body to verification.
-11. Treat SMTP configuration save and connection verification as distinct
-    outcomes.
-12. Remove fail-open preview and simulated-success behavior before describing
-    the screens as server-backed.
+Authenticated runtime and deployed consumer-effect verification remain
+separate release gates; source integration does not prove either one.
 
 ## Backend source map
 
@@ -493,14 +600,20 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 - `../backend/mutakamel-apps/core-app/src/admin/system-settings/system-settings.controller.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/system-settings/system-settings.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/system-settings/platform-smtp-config.service.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/system-settings/realtime-fatal-alert-config.service.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/system-settings/realtime-fatal-alert-config.internal.controller.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/system-settings/dto/system-setting-query.dto.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/system-settings/dto/upsert-system-setting.dto.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/system-settings/dto/platform-smtp-config.dto.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/system-settings/dto/realtime-fatal-alert-config.dto.ts`
 - `../backend/mutakamel-apps/core-app/src/common/system-settings/system-settings.registry.ts`
 - `../backend/mutakamel-apps/core-app/src/common/email/smtp-connection-verifier.service.ts`
 - `../backend/mutakamel-apps/core-app/packages/database/src/entities/control-plane/system-setting.entity.ts`
 - `../backend/mutakamel-apps/core-app/packages/database/src/entities/control-plane/platform-smtp-config.entity.ts`
 - `../backend/mutakamel-apps/core-app/packages/database/src/entities/control-plane/platform-smtp-config-history.entity.ts`
+- `../backend/mutakamel-apps/core-app/packages/database/src/entities/control-plane/realtime-fatal-alert-config.entity.ts`
+- `../backend/mutakamel-apps/realtime-app/src/observability/core-fatal-alert-config.client.ts`
+- `../backend/mutakamel-apps/realtime-app/src/observability/core-managed-fatal-alert.sink.ts`
 - `../backend/mutakamel-apps/core-app/src/common/notifications/notifications.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/billing/billing-cycle.service.ts`
 - `../backend/mutakamel-apps/core-app/src/tenant/payments/payments.service.ts`
@@ -512,6 +625,12 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 - `admin-portal/src/app/settings/components/SettingField.tsx`
 - `admin-portal/src/app/settings/smtp/hooks/useSmtpSettings.ts`
 - `admin-portal/src/app/settings/smtp/page.tsx`
+- `admin-portal/src/app/settings/fatal-alerts/fatal-alert-contract.ts`
+- `admin-portal/src/app/settings/fatal-alerts/hooks/useFatalAlertSettings.ts`
+- `admin-portal/src/app/settings/fatal-alerts/page.tsx`
+- `admin-portal/src/app/settings/storage/storage-runtime-contract.ts`
+- `admin-portal/src/app/settings/storage/hooks/useStorageRuntimeSettings.ts`
+- `admin-portal/src/app/settings/storage/page.tsx`
 
 
 ## DTOs (Migrated from dtos.md)

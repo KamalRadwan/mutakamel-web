@@ -21,7 +21,7 @@ export function CreateCrmNotesAttachmentsModal({ isOpen, onClose, onSubmit }: Cr
   const [noteContent, setNoteContent] = useState("");
   const [attachmentName, setAttachmentName] = useState("Document_V1.pdf");
   const [fileSize, setFileSize] = useState("1.5 MB");
-  const [createdBy, setCreatedBy] = useState(t.crm.ahmedMahmoud);
+  const [createdBy] = useState(t.crm.ahmedMahmoud);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +39,7 @@ export function CreateCrmNotesAttachmentsModal({ isOpen, onClose, onSubmit }: Cr
           <Select
             label={t.crm.associatedEntity}
             value={targetType}
-            onChange={(e) => setTargetType(e.target.value as any)}
+            onChange={(e) => setTargetType(e.target.value as typeof targetType)}
             options={[
               { label: t.crm.deal, value: "deal" },
               { label: t.crm.lead, value: "lead" },

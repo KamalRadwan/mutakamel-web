@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Box, Store, Layers } from "lucide-react";
+import { Eye, Trash2, Box } from "lucide-react";
 import { useTradeCatalogUomChannels, CatalogUomChannelItem } from "./hooks/useTradeCatalogUomChannels";
 import { CreateTradeCatalogUomChannelsModal } from "./components/CreateTradeCatalogUomChannelsModal";
 import { DeleteTradeCatalogUomChannelsConfirmModal } from "./components/DeleteTradeCatalogUomChannelsConfirmModal";
 
 export default function TradeCatalogUomChannelsPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

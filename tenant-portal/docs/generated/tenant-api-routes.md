@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-07-29T05:28:05.220Z**
+Generated at: **2026-08-24T23:09:23.132Z**
 
-Frontend revision: `236bb35e6637+dirty`
+Frontend revision: `5611e5b9a5cd+dirty`
 
-Backend revision: `e2a7582ee1ee+dirty`
+Backend revision: `3cbfe3e8ddd7+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -17,10 +17,10 @@ canonical Gateway path mappings.
 
 | App | Routes |
 | --- | ---: |
-| core | 200 |
-| crm | 137 |
-| trade | 226 |
-| **Total** | **563** |
+| core | 199 |
+| crm | 143 |
+| trade | 231 |
+| **Total** | **573** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -46,6 +46,7 @@ Machine-readable source:
 | core | GET | `/api/tenant/core/v1/audit` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.audit.list` |
 | core | GET | `/api/tenant/core/v1/audit/entities/:entityType/:entityId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.audit.entity-history` |
 | core | POST | `/api/tenant/core/v1/auth/accept-invite` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.accept-invite` |
+| core | POST | `/api/tenant/core/v1/auth/activity` | TENANT_PORTAL | AUTHENTICATED | no | `core.tenant.auth.activity` |
 | core | POST | `/api/tenant/core/v1/auth/forgot-password` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.forgot-password` |
 | core | POST | `/api/tenant/core/v1/auth/login` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.login` |
 | core | POST | `/api/tenant/core/v1/auth/logout` | TENANT_PORTAL | PUBLIC | yes | `core.tenant.auth.logout` |
@@ -53,9 +54,11 @@ Machine-readable source:
 | core | GET | `/api/tenant/core/v1/auth/me` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.auth.me` |
 | core | POST | `/api/tenant/core/v1/auth/refresh` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.refresh` |
 | core | POST | `/api/tenant/core/v1/auth/reset-password` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.reset-password` |
+| core | GET | `/api/tenant/core/v1/auth/sessions` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.auth.sessions.list` |
+| core | DELETE | `/api/tenant/core/v1/auth/sessions/:sessionId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.auth.sessions.revoke` |
 | core | GET | `/api/tenant/core/v1/billing/invoices` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.billing.invoices.list` |
 | core | GET | `/api/tenant/core/v1/billing/invoices/:invoiceId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.billing.invoices.get` |
-| core | POST | `/api/tenant/core/v1/billing/invoices/:invoiceId/payment-intents` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.billing.invoices.payment-intents.create.v2` |
+| core | POST | `/api/tenant/core/v1/billing/invoices/:invoiceId/payment-intents` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.billing.invoices.payment-intents.create.v1` |
 | core | GET | `/api/tenant/core/v1/billing/invoices/:invoiceId/payment-intents/active` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.billing.invoices.payment-intents.active` |
 | core | POST | `/api/tenant/core/v1/billing/invoices/:invoiceId/payment-quote` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.billing.invoices.payment-quote` |
 | core | GET | `/api/tenant/core/v1/billing/payment-input-currencies` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.billing.payment-input-currencies.list` |
@@ -66,12 +69,8 @@ Machine-readable source:
 | core | POST | `/api/tenant/core/v1/branding/icon` | TENANT_PORTAL | WRITE_SENSITIVE | no | `core.tenant.branding.icon.upload` |
 | core | POST | `/api/tenant/core/v1/branding/logo` | TENANT_PORTAL | WRITE_SENSITIVE | no | `core.tenant.branding.logo.upload` |
 | core | GET | `/api/tenant/core/v1/branding/public` | TENANT_PORTAL | PUBLIC | yes | `core.tenant.branding.public` |
-| core | POST | `/api/tenant/core/v1/business-letters` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.business-letters.create` |
-| core | GET | `/api/tenant/core/v1/business-letters/:letterId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.business-letters.get` |
-| core | PATCH | `/api/tenant/core/v1/business-letters/:letterId` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.business-letters.replace-draft` |
-| core | POST | `/api/tenant/core/v1/business-letters/:letterId/issue` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.business-letters.issue` |
-| core | GET | `/api/tenant/core/v1/business-letters/:letterId/render-jobs/:renderJobId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.business-letters.render-pdf.get` |
-| core | POST | `/api/tenant/core/v1/business-letters/:letterId/render-pdf` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.business-letters.render-pdf` |
+| core | GET | `/api/tenant/core/v1/branding/public/icon` | TENANT_PORTAL | PUBLIC | yes | `core.tenant.branding.public-icon` |
+| core | GET | `/api/tenant/core/v1/branding/public/logo` | TENANT_PORTAL | PUBLIC | yes | `core.tenant.branding.public-logo` |
 | core | GET | `/api/tenant/core/v1/currencies` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.currencies.list` |
 | core | POST | `/api/tenant/core/v1/currencies` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.currencies.create` |
 | core | DELETE | `/api/tenant/core/v1/currencies/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.currencies.delete` |
@@ -102,7 +101,6 @@ Machine-readable source:
 | core | PATCH | `/api/tenant/core/v1/email-config` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant-email-config.update` |
 | core | POST | `/api/tenant/core/v1/email-config/verify` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant-email-config.verify` |
 | core | POST | `/api/tenant/core/v1/email-config/verify-connection` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant-email-config.verify-connection` |
-| core | GET | `/api/tenant/core/v1/files/:bucket/:year/:month/:name` | TENANT_PORTAL | PUBLIC | yes | `core.files.download.get` |
 | core | GET | `/api/tenant/core/v1/notifications` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.notifications.get` |
 | core | DELETE | `/api/tenant/core/v1/notifications/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.notifications.by.id.delete` |
 | core | POST | `/api/tenant/core/v1/notifications/:id/ack` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.notifications.by.id.ack.post` |
@@ -191,18 +189,19 @@ Machine-readable source:
 | core | POST | `/api/tenant/core/v1/templates/assets` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.templates.asset.create` |
 | core | DELETE | `/api/tenant/core/v1/templates/assets/:assetId` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.templates.asset.retire` |
 | core | GET | `/api/tenant/core/v1/templates/assets/:assetId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.asset.get` |
+| core | GET | `/api/tenant/core/v1/templates/assets/:assetId/content` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.asset.content` |
 | core | GET | `/api/tenant/core/v1/templates/assignments` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.assignments.list` |
 | core | POST | `/api/tenant/core/v1/templates/assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.templates.assignment.create` |
 | core | DELETE | `/api/tenant/core/v1/templates/assignments/:assignmentId` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.templates.assignment.delete` |
 | core | GET | `/api/tenant/core/v1/templates/assignments/:assignmentId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.assignment.get` |
 | core | PATCH | `/api/tenant/core/v1/templates/assignments/:assignmentId` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.templates.assignment.update` |
-| core | GET | `/api/tenant/core/v1/templates/assignments/production-readiness` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.assignments.production-readiness.get` |
-| core | POST | `/api/tenant/core/v1/templates/assignments/production-readiness/remediate` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.templates.assignments.production-readiness.remediate` |
 | core | POST | `/api/tenant/core/v1/templates/assignments/resolve` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.assignments.resolve` |
 | core | GET | `/api/tenant/core/v1/templates/creation-scopes` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.creation-scopes.list` |
 | core | GET | `/api/tenant/core/v1/templates/data-sources` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.data-sources.list` |
 | core | GET | `/api/tenant/core/v1/templates/data-sources/:adapterKey/schema` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.data-source.schema.get` |
 | core | GET | `/api/tenant/core/v1/templates/preview-jobs/:jobId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.preview.pdf.get` |
+| core | GET | `/api/tenant/core/v1/templates/preview-jobs/:jobId/artifact` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.preview.pdf.artifact` |
+| core | GET | `/api/tenant/core/v1/templates/public-assets/:assetId` | TENANT_PORTAL | PUBLIC | yes | `core.templates.asset.public-content` |
 | core | POST | `/api/tenant/core/v1/templates/search` | TENANT_PORTAL | READ_HEAVY | yes | `core.templates.search` |
 | core | GET | `/api/tenant/core/v1/templates/starters` | TENANT_PORTAL | AUTHENTICATED | yes | `core.templates.starters.list` |
 | core | GET | `/api/tenant/core/v1/users` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.list` |
@@ -264,6 +263,8 @@ Machine-readable source:
 | crm | DELETE | `/api/tenant/crm/v1/customer-profiles/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.by.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/customer-profiles/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.customer.profiles.by.id.get` |
 | crm | PATCH | `/api/tenant/crm/v1/customer-profiles/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.by.id.patch` |
+| crm | POST | `/api/tenant/crm/v1/customer-profiles/:id/contacts` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.contacts.post` |
+| crm | GET | `/api/tenant/crm/v1/customer-profiles/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.customer.profiles.capabilities.get` |
 | crm | GET | `/api/tenant/crm/v1/dashboards` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.dashboard.builder.list.get` |
 | crm | POST | `/api/tenant/crm/v1/dashboards` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.dashboard.builder.create.post` |
 | crm | DELETE | `/api/tenant/crm/v1/dashboards/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.dashboard.builder.by.id.delete` |
@@ -279,6 +280,7 @@ Machine-readable source:
 | crm | GET | `/api/tenant/crm/v1/dashboards/:id/shares` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.dashboard.builder.shares.get` |
 | crm | POST | `/api/tenant/crm/v1/dashboards/:id/shares` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.dashboard.builder.shares.post` |
 | crm | DELETE | `/api/tenant/crm/v1/dashboards/:id/shares/:shareId` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.dashboard.builder.shares.delete` |
+| crm | POST | `/api/tenant/crm/v1/dashboards/:id/widgets/:widgetId/drilldown` | TENANT_PORTAL | READ_HEAVY | yes | `crm.dashboard.builder.widget.drilldown.post` |
 | crm | GET | `/api/tenant/crm/v1/dashboards/action-center` | TENANT_PORTAL | READ_HEAVY | yes | `crm.dashboards.action.center.get` |
 | crm | GET | `/api/tenant/crm/v1/dashboards/activities-productivity` | TENANT_PORTAL | READ_HEAVY | yes | `crm.dashboards.activities.productivity.get` |
 | crm | GET | `/api/tenant/crm/v1/dashboards/catalog` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.dashboard.builder.catalog.get` |
@@ -305,7 +307,9 @@ Machine-readable source:
 | crm | PATCH | `/api/tenant/crm/v1/leads/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.patch` |
 | crm | POST | `/api/tenant/crm/v1/leads/:id/convert` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.convert.post` |
 | crm | POST | `/api/tenant/crm/v1/leads/:id/stage` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.stage.post` |
+| crm | GET | `/api/tenant/crm/v1/leads/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.capabilities.get` |
 | crm | GET | `/api/tenant/crm/v1/leads/company-options` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.company.options.get` |
+| crm | GET | `/api/tenant/crm/v1/leads/company-options/:companyPartyId/contacts` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.company.options.contacts.get` |
 | crm | GET | `/api/tenant/crm/v1/notes` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.notes.get` |
 | crm | POST | `/api/tenant/crm/v1/notes` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.notes.post` |
 | crm | DELETE | `/api/tenant/crm/v1/notes/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.notes.by.id.delete` |
@@ -318,6 +322,7 @@ Machine-readable source:
 | crm | PUT | `/api/tenant/crm/v1/opportunities/:id/pipeline` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.opportunities.by.id.pipeline.put` |
 | crm | POST | `/api/tenant/crm/v1/opportunities/:id/stage` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunities.by.id.stage.post` |
 | crm | GET | `/api/tenant/crm/v1/opportunities/:id/stage-history` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunities.by.id.stage.history.get` |
+| crm | GET | `/api/tenant/crm/v1/opportunities/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunities.capabilities.get` |
 | crm | GET | `/api/tenant/crm/v1/opportunity-stages` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunity.stages.get` |
 | crm | POST | `/api/tenant/crm/v1/opportunity-stages` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunity.stages.post` |
 | crm | DELETE | `/api/tenant/crm/v1/opportunity-stages/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunity.stages.by.id.delete` |
@@ -454,6 +459,7 @@ Machine-readable source:
 | trade | GET | `/api/tenant/trade/v1/imports/:runId/results` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.imports.by-run-id.results.get` |
 | trade | POST | `/api/tenant/trade/v1/imports/preview` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.imports.preview.post` |
 | trade | POST | `/api/tenant/trade/v1/imports/sources` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.imports.sources.post` |
+| trade | POST | `/api/tenant/trade/v1/imports/sources/:id/release` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.imports.sources.by-id.release.post` |
 | trade | GET | `/api/tenant/trade/v1/inventory/availability` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.inventory.availability.get` |
 | trade | GET | `/api/tenant/trade/v1/inventory/decisions` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.inventory.decisions.get` |
 | trade | GET | `/api/tenant/trade/v1/inventory/decisions/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.inventory.decisions.by-id.get` |
@@ -564,6 +570,10 @@ Machine-readable source:
 | trade | POST | `/api/tenant/trade/v1/sales-orders/:id/confirmation-attempts/:attemptId/cancel` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.sales.orders.by-id.confirmation.attempts.by-attempt-id.cancel.post` |
 | trade | POST | `/api/tenant/trade/v1/sales-orders/:id/hold` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.sales.orders.by-id.hold.post` |
 | trade | POST | `/api/tenant/trade/v1/sales-orders/:id/release-hold` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.sales.orders.by-id.release.hold.post` |
+| trade | GET | `/api/tenant/trade/v1/uoms` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.uoms.get` |
+| trade | POST | `/api/tenant/trade/v1/uoms` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.uoms.post` |
+| trade | GET | `/api/tenant/trade/v1/uoms/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.uoms.by-id.get` |
+| trade | PATCH | `/api/tenant/trade/v1/uoms/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.uoms.by-id.patch` |
 | trade | GET | `/api/tenant/trade/v1/webhooks/deliveries` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.webhooks.deliveries.get` |
 | trade | GET | `/api/tenant/trade/v1/webhooks/deliveries/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.webhooks.deliveries.by-id.get` |
 | trade | POST | `/api/tenant/trade/v1/webhooks/deliveries/:id/retry` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.webhooks.deliveries.by-id.retry.post` |

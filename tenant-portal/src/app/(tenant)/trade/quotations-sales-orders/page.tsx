@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, ShoppingCart, FileCheck, CheckCircle2 } from "lucide-react";
+import { Eye, Trash2, ShoppingCart } from "lucide-react";
 import { useTradeQuotationsSalesOrders, QuotationSalesOrderItem } from "./hooks/useTradeQuotationsSalesOrders";
 import { CreateTradeQuotationsSalesOrdersModal } from "./components/CreateTradeQuotationsSalesOrdersModal";
 import { DeleteTradeQuotationsSalesOrdersConfirmModal } from "./components/DeleteTradeQuotationsSalesOrdersConfirmModal";
 
 export default function TradeQuotationsSalesOrdersPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

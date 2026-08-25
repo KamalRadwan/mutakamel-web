@@ -1,67 +1,431 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useTenantAuth } from "@/context/AuthContext";
+import {
+  resolveDefaultTenantBranchId,
+  useTenantBranchSelection,
+  type TenantBranchSource,
+} from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { isUUIDv7 } from "@/lib/uuid";
+
+export const CUSTOMER_PROFILES_PATH = "/api/tenant/crm/v1/customer-profiles";
+export const CUSTOMER_PROFILES_PAGE_SIZE = 25;
+
+export const CUSTOMER_PROFILE_TYPES = ["INDIVIDUAL", "CORPORATE"] as const;
+export const CUSTOMER_PROFILE_STATUSES = [
+  "PROSPECT",
+  "ACTIVE_CUSTOMER",
+  "INACTIVE",
+  "BLACKLISTED",
+] as const;
+
+export type CustomerProfileType = (typeof CUSTOMER_PROFILE_TYPES)[number];
+export type CustomerProfileStatus =
+  (typeof CUSTOMER_PROFILE_STATUSES)[number];
 
 export interface CustomerProfileItem {
   id: string;
-  name: string;
-  category: "VIP" | "Enterprise" | "SME";
-  contactPerson: string;
-  phone: string;
-  email: string;
-  totalDealsValue: string;
-  status: "active" | "churned";
+  branchId: string;
+  displayName: string;
+  profileType: CustomerProfileType;
+  status: CustomerProfileStatus;
+  companyName: string | null;
+  phone: string | null;
+  email: string | null;
 }
 
-const mockCustomerProfiles: CustomerProfileItem[] = [
-  { id: "cust-101", name: "شركة الأمل الطبية", category: "Enterprise", contactPerson: "د. سامي المالك", phone: "+966 50 123 4567", email: "info@alamal-med.com", totalDealsValue: "450,000.00 SAR", status: "active" },
-  { id: "cust-102", name: "مؤسسة الأفق للتجارة", category: "VIP", contactPerson: "منير سعد", phone: "+966 55 987 6543", email: "muneer@alofok.com", totalDealsValue: "820,000.00 SAR", status: "active" },
-  { id: "cust-103", name: "مدارس الرواد الأهلية", category: "SME", contactPerson: "سارة عبدالكريم", phone: "+966 54 222 3333", email: "sara@alruwad.sa", totalDealsValue: "120,000.00 SAR", status: "active" },
-];
+export interface CustomerProfilesPage {
+  items: CustomerProfileItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+const LIST_RESPONSE_LIMIT_BYTES = 1_000_000;
+const DETAIL_RESPONSE_LIMIT_BYTES = 250_000;
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function invalidResponse(): never {
+  throw new Error("Invalid CRM customer-profiles response.");
+}
+
+function isMember<const T extends readonly string[]>(
+  values: T,
+  value: unknown,
+): value is T[number] {
+  return typeof value === "string" && values.includes(value as T[number]);
+}
+
+function requiredUuidV7(
+  source: Record<string, unknown>,
+  key: string,
+): string {
+  const value = source[key];
+  if (!isUUIDv7(value)) {
+    invalidResponse();
+  }
+  return value;
+}
+
+function requiredText(
+  source: Record<string, unknown>,
+  key: string,
+  maxLength: number,
+): string {
+  const value = source[key];
+  if (
+    typeof value !== "string" ||
+    value.trim().length === 0 ||
+    value.length > maxLength
+  ) {
+    invalidResponse();
+  }
+  return value;
+}
+
+function nullableText(
+  source: Record<string, unknown>,
+  key: string,
+  maxLength: number,
+): string | null {
+  const value = source[key];
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || value.length > maxLength) {
+    invalidResponse();
+  }
+  return value;
+}
+
+function safeInteger(
+  source: Record<string, unknown>,
+  key: string,
+  minimum: number,
+  maximum = Number.MAX_SAFE_INTEGER,
+): number {
+  const value = source[key];
+  if (
+    !Number.isSafeInteger(value) ||
+    (value as number) < minimum ||
+    (value as number) > maximum
+  ) {
+    invalidResponse();
+  }
+  return value as number;
+}
+
+export function parseCustomerProfileResponse(
+  payload: unknown,
+  expectedBranchId?: string,
+): CustomerProfileItem {
+  const source = record(payload);
+  if (!source) invalidResponse();
+
+  const branchId = requiredUuidV7(source, "branchId");
+  if (expectedBranchId && branchId !== expectedBranchId) invalidResponse();
+
+  if (
+    !isMember(CUSTOMER_PROFILE_TYPES, source.profileType) ||
+    !isMember(CUSTOMER_PROFILE_STATUSES, source.status)
+  ) {
+    invalidResponse();
+  }
+
+  const primaryMobile = nullableText(source, "primaryMobile", 32);
+  const companyPhone = nullableText(source, "companyPhone", 32);
+  const primaryEmail = nullableText(source, "email", 180);
+  const companyEmail = nullableText(source, "companyEmail", 180);
+
+  return {
+    id: requiredUuidV7(source, "id"),
+    branchId,
+    displayName: requiredText(source, "displayName", 180),
+    profileType: source.profileType,
+    status: source.status,
+    companyName: nullableText(source, "companyName", 180),
+    phone: primaryMobile ?? companyPhone,
+    email: primaryEmail ?? companyEmail,
+  };
+}
+
+export function parseCustomerProfilesPageResponse(
+  payload: unknown,
+  expectedBranchId?: string,
+): CustomerProfilesPage {
+  const source = record(payload);
+  if (!source || !Array.isArray(source.items)) invalidResponse();
+
+  const total = safeInteger(source, "total", 0);
+  const page = safeInteger(source, "page", 1);
+  const limit = safeInteger(source, "limit", 1, 100);
+  const totalPages = safeInteger(source, "totalPages", 0);
+  if (
+    typeof source.hasNext !== "boolean" ||
+    typeof source.hasPrev !== "boolean" ||
+    source.items.length > limit ||
+    source.items.length > total ||
+    totalPages !== (total === 0 ? 0 : Math.ceil(total / limit)) ||
+    source.hasNext !== (page < totalPages) ||
+    source.hasPrev !== (page > 1 && totalPages > 0)
+  ) {
+    invalidResponse();
+  }
+
+  const items = source.items.map((item) =>
+    parseCustomerProfileResponse(item, expectedBranchId),
+  );
+  if (new Set(items.map(({ id }) => id)).size !== items.length) {
+    invalidResponse();
+  }
+
+  return {
+    items,
+    total,
+    page,
+    limit,
+    totalPages,
+    hasNext: source.hasNext,
+    hasPrev: source.hasPrev,
+  };
+}
+
+export function resolveCustomerProfilesBranchId(
+  source: TenantBranchSource | null | undefined,
+): string | null {
+  return resolveDefaultTenantBranchId(source);
+}
+
+export function buildCustomerProfilesListPath({
+  branchId,
+  page,
+  search,
+}: {
+  branchId: string;
+  page: number;
+  search: string;
+}): string {
+  if (!isUUIDv7(branchId)) {
+    throw new Error("A valid branch is required to load customer profiles.");
+  }
+  if (!Number.isSafeInteger(page) || page < 1) {
+    throw new Error("Customer profile page must be a positive integer.");
+  }
+  const normalizedSearch = search.trim();
+  if (normalizedSearch.length > 200) {
+    throw new Error("Customer profile search must be 200 characters or fewer.");
+  }
+
+  const query = new URLSearchParams({
+    branchId,
+    page: String(page),
+    limit: String(CUSTOMER_PROFILES_PAGE_SIZE),
+    sortBy: "createdAt",
+    sortDir: "DESC",
+  });
+  if (normalizedSearch) query.set("search", normalizedSearch);
+  return CUSTOMER_PROFILES_PATH + "?" + query.toString();
+}
+
+export function customerProfilePath(id: string): string {
+  return CUSTOMER_PROFILES_PATH + "/" + encodeURIComponent(id);
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
 
 export function useCustomerProfiles() {
-  const { t } = useI18n();
-  const [items, setItems] = useState<CustomerProfileItem[]>(mockCustomerProfiles);
+  const { lang, t } = useI18n();
+  const { user, isLoading: isAuthLoading } = useTenantAuth();
+  const [result, setResult] = useState<CustomerProfilesPage | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedForDelete, setSelectedForDelete] = useState<CustomerProfileItem | null>(null);
+  const [serverSearch, setServerSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredItems = items.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.contactPerson.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const { branchIds, branchId, selectBranch } =
+    useTenantBranchSelection(user);
+  const userId = user?.id ?? null;
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setPage(1);
+      setServerSearch(searchQuery.trim());
+    }, 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      setIsLoading(true);
+      setError(null);
+      setResult(null);
+
+      if (!userId) {
+        setError(
+          lang === "ar"
+            ? "تعذر تحديد جلسة مستخدم موثقة لتحميل ملفات العملاء."
+            : "An authenticated user session is required to load customer profiles.",
+        );
+        setIsLoading(false);
+        return;
+      }
+      if (!branchId) {
+        setError(
+          lang === "ar"
+            ? "تعذر تحديد فرع واحد موثوق. عيّن فرعًا أساسيًا أو اختر حسابًا له فرع واحد متاح."
+            : "No single trusted branch is available. Set a primary branch or use an account with one accessible branch.",
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await axiosClient.get<unknown>(
+          buildCustomerProfilesListPath({ branchId, page, search: serverSearch }),
+          {
+            signal,
+            cache: "no-store",
+            maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+          },
+        );
+        const parsed = parseCustomerProfilesPageResponse(
+          response.data,
+          branchId,
+        );
+        if (parsed.page !== page || parsed.limit !== CUSTOMER_PROFILES_PAGE_SIZE) {
+          invalidResponse();
+        }
+        setResult(parsed);
+      } catch (caught) {
+        if (isAbortError(caught)) return;
+        setResult(null);
+        setError(
+          errorMessage(caught, "Unable to load CRM customer profiles."),
+        );
+      } finally {
+        if (!signal.aborted) setIsLoading(false);
+      }
+    },
+    [branchId, lang, page, serverSearch, userId],
   );
 
-  const handleCreate = (newItem: Omit<CustomerProfileItem, "id" | "totalDealsValue" | "status">) => {
-    const created: CustomerProfileItem = {
-      ...newItem,
-      id: `cust-${Date.now().toString().slice(-4)}`,
-      totalDealsValue: "0.00 SAR",
-      status: "active",
-    };
-    setItems((prev) => [...prev, created]);
-    setIsCreateOpen(false);
-  };
+  useEffect(() => {
+    if (isAuthLoading) return;
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) void load(controller.signal);
+    });
+    return () => controller.abort();
+  }, [isAuthLoading, load, reloadToken]);
 
-  const handleDelete = () => {
-    if (selectedForDelete) {
-      setItems((prev) => prev.filter((i) => i.id !== selectedForDelete.id));
-      setSelectedForDelete(null);
-    }
-  };
+  const previousPage = useCallback(() => {
+    if (result?.hasPrev) setPage((current) => Math.max(1, current - 1));
+  }, [result?.hasPrev]);
+
+  const nextPage = useCallback(() => {
+    if (result?.hasNext) setPage((current) => current + 1);
+  }, [result?.hasNext]);
 
   return {
     t,
-    items: filteredItems,
+    lang,
+    items: result?.items ?? [],
+    branchIds,
+    branchId,
+    selectBranch: (nextBranchId: string) => {
+      selectBranch(nextBranchId);
+      setResult(null);
+      setSearchQuery("");
+      setServerSearch("");
+      setPage(1);
+      setError(null);
+    },
+    pagination: result,
     searchQuery,
     setSearchQuery,
-    isCreateOpen,
-    setIsCreateOpen,
-    selectedForDelete,
-    setSelectedForDelete,
-    handleCreate,
-    handleDelete,
+    isLoading: isAuthLoading || isLoading,
+    error,
+    previousPage,
+    nextPage,
+    reload: () => setReloadToken((current) => current + 1),
+  };
+}
+
+export function useCustomerProfile(id: string) {
+  const { user, isLoading: isAuthLoading } = useTenantAuth();
+  const [item, setItem] = useState<CustomerProfileItem | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const userId = user?.id ?? null;
+
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      setIsLoading(true);
+      setError(null);
+      setItem(null);
+
+      if (!userId) {
+        setError("An authenticated user session is required to load this customer profile.");
+        setIsLoading(false);
+        return;
+      }
+      if (!isUUIDv7(id)) {
+        setError("The customer profile link is invalid.");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await axiosClient.get<unknown>(customerProfilePath(id), {
+          signal,
+          cache: "no-store",
+          maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
+        });
+        setItem(parseCustomerProfileResponse(response.data));
+      } catch (caught) {
+        if (isAbortError(caught)) return;
+        setItem(null);
+        setError(
+          errorMessage(caught, "Unable to load the CRM customer profile."),
+        );
+      } finally {
+        if (!signal.aborted) setIsLoading(false);
+      }
+    },
+    [id, userId],
+  );
+
+  useEffect(() => {
+    if (isAuthLoading) return;
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) void load(controller.signal);
+    });
+    return () => controller.abort();
+  }, [isAuthLoading, load, reloadToken]);
+
+  return {
+    item,
+    isLoading: isAuthLoading || isLoading,
+    error,
+    reload: () => setReloadToken((current) => current + 1),
   };
 }

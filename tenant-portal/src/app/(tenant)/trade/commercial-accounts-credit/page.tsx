@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Building2, CreditCard, ShieldAlert } from "lucide-react";
+import { Eye, Trash2, Building2 } from "lucide-react";
 import { useCommercialAccountsCredit, CommercialAccountItem } from "./hooks/useCommercialAccountsCredit";
 import { CreateCommercialAccountsCreditModal } from "./components/CreateCommercialAccountsCreditModal";
 import { DeleteCommercialAccountsCreditConfirmModal } from "./components/DeleteCommercialAccountsCreditConfirmModal";
 
 export default function CommercialAccountsCreditPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

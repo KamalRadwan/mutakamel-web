@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, DollarSign, BookOpen, Percent } from "lucide-react";
+import { Eye, Trash2, BookOpen } from "lucide-react";
 import { useTradePricingPriceBooks, PriceBookItem } from "./hooks/useTradePricingPriceBooks";
 import { CreateTradePricingPriceBooksModal } from "./components/CreateTradePricingPriceBooksModal";
 import { DeleteTradePricingPriceBooksConfirmModal } from "./components/DeleteTradePricingPriceBooksConfirmModal";
 
 export default function TradePricingPriceBooksPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

@@ -1,11 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
+  STORAGE_SERVER_DNS_LABEL_PATTERN,
   isSecureStorageEndpoint,
   probeFreshnessPercent,
+  requiresStorageRuntimeSetup,
   shouldResetStorageServerWriteKey,
 } from "./storage-server-contract";
 
 describe("storage server contract helpers", () => {
+  it("provides a Unicode Sets-compatible HTML pattern for DNS labels", () => {
+    const pattern = new RegExp(`^(?:${STORAGE_SERVER_DNS_LABEL_PATTERN})$`, "v");
+
+    expect(pattern.test("garage-primary")).toBe(true);
+    expect(pattern.test("g")).toBe(true);
+    expect(pattern.test(`g${"-".repeat(61)}g`)).toBe(true);
+    expect(pattern.test("g".repeat(64))).toBe(false);
+    expect(pattern.test("-garage")).toBe(false);
+    expect(pattern.test("garage-")).toBe(false);
+    expect(pattern.test("garage_primary")).toBe(false);
+  });
+
   it("accepts only a credential-free HTTPS origin", () => {
     expect(isSecureStorageEndpoint("https://garage.example.com")).toBe(true);
     expect(isSecureStorageEndpoint("http://garage.example.com")).toBe(false);
@@ -54,6 +68,29 @@ describe("storage server contract helpers", () => {
         errorCode: "COMMON.VALIDATION.FAILED",
       }),
     ).toBe(true);
+  });
+
+  it("recognizes storage runtime setup blockers", () => {
+    expect(
+      requiresStorageRuntimeSetup({
+        errorCode: "CORE.STORAGE_RUNTIME.NOT_CONFIGURED",
+      }),
+    ).toBe(true);
+    expect(
+      requiresStorageRuntimeSetup({
+        errorCode: "CORE.STORAGE.RUNTIME_KEY_UNAVAILABLE",
+      }),
+    ).toBe(true);
+    expect(
+      requiresStorageRuntimeSetup({
+        errorCode: "CORE.STORAGE_RUNTIME.DISABLED",
+      }),
+    ).toBe(true);
+    expect(
+      requiresStorageRuntimeSetup({
+        errorCode: "STORAGE_SERVER_CONNECTION_TEST_FAILED",
+      }),
+    ).toBe(false);
   });
 
   it("reports a bounded freshness percentage", () => {

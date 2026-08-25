@@ -6,14 +6,12 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Target, History, DollarSign } from "lucide-react";
+import { Eye, Trash2, Target } from "lucide-react";
 import { useOpportunitiesStageHistory, OpportunityItem } from "./hooks/useOpportunitiesStageHistory";
 import { CreateOpportunitiesStageHistoryModal } from "./components/CreateOpportunitiesStageHistoryModal";
 import { DeleteOpportunitiesStageHistoryConfirmModal } from "./components/DeleteOpportunitiesStageHistoryConfirmModal";
-import { useI18n } from "@/i18n/I18nContext";
 
 export default function OpportunitiesStageHistoryPage() {
-//     const { t } = useI18n();
   const {
     t,
     items,

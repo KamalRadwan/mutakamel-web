@@ -16,6 +16,7 @@ interface Props {
 }
 
 const decimalPattern = /^\d{1,18}(?:\.\d{1,4})?$/;
+const CRM_OUTBOUND_EMAIL_DEFAULT_CONFIG = JSON.stringify({ dailyQuota: 1000, rateLimitPerMin: 30 });
 
 export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, canRead, canCreate, canMutate }: Props) {
   const catalogue = useApplicationCatalogue(canRead ? applicationId : null);
@@ -94,12 +95,17 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
     }
   };
 
-  const toggleGrant = (featureId: string) => {
+  const toggleGrant = (feature: FeatureView, checked: boolean) => {
     setSelectedGrantIds((current) => {
       const next = new Set(current);
-      if (next.has(featureId)) next.delete(featureId); else next.add(featureId);
+      if (checked) next.add(feature.id); else next.delete(feature.id);
       return next;
     });
+    if (checked && feature.key === "crm.outbound_email") {
+      setGrantConfig((current) => current[feature.id]?.trim()
+        ? current
+        : { ...current, [feature.id]: CRM_OUTBOUND_EMAIL_DEFAULT_CONFIG });
+    }
   };
 
   const validateAndSavePrices = async () => {
@@ -184,7 +190,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                   return (
                     <div key={feature.id} className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
                       <label className="flex items-start gap-3">
-                        <input type="checkbox" checked={isGranted} onChange={() => toggleGrant(feature.id)} disabled={!canMutate} className="mt-1 h-4 w-4 accent-violet-600" />
+                        <input type="checkbox" checked={isGranted} onChange={(event) => toggleGrant(feature, event.target.checked)} disabled={!canMutate} className="mt-1 h-4 w-4 accent-violet-600" />
                         <span><span className="block text-sm font-bold">{feature.name}</span><code className="text-[11px] text-violet-600 dark:text-violet-400">{feature.key}</code></span>
                       </label>
                       {isGranted && (

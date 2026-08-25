@@ -1,7 +1,6 @@
 export const TENANT_CREATE_PERMISSION = "admin.tenants.create";
 const UUID_V7 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const STORAGE_SERVER_STATUSES = ["DRAFT", "ACTIVE", "OFFLINE"] as const;
 
 export interface TenantStoragePlacementOption {
   id: string;
@@ -11,15 +10,6 @@ export interface TenantStoragePlacementOption {
   status: "ACTIVE";
   maxTenants: number | null;
   assignedTenants: number;
-}
-
-export interface TenantStorageServerSummary {
-  id: string;
-  code: string;
-  name: string;
-  region: string;
-  bucketName: string;
-  status: (typeof STORAGE_SERVER_STATUSES)[number];
 }
 
 export type StoragePlacementState =
@@ -66,61 +56,6 @@ export function readStoragePlacementOptions(
   return parsed;
 }
 
-export function sanitizeTenantStoragePlacement<
-  Tenant extends Record<string, unknown>,
->(
-  tenant: Tenant,
-): Tenant & {
-  storageServerId: string | null;
-  storageServer?: TenantStorageServerSummary;
-} {
-  const rawStorageServerId = tenant.storageServerId;
-  const storageServerId =
-    rawStorageServerId === null
-      ? null
-      : typeof rawStorageServerId === "string" &&
-          UUID_V7.test(rawStorageServerId)
-        ? rawStorageServerId
-        : (() => {
-            throw new Error("INVALID_TENANT_STORAGE_PLACEMENT_RESPONSE");
-          })();
-  const rawSummary = tenant.storageServer;
-  const result = {
-    ...tenant,
-    storageServerId,
-  } as Tenant & {
-    storageServerId: string | null;
-    storageServer?: TenantStorageServerSummary;
-  };
-
-  delete result.storageServer;
-  if (rawSummary === undefined || rawSummary === null) return result;
-
-  const summary = asRecord(rawSummary);
-  if (
-    !summary ||
-    storageServerId === null ||
-    summary.id !== storageServerId ||
-    !isNonEmptyString(summary.name) ||
-    !isNonEmptyString(summary.code) ||
-    !isNonEmptyString(summary.region) ||
-    !isNonEmptyString(summary.bucketName) ||
-    !isOneOf(summary.status, STORAGE_SERVER_STATUSES)
-  ) {
-    throw new Error("INVALID_TENANT_STORAGE_PLACEMENT_RESPONSE");
-  }
-
-  result.storageServer = {
-    id: summary.id as string,
-    code: summary.code as string,
-    name: summary.name as string,
-    region: summary.region as string,
-    bucketName: summary.bucketName as string,
-    status: summary.status as (typeof STORAGE_SERVER_STATUSES)[number],
-  };
-  return result;
-}
-
 function readStoragePlacementOption(
   value: unknown,
 ): TenantStoragePlacementOption {
@@ -158,13 +93,6 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
-}
-
-function isOneOf<const Values extends readonly string[]>(
-  value: unknown,
-  values: Values,
-): value is Values[number] {
-  return typeof value === "string" && values.includes(value);
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

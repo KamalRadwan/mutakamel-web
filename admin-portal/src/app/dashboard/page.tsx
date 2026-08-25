@@ -108,7 +108,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100">
       <Navbar />
-      <main className="mx-auto w-full max-w-[1600px] flex-1 space-y-5 p-4 sm:p-6">
+      <main className="w-full flex-1 space-y-5 px-[10px] py-4 sm:py-6">
         {children}
       </main>
     </div>

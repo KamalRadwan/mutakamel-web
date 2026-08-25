@@ -12,8 +12,10 @@ Protected calls use the shared authenticated client:
 
 ```ts
 credentials: "include";
-"x-auth-cookie-mode": "1";
 ```
+
+The server infers the browser channel from trusted origin/fetch metadata; the
+client must not select an authentication mode with a request header.
 
 JWT access and refresh tokens belong only in HttpOnly cookies. Browser-readable
 storage may not retain them.

@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Users, UserCheck, Shield } from "lucide-react";
+import { Eye, Trash2, UserCheck } from "lucide-react";
 import { useUsers, UserItem } from "./hooks/useUsers";
 import { CreateUsersModal } from "./components/CreateUsersModal";
 import { DeleteUsersConfirmModal } from "./components/DeleteUsersConfirmModal";
 
 export default function UsersPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

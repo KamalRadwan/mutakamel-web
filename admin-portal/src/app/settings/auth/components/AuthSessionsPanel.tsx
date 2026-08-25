@@ -1,0 +1,198 @@
+"use client";
+
+import { useState } from "react";
+import { Laptop, Loader2, LogOut, RefreshCw, ShieldOff } from "lucide-react";
+import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
+import { useI18n } from "@/i18n/I18nContext";
+import type { AuthSessionSummary } from "@/lib/auth/sessionApi";
+import { useAuthSessions } from "../hooks/useAuthSessions";
+
+export function AuthSessionsPanel() {
+  const { lang, t } = useI18n();
+  const copy = t.authActions.sessions;
+  const {
+    sessions,
+    isLoading,
+    revokingId,
+    isLoggingOutAll,
+    error,
+    reload,
+    revoke,
+    logoutEverywhere,
+  } = useAuthSessions();
+  const [pendingSession, setPendingSession] = useState<AuthSessionSummary | null>(null);
+  const [isLogoutAllOpen, setIsLogoutAllOpen] = useState(false);
+  const locale = lang === "ar" ? "ar-EG" : "en-US";
+  const isConfirmingSession = pendingSession?.id === revokingId;
+  const isBusy = revokingId !== null || isLoggingOutAll;
+
+  const closeSessionConfirmation = () => {
+    if (!isConfirmingSession) setPendingSession(null);
+  };
+
+  const confirmRevocation = async () => {
+    if (!pendingSession || isConfirmingSession) return;
+    if (await revoke(pendingSession)) setPendingSession(null);
+  };
+
+  const closeLogoutAllConfirmation = () => {
+    if (!isLoggingOutAll) setIsLogoutAllOpen(false);
+  };
+
+  const confirmLogoutAll = async () => {
+    if (isLoggingOutAll) return;
+    if (await logoutEverywhere()) setIsLogoutAllOpen(false);
+  };
+
+  return (
+    <>
+      <section
+        aria-busy={isLoading || isBusy}
+        className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900"
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+              <Laptop className="size-4 text-blue-600 dark:text-blue-400" />
+              {copy.title}
+            </h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {copy.description}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsLogoutAllOpen(true)}
+              disabled={isLoading || isBusy}
+              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/40"
+            >
+              <LogOut className="size-4" />
+              {copy.logoutAllButton}
+            </button>
+            <button
+              type="button"
+              onClick={() => void reload()}
+              disabled={isLoading || isBusy}
+              className="grid size-9 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              aria-label={copy.refresh}
+            >
+              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <p role="alert" className="text-xs font-medium text-rose-600 dark:text-rose-400">
+            {copy.error}
+          </p>
+        )}
+
+        {isLoading ? (
+          <div role="status" className="flex items-center justify-center p-8 text-slate-400">
+            <Loader2 className="size-5 animate-spin" />
+            <span className="sr-only">{copy.loading}</span>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {sessions.map((session) => (
+              <article
+                key={session.id}
+                className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                      {session.deviceLabel ?? session.clientId}
+                    </span>
+                    {session.current && (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        {copy.current}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    {copy.lastUsed}: {formatDate(
+                      session.lastUserActivityAt ??
+                        session.lastAccessIssuedAt ??
+                        session.lastRefreshAt ??
+                        session.createdAt,
+                      locale,
+                    )}
+                    {" · "}
+                    {copy.refreshes}: {session.refreshUseCount}
+                    {" · "}
+                    {copy.accessIssuances}: {session.accessIssueCount}
+                  </p>
+                  <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+                    {session.clientId} · {session.clientType}
+                  </p>
+                </div>
+                {!session.endedAt && (
+                  <button
+                    type="button"
+                    onClick={() => setPendingSession(session)}
+                    disabled={isBusy}
+                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                  >
+                    {revokingId === session.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <ShieldOff className="size-4" />
+                    )}
+                    {session.current ? copy.endCurrent : copy.revoke}
+                  </button>
+                )}
+              </article>
+            ))}
+            {sessions.length === 0 && (
+              <p className="py-6 text-center text-xs text-slate-500">
+                {copy.empty}
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+
+      <DestructiveActionModal
+        isOpen={pendingSession !== null}
+        onClose={closeSessionConfirmation}
+        onConfirm={() => void confirmRevocation()}
+        title={pendingSession?.current ? copy.endCurrentTitle : copy.revokeTitle}
+        description={pendingSession?.current
+          ? copy.endCurrentDescription
+          : copy.revokeDescription}
+        targetName={pendingSession?.deviceLabel ?? pendingSession?.clientId ?? ""}
+        actionType="revoke-session"
+        requireNameTyping={false}
+        isSubmitting={isConfirmingSession}
+        confirmLabel={pendingSession?.current ? copy.endCurrent : copy.revoke}
+        submittingLabel={pendingSession?.current ? copy.endingCurrent : copy.revoking}
+      />
+
+      <DestructiveActionModal
+        isOpen={isLogoutAllOpen}
+        onClose={closeLogoutAllConfirmation}
+        onConfirm={() => void confirmLogoutAll()}
+        title={copy.logoutAllTitle}
+        description={copy.logoutAllDescription}
+        targetName={copy.logoutAllTarget}
+        actionType="revoke-session"
+        requireNameTyping={false}
+        isSubmitting={isLoggingOutAll}
+        confirmLabel={copy.logoutAllConfirm}
+        submittingLabel={copy.logoutAllSubmitting}
+      />
+    </>
+  );
+}
+
+function formatDate(value: string, locale: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat(locale, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(date);
+}

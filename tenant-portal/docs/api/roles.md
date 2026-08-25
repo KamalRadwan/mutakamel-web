@@ -13,7 +13,7 @@
 - Gateway contracts: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
 - Roles controller/service/DTOs: `../backend/mutakamel-apps/core-app/src/tenant/tenant-roles`
 - Exact-scope controller/service/DTOs: `../backend/mutakamel-apps/core-app/src/tenant/scope-role-assignments`
-- Legacy settings/users UI: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
+- Historical consolidated settings/users reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
 
 ## Security and common contract
 
@@ -21,7 +21,10 @@ Routes require a tenant JWT, matching verified host, current session/subscriptio
 
 All IDs are UUIDv7. Unknown DTO fields are rejected. List routes use common pagination (`page` 1, `limit` 20/max 100, `search` max 200). Paginated results put the array in `data` and counts in `meta`. Standard errors use the Core envelope; `204` has no body.
 
-These mutations have no explicit application idempotency contract. Role/assignment changes bump session versions for affected users; the UI must expect their access tokens to become stale.
+These mutations have no explicit application idempotency contract. Role and
+scope-assignment changes advance `authorizationVersion` for affected users; the
+UI must expect stale access JWTs to refresh and reload `/auth/me`, while the
+reusable Auth Session remains active unless a separate security action ends it.
 
 Role data is private and scope-sensitive; do not store it in a shared/public cache. All routes are synchronous from the portal contract and expose no async job.
 
@@ -82,7 +85,7 @@ Safe catalogue example:
 
 ```http
 GET /api/tenant/core/v1/permissions?page=1&limit=20&sortBy=group&sortDir=ASC
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>
 ```
 
 Validation combines DTO rules (UUIDv7, lengths, unique tuples, scope shape) with owner/branch/role domain checks.
@@ -93,5 +96,8 @@ Expected errors include `ROLE_NOT_FOUND`, `ROLE_NAME_TAKEN`, `ROLE_IN_USE`, `ROL
 
 - Prefer exact-scope assignments for new owner administration flows; keep legacy branch routes only where existing behavior requires them.
 - Show the effective scope tuple explicitly before replacement.
-- Refetch assignments after write and require reauthentication if the current user's session becomes stale.
+- Refetch assignments after write. If the current user's
+  `authorizationVersion` advanced, refresh/reissue the access JWT and reload
+  `/auth/me`; the reusable Auth Session remains active unless a separate
+  security action ends it.
 - Never infer tenant-owner status from a role name or permission key.

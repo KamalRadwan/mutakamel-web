@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, SlidersHorizontal, GitBranch, Layers } from "lucide-react";
+import { Eye, Trash2, SlidersHorizontal } from "lucide-react";
 import { useTradeConfigurationScope, ConfigScopeItem } from "./hooks/useTradeConfigurationScope";
 import { CreateTradeConfigurationScopeModal } from "./components/CreateTradeConfigurationScopeModal";
 import { DeleteTradeConfigurationScopeConfirmModal } from "./components/DeleteTradeConfigurationScopeConfirmModal";
 
 export default function TradeConfigurationScopePage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

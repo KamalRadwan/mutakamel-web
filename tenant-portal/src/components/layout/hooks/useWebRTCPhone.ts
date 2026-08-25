@@ -1,17 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import type { RTCSession } from 'jssip/lib/RTCSession';
 import type { UA } from 'jssip';
-import { playDtmfTone, iceServersFromSettings, isWebphoneReady, normalizeCallTarget, sipUri } from '@mutakamel/webphone';
+import { playDtmfTone, iceServersFromSettings, isWebphoneReady, normalizeCallTarget } from '@mutakamel/webphone';
 import { safeStorage } from "@/lib/safeStorage";
-import { createMyWebphoneCallLog, loadAsteriskSettings, loadMyWebphoneCallLogs, loadMyWebphoneConfig } from '../webphone/api';
 import type {
-  ActiveCallContext,
   AdminWebphoneConfig,
   AsteriskIntegrationSettings,
-  CreateWebphoneCallLogPayload,
   WebphoneCallLog,
   WebphoneCallState,
   WebphoneConnectionState,
@@ -25,14 +22,12 @@ type PhoneLifecycle = {
   stopLocalAudioStream: () => void;
 };
 
-type LegacyPeerConnection = RTCPeerConnection & {
-  getRemoteStreams?: () => MediaStream[];
+type HoldableRTCSession = RTCSession & {
+  isLocalHeld?: () => boolean;
+  isOnHold?: () => { local?: boolean };
+  hold?: () => void;
+  unhold?: () => void;
 };
-
-type WebAudioWindow = Window &
-  typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
 
 const WEBPHONE_STORAGE_KEYS = {
   expanded: 'mutakamel.webphone.expanded',
@@ -68,47 +63,36 @@ export function useWebRTCPhone() {
 
   const uaRef = useRef<UA | null>(null);
   const sessionRef = useRef<RTCSession | null>(null);
-  const boundSessionsRef = useRef<WeakSet<RTCSession>>(new WeakSet());
-  const boundPeerConnectionsRef = useRef<WeakSet<RTCPeerConnection>>(new WeakSet());
-  const boundIceSessionsRef = useRef<WeakSet<RTCSession>>(new WeakSet());
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const micMeterStopRef = useRef<(() => void) | null>(null);
-  const speakerMeterStopRef = useRef<(() => void) | null>(null);
-  const ringToneStopRef = useRef<(() => void) | null>(null);
   const autoAnswerRef = useRef(false);
   const doNotDisturbRef = useRef(false);
-  const stoppingLocalStreamRef = useRef(false);
-  const callStartedAtRef = useRef<number | null>(null);
-  const activeCallContextRef = useRef<ActiveCallContext | null>(null);
   const phoneLifecycleRef = useRef<PhoneLifecycle>(idlePhoneLifecycle);
 
-  const [shouldRender, setShouldRender] = useState(false);
   const [expanded, setExpanded] = useState(() => readBooleanPreference(WEBPHONE_STORAGE_KEYS.expanded, false));
   const [incomingPopupDismissed, setIncomingPopupDismissed] = useState(false);
   const [activeTab, setActiveTab] = useState<WebphoneTab>('phone');
-  const [settings, setSettings] = useState<AsteriskIntegrationSettings>();
-  const [webphone, setWebphone] = useState<AdminWebphoneConfig>();
-  const [connectionState, setConnectionState] = useState<WebphoneConnectionState>('idle');
+  const [settings] = useState<AsteriskIntegrationSettings>();
+  const [webphone] = useState<AdminWebphoneConfig>();
+  const [connectionState] = useState<WebphoneConnectionState>('idle');
   const [callState, setCallState] = useState<WebphoneCallState>('idle');
   const [status, setStatus] = useState('WebPhone');
   const [dialTarget, setDialTarget] = useState('');
-  const [remoteParty, setRemoteParty] = useState('');
+  const [remoteParty] = useState('');
   const [muted, setMuted] = useState(false);
   const [speakerMuted, setSpeakerMuted] = useState(false);
   const [held, setHeld] = useState(false);
   const [autoAnswer, setAutoAnswerState] = useState(false);
   const [doNotDisturb, setDoNotDisturbState] = useState(false);
-  const [callLogs, setCallLogs] = useState<WebphoneCallLog[]>([]);
-  const [logsLoading, setLogsLoading] = useState(false);
+  const [callLogs] = useState<WebphoneCallLog[]>([]);
+  const [logsLoading] = useState(false);
 
   const [micVolume, setMicVolumeState] = useState(() => readNumberPreference(WEBPHONE_STORAGE_KEYS.micVolume, 100));
   const [speakerVolume, setSpeakerVolumeState] = useState(() => readNumberPreference(WEBPHONE_STORAGE_KEYS.speakerVolume, 100));
-  const [micLevel, setMicLevel] = useState(0);
-  const [speakerLevel, setSpeakerLevel] = useState(0);
-  const [timerLabel, setTimerLabel] = useState('00:00');
-  const [mediaNotice, setMediaNotice] = useState<string | null>(null);
+  const [micLevel] = useState(0);
+  const [speakerLevel] = useState(0);
+  const [timerLabel] = useState('00:00');
+  const [mediaNotice] = useState<string | null>(null);
 
   const setAutoAnswer = (enabled: boolean) => {
     autoAnswerRef.current = enabled;
@@ -176,7 +160,7 @@ export function useWebRTCPhone() {
   };
 
   const toggleHold = () => {
-    const session = sessionRef.current as any;
+    const session = sessionRef.current as HoldableRTCSession | null;
     if (!session) return;
 
     if (session.isLocalHeld?.() || session.isOnHold?.()?.local) {

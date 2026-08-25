@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import {
   buildTenantSubscriptionLines,
+  getCanonicalCountrySelection,
   getTenantRegistrationLoadState,
+  isCanonicalCountrySelection,
   isTenantIdentityEvidenceCurrent,
   readDatabasePlacementOptions,
   readProvisioningPlanPreview,
@@ -37,6 +39,30 @@ const candidate: TenantApplicationCandidate = {
 };
 
 describe("tenant registration contract", () => {
+  it("derives country name, calling code, and timezone from the canonical ISO registry", () => {
+    expect(getCanonicalCountrySelection(" eg ")).toEqual({
+      countryName: "Egypt",
+      countryIsoCode: "EG",
+      callingCode: "+20",
+      timezones: ["Africa/Cairo"],
+    });
+    expect(
+      isCanonicalCountrySelection({
+        countryName: "Egypt",
+        countryIsoCode: "EG",
+        timezone: "Africa/Cairo",
+      }),
+    ).toBe(true);
+    expect(
+      isCanonicalCountrySelection({
+        countryName: "A mismatched client label",
+        countryIsoCode: "EG",
+        timezone: "Africa/Cairo",
+      }),
+    ).toBe(false);
+    expect(getCanonicalCountrySelection("ZZ")).toBeNull();
+  });
+
   it("accepts only the bounded least-privilege create-options projection", () => {
     const payload = {
       contractVersion: 1,
@@ -53,9 +79,7 @@ describe("tenant registration contract", () => {
           selectionBlockers: [],
           readinessReasons: [],
           catalogueReasons: [],
-          tiers: [
-            { id: tierId, key: "business", name: "Business", rank: 1 },
-          ],
+          tiers: [{ id: tierId, key: "business", name: "Business", rank: 1 }],
         },
       ],
     };
@@ -193,8 +217,60 @@ describe("tenant registration contract", () => {
         total: 1,
       }),
     ).toThrow("INVALID_DATABASE_PLACEMENT_OPTIONS_RESPONSE");
+    expect(() => readDatabasePlacementOptions({ items: [], total: 1 })).toThrow(
+      "INVALID_DATABASE_PLACEMENT_OPTIONS_RESPONSE",
+    );
+  });
+
+  it("normalizes nullable database location metadata from Core", () => {
+    const parsed = readDatabasePlacementOptions({
+      items: [
+        {
+          id: databaseId,
+          name: "PostgreSQL Global 01",
+          status: "ACTIVE",
+          countryName: null,
+          countryIsoCode: null,
+          currentTenants: 0,
+          maxTenants: 50,
+        },
+      ],
+      total: 1,
+    });
+
+    expect(parsed).toEqual([
+      {
+        id: databaseId,
+        name: "PostgreSQL Global 01",
+        status: "ACTIVE",
+        currentTenants: 0,
+        maxTenants: 50,
+      },
+    ]);
+    expect(parsed[0]).not.toHaveProperty("countryName");
+    expect(parsed[0]).not.toHaveProperty("countryIsoCode");
+
     expect(() =>
-      readDatabasePlacementOptions({ items: [], total: 1 }),
+      readDatabasePlacementOptions({
+        items: [
+          {
+            ...parsed[0],
+            countryName: "   ",
+          },
+        ],
+        total: 1,
+      }),
+    ).toThrow("INVALID_DATABASE_PLACEMENT_OPTIONS_RESPONSE");
+    expect(() =>
+      readDatabasePlacementOptions({
+        items: [
+          {
+            ...parsed[0],
+            countryIsoCode: "egy",
+          },
+        ],
+        total: 1,
+      }),
     ).toThrow("INVALID_DATABASE_PLACEMENT_OPTIONS_RESPONSE");
   });
 
@@ -273,9 +349,15 @@ describe("tenant registration contract", () => {
       fingerprint: tenantIdentityFingerprint("acme", "Acme LLC"),
       result: available,
     };
-    expect(isTenantIdentityEvidenceCurrent(evidence, "ACME", "Acme LLC")).toBe(true);
-    expect(isTenantIdentityEvidenceCurrent(evidence, "trade", "Acme LLC")).toBe(false);
-    expect(isTenantIdentityEvidenceCurrent(evidence, "acme", "Other LLC")).toBe(false);
+    expect(isTenantIdentityEvidenceCurrent(evidence, "ACME", "Acme LLC")).toBe(
+      true,
+    );
+    expect(isTenantIdentityEvidenceCurrent(evidence, "trade", "Acme LLC")).toBe(
+      false,
+    );
+    expect(isTenantIdentityEvidenceCurrent(evidence, "acme", "Other LLC")).toBe(
+      false,
+    );
 
     const taken = {
       ...available,
@@ -311,8 +393,17 @@ describe("tenant registration contract", () => {
       message: "failure",
     });
     expect(shouldRetainTenantCreateIntent(error(503, "HTTP_503"))).toBe(true);
-    expect(shouldRetainTenantCreateIntent(error(409, "GW.IDEM.IN.FLIGHT"))).toBe(true);
-    expect(shouldRetainTenantCreateIntent(error(409, "IDEMPOTENCY_KEY_REUSED"))).toBe(false);
-    expect(shouldRetainTenantCreateIntent(error(400, "VALIDATION_FAILED"))).toBe(false);
+    expect(
+      shouldRetainTenantCreateIntent(error(409, "GW.IDEM.IN_FLIGHT")),
+    ).toBe(true);
+    expect(shouldRetainTenantCreateIntent(error(500, "UNKNOWN_ERROR"))).toBe(
+      true,
+    );
+    expect(
+      shouldRetainTenantCreateIntent(error(409, "IDEMPOTENCY_KEY_REUSED")),
+    ).toBe(false);
+    expect(
+      shouldRetainTenantCreateIntent(error(400, "VALIDATION_FAILED")),
+    ).toBe(false);
   });
 });

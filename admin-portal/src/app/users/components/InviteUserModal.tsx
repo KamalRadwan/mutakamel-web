@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UserPlus, X, Loader2, Mail, ShieldAlert } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastContext";
-import { inviteAdminUser, listRoles } from "../api/adminUsersApi";
+import {
+  inviteAdminUser,
+  listAdminUsers,
+  listRoles,
+} from "../api/adminUsersApi";
 import { getErrorMessageAndDetails } from "../utils/errorMapping";
-import type { AdminRole } from "../types";
+import {
+  claimAdminUserWriteIntent,
+  settleAdminUserWriteIntent,
+  type AdminUserWriteIntent,
+} from "../model/writeIntent";
+import { normalizeApiError } from "@/shared/api/normalized-api-error";
+import type { AdminRole, CreateAdminUserDto } from "../types";
 
 export function InviteUserModal({
   onClose,
@@ -26,6 +36,10 @@ export function InviteUserModal({
   const [roleId, setRoleId] = useState("");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAmbiguous, setIsAmbiguous] = useState(false);
+  const inviteIntentRef = useRef<AdminUserWriteIntent<CreateAdminUserDto> | null>(
+    null,
+  );
 
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
@@ -63,17 +77,39 @@ export function InviteUserModal({
     e.preventDefault();
     if (!email.trim() || !firstName.trim() || !lastName.trim() || !roleId) return;
 
+    const command: CreateAdminUserDto = {
+      email: email.trim().toLowerCase(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      roleId,
+      isSuperAdmin: user?.isSuperAdmin ? isSuperAdmin : false,
+    };
+    let intent: AdminUserWriteIntent<CreateAdminUserDto>;
+    try {
+      intent = claimAdminUserWriteIntent(
+        inviteIntentRef.current,
+        "POST",
+        "/api/admin/core/v1/users",
+        command,
+      );
+    } catch {
+      toast.error(
+        lang === "ar" ? "\u0627\u0644\u0637\u0644\u0628 \u063a\u064a\u0631 \u0645\u0637\u0627\u0628\u0642" : "Request changed",
+        lang === "ar"
+          ? "\u0623\u0639\u062f \u0627\u0644\u0642\u064a\u0645 \u0627\u0644\u0623\u0635\u0644\u064a\u0629 \u0644\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629."
+          : "Restore the original values before retrying the unresolved invitation.",
+      );
+      return;
+    }
+    inviteIntentRef.current = intent;
+
     setIsSubmitting(true);
     setFieldErrors({});
 
     try {
-      await inviteAdminUser({
-        email: email.trim().toLowerCase(),
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        roleId,
-        isSuperAdmin: user?.isSuperAdmin ? isSuperAdmin : false,
-      });
+      await inviteAdminUser(intent.command, intent.idempotencyKey);
+      inviteIntentRef.current = null;
+      setIsAmbiguous(false);
 
       toast.success(
         lang === "ar" ? "تمت الدعوة بنجاح" : "Invitation Sent",
@@ -86,6 +122,26 @@ export function InviteUserModal({
       onClose();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
+      const normalized = normalizeApiError(err);
+      const nextIntent = settleAdminUserWriteIntent(intent, err, normalized);
+      inviteIntentRef.current = nextIntent;
+      const ambiguous = nextIntent?.ambiguous === true;
+      setIsAmbiguous(ambiguous);
+
+      if (ambiguous && (await invitedUserExists(intent.command))) {
+        inviteIntentRef.current = null;
+        setIsAmbiguous(false);
+        toast.success(
+          lang === "ar" ? "\u062a\u0645 \u062a\u0623\u0643\u064a\u062f \u0627\u0644\u062f\u0639\u0648\u0629" : "Invitation confirmed",
+          lang === "ar"
+            ? "\u0623\u0643\u062f\u062a \u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645 \u0623\u0646 \u0627\u0644\u062f\u0639\u0648\u0629 \u062d\u0641\u0638\u062a \u0628\u0646\u062c\u0627\u062d."
+            : "An authoritative user read confirmed the invitation was saved.",
+        );
+        onSuccess();
+        onClose();
+        return;
+      }
+
       const details = getErrorMessageAndDetails(err, lang);
       if (details.fieldErrors) {
         setFieldErrors(details.fieldErrors);
@@ -108,11 +164,13 @@ export function InviteUserModal({
 
         <div className="relative z-10">
           <button
-          onClick={onClose}
-          className="absolute top-4 end-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
+            onClick={onClose}
+            disabled={isAmbiguous}
+            aria-label={isAr ? "Close" : "Close"}
+            className="absolute top-4 end-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <X className="w-4 h-4" />
+          </button>
 
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center border border-blue-100 dark:border-blue-800 shrink-0">
@@ -132,6 +190,14 @@ export function InviteUserModal({
           {t.users.invitedInfoBanner}
         </div>
 
+        {isAmbiguous ? (
+          <div role="alert" className="p-3 mb-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
+            {isAr
+              ? "\u0646\u062a\u064a\u062c\u0629 \u0627\u0644\u062f\u0639\u0648\u0629 \u063a\u064a\u0631 \u0645\u0624\u0643\u062f\u0629. \u0623\u0639\u062f \u0645\u062d\u0627\u0648\u0644\u0629 \u0646\u0641\u0633 \u0627\u0644\u0637\u0644\u0628."
+              : "The invitation outcome is unconfirmed. Retry the exact unchanged request."}
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -143,6 +209,7 @@ export function InviteUserModal({
                 type="text"
                 maxLength={80}
                 value={firstName}
+                disabled={isAmbiguous}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder={isAr ? "عمر" : "Omar"}
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
@@ -157,6 +224,7 @@ export function InviteUserModal({
                 type="text"
                 maxLength={80}
                 value={lastName}
+                disabled={isAmbiguous}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder={isAr ? "حسين" : "Hassan"}
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
@@ -175,6 +243,7 @@ export function InviteUserModal({
                 type="email"
                 maxLength={255}
                 value={email}
+                disabled={isAmbiguous}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   setFieldErrors((prev) => ({ ...prev, email: "" }));
@@ -211,7 +280,7 @@ export function InviteUserModal({
                 required
                 value={roleId}
                 onChange={(e) => setRoleId(e.target.value)}
-                disabled={isLoadingRoles}
+                disabled={isLoadingRoles || isAmbiguous}
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 cursor-pointer disabled:opacity-50"
               >
                 <option value="" disabled>
@@ -232,6 +301,7 @@ export function InviteUserModal({
                 <input
                   type="checkbox"
                   checked={isSuperAdmin}
+                  disabled={isAmbiguous}
                   onChange={(e) => setIsSuperAdmin(e.target.checked)}
                   className="size-4 rounded text-blue-600 focus:ring-blue-600"
                 />
@@ -251,7 +321,7 @@ export function InviteUserModal({
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isAmbiguous}
               className="flex-1 px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
             >
               {isAr ? "إلغاء" : "Cancel"}
@@ -277,4 +347,24 @@ export function InviteUserModal({
       </div>
     </div>
   );
+}
+
+async function invitedUserExists(command: CreateAdminUserDto): Promise<boolean> {
+  try {
+    const result = await listAdminUsers({
+      page: 1,
+      limit: 100,
+      search: command.email,
+    });
+    return result.data.some(
+      (candidate) =>
+        candidate.email.toLowerCase() === command.email &&
+        candidate.firstName === command.firstName &&
+        candidate.lastName === command.lastName &&
+        candidate.roleId === command.roleId &&
+        candidate.isSuperAdmin === Boolean(command.isSuperAdmin),
+    );
+  } catch {
+    return false;
+  }
 }

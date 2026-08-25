@@ -23,6 +23,12 @@ export type ApplicationDatabaseAccessMode =
   | "NONE"
   | "TENANT_DATABASE";
 
+export type ApplicationDatabaseDeployment =
+  | "NONE"
+  | "ON_DEMAND"
+  | "PREWARM"
+  | "REQUIRED";
+
 export type ApplicationCommandOperation =
   | "CREATE"
   | "UPDATE"
@@ -141,7 +147,8 @@ export interface AdoptApplicationTechnicalPackageDto {
 export interface ApplicationTechnicalIdentityView {
   runtimeTarget: string;
   primaryComponentKey: string;
-  databasePrincipal: string;
+  databasePrincipal: string | null;
+  databaseDeployment: ApplicationDatabaseDeployment;
   contractVersion: 1;
 }
 
@@ -153,6 +160,16 @@ export interface ApplicationDatabasePolicyView {
   maintenanceWindowHours: number;
   policyRevision: string;
   updatedAt: string;
+}
+
+export interface ApplicationServerSummaryView {
+  available: true;
+  rolloutRequired: boolean;
+  eligible: number;
+  ready: number;
+  pending: number;
+  degraded: number;
+  coveragePercent: number;
 }
 
 export interface ApplicationView {
@@ -173,16 +190,14 @@ export interface ApplicationView {
   publishedAt: string | null;
   publishedBy: string | null;
   databaseAccessMode: ApplicationDatabaseAccessMode;
+  databaseDeployment: ApplicationDatabaseDeployment;
   databasePrincipal: string | null;
   requiredOnDatabaseServer: boolean;
   technicalDefinitionRevision: string;
   catalogueRevision: string;
   activeManifest: ApplicationManifestEvidenceView | null;
   databasePolicy: ApplicationDatabasePolicyView;
-  serverSummary: {
-    available: boolean;
-    reason?: string;
-  };
+  serverSummary: ApplicationServerSummaryView;
   createdAt: string;
   updatedAt: string;
 }
@@ -195,6 +210,7 @@ export interface ApplicationMutationReceipt {
   lifecycleStatus: ApplicationLifecycleStatus;
   runtimeTarget: string | null;
   databaseAccessMode: ApplicationDatabaseAccessMode;
+  databaseDeployment: ApplicationDatabaseDeployment;
   databasePrincipal: string | null;
   technicalDefinitionRevision: string;
   publicationStatus: ApplicationPublicationStatus;
@@ -224,6 +240,7 @@ export interface ApplicationListQueryDto {
   lifecycleStatus?: ApplicationLifecycleStatus;
   publicationStatus?: ApplicationPublicationStatus;
   databaseAccessMode?: ApplicationDatabaseAccessMode;
+  databaseDeployment?: ApplicationDatabaseDeployment;
 }
 
 export interface CreateApplicationDto {
@@ -234,6 +251,11 @@ export interface CreateApplicationDto {
   applicationType: ApplicationType;
   commercialMode: ApplicationCommercialMode;
   catalogueVisibility: ApplicationCatalogueVisibility;
+}
+
+export interface OnboardApplicationDto extends CreateApplicationDto {
+  databaseDeployment: ApplicationDatabaseDeployment;
+  reason: string; // non-empty, max 256
 }
 
 export interface UpdateApplicationDto {

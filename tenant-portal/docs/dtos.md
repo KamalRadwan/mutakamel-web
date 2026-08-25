@@ -256,7 +256,7 @@ them.
 
 | Area | Primary DTO source | Important request classes |
 | --- | --- | --- |
-| Authentication | `core-app/src/tenant/tenant-auth/dto/` | `LoginDto`, `RefreshDto`, `AcceptInviteDto`, `ForgotPasswordDto`, `ResetPasswordDto` |
+| Authentication | `core-app/src/tenant/tenant-auth/dto/` | `LoginDto`, `AcceptInviteDto`, `ForgotPasswordDto`, `ResetPasswordDto`; refresh/logout have no body and read the reusable credential only from the HttpOnly session cookie |
 | Organization | `core-app/src/tenant/organization/dto/` | create/update company, branch, department, and team DTOs; `OrganizationQueryDto` |
 | Users | `core-app/src/tenant/tenant-users/dto/` | `CreateTenantUserDto`, `UpdateTenantUserDto`, `UpdateTenantProfileDto`, `TenantUserQueryDto`, team-membership DTOs |
 | Roles | `core-app/src/tenant/tenant-roles/dto/` | create/update role, permission replacement, role assignment, and branch-role DTOs |

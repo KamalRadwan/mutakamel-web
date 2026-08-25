@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Component, BarChart3, AppWindow } from "lucide-react";
+import { Eye, Trash2, Component } from "lucide-react";
 import { useTradeDashboardWidgets, TradeWidgetCatalogItem } from "./hooks/useTradeDashboardWidgets";
 import { CreateTradeDashboardWidgetsModal } from "./components/CreateTradeDashboardWidgetsModal";
 import { DeleteTradeDashboardWidgetsConfirmModal } from "./components/DeleteTradeDashboardWidgetsConfirmModal";
 
 export default function TradeDashboardWidgetsPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

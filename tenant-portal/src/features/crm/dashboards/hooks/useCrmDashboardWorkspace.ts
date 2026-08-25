@@ -91,7 +91,7 @@ export function useCrmDashboardWorkspace(options: UseCrmDashboardWorkspaceOption
       { id: "4", title: t.crm.artificialIntelligencePlatfo, amount: 940000, status: "WON" },
     ]);
     setIsDrilldownLoading(false);
-  }, [filters, setFilters]);
+  }, [filters, setFilters, t.crm]);
 
   const closeDrilldown = useCallback(() => {
     setDrilldownOpen(false);

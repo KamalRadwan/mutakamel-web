@@ -5,18 +5,33 @@ import type {
 } from "@/features/admin/applications/types";
 
 export type TenantRegistrationLoadState =
-  | "idle"
-  | "loading"
-  | "forbidden"
-  | "error"
-  | "empty"
-  | "ready";
+  "idle" | "loading" | "forbidden" | "error" | "empty" | "ready";
 
 export type TenantBillingCycle = "MONTHLY" | "ANNUAL";
 
 export interface ValidateTenantIdentityDto {
   name: string;
   companyName: string;
+}
+
+export interface ReverseGeocodeTenantAddressDto {
+  latitude: number;
+  longitude: number;
+}
+
+export interface TenantReverseGeocodedAddress {
+  countryName: string;
+  countryIsoCode: string;
+  state?: string;
+  stateCode?: string;
+  city?: string;
+  cityId?: number;
+  district?: string;
+  street1?: string;
+  buildingNo?: string;
+  postalCode?: string;
+  landmark?: string;
+  formattedAddress?: string;
 }
 
 export type TenantIdentityValidationReason = "REQUIRED" | "TAKEN";
@@ -172,8 +187,12 @@ export interface TenantCreateCommand {
   address: {
     city?: string;
     state?: string;
+    district?: string;
     postalCode?: string;
     street1?: string;
+    buildingNo?: string;
+    landmark?: string;
+    formattedAddress?: string;
   };
   taxNumber?: string;
   commercialRegistrationNumber?: string;

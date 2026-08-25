@@ -32,7 +32,7 @@ export function CreatePresetDashboardsModal({ isOpen, onClose, onSubmit }: Creat
         <Select
           label={t.crm.classificationOfTargets}
           value={category}
-          onChange={(e) => setCategory(e.target.value as any)}
+          onChange={(e) => setCategory(e.target.value as typeof category)}
           options={[
             { label: t.crm.executiveManagement, value: "executive" },
             { label: t.crm.salesReps, value: "sales_rep" },

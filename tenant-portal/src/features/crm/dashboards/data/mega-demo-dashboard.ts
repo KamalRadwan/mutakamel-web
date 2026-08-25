@@ -1,5 +1,4 @@
 import type { CrmDashboard, DashboardRunResult } from "../models/dashboard-types";
-import { useI18n } from "@/i18n/I18nContext";
 
 // Widget Definitions & Placements for the Mega Fake CRM Dashboard
 export const megaDemoDashboard: CrmDashboard = {

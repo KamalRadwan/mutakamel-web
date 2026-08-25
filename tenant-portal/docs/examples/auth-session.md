@@ -2,7 +2,7 @@
 
 Status: **Illustrative replacement flow**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-09**
 
 Exact DTOs and response fields: [Auth API](../api/auth.md).
 
@@ -22,45 +22,55 @@ async function login(input: LoginInput) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(input),
+    credentials: "include",
     cache: "no-store",
   });
 
   const payload: unknown = await response.json();
   if (!response.ok) throw normalizeTenantApiError(response.status, payload);
 
-  const auth = parseVerifiedLoginEnvelope(payload);
-  return adoptNewSessionGeneration(auth);
+  const auth = parseVerifiedCookieSessionEnvelope(payload);
+  const me = await tenantApi.get("/api/tenant/core/v1/auth/me");
+  return adoptVerifiedSessionMetadata(auth, me);
 }
 ```
 
-`parseVerifiedLoginEnvelope`, generation storage, and error normalization must
-live in shared auth/API code. A feature component must not implement them.
+`parseVerifiedCookieSessionEnvelope` rejects raw access/refresh fields. Only
+non-secret session metadata may enter browser state. Every cold/new tab repeats
+the `/auth/me` bootstrap instead of trusting stored metadata.
 
 ## Protected request with one refresh
 
 ```ts
 async function protectedRequest(path: string, init: RequestInit = {}) {
-  const expected = requireCurrentSessionGeneration();
-  let response = await sendWithSession(path, init, expected);
+  const eventBeforeRequest = readSharedNonSecretAuthEvent();
+  const prepared = prepareExactRequest(path, init);
+  let response = await sendWithCookieSession(prepared);
 
-  if (response.status === 401 && isRefreshEligible(path, init)) {
-    const refreshed = await coordinateOneRefresh(expected);
-    assertGenerationStillCurrent(refreshed);
-    response = await sendWithSession(path, init, refreshed);
+  if (isRefreshable401(response)) {
+    await refreshOrObserveAnotherTab(eventBeforeRequest);
+    if (!prepared.replayAfterRefresh) {
+      throw normalizeTenantApiError(response);
+    }
+    response = await sendWithCookieSession(prepared);
   }
 
-  assertGenerationStillCurrent(expected);
   return parseTenantResponseForCanonicalApp(path, response);
 }
 ```
 
 Real implementation must:
 
-- bind the retry to the refreshed generation correctly;
+- recheck the shared non-secret event after acquiring the Web Lock;
+- require the observed event to retain the same `sid`; a different-session
+  login fails the old request closed;
 - avoid refreshing auth endpoints;
-- preserve a write's exact idempotency key/body;
-- clear only the expected session after refresh failure;
-- reject a response from a replaced account.
+- replay mutations only with a verified caller-owned idempotency key or an
+  explicitly documented naturally idempotent contract, preserving the exact
+  key/body;
+- never replay a non-replayable write after repairing auth;
+- clear auth only for explicit terminal session/security errors;
+- retain auth for permission, rate-limit, network, and availability failures.
 
 The parser must use the path's owner: Core envelope, raw CRM success, or Trade
 envelope. Payload-shape guessing is not safe.
@@ -68,12 +78,14 @@ envelope. Payload-shape guessing is not safe.
 ## Logout ordering
 
 ```text
-capture current generation
--> remove/tombstone it locally
--> notify other tabs
--> call logout with captured refresh evidence when available
--> navigate to login
+capture current sid metadata
+-> call logout using the HttpOnly credential
+-> on durable 204: remove/tombstone local metadata
+-> on durable 204: notify other tabs with a non-secret event
+-> on durable 204: navigate to login
 ```
 
-Local invalidation happens before navigation so delayed work cannot continue as
-authenticated.
+On permission, network, rate-limit, or server failure, retain local auth and
+report that logout did not complete; browser JavaScript cannot clear the
+HttpOnly credential truthfully. Explicit terminal session errors may complete
+the local transition immediately.

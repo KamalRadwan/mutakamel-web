@@ -36,7 +36,7 @@ export function CreatePartyDirectoryModal({ isOpen, onClose, onSubmit }: CreateM
           <Select
             label="نوع الجهة"
             value={partyType}
-            onChange={(e) => setPartyType(e.target.value as any)}
+            onChange={(e) => setPartyType(e.target.value as typeof partyType)}
             options={[
               { label: "منظمة / شركة (Organization)", value: "organization" },
               { label: "فرد / شخص (Individual)", value: "individual" },

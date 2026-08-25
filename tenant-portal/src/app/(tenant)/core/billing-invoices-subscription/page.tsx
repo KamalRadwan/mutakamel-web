@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, CreditCard, Receipt, FileText } from "lucide-react";
+import { Eye, Trash2, Receipt } from "lucide-react";
 import { useBillingInvoicesSubscription, InvoiceItem } from "./hooks/useBillingInvoicesSubscription";
 import { CreateBillingInvoicesSubscriptionModal } from "./components/CreateBillingInvoicesSubscriptionModal";
 import { DeleteBillingInvoicesSubscriptionConfirmModal } from "./components/DeleteBillingInvoicesSubscriptionConfirmModal";
 
 export default function BillingInvoicesSubscriptionPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

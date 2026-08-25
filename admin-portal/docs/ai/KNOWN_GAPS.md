@@ -1,85 +1,52 @@
 # Known Frontend Gaps
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
-This page is a concise implementation queue. The evidence-backed details are in
-the [capability matrix](../audit/frontend-capability-matrix.md).
+The exhaustive evidence and status history are in the
+[Core Admin UI parity audit](../audit/core-admin-ui-gap-audit-2026-08-12.md)
+and [capability matrix](../audit/frontend-capability-matrix.md).
 
-## BROKEN
+## Core Admin web route gaps
 
-- Tenant detail calls nonexistent `GET .../tenants/:id/fqdns`; FQDNs belong to
-  the safe tenant detail projection.
-- Tenant-user suspend, activate, and restore use `PATCH`; Core requires `POST`.
-- FQDN create sends `{ domain }`; Core accepts `{ fqdn }`.
-- Set-primary FQDN uses `PATCH`; Core requires `POST`.
-- Subscription cancellation uses the tenant-nested path; Core uses
-  `/subscriptions/:tenantId/cancel`.
-- Wallet credit/debit call nonexistent endpoints instead of server preview and
-  confirmation.
-- Tenant destroy and some provisioning controls report local success without
-  authoritative completion.
-- Tenant creation now uses authoritative Application/readiness/tier, plan,
-  Database, Storage, quote, and create contracts. Identity/FQDN validation is
-  still simulated. Candidate discovery also needs three permissions and an
-  N+1 readiness/tier sequence until Core exposes a safe composite projection.
-- Forgot password is simulated.
-- Navbar notifications are static.
+None. Current Admin Portal source has exact reachable production calls for all
+240 Core Admin routes: **240 direct, 0 equivalent, 0 missing**.
 
-## MISSING
+This closes the former false/missing claims for tenant FQDN and access methods,
+wallet adjustments, forgot password, invite/reset/logout-all, self profile,
+notifications, reports, subscriptions, invoices, logging, audit, and all
+provisioning-governance routes.
 
-- Five reports.
-- Global provisioning governance.
-- Subscription, invoice, payment/refund/reconciliation administration.
-- Correct wallet adjustments.
-- Control-plane audit explorer.
-- Logging overrides and credential-compatible live stream.
-- Notification inbox/preferences/actions.
-- Self profile, accept invite, reset password, and logout all.
-- Storage routing/principal rotation and bounded catalogue gaps.
+## Remaining web verification
 
-## GATED
+- UI-022 is complete: a TypeScript AST scan found 151 production Axios write
+  calls and 0 bare/implicit-policy calls. Idempotent writes own stable UUIDv7
+  intents; non-idempotent calls explicitly opt out and are non-replayable.
+  Focused validation passed 6 files/64 tests, TypeScript `--noEmit`, and scoped
+  ESLint; a transport test asserts raw auth/activity calls omit unsupported
+  idempotency headers.
+- Run the full test, typecheck, strict lint, build, and documentation suite after
+  the working tree settles.
+- Exercise representative read, write, critical, forbidden, validation,
+  timeout, and reconciliation paths through an authenticated Gateway/Core
+  session.
+- Verify the deployed build separately. Source parity is not deployment or
+  release-readiness proof.
 
-- Existing-tenant Storage Server migrations.
-- Admin Realtime activation and Socket.IO client.
-- Storage attestation/recovery operator workflows until their safe release
-  contract and evidence package are confirmed.
+## External and gated work
 
-## REFACTOR
+- Existing-tenant Storage Server migration is historical design only: its eight
+  proposed routes are absent from current Core/Gateway source.
+- Admin Realtime Socket.IO activation remains gated; notifications use the
+  integrated REST contract.
+- Worker Backup package/schema adoption and authenticated runtime evidence are
+  separate release blockers from Core Admin parity.
+- Flutter Admin is not at parity and cannot safely use the Web-only browser
+  cookie authentication channel. Mobile implementation requires an authorized
+  backend mobile Admin authentication contract.
 
-- Central typed domain API modules and exact projections.
-- Normalized error with `source` and preserved `correlationId`.
-- ONE/ALL/ANY permission requirement component.
-- Caller-owned stable UUIDv7 mutation intents.
-- Independent tenant-tab queries and explicit forbidden/unavailable/failure
-  states.
-- Decimal/byte-safe helpers and `meta.total` pagination.
-- Removal of explicit `any`, console-only errors, mock fallbacks, and
-  cascading manual effects.
-- Regression coverage for every repaired contract.
+## Backend/tooling verification limitation
 
-## Evidence still required for a completion claim
-
-- Zero-error/warning lint.
-- Passing typecheck, tests, and the default production build.
-- Authorized authenticated Gateway/Core runtime exercise.
-- Release/deployment verification where applicable.
-
-## Validation snapshot
-
-Source validation on **2026-07-30** produced:
-
-- `npm run docs:check`: PASS; 232 generated Admin Core routes and 57 Markdown
-  files checked.
-- `npx tsc --noEmit`: PASS.
-- `npx vitest run`: PASS; 8 files and 56 tests.
-- `npm run lint -- --max-warnings=0`: FAIL; 213 findings, comprising 109
-  errors and 104 warnings.
-- `npm run build`: FAIL before compilation because Next.js 16 defaults to
-  Turbopack while `next.config.ts` defines webpack customization without a
-  Turbopack configuration.
-- `npm run build -- --webpack`: PASS; this proves the webpack production
-  bundle can compile, but it does not close the default-build configuration
-  gap.
-- Documentation-scoped `git diff --check`: PASS. Repository-wide
-  `git diff --check` remains blocked by whitespace in pre-existing Admin and
-  Tenant Portal application changes outside this documentation rebuild.
+The local Gateway dependency directory cannot currently be restored because
+private GitHub Packages returns 401 without `NODE_AUTH_TOKEN`. Static
+Core/Gateway Admin reconciliation is complete; Gateway test execution remains
+credential-dependent. No backend source was changed by this frontend task.

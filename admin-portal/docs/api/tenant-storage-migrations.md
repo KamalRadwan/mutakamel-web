@@ -1,13 +1,24 @@
-# Tenant Storage Server Migrations
+# Tenant Storage Server Migrations (Historical Design)
 
-Last source verification: **2026-07-30**.
+Status: **REMOVED / NOT A CURRENT CORE ADMIN CONTRACT**
+
+Last source verification: **2026-08-12**.
+
+> Current-source correction: the eight Core Admin/Gateway routes and the cited
+> Core controller, service, DTO, and contract files in this historical design
+> are absent from the current backend source. They are not part of the
+> hard-checked 240-route Core Admin inventory and must not be implemented or
+> counted as frontend gaps. Worker migration capabilities are a different
+> service surface and do not make these Core routes available. Everything below
+> is retained only as design history for a possible future contract.
 
 This document defines the Admin Portal contract for moving an existing tenant
 between Storage Servers. It is separate from tenant profile editing and from
 Storage Server registry administration.
 
-The backend migration authority and all eight Gateway routes exist in source.
-The feature remains **default-off and not frontend-ready for production**.
+The backend migration authority and eight Gateway routes described by the old
+design do **not** exist in current source. The feature is therefore unavailable,
+not merely default-off.
 Do not expose a tenant “Change storage” action until the release and read-model
 gates in this document are closed.
 
@@ -20,9 +31,9 @@ gates in this document are closed.
 - A Storage Server registry update never moves tenants.
 - There is no automatic target, silent failover, or direct assignment patch.
 
-## Browser routes and permissions
+## Historical proposed browser routes and permissions
 
-All browser calls use the Core Gateway prefix
+If a future contract is approved, browser calls would use the Core Gateway prefix
 `/api/admin/core/v1`. Every mutation requires one UUIDv7
 `x-idempotency-key` for that exact user intent.
 
@@ -272,9 +283,11 @@ not a field inside profile edit. It must represent:
 Critical actions require typed confirmation and must be disabled from stale
 cached views. Never optimistically replace the tenant’s `storageServerId`.
 
-## Backend source map
+## Historical backend source map (paths absent)
 
-Paths are relative to `C:\mutakamel.ai\frontend`:
+The following paths were cited by the old design but do not exist in the current
+Core source. They are listed to make the documentation drift explicit, not as
+implementation evidence. Paths are relative to `C:\mutakamel.ai\frontend`:
 
 - `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/tenant-storage-migrations.controller.ts`

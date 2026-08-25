@@ -55,7 +55,7 @@ Safe detail-read example:
 
 ```http
 GET /api/tenant/core/v1/business-letters/019f9872-0a1a-7cc0-914d-a57aa437fc41
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>
 ```
 
 No create-body example is provided because inventing the closed nested V1 fields would be unsafe. Generate a create payload only from the referenced registry schema or a future server-provided form contract.

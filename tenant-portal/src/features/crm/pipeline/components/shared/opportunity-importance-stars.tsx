@@ -19,14 +19,17 @@ export function OpportunityImportanceStars({
 }: OpportunityImportanceStarsProps) {
     const { t } = useI18n();
   return (
-    <div className={cn("flex gap-0.5", className)} title={t.crm.importanceClickToEdit}>
+    <div
+      className={cn("flex gap-0.5", className)}
+      title={onChange ? t.crm.importanceClickToEdit : undefined}
+    >
       {[1, 2, 3].map((star) => (
         <button
           key={star}
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onChange?.(star);
+            onChange?.(star === 1 && importance === 1 ? 0 : star);
           }}
           disabled={!onChange}
           className={cn(

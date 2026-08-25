@@ -5,7 +5,16 @@ import { User, Shield, Settings, LogOut, ChevronDown } from "lucide-react";
 import { useUserDropdown } from "./hooks/useUserDropdown";
 
 export function UserDropdown() {
-  const { t, isOpen, currentAdmin, toggleOpen, close, handleLogout } = useUserDropdown();
+  const {
+    t,
+    isOpen,
+    currentAdmin,
+    canViewRoles,
+    canViewSettings,
+    toggleOpen,
+    close,
+    handleLogout,
+  } = useUserDropdown();
 
   return (
     <div className="relative">
@@ -35,10 +44,7 @@ export function UserDropdown() {
       {/* Dropdown Popover */}
       {isOpen && (
         <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={close}
-          />
+          <div className="fixed inset-0 z-40" onClick={close} />
           <div className="absolute end-0 mt-2 z-50 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
             {/* Header User Card */}
             <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
@@ -65,22 +71,26 @@ export function UserDropdown() {
                 <User className="w-4 h-4 text-slate-400" />
                 <span>{t.common.profileAndCurrency}</span>
               </Link>
-              <Link
-                href="/roles"
-                onClick={close}
-                className="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              >
-                <Shield className="w-4 h-4 text-slate-400" />
-                <span>{t.common.permissionsAndRoles}</span>
-              </Link>
-              <Link
-                href="/settings"
-                onClick={close}
-                className="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              >
-                <Settings className="w-4 h-4 text-slate-400" />
-                <span>{t.common.systemSettings}</span>
-              </Link>
+              {canViewRoles ? (
+                <Link
+                  href="/roles"
+                  onClick={close}
+                  className="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  <Shield className="w-4 h-4 text-slate-400" />
+                  <span>{t.common.permissionsAndRoles}</span>
+                </Link>
+              ) : null}
+              {canViewSettings ? (
+                <Link
+                  href="/settings"
+                  onClick={close}
+                  className="flex items-center gap-2.5 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  <Settings className="w-4 h-4 text-slate-400" />
+                  <span>{t.common.systemSettings}</span>
+                </Link>
+              ) : null}
             </div>
 
             {/* Logout Footer */}

@@ -1,18 +1,20 @@
 # Replacement Source Inventory
 
-Status: **verified-current snapshot**
+Status: **dated historical snapshot; not current source evidence**
 
 Last verified: **2026-07-25**
 
 ## Scope
 
-The standalone `tenant-portal` replaces tenant-facing behavior in
-`mutakamel-web-app`. Platform-admin pages are excluded. Backend code is
-read-only evidence.
+The standalone `tenant-portal` migration was initially scoped from a
+2026-07-25 snapshot of `mutakamel-web-app`. That consolidated workspace is
+absent from the current checkout; the counts and paths below are historical
+inventory only. Platform-admin pages were excluded. Backend code is read-only
+evidence.
 
 ## Old-web baseline
 
-Current source counts:
+Counts captured on 2026-07-25:
 
 | Evidence | Count | Meaning |
 | --- | ---: | --- |
@@ -34,9 +36,9 @@ Source roots:
 
 See [Tenant route map](../app/route-map.md) for the functional URL inventory.
 
-## New-portal baseline
+## New-portal baseline captured on 2026-07-25
 
-Current application source contains only:
+At the snapshot date, application source contained only:
 
 ```text
 src/app/globals.css
@@ -44,10 +46,11 @@ src/app/layout.tsx
 src/app/page.tsx
 ```
 
-The default page/layout do not yet implement tenant admission, authentication,
-an API client, an application shell, feature routes, or tests. Documentation
-and its audit tooling are implemented, but product replacement coverage is
-still zero.
+This baseline is retained only to explain the original migration plan. It is
+not a statement about current `tenant-portal` source: Auth/session and API
+client foundations plus a substantial route/feature tree now exist, and each
+capability must report its own current source, test, runtime, and release
+evidence.
 
 ## Classification rule
 
@@ -67,7 +70,8 @@ still require a new explicit route under the approved Tenant Portal scope.
 
 ## Reproduction notes
 
-The counts were produced with narrow `rg --files` scans of the roots above.
-Generated files, dependencies, build output, and non-TypeScript tenant feature
-assets were not counted. Re-run this inventory before cutover because old-web
-source can continue to change during the migration.
+The counts were produced with narrow `rg --files` scans of the historical roots
+above. Generated files, dependencies, build output, and non-TypeScript tenant
+feature assets were not counted. Do not rerun those paths unless the historical
+workspace is deliberately restored; produce a new dated inventory from current
+split-portal source before cutover.

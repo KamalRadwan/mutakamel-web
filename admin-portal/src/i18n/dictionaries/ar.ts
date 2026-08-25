@@ -27,6 +27,11 @@ export const ar = {
     adminDropdown: "إدارة التحكم",
     users: "المستخدمين",
     roles: "الأدوار والصلاحيات",
+    reports: "التقارير",
+    subscriptions: "الاشتراكات",
+    invoices: "الفواتير",
+    logging: "التحكم في السجلات",
+    provisioning: "حوكمة التجهيز",
     settings: "الإعدادات",
   },
   login: {
@@ -41,9 +46,186 @@ export const ar = {
     footerNote: "نظام تحكم آمن ومشفّر لبيانات المنصة",
     invalidCredentials: "بريد إلكتروني أو كلمة مرور غير صحيحة",
   },
+  authActions: {
+    common: {
+      checkingLink: "جارٍ التحقق من الرابط الآمن...",
+      missingTokenTitle: "الرابط غير مكتمل",
+      missingTokenDescription:
+        "لا يحتوي الرابط على رمز صالح. افتح الرابط الكامل من رسالة الدعوة أو إعادة تعيين كلمة المرور.",
+      backToSignIn: "العودة إلى تسجيل الدخول",
+      newPassword: "كلمة المرور الجديدة",
+      confirmPassword: "تأكيد كلمة المرور الجديدة",
+      showPassword: "إظهار كلمة المرور",
+      hidePassword: "إخفاء كلمة المرور",
+      passwordRequirements: "متطلبات كلمة المرور",
+      rules: {
+        length: "12 حرفًا على الأقل",
+        lowercase: "حرف إنجليزي صغير واحد على الأقل",
+        uppercase: "حرف إنجليزي كبير واحد على الأقل",
+        number: "رقم واحد على الأقل",
+        symbol: "رمز خاص واحد على الأقل",
+      },
+      errors: {
+        tokenMissing: "رمز الإجراء مفقود من الرابط.",
+        tokenInvalid: "صيغة رمز الإجراء غير صالحة.",
+        passwordRequired: "أدخل كلمة مرور جديدة.",
+        passwordTooLong: "يجب ألا تتجاوز كلمة المرور 128 حرفًا.",
+        passwordWeak: "يجب أن تستوفي كلمة المرور جميع متطلبات القوة الموضحة.",
+        confirmationMismatch: "تأكيد كلمة المرور غير مطابق.",
+        invalidOrExpiredToken:
+          "انتهت صلاحية الرابط أو تم استخدامه بالفعل. اطلب رابطًا جديدًا.",
+        rateLimited: "تم إجراء محاولات كثيرة. انتظر قليلًا ثم حاول مرة أخرى.",
+        sessionChanged:
+          "تغيّرت جلسة تسجيل الدخول في نافذة أخرى. أعد فتح الرابط وحاول مرة أخرى.",
+        unavailable:
+          "تعذر إكمال الطلب الآن. لم تتم إعادة المحاولة تلقائيًا؛ تحقق من حالة حسابك قبل المحاولة مجددًا.",
+      },
+    },
+    acceptInvite: {
+      eyebrow: "دعوة مسؤول",
+      title: "تفعيل حساب المسؤول",
+      subtitle:
+        "أنشئ كلمة مرور قوية لتفعيل حسابك وبدء جلسة آمنة في لوحة التحكم.",
+      submit: "قبول الدعوة وتسجيل الدخول",
+      submitting: "جارٍ تفعيل الحساب...",
+    },
+    resetPassword: {
+      eyebrow: "استعادة آمنة للحساب",
+      title: "تعيين كلمة مرور جديدة",
+      subtitle:
+        "سيؤدي نجاح العملية إلى إنهاء جميع الجلسات الحالية وإعادتك إلى تسجيل الدخول.",
+      submit: "تعيين كلمة المرور",
+      submitting: "جارٍ تحديث كلمة المرور...",
+    },
+    sessions: {
+      title: "جلسات تسجيل الدخول",
+      description:
+        "لكل متصفح أو جهاز جلسة مستقلة. يمكنك إلغاء جلسة واحدة أو إنهاء كل الجلسات عند الاشتباه بمشكلة أمنية.",
+      refresh: "تحديث الجلسات",
+      loading: "جارٍ تحميل جلسات تسجيل الدخول...",
+      error: "تعذر تحميل الجلسات أو تنفيذ الإجراء. حاول مرة أخرى.",
+      current: "الجلسة الحالية",
+      lastUsed: "آخر استخدام",
+      refreshes: "مرات التحديث",
+      accessIssuances: "إصدارات الوصول",
+      endCurrent: "إنهاء هذه الجلسة",
+      revoke: "إلغاء الجلسة",
+      empty: "لا توجد جلسات متاحة.",
+      endCurrentTitle: "إنهاء الجلسة الحالية؟",
+      revokeTitle: "إلغاء جلسة تسجيل الدخول؟",
+      endCurrentDescription:
+        "سيتم تسجيل خروج هذا المتصفح فورًا مع بقاء الجلسات الأخرى دون تغيير.",
+      revokeDescription: "سيفقد ذلك المتصفح أو الجهاز إمكانية الوصول فورًا.",
+      endingCurrent: "جارٍ إنهاء الجلسة...",
+      revoking: "جارٍ إلغاء الجلسة...",
+      logoutAllButton: "تسجيل الخروج من كل الأجهزة",
+      logoutAllTitle: "إنهاء جميع الجلسات؟",
+      logoutAllDescription:
+        "سيتم إنهاء كل جلسات حسابك، بما فيها هذا المتصفح. استخدم هذا الإجراء إذا فقدت جهازًا أو اشتبهت بوصول غير مصرح به.",
+      logoutAllTarget: "جميع جلسات الحساب",
+      logoutAllConfirm: "إنهاء جميع الجلسات",
+      logoutAllSubmitting: "جارٍ إنهاء جميع الجلسات...",
+    },
+    invalidationReplay: {
+      title: "استعادة تسليم إبطالات المصادقة",
+      description:
+        "تحقق من أحداث إبطال الجلسات النهائية المحددة وأعدها إلى قائمة الإرسال. لا يغيّر هذا الإجراء مسار الحدث أو حمولته المخزنة.",
+      warningTitle: "عملية استعادة أمنية",
+      warningDescription:
+        "حدد كل حدث فاشل صراحةً. تحقق من الطلب نفسه بوضع المعاينة قبل تطبيقه؛ لا تتم إعادة محاولة فشل النقل تلقائيًا.",
+      target: "هدف قائمة الإرسال",
+      controlPlaneTarget: "مستوى التحكم (جلسات المسؤولين)",
+      tenantTarget: "قاعدة بيانات المستأجر (جلسات المستأجر)",
+      tenantId: "معرف المستأجر",
+      tenantIdPlaceholder: "معرف مستأجر UUIDv7 قياسي",
+      eventIds: "معرفات الأحداث الفاشلة",
+      eventIdsHint:
+        "أدخل من 1 إلى 25 معرف UUIDv7 فريدًا، وافصل بينها بسطر أو مسافة أو فاصلة.",
+      eventIdsPlaceholder: "معرف UUIDv7 قياسي واحد في كل سطر",
+      reason: "سبب الاستعادة",
+      reasonHint:
+        "من 8 إلى 500 حرف. يُكتب السبب بعد إزالة المسافات الطرفية ضمن دليل تدقيق غير قابل للتغيير.",
+      characters: "حرفًا",
+      events: "أحداث",
+      dryRun: "التحقق بالمعاينة",
+      dryRunning: "جارٍ التحقق بالمعاينة...",
+      apply: "تطبيق إعادة الإرسال",
+      applying: "جارٍ جدولة إعادة الإرسال...",
+      dryRunRequired:
+        "أكمل معاينة ناجحة لنفس الهدف وقائمة الأحداث والسبب قبل التطبيق.",
+      confirmation: {
+        dryTitle: "التحقق من طلب إعادة الإرسال؟",
+        dryDescription:
+          "سيقفل النظام الأحداث النهائية المحددة ويتحقق منها ويضيف دليل التدقيق. لن يُعاد أي حدث إلى قائمة الإرسال.",
+        dryConfirm: "تشغيل التحقق",
+        drySubmitting: "جارٍ التحقق...",
+        applyTitle: "إعادة إبطالات المصادقة هذه إلى قائمة الإرسال؟",
+        applyDescription:
+          "ستعود الأحداث نفسها التي تم التحقق منها في المعاينة إلى الموزع الدائم، دون تغيير المسار أو الحمولة.",
+        applyToken: "APPLY",
+        applyConfirm: "تطبيق إعادة الإرسال",
+        applySubmitting: "جارٍ جدولة إعادة الإرسال...",
+      },
+      success: {
+        dryTitle: "نجحت المعاينة",
+        applyTitle: "تمت جدولة إعادة الإرسال",
+        dryDescription: "الأحداث المحددة مؤهلة. راجع الإيصال قبل التطبيق.",
+        applyDescription: "أُعيدت الأحداث المحددة إلى الموزع الدائم.",
+        commandId: "معرف الأمر",
+        eligible: "الأحداث المؤهلة",
+        replayed: "الأحداث المعادة",
+        correlation: "معرف التتبع",
+      },
+      failure: {
+        title: "لم يكتمل أمر الاستعادة",
+        code: "رمز الخطأ",
+        correlation: "معرف التتبع",
+        retryExact: "إعادة محاولة الطلب نفسه",
+        retryNotice:
+          "قد تكون النتيجة غير محسومة. تستخدم المحاولة اليدوية الحمولة نفسها ومعرف أمر UUIDv7 نفسه؛ لم تحدث إعادة محاولة نقل تلقائية.",
+      },
+      validation: {
+        tenantRequired:
+          "أدخل معرف UUIDv7 الدقيق للمستأجر عند اختيار قائمة إرسال المستأجر.",
+        tenantInvalid: "يجب أن يكون معرف المستأجر UUIDv7 قياسيًا.",
+        eventRequired: "أدخل معرف حدث فاشل واحدًا على الأقل.",
+        eventTooMany: "لا تدخل أكثر من 25 معرف حدث.",
+        eventDuplicate: "يجب أن يكون كل معرف حدث فريدًا.",
+        eventInvalid: "يجب أن يكون كل معرف حدث UUIDv7 قياسيًا.",
+        reasonRequired: "أدخل سببًا للتدقيق.",
+        reasonTooShort:
+          "يجب ألا يقل السبب بعد إزالة المسافات الطرفية عن 8 أحرف.",
+        reasonTooLong:
+          "يجب ألا يزيد السبب بعد إزالة المسافات الطرفية على 500 حرف.",
+        dryRunRequired: "يلزم نجاح معاينة لهذا الطلب نفسه قبل التطبيق.",
+      },
+      apiErrors: {
+        permission: "لا تملك جلسة المسؤول الحالية صلاحية إعادة الإرسال.",
+        commandInvalid: "رُفضت هوية الأمر. ابدأ طلب مشغّل جديدًا.",
+        targetInvalid:
+          "الهدف أو المستأجر أو قائمة الأحداث أو الوضع أو السبب غير صالح.",
+        tenantUnavailable: "قاعدة بيانات المستأجر المحددة غير متاحة حاليًا.",
+        commandConflict: "معرف الأمر هذا مرتبط بمشغّل آخر أو بطلب مختلف.",
+        eventNotFound:
+          "حدث واحد أو أكثر من الأحداث المحددة غير موجود في قائمة الإرسال المختارة.",
+        eventNotEligible:
+          "لا يمكن إعادة الإرسال إلا لإبطالات مصادقة فاشلة وغير منشورة من الهدف المحدد.",
+        eventInvalid: "فشل دليل الحدث المخزن في تحقق السلامة ولم يتم تغييره.",
+        auditInvalid:
+          "دليل تدقيق إعادة الإرسال غير القابل للتغيير مفقود أو غير صالح.",
+        inFlight:
+          "لا يزال الأمر نفسه قيد المعالجة. تحقق من النتيجة قبل إعادة المحاولة.",
+        sessionChanged: "تغيّرت جلسة المسؤول أثناء انتظار الأمر.",
+        validation: "رفض النظام حقلًا واحدًا أو أكثر من حقول الأمر.",
+        unknown:
+          "تعذر إكمال الأمر. استخدم رمز الخطأ ومعرف التتبع أثناء التحقيق.",
+      },
+    },
+  },
   dashboard: {
     title: "لوحة تحكم المنصة",
-    welcome: "مرحباً بعودتك، منى علي. نظرة عامة على أداء المستأجرين، السيرفرات، والاشتراكات.",
+    welcome:
+      "مرحباً بعودتك، منى علي. نظرة عامة على أداء المستأجرين، السيرفرات، والاشتراكات.",
     addTenant: "+ إضافة مستأجر جديد",
     refresh: "تحديث البيانات",
     thisMonth: "الشهر الحالي",
@@ -76,7 +258,8 @@ export const ar = {
       recentTenantsTitle: "أحدث المستأجرين المسجلين",
       viewAllTenants: "عرض الكل",
       growthTitle: "تحليل نمو المستأجرين والإيرادات المحصلة",
-      growthSubtext: "مقارنة الاتجاه التراكمي لعدد الشركات المضافة مع حصيلة الاشتراكات الدورية",
+      growthSubtext:
+        "مقارنة الاتجاه التراكمي لعدد الشركات المضافة مع حصيلة الاشتراكات الدورية",
       liveSync: "مباشر (Live Sync)",
       collectedRevenue: "الإيرادات المحصلة",
       tenantCount: "عدد المستأجرين",
@@ -121,7 +304,8 @@ export const ar = {
       pastDueSubscriptions: "اشتراكات متأخرة الدفع",
       cancelledSubscriptions: "اشتراكات ملغاة",
       collectionRatioTitle: "نسبة التحصيل المالي",
-      collectionRatioSubtext: "نسبة المبالغ المحصلة فعلياً من إجمالي قيمة الفواتير المصدورة",
+      collectionRatioSubtext:
+        "نسبة المبالغ المحصلة فعلياً من إجمالي قيمة الفواتير المصدورة",
       collectedVsIssued: "المبالغ المحصلة من إجمالي المصدور",
       totalIssuedLabel: "إجمالي المصدور:",
       actualCollectedRatio: "نسبة التحصيل الفعلية",
@@ -135,7 +319,8 @@ export const ar = {
   },
   dbServers: {
     pageTitle: "سيرفرات قواعد البيانات",
-    pageSubtitle: "إدارة البنية التحتية، سعة الاستضافة، وحالات التشغيل لسيرفرات قواعد البيانات للمستأجرين.",
+    pageSubtitle:
+      "إدارة البنية التحتية، سعة الاستضافة، وحالات التشغيل لسيرفرات قواعد البيانات للمستأجرين.",
     registerServer: "تسجيل سيرفر جديد",
     totalServers: "إجمالي السيرفرات",
     activePlacement: "السيرفرات النشطة الجاهزة",
@@ -178,7 +363,8 @@ export const ar = {
   },
   tenants: {
     pageTitle: "إدارة المستأجرين",
-    pageSubtitle: "إدارة شركات المنصة، الباقات، النطاقات، وعمليات التجهيز التلقائي للوحة التحكم.",
+    pageSubtitle:
+      "إدارة شركات المنصة، الباقات، النطاقات، وعمليات التجهيز التلقائي للوحة التحكم.",
     registerTenant: "إضافة مستأجر جديد",
     totalTenants: "إجمالي الشركات",
     activeTenants: "المستأجرين النشطين",
@@ -200,7 +386,8 @@ export const ar = {
     delete: "حذف مؤقت",
     destroy: "تدمير نهائي",
     wizardTitle: "معالج تجهيز مستأجر جديد",
-    wizardSubtitle: "قم بتمرير بيانات هوية المستأجر، المالك، موديولات التطبيق، وسيرفر الاستضافة لتجهيز البيئة تلقائياً.",
+    wizardSubtitle:
+      "قم بتمرير بيانات هوية المستأجر، المالك، موديولات التطبيق، وسيرفر الاستضافة لتجهيز البيئة تلقائياً.",
     step1: "1. هوية المستأجر",
     step2: "2. المالك والحساب",
     step3: "3. التطبيقات والاشتراك",
@@ -293,8 +480,10 @@ export const ar = {
       editMetadata: "تعديل البيانات الأساسية",
       databasePolicy: "سياسة قاعدة البيانات",
       delete: "حذف",
-      activationBlocked: "انشر الإصدار الحالي وأكمل التجهيز التقني قبل تفعيل التطبيق.",
-      activationUnavailable: "حالة الجاهزية التقنية غير متاحة. سيظل التفعيل معطلاً.",
+      activationBlocked:
+        "انشر الإصدار الحالي وأكمل التجهيز التقني قبل تفعيل التطبيق.",
+      activationUnavailable:
+        "حالة الجاهزية التقنية غير متاحة. سيظل التفعيل معطلاً.",
       facts: {
         applicationType: "نوع التطبيق",
         commercialMode: "النمط التجاري",
@@ -305,7 +494,8 @@ export const ar = {
       releaseAuthority: {
         eyebrow: "مرجعية الإصدار",
         title: "حالة النشر والاعتماد",
-        subtitle: "التعريف والنشر ودورة الحياة وإتاحة الاختيار للمستأجر ضوابط مستقلة.",
+        subtitle:
+          "التعريف والنشر ودورة الحياة وإتاحة الاختيار للمستأجر ضوابط مستقلة.",
         definition: "التعريف",
         publication: "النشر",
         lifecycle: "دورة الحياة",
@@ -321,13 +511,16 @@ export const ar = {
         publishedAt: "تاريخ النشر",
         publish: "نشر الإصدار",
         publishing: "جارٍ النشر…",
-        permissionRequired: "يتطلب النشر admin.applications.update + admin.applications.critical.",
-        unpublishedHint: "إصدار الكتالوج الحالي غير منشور. سيظل التفعيل واختيار المستأجرين الجدد معطلين.",
+        permissionRequired:
+          "يتطلب النشر admin.applications.update + admin.applications.critical.",
+        unpublishedHint:
+          "إصدار الكتالوج الحالي غير منشور. سيظل التفعيل واختيار المستأجرين الجدد معطلين.",
         publishedHint: "يمتلك إصدار الكتالوج الحالي سجل نشر موثقاً.",
       },
       publication: {
         title: "نشر إصدار التطبيق",
-        description: "يعتمد النشر إصدار الكتالوج الحالي تحديداً. لا يفعّل التطبيق ولا يتجاوز الجاهزية التقنية.",
+        description:
+          "يعتمد النشر إصدار الكتالوج الحالي تحديداً. لا يفعّل التطبيق ولا يتجاوز الجاهزية التقنية.",
         catalogueRevision: "إصدار الكتالوج",
         publicationRevision: "إصدار النشر",
         reason: "سبب النشر",
@@ -351,9 +544,11 @@ export const ar = {
       active: "نشط",
       historical: "تاريخي",
       serverSummaryTitle: "ملخص ربط الخوادم غير متاح",
-      serverSummaryDescription: "لا يجمع كتالوج التطبيقات روابط خوادم قواعد البيانات الحية. راجع كل خادم من صفحة خوادم قواعد البيانات.",
+      serverSummaryDescription:
+        "لا يجمع كتالوج التطبيقات روابط خوادم قواعد البيانات الحية. راجع كل خادم من صفحة خوادم قواعد البيانات.",
       deleteTitle: "حذف التطبيق",
-      deleteDescription: "يمكن حذف مسودة غير مستخدمة فقط. لا تقوم هذه العملية بتصدير أي كلمة مرور أو بيانات اعتماد.",
+      deleteDescription:
+        "يمكن حذف مسودة غير مستخدمة فقط. لا تقوم هذه العملية بتصدير أي كلمة مرور أو بيانات اعتماد.",
       deleteReason: "حذف مسودة كتالوج غير مستخدمة",
       lifecycle: {
         activate: "تفعيل",
@@ -392,13 +587,15 @@ export const ar = {
         failed: "تعذر حفظ التغيير.",
         save: "حفظ التغييرات",
         publicationInvalidationTitle: "سيُلغي هذا التعديل صلاحية النشر الحالي",
-        publicationInvalidationDescription: "يغيّر حفظ البيانات الأساسية إصدار الكتالوج إلى UNPUBLISHED. سيظل التفعيل واختيار المستأجرين الجدد معطلين حتى نشر الإصدار المحدّث بشكل صريح.",
+        publicationInvalidationDescription:
+          "يغيّر حفظ البيانات الأساسية إصدار الكتالوج إلى UNPUBLISHED. سيظل التفعيل واختيار المستأجرين الجدد معطلين حتى نشر الإصدار المحدّث بشكل صريح.",
       },
     },
     technicalProvisioning: {
       eyebrow: "مرجعية التجهيز",
       title: "الجاهزية التقنية",
-      subtitle: "التطبيق ← التشغيل ← مستخدم قاعدة البيانات ← المكوّن ← الإصدار الثابت.",
+      subtitle:
+        "التطبيق ← التشغيل ← مستخدم قاعدة البيانات ← المكوّن ← الإصدار الثابت.",
       refresh: "تحديث",
       loading: "جارٍ تحميل الجاهزية التقنية…",
       unavailable: "حالة الجاهزية التقنية غير متاحة. سيظل التفعيل معطلاً.",
@@ -410,7 +607,8 @@ export const ar = {
       contractShort: "إصدار العقد",
       release: "الإصدار",
       releaseRequired: "الإصدار مطلوب",
-      noCredential: "مسار العامل مرجعه الخادم ولا يتم عرض كلمات مرور أو أسرار أو SQL أو ملفات ترحيل.",
+      noCredential:
+        "مسار العامل مرجعه الخادم ولا يتم عرض كلمات مرور أو أسرار أو SQL أو ملفات ترحيل.",
       checks: {
         runtimeTarget: "هدف التشغيل",
         componentBinding: "ربط المكوّن",
@@ -429,47 +627,60 @@ export const ar = {
         componentBindingRequired: "لم يتم ربط مكوّن التجهيز الأساسي.",
         activeComponentRequired: "يجب أن تكون كل المكوّنات المرتبطة نشطة.",
         publishedReleaseRequired: "يحتاج كل مكوّن نشط إلى إصدار ثابت منشور.",
-        minimumReleaseNotSatisfied: "لم يصل أحد المكوّنات المرتبطة إلى الحد الأدنى المطلوب للإصدار.",
-        databasePermissionManifestRequired: "يحتاج التطبيق المتصل بقاعدة البيانات إلى بيانات أذونات نشطة.",
-        databasePermissionManifestInvalid: "فشل التحقق من بيانات أذونات قاعدة البيانات النشطة.",
+        minimumReleaseNotSatisfied:
+          "لم يصل أحد المكوّنات المرتبطة إلى الحد الأدنى المطلوب للإصدار.",
+        databasePermissionManifestRequired:
+          "يحتاج التطبيق المتصل بقاعدة البيانات إلى بيانات أذونات نشطة.",
+        databasePermissionManifestInvalid:
+          "فشل التحقق من بيانات أذونات قاعدة البيانات النشطة.",
       },
       selectionTitle: "عوائق اختيار المستأجر الجديد",
       selectionBlockers: {
         applicationLifecycleNotActive: "دورة حياة التطبيق ليست ACTIVE.",
         applicationNotPublished: "إصدار التطبيق الحالي غير منشور.",
         applicationNotPublic: "التطبيق غير عام في الكتالوج.",
-        applicationNonBillable: "التطبيق ليس عرضاً تجارياً قابلاً لاختيار المستأجر.",
+        applicationNonBillable:
+          "التطبيق ليس عرضاً تجارياً قابلاً لاختيار المستأجر.",
         technicalReadinessBlocked: "الجاهزية التقنية معطلة.",
       },
       bindingCalloutTitle: "ربط المكوّن الأساسي",
-      bindingCalloutDescription: "يربط Core المكوّن الأساسي المشتق بعد اعتماد الهوية التقنية. لا يمكن للمتصفح اختيار مفتاح المكوّن أو إصدار العقد.",
+      bindingCalloutDescription:
+        "يربط Core المكوّن الأساسي المشتق بعد اعتماد الهوية التقنية. لا يمكن للمتصفح اختيار مفتاح المكوّن أو إصدار العقد.",
       adoptionCalloutTitle: "اعتماد الهوية التقنية",
-      adoptionCalloutDescription: "أثناء بقاء التطبيق في DRAFT، اطلب من Core حجز هدف التشغيل ومستخدم PostgreSQL وهوية المكوّن الأساسية المشتقة.",
-      permissionRequired: "يتطلب admin.applications.update + admin.applications.critical",
+      adoptionCalloutDescription:
+        "أثناء بقاء التطبيق في DRAFT، اطلب من Core حجز هدف التشغيل ومستخدم PostgreSQL وهوية المكوّن الأساسية المشتقة.",
+      permissionRequired:
+        "يتطلب admin.applications.update + admin.applications.critical",
       adoptIdentity: "اعتماد الهوية",
       adopting: "جارٍ الاعتماد…",
       linkComponent: "ربط المكوّن",
       linking: "جارٍ الربط…",
       bindingEyebrow: "أمر بيانات منضبط",
       bindingTitle: "ربط مكوّن التجهيز الأساسي",
-      bindingDescription: "راجع الهوية المشتقة من الخادم وسجّل سبب العملية. يثبّت Core مفتاح المكوّن وإصدار العقد.",
+      bindingDescription:
+        "راجع الهوية المشتقة من الخادم وسجّل سبب العملية. يثبّت Core مفتاح المكوّن وإصدار العقد.",
       adoptionEyebrow: "أمر هوية ثابتة",
       adoptionTitle: "اعتماد هوية الحزمة التقنية",
-      adoptionDescription: "راجع المعاينة المشتقة. Core هو المرجع ويعيد هدف التشغيل والمستخدم والمكوّن والإصدار المحجوز من دون عرض بيانات اعتماد.",
+      adoptionDescription:
+        "راجع المعاينة المشتقة. Core هو المرجع ويعيد هدف التشغيل والمستخدم والمكوّن والإصدار المحجوز من دون عرض بيانات اعتماد.",
       closeAdoptionDialog: "إغلاق نافذة الهوية التقنية",
       closeDialog: "إغلاق نافذة ربط المكوّن",
       authoritativeMapping: "ربط التشغيل المرجعي",
       applicationKey: "التطبيق",
       componentKey: "المكوّن",
       componentKeyPlaceholder: "مثال: crm أو crm.foundation",
-      componentKeyError: "أدخل مفتاح مكوّن قياسياً باستخدام حروف صغيرة وأرقام ونقاط وشرطة سفلية أو عادية.",
+      componentKeyError:
+        "أدخل مفتاح مكوّن قياسياً باستخدام حروف صغيرة وأرقام ونقاط وشرطة سفلية أو عادية.",
       ownerApplication: "التطبيق المالك",
       workerTarget: "هدف العامل",
       databasePrincipal: "مستخدم قاعدة البيانات",
       notAdopted: "غير معتمد",
-      identityPreview: "هذه معاينة مشتقة فقط. استجابة الأمر التالية وحالة Core المحدثة هما المرجع.",
-      identityAuthoritative: "تأتي هذه الهوية من حالة Core المحدثة ولا يمكن تعديلها من المتصفح.",
-      safeBoundary: "يتم إرسال الإصدار المتوقع وسبب التدقيق فقط. كلمات المرور والأسرار وSQL وملفات الترحيل والهويات المخصصة خارج هذا الأمر.",
+      identityPreview:
+        "هذه معاينة مشتقة فقط. استجابة الأمر التالية وحالة Core المحدثة هما المرجع.",
+      identityAuthoritative:
+        "تأتي هذه الهوية من حالة Core المحدثة ولا يمكن تعديلها من المتصفح.",
+      safeBoundary:
+        "يتم إرسال الإصدار المتوقع وسبب التدقيق فقط. كلمات المرور والأسرار وSQL وملفات الترحيل والهويات المخصصة خارج هذا الأمر.",
       contractVersion: "إصدار العقد",
       changeReason: "سبب التغيير",
       reasonPlaceholder: "وضّح سبب هذا التغيير التقني",
@@ -481,18 +692,22 @@ export const ar = {
       adoptionSuccessTitle: "تم اعتماد الهوية",
       adoptionSuccessMessage: "حجز Core الهوية التقنية وتم تحديث حالة التطبيق.",
       adoptionErrorTitle: "فشل اعتماد الهوية",
-      reconciledSuccess: "اكتمل الطلب الأصلي، وتحتوي حالة Core المحدثة الآن على نتيجته.",
+      reconciledSuccess:
+        "اكتمل الطلب الأصلي، وتحتوي حالة Core المحدثة الآن على نتيجته.",
       processingTitle: "نتيجة الأمر قيد التحقق",
-      processingMessage: "تم تحديث حالة Core. أعد نفس الطلب المحفوظ فقط ما دامت نتيجته المرجعية غير ظاهرة.",
+      processingMessage:
+        "تم تحديث حالة Core. أعد نفس الطلب المحفوظ فقط ما دامت نتيجته المرجعية غير ظاهرة.",
       toastErrorTitle: "فشل ربط المكوّن",
-      staleMessage: "تغيّر التعريف التقني. تم تحديث حالة الجاهزية؛ راجع الإصدار الجديد قبل الإرسال مرة أخرى.",
+      staleMessage:
+        "تغيّر التعريف التقني. تم تحديث حالة الجاهزية؛ راجع الإصدار الجديد قبل الإرسال مرة أخرى.",
       forbiddenMessage: "لا تملك الصلاحيتين المطلوبتين لتنفيذ هذا الأمر الحرج.",
       readinessForbidden: "لا تملك صلاحية قراءة حالة التجهيز التقني.",
     },
   },
   users: {
     pageTitle: "إدارة أعضاء فريق التحكم",
-    pageSubtitle: "إدارة حسابات مشرفي النظام، الأدوار الموكلة، وإعدادات اتصالات الـ WebPhone.",
+    pageSubtitle:
+      "إدارة حسابات مشرفي النظام، الأدوار الموكلة، وإعدادات اتصالات الـ WebPhone.",
     inviteMember: "دعوة عضو جديد",
     totalMembers: "إجمالي أعضاء الفريق",
     activeAccounts: "حسابات نشطة",
@@ -529,7 +744,8 @@ export const ar = {
     pageOf: "صفحة {page} من {total}",
     showingCountOfTotal: "عرض {from}–{to} من أصل {total} عضو فريق",
     inviteTitle: "دعوة مشرف جديد",
-    inviteSubtitle: "أرسل بريداً إلكترونياً لإضافة عضو جديد لفريق إدارة المنصة.",
+    inviteSubtitle:
+      "أرسل بريداً إلكترونياً لإضافة عضو جديد لفريق إدارة المنصة.",
     roleLabel: "الدور الموكل",
     superAdminCheckbox: "منح صلاحيات المدير الخارق (Super Admin)",
     sendInvite: "إرسال دعوة الانضمام",
@@ -561,17 +777,20 @@ export const ar = {
     clearSipPassword: "مسح كلمة مرور SIP",
     confirmClearPassword: "هل أنت متأكد من رغبتك في مسح كلمة مرور SIP؟",
     permissionDeniedTitle: "وصول غير مصرح به",
-    permissionDeniedDesc: "لا تملك الصلاحيات الكافية لعرض أو إدارة حسابات أعضاء الفريق.",
+    permissionDeniedDesc:
+      "لا تملك الصلاحيات الكافية لعرض أو إدارة حسابات أعضاء الفريق.",
     userNotFoundTitle: "المستخدم غير موجود",
     userNotFoundDesc: "تعذر العثور على حساب المشرف المطلوب، ربما تم حذفه.",
     backToUsers: "العودة لقائمة الأعضاء",
     retryLoad: "إعادة المحاولة",
     loadError: "فشل تحميل تفاصيل المشرف.",
-    roleChangeWarning: "تغيير دور المستخدم أو صلاحية السوبر أدمن سيؤدي لإبطال جلساته النشطة تلقائياً.",
+    roleChangeWarning:
+      "تغيير دور المستخدم أو صلاحية السوبر أدمن سيؤدي لإبطال جلساته النشطة تلقائياً.",
     saveChanges: "حفظ التغييرات",
     discardChanges: "تجاهل التغييرات",
     rolesUnavailable: "قائمة الأدوار غير متاحة بسبب عدم توفر الصلاحية.",
-    invitedInfoBanner: "سيبقى الحساب في حالة (معلق الدعوة) حتى يتم قبول رابط الدعوة المرسل بالبريد.",
+    invitedInfoBanner:
+      "سيبقى الحساب في حالة (معلق الدعوة) حتى يتم قبول رابط الدعوة المرسل بالبريد.",
   },
   roles: {
     pageTitle: "أدوار النظام والصلاحيات",
@@ -599,7 +818,8 @@ export const ar = {
   backup: {
     eyebrow: "حماية البيانات",
     title: "النسخ الاحتياطي والاستعادة",
-    subtitle: "إدارة وصول قاعدة البيانات وسياسات الحماية وأدلة النسخ ومسارات الاستعادة المنضبطة.",
+    subtitle:
+      "إدارة وصول قاعدة البيانات وسياسات الحماية وأدلة النسخ ومسارات الاستعادة المنضبطة.",
     serviceBoundary: "عمليات Worker",
     navigationLabel: "أقسام النسخ الاحتياطي والاستعادة",
     navigation: {
@@ -613,7 +833,8 @@ export const ar = {
   },
   storageServers: {
     pageTitle: "سيرفرات التخزين والبنية التحتية",
-    pageSubtitle: "إدارة سيرفرات التخزين الموزعة، التوافق مع S3، ملفات التوجيه ومفاتيح المصادقة.",
+    pageSubtitle:
+      "إدارة سيرفرات التخزين الموزعة، التوافق مع S3، ملفات التوجيه ومفاتيح المصادقة.",
     registerServer: "تسجيل سيرفر تخزين",
     totalServers: "إجمالي عقد التخزين",
     activePlacement: "عقد التخزين النشطة",
@@ -633,13 +854,186 @@ export const ar = {
     offline: "إيقاف مؤقت",
     delete: "حذف السيرفر",
   },
+  createStorageServer: {
+    backToList: "العودة إلى خوادم التخزين",
+    tag: "تسجيل آمن ومستقل",
+    title: "إضافة خادم تخزين جديد (Garage / S3)",
+    subtitle:
+      "يسجل النظام الخادم كمسودة (DRAFT). تظل بيانات الاعتماد مشفرة ولا تعني عملية الحفظ نجاح الاتصال تلقائياً.",
+    accessDeniedTitle: "تم رفض الوصول",
+    accessDeniedDesc:
+      "يتطلب تسجيل خوادم التخزين الحصول على صلاحيتي الإنشاء والإجراء الحرج.",
+    checkingPermissions: "جارٍ التحقق من الصلاحيات…",
+    sections: {
+      identity: "هوية الخادم وموقعه",
+      identityDesc: "اسم العقدة، الرمز الثابت، ورابط الاتصال الآمن المباشر.",
+      credentials: "بيانات اعتماد Garage / S3",
+      credentialsDesc:
+        "ترسل مرة واحدة عبر HTTPS إلى النظام ولا تعود مطلقاً لأي API أو المتصفح.",
+      preview: "معاينة التكوين المباشر",
+      previewDesc: "ملخص المسودة التي سيتم تسجيلها داخل النظام.",
+    },
+    fields: {
+      name: "اسم الخادم",
+      code: "الرمز الثابت",
+      codeHint: "أحرف إنجليزية صغيرة وأرقام وشرطة فقط (مثال: garage-primary).",
+      endpoint: "نقطة النهاية HTTPS",
+      endpointHint: "مثال: https://garage.example.com من دون مسار.",
+      region: "المنطقة الجغرافية",
+      bucketName: "اسم الحاوية (Bucket Name)",
+      maxTenants: "الحد الأقصى للمستأجرين",
+      maxTenantsHint: "اتركه فارغاً لعدم وضع حد عددي.",
+      accessKeyId: "معرف مفتاح الوصول (Access Key ID)",
+      secretAccessKey: "مفتاح الوصول السري (Secret Access Key)",
+    },
+    previewCard: {
+      targetEndpoint: "رابط نقطة النهاية",
+      bucketTarget: "الحاوية والمنطقة",
+      tenantCap: "حد التسكين",
+      unlimited: "غير محدود",
+      securityMode: "حماية الاعتماد",
+      encryptedNotice: "كلمات المرور مشفرة مفتاحياً",
+    },
+    actions: {
+      cancel: "إلغاء",
+      submit: "تسجيل مسودة خادم التخزين",
+      submitting: "جارٍ الحفظ والتشفير…",
+    },
+    runtimeSetup: {
+      title: "يجب إعداد تشغيل التخزين أولاً",
+      keyUnavailableDescription:
+        "لا يستطيع Core تشفير بيانات الاعتماد قبل توليد مفتاح تشغيل التخزين. اضبط Storage Runtime ثم ارجع وأعد محاولة التسجيل.",
+      disabledDescription:
+        "تم حفظ الخادم، لكن لا يمكن إكمال الإعداد وStorage Runtime معطل. فعّله ثم أعد محاولة التفعيل فقط.",
+      openSettings: "فتح إعدادات تشغيل التخزين",
+      askAdministrator:
+        "اطلب من مسؤول يملك صلاحيات إعدادات النظام ضبط Storage Runtime، ثم أعد المحاولة.",
+      correlationId: "معرّف التتبع",
+    },
+    errors: {
+      endpointHttpsOnly:
+        "أدخل أصلاً آمناً بصيغة HTTPS فقط، من دون مسار أو بيانات اعتماد أو query string.",
+      registrationFailed: "فشل تسجيل خادم التخزين.",
+    },
+    success: {
+      title: "تم تسجيل خادم التخزين",
+      message: "تم حفظ بيانات الاعتماد بشكل مشفر. اختبر الاتصال قبل التفعيل.",
+    },
+  },
+  databaseServerDetail: {
+    backToList: "العودة لسيرفرات قواعد البيانات",
+    editMetadata: "تعديل البيانات الأساسية",
+    activateServer: "تفعيل السيرفر",
+    drainConnections: "تفريغ الاتصالات",
+    takeOffline: "إيقاف السيرفر مؤقتاً",
+    deleteHost: "حذف السيرفر",
+    tabs: {
+      overview: "نظرة عامة والمقاييس",
+      readiness: "جاهزية الوصول وحسابات النظام",
+      bindings: "ارتباطات التطبيقات",
+      security: "الأمان والتشفير",
+      history: "سجل التعديلات والأنشطة",
+    },
+    overview: {
+      maxCapacity: "السعة القصوى",
+      maxCapacitySub: "حد استضافة المستأجرين",
+      currentTenants: "المستأجرين الحاليين",
+      currentTenantsSub: "توزيعات المخططات النشطة",
+      sslSecurityMode: "وضع أمان SSL",
+      connectTimeout: "مهلة الاتصال",
+      connectTimeoutSub: "نافذة فحص صحة المضيف",
+      capacityUtilization: "استهلاك سعة السيرفر",
+      tenantPlacementStatus: "حالة تسكين المستأجرين",
+      hostInformation: "بيانات السيرفر والمضيف",
+      hostAddress: "عنوان المضيف (IP / Domain)",
+      port: "المنفذ (Port)",
+      countryRegion: "الدولة / المنطقة",
+      placementStatus: "حالة التسكين الاستيعابية",
+      createdAt: "تاريخ الإنشاء",
+      updatedAt: "آخر تحديث",
+      connectionParameters: "معلمات الاتصال الموصى بها",
+    },
+    readiness: {
+      title: "جاهزية الوصول لخادم قاعدة البيانات",
+      subtitle:
+        "يتحقق النظام من كافة الخدمات المطلوبة وارتباطات التطبيقات قبل تفعيل هذا السيرفر.",
+      retrySetup: "إعادة محاولة إعداد التسجيل",
+      backupNeedsAttentionTitle: "وصول النسخ الاحتياطي يتطلب الانتباه",
+      backupNeedsAttentionSub:
+        "يظل تفعيل السيرفر محظوراً حتى تجهز هذه التبعية.",
+      openBackup: "فتح نظام النسخ الاحتياطي",
+      provisioningAccount: "حساب خدمة التجهيز (Provisioning)",
+      provisioningDesc:
+        "يستخدم لإنشاء وترحيل قواعد بيانات المستأجرين. تظل كلمة المرور مشفرة داخل النظام.",
+      rotatePassword: "تدوير كلمة المرور",
+      reconcile: "مطابقة الاعتماد",
+      provisioningUnavailableTitle: "وصول التجهيز غير متاح",
+      provisioningUnavailableSub:
+        "أعد محاولة إعداد تسجيل السيرفر لاستعادة ارتباط التجهيز المطلوب.",
+    },
+    bindings: {
+      title: "ارتباطات الوصول لقواعد البيانات للتطبيقات",
+      subtitle:
+        "حسابات ثابتة، مراجعات مستقلة لكلمات المرور، وارتباطات بأقل الصلاحيات لهذا السيرفر.",
+      addApplication: "إضافة تطبيق",
+      searchPlaceholder: "البحث عن تطبيق أو حساب...",
+      boundaryNotice:
+        "تظل كلمات المرور داخل حدود الاعتماد المشفرة للنظام. تتلقى هذه اللوحة الحسابات والحالة وأدلة المراجعة فقط—وليس ملفات أو كشف كلمات المرور.",
+      lastOpTitle: "آخر عملية",
+      affectedTitle: "المتأثرين",
+      resultTitle: "النتيجة",
+      accessInit: "تم تهيئة الوصول",
+      credUpdated: "تم تحديث الاعتماد",
+      readyReceipt: "جاهز · إيصال خالي من الأسرار",
+      table: {
+        application: "التطبيق",
+        principalKey: "الحساب / المفتاح",
+        status: "الحالة",
+        credRev: "مراجعة الاعتماد",
+        schedule: "جدولة التدوير",
+        actions: "الإجراءات",
+        stagedCandidate: "مرشح مرحلي",
+        disabled: "معطل",
+        loading: "جاري تحميل ارتباطات التطبيقات...",
+        empty: "لا توجد تطبيقات مرتبطة بهذا السيرفر",
+        retry: "إعادة المحاولة",
+      },
+    },
+    security: {
+      title: "إعدادات الأمان وتشفير SSL/TLS",
+      subtitle: "تفاصيل وضع الاتصال المشفر وشهادات الأمان وحدود الأمان للخادم.",
+      modeLabel: "وضع تشفير SSL المكتشف",
+      certStatus: "حالة شهادة الأمان",
+      verification: "التحقق من هوية المضيف",
+      strictVerification: "التحقق الصارم (Strict Verification)",
+      relaxedVerification: "التحقق المرن (Relaxed Verification)",
+      tlsDisabled: "تشفير TLS معطل (غير مستحسن في الإنتاج)",
+      certConfigured: "تم تهيئة حزمة شهادات الأمان (CA Bundle)",
+      encryptedBoundaryTitle:
+        "حدود الاعتمادات المشفرة (Encrypted Credential Boundary)",
+      encryptedBoundaryDesc:
+        "يضمن النظام حماية كلمات المرور عبر عدم تخزينها أو كشفها في متصفح المستخدم أو سجلات التشغيل. يتم الوصول فقط عبر مفاتيح مؤمنة تشفيرياً.",
+    },
+    history: {
+      title: "سجل تعديلات وأنشطة السيرفر",
+      subtitle:
+        "تتبع كافة التعديلات والتغييرات التي تمت على إعدادات وحالة هذا السيرفر.",
+      totalEntries: "إجمالي السجلات: {{count}}",
+      loading: "جاري تحميل سجل التعديلات...",
+      empty: "لا يوجد سجل تعديلات مسجل حتى الآن.",
+      retry: "إعادة المحاولة",
+    },
+  },
   settings: {
     pageTitle: "إعدادات النظام ولوحة التحكم",
-    pageSubtitle: "تهيئة المصادقة، الهوية البصرية، خوادم البريد الإلكتروني، خطوط Asterisk SIP، والتنبيهات.",
+    pageSubtitle:
+      "تهيئة المصادقة، الهوية البصرية، خوادم البريد الإلكتروني، خطوط Asterisk SIP، والتنبيهات.",
     tabs: {
       platform: "الهوية والهوية البصرية",
       auth: "المصادقة والأمان",
       smtp: "البريد الإلكتروني (SMTP)",
+      fatalAlerts: "التنبيهات الحرجة",
+      storageRuntime: "تشغيل التخزين",
       webphone: "الهاتف المرئي (Asterisk SIP)",
       notifications: "الإشعارات والتنبيهات",
       billing: "الفواتير وبوابات الدفع",

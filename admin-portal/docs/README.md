@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-05**
+Last source verification: **2026-08-12**
 
 This documentation describes the current Admin Portal source, all
 browser-visible Core Admin capabilities, exact integration defects, required
@@ -16,7 +16,7 @@ not mean frontend parity or deployment completion.
 3. [Frontend integration guide](frontend-integration-guide.md)
 4. [Frontend capability matrix](audit/frontend-capability-matrix.md)
 5. [API domain index](api/README.md)
-6. [Generated 235-route inventory](generated/admin-core-api-routes.md)
+6. [Generated 240-route inventory](generated/admin-core-api-routes.md)
 7. [Known gaps](ai/KNOWN_GAPS.md)
 8. [Implementation playbook](ai/IMPLEMENTATION_PLAYBOOK.md)
 9. [Test matrix](ai/TEST_MATRIX.md)
@@ -35,8 +35,10 @@ Protected requests use the shared authenticated client with:
 
 ```ts
 credentials: "include";
-"x-auth-cookie-mode": "1";
 ```
+
+The Gateway/Core boundary infers the browser channel. Frontend code does not
+send a caller-selected authentication-mode header.
 
 Do not store JWT access or refresh tokens in browser-readable storage.
 
@@ -61,10 +63,11 @@ Do not store JWT access or refresh tokens in browser-readable storage.
 
 ## Current route evidence
 
-The source-generated Core Admin inventory contains 235 canonical browser
-routes. Of those, 128 are write-sensitive and two use explicit ANY
-permissions. Worker Admin routes are documented separately and are not counted
-in that inventory.
+The hard-checked current Core Admin inventory contains 240 canonical browser
+routes: 97 GET operations and 143 non-GET operations. Core and Gateway expose
+the same 240 method/path set with zero missing, orphan, or duplicate contracts.
+Worker Admin routes are documented separately and are not counted in that
+inventory.
 
 The generated inventory is transport evidence only. Controller/DTO behavior
 comes from the hand-written domain guides and owning backend source.
@@ -77,8 +80,10 @@ comes from the hand-written domain guides and owning backend source.
 - Live authenticated status requires a real authorized Gateway/Core session.
 - Deployment-verified status requires evidence from the target environment.
 
-Never say “full parity” while any BROKEN/MISSING item, required validation, live
-runtime check, or release gate remains open.
+The current Web source has 240 direct Core Admin calls, 0 equivalent-only
+representations, and 0 missing route capabilities. Call this **source route
+parity**, not authenticated runtime, deployment verification, or release
+readiness while those independent gates remain open.
 
 ## Validation
 

@@ -32,7 +32,7 @@ export function CreateTradeConfigurationScopeModal({ isOpen, onClose, onSubmit }
         <Select
           label="مستوى النطاق Scope Level"
           value={scopeLevel}
-          onChange={(e) => setScopeLevel(e.target.value as any)}
+          onChange={(e) => setScopeLevel(e.target.value as typeof scopeLevel)}
           options={[
             { label: "عام لجميع الفروع (Global)", value: "global" },
             { label: "فرع محدد (Branch)", value: "branch" },

@@ -2,36 +2,32 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
 ## Gateway inventory
 
 | Scope | Routes | Coverage |
 | --- | ---: | --- |
-| Core route table, all masters | 443 | Source context only |
-| Core Admin browser routes | 232 | Complete generated inventory |
-| Write-sensitive Admin routes | 133 | Complete generated inventory |
+| Core controller handlers | 445 | Compiler-backed source context |
+| Gateway Core contracts | 439 | Gateway source context |
+| Core Admin browser routes | 240 | Complete generated inventory |
+| Non-GET Core Admin routes | 143 | Complete generated inventory |
 | Explicit ANY-permission Admin routes | 1 | FQDN validation |
 
 See the [generated route table](../generated/admin-core-api-routes.md).
 
 ## Semantic domain coverage
 
-| Route-key domain | Routes | Primary guide |
+| Capability family | Routes | Primary guides |
 | --- | ---: | --- |
-| Auth | 8 | [Authentication](../api/auth.md) |
-| Dashboard/reports | 6 | [Dashboard](../api/dashboard.md), [Reports](../api/reports.md) |
-| Users/roles/permissions | 22 | [Users](../api/users.md), [Roles](../api/roles-permissions.md) |
-| Database Servers | 10 | [Database Servers](../api/database-servers.md) |
-| Storage registry/attestation/recovery | 22 | [Storage Servers](../api/storage-servers.md) |
-| Tenants, tenant FQDNs, subscriptions, wallet, and payments | 81 | [Tenants](../api/tenants.md), [Tenant users](../api/tenant-users.md), [Operations](../api/tenant-operations.md), [Subscriptions](../api/subscriptions.md), [Wallet](../api/wallet.md), [Payments](../api/payments-reconciliation.md) |
-| Provisioning governance | 32 | [Provisioning governance](../api/provisioning-governance.md) |
-| Catalogue | 26 | [Catalogue](../api/catalog.md) |
-| Invoices | 7 | [Invoices](../api/invoices.md) |
-| Settings | 7 | [System settings](../api/system-settings.md) |
-| Notifications | 14 | [Notifications](../api/notifications.md) |
-| Logging | 6 | [Logging](../api/logging.md) |
-| Control-plane audit | 2 | [Control-plane audit](../api/control-plane-audit.md) |
+| Application catalogue and pricing | 31 | [Catalogue](../api/catalog.md) |
+| Billing and settlement | 27 | [Subscriptions](../api/subscriptions.md), [Wallet](../api/wallet.md), [Payments](../api/payments-reconciliation.md), [Invoices](../api/invoices.md) |
+| Identity, RBAC, and sessions | 34 | [Authentication](../api/auth.md), [Users](../api/users.md), [Roles](../api/roles-permissions.md) |
+| Infrastructure registries | 28 | [Database Servers](../api/database-servers.md), [Storage Servers](../api/storage-servers.md) |
+| Operations and observability | 35 | [Dashboard](../api/dashboard.md), [Reports](../api/reports.md), [Notifications](../api/notifications.md), [Logging](../api/logging.md), [Audit](../api/control-plane-audit.md) |
+| Tenant lifecycle and access | 44 | [Tenants](../api/tenants.md), [Tenant users](../api/tenant-users.md) |
+| Tenant provisioning and governance | 41 | [Operations](../api/tenant-operations.md), [Provisioning governance](../api/provisioning-governance.md) |
+| **Total** | **240** | **Every route is assigned** |
 
 The generated table is the exhaustive method/path index. Hand-written guides
 add DTO, state, security, and frontend status details and should not duplicate
@@ -54,5 +50,5 @@ the entire generated table.
 - Source verification does not establish authenticated runtime or deployment.
 - The working trees may be dirty; generated metadata records revisions and
   `+dirty` state.
-- Worker backup/restore routes remain outside the 232 Core Admin count and have
+- Worker backup/restore routes remain outside the 240 Core Admin count and have
   their own guide.

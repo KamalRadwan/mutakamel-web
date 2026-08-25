@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, AppWindow, ArrowLeft, FileCheck, Loader2, Pencil, Settings, Shield, Trash2 } from "lucide-react";
+import { AppWindow, ArrowLeft, Database, FileCheck, Loader2, Pencil, Settings, Shield, Trash2 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -18,6 +18,7 @@ import { ApplicationTechnicalProvisioningPanel } from "@/features/admin/applicat
 import { useApplication } from "@/features/admin/applications/hooks/useApplication";
 import { useApplicationTechnicalProvisioning } from "@/features/admin/applications/hooks/useApplicationTechnicalProvisioning";
 import { getActivationReadinessState } from "@/features/admin/applications/lib/technical-provisioning-state";
+import type { ApplicationServerSummaryView } from "@/features/admin/applications/types";
 import { useI18n } from "@/i18n/I18nContext";
 import { adminCanAll } from "@/lib/auth/rbac";
 
@@ -67,6 +68,11 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
       publishedBy: application.publishedBy,
     },
   );
+  const requiredFleetCoverageBlocked =
+    application.databaseDeployment === "REQUIRED" &&
+    (application.serverSummary.ready < application.serverSummary.eligible ||
+      application.serverSummary.pending > 0 ||
+      application.serverSummary.degraded > 0);
   const lifecycleOptions: ApplicationLifecycleAction[] = application.lifecycleStatus === "DRAFT"
     ? ["activate", "disable"]
     : application.lifecycleStatus === "ACTIVE"
@@ -77,7 +83,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
 
   const runLifecycle = async (reason: string) => {
     if (lifecycleAction === "activate") {
-      if (activationReadiness !== "ALLOWED") {
+      if (activationReadiness !== "ALLOWED" || requiredFleetCoverageBlocked) {
         throw new Error(
           activationReadiness === "UNAVAILABLE"
             ? t.applications.detail.activationUnavailable
@@ -108,7 +114,10 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
             {canEditMetadata && <button type="button" onClick={() => setConfigurationMode("metadata")} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-bold hover:bg-white/15"><Pencil className="h-3.5 w-3.5" />{t.applications.detail.editMetadata}</button>}
             {canLifecycle && <button type="button" onClick={() => setConfigurationMode("policy")} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-bold hover:bg-white/15"><Settings className="h-3.5 w-3.5" />{t.applications.detail.databasePolicy}</button>}
             {canLifecycle && lifecycleOptions.map((action) => {
-              const blocked = action === "activate" && activationReadiness !== "ALLOWED";
+              const blocked =
+                action === "activate" &&
+                (activationReadiness !== "ALLOWED" ||
+                  requiredFleetCoverageBlocked);
               const blockedTitle = activationReadiness === "UNAVAILABLE" ? t.applications.detail.activationUnavailable : t.applications.detail.activationBlocked;
               return <button key={action} type="button" disabled={blocked} title={blocked ? blockedTitle : undefined} onClick={() => setLifecycleAction(action)} className="min-h-11 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400">{t.applications.detail.lifecycle[action]}</button>;
             })}
@@ -130,7 +139,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Fact label={t.applications.detail.facts.applicationType} value={application.applicationType} tone="violet" />
         <Fact label={t.applications.detail.facts.commercialMode} value={application.commercialMode} tone="amber" />
-        <Fact label={t.applications.detail.facts.databaseAccess} value={application.databaseAccessMode} tone="blue" />
+        <Fact label={lang === "ar" ? "نشر قاعدة البيانات" : "Database deployment"} value={application.databaseDeployment} tone="blue" />
         <Fact label={t.applications.detail.facts.databasePrincipal} value={application.databasePrincipal || t.applications.detail.facts.none} tone="emerald" mono />
       </section>
 
@@ -158,7 +167,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
         </article>
       </section>
 
-      {!application.serverSummary.available && <section className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /><div><h2 className="text-sm font-black">{t.applications.detail.serverSummaryTitle}</h2><p className="mt-1 text-xs">{t.applications.detail.serverSummaryDescription}</p></div></section>}
+      <ApplicationServerCoverage summary={application.serverSummary} lang={lang} />
 
       <ApplicationCatalogueWorkspace applicationId={application.id} applicationKey={application.key} canRead={canReadCatalogue} canCreate={canCreateCatalogue} canMutate={canMutateCatalogue} />
     </div>
@@ -197,6 +206,40 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   </PageFrame>;
 }
 
-function PageFrame({ children }: { children: React.ReactNode }) { return <div className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"><Navbar /><main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 sm:p-6">{children}</main></div>; }
+function PageFrame({ children }: { children: React.ReactNode }) { return <div className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"><Navbar /><main className="w-full flex-1 space-y-6 px-[10px] py-4 sm:py-6">{children}</main></div>; }
 function Fact({ label, value, tone, mono = false }: { label: string; value: string; tone: "violet" | "amber" | "blue" | "emerald"; mono?: boolean }) { const tones = { violet: "border-violet-200 dark:border-violet-900", amber: "border-amber-200 dark:border-amber-900", blue: "border-blue-200 dark:border-blue-900", emerald: "border-emerald-200 dark:border-emerald-900" }; return <div className={`rounded-2xl border bg-white p-4 shadow-sm dark:bg-slate-900 ${tones[tone]}`}><div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</div><div className={`mt-2 truncate text-sm font-black ${mono ? "font-mono" : ""}`} title={value}>{value}</div></div>; }
 function Item({ label, value }: { label: string; value: string }) { return <div><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</dt><dd className="mt-1 font-mono font-bold text-slate-900 dark:text-slate-100">{value}</dd></div>; }
+
+function ApplicationServerCoverage({ summary, lang }: { summary: ApplicationServerSummaryView; lang: "ar" | "en" }) {
+  const copy = lang === "ar"
+    ? { title: "تغطية خوادم قواعد البيانات", ready: "جاهز", eligible: "مؤهل", pending: "قيد الانتظار", degraded: "متعثر", rollout: "يحتاج استكمال النشر", complete: "التغطية مكتملة", notRequired: "لا يحتاج نشرًا على الأسطول" }
+    : { title: "Database Server coverage", ready: "Ready", eligible: "Eligible", pending: "Pending", degraded: "Degraded", rollout: "Rollout needs attention", complete: "Coverage complete", notRequired: "Fleet rollout not required" };
+  const coverage = Math.min(100, Math.max(0, summary.coveragePercent));
+  const needsAttention =
+    summary.rolloutRequired &&
+    (summary.ready < summary.eligible ||
+      summary.pending > 0 ||
+      summary.degraded > 0);
+  const status = needsAttention
+    ? copy.rollout
+    : summary.rolloutRequired
+      ? copy.complete
+      : copy.notRequired;
+  return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="flex items-center gap-2 text-sm font-black"><Database className={`h-4 w-4 ${needsAttention ? "text-amber-500" : "text-emerald-500"}`} />{copy.title}</h2>
+      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${needsAttention ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"}`}>{status}</span>
+    </div>
+    <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={coverage} className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${coverage}%` }} /></div>
+    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <CoverageMetric label={copy.eligible} value={summary.eligible} />
+      <CoverageMetric label={copy.ready} value={summary.ready} />
+      <CoverageMetric label={copy.pending} value={summary.pending} />
+      <CoverageMetric label={copy.degraded} value={summary.degraded} />
+    </div>
+  </section>;
+}
+
+function CoverageMetric({ label, value }: { label: string; value: number }) {
+  return <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</div><div className="mt-1 font-mono text-lg font-black">{value}</div></div>;
+}

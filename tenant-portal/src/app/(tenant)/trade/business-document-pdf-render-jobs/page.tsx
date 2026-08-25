@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, FileCode, Printer, Download, Clock } from "lucide-react";
+import { Eye, Trash2, FileCode } from "lucide-react";
 import { useTradePdfRenderJobs, PdfRenderJobItem } from "./hooks/useTradePdfRenderJobs";
 import { CreateTradePdfRenderJobsModal } from "./components/CreateTradePdfRenderJobsModal";
 import { DeleteTradePdfRenderJobsConfirmModal } from "./components/DeleteTradePdfRenderJobsConfirmModal";
 
 export default function TradePdfRenderJobsPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

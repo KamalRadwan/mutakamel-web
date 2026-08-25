@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
 Owner: **Core**
 
@@ -57,11 +57,14 @@ this documentation work.
 Device/push tokens are sensitive browser-bound values. Do not log or expose
 them in UI fixtures.
 
-## Current frontend defect
+## Current frontend status
 
-`src/components/layout/hooks/useNotificationDropdown.ts` returns static local
-notifications. It is not a live inbox. No preferences, device-token, read,
-acknowledge, or dismiss workflow is integrated.
+All 14 routes are source-integrated. The navbar reads authoritative unread
+count and recent notifications; `/notifications` owns the cursor-paginated
+inbox, single and bulk read/acknowledge/dismiss/delete actions, configuration,
+preferences, and device-token management. The UI applies exact read/manage
+permissions, 204 handling, bounded refresh/error states, bilingual copy, and
+focused tests. REST is authoritative; Admin Realtime remains separately gated.
 
 ## Source map
 

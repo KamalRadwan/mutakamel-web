@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { Save, Info, Lock, Loader2 } from "lucide-react";
+import { Save, Info, Lock, Loader2, RefreshCw } from "lucide-react";
 import { SettingFieldData } from "../hooks/useSettings";
 import { useToast } from "@/components/ui/ToastContext";
 
@@ -13,23 +12,24 @@ interface SettingFieldProps {
     key: string,
     value: string | number | boolean,
   ) => Promise<void> | void;
+  onReload: (key: string) => Promise<void> | void;
 }
 
-export function SettingField({ setting, lang, onUpdate }: SettingFieldProps) {
+export function SettingField({ setting, lang, onUpdate, onReload }: SettingFieldProps) {
   const toast = useToast();
-  const { key, value: initialValue, descriptionI18n, uiMeta, readOnly, isSaving } = setting;
+  const {
+    key,
+    value: initialValue,
+    descriptionI18n,
+    uiMeta,
+    readOnly,
+    isSaving,
+    permissionLocked,
+    isRefreshing,
+    hasPendingChange,
+  } = setting;
 
-  const [localValue, setLocalValue] = useState(initialValue);
-  const [previousInitialValue, setPreviousInitialValue] =
-    useState(initialValue);
-
-  if (previousInitialValue !== initialValue) {
-    setPreviousInitialValue(initialValue);
-    setLocalValue(initialValue);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const hasChanged = localValue !== initialValue;
+  const localValue = initialValue;
 
   if (!uiMeta) {
     return (
@@ -43,7 +43,6 @@ export function SettingField({ setting, lang, onUpdate }: SettingFieldProps) {
 
   const handleChange = async (newVal: string | number | boolean) => {
     if (readOnly) return;
-    setLocalValue(newVal);
     try {
       await onUpdate(key, newVal);
     } catch (err: unknown) {
@@ -82,7 +81,13 @@ export function SettingField({ setting, lang, onUpdate }: SettingFieldProps) {
 
           {readOnly && (
             <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-2 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded w-fit">
-              {lang === "ar" ? "هذا الإعداد يُدار عبر بيئة التشغيل ومقفل للتعديل." : "Managed by environment configuration and is read-only."}
+              {permissionLocked
+                ? lang === "ar"
+                  ? "يتطلب التعديل صلاحيتَي admin.settings.update و admin.settings.critical معاً."
+                  : "Editing requires both admin.settings.update and admin.settings.critical."
+                : lang === "ar"
+                  ? "هذا الإعداد يُدار عبر بيئة التشغيل ومقفل للتعديل."
+                  : "Managed by environment configuration and is read-only."}
             </p>
           )}
 
@@ -162,8 +167,37 @@ export function SettingField({ setting, lang, onUpdate }: SettingFieldProps) {
                 <Save className="w-3.5 h-3.5" />
                 {lang === "ar" ? "جاري الحفظ..." : "Saving..."}
               </span>
-            ) : null}
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  void Promise.resolve(onReload(key)).catch(() => undefined);
+                }}
+                disabled={isRefreshing || hasPendingChange}
+                title={
+                  hasPendingChange
+                    ? lang === "ar"
+                      ? "احفظ التغيير قبل إعادة تحميل القيمة الموثوقة."
+                      : "Save the edit before reloading the authoritative value."
+                    : lang === "ar"
+                      ? "إعادة تحميل هذا الإعداد من Core"
+                      : "Reload this setting from Core"
+                }
+                className="inline-flex items-center gap-1.5 text-slate-500 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:text-blue-300"
+              >
+                <RefreshCw
+                  className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+                  aria-hidden="true"
+                />
+                {lang === "ar" ? "إعادة تحميل" : "Reload"}
+              </button>
+            )}
           </div>
+          {setting.error ? (
+            <p role="alert" className="w-full text-start text-xs text-rose-700 dark:text-rose-300">
+              {setting.error}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 # Tenant Portal Glossary
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 | Term | Meaning |
 | --- | --- |
@@ -13,7 +13,8 @@ Last verified: **2026-07-25**
 | Route contract | Typed Gateway allowlist/policy entry |
 | Route class | Gateway transport/security category such as public, authenticated, or write-sensitive |
 | Actor | Authenticated tenant user performing a request |
-| Session version | Monotonic identity version used to revoke older JWTs |
+| Auth Session (`sid`) | Durable independently revocable login/device session that owns deadlines, counters, and a reusable opaque credential fingerprint |
+| Auth epochs | Exact `securityEpoch`, `authorizationVersion`, `profileVersion`, and per-session `sessionEpoch` values carried by an access JWT and rechecked against PostgreSQL |
 | Session generation | Frontend identifier binding browser work to one adopted login |
 | Trusted context | Gateway-injected tenant/actor/organization/session headers |
 | Access policy | Core projection of tenant lifecycle, subscriptions, features, and module readiness |

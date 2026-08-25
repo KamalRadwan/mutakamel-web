@@ -56,8 +56,6 @@ export const ar = {
     authentication: "المصادقة والأمان",
     moduleAssignments: "تعيينات الوحدات للمستخدمين",
     provisioningUpdates: "تحديثات التجهيز",
-    signedDownloads: "تنزيل الملفات الموقعة",
-    hostStatus: "حالة الاستضافة",
     workspaceSettings: "إعدادات الهوية والهيكل",
 
     // CRM Navigation items
@@ -77,9 +75,6 @@ export const ar = {
     presetDashboards: "لوحات التحكم المسبقة",
     staticData: "كتالوج البيانات الثابتة",
     crmSettings: "إعدادات CRM",
-    apiDocs: "توثيق واجهات API",
-    browserContracts: "عقود المتصفح القياسية",
-    browserExamples: "أمثلة الاستخدام",
 
     // Trade Navigation items
     tradeDashboard: "لوحة التجارة",
@@ -100,7 +95,6 @@ export const ar = {
     extensionProfiles: "ملفات التوسعة والإضافات",
     workflowVersions: "إصدارات مسارات العمل",
     importsWebhooks: "الاستيراد والويب هوك",
-    aiGuide: "دليل تنفيذ الذكاء الاصطناعي"
   },
   dashboard: {
     title: "لوحة القيادة",

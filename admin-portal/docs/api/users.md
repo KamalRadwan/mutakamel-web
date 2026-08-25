@@ -78,8 +78,10 @@ interface UpdateAdminProfileDto {
 }
 ```
 
-The current Portal has no self-profile page. Theme/language UI elsewhere does
-not prove this profile contract is integrated.
+The current Portal exposes `/profile`, reads this projection from
+`GET /users/me/profile`, and saves the exact DTO through
+`PATCH /users/me/profile`. Loading, forbidden, unavailable, save-failure, and
+safe retry states are rendered explicitly.
 
 ## WebPhone
 
@@ -120,12 +122,14 @@ A missing read permission renders forbidden, not an empty user list.
 
 - `src/app/users/hooks/useUsers.ts`
 - `src/app/users/[id]/hooks/useUserDetail.ts`
+- `src/app/profile/hooks/useMyProfile.ts`
+- `src/app/profile/page.tsx`
 - `src/components/layout/webphone/`
 - `src/components/layout/hooks/useWebRTCPhone.ts`
 
 The user list, invite, detail, lifecycle, role assignment, administrative
-WebPhone, self WebPhone, and call-log foundations use real APIs. Self profile
-remains missing and error/state typing still requires refactoring.
+WebPhone, self WebPhone, call logs, and self profile use real APIs. Authenticated
+runtime and deployment verification remain separate from source integration.
 
 ## Source map
 

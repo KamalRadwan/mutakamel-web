@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, LayoutTemplate, FileCode, Mail } from "lucide-react";
+import { Eye, Trash2, LayoutTemplate } from "lucide-react";
 import { useTemplatePlatform, TemplateItem } from "./hooks/useTemplatePlatform";
 import { CreateTemplatePlatformModal } from "./components/CreateTemplatePlatformModal";
 import { DeleteTemplatePlatformConfirmModal } from "./components/DeleteTemplatePlatformConfirmModal";
 
 export default function TemplatePlatformPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

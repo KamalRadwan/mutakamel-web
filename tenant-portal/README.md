@@ -1,12 +1,14 @@
 # Mutakamel Tenant Portal
 
-`tenant-portal` is the standalone Next.js application that will replace the
-tenant-facing routes and features currently hosted in
-`backend/mutakamel-apps/mutakamel-web-app`.
+`tenant-portal` is the current standalone Next.js application for the Tenant
+browser experience. Caddy routes the configured local Tenant hosts to its fixed
+port; the consolidated `backend/mutakamel-apps/mutakamel-web-app` remains
+migration/reference source and is not the current ingress target.
 
-The application is documentation-first while the replacement is being built.
-The current source is still a bootstrap shell; a documented capability is not
-automatically an implemented screen.
+The application contains an implemented shell, authentication/session client,
+and partial Core, CRM, and Trade feature source. Documentation is not runtime or
+release evidence: verify each capability against its current source, tests, and
+authenticated deployment before treating it as complete.
 
 ## Runtime
 
@@ -41,14 +43,14 @@ this documentation set.
 
 | Area | Status |
 | --- | --- |
-| Documentation | Source-verified foundation and route inventory |
-| Application shell | Bootstrap only |
-| Tenant host admission | Not implemented in this app |
-| Authentication/session client | Not implemented in this app |
-| Core tenant features | Not implemented in this app |
-| CRM features | Not implemented in this app |
-| Trade features | Not implemented in this app |
-| Application tests | Not configured |
+| Documentation | Source-verified foundation and route inventory; individual capability status remains explicit |
+| Application shell | Implemented; feature completeness varies by route |
+| Tenant host admission | Ingress/Core-owned; current Caddy routes configured Tenant hosts to `5002`, while Gateway/Core remain authority |
+| Authentication/session client | Implemented source for email/password login, `/auth/me` bootstrap, reusable cross-tab refresh, activity, logout, and self-session management; authenticated runtime proof remains open |
+| Core tenant features | Partial implementation; verify each documented route/screen independently |
+| CRM features | Partial implementation; verify each documented route/screen independently |
+| Trade features | Partial implementation; verify each documented route/screen independently |
+| Application tests | Vitest configured; coverage is capability-specific and is not a blanket release gate |
 | Documentation audit | Configured |
 
 The existing tenant implementation under

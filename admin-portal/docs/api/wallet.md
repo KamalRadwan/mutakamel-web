@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-11**
 
 Owner: **Core**
 
@@ -71,12 +71,13 @@ type LedgerReason =
 
 Unknown additive values require a safe fallback.
 
-## Current frontend defect
+## Current frontend integration
 
-`src/app/tenants/[id]/hooks/useTenantDetail.ts` calls nonexistent
-credit/debit routes and the UI performs local FX with `parseFloat`. Replace it
-with preview, operator review, confirmation, and authoritative refetch. Do not
-report wallet success from local state.
+The tenant billing tab uses the server preview and confirmation routes with
+separate stable UUIDv7 intents. It displays input currencies from the safe
+catalogue, preserves every financial value as a decimal string, exposes the
+paginated ledger, and refetches authoritative wallet state after confirmation.
+There are no local credit/debit endpoints or browser-side FX calculations.
 
 ## Source map
 

@@ -1,119 +1,225 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useI18n } from "@/i18n/I18nContext";
-import { axiosClient } from "@/lib/api/axiosClient";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ui/ToastContext";
+import { useAuth } from "@/context/AuthContext";
+import { useI18n } from "@/i18n/I18nContext";
+import { getApiRequestOutcome } from "@/lib/api/axiosClient";
+import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+import { generateUUIDv7 } from "@/lib/utils/uuid";
+import {
+  isAmbiguousWriteOutcome,
+  shouldRotateWriteCommandKey,
+} from "@/shared/api/write-command-recovery";
+import {
+  normalizeApiError,
+  type NormalizedApiError,
+} from "@/shared/api/normalized-api-error";
+import { rolesApi } from "../api";
+import type { AdminRole } from "../contract";
 
-export interface AdminRole {
-  id: string;
-  name: string;
-  description?: string;
-  isSystem: boolean;
-  createdAt: string;
+const PAGE_SIZE = 20;
+
+interface DeleteIntent {
+  roleId: string;
+  idempotencyKey: string;
+  ambiguous: boolean;
 }
 
 export function useRoles() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const router = useRouter();
   const { lang, t } = useI18n();
+  const { user } = useAuth();
   const toast = useToast();
+  const canDelete = adminCanAll(user, ADMIN_RBAC_CRITICAL.ROLES_DELETE);
 
   const [search, setSearch] = useState("");
-  const [isSystemFilter, setIsSystemFilter] = useState("ALL");
-
-  const [roles, setRoles] = useState<AdminRole[]>([]);
+  const [isSystemFilter, setSystemFilter] = useState("ALL");
+  const [page, setPage] = useState(1);
+  const [rolesOnPage, setRolesOnPage] = useState<AdminRole[]>([]);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrev, setHasPrev] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [listError, setListError] = useState<NormalizedApiError | null>(null);
+  const [revision, setRevision] = useState(0);
+  const loadedQueryRef = useRef<{ page: number; isSystemFilter: string } | null>(
+    null,
+  );
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [activeModalRoleId, setActiveModalRoleId] = useState<string | null>(null);
-
-  const fetchRoles = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.set("limit", "100"); // Standard pagination
-      if (isSystemFilter !== "ALL") params.set("isSystem", isSystemFilter === "TRUE" ? "true" : "false");
-      // Note: simple search might be handled locally if API doesn't support generic text search,
-      // but if the API supports it, we'd add it here. For now, we will filter by search locally if needed,
-      // or assume the API handles `search` param. We'll pass it to API just in case.
-      if (search) params.set("search", search);
-
-      const res = await axiosClient.get(`/api/admin/core/v1/roles?${params.toString()}`);
-
-      const payloadData = res.data?.data;
-      const payloadMeta = res.data?.meta;
-
-      let fetchedRoles: AdminRole[] = [];
-      let total = 0;
-
-      if (Array.isArray(payloadData)) {
-        fetchedRoles = payloadData;
-        total = payloadMeta?.total ?? fetchedRoles.length;
-      } else if (payloadData?.items) {
-        fetchedRoles = payloadData.items;
-        total = payloadData.total ?? fetchedRoles.length;
-      }
-
-      // Fallback local search if API doesn't support 'search' param natively
-      if (search) {
-        fetchedRoles = fetchedRoles.filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
-      }
-
-      setRoles(fetchedRoles);
-      setTotalItems(total);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error) {
-      toast.error(
-        lang === "ar" ? "فشل جلب الأدوار" : "Failed to fetch roles",
-        lang === "ar" ? "تعذر تحميل قائمة الأدوار من الخادم." : "Could not load the roles list from the server."
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isSystemFilter, search, lang, toast]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<NormalizedApiError | null>(null);
+  const [isDeleteAmbiguous, setIsDeleteAmbiguous] = useState(false);
+  const deleteIntentRef = useRef<DeleteIntent | null>(null);
 
   useEffect(() => {
-    // Debounce for search
-    const timer = setTimeout(() => {
-      fetchRoles();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [fetchRoles]);
+    const controller = new AbortController();
+    let disposed = false;
+    const load = async () => {
+      const sameQuery =
+        loadedQueryRef.current?.page === page &&
+        loadedQueryRef.current.isSystemFilter === isSystemFilter;
+      setIsLoading(!sameQuery || rolesOnPage.length === 0);
+      setIsRefreshing(sameQuery && rolesOnPage.length > 0);
+      if (!sameQuery) {
+        setRolesOnPage([]);
+        setTotalItems(0);
+        setTotalPages(0);
+        setHasNext(false);
+        setHasPrev(false);
+      }
+      setListError(null);
+      try {
+        const result = await rolesApi.list(
+          {
+            page,
+            limit: PAGE_SIZE,
+            ...(isSystemFilter === "ALL"
+              ? {}
+              : { isSystem: isSystemFilter === "TRUE" }),
+          },
+          controller.signal,
+        );
+        if (disposed) return;
+        loadedQueryRef.current = { page, isSystemFilter };
+        setRolesOnPage(result.items);
+        setTotalItems(result.total);
+        setTotalPages(result.totalPages);
+        setHasNext(result.hasNext);
+        setHasPrev(result.hasPrev);
+      } catch (caught) {
+        if (disposed || isAbortError(caught)) return;
+        setListError(normalizeApiError(caught));
+      } finally {
+        if (!disposed) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
+      }
+    };
+    queueMicrotask(() => void load());
+    return () => {
+      disposed = true;
+      controller.abort();
+    };
+    // The previous page is intentionally retained while a refresh is pending.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSystemFilter, page, revision]);
 
-  const activeModalRole = roles.find((r) => r.id === activeModalRoleId);
+  const roles = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return query
+      ? rolesOnPage.filter((role) =>
+          role.name.toLocaleLowerCase().includes(query),
+        )
+      : rolesOnPage;
+  }, [rolesOnPage, search]);
 
-  const openDeleteModal = (id: string) => {
-    setActiveModalRoleId(id);
-    setIsDeleteModalOpen(true);
-  };
+  const setIsSystemFilter = useCallback((value: string) => {
+    setSystemFilter(value);
+    setPage(1);
+  }, []);
 
-  const closeDeleteModal = () => {
+  const refreshRoles = useCallback(() => {
+    setRevision((current) => current + 1);
+  }, []);
+
+  const activeModalRole = rolesOnPage.find(
+    (role) => role.id === activeModalRoleId,
+  );
+
+  const openDeleteModal = useCallback(
+    (roleId: string) => {
+      if (!canDelete) {
+        setDeleteError(forbiddenError());
+        return;
+      }
+      if (
+        deleteIntentRef.current?.ambiguous &&
+        deleteIntentRef.current.roleId !== roleId
+      ) {
+        return;
+      }
+      setDeleteError(null);
+      setIsDeleteAmbiguous(false);
+      setActiveModalRoleId(roleId);
+      setIsDeleteModalOpen(true);
+    },
+    [canDelete],
+  );
+
+  const closeDeleteModal = useCallback(() => {
+    if (isDeleting || deleteIntentRef.current?.ambiguous) return;
     setActiveModalRoleId(null);
     setIsDeleteModalOpen(false);
-  };
+    setDeleteError(null);
+    setIsDeleteAmbiguous(false);
+    deleteIntentRef.current = null;
+  }, [isDeleting]);
 
-  const confirmDelete = async () => {
-    if (!activeModalRoleId) return;
+  const confirmDelete = useCallback(async () => {
+    if (!activeModalRoleId || isDeleting) return;
+    if (!canDelete) {
+      setDeleteError(forbiddenError());
+      return;
+    }
+    const existing = deleteIntentRef.current;
+    const intent =
+      existing?.roleId === activeModalRoleId
+        ? existing
+        : {
+            roleId: activeModalRoleId,
+            idempotencyKey: generateUUIDv7(),
+            ambiguous: false,
+          };
+    deleteIntentRef.current = intent;
+    setIsDeleting(true);
+    setDeleteError(null);
     try {
-      await axiosClient.delete(`/api/admin/core/v1/roles/${activeModalRoleId}`);
+      await rolesApi.remove(intent.roleId, intent.idempotencyKey);
+      deleteIntentRef.current = null;
+      setIsDeleteAmbiguous(false);
+      setActiveModalRoleId(null);
+      setIsDeleteModalOpen(false);
       toast.success(
         lang === "ar" ? "تم الحذف" : "Deleted",
-        lang === "ar" ? "تم حذف الدور بنجاح." : "Role deleted successfully."
+        lang === "ar"
+          ? "تم حذف الدور بنجاح."
+          : "Role deleted successfully.",
       );
-      closeDeleteModal();
-      fetchRoles(); // Refresh the list
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+      if (rolesOnPage.length === 1 && page > 1) setPage(page - 1);
+      else refreshRoles();
+    } catch (caught) {
+      const error = normalizeApiError(caught);
+      if (retainDeleteIntent(caught, error)) {
+        deleteIntentRef.current = { ...intent, ambiguous: true };
+        setIsDeleteAmbiguous(true);
+      } else if (shouldRotateWriteCommandKey(error)) {
+        deleteIntentRef.current = null;
+        setIsDeleteAmbiguous(false);
+      }
+      setDeleteError(error);
       toast.error(
         lang === "ar" ? "فشل الحذف" : "Delete failed",
-        error?.response?.data?.message || (lang === "ar" ? "حدث خطأ أثناء حذف الدور." : "An error occurred while deleting the role.")
+        error.message,
       );
+    } finally {
+      setIsDeleting(false);
     }
-  };
+  }, [
+    activeModalRoleId,
+    canDelete,
+    isDeleting,
+    lang,
+    page,
+    refreshRoles,
+    rolesOnPage.length,
+    toast,
+  ]);
 
   return {
     t,
@@ -123,8 +229,17 @@ export function useRoles() {
     isSystemFilter,
     setIsSystemFilter,
     roles,
+    rolesOnPage,
     totalItems,
+    totalPages,
+    page,
+    pageSize: PAGE_SIZE,
+    hasNext,
+    hasPrev,
+    setPage,
     isLoading,
+    isRefreshing,
+    listError,
     isCreateModalOpen,
     setIsCreateModalOpen,
     isDeleteModalOpen,
@@ -132,6 +247,36 @@ export function useRoles() {
     closeDeleteModal,
     activeModalRole,
     confirmDelete,
-    refreshRoles: fetchRoles, // Exposing this in case the Create Modal needs to refresh the list
+    isDeleting,
+    deleteError,
+    isDeleteAmbiguous,
+    refreshRoles,
   };
 }
+
+function forbiddenError(): NormalizedApiError {
+  return {
+    isNormalized: true,
+    httpStatus: 403,
+    errorCode: "ADMIN_PERMISSION_DENIED",
+    errorCategory: "AUTHORIZATION",
+    message: "Both admin.roles.delete and admin.roles.critical are required.",
+  };
+}
+
+function retainDeleteIntent(
+  original: unknown,
+  error: NormalizedApiError,
+): boolean {
+  return (
+    getApiRequestOutcome(original) === "settled-before-session-change" ||
+    isAmbiguousWriteOutcome(error) ||
+    /(?:UPSTREAM|UNAVAILABLE|TIMEOUT)/u.test(error.errorCode)
+  );
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+export type { AdminRole } from "../contract";

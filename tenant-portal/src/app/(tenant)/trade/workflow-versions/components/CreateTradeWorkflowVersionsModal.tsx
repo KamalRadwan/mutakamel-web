@@ -33,7 +33,7 @@ export function CreateTradeWorkflowVersionsModal({ isOpen, onClose, onSubmit }: 
           <Select
             label="نوع المستند المستهدف"
             value={targetDocumentType}
-            onChange={(e) => setTargetDocumentType(e.target.value as any)}
+            onChange={(e) => setTargetDocumentType(e.target.value as typeof targetDocumentType)}
             options={[
               { label: "أوامر المبيعات (Sales Order)", value: "Sales Order" },
               { label: "أوامر الشراء (Purchase Order)", value: "Purchase Order" },

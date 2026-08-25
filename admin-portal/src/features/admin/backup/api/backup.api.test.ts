@@ -293,26 +293,13 @@ describe("backup Worker API", () => {
     );
   });
 
-  it("reads individual backup and restore runs from their owning families", async () => {
-    getMock
-      .mockResolvedValueOnce(workerResponse({ id: RUN_ID, status: "RUNNING" }))
-      .mockResolvedValueOnce(workerResponse({ id: RUN_ID, status: "VERIFIED" }))
-      .mockResolvedValueOnce(workerResponse([{ id: RUN_ID }]));
+  it("serializes restore-list filters against the owning family", async () => {
+    getMock.mockResolvedValueOnce(workerResponse([{ id: RUN_ID }]));
 
-    await backupApi.getRun(RUN_ID);
-    await backupApi.getRestore(RUN_ID);
     await backupApi.listRestores({ tenantId: TENANT_ID, status: "VERIFIED" });
 
     expect(getMock).toHaveBeenNthCalledWith(
       1,
-      `/api/admin/worker/v1/backups/runs/${RUN_ID}`,
-    );
-    expect(getMock).toHaveBeenNthCalledWith(
-      2,
-      `/api/admin/worker/v1/restores/runs/${RUN_ID}`,
-    );
-    expect(getMock).toHaveBeenNthCalledWith(
-      3,
       `/api/admin/worker/v1/restores/runs?tenantId=${TENANT_ID}&status=VERIFIED`,
     );
   });

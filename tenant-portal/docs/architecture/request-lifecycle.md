@@ -1,16 +1,19 @@
 # HTTP Request Lifecycle
 
-Status: **Verified current backend; frontend target documented**
+Status: **Verified current backend and split-portal transport; authenticated runtime proof remains open**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 ## Protected request
 
-1. A feature calls the shared Tenant Portal API client with a canonical path.
-2. The client binds the request to the current tenant-session generation.
-3. The same-origin Next API boundary forwards the method, query, body, accepted
-   headers, original host, and protocol to API Gateway.
-4. It strips browser-supplied internal and forwarding headers.
+1. A feature calls the shared Tenant Portal API client with a canonical path
+   and `credentials: include`.
+2. The browser cookie jar automatically attaches the Secure HttpOnly access
+   and session cookies. For an unsafe method, the client also copies the
+   decoded readable CSRF cookie into `X-CSRF-Token`.
+3. Current local Caddy ingress sends same-origin `/api` and `/api/*` directly to
+   API Gateway on port `9000`; there is no current Next API proxy hop.
+4. Gateway strips browser-supplied internal and forwarding headers.
 5. Gateway parses `/api/tenant/{app}/v1/*` and resolves a typed route contract.
 6. Gateway verifies that the JWT audience is `tenant`.
 7. Gateway rejects a token when the Redis session watermark proves it stale;
@@ -23,8 +26,8 @@ Last verified: **2026-07-25**
     database.
 11. The controller validates DTOs and delegates to domain services.
 12. The response/error is normalized and returned with a correlation ID.
-13. The frontend discards the response if its auth generation is no longer
-    current.
+13. The frontend discards a response that is no longer bound to the initiating
+    `sid`/coordination generation.
 
 ## Public request
 
@@ -87,8 +90,9 @@ errors without dropping stable codes, correlation IDs, or relevant headers.
 ## Source evidence
 
 ```text
-../backend/mutakamel-apps/mutakamel-web-app/src/shared/api/gateway-route-handler.ts
-../backend/mutakamel-apps/mutakamel-web-app/src/shared/api/tenant-api-client.ts
+src/lib/api/axiosClient.ts
+src/lib/auth/sessionCoordinator.ts
+src/shared/api/tenant-api-client.ts
 ../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/
 ../backend/mutakamel-apps/api-gateway-app/src/auth/
 ../backend/mutakamel-apps/core-app/src/common/common.module.ts
@@ -96,3 +100,8 @@ errors without dropping stable codes, correlation IDs, or relevant headers.
 ../backend/mutakamel-apps/trade-app/src/common/common.module.ts
 ../backend/mutakamel-apps/trade-app/src/common/trade-response.interceptor.ts
 ```
+
+Earlier documentation referenced a consolidated Next proxy under
+`../backend/mutakamel-apps/mutakamel-web-app`. That workspace is absent from
+the current checkout; those paths are dated historical context and are not the
+current request topology.

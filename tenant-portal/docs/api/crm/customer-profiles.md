@@ -1,27 +1,29 @@
 # CRM customer profiles
 
 > Status: `verified-current`
-> Last source verification: `2026-07-25`
+> Last source verification: `2026-08-25`
 > Owner: CRM (`crm-app`)
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
 > Tenant Portal replacement: `not-started`
-> Legacy frontend: `live-partial`
-> Authorship: hand-written from current source
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
-Customer profiles represent individual or corporate prospects/customers in one branch. The Gateway exposes five of the controller's seven routes.
+Customer profiles represent individual or corporate prospects/customers in one branch. The Gateway exposes all seven controller routes.
 
 ## Endpoint catalogue
 
 | Method | Canonical browser path | Controller/upstream path | Permission | Success |
 |---|---|---|---|---|
+| `GET` | `/api/tenant/crm/v1/customer-profiles/capabilities` | `/api/v1/crm/customer-profiles/capabilities` | branch membership; returns effective create/update/delete scopes | `200`, capability object |
 | `POST` | `/api/tenant/crm/v1/customer-profiles` | `/api/v1/crm/customer-profiles` | `crm.customer_profiles.create.{own|team|all}` | `201`, profile |
 | `GET` | `/api/tenant/crm/v1/customer-profiles` | `/api/v1/crm/customer-profiles` | `crm.customer_profiles.read.{own|team|all}` | `200`, page |
+| `POST` | `/api/tenant/crm/v1/customer-profiles/:id/contacts` | `/api/v1/crm/customer-profiles/:id/contacts` | `crm.customer_profiles.update.{own|team|all}` plus record branch access | `201`, linked person identity |
 | `GET` | `/api/tenant/crm/v1/customer-profiles/:id` | `/api/v1/crm/customer-profiles/:id` | `crm.customer_profiles.read.{own|team|all}` | `200`, profile |
 | `PATCH` | `/api/tenant/crm/v1/customer-profiles/:id` | `/api/v1/crm/customer-profiles/:id` | `crm.customer_profiles.update.{own|team|all}` | `200`, profile |
 | `DELETE` | `/api/tenant/crm/v1/customer-profiles/:id` | `/api/v1/crm/customer-profiles/:id` | `crm.customer_profiles.delete.{own|team|all}` | `204` |
 
-`GET /customer-profiles/capabilities` and `POST /customer-profiles/:id/contacts` exist in the controller but have no Gateway route. They are not usable tenant-browser endpoints. The legacy frontend calls them; this is a known replacement blocker.
+`GET /customer-profiles/capabilities` requires UUIDv7 `branchId` and returns nullable action scopes. Treat a null action as unavailable. `POST /customer-profiles/:id/contacts` accepts the contact-person shape below, creates and links the person transactionally, and must not be replayed automatically after an ambiguous response.
 
 ## Wire enums
 

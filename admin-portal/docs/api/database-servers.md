@@ -2,12 +2,17 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-06**
+Last source verification: **2026-08-25**
 
 This is the browser-facing Database Servers V1 contract. API Gateway is the
 browser authority; Core owns registration, PostgreSQL role administration,
 credential encryption, activation readiness, reconciliation, and audit.
 Worker is the only automatic-rotation scheduler.
+
+`POST /database-servers/check-connectivity` is an optional operator diagnostic,
+not a registration prerequisite. `POST /database-servers` always performs the
+authoritative connection, TLS, PostgreSQL-version, and security-administrator
+posture validation itself before it persists or bootstraps the server.
 
 Registration supports **PostgreSQL major version 16 only**
 (`server_version_num >= 160000 && < 170000`). PostgreSQL 15 and 17+ fail the
@@ -109,7 +114,7 @@ Permission arrays use ALL semantics.
 | Method and browser path | Permissions | Success | Body |
 | --- | --- | ---: | --- |
 | `POST /database-servers` | `admin.database_servers.create` | 201 | `CreateDatabaseServerDto` |
-| `POST /database-servers/check-connectivity` | create | 200 | `CheckDatabaseServerConnectivityDto` |
+| `POST /database-servers/check-connectivity` | create | 200 | optional diagnostic `CheckDatabaseServerConnectivityDto` |
 | `POST /database-servers/:id/credential-bootstrap/retry` | create + critical | 200 | `{ reason }` |
 | `GET /database-servers/:id/system-principals` | read | 200 | none |
 | `PATCH /database-servers/:id/system-principals/:purpose/rotation-policy` | update + critical | 200 | system rotation policy DTO |
@@ -317,10 +322,12 @@ without duplicating Backup lifecycle controls.
 
 ## Registration example
 
-Preflight request:
+Optional diagnostic request:
 
 ```http
 POST /api/admin/core/v1/database-servers/check-connectivity
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019fc7e0-bcef-727f-90cb-ff6028ed3306
 Content-Type: application/json
 
@@ -355,21 +362,58 @@ Success:
 }
 ```
 
-Create request uses the same connection fields plus `name`, `maxTenants`, and
-optional location/pool values. Core first validates the supplied security-admin
-connection and exact PostgreSQL role posture above, then persists the DRAFT with two pending system bindings and all
-eligible Application bindings before attempting generated-role bootstrap. The
-201 response is always secret-free. If a generated bootstrap operation fails,
-the server remains DRAFT and its binding states identify the safe
-retry/reconciliation path.
+Create uses the same connection fields plus `name`, `maxTenants`, and optional
+location/pool values. It does not consume or trust the optional diagnostic
+result: Core reconnects and repeats the exact PostgreSQL 16, TLS, and role
+posture checks authoritatively. Only after those checks does it persist the
+DRAFT with two pending system bindings and the current desired Application
+bindings, then attempt generated-role bootstrap. The 201 response is always
+secret-free. If a generated bootstrap operation fails, the server remains
+DRAFT and its binding states identify the safe retry/reconciliation path.
 
-Only `ACTIVE`, database-backed Applications whose policy enables new-server
-binding are eligible. If no Application is active yet, registration still
-returns the durable DRAFT after completing the two system principals. The
-detail screen explains that blocker and links authorized operators to
-Application Catalogue. After the Applications are activated, the generic
-bootstrap retry idempotently backfills the missing bindings before generating
-their credentials; it never weakens the lifecycle eligibility rule.
+The desired Application set follows each Application's deployment profile.
+`PREWARM` and `REQUIRED` Applications are automatically enrolled when eligible;
+`ON_DEMAND` is added only by an explicit bounded bootstrap. A desired set of
+zero Applications is valid: after the two system principals are ready, the
+Application bootstrap phase returns `READY` with an empty result. The empty
+catalogue is therefore not an activation blocker and does not create a futile
+retry step. Later fleet rollout or one-Application recovery uses the
+Application lifecycle/rollout and single-Application bootstrap contracts.
+
+### Admin Portal register-and-activate intent
+
+The UI presents `Register and activate` when the actor has
+`admin.database_servers.update` plus `admin.database_servers.critical`, while
+preserving two independently recoverable backend commands:
+
+1. `POST /database-servers` owns the registration UUIDv7 key, performs the
+   authoritative validation, persists the DRAFT, and runs generated-access
+   bootstrap.
+2. Only when the returned `credentialBootstrap.status` is `READY`,
+   `POST /database-servers/:id/activate` owns a separate UUIDv7 key and performs
+   the final fail-closed readiness/fleet transition.
+
+This is one operator setup intent, not an atomic two-command transaction. A
+definitive activation `4xx` retires only the activation key and leaves the
+already-created server safely in `DRAFT`. The UI redirects to detail when read
+is allowed. Without read permission, an actor who can activate remains in the
+wizard and can retry activation only after resolving the reported blocker; the
+definitively failed key is retired and the later unchanged retry receives its
+own stable activation intent. An in-flight, network, or `5xx` activation
+outcome instead retains the exact server ID and activation key. Both paths
+clear the write-only security-admin credential, lock registration fields, and
+cannot issue another create or resend credentials.
+
+An actor with create permission but without the update+critical pair stops
+after the DRAFT registration. If bootstrap is not `READY`, activation is not
+attempted. A read-authorized actor recovers from detail. A no-read actor holding
+the initial-bootstrap create+critical pair remains in the wizard and calls only
+`POST /database-servers/:id/credential-bootstrap/retry` with a separate stable
+UUIDv7 intent; an ambiguous retry keeps that bootstrap key, and no retry
+recreates the server or resends the cleared security-administrator credential.
+A no-read actor without authority for the remaining recovery command returns
+to `/dashboard`, as does a successful no-read flow. The registration page never
+issues a list GET.
 
 ## System principal commands
 
@@ -377,6 +421,8 @@ Retry all incomplete initial bindings:
 
 ```http
 POST /api/admin/core/v1/database-servers/:id/credential-bootstrap/retry
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: <uuidv7>
 Content-Type: application/json
 
@@ -387,6 +433,8 @@ Manual system rotation:
 
 ```http
 POST /api/admin/core/v1/database-servers/:id/system-principals/provisioning/credential/regenerate
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: <uuidv7>
 Content-Type: application/json
 
@@ -440,12 +488,14 @@ READY/DEFERRED -> ROTATING -> READY
                          -> DEGRADED
 ```
 
-Activation fails closed unless both system principals and every required
-Application binding are `READY`. Metadata, connection, and lifecycle changes
-are blocked during mutating credential states. A non-ambiguous pre-mutation
-rotation failure keeps the verified old credential and becomes `DEFERRED`; an
-ambiguous PostgreSQL mutation retains the exact candidate and becomes
-`RECONCILING`.
+Activation fails closed unless both system principals and every desired
+Application binding are `READY`; zero desired Application bindings is a valid
+ready set. Metadata, connection, and lifecycle changes are blocked during
+mutating credential states. A non-ambiguous pre-mutation rotation failure keeps
+the verified old credential and becomes `DEFERRED`; an ambiguous PostgreSQL
+mutation retains the exact candidate and becomes `RECONCILING`. Only `ACTIVE`
+may enter `DRAINING`; an `OFFLINE` server must be activated first so the same
+readiness and fleet checks run. Repeating drain on `DRAINING` is idempotent.
 
 ## Error examples and UI behavior
 
@@ -486,6 +536,8 @@ Required behavior:
 - `401`: use the coordinated shared refresh path.
 - `403`: show a persistent forbidden state, not an empty state.
 - `409` stale revision/state: refetch before creating a new intent.
+- `409 DB_SERVER_DRAIN_REQUIRES_ACTIVE`: activate an `OFFLINE` server before
+  draining it; do not bypass the activation readiness check.
 - `409 GW.IDEM.IN.FLIGHT`: preserve the exact key and show processing.
 - `422` connectivity/TLS/posture failure: keep write-only values in active
   component memory and display the safe message/correlation ID.
@@ -496,23 +548,51 @@ Required behavior:
   submission so a cached conflict is not replayed.
   `GW.IDEM.IN_FLIGHT` is not definitive and retains the exact key. Network and
   `5xx` outcomes also retain the original key because acceptance is unknown.
+- After registration succeeds, activation recovery is isolated from create:
+  a definitive activation `4xx` leaves the DRAFT and retires its activation
+  key; a no-read actor with activation authority remains in the wizard and may
+  start an activation-only retry after resolving the blocker.
+  `GW.IDEM.IN_FLIGHT`, network, and `5xx` retain the exact activation key and
+  server ID. The browser must never reuse or replay the registration body or
+  security-administrator credentials to resolve an activation outcome.
+- If the create receipt reports bootstrap below `READY`, a no-read actor with
+  create+critical authority retains the server ID and uses the dedicated
+  bootstrap-retry command with its own stable intent. The browser never retries
+  create; ambiguous bootstrap outcomes retain the exact bootstrap key.
 
 ## Admin Portal implementation
 
 The active source:
 
 - accepts only security-administrator credentials during registration;
+- mounts the registration-only hook without issuing a Database Server list
+  request;
+- presents connectivity testing as an optional diagnostic with an independent
+  UUIDv7 intent, while create always repeats all connectivity and posture checks
+  authoritatively;
+- presents `Register and activate` as one setup action for actors with
+  update+critical, while create and activate retain independent UUIDv7 intent
+  keys and backend receipts;
 - explains and enforces the exact `LOGIN + CREATEDB + CREATEROLE` posture,
   forbidden elevated attributes, `ADMIN`-only generated-role membership
   boundary, generated principals, and absence of `pg_read_all_data`;
 - supports all four TLS modes and active-memory certificate upload fields;
-- warns before registration that only already-`ACTIVE` eligible Applications
-  receive bindings while preserving the safe empty-DRAFT recovery path;
-- redirects the successful create response to the DRAFT detail screen;
+- explains that an empty Application catalogue is valid and its Application
+  bootstrap phase completes as a `READY` no-op;
+- follows a READY create receipt with activation for full-authority actors;
+  definitive activation failure preserves the DRAFT and sends read-authorized
+  actors to detail, while a no-read actor with activation authority stays in
+  the wizard for activation-only retry after blocker resolution; an ambiguous
+  outcome keeps the exact activation key;
+- keeps a no-read actor with initial-bootstrap create+critical authority in the
+  wizard when bootstrap is not READY, using a distinct stable bootstrap-only
+  retry intent; no recovery path recreates the server or resends credentials;
+- leaves create-only actors at the durable DRAFT and routes only no-read actors
+  unable to perform the remaining recovery command to `/dashboard`; successful
+  no-read flows also return there, without loading the list;
 - renders a unified credential-assembly rail and activation blocker;
-- identifies the zero-active-Application blocker, disables a futile retry, and
-  links authorized operators to Application Catalogue before retry backfills
-  the newly eligible bindings;
+- does not invent a zero-active-Application blocker or offer a futile retry for
+  an already-ready empty desired set;
 - renders only the fixed provisioning principal with its revision,
   state/failure evidence, maintenance-aware hour policy, manual rotation, and
   reconciliation; Backup owns the equivalent `mutakamel_backup` UI;

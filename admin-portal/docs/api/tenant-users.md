@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-11**
 
 This is the frontend contract for the tenant **Users / Access** area in Admin
 Portal. It covers the 18 Gateway routes that read or mutate tenant users and
@@ -337,8 +337,9 @@ interface AdminUpdateTenantUserDto {
 
 Email and owner status are immutable. Core validates the complete resulting
 organization placement, active ancestry, manager activity, and manager-cycle
-safety. A successful update advances the user's session version and revokes
-existing refresh tokens.
+safety. A changed profile advances `profileVersion`; an organization-placement
+change also advances `authorizationVersion`. Existing reusable Auth Sessions
+remain active, but their stale access JWTs must refresh and reload `/auth/me`.
 
 ## Password and invitation actions
 
@@ -381,8 +382,9 @@ interface AdminTenantUserChangePasswordDto {
 Each string must be 12..128 characters and contain at least one uppercase
 letter, lowercase letter, number, and symbol. They must match. Do not offer
 this action for owners, `INVITED`, `DEACTIVATED`, or deleted users. Success
-returns `AdminTenantUserView`, clears the lock/failure counter, revokes refresh
-tokens, and invalidates pending password-reset tokens.
+returns `AdminTenantUserView`, clears the lock/failure counter, advances
+`securityEpoch`, ends all of that user's Auth Sessions, and invalidates pending
+password-reset tokens.
 
 ## WebPhone
 
@@ -510,28 +512,20 @@ Also handle the shared Gateway validation, authorization, idempotency, and
 rate-limit errors described in the tenant
 [Error catalogue](tenants.md#error-catalogue).
 
-## Current Admin Portal gaps
+## Current Admin Portal integration
 
-The current tenant detail/access UI is not wired to this contract. A frontend
-implementation must remove these assumptions:
+The tenant access workspace implements all 18 routes in this contract. It
+loads no tenant-database resource before tenant status is `ACTIVE` or
+`SUSPENDED`, and it issues no read without `admin.tenant_users.read`. Directory
+and summary share exact filters while roles, branches, departments, and teams
+retain independent permission/error states.
 
-- Mock user ids and mock access catalogue ids are not valid API identifiers.
-- `DELETED` is currently treated like a user status; it must use
-  `visibility` and `deletedAt`.
-- Roles are represented as `string[]`; the API uses structured
-  `roleAssignments`.
-- Department and WebPhone flags are flattened in local UI types; the API nests
-  them under `organization` and `webphone`.
-- KPI values are calculated from local rows; use `/users/summary`.
-- Reset/resend/change-password/lifecycle/role/delete/restore actions currently
-  mutate local state only.
-- The UI does not preserve one UUIDv7 idempotency key across exact mutation
-  retries.
-- Owner protection and tenant database readiness are not consistently applied.
-- The invite form does not load branch/department/team/role catalogues from
-  the tenant database.
-- WebPhone password masking/rotation and partial email-delivery failure are not
-  represented.
+The UI uses structured organization, role-assignment, manager, and WebPhone
+projections. Invite, edit, reset/resend/change-password, WebPhone, role,
+lifecycle, delete, and restore commands use their canonical `POST`/`PATCH`/
+`DELETE` verbs and stable caller-owned UUIDv7 identities. Deleted visibility,
+owner protection, cascade confirmations, write-only password handling, and
+partial email-delivery outcomes are represented explicitly.
 
 ## Frontend implementation checklist
 

@@ -7,23 +7,42 @@ import { CreateDatabaseServerWizard } from "./CreateDatabaseServerWizard";
 const mocks = vi.hoisted(() => ({
   checkConnectivity: vi.fn(),
   createServer: vi.fn(),
+  activateServer: vi.fn(),
+  retryBootstrap: vi.fn(),
   push: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastWarning: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
 }));
-vi.mock("../hooks/useDatabaseServers", () => ({
-  useDatabaseServers: () => ({
+vi.mock("../hooks/useDatabaseServerRegistration", () => ({
+  useDatabaseServerRegistration: () => ({
     createServer: mocks.createServer,
     checkConnectivity: mocks.checkConnectivity,
+    activateServer: mocks.activateServer,
+    retryBootstrap: mocks.retryBootstrap,
   }),
+}));
+vi.mock("@/components/ui/ToastContext", () => ({
+  useToast: () => ({
+    success: mocks.toastSuccess,
+    warning: mocks.toastWarning,
+  }),
+}));
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({ lang: "en", dir: "ltr" }),
 }));
 
 beforeEach(() => {
   mocks.checkConnectivity.mockReset();
   mocks.createServer.mockReset();
+  mocks.activateServer.mockReset();
+  mocks.retryBootstrap.mockReset();
   mocks.push.mockReset();
+  mocks.toastSuccess.mockReset();
+  mocks.toastWarning.mockReset();
   mocks.checkConnectivity.mockResolvedValue({
     connected: true,
     message: "connected",
@@ -100,10 +119,16 @@ describe("CreateDatabaseServerWizard", () => {
       target: { value: "mutakamel_security_admin" },
     });
     fireEvent.change(password, { target: { value: "secret" } });
-    fireEvent.click(screen.getByRole("button", { name: "Test Connectivity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Test (Optional)" }));
 
-    expect(await screen.findByText("Connectivity Verified")).not.toBeNull();
-    expect(document.body.textContent).toContain("ACTIVE + PUBLISHED");
+    expect(
+      await screen.findByText(
+        "Optional connectivity diagnostic passed. Register still performs the authoritative validation.",
+      ),
+    ).not.toBeNull();
+    expect(document.body.textContent).toContain(
+      "An empty Application catalogue is valid",
+    );
     expect(mocks.checkConnectivity).toHaveBeenCalledTimes(1);
   });
 
@@ -126,7 +151,7 @@ describe("CreateDatabaseServerWizard", () => {
 
     render(<CreateDatabaseServerWizard />);
     enterValidConnectionAndCredentials(secret);
-    fireEvent.click(screen.getByRole("button", { name: "Test Connectivity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Test (Optional)" }));
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain(
@@ -160,10 +185,14 @@ describe("CreateDatabaseServerWizard", () => {
 
     render(<CreateDatabaseServerWizard />);
     enterValidConnectionAndCredentials(secret);
-    fireEvent.click(screen.getByRole("button", { name: "Test Connectivity" }));
-    expect(await screen.findByText("Connectivity Verified")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Test (Optional)" }));
+    expect(
+      await screen.findByText(
+        "Optional connectivity diagnostic passed. Register still performs the authoritative validation.",
+      ),
+    ).not.toBeNull();
     fireEvent.click(
-      screen.getByRole("button", { name: "Create & Generate Access" }),
+      screen.getByRole("button", { name: "Register Server" }),
     );
 
     const alert = await screen.findByRole("alert");

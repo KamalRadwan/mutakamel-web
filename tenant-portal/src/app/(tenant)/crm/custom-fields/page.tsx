@@ -1,112 +1,196 @@
 "use client";
 
-import Link from "next/link";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { TableToolbar } from "@/components/ui/TableToolbar";
-import { Table } from "@/components/ui/Table";
+import { FormInput, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, FormInput, Layers, Hash } from "lucide-react";
-import { useCrmCustomFields, CustomFieldItem } from "./hooks/useCrmCustomFields";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Table } from "@/components/ui/Table";
+import { TableToolbar } from "@/components/ui/TableToolbar";
 import { CreateCrmCustomFieldsModal } from "./components/CreateCrmCustomFieldsModal";
-import { DeleteCrmCustomFieldsConfirmModal } from "./components/DeleteCrmCustomFieldsConfirmModal";
-import { useI18n } from "@/i18n/I18nContext";
+import {
+  type CustomFieldItem,
+  useCrmCustomFields,
+} from "./hooks/useCrmCustomFields";
 
 export default function CrmCustomFieldsPage() {
-//     const { t } = useI18n();
   const {
     t,
+    lang,
     items,
     searchQuery,
     setSearchQuery,
+    isLoading,
+    isCreating,
+    error,
+    createError,
+    canManage,
     isCreateOpen,
-    setIsCreateOpen,
-    selectedForDelete,
-    setSelectedForDelete,
+    openCreate,
+    closeCreate,
     handleCreate,
-    handleDelete,
+    reload,
   } = useCrmCustomFields();
+
+  const copy =
+    lang === "ar"
+      ? {
+          subtitle:
+            "تعريفات الحقول المخصصة الحالية من CRM. الإنشاء هنا يقتصر على الأنواع التي لا تحتاج قائمة خيارات.",
+          reload: "إعادة التحميل",
+          search: "ابحث بالاسم أو المفتاح أو نوع السجل...",
+          arabicName: "الاسم بالعربية",
+          englishName: "الاسم بالإنجليزية",
+          owner: "نوع السجل",
+          fieldType: "نوع الحقل",
+          properties: "الخصائص",
+          searchable: "قابل للبحث",
+          options: "خيارات",
+          active: "نشط",
+          inactive: "غير نشط",
+          loading: "جارٍ تحميل تعريفات الحقول المخصصة...",
+          empty: "لا توجد تعريفات مطابقة.",
+        }
+      : {
+          subtitle:
+            "Current CRM custom-field definitions. Creation is limited to field types that do not require option configuration.",
+          reload: "Reload",
+          search: "Search by name, key, or record type...",
+          arabicName: "Arabic name",
+          englishName: "English name",
+          owner: "Record type",
+          fieldType: "Field type",
+          properties: "Properties",
+          searchable: "Searchable",
+          options: "options",
+          active: "Active",
+          inactive: "Inactive",
+          loading: "Loading custom-field definitions...",
+          empty: "No matching definitions.",
+        };
 
   const columns = [
     {
-      header: t.crm.fieldTitle,
+      header: copy.arabicName,
       cell: (item: CustomFieldItem) => (
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400">
-            <FormInput className="w-4 h-4" />
+          <div className="rounded-xl bg-violet-50 p-2 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400">
+            <FormInput className="size-4" aria-hidden="true" />
           </div>
           <div>
-            <p className="font-bold text-slate-900 dark:text-slate-100">{item.label}</p>
-            <p className="text-[11px] font-mono text-slate-400">{item.key}</p>
+            <p
+              className="font-bold text-slate-900 dark:text-slate-100"
+              dir="rtl"
+            >
+              {item.nameAr}
+            </p>
+            <code className="text-[11px] text-slate-500 dark:text-slate-400">
+              {item.fieldKey}
+            </code>
           </div>
         </div>
       ),
     },
     {
-      header: t.crm.targetEntity,
+      header: copy.englishName,
+      cell: (item: CustomFieldItem) => <span dir="ltr">{item.nameEn}</span>,
+    },
+    {
+      header: copy.owner,
       cell: (item: CustomFieldItem) => (
-        <Badge variant="info">{item.targetEntity.toUpperCase()}</Badge>
+        <Badge variant="info">{item.ownerType.replaceAll("_", " ")}</Badge>
       ),
     },
     {
-      header: t.crm.fieldType,
+      header: copy.fieldType,
       cell: (item: CustomFieldItem) => (
-        <Badge variant="neutral">{item.fieldType}</Badge>
+        <Badge variant="neutral">{item.type.replaceAll("_", " ")}</Badge>
       ),
     },
     {
-      header: t.crm.compulsory,
+      header: copy.properties,
       cell: (item: CustomFieldItem) => (
-        <Badge variant={item.isRequired ? "danger" : "neutral"}>
-          {item.isRequired ? t.crm.yesMandatory : t.crm.optional}
-        </Badge>
-      ),
-    },
-    {
-      header: t.crm.procedures,
-      cell: (item: CustomFieldItem) => (
-        <div className="flex items-center gap-1.5">
-          <Link href={`/crm/custom-fields/${item.id}/general`}>
-            <Button variant="ghost" size="sm">
-              <Eye className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedForDelete(item)}>
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
+        <div className="flex flex-wrap gap-1.5">
+          <Badge variant={item.isActive ? "success" : "neutral"}>
+            {item.isActive ? copy.active : copy.inactive}
+          </Badge>
+          {item.isSearchable && (
+            <Badge variant="warning">{copy.searchable}</Badge>
+          )}
+          {item.optionsCount > 0 && (
+            <Badge variant="neutral">
+              {item.optionsCount} {copy.options}
+            </Badge>
+          )}
         </div>
       ),
     },
   ];
+  const canCreate = canManage && !isLoading && !error;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={t.crm.cRMFormCustomFieldsCustom}
-        subtitle={t.crm.expandAndCreateDynamicFiel}
-        actionLabel={t.crm.addACustomField}
-        onAction={() => setIsCreateOpen(true)}
-      />
+        subtitle={copy.subtitle}
+        actionLabel={canCreate ? t.crm.addACustomField : undefined}
+        onAction={canCreate ? openCreate : undefined}
+      >
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => void reload()}
+          disabled={isLoading}
+        >
+          <RefreshCw
+            className={`size-4 ${isLoading ? "animate-spin" : ""}`}
+            aria-hidden="true"
+          />
+          {copy.reload}
+        </Button>
+      </PageHeader>
+
+      {error && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+        >
+          {error}
+        </div>
+      )}
+
+      {createError && !isCreateOpen ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          {createError}
+        </div>
+      ) : null}
 
       <TableToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder={t.crm.searchByTitleCodeKeyOr}
+        placeholder={copy.search}
       />
 
-      <Table columns={columns} data={items} />
+      {isLoading ? (
+        <p
+          role="status"
+          className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900"
+        >
+          {copy.loading}
+        </p>
+      ) : (
+        <Table columns={columns} data={items} emptyText={copy.empty} />
+      )}
 
       <CreateCrmCustomFieldsModal
+        key={isCreateOpen ? "open" : "closed"}
         isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
+        isSubmitting={isCreating}
+        error={createError}
+        onClose={closeCreate}
         onSubmit={handleCreate}
-      />
-
-      <DeleteCrmCustomFieldsConfirmModal
-        isOpen={!!selectedForDelete}
-        item={selectedForDelete}
-        onClose={() => setSelectedForDelete(null)}
-        onConfirm={handleDelete}
       />
     </div>
   );

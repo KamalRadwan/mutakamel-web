@@ -4,6 +4,7 @@ import {
   ApplicationListQueryDto,
   ApplicationView,
   CreateApplicationDto,
+  OnboardApplicationDto,
   ApplicationMutationReceipt,
   UpdateApplicationDto,
   UpdateApplicationDatabasePolicyDto,
@@ -117,6 +118,15 @@ export const applicationsApi = {
   updateDatabasePolicy: async (applicationKey: string, data: UpdateApplicationDatabasePolicyDto, idempotencyKey: string) => {
     const response = await axiosClient.patch<SuccessResponse<ApplicationMutationReceipt>>(
       `${BASE_URL}/${encodeURIComponent(applicationKey)}/database-policy`,
+      data,
+      { headers: { "x-idempotency-key": idempotencyKey } }
+    );
+    return extractCoreData(response);
+  },
+
+  onboard: async (data: OnboardApplicationDto, idempotencyKey: string) => {
+    const response = await axiosClient.post<SuccessResponse<ApplicationMutationReceipt>>(
+      `${BASE_URL}/onboarding`,
       data,
       { headers: { "x-idempotency-key": idempotencyKey } }
     );

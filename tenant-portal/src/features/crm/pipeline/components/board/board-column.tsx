@@ -1,9 +1,13 @@
 "use client";
 
 import { Droppable } from "@hello-pangea/dnd";
-import { ChevronRight, ChevronLeft, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronRight, ChevronLeft, Loader2 } from "lucide-react";
 import { useState } from "react";
-import type { OpportunityBoardLane, OpportunityCardRecord } from "../../models/pipeline-types";
+import {
+  formatCurrencyAmount,
+  type OpportunityBoardLane,
+  type OpportunityCardRecord,
+} from "../../models/pipeline-types";
 import { OpportunityCard } from "./opportunity-card";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -12,11 +16,21 @@ import { useI18n } from "@/i18n/I18nContext";
 interface BoardColumnProps {
   lane: OpportunityBoardLane;
   updateImportance: (cardId: string, importance: number) => void;
-  onOpenActivitiesModal?: (item: OpportunityCardRecord) => void;
+  canUpdate: (opportunity: OpportunityCardRecord) => boolean;
+  isBusy: boolean;
+  loadMoreStage: (stageId: string) => void | Promise<void>;
+  isLoadingMore: boolean;
 }
 
-export function BoardColumn({ lane, updateImportance, onOpenActivitiesModal }: BoardColumnProps) {
-    const { t } = useI18n();
+export function BoardColumn({
+  lane,
+  updateImportance,
+  canUpdate,
+  isBusy,
+  loadMoreStage,
+  isLoadingMore,
+}: BoardColumnProps) {
+  const { t, lang } = useI18n();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { stage, items, summary, activitySummary } = lane;
 
@@ -55,7 +69,7 @@ export function BoardColumn({ lane, updateImportance, onOpenActivitiesModal }: B
         <div className="flex-1 w-full flex flex-col items-center py-6 gap-4">
           <div className={cn("w-3 h-3 rounded-full", getStageColor(stage.colorTheme))} />
           <div className="writing-vertical-rl text-sm font-semibold text-gray-700 dark:text-gray-300 transform rotate-90">
-            {stage.nameAr}
+            {lang === "ar" ? stage.nameAr : stage.nameEn}
           </div>
           <div className="mt-4 px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded-full text-xs font-bold text-gray-700 dark:text-gray-300">
             {summary.totalCount}
@@ -72,15 +86,14 @@ export function BoardColumn({ lane, updateImportance, onOpenActivitiesModal }: B
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <div className={cn("w-2.5 h-2.5 rounded-full", getStageColor(stage.colorTheme))} />
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100">{stage.nameAr}</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+              {lang === "ar" ? stage.nameAr : stage.nameEn}
+            </h3>
             <span className="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-800 text-xs font-medium text-gray-600 dark:text-gray-400">
               {summary.totalCount}
             </span>
           </div>
           <div className="flex items-center">
-            <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
             <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" onClick={() => setIsCollapsed(true)}>
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -95,8 +108,10 @@ export function BoardColumn({ lane, updateImportance, onOpenActivitiesModal }: B
           {activitySummary.noOpenCount > 0 && <div className="bg-gray-300 dark:bg-gray-700 h-full" style={{ width: `${(activitySummary.noOpenCount / summary.totalCount) * 100}%` }} title={t.crm.thereIsNoActivity} />}
         </div>
         
-        <div className="text-xs text-gray-500 mt-2 font-medium">
-          {new Intl.NumberFormat("en-US", { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(summary.amountsByCurrency["SAR"] || 0)}
+        <div className="mt-2 flex flex-wrap gap-x-2 text-xs font-medium text-gray-500">
+          {Object.entries(summary.amountsByCurrency).map(([currency, amount]) => (
+            <span key={currency}>{formatCurrencyAmount(amount, currency)}</span>
+          ))}
         </div>
       </div>
 
@@ -111,16 +126,36 @@ export function BoardColumn({ lane, updateImportance, onOpenActivitiesModal }: B
               snapshot.isDraggingOver ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
             )}
           >
-            {stage.category !== "CLOSED" && (
-              <Button variant="ghost" className="w-full justify-start text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm mb-1">
-                <Plus className="w-4 h-4 mr-2" />
-                {t.crm.addAnOpportunity}</Button>
-            )}
-
             {items.map((item: OpportunityCardRecord, index: number) => (
-              <OpportunityCard key={item.id} item={item} index={index} updateImportance={updateImportance} onOpenActivitiesModal={onOpenActivitiesModal} />
+              <OpportunityCard
+                key={item.id}
+                item={item}
+                index={index}
+                updateImportance={updateImportance}
+                canUpdate={canUpdate(item) && !isBusy}
+              />
             ))}
             {provided.placeholder}
+            {lane.pageInfo.hasMore ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => void loadMoreStage(stage.id)}
+                disabled={isLoadingMore || isBusy}
+              >
+                {isLoadingMore ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : null}
+                {isLoadingMore
+                  ? lang === "ar"
+                    ? "جارٍ التحميل…"
+                    : "Loading…"
+                  : lang === "ar"
+                    ? `تحميل المزيد (${items.length}/${summary.totalCount})`
+                    : `Load more (${items.length}/${summary.totalCount})`}
+              </Button>
+            ) : null}
           </div>
         )}
       </Droppable>

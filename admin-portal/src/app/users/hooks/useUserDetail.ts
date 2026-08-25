@@ -2,7 +2,7 @@
  
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
@@ -25,6 +25,12 @@ import type {
   AdminWebphoneConfig,
   AdminUserStatus,
 } from "../types";
+import {
+  claimAdminUserWriteIntent,
+  settleAdminUserWriteIntent,
+  type AdminUserWriteIntent,
+} from "../model/writeIntent";
+import { normalizeApiError } from "@/shared/api/normalized-api-error";
 
 export type WebphoneForm = {
   enabled: boolean;
@@ -75,6 +81,47 @@ export function useUserDetail(id: string) {
 
   const [extensionError, setExtensionError] = useState<string | null>(null);
   const [sipUsernameError, setSipUsernameError] = useState<string | null>(null);
+  const writeIntentsRef = useRef(
+    new Map<string, AdminUserWriteIntent<unknown>>(),
+  );
+
+  const runWrite = useCallback(
+    async <T,>(
+      slot: string,
+      method: "POST" | "PATCH" | "DELETE",
+      path: string,
+      command: T,
+      invoke: (intent: AdminUserWriteIntent<T>) => Promise<unknown>,
+      reconcile?: () => Promise<boolean>,
+    ) => {
+      const current = writeIntentsRef.current.get(slot) as
+        | AdminUserWriteIntent<T>
+        | undefined;
+      const intent = claimAdminUserWriteIntent(
+        current ?? null,
+        method,
+        path,
+        command,
+      );
+      writeIntentsRef.current.set(slot, intent);
+      try {
+        const result = await invoke(intent);
+        writeIntentsRef.current.delete(slot);
+        return result;
+      } catch (caught) {
+        const normalized = normalizeApiError(caught);
+        const next = settleAdminUserWriteIntent(intent, caught, normalized);
+        if (next) writeIntentsRef.current.set(slot, next);
+        else writeIntentsRef.current.delete(slot);
+        if (next?.ambiguous && reconcile && (await reconcile())) {
+          writeIntentsRef.current.delete(slot);
+          return undefined;
+        }
+        throw caught;
+      }
+    },
+    [],
+  );
 
   const loadUser = useCallback(async () => {
     setIsLoading(true);
@@ -153,11 +200,29 @@ export function useUserDetail(id: string) {
     setIsSaving(true);
 
     try {
-      const updated = await updateAdminUser(user.id, {
+      const command = {
         firstName: firstName.trim() !== user.firstName ? firstName.trim() : undefined,
         lastName: lastName.trim() !== user.lastName ? lastName.trim() : undefined,
         isSuperAdmin: isSuperAdmin !== user.isSuperAdmin ? isSuperAdmin : undefined,
-      });
+      };
+      let updated = (await runWrite(
+        "identity",
+        "PATCH",
+        `/api/admin/core/v1/users/${encodeURIComponent(user.id)}`,
+        command,
+        (intent) => updateAdminUser(user.id, intent.command, intent.idempotencyKey),
+        async () => {
+          const fresh = await getAdminUser(user.id).catch(() => null);
+          if (!fresh) return false;
+          const matches =
+            (command.firstName === undefined || fresh.firstName === command.firstName) &&
+            (command.lastName === undefined || fresh.lastName === command.lastName) &&
+            (command.isSuperAdmin === undefined || fresh.isSuperAdmin === command.isSuperAdmin);
+          if (matches) setUser(fresh);
+          return matches;
+        },
+      )) as AdminUser | undefined;
+      updated ??= await getAdminUser(user.id);
 
       setUser(updated);
       setFirstName(updated.firstName);
@@ -171,9 +236,11 @@ export function useUserDetail(id: string) {
       const details = getErrorMessageAndDetails(requestError, lang);
       toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", toastErrorMessage(details));
 
-      setFirstName(user.firstName);
-      setLastName(user.lastName);
-      setIsSuperAdmin(user.isSuperAdmin);
+      if (!writeIntentsRef.current.get("identity")?.ambiguous) {
+        setFirstName(user.firstName);
+        setLastName(user.lastName);
+        setIsSuperAdmin(user.isSuperAdmin);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -185,7 +252,18 @@ export function useUserDetail(id: string) {
     setIsSaving(true);
 
     try {
-      await assignUserRole(user.id, { roleId: assignedRoleId });
+      const command = { roleId: assignedRoleId };
+      await runWrite(
+        "role",
+        "PATCH",
+        `/api/admin/core/v1/users/${encodeURIComponent(user.id)}/roles`,
+        command,
+        (intent) => assignUserRole(user.id, intent.command, intent.idempotencyKey),
+        async () => {
+          const fresh = await getAdminUser(user.id).catch(() => null);
+          return fresh?.roleId === command.roleId;
+        },
+      );
       const freshUser = await getAdminUser(user.id);
 
       setUser(freshUser);
@@ -200,7 +278,9 @@ export function useUserDetail(id: string) {
       const details = getErrorMessageAndDetails(requestError, lang);
       toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", toastErrorMessage(details));
 
-      setAssignedRoleId(user.roleId ?? user.role?.id ?? undefined);
+      if (!writeIntentsRef.current.get("role")?.ambiguous) {
+        setAssignedRoleId(user.roleId ?? user.role?.id ?? undefined);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -221,7 +301,21 @@ export function useUserDetail(id: string) {
 
     try {
       const payload = webphonePayloadFromForm(webphoneForm);
-      const updated = await updateUserWebphone(user.id, payload);
+      let updated = (await runWrite(
+        "webphone",
+        "PATCH",
+        `/api/admin/core/v1/users/${encodeURIComponent(user.id)}/webphone`,
+        payload,
+        (intent) => updateUserWebphone(user.id, intent.command, intent.idempotencyKey),
+        async () => {
+          const fresh = await getUserWebphone(user.id).catch(() => null);
+          if (!fresh) return false;
+          const matches = webphonePayloadMatches(payload, fresh);
+          if (matches) setWebphone(fresh);
+          return matches;
+        },
+      )) as AdminWebphoneConfig | undefined;
+      updated ??= await getUserWebphone(user.id);
 
       setWebphone(updated);
       setWebphoneForm(webphoneFormFromConfig(updated));
@@ -246,8 +340,23 @@ export function useUserDetail(id: string) {
     setIsSaving(true);
 
     try {
-      const updated =
-        nextStatus === "ACTIVE" ? await activateAdminUser(user.id) : await suspendAdminUser(user.id);
+      const action = nextStatus === "ACTIVE" ? "activate" : "suspend";
+      let updated = (await runWrite(
+        `status:${action}`,
+        "POST",
+        `/api/admin/core/v1/users/${encodeURIComponent(user.id)}/${action}`,
+        {},
+        (intent) =>
+          nextStatus === "ACTIVE"
+            ? activateAdminUser(user.id, intent.idempotencyKey)
+            : suspendAdminUser(user.id, intent.idempotencyKey),
+        async () => {
+          const fresh = await getAdminUser(user.id).catch(() => null);
+          if (fresh?.status === nextStatus) setUser(fresh);
+          return fresh?.status === nextStatus;
+        },
+      )) as AdminUser | undefined;
+      updated ??= await getAdminUser(user.id);
 
       setUser(updated);
       setStatus(updated.status);
@@ -269,7 +378,22 @@ export function useUserDetail(id: string) {
     setIsSaving(true);
 
     try {
-      await deleteAdminUser(user.id);
+      await runWrite(
+        "delete",
+        "DELETE",
+        `/api/admin/core/v1/users/${encodeURIComponent(user.id)}`,
+        null,
+        (intent) => deleteAdminUser(user.id, intent.idempotencyKey),
+        async () => {
+          try {
+            await getAdminUser(user.id);
+            return false;
+          } catch (caught) {
+            return normalizeErrorCode(caught) === "ADMIN_USER_NOT_FOUND" ||
+              (caught as { response?: { status?: number } })?.response?.status === 404;
+          }
+        },
+      );
       toast.success(
         lang === "ar" ? "تم الحذف" : "Deleted",
         lang === "ar" ? "تم حذف حساب المشرف بنجاح." : "Admin user deleted successfully."
@@ -408,4 +532,19 @@ function validateWebphoneForm(
 function nullableText(value: string) {
   const trimmed = value.trim();
   return trimmed || null;
+}
+
+function webphonePayloadMatches(
+  payload: ReturnType<typeof webphonePayloadFromForm>,
+  config: AdminWebphoneConfig,
+): boolean {
+  return (
+    config.enabled === payload.enabled &&
+    (config.extension ?? null) === payload.extension &&
+    (config.sipUsername ?? null) === payload.sipUsername &&
+    (config.displayName ?? null) === payload.displayName &&
+    (config.outboundCallerId ?? null) === payload.outboundCallerId &&
+    (config.transport ?? "wss") === payload.transport &&
+    !("sipPassword" in payload)
+  );
 }

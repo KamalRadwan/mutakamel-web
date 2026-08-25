@@ -1,14 +1,15 @@
 # Project Index
 
-Last source verification: **2026-08-05**
+Last source verification: **2026-08-12**
 
 ## Documentation
 
 - [Documentation contract](../DOCUMENTATION_CONTRACT.md)
 - [API index](../api/README.md)
 - [Backup and Restore contract](../api/backups-restores.md)
-- [Generated 235-route inventory](../generated/admin-core-api-routes.md)
+- [Generated 240-route inventory](../generated/admin-core-api-routes.md)
 - [Frontend capability matrix](../audit/frontend-capability-matrix.md)
+- [Core Admin UI parity audit](../audit/core-admin-ui-gap-audit-2026-08-12.md)
 - [Documentation coverage](../audit/documentation-coverage.md)
 - [HTTP/error contract](../architecture/http-and-error-contract.md)
 - [Permissions/idempotency/state](../architecture/permissions-idempotency-and-state.md)

@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, FileSpreadsheet, FileCheck, Receipt } from "lucide-react";
+import { Eye, Trash2, Receipt } from "lucide-react";
 import { useTradeInvoicesContracts, InvoiceContractItem } from "./hooks/useTradeInvoicesContracts";
 import { CreateTradeInvoicesContractsModal } from "./components/CreateTradeInvoicesContractsModal";
 import { DeleteTradeInvoicesContractsConfirmModal } from "./components/DeleteTradeInvoicesContractsConfirmModal";
 
 export default function TradeInvoicesContractsPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

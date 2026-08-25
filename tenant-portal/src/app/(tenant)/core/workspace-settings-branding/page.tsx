@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Settings, Palette, Globe } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
 import { useWorkspaceSettingsBranding, WorkspaceProfileItem } from "./hooks/useWorkspaceSettingsBranding";
 import { CreateWorkspaceSettingsBrandingModal } from "./components/CreateWorkspaceSettingsBrandingModal";
 import { DeleteWorkspaceSettingsBrandingConfirmModal } from "./components/DeleteWorkspaceSettingsBrandingConfirmModal";
 
 export default function WorkspaceSettingsBrandingPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

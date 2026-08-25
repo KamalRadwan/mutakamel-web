@@ -6,14 +6,12 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, LayoutGrid, BarChart2, PieChart } from "lucide-react";
+import { Eye, Trash2, LayoutGrid } from "lucide-react";
 import { useCrmDashboardBuilder, WidgetItem } from "./hooks/useCrmDashboardBuilder";
 import { CreateCrmDashboardBuilderModal } from "./components/CreateCrmDashboardBuilderModal";
 import { DeleteCrmDashboardBuilderConfirmModal } from "./components/DeleteCrmDashboardBuilderConfirmModal";
-import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmDashboardBuilderPage() {
-//     const { t } = useI18n();
   const {
     t,
     items,

@@ -1,30 +1,33 @@
 # Trade Catalog, UOM and Channels API
 
 > Contract status: source-verified backend contract; replacement frontend not implemented
-> Verification date: 2026-07-25
+> Verification date: 2026-08-25
 > Backend owner: Trade
-> Documentation: source-generated from verified Gateway routes, Trade controllers/DTOs/services/tests, and legacy frontend evidence
+> Documentation: source-generated from verified Gateway routes, Trade controllers/DTOs/services/tests, and dated historical frontend evidence
 > Canonical browser prefix: `/api/tenant/trade/v1`
-> Controller-relative prefixes: `/trade/items`, `/trade/catalog/uoms`, `/trade/channels`
-> Tenant Portal status: `tenant-portal` replaces the legacy tenant Trade UI; Legacy `mutakamel-web-app` has live catalog management clients and screens. The replacement `tenant-portal` has no Trade client or screen yet.
+> Controller-relative prefixes: `/trade/items`, `/trade/uoms`, `/trade/catalog/uoms`, `/trade/channels`
+> Tenant Portal status: The standalone `tenant-portal` replacement has no Trade catalog client or screen yet. The consolidated `mutakamel-web-app` references below are dated 2026-07-25 historical evidence; that workspace is absent from the current checkout and does not prove a live frontend.
 
 ## Capability
 
-Tenant catalog masters, company and branch item profiles, channel listings, channel-to-branch assignments, and the routed UOM read catalogue.
+Tenant catalog masters, company and branch item profiles, UOM-master governance, channel listings, channel-to-branch assignments, and the routed operating-context UOM catalogue.
 
-- Controller feature requirement: none declared; Trade module entitlement, seat, permission, and scope still apply.
-- Gateway routes assigned to this page: **19**.
+- Controller feature requirement: `trade.catalog`; Trade module entitlement, seat, permission, and scope also apply.
+- Gateway routes assigned to this page: **23**.
 - These are browser contracts. The Trade upstream remains `/api/v1/trade/...`; the browser must use the canonical prefix above.
 
 ## Source evidence
 
-Backend source references below are relative to `C:\mutakamel.ai\frontend`.
+Current backend source references below are relative to
+`C:\mutakamel.ai\frontend`. Consolidated frontend paths are explicitly dated
+historical references; their absent workspace is not current runtime evidence.
 
 - `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts`
 - `../backend/mutakamel-apps/trade-app/src/modules/catalog/catalog.controller.ts`
 - `../backend/mutakamel-apps/trade-app/src/modules/catalog/catalog-read.controller.ts`
 - `../backend/mutakamel-apps/trade-app/src/modules/catalog/dto/catalog.dto.ts`
 - `../backend/mutakamel-apps/trade-app/src/modules/catalog/catalog.service.ts`
+- `../backend/mutakamel-apps/trade-app/src/modules/catalog/catalog-uom.service.ts`
 - `../backend/mutakamel-apps/trade-app/src/modules/catalog/catalog-read-projection.service.ts`
 - `../backend/mutakamel-apps/trade-app/src/modules/catalog/catalog.service.spec.ts`
 - `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/trade/trade-management-api.ts`
@@ -32,7 +35,12 @@ Backend source references below are relative to `C:\mutakamel.ai\frontend`.
 
 ## Authorization and scope
 
-Every route requires an authenticated active `TENANT_USER`, a current session version, a Trade/Sales module seat unless the actor is the tenant owner, an enabled Trade entitlement, the feature gate above when declared, the exact permission in the table, and an authorized company/branch context. Tenant owners bypass permission-row lookup, not session, entitlement, feature, or scope validation. Dashboard-context exceptions are called out below.
+Every route requires an authenticated active `TENANT_USER`, an active unexpired
+`sid` with all four exact Auth epochs, a Trade/Sales module seat unless the actor
+is the tenant owner, an enabled Trade entitlement, the feature gate above when
+declared, the exact permission in the table, and an authorized company/branch
+context. Tenant owners bypass permission-row lookup, not session, entitlement,
+feature, or scope validation. Dashboard-context exceptions are called out below.
 
 - `COMPANY`: send an authorized `X-Mutakamel-Company-Id`.
 - `BRANCH`: send both company and branch UUIDv7 headers.
@@ -57,6 +65,10 @@ Every route requires an authenticated active `TENANT_USER`, a current session ve
 | GET | `/api/tenant/trade/v1/items/:id/channel-listings` | `/trade/items/:id/channel-listings` | `trade.items.read` | `COMPANY_OR_BRANCH` | `query: ItemChannelListingListQueryDto` | — | 200 | `AUTHENTICATED`; gateway-idempotent=true |
 | POST | `/api/tenant/trade/v1/items/:id/channel-listings` | `/trade/items/:id/channel-listings` | `trade.items.manage` | `COMPANY_OR_BRANCH` | `body: ItemChannelListingDto` | `X-Idempotency-Key` | 201 | `WRITE_SENSITIVE`; gateway-idempotent=true |
 | PATCH | `/api/tenant/trade/v1/items/:id/channel-listings/:channelId` | `/trade/items/:id/channel-listings/:channelId` | `trade.items.manage` | `COMPANY_OR_BRANCH` | `body: UpdateItemChannelListingDto` | `X-Idempotency-Key`, `If-Match` | 200 | `WRITE_SENSITIVE`; gateway-idempotent=true |
+| GET | `/api/tenant/trade/v1/uoms` | `/trade/uoms` | `trade.items.read` | `OPERATING_CONTEXT` | `query: UomListQueryDto` | — | 200 | `AUTHENTICATED`; gateway-idempotent=true; branch headers required at Gateway |
+| GET | `/api/tenant/trade/v1/uoms/:id` | `/trade/uoms/:id` | `trade.items.read` | `OPERATING_CONTEXT` | UUIDv7 `id` | — | 200 | `AUTHENTICATED`; gateway-idempotent=true; branch headers required at Gateway |
+| POST | `/api/tenant/trade/v1/uoms` | `/trade/uoms` | `trade.catalog_master.manage` | `TENANT` | `body: CreateUomDto` | `X-Idempotency-Key` | 201 | `WRITE_SENSITIVE`; gateway-idempotent=true |
+| PATCH | `/api/tenant/trade/v1/uoms/:id` | `/trade/uoms/:id` | `trade.catalog_master.manage` | `TENANT` | UUIDv7 `id`; `body: UpdateUomDto` | `X-Idempotency-Key`, `If-Match` | 200 | `WRITE_SENSITIVE`; gateway-idempotent=true |
 | GET | `/api/tenant/trade/v1/catalog/uoms` | `/trade/catalog/uoms` | `trade.items.read` | `COMPANY_OR_BRANCH` | `query: UomCatalogueQueryDto` | — | 200 | `AUTHENTICATED`; gateway-idempotent=true |
 | GET | `/api/tenant/trade/v1/channels` | `/trade/channels` | `trade.items.read` | `COMPANY` | — | — | 200 | `AUTHENTICATED`; gateway-idempotent=true |
 | POST | `/api/tenant/trade/v1/channels` | `/trade/channels` | `trade.items.manage` | `COMPANY` | `body: CreateChannelDto` | `X-Idempotency-Key` | 201 | `WRITE_SENSITIVE`; gateway-idempotent=true |
@@ -80,7 +92,9 @@ The global validation pipe transforms primitive query values, whitelists declare
 - `ItemStatus`: `DRAFT`, `ACTIVE`, `INACTIVE`, `DISCONTINUED`.
 - `ItemTrackingMode`: `NONE`, `LOT`, `SERIAL`.
 - `ChannelType`: `INTERNAL_SALES`, `POS`, `ECOMMERCE`, `B2B_PORTAL`, `MARKETPLACE`, `FIELD_SALES`, `API`.
-- UOM catalogue purpose: `ANY`, `SALES`, `PURCHASE`; controller-only UOM status: `ACTIVE`, `RETIRED`.
+- UOM catalogue purpose: `ANY`, `SALES`, `PURCHASE`; UOM status: `ACTIVE`, `RETIRED`.
+
+`CreateUomDto` requires `code` (1–32, starting with a letter and containing only letters, digits, `.`, `_`, or `-`), `displayName` (1–160), a non-empty localized-name map, and `sourceEvidence`. Evidence requires `sourceKind` (1–80) and permits `reference` up to 240 and `note` up to 500; Trade stamps the authenticated actor and time. `UpdateUomDto` accepts only `displayName`, `localizedNames`, `sourceEvidence`, and `status`; explicit `null` is invalid. The response projection carries `version`, which is the value for the next `If-Match`.
 
 ## Response, errors, security, idempotency and async behavior
 
@@ -91,7 +105,7 @@ The global validation pipe transforms primitive query values, whitelists declare
 
 - Catalog mutations are synchronous domain commands and require a UUIDv7 idempotency key; updates additionally require an aggregate ETag in `If-Match`.
 - Tenant-master item creation is tenant-scoped. Company profiles and channels are company-scoped. Branch profiles and channel branch assignments are branch-scoped. Listing reads/writes accept company or branch context.
-- The four `/api/v1/trade/uoms` CRUD controller routes are not present in the Gateway contract and are not browser APIs. Only `GET /catalog/uoms` is routed.
+- The `/uoms` master routes are browser contracts. Gateway requires authorized company-and-branch context for both master reads; create/update remain tenant-master commands and require `trade.catalog_master.manage`. `GET /catalog/uoms` is a separate operating-catalog projection and must not be substituted for master governance.
 
 ## Safe example
 
@@ -113,7 +127,7 @@ Do not add `x-mutakamel-tenant-id`, `x-mutakamel-tenant-db-name`, or `x-internal
 
 ## Ambiguities and AI rules
 
-- There is no Gateway path for direct UOM list/get/create/update. An AI must not call `/api/tenant/trade/v1/uoms` until a Gateway contract is added.
+- Use `/api/tenant/trade/v1/uoms` for UOM-master list/get/create/update and `/api/tenant/trade/v1/catalog/uoms` for the authorized operating-catalog projection; do not merge their scope or response contracts.
 - Never infer writable fields from response entities. Use only the DTO named in the route table.
 - Never call Trade directly from the browser and never call Worker. Use the canonical Gateway path.
-- See [examples.md](examples.md) for safe request patterns and [route-coverage.md](route-coverage.md) for the complete 226-route assignment.
+- See [examples.md](examples.md) for safe request patterns and the [generated tenant route inventory](../../generated/tenant-api-routes.md) for current Gateway coverage.

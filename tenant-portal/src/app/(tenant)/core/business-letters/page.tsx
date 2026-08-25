@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, FileText, Send, Building } from "lucide-react";
+import { Eye, Trash2, FileText } from "lucide-react";
 import { useBusinessLetters, BusinessLetterItem } from "./hooks/useBusinessLetters";
 import { CreateBusinessLettersModal } from "./components/CreateBusinessLettersModal";
 import { DeleteBusinessLettersConfirmModal } from "./components/DeleteBusinessLettersConfirmModal";
 
 export default function BusinessLettersPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

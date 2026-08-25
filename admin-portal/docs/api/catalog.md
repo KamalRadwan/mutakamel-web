@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-05**
+Last source verification: **2026-08-25**
 
 This is the Admin Portal implementation contract for the Application Catalogue:
 Application identity, independent publication and lifecycle, immutable runtime
@@ -23,7 +23,7 @@ Those names are storage and current-wire legacy details. There is no supported
 | Browser root | `/api/admin/core/v1` |
 | Primary resource | `/api/admin/core/v1/applications` |
 | Guard | `AdminGuard` |
-| Authentication | Shared cookie-mode client with `credentials: "include"` and `x-auth-cookie-mode: 1` |
+| Authentication | Shared cookie client with `credentials: "include"`; server-inferred browser channel |
 | Identifiers | Application routes use immutable lowercase `applicationKey`; nested commercial routes use UUIDv7 `applicationId`, `tierId`, or `id` |
 | Unknown DTO fields | Rejected because Core uses whitelist plus `forbidNonWhitelisted` |
 | Permission pairs | ALL semantics |
@@ -101,8 +101,8 @@ reuse it only when retrying the same method, path, query, actor, and body.
   refetching, not by generating another key.
 - `GW.IDEM.MISMATCH` or Core `IDEMPOTENCY_KEY_REUSED`: the key was reused for a
   different intent.
-- Application writes, tier-feature replacement, price replacement, and
-  currency writes have durable Core command evidence.
+- Application writes, including atomic onboarding, tier-feature replacement,
+  price replacement, and currency writes have durable Core command evidence.
 - Tier/feature update and delete require Gateway idempotency, but do not have
   equivalent durable Core command rows.
 - Tier and feature creation are intentionally non-idempotent. Their client
@@ -162,6 +162,11 @@ type ApplicationLifecycleStatus =
   | "DISABLED";
 type ApplicationPublicationStatus = "UNPUBLISHED" | "PUBLISHED";
 type ApplicationDatabaseAccessMode = "NONE" | "TENANT_DATABASE";
+type ApplicationDatabaseDeployment =
+  | "NONE"
+  | "ON_DEMAND"
+  | "PREWARM"
+  | "REQUIRED";
 type ApplicationManifestPublicationSource = "MIGRATION" | "SIGNED_API";
 type BillingCycle = "MONTHLY" | "ANNUAL";
 type FxRateSource = "ADMIN" | "PROVIDER" | "SYSTEM";
@@ -172,6 +177,21 @@ type ApplicationComponentStatus = "ACTIVE" | "RETIRED";
 Application command operations are `CREATE`, `UPDATE`,
 `ADOPT_TECHNICAL_PACKAGE`, `PUBLISH`, `DELETE`, `UPDATE_DATABASE_POLICY`,
 `ACTIVATE`, `DEPRECATE`, and `DISABLE`.
+
+Database deployment is the closed operator-facing profile; the older access,
+policy, and required flags remain compatibility projections derived from it:
+
+| Deployment | Database principal | Automatic fleet enrollment | Application activation coverage gate |
+|:---|:---:|:---:|:---:|
+| `NONE` | No | No | No |
+| `ON_DEMAND` | Yes | No; bind explicitly when needed | No |
+| `PREWARM` | Yes | Yes | No |
+| `REQUIRED` | Yes | Yes | Yes, exact READY coverage is required |
+
+TENANT Applications cannot use `NONE` in the current V1 provisioning contract.
+For rolling-schema compatibility Core derives the effective profile from legacy
+rows when the new column is not yet authoritative; frontend code consumes only
+the returned `databaseDeployment` value.
 
 Audit entity types are `MODULE`, `MODULE_ORDER`, `APPLICATION`, `TIER`,
 `FEATURE`, `TIER_FEATURE_GRANTS`, `PRICE_LADDER`, and
@@ -283,6 +303,7 @@ interface ApplicationView {
   publishedAt: string | null;
   publishedBy: string | null;
   databaseAccessMode: ApplicationDatabaseAccessMode;
+  databaseDeployment: ApplicationDatabaseDeployment;
   databasePrincipal: string | null;
   requiredOnDatabaseServer: boolean;
   technicalDefinitionRevision: string;
@@ -290,8 +311,13 @@ interface ApplicationView {
   activeManifest: ApplicationManifestEvidenceView | null;
   databasePolicy: ApplicationDatabasePolicyView;
   serverSummary: {
-    available: false;
-    reason: "SERVER_APPLICATION_BINDINGS_NOT_AVAILABLE";
+    available: true;
+    rolloutRequired: boolean;
+    eligible: number;
+    ready: number;
+    pending: number;
+    degraded: number;
+    coveragePercent: number;
   };
   createdAt: string;
   updatedAt: string;
@@ -313,14 +339,20 @@ interface ApplicationMutationReceipt {
   applicationKey: string;
   lifecycleStatus: ApplicationLifecycleStatus;
   runtimeTarget: string | null;
+  databaseAccessMode: ApplicationDatabaseAccessMode;
+  databaseDeployment: ApplicationDatabaseDeployment;
+  databasePrincipal: string | null;
+  technicalDefinitionRevision: string;
   publicationStatus: ApplicationPublicationStatus;
   publicationRevision: string;
   catalogueRevision: string;
   policyRevision: string;
   deleted: boolean;
+  onboarded?: true;
   technicalIdentity?: {
     runtimeTarget: string;
-    databasePrincipal: string;
+    databasePrincipal: string | null;
+    databaseDeployment: ApplicationDatabaseDeployment;
     primaryComponentKey: string;
     contractVersion: 1;
   };
@@ -392,6 +424,14 @@ wire field. It contains the parent Application UUID. Frontend adapters may
 expose an internal alias such as `applicationId`, but requests, stored payloads,
 tests, and transport examples must not pretend the wire field was renamed.
 
+`serverSummary` is always available in the current V1 projection. For
+`PREWARM` and `REQUIRED`, `eligible` counts operational Database Servers and
+the remaining fields report exact binding readiness against the current
+principal, manifest, and policy revision. For `NONE` and `ON_DEMAND`, fleet
+rollout is not automatic, so `rolloutRequired=false`, all fleet counts are
+zero, and coverage is `100`. This projection is the only Application-level
+fleet authority; the frontend does not rebuild it from list-page data.
+
 ## DTO validation
 
 ### Applications
@@ -409,6 +449,7 @@ interface ApplicationListQueryDto {
   lifecycleStatus?: ApplicationLifecycleStatus;
   publicationStatus?: ApplicationPublicationStatus;
   databaseAccessMode?: ApplicationDatabaseAccessMode;
+  databaseDeployment?: ApplicationDatabaseDeployment;
 }
 
 interface CreateApplicationDto {
@@ -419,6 +460,11 @@ interface CreateApplicationDto {
   applicationType: ApplicationType;
   commercialMode: ApplicationCommercialMode;
   catalogueVisibility: ApplicationCatalogueVisibility;
+}
+
+interface OnboardApplicationDto extends CreateApplicationDto {
+  databaseDeployment: ApplicationDatabaseDeployment;
+  reason: string; // trimmed, non-empty, max 256
 }
 
 interface UpdateApplicationDto {
@@ -453,11 +499,14 @@ interface UpdateApplicationDatabasePolicyDto {
 
 interface AdoptApplicationTechnicalPackageDto {
   expectedTechnicalDefinitionRevision: string; // positive integer string
+  databaseDeployment?: ApplicationDatabaseDeployment; // default REQUIRED
   reason: string; // trimmed, non-empty, max 256
 }
 
-type CreateApplicationProvisioningBindingDto =
-  AdoptApplicationTechnicalPackageDto;
+interface CreateApplicationProvisioningBindingDto {
+  expectedTechnicalDefinitionRevision: string;
+  reason: string; // trimmed, non-empty, max 256
+}
 ```
 
 Application update and policy update require at least one actual writable
@@ -559,6 +608,7 @@ returned with four fractional digits.
 | `GET /applications/:applicationKey/technical-provisioning` | `admin.applications.read` | 200 | No |
 | `POST /applications/:applicationKey/technical-provisioning/adopt` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
 | `POST /applications/:applicationKey/technical-provisioning/primary-component` | `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
+| `POST /applications/onboarding` | `admin.applications.create` + `admin.applications.update` + `admin.applications.critical` | 201 | Yes |
 | `POST /applications` | `admin.applications.create` | 201 | Yes |
 | `PATCH /applications/:applicationKey` | `admin.applications.update` | 200 | Yes |
 | `DELETE /applications/:applicationKey` | `admin.applications.delete` + `admin.applications.critical` | 204 | Yes |
@@ -587,18 +637,95 @@ returned with four fractional digits.
 
 Every abbreviated path in the table is relative to `/api/admin/core/v1`.
 
+### Atomic onboarding and permission fallback
+
+`POST /applications/onboarding` is the normal full-authority registration
+path. It is Gateway `WRITE_SENSITIVE`, idempotent, has transport retry disabled,
+and requires ALL three permissions: `admin.applications.create`,
+`admin.applications.update`, and `admin.applications.critical`. One
+caller-owned UUIDv7 key identifies the entire unchanged onboarding intent.
+
+Core validates the commercial shape and closed database-deployment profile,
+then creates the catalogue DRAFT, immutable runtime/database identity, initial
+database policy, and deterministic TENANT primary component in one database
+transaction. The receipt uses operation `CREATE`, includes the effective
+database fields, and adds `onboarded: true`, `technicalIdentity`, and, for a
+TENANT Application, `technicalProvisioning`. The Application remains
+`DRAFT`/`UNPUBLISHED`; onboarding does not publish or activate it.
+
+The narrower `POST /applications` contract remains supported for an actor who
+has only `admin.applications.create`. The Admin Portal sends that single legacy
+request and labels the result as a catalogue-only DRAFT. It does not simulate
+atomic onboarding by chaining adoption or component-binding calls in the
+browser. When that create-only actor lacks `admin.applications.read`, the
+`/applications-catalogue` route renders a narrow registration-only page before
+the catalogue/list hook mounts. The page uses the mutation-only registration
+hook and does not issue `GET /applications` or any commercial-catalogue list
+read. Actors with the complete create+update+critical permission set use
+onboarding directly; partial subsets do not satisfy the ALL gate.
+
+Example onboarding body:
+
+```json
+{
+  "key": "hr",
+  "name": "Human Resources",
+  "description": "People operations and workforce management.",
+  "applicationType": "TENANT",
+  "commercialMode": "SUBSCRIPTION",
+  "catalogueVisibility": "PUBLIC",
+  "databaseDeployment": "REQUIRED",
+  "reason": "Add the reviewed HR product to the control plane."
+}
+```
+
+The 201 receipt remains secret-free and includes, in addition to the normal
+`CREATE` revisions, the authoritative profile:
+
+```json
+{
+  "operation": "CREATE",
+  "applicationKey": "hr",
+  "lifecycleStatus": "DRAFT",
+  "runtimeTarget": "hr-app",
+  "databaseAccessMode": "TENANT_DATABASE",
+  "databaseDeployment": "REQUIRED",
+  "databasePrincipal": "mutakamel_hr_app",
+  "technicalDefinitionRevision": "1",
+  "publicationStatus": "UNPUBLISHED",
+  "onboarded": true,
+  "technicalIdentity": {
+    "runtimeTarget": "hr-app",
+    "primaryComponentKey": "app.hr",
+    "databasePrincipal": "mutakamel_hr_app",
+    "databaseDeployment": "REQUIRED",
+    "contractVersion": 1
+  }
+}
+```
+
+`databaseDeployment=NONE` for a TENANT Application fails with
+`TENANT_RUNTIME_ONLY_PROVISIONING_NOT_SUPPORTED`. An exact ambiguous or
+in-flight retry retains the same UUIDv7 key; a changed body is a new intent.
+
 ### Release authority UI contract
 
-Lifecycle, publication, and technical readiness are independent evidence. The
-Application list must expose separate lifecycle and publication columns and a
-`publicationStatus` filter. The detail view must show `runtimeTarget`,
-publication status/revision, and attributable `publishedAt`/`publishedBy`.
+Lifecycle, publication, deployment, and technical readiness are independent
+evidence. The Application list must expose separate lifecycle, publication,
+and database-deployment columns plus their filters. The detail view must show
+`runtimeTarget`, the authoritative `databaseDeployment`, publication
+status/revision, and attributable `publishedAt`/`publishedBy`.
 
 - `PUBLISH` is an explicit critical action. It uses both current revision
-  fences, requires a reason, and never changes lifecycle state.
+  fences, requires a reason, and never changes lifecycle state. Re-publishing
+  an already-`ACTIVE` `REQUIRED` Application also rechecks exact fleet
+  coverage before establishing release authority.
 - `ACTIVATE` is available only when an attributable publication exists and
   technical `activationAllowed` is true. `activationAllowed` alone is not a
-  publication check.
+  publication check. A `REQUIRED` database deployment additionally needs exact
+  READY coverage on every operational Database Server; Core returns
+  `APPLICATION_REQUIRED_DATABASE_COVERAGE_INCOMPLETE` with safe summary counts
+  when that fleet gate is incomplete.
 - Metadata editing a published Application must warn that the current release
   authority will be invalidated. The returned/refetched `UNPUBLISHED` state is
   authoritative; the browser must never publish automatically.
@@ -676,6 +803,8 @@ but the Core receipt and refetched readiness projection are authoritative.
 
 ```http
 POST /api/admin/core/v1/applications/hr/technical-provisioning/adopt HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-000000000002
 Content-Type: application/json
 
@@ -686,10 +815,12 @@ Content-Type: application/json
 ```
 
 Core derives `hr-app`, `mutakamel_hr_app`, `app.hr`, and contract version `1`.
-The request cannot select a runtime target, database principal, component key,
-credential, SQL, or migration content. Exact-intent retries reuse the same
-UUIDv7 key; ambiguous or in-flight outcomes are reconciled by refetching the
-readiness projection before the UI offers another intent.
+The request may select only the closed `databaseDeployment` profile and
+defaults to `REQUIRED` when it is omitted. It cannot select a runtime target,
+database principal, component key, credential, SQL, or migration content.
+Exact-intent retries reuse the same UUIDv7 key; ambiguous or in-flight outcomes
+are reconciled by refetching the readiness projection before the UI offers
+another intent.
 
 ```json
 {
@@ -706,10 +837,11 @@ readiness projection before the UI offers another intent.
     "catalogueRevision": "2",
     "policyRevision": "1",
     "deleted": false,
-    "technicalIdentity": {
-      "runtimeTarget": "hr-app",
-      "databasePrincipal": "mutakamel_hr_app",
-      "primaryComponentKey": "app.hr",
+      "technicalIdentity": {
+        "runtimeTarget": "hr-app",
+        "databasePrincipal": "mutakamel_hr_app",
+        "databaseDeployment": "REQUIRED",
+        "primaryComponentKey": "app.hr",
       "contractVersion": 1
     }
   },
@@ -729,6 +861,8 @@ stale submission with `409 APPLICATION_COMPONENT_BINDING_NOT_REQUIRED`.
 
 ```http
 POST /api/admin/core/v1/applications/hr/technical-provisioning/primary-component HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-000000000002
 Content-Type: application/json
 
@@ -817,6 +951,7 @@ Response — HTTP `200`:
     "publishedAt": "2026-08-02T10:30:00.000Z",
     "publishedBy": "019f0000-0000-7000-8000-000000000099",
     "databaseAccessMode": "TENANT_DATABASE",
+    "databaseDeployment": "REQUIRED",
     "databasePrincipal": "mutakamel_crm_app",
     "requiredOnDatabaseServer": true,
     "technicalDefinitionRevision": "1",
@@ -843,8 +978,13 @@ Response — HTTP `200`:
       "updatedAt": "2026-08-02T10:00:00.000Z"
     },
     "serverSummary": {
-      "available": false,
-      "reason": "SERVER_APPLICATION_BINDINGS_NOT_AVAILABLE"
+      "available": true,
+      "rolloutRequired": true,
+      "eligible": 3,
+      "ready": 3,
+      "pending": 0,
+      "degraded": 0,
+      "coveragePercent": 100
     },
     "createdAt": "2026-08-02T10:00:00.000Z",
     "updatedAt": "2026-08-02T10:00:00.000Z"
@@ -897,6 +1037,7 @@ Response — HTTP `200`:
     "publishedAt": "2026-08-02T10:30:00.000Z",
     "publishedBy": "019f0000-0000-7000-8000-000000000099",
     "databaseAccessMode": "TENANT_DATABASE",
+    "databaseDeployment": "REQUIRED",
     "databasePrincipal": "mutakamel_crm_app",
     "requiredOnDatabaseServer": true,
     "technicalDefinitionRevision": "1",
@@ -923,8 +1064,13 @@ Response — HTTP `200`:
       "updatedAt": "2026-08-02T10:00:00.000Z"
     },
     "serverSummary": {
-      "available": false,
-      "reason": "SERVER_APPLICATION_BINDINGS_NOT_AVAILABLE"
+      "available": true,
+      "rolloutRequired": true,
+      "eligible": 3,
+      "ready": 2,
+      "pending": 1,
+      "degraded": 0,
+      "coveragePercent": 66.66
     },
     "createdAt": "2026-08-02T10:00:00.000Z",
     "updatedAt": "2026-08-02T10:00:00.000Z"
@@ -973,6 +1119,8 @@ Request:
 
 ```http
 POST /api/admin/core/v1/applications HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a001
 Content-Type: application/json
 
@@ -998,6 +1146,10 @@ Response — HTTP `201`:
     "applicationKey": "hr",
     "lifecycleStatus": "DRAFT",
     "runtimeTarget": null,
+    "databaseAccessMode": "NONE",
+    "databaseDeployment": "NONE",
+    "databasePrincipal": null,
+    "technicalDefinitionRevision": "1",
     "publicationStatus": "UNPUBLISHED",
     "publicationRevision": "1",
     "catalogueRevision": "1",
@@ -1010,7 +1162,10 @@ Response — HTTP `201`:
 ```
 
 Create cannot accept a `runtimeTarget`, principal, or manifest. The draft starts with
-`databaseAccessMode=NONE` and disabled new-server/rotation policy.
+`databaseAccessMode=NONE`, `databaseDeployment=NONE`, and disabled
+new-server/rotation policy. This is the Admin Portal fallback for an actor with
+create permission but without the complete onboarding permission set; the
+browser does not follow it with hidden technical-provisioning mutations.
 
 ### 5. Update Application metadata
 
@@ -1018,6 +1173,8 @@ Request:
 
 ```http
 PATCH /api/admin/core/v1/applications/hr HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a002
 Content-Type: application/json
 
@@ -1063,6 +1220,8 @@ Request:
 
 ```http
 DELETE /api/admin/core/v1/applications/hr?expectedCatalogueRevision=2&reason=Draft%20created%20in%20error HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a003
 Body: none
 ```
@@ -1078,6 +1237,8 @@ Request:
 
 ```http
 PATCH /api/admin/core/v1/applications/crm/database-policy HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a004
 Content-Type: application/json
 
@@ -1124,6 +1285,8 @@ not activate the Application and does not replace technical readiness checks.
 
 ```http
 POST /api/admin/core/v1/applications/hr/publish HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a005
 Content-Type: application/json
 
@@ -1167,6 +1330,8 @@ Request:
 
 ```http
 POST /api/admin/core/v1/applications/hr/activate HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a006
 Content-Type: application/json
 
@@ -1209,6 +1374,8 @@ Request:
 
 ```http
 POST /api/admin/core/v1/applications/crm/deprecate HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a007
 Content-Type: application/json
 
@@ -1241,8 +1408,9 @@ Response — HTTP `201`:
 }
 ```
 
-Allowed transition: `ACTIVE -> DEPRECATED`. Leaving ACTIVE disables
-`enableOnNewServers` and may advance `policyRevision`.
+Allowed transition: `ACTIVE -> DEPRECATED`. Deprecation does not silently
+rewrite the Application's deployment profile or clear `enableOnNewServers`;
+the existing installed fleet remains governed by the explicit profile/policy.
 
 ### 11. Disable an Application
 
@@ -1250,6 +1418,8 @@ Request:
 
 ```http
 POST /api/admin/core/v1/applications/crm/disable HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a008
 Content-Type: application/json
 
@@ -1283,7 +1453,9 @@ Response — HTTP `201`:
 ```
 
 Allowed transitions are `ACTIVE -> DISABLED` and
-`DEPRECATED -> DISABLED`. DISABLED has no reactivation transition in V1.
+`DEPRECATED -> DISABLED`. DISABLED has no reactivation transition in V1. Core
+turns off credential rotation for the disabled Application but does not erase
+its deployment profile or fleet-membership evidence.
 
 ### 12. List global catalogue audit
 
@@ -1389,6 +1561,8 @@ Request:
 
 ```http
 POST /api/admin/core/v1/applications/019f0000-0000-7000-8000-000000000002/tiers HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 
 {
@@ -1464,6 +1638,8 @@ Request:
 
 ```http
 PATCH /api/admin/core/v1/tiers/019f0000-0000-7000-8000-000000000101 HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a008
 Content-Type: application/json
 
@@ -1506,6 +1682,8 @@ Request:
 
 ```http
 DELETE /api/admin/core/v1/tiers/019f0000-0000-7000-8000-000000000101 HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a009
 Body: none
 ```
@@ -1521,6 +1699,8 @@ Request:
 
 ```http
 POST /api/admin/core/v1/applications/019f0000-0000-7000-8000-000000000002/features HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 
 {
@@ -1598,6 +1778,8 @@ Request:
 
 ```http
 PATCH /api/admin/core/v1/features/019f0000-0000-7000-8000-000000000201 HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a010
 Content-Type: application/json
 
@@ -1637,6 +1819,8 @@ Request:
 
 ```http
 DELETE /api/admin/core/v1/features/019f0000-0000-7000-8000-000000000201 HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a012
 Body: none
 ```
@@ -1683,6 +1867,8 @@ Request:
 
 ```http
 PATCH /api/admin/core/v1/tiers/019f0000-0000-7000-8000-000000000101/features HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a013
 Content-Type: application/json
 
@@ -1756,6 +1942,8 @@ Request:
 
 ```http
 PATCH /api/admin/core/v1/tiers/019f0000-0000-7000-8000-000000000101/price-tiers HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a014
 Content-Type: application/json
 
@@ -1837,6 +2025,8 @@ Request:
 
 ```http
 PATCH /api/admin/core/v1/billing/currency-rates HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a015
 Content-Type: application/json
 
@@ -1872,6 +2062,8 @@ Request:
 
 ```http
 PATCH /api/admin/core/v1/billing/currency-rates/EUR HTTP/1.1
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-00000000a016
 Content-Type: application/json
 
@@ -1909,32 +2101,35 @@ rate revision, even if the submitted values are unchanged.
    `INCLUDED`.
 3. A database-enabled Application cannot become ACTIVE without its fixed
    principal and a valid active manifest.
-4. Manifest responses expose evidence only, never raw grants, SQL, passwords,
+4. `databaseDeployment` is the canonical closed profile. `PREWARM` and
+   `REQUIRED` enroll on new servers; only `REQUIRED` makes exact operational
+   fleet coverage an Application activation/re-publication gate.
+5. Manifest responses expose evidence only, never raw grants, SQL, passwords,
    or secret references.
-5. Application updates use `catalogueRevision`; publication uses both
+6. Application updates use `catalogueRevision`; publication uses both
    `catalogueRevision` and `publicationRevision`; policy updates use
    `policyRevision`. Stale writes fail closed.
-6. Mutable metadata changes invalidate an existing publication, advance its
+7. Mutable metadata changes invalidate an existing publication, advance its
    revision, clear attribution, and require explicit re-publication. Neither
    metadata update nor lifecycle transition auto-publishes.
-7. Activation requires attributable `PUBLISHED` state plus technical
+8. Activation requires attributable `PUBLISHED` state plus technical
    readiness. New selection requires `ACTIVE`, `PUBLISHED`, `PUBLIC`,
    commercial eligibility, and technical readiness.
-8. Deprecation prevents new selection but preserves an installed
+9. Deprecation prevents new selection but preserves an installed
    `PUBLISHED` runtime authority. Installed runtime accepts only `ACTIVE` or
    `DEPRECATED`; `DRAFT`, `DISABLED`, or `UNPUBLISHED` is not valid authority.
-9. Tier/feature/grant/price configuration is independent. Admin screens must
+10. Tier/feature/grant/price configuration is independent. Admin screens must
    show each active state explicitly and must not infer entitlement merely from
    the presence of a row.
-10. Grant replacement and price replacement are whole-resource commands, not
+11. Grant replacement and price replacement are whole-resource commands, not
    incremental patches.
-11. Prices and currency rates are exact decimal strings. Do not use
+12. Prices and currency rates are exact decimal strings. Do not use
    `parseFloat`, locale-formatted numbers, or binary floating-point state to
    build requests.
-12. Currency rate means quote-currency units per USD. USD remains fixed.
-13. All permission pairs in the matrix use ALL semantics. UI hiding is not an
+13. Currency rate means quote-currency units per USD. USD remains fixed.
+14. All permission pairs in the matrix use ALL semantics. UI hiding is not an
    authorization boundary.
-14. A `403` is not an empty list. Preserve forbidden, validation, conflict,
+15. A `403` is not an empty list. Preserve forbidden, validation, conflict,
    in-flight, unavailable, and retry states separately.
 
 ## Error catalogue for frontend handling
@@ -1943,6 +2138,9 @@ Application errors:
 
 - `APPLICATION_NOT_FOUND`
 - `APPLICATION_KEY_TAKEN`
+- `APPLICATION_IDENTITY_TAKEN`
+- `APPLICATION_TECHNICAL_IDENTITY_INVALID`
+- `TENANT_RUNTIME_ONLY_PROVISIONING_NOT_SUPPORTED`
 - `APPLICATION_UPDATE_EMPTY`
 - `APPLICATION_PUBLICATION_REVISION_STALE`
 - `APPLICATION_ALREADY_PUBLISHED`
@@ -1957,6 +2155,7 @@ Application errors:
 - `APPLICATION_IN_USE`
 - `APPLICATION_DATABASE_ENABLEMENT_NOT_READY`
 - `APPLICATION_DATABASE_ROTATION_NOT_READY`
+- `APPLICATION_REQUIRED_DATABASE_COVERAGE_INCOMPLETE`
 - `APPLICATION_POLICY_UNCHANGED`
 - `APPLICATION_LIFECYCLE_TRANSITION_INVALID`
 - `APPLICATION_RUNTIME_TARGET_REQUIRED`
@@ -2019,11 +2218,22 @@ visible action with this unused legacy permission.
 Implemented in active frontend source:
 
 - the Application list wires create, all documented filters including
-  publication, independent lifecycle/publication columns, real totals, error
-  retry, and the global audit route;
+  publication and database deployment, independent lifecycle/publication/
+  deployment columns, real totals, error retry, and the global audit route;
+- the `/applications-catalogue` permission boundary renders a narrow
+  registration-only page for create-without-read actors, and that branch mounts
+  neither the Application-list hook nor commercial-catalogue reads;
+- the create modal uses one `/applications/onboarding` call and one stable
+  UUIDv7 intent when the actor has create+update+critical; an actor with only
+  create uses the catalogue-only `/applications` fallback and no client-side
+  adoption/binding chain;
 - Application detail exposes metadata and database-policy revision-fenced
   editing, reasoned lifecycle commands, DRAFT-only deletion, and manifest
   evidence with independent retry state;
+- list, detail, and mutation receipts consume the canonical
+  `databaseDeployment` profile; detail renders Core's real `serverSummary`
+  fleet counts and percentage rather than a local Database Server-list
+  approximation;
 - Application detail independently loads a technical-readiness projection and
   implements separate stable-intent stale/in-flight recovery for deterministic
   technical adoption and primary-component binding;
@@ -2061,15 +2271,13 @@ Implemented in active frontend source:
 - targeted contract, API-client, and readiness-state tests encode the current
   publication and runtime-target source behavior.
 
-Remaining runtime and localization gates:
+Remaining runtime and operational gates:
 
 - authenticated browser E2E still needs to prove permission denial, revision
   conflict, replay/in-flight recovery, and successful mutation refetch against
   a running Gateway/Core stack;
-- the detail technical-readiness, binding, metadata-policy, and lifecycle
-  surfaces support Arabic RTL and English LTR; list, audit, and commercial
-  control-rail copy still need the remaining catalogue localization pass before
-  the whole domain can be called bilingual-complete;
+- list, audit, detail, technical-readiness, binding, metadata-policy, lifecycle,
+  and commercial controls have Arabic RTL and English LTR source coverage;
 - live PostgreSQL privilege, multi-replica convergence, and deployment evidence
   remain backend/operational gates and are not established by frontend source.
 

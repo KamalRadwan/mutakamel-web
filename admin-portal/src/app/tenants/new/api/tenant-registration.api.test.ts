@@ -10,14 +10,12 @@ vi.mock("@/lib/api/axiosClient", () => ({
 }));
 
 vi.mock("@/shared/api/core-envelope", () => ({
-  extractCoreData: (response: { data: { data: unknown } }) => response.data.data,
+  extractCoreData: (response: { data: { data: unknown } }) =>
+    response.data.data,
 }));
 
 import { tenantRegistrationApi } from "./tenant-registration.api";
-import type {
-  TenantCreateCommand,
-  TenantSubscriptionLine,
-} from "../types";
+import type { TenantCreateCommand, TenantSubscriptionLine } from "../types";
 
 const applicationId = "019f0000-0000-7000-8000-000000000001";
 const tierId = "019f0000-0000-7000-8000-000000000002";
@@ -46,7 +44,7 @@ describe("tenant registration API", () => {
     postMock.mockReset();
   });
 
-  it("validates identity through the real non-idempotent read-like command", async () => {
+  it("validates identity through the idempotent read-like command", async () => {
     const controller = new AbortController();
     const result = {
       valid: true,
@@ -67,7 +65,41 @@ describe("tenant registration API", () => {
     expect(postMock).toHaveBeenCalledWith(
       "/api/admin/core/v1/tenants/validate-identity",
       { name: "acme", companyName: "Acme LLC" },
-      { skipAutoIdempotency: true, signal: controller.signal },
+      {
+        skipAutoIdempotency: true,
+        replayAfterRefresh: true,
+        signal: controller.signal,
+      },
+    );
+  });
+
+  it("reverse-geocodes exact coordinates without an idempotency header", async () => {
+    const controller = new AbortController();
+    const suggestion = {
+      countryName: "Egypt",
+      countryIsoCode: "EG",
+      state: "Cairo",
+      city: "Cairo",
+      street1: "Tahrir Street",
+      buildingNo: "10",
+      formattedAddress: "10 Tahrir Street, Cairo, Egypt",
+    };
+    postMock.mockResolvedValue(envelope(suggestion));
+
+    await expect(
+      tenantRegistrationApi.reverseGeocode(
+        { latitude: 30.0444, longitude: 31.2357 },
+        controller.signal,
+      ),
+    ).resolves.toEqual(suggestion);
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/admin/core/v1/tenants/reverse-geocode",
+      { latitude: 30.0444, longitude: 31.2357 },
+      {
+        skipAutoIdempotency: true,
+        replayAfterRefresh: true,
+        signal: controller.signal,
+      },
     );
   });
 
@@ -107,6 +139,8 @@ describe("tenant registration API", () => {
             id: databaseId,
             name: "DB 01",
             status: "ACTIVE",
+            countryName: null,
+            countryIsoCode: null,
             currentTenants: 1,
             maxTenants: 50,
           },
@@ -124,7 +158,21 @@ describe("tenant registration API", () => {
       }),
     );
 
-    await tenantRegistrationApi.listDatabasePlacementOptions(["trade", "crm", "crm"]);
+    await expect(
+      tenantRegistrationApi.listDatabasePlacementOptions([
+        "trade",
+        "crm",
+        "crm",
+      ]),
+    ).resolves.toEqual([
+      {
+        id: databaseId,
+        name: "DB 01",
+        status: "ACTIVE",
+        currentTenants: 1,
+        maxTenants: 50,
+      },
+    ]);
     expect(getMock).toHaveBeenCalledWith(
       "/api/admin/core/v1/tenants/database-placement-options?applicationKeys=crm%2Ctrade",
     );
@@ -133,6 +181,7 @@ describe("tenant registration API", () => {
     expect(postMock).toHaveBeenCalledWith(
       "/api/admin/core/v1/tenants/provisioning-plans",
       { moduleKeys: ["crm", "trade"] },
+      { skipAutoIdempotency: true, replayAfterRefresh: true },
     );
   });
 
@@ -172,6 +221,7 @@ describe("tenant registration API", () => {
         currencyCode: "USD",
         items: [{ moduleId: applicationId, tierId, seats: 10 }],
       },
+      { skipAutoIdempotency: true, replayAfterRefresh: true },
     );
 
     const command: TenantCreateCommand = {

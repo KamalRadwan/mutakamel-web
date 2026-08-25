@@ -1,50 +1,69 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-// @ts-ignore
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import type { LeadItem } from "../../hooks/useLeads";
-import { LEAD_STAGES } from "../../hooks/useLeads";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from "@hello-pangea/dnd";
+import type { LeadItem, LeadStage } from "../../hooks/useLeads";
 import { LeadCard } from "../shared/lead-card";
 import { useI18n } from "@/i18n/I18nContext";
 
 interface LeadsBoardViewProps {
   items: LeadItem[];
-  moveLead: (leadId: string, destStageId: string, destIndex: number) => void;
+  stages: LeadStage[];
+  moveLead: (
+    leadId: string,
+    destStageId: string,
+  ) => void | Promise<void>;
+  canUpdate: (lead: LeadItem) => boolean;
+  isMovePending: boolean;
+  canDelete: (lead: LeadItem) => boolean;
   onDelete?: (lead: LeadItem) => void;
 }
 
-export function LeadsBoardView({ items, moveLead, onDelete }: LeadsBoardViewProps) {
+export function LeadsBoardView({
+  items,
+  stages,
+  moveLead,
+  canUpdate,
+  isMovePending,
+  canDelete,
+  onDelete,
+}: LeadsBoardViewProps) {
   const { lang } = useI18n();
   const isRtl = lang === "ar";
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setMounted(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const boardData = useMemo(() => {
-    return LEAD_STAGES.map((stage) => {
+    return stages.map((stage) => {
       return {
         ...stage,
         items: items.filter((item) => item.stageId === stage.id),
       };
     });
-  }, [items]);
+  }, [items, stages]);
 
   const onDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
 
     if (!destination) return;
 
-    if (
-      source.droppableId === destination.droppableId &&
-      source.index === destination.index
-    ) {
-      return;
-    }
+    if (source.droppableId === destination.droppableId) return;
 
-    moveLead(draggableId, destination.droppableId, destination.index);
+    moveLead(draggableId, destination.droppableId);
   };
 
   if (!mounted) return null; // Avoid hydration mismatch for dnd
@@ -67,7 +86,11 @@ export function LeadsBoardView({ items, moveLead, onDelete }: LeadsBoardViewProp
                 </div>
 
                 {/* Droppable Area */}
-                <Droppable droppableId={column.id} direction="vertical">
+                <Droppable
+                  droppableId={column.id}
+                  direction="vertical"
+                  isDropDisabled={column.flag === "CONVERTED" || isMovePending}
+                >
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
@@ -78,7 +101,16 @@ export function LeadsBoardView({ items, moveLead, onDelete }: LeadsBoardViewProp
                     >
                       <div className="flex flex-col gap-2 min-h-[50px]">
                         {column.items.map((lead, index) => (
-                          <Draggable key={lead.id} draggableId={lead.id} index={index}>
+                          <Draggable
+                            key={lead.id}
+                            draggableId={lead.id}
+                            index={index}
+                            isDragDisabled={
+                              isMovePending ||
+                              column.flag === "CONVERTED" ||
+                              !canUpdate(lead)
+                            }
+                          >
                             {(provided, snapshot) => (
                               <div
                                 ref={provided.innerRef}
@@ -87,7 +119,12 @@ export function LeadsBoardView({ items, moveLead, onDelete }: LeadsBoardViewProp
                                 style={provided.draggableProps.style}
                                 className={snapshot.isDragging ? "opacity-90 ring-2 ring-blue-500 shadow-xl rounded-xl z-50" : ""}
                               >
-                                <LeadCard lead={lead} onDelete={onDelete} />
+                                <LeadCard
+                                  lead={lead}
+                                  stages={stages}
+                                  onDelete={onDelete}
+                                  canDelete={canDelete(lead)}
+                                />
                               </div>
                             )}
                           </Draggable>

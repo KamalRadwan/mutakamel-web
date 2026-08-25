@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
 Owner: **Core**
 
@@ -56,8 +56,11 @@ export/copy restrictions; never deliberately surface secrets.
 
 ## Current frontend status
 
-There is no logging route, override editor, history/effective viewer, or live
-stream client in `src/app/`.
+`/logging` source-integrates all six routes: override list/upsert/delete,
+effective state, history, and the authorized SSE live stream. The module has
+exact permission gates, validated override controls, destructive confirmation,
+bounded reconnect/stale/error states, bilingual copy, and focused tests.
+Authenticated runtime and deployment verification remain separate gates.
 
 ## Source map
 

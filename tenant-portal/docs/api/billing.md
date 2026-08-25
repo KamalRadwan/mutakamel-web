@@ -17,7 +17,7 @@ Wallet top-up and payment history are documented in [payments-wallet.md](payment
 - Subscription controller: `../backend/mutakamel-apps/core-app/src/tenant/subscription/subscription-self-serve.controller.ts`
 - Subscription DTO/service: `../backend/mutakamel-apps/core-app/src/admin/subscriptions`
 - Payment DTO/service: `../backend/mutakamel-apps/core-app/src/tenant/payments`
-- Legacy client/types: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/billing`
+- Historical consolidated client/types reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/billing`
 
 ## Owner/security boundary
 
@@ -44,7 +44,8 @@ Safe payment-intent example:
 
 ```http
 POST /api/tenant/core/v1/billing/invoices/019f9872-0a1a-7cc0-914d-a57aa437fc41/payment-intents
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 X-Idempotency-Key: 019f9871-fd40-7680-bfbb-fd535b5880c8
 
@@ -83,7 +84,9 @@ IDs are UUIDv7; module/tier keys are maximum 64; `seats` is integer 1–100,000.
 - Invoice purpose: `TRIAL_ACTIVATION`, `RENEWAL`, `PRORATION`, `MANUAL`.
 - Payment status: `CREATED`, `PENDING`, `SUCCEEDED`, `FAILED`, `EXPIRED`, `REQUIRES_REVIEW`, `REFUND_PENDING`, `REFUNDED`.
 
-Legacy client types tolerate some older status strings during migration; new code must produce/branch on the backend values above.
+The dated consolidated-client types tolerated some older status strings during
+migration; that absent workspace is historical evidence only. Current code
+must produce and branch on the backend values above.
 
 ## Errors, cache, and AI rules
 

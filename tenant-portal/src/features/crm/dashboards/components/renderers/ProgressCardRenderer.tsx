@@ -9,7 +9,7 @@ interface ProgressCardRendererProps {
   result: DashboardWidgetResult;
 }
 
-export function ProgressCardRenderer({ widget, result }: ProgressCardRendererProps) {
+export function ProgressCardRenderer({ result }: ProgressCardRendererProps) {
   const { lang } = useI18n();
   const isRtl = lang === "ar";
   const value = result.value ?? 0;

@@ -30,7 +30,7 @@ export function CreateTemplatePlatformModal({ isOpen, onClose, onSubmit }: Creat
         <Select
           label="تصنيف القالب"
           value={category}
-          onChange={(e) => setCategory(e.target.value as any)}
+          onChange={(e) => setCategory(e.target.value as typeof category)}
           options={[
             { label: "مستند طباعة (PDF)", value: "pdf" },
             { label: "رسالة بريدية (Email)", value: "email" },

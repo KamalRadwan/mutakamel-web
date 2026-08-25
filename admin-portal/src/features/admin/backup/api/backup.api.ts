@@ -120,13 +120,6 @@ export const backupApi = {
     return response.data;
   },
 
-  getRun: async (runId: string) => {
-    const response = await axiosClient.get<BackupRun>(
-      `${BACKUP_BASE_URL}/runs/${encodeURIComponent(runId)}`,
-    );
-    return response.data;
-  },
-
   deleteRun: async (runId: string, idempotencyKey: string) => {
     await axiosClient.delete(
       `${BACKUP_BASE_URL}/runs/${encodeURIComponent(runId)}`,
@@ -163,13 +156,6 @@ export const backupApi = {
   listRestores: async (query?: RestoreRunListQuery) => {
     const response = await axiosClient.get<RestoreRun[]>(
       `${RESTORE_BASE_URL}/runs${toQueryString(query)}`,
-    );
-    return response.data;
-  },
-
-  getRestore: async (runId: string) => {
-    const response = await axiosClient.get<RestoreRun>(
-      `${RESTORE_BASE_URL}/runs/${encodeURIComponent(runId)}`,
     );
     return response.data;
   },

@@ -1,4 +1,4 @@
-export type StorageServerStatus = "DRAFT" | "ACTIVE" | "OFFLINE";
+export type StorageServerStatus = "DRAFT" | "ACTIVE" | "DRAINING" | "OFFLINE";
 export type StorageConnectionTestStatus = "NOT_TESTED" | "PASSED" | "FAILED";
 export type StorageServerSortField =
   | "name"

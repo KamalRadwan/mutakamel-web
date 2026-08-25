@@ -34,32 +34,34 @@ export function StorageServersScreen() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white shadow-sm">
-              <HardDrive className="size-5" aria-hidden="true" />
+      <header className="rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:px-5 sm:py-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white shadow-xs">
+              <HardDrive className="size-4" aria-hidden="true" />
             </span>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
-                {isArabic ? "البنية التحتية" : "Infrastructure"}
-              </p>
-              <h1 className="mt-1 text-2xl font-black tracking-tight">
-                {isArabic ? "خوادم التخزين" : "Storage servers"}
-              </h1>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                  {isArabic ? "خوادم التخزين" : "Storage servers"}
+                </h1>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md border border-indigo-200/50 dark:border-indigo-900/50">
+                  {isArabic ? "البنية التحتية" : "Infrastructure"}
+                </span>
+              </div>
+              <p className="mt-0.5 max-w-2xl text-[11px] leading-tight text-slate-600 dark:text-slate-400">
                 {isArabic
-                  ? "سجل خوادم S3 وحالة اختبار الاتصال الآمن. يجدول Worker الاختبار كل 12 ساعة، وتظل الأدلة صالحة 24 ساعة."
-                  : "S3 registry and safe connection evidence. Worker schedules checks every 12 hours; evidence remains valid for 24 hours."}
+                  ? "سجل خوادم S3 وحالة اختبار الاتصال الآمن. يجدول Worker الاختبار كل 12 ساعة."
+                  : "S3 registry and safe connection evidence. Worker schedules checks every 12 hours."}
               </p>
             </div>
           </div>
           {view.canCreate ? (
             <Link
               href="/storage-servers/new"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 text-xs font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 shrink-0"
             >
-              <Plus className="size-4" aria-hidden="true" />
+              <Plus className="size-3.5" aria-hidden="true" />
               {isArabic ? "تسجيل خادم" : "Register server"}
             </Link>
           ) : null}

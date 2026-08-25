@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Package, Warehouse, AlertTriangle } from "lucide-react";
+import { Eye, Trash2, Package } from "lucide-react";
 import { useTradeInventory, InventoryStockItem } from "./hooks/useTradeInventory";
 import { CreateTradeInventoryModal } from "./components/CreateTradeInventoryModal";
 import { DeleteTradeInventoryConfirmModal } from "./components/DeleteTradeInventoryConfirmModal";
 
 export default function TradeInventoryPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

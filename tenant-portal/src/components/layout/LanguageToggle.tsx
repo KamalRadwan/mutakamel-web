@@ -8,11 +8,13 @@ export function LanguageToggle() {
 
   return (
     <button
+      type="button"
       onClick={toggleLang}
-      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+      aria-label={lang === "ar" ? "Switch language to English" : "تغيير اللغة إلى العربية"}
+      className="flex items-center rounded-lg bg-slate-100 p-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200 sm:gap-1.5 sm:px-3 sm:py-1.5 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
     >
-      <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-      <span>{lang === "ar" ? "English" : "العربية"}</span>
+      <Globe className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+      <span className="hidden sm:inline">{lang === "ar" ? "English" : "العربية"}</span>
     </button>
   );
 }

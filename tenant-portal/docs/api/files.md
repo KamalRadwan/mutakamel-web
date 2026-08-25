@@ -5,7 +5,7 @@
 > **Backend owner:** Core + shared storage package
 > **Canonical browser path:** `/api/tenant/core/v1/files/:bucket/:year/:month/:name?exp=...&sig=...`
 > **Controller-relative path:** `/files/:bucket/:year/:month/:name` (version-neutral Core route, mounted as `/api/files/...`)
-> **Tenant Portal status:** Planned. Legacy branding/directory/document clients already consume server-issued file URLs.
+> **Tenant Portal status:** Planned. Dated consolidated-frontend evidence showed branding/directory/document clients consuming server-issued file URLs; that workspace is absent from the current checkout and does not prove live behavior.
 > **Documentation:** Hand-written and source-verified; not generated.
 
 ## Source of truth
@@ -13,7 +13,7 @@
 - Gateway route: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
 - Controller: `../backend/mutakamel-apps/core-app/src/common/storage/storage-files.controller.ts`
 - Storage constants/security: `../backend/mutakamel-apps/shared-libs/packages/storage/src/constants/buckets.constant.ts` and `../backend/mutakamel-apps/shared-libs/packages/storage/src/security/signed-url.util.ts`
-- Existing browser proxy: `../backend/mutakamel-apps/mutakamel-web-app/src/app/api/[master]/[app]/[version]/[...path]/route.ts`
+- Historical consolidated browser-proxy reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/app/api/[master]/[app]/[version]/[...path]/route.ts`
 
 ## Contract
 

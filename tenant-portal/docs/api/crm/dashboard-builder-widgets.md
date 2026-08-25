@@ -1,15 +1,15 @@
 # CRM dashboard builder and widgets
 
 > Status: `verified-current`
-> Last source verification: `2026-07-25`
+> Last source verification: `2026-08-25`
 > Owner: CRM (`crm-app`)
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
 > Tenant Portal replacement: `not-started`
-> Legacy frontend: `live-partial`
-> Authorship: hand-written from current source
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
-The builder stores user dashboards, reusable widgets, placements, favorites/defaults, and user/team shares. It also validates and executes server-owned metric queries. The Gateway exposes 32 builder/widget routes.
+The builder stores user dashboards, reusable widgets, placements, favorites/defaults, and user/team shares. It also validates and executes server-owned metric queries. The Gateway exposes 33 builder/widget routes.
 
 ## Endpoint catalogue
 
@@ -33,6 +33,7 @@ The builder stores user dashboards, reusable widgets, placements, favorites/defa
 | `PUT` | `/api/tenant/crm/v1/dashboards/:id/favorite` | `/api/v1/crm/dashboards/:id/favorite` | `crm.dashboards.read.{own|team|all}` | `200`, dashboard detail |
 | `PUT` | `/api/tenant/crm/v1/dashboards/:id/layout` | `/api/v1/crm/dashboards/:id/layout` | `crm.dashboards.update` | `200`, dashboard |
 | `POST` | `/api/tenant/crm/v1/dashboards/:id/run` | `/api/v1/crm/dashboards/:id/run` | `crm.dashboards.read.{own|team|all}` | `201`, execution |
+| `POST` | `/api/tenant/crm/v1/dashboards/:id/widgets/:widgetId/drilldown` | `/api/v1/crm/dashboards/:id/widgets/:widgetId/drilldown` | `crm.dashboards.read.{own|team|all}` | `201`, bounded drill-down page |
 | `POST` | `/api/tenant/crm/v1/dashboards/:id/placements` | `/api/v1/crm/dashboards/:id/placements` | `crm.dashboards.update` | `201`, placement/dashboard |
 | `DELETE` | `/api/tenant/crm/v1/dashboards/:id/placements/:placementId` | `/api/v1/crm/dashboards/:id/placements/:placementId` | `crm.dashboards.update` | `200`, new dashboard revision |
 | `GET` | `/api/tenant/crm/v1/dashboards/:id/shares` | `/api/v1/crm/dashboards/:id/shares` | `crm.dashboards.share` | `200`, array |
@@ -55,7 +56,7 @@ The builder stores user dashboards, reusable widgets, placements, favorites/defa
 | `POST` | `/api/tenant/crm/v1/widgets/:id/shares` | `/api/v1/crm/widgets/:id/shares` | `crm.widgets.share` | `201`, share |
 | `DELETE` | `/api/tenant/crm/v1/widgets/:id/shares/:shareId` | `/api/v1/crm/widgets/:id/shares/:shareId` | `crm.widgets.share` | `204` |
 
-The controller also defines `POST /api/v1/crm/dashboards/:id/widgets/:widgetId/drilldown`, but the Gateway has no matching route. Do not call a guessed tenant-browser URL. The legacy dashboard client calls it, so drilldown is a known replacement blocker.
+Drill-down accepts a server-owned widget selection only: required `pointKey`, optional `seriesKey`, opaque URL-safe `cursor`, `limit` from 1 through 100, optional positive `expectedWidgetRevision`, and optional dashboard filters. Clients cannot supply query text, projections, predicates, or SQL.
 
 ## Access model
 

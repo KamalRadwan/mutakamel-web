@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Layers, UserCheck } from "lucide-react";
+import { Eye, Trash2, UserCheck } from "lucide-react";
 import { useUserModuleAssignments, UserModuleAssignmentItem } from "./hooks/useUserModuleAssignments";
 import { CreateUserModuleAssignmentsModal } from "./components/CreateUserModuleAssignmentsModal";
 import { DeleteUserModuleAssignmentsConfirmModal } from "./components/DeleteUserModuleAssignmentsConfirmModal";
 
 export default function UserModuleAssignmentsPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

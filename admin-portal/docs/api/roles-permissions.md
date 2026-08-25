@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
 Owner: **Core**
 
@@ -61,15 +61,20 @@ only.
 - Empty permission IDs clear assignable permissions when backend invariants
   allow it.
 - System roles and assigned roles can reject update/delete.
-- Role/permission changes can invalidate affected sessions.
+- Role/permission changes advance affected users' `authorizationVersion`.
+  Existing access JWTs become stale and must be reissued, while the reusable
+  Auth Session remains active. Status, password, and other security changes
+  are the session-ending category.
 - Delete returns `204` with no body.
 - Retain one UUIDv7 key for one exact retry of a write-sensitive intent.
 
 ## Current frontend status
 
-`src/app/roles/` uses real Core role and permission calls. Remaining refactors
-include exact response types, explicit error/data states, stable mutation
-intents, and avoiding critical over-restriction for ordinary metadata updates.
+`src/app/roles/` source-integrates all six role/permission routes with strict
+readers, server pagination, independent role and catalogue loading, explicit
+data/error states, nullable-description reconciliation, exact metadata versus
+critical permission gates, validation, and caller-owned UUIDv7 intents.
+Focused tests cover partial permission sets and ambiguous retry behavior.
 
 ## Source map
 
@@ -95,7 +100,7 @@ intents, and avoiding critical over-restriction for ordinary metadata updates.
 ```typescript
 {
   name?: string;
-  description?: string;
+  description?: string | null;
 }
 ```
 

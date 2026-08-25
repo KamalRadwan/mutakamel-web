@@ -9,7 +9,7 @@ import {
   Unplug,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import type { DashboardGroupKey, DashboardResponse } from "@/types/dashboard";
+import type { DashboardGroup, DashboardGroupKey, DashboardResponse } from "@/types/dashboard";
 import type { DashboardTabKey } from "../hooks/useDashboardData";
 import {
   getAuthorizedDashboardGroups,
@@ -37,24 +37,6 @@ export function DashboardGroupsOverview({
 
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 text-white shadow-2xs dark:border-slate-800">
-        <div className="relative p-5 sm:p-6">
-          <div className="absolute inset-y-0 end-0 w-1/3 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.28),transparent_70%)]" />
-          <div className="relative max-w-2xl">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-300">
-              {lang === "ar" ? "نطاق التقارير المصرح" : "Authorized report scope"}
-            </p>
-            <h2 className="mt-2 text-xl font-extrabold tracking-tight sm:text-2xl">
-              {lang === "ar" ? "مركز عمليات مستوى التحكم" : "Control-plane operations desk"}
-            </h2>
-            <p className="mt-2 text-xs leading-6 text-slate-300">
-              {lang === "ar"
-                ? "تعرض هذه الصفحة فقط مجموعات البيانات المسموح بها لحسابك. المجموعة غير المتاحة تعني أن المصدر الموثوق غير نشط، وليس أن قيمتها صفر."
-                : "This page exposes only the report groups authorized for your account. An unavailable group means its authoritative source is not active, not that its values are zero."}
-            </p>
-          </div>
-        </div>
-      </section>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <ScopeMetric
@@ -86,35 +68,33 @@ export function DashboardGroupsOverview({
       <section>
         <div className="mb-3 flex items-center justify-between gap-3 px-1">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-950 dark:text-white">
+            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
               {lang === "ar" ? "مجموعات التقارير" : "Report groups"}
             </h2>
             <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
               {data.range.label}
             </p>
           </div>
-          <Layers3 className="size-5 text-slate-400" aria-hidden="true" />
+          <Layers3 className="size-5 text-indigo-500" aria-hidden="true" />
         </div>
 
         {groups.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-              {lang === "ar" ? "لا توجد مجموعات تقارير مصرح بها." : "No report groups are authorized."}
-            </p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {lang === "ar" ? "صلاحية فتح لوحة التحكم وحدها لا تمنح بيانات أي مجموعة." : "Dashboard access alone does not grant any group data."}
+            <p className="text-sm font-bold text-slate-600 dark:text-slate-400">
+              {lang === "ar"
+                ? "لا توجد مجموعات تقارير مصرح بها لحسابك."
+                : "No authorized report groups available."}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map(([key, group]) => (
-              <GroupSummary
+              <GroupCard
                 key={key}
                 groupKey={key}
-                available={group.available}
-                cardCount={group.cards.length}
-                alertCount={group.alerts.length}
-                onOpen={() => onOpenGroup(key)}
+                group={group}
+                lang={lang}
+                onClick={() => onOpenGroup(key)}
               />
             ))}
           </div>
@@ -124,46 +104,61 @@ export function DashboardGroupsOverview({
   );
 }
 
-function GroupSummary({
+function GroupCard({
   groupKey,
-  available,
-  cardCount,
-  alertCount,
-  onOpen,
+  group,
+  lang,
+  onClick,
 }: {
   groupKey: DashboardGroupKey;
-  available: boolean;
-  cardCount: number;
-  alertCount: number;
-  onOpen: () => void;
+  group: DashboardGroup;
+  lang: "ar" | "en";
+  onClick: () => void;
 }) {
-  const { lang } = useI18n();
+  const label = getDashboardGroupLabel(groupKey, lang);
+  const description = getDashboardGroupDescription(groupKey, lang);
+  const available = group.available;
+  const alertCount = group.alerts.length;
+  const cardCount = group.cards.length;
+
   return (
     <button
       type="button"
-      onClick={onOpen}
-      className="group rounded-2xl border border-slate-200 bg-white p-4 text-start shadow-2xs transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-700"
+      onClick={onClick}
+      className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 text-start shadow-xs transition-all hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500 cursor-pointer"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className={`size-2 rounded-full ${available ? "bg-emerald-500" : "bg-slate-400"}`} />
-            <h3 className="text-sm font-extrabold text-slate-950 dark:text-white">
-              {getDashboardGroupLabel(groupKey, lang)}
-            </h3>
-          </div>
-          <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-            {getDashboardGroupDescription(groupKey, lang)}
-          </p>
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+            {label}
+          </h3>
+          <ChevronRight className="size-4 text-slate-400 group-hover:text-indigo-500 transition-colors rtl:rotate-180" />
         </div>
-        <ChevronRight className={`size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 ${lang === "ar" ? "rotate-180" : ""}`} aria-hidden="true" />
+        <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2">
+          {description}
+        </p>
       </div>
+
       <div className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide">
-        <span className={`rounded-md px-2 py-1 ${available ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+        <span
+          className={`rounded-md px-2 py-0.5 border ${
+            available
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50"
+              : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+          }`}
+        >
           {available ? (lang === "ar" ? "متاح" : "Available") : lang === "ar" ? "غير متاح" : "Unavailable"}
         </span>
-        {available && <span className="text-slate-400">{cardCount} {lang === "ar" ? "مؤشرات" : "metrics"}</span>}
-        {alertCount > 0 && <span className="text-amber-600 dark:text-amber-400">{alertCount} {lang === "ar" ? "تنبيهات" : "alerts"}</span>}
+        {available && (
+          <span className="text-slate-500 font-mono">
+            {cardCount} {lang === "ar" ? "مؤشرات" : "metrics"}
+          </span>
+        )}
+        {alertCount > 0 && (
+          <span className="text-amber-600 dark:text-amber-400 font-mono">
+            {alertCount} {lang === "ar" ? "تنبيهات" : "alerts"}
+          </span>
+        )}
       </div>
     </button>
   );
@@ -181,18 +176,43 @@ function ScopeMetric({
   tone: "blue" | "green" | "amber" | "slate";
 }) {
   const tones = {
-    blue: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
-    green: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-    amber: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
-    slate: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    blue: {
+      icon: "text-blue-500 dark:text-blue-400",
+      bg: "bg-blue-50 dark:bg-blue-950/40 border-blue-200/60 dark:border-blue-900/50",
+      topBorder: "border-t-2 border-t-blue-500",
+    },
+    green: {
+      icon: "text-emerald-500 dark:text-emerald-400",
+      bg: "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/60 dark:border-emerald-900/50",
+      topBorder: "border-t-2 border-t-emerald-500",
+    },
+    amber: {
+      icon: "text-amber-500 dark:text-amber-400",
+      bg: "bg-amber-50 dark:bg-amber-950/40 border-amber-200/60 dark:border-amber-900/50",
+      topBorder: "border-t-2 border-t-amber-500",
+    },
+    slate: {
+      icon: "text-slate-500 dark:text-slate-400",
+      bg: "bg-slate-100 dark:bg-slate-800 border-slate-200/60 dark:border-slate-700/50",
+      topBorder: "border-t-2 border-t-slate-400",
+    },
   };
+
+  const current = tones[tone];
+
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-      <div className={`inline-flex rounded-lg p-2 ${tones[tone]}`}>
+    <section
+      className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900 ${current.topBorder}`}
+    >
+      <div className={`inline-flex rounded-xl p-2.5 border ${current.bg} ${current.icon}`}>
         <Icon className="size-4" aria-hidden="true" />
       </div>
-      <p className="mt-3 text-2xl font-black tabular-nums text-slate-950 dark:text-white">{value}</p>
-      <p className="mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-3 text-xl sm:text-2xl font-black tabular-nums text-slate-900 dark:text-slate-100">
+        {value}
+      </p>
+      <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        {label}
+      </p>
     </section>
   );
 }

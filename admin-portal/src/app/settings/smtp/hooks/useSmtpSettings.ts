@@ -1,194 +1,293 @@
 "use client";
- 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
-import { SuccessResponse } from "@/types/common";
+import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { generateUUIDv7 } from "@/lib/utils/uuid";
+import {
+  normalizeApiError,
+  type NormalizedApiError,
+} from "@/shared/api/normalized-api-error";
+import {
+  buildSmtpPatch,
+  formFromSmtpConfig,
+  isSmtpFormDirty,
+  readSmtpAuditEnvelope,
+  readSmtpConfigEnvelope,
+  readSmtpVerificationEnvelope,
+  type CoreSnapshot,
+  type PlatformSmtpConfig,
+  type SmtpAuditLog,
+  type SmtpField,
+  type SmtpFormState,
+  type SmtpValidationErrors,
+} from "../smtp-contract";
+import type { SettingsLoadState } from "../../hooks/useSettings";
 
-import { useHasPermission } from "@/components/auth/RequirePermission";
+const SAVE_PERMISSIONS = [
+  "admin.settings.update",
+  "admin.settings.critical",
+] as const;
 
-export interface SmtpConfigState {
-  fromAddress: string;
-  fromName: string;
-  senderDomain: string;
-  smtpHost: string;
-  smtpPort: number;
-  smtpSecure: boolean;
-  smtpProtocol: "smtp" | "smtps";
-  smtpUsername: string;
-  smtpPasswordConfigured: boolean;
-  configured: boolean;
-  revision?: number | null;
-  updatedAt?: string | null;
-}
+type SmtpMutation = {
+  action: "SAVE" | "VERIFY" | null;
+  phase: "IDLE" | "PENDING" | "SUCCEEDED" | "FAILED";
+  error: NormalizedApiError | null;
+  localCode: string | null;
+  correlationId: string | null;
+};
 
-export interface SmtpAuditChange {
-  field: string;
-  label: string;
-  previousValue: any;
-  newValue: any;
-}
-
-export interface SmtpAuditLog {
-  id: string;
-  action: "CONFIGURED" | "UPDATED" | "CONNECTION_VERIFIED";
-  revision: number | null;
-  actor: string;
-  changes: SmtpAuditChange[];
-  createdAt: string;
-}
+const EMPTY_MUTATION: SmtpMutation = {
+  action: null,
+  phase: "IDLE",
+  error: null,
+  localCode: null,
+  correlationId: null,
+};
 
 export function useSmtpSettings() {
   const { lang } = useI18n();
-  const hasUpdatePermission = useHasPermission("admin.settings.update");
-
-  const [config, setConfig] = useState<SmtpConfigState>({
-    fromAddress: "",
-    fromName: "",
-    senderDomain: "",
-    smtpHost: "",
-    smtpPort: 587,
-    smtpSecure: true,
-    smtpProtocol: "smtps",
-    smtpUsername: "",
-    smtpPasswordConfigured: false,
-    configured: false,
-  });
-
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canRead = adminCan(user, "admin.settings.read");
+  const canSaveCritical = adminCanAll(user, SAVE_PERMISSIONS);
+  const canVerify = adminCan(user, "admin.settings.update");
+  const [snapshot, setSnapshot] = useState<CoreSnapshot<PlatformSmtpConfig> | null>(null);
+  const [form, setForm] = useState<SmtpFormState | null>(null);
+  const [password, setPasswordState] = useState("");
   const [auditLogs, setAuditLogs] = useState<SmtpAuditLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [hasFetchError, setHasFetchError] = useState(false);
-
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [configState, setConfigState] = useState<SettingsLoadState>("LOADING");
+  const [auditState, setAuditState] = useState<SettingsLoadState>("LOADING");
+  const [configError, setConfigError] = useState<NormalizedApiError | null>(null);
+  const [auditError, setAuditError] = useState<NormalizedApiError | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<SmtpValidationErrors>({});
+  const [mutation, setMutation] = useState<SmtpMutation>(EMPTY_MUTATION);
+  const configGeneration = useRef(0);
+  const auditGeneration = useRef(0);
+  const saveIntent = useRef<{ fingerprint: string; key: string } | null>(null);
+  const verifyIntent = useRef<string | null>(null);
 
   const fetchConfig = useCallback(async () => {
-    setIsLoading(true);
-    setHasFetchError(false);
-    try {
-      const [configRes, auditRes] = await Promise.all([
-        axiosClient.get<SuccessResponse<any>>(`/api/admin/core/v1/system-settings/email`),
-        axiosClient.get<SuccessResponse<SmtpAuditLog[]>>(`/api/admin/core/v1/system-settings/email/audit`),
-      ]);
-
-      if (configRes.data && configRes.data.success) {
-        const data = configRes.data.data;
-        setConfig({
-          fromAddress: data.fromAddress || "",
-          fromName: data.fromName || "",
-          senderDomain: data.senderDomain || "",
-          smtpHost: data.smtpHost || "",
-          smtpPort: data.smtpPort || 587,
-          smtpSecure: Boolean(data.smtpSecure),
-          smtpProtocol: data.smtpProtocol || "smtp",
-          smtpUsername: data.smtpUsername || "",
-          smtpPasswordConfigured: Boolean(data.smtpPasswordConfigured),
-          configured: Boolean(data.configured),
-          revision: data.revision,
-          updatedAt: data.updatedAt,
-        });
-      }
-
-      if (auditRes.data && auditRes.data.success) {
-        setAuditLogs(auditRes.data.data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch SMTP settings or audit logs", err);
-      setHasFetchError(true);
-      setAuditLogs([]);
-    } finally {
-      setIsLoading(false);
+    const generation = ++configGeneration.current;
+    if (isAuthLoading) {
+      setConfigState("LOADING");
+      return;
     }
-  }, []);
+    if (!canRead) {
+      setSnapshot(null);
+      setForm(null);
+      setConfigError(null);
+      setConfigState("FORBIDDEN");
+      return;
+    }
+    setConfigState("LOADING");
+    setConfigError(null);
+    try {
+      const response = await axiosClient.get<unknown>(
+        "/api/admin/core/v1/system-settings/email",
+        { cache: "no-store" },
+      );
+      if (generation !== configGeneration.current) return;
+      const result = readSmtpConfigEnvelope(response.data);
+      setSnapshot(result);
+      setForm(formFromSmtpConfig(result.data));
+      setPasswordState("");
+      setFieldErrors({});
+      saveIntent.current = null;
+      setConfigState("READY");
+    } catch (caught) {
+      if (generation !== configGeneration.current) return;
+      const normalized = normalizeApiError(caught);
+      setSnapshot(null);
+      setForm(null);
+      setConfigError(normalized);
+      setConfigState(classifyLoadError(normalized));
+    }
+  }, [canRead, isAuthLoading]);
+
+  const fetchAudit = useCallback(async () => {
+    const generation = ++auditGeneration.current;
+    if (isAuthLoading) {
+      setAuditState("LOADING");
+      return;
+    }
+    if (!canRead) {
+      setAuditLogs([]);
+      setAuditError(null);
+      setAuditState("FORBIDDEN");
+      return;
+    }
+    setAuditState("LOADING");
+    setAuditError(null);
+    try {
+      const response = await axiosClient.get<unknown>(
+        "/api/admin/core/v1/system-settings/email/audit",
+        { cache: "no-store" },
+      );
+      if (generation !== auditGeneration.current) return;
+      const result = readSmtpAuditEnvelope(response.data);
+      setAuditLogs(result.data);
+      setAuditState("READY");
+    } catch (caught) {
+      if (generation !== auditGeneration.current) return;
+      const normalized = normalizeApiError(caught);
+      setAuditLogs([]);
+      setAuditError(normalized);
+      setAuditState(classifyLoadError(normalized));
+    }
+  }, [canRead, isAuthLoading]);
 
   useEffect(() => {
-    queueMicrotask(() => fetchConfig());
-  }, [fetchConfig]);
+    queueMicrotask(() => {
+      void fetchConfig();
+      void fetchAudit();
+    });
+  }, [fetchAudit, fetchConfig]);
 
-  const handleUpdate = (field: keyof SmtpConfigState, value: any) => {
-    setConfig((prev) => ({ ...prev, [field]: value }));
-  };
+  const handleUpdate = useCallback(
+    <K extends keyof SmtpFormState>(field: K, value: SmtpFormState[K]) => {
+      if (!canSaveCritical) return;
+      setForm((current) => (current ? { ...current, [field]: value } : current));
+      setFieldErrors((current) => without(current, field));
+      saveIntent.current = null;
+      setMutation(EMPTY_MUTATION);
+    },
+    [canSaveCritical],
+  );
+  const setPassword = useCallback(
+    (value: string) => {
+      if (!canSaveCritical) return;
+      setPasswordState(value);
+      setFieldErrors((current) => without(current, "smtpPassword"));
+      saveIntent.current = null;
+      setMutation(EMPTY_MUTATION);
+    },
+    [canSaveCritical],
+  );
 
-  const saveConfig = async (password?: string) => {
-    setIsSaving(true);
+  const hasUnsavedChanges = useMemo(
+    () => Boolean(snapshot && form && isSmtpFormDirty(form, password, snapshot.data)),
+    [form, password, snapshot],
+  );
 
-    const payload: Record<string, any> = {
-      fromAddress: config.fromAddress,
-      fromName: config.fromName,
-      senderDomain: config.senderDomain,
-      smtpHost: config.smtpHost,
-      smtpPort: config.smtpPort,
-      smtpSecure: config.smtpSecure,
-      smtpProtocol: config.smtpProtocol,
-      smtpUsername: config.smtpUsername,
-    };
-
-    if (password) {
-      payload.smtpPassword = password;
+  const saveConfig = useCallback(async () => {
+    if (!snapshot || !form || !canSaveCritical || mutation.phase === "PENDING") {
+      setMutation({ ...EMPTY_MUTATION, action: "SAVE", phase: "FAILED", localCode: "SAVE_PERMISSION_OR_STATE_REQUIRED" });
+      return false;
     }
-
+    const { dto, errors } = buildSmtpPatch(form, password, snapshot.data);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length || !Object.keys(dto).length) {
+      setMutation({ ...EMPTY_MUTATION, action: "SAVE", phase: "FAILED", localCode: Object.keys(errors).length ? "SMTP_VALIDATION_FAILED" : "NO_SMTP_CHANGES" });
+      return false;
+    }
+    const fingerprint = JSON.stringify(dto);
+    const key = saveIntent.current?.fingerprint === fingerprint
+      ? saveIntent.current.key
+      : generateUUIDv7();
+    saveIntent.current = { fingerprint, key };
+    setMutation({ action: "SAVE", phase: "PENDING", error: null, localCode: null, correlationId: null });
     try {
-      const res = await axiosClient.patch<SuccessResponse<any>>(
-        `/api/admin/core/v1/system-settings/email`,
-        payload
+      const response = await axiosClient.patch<unknown>(
+        "/api/admin/core/v1/system-settings/email",
+        dto,
+        { headers: { "x-idempotency-key": key } },
       );
-
-      const updated = res.data.data;
-      setConfig((prev) => ({
-        ...prev,
-        smtpPasswordConfigured: Boolean(updated.smtpPasswordConfigured),
-        revision: updated.revision,
-        configured: Boolean(updated.configured),
-      }));
-      setLastSaved(new Date());
-      fetchConfig();
-    } catch (err: any) {
-      let msg = "Failed to save SMTP configuration";
-      if (err?.response?.data) {
-        msg = err.response.data.message || err.response.data.title || err.response.data.detail || msg;
-      }
-      throw new Error(msg);
-    } finally {
-      setIsSaving(false);
+      const result = readSmtpConfigEnvelope(response.data);
+      saveIntent.current = null;
+      setSnapshot(result);
+      setForm(formFromSmtpConfig(result.data));
+      setPasswordState("");
+      setFieldErrors({});
+      setMutation({ action: "SAVE", phase: "SUCCEEDED", error: null, localCode: null, correlationId: result.correlationId });
+      void fetchAudit();
+      return true;
+    } catch (caught) {
+      const normalized = normalizeApiError(caught);
+      if (!retainIntent(normalized)) saveIntent.current = null;
+      setMutation({ action: "SAVE", phase: "FAILED", error: normalized, localCode: null, correlationId: normalized.correlationId ?? null });
+      return false;
     }
-  };
+  }, [canSaveCritical, fetchAudit, form, mutation.phase, password, snapshot]);
 
-  const verifyConnection = async () => {
-    setIsVerifying(true);
+  const verifyConnection = useCallback(async () => {
+    if (
+      !snapshot?.data.configured ||
+      !canVerify ||
+      hasUnsavedChanges ||
+      mutation.phase === "PENDING"
+    ) {
+      setMutation({ ...EMPTY_MUTATION, action: "VERIFY", phase: "FAILED", localCode: hasUnsavedChanges ? "SAVE_BEFORE_VERIFY" : "VERIFY_PERMISSION_OR_STATE_REQUIRED" });
+      return false;
+    }
+    const key = verifyIntent.current ?? generateUUIDv7();
+    verifyIntent.current = key;
+    setMutation({ action: "VERIFY", phase: "PENDING", error: null, localCode: null, correlationId: null });
     try {
-      await axiosClient.post<SuccessResponse<any>>(
-        `/api/admin/core/v1/system-settings/email/verify-connection`,
-        undefined // Explicitly no body
+      const response = await axiosClient.post<unknown>(
+        "/api/admin/core/v1/system-settings/email/verify-connection",
+        undefined,
+        { headers: { "x-idempotency-key": key } },
       );
-
-      fetchConfig();
-    } catch (err: any) {
-      let msg = "Connection verification failed";
-      if (err?.response?.data) {
-        msg = err.response.data.message || err.response.data.title || err.response.data.detail || msg;
-      }
-      throw new Error(msg);
-    } finally {
-      setIsVerifying(false);
+      const result = readSmtpVerificationEnvelope(response.data);
+      verifyIntent.current = null;
+      setMutation({ action: "VERIFY", phase: "SUCCEEDED", error: null, localCode: null, correlationId: result.correlationId });
+      void fetchAudit();
+      return true;
+    } catch (caught) {
+      const normalized = normalizeApiError(caught);
+      if (!retainIntent(normalized)) verifyIntent.current = null;
+      setMutation({ action: "VERIFY", phase: "FAILED", error: normalized, localCode: null, correlationId: normalized.correlationId ?? null });
+      return false;
     }
-  };
+  }, [canVerify, fetchAudit, hasUnsavedChanges, mutation.phase, snapshot]);
 
   return {
     lang,
-    config,
+    snapshot,
+    form,
+    password,
     auditLogs,
-    isLoading,
-    isSaving,
-    lastSaved,
+    configState,
+    auditState,
+    configError,
+    auditError,
+    fieldErrors,
+    mutation,
+    canRead,
+    canSaveCritical,
+    canVerify,
+    hasUnsavedChanges,
+    canTestSavedConfig: Boolean(
+      snapshot?.data.configured && canVerify && !hasUnsavedChanges && configState === "READY",
+    ),
     handleUpdate,
+    setPassword,
     saveConfig,
     verifyConnection,
-    isVerifying,
-    refetch: fetchConfig,
-    hasUpdatePermission,
-    hasFetchError,
+    refetchConfig: fetchConfig,
+    refetchAudit: fetchAudit,
   };
+}
+
+function classifyLoadError(error: NormalizedApiError): SettingsLoadState {
+  if (error.httpStatus === 403) return "FORBIDDEN";
+  if (error.httpStatus >= 500 || error.errorCode === "UNKNOWN_ERROR") return "UNAVAILABLE";
+  return "ERROR";
+}
+
+function retainIntent(error: NormalizedApiError): boolean {
+  return (
+    error.httpStatus >= 500 ||
+    error.errorCode === "UNKNOWN_ERROR" ||
+    error.errorCode === "GW.IDEM.IN_FLIGHT"
+  );
+}
+
+function without(errors: SmtpValidationErrors, field: SmtpField): SmtpValidationErrors {
+  if (!errors[field]) return errors;
+  const next = { ...errors };
+  delete next[field];
+  return next;
 }

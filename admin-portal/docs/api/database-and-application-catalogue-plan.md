@@ -93,8 +93,8 @@ Current Application Catalogue evidence must still retain these boundaries:
   version; Core derives them during fenced DRAFT adoption/binding and the UI
   treats the returned/refetched server projection as authority;
 - metadata changes invalidate publication and never auto-publish;
-- remaining catalogue localization, deployment, and operational release gates
-  stay explicit.
+- Arabic/English source coverage is complete; authenticated deployment and
+  operational release gates stay explicit.
 
 ## Documentation implementation matrix
 
@@ -108,10 +108,10 @@ Current Application Catalogue evidence must still retain these boundaries:
 | `docs/rbac/permissions.md` | Add exact `admin.applications.*`; correct catalogue critical overlays and Database credential permissions |
 | `docs/api/README.md` | Describe Application Catalogue as one domain and correct its current source status |
 | `docs/frontend-integration-guide.md` | Replace `/modules` routes and false-live claims with `/applications-catalogue` and current gaps |
-| `docs/audit/frontend-capability-matrix.md` | Separate Application identity partial integration from missing commercial catalogue UI |
+| `docs/audit/frontend-capability-matrix.md` | Record the source-integrated Application identity, publication, technical-readiness, audit, pricing, currency, tier, feature, and grant surfaces |
 | `docs/guides/sidebar-navigation.md` | Replace stale Modules navigation with Application Catalogue navigation |
 
-The generated Admin Core route inventory is current at 235 routes. It remains
+The generated Admin Core route inventory is current at 240 routes. It remains
 transport evidence; controller, DTO, service, and test source remain the
 behavioral authority.
 

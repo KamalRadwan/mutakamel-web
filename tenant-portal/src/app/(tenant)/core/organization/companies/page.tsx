@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Building2, GitBranch, Layers, Users, Eye, Trash2, Globe, FileText } from "lucide-react";
+import { Building2, GitBranch, Layers, Users, Eye, Trash2, Globe } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useCompanies, CompanyItem } from "./hooks/useCompanies";
 import { CreateCompanyModal } from "./components/CreateCompanyModal";
@@ -18,8 +17,6 @@ export default function CompaniesPage() {
     rawCount,
     searchQuery,
     setSearchQuery,
-    statusFilter,
-    setStatusFilter,
     isCreateOpen,
     setIsCreateOpen,
     handleCreate,

@@ -1,8 +1,16 @@
-export type OpportunityView = "board" | "list" | "card";
 export type OpportunityStatus = "IN_PROGRESS" | "ON_HOLD" | "WON" | "LOST";
 export type OpportunityImportance = 0 | 1 | 2 | 3;
 export type OpportunityActivityState = "NO_OPEN" | "OVERDUE" | "TODAY" | "FUTURE";
-export type StageFlag = "NEW" | "OPEN" | "WON" | "LOST";
+export type StageFlag =
+  | "NEW"
+  | "DISCOVERY"
+  | "QUALIFICATION"
+  | "PROPOSAL"
+  | "NEGOTIATION"
+  | "CONTRACTING"
+  | "ON_HOLD"
+  | "WON"
+  | "LOST";
 
 export interface OpportunityRecord {
   id: string;
@@ -14,30 +22,24 @@ export interface OpportunityRecord {
   status: OpportunityStatus;
   title: string;
   importance: OpportunityImportance;
-  amount: number;
-  currencyCode: string;
-  description?: string;
-  probabilityPercent: number;
-  expectedCloseDate?: string;
-  ownerUserId: string;
+  amount: string | null;
+  currencyCode: string | null;
+  description?: string | null;
+  probabilityPercent: number | null;
+  expectedCloseDate?: string | null;
+  ownerUserId?: string | null;
   createdAt: string;
   updatedAt: string;
-  wonAt?: string;
-  lostAt?: string;
-  lostReason?: string;
-  nextOpenActivityAt?: string;
+  wonAt?: string | null;
+  lostAt?: string | null;
+  lostReason?: string | null;
+  nextOpenActivityAt?: string | null;
   activityState: OpportunityActivityState;
 }
 
 export interface OpportunityCardRecord extends OpportunityRecord {
-  customerCompanyName?: string;
-  customerPhone?: string;
-  customerCountry?: string;
-  customerCity?: string;
-  leadSourceName?: string;
-  ownerDisplayName?: string;
-  ownerAvatarUrl?: string;
-  openActivityCount: number;
+  customerDisplayName?: string;
+  contactDisplayName?: string;
 }
 
 export interface OpportunityStage {
@@ -51,7 +53,6 @@ export interface OpportunityStage {
   rank: number;
   isActive: boolean;
   isSystem: boolean;
-  probabilityPercent: number;
   colorTheme?: string;
 }
 
@@ -70,9 +71,10 @@ export interface OpportunityBoardLane {
   items: OpportunityCardRecord[];
   summary: {
     totalCount: number;
-    amountsByCurrency: Record<string, number>;
+    amountsByCurrency: Record<string, string>;
   };
   activitySummary: {
+    totalCount: number;
     noOpenCount: number;
     overdueCount: number;
     todayCount: number;
@@ -81,7 +83,7 @@ export interface OpportunityBoardLane {
   pageInfo: {
     limit: number;
     hasMore: boolean;
-    nextCursor?: string;
+    nextCursor: string | null;
   };
 }
 
@@ -90,9 +92,15 @@ export interface OpportunityBoard {
   stages: OpportunityBoardLane[];
 }
 
-export interface SearchFilterToken {
-  id: string;
-  field: "sales_person" | "opportunity" | "phone" | "customer" | "all";
-  fieldLabel: string;
-  value: string;
+export function formatCurrencyAmount(
+  amount: string | null,
+  currencyCode: string | null,
+): string {
+  if (amount === null || !/^-?\d+(?:\.\d{1,2})?$/.test(amount)) return "—";
+  const negative = amount.startsWith("-");
+  const unsigned = negative ? amount.slice(1) : amount;
+  const [whole, fraction = ""] = unsigned.split(".");
+  const grouped = new Intl.NumberFormat("en-US").format(BigInt(whole));
+  const decimal = fraction ? `.${fraction.padEnd(2, "0")}` : "";
+  return `${currencyCode ? `${currencyCode} ` : ""}${negative ? "-" : ""}${grouped}${decimal}`;
 }

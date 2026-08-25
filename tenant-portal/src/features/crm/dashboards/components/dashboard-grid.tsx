@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
-// @ts-ignore
-import { ResponsiveGridLayout } from "react-grid-layout";
+import { Responsive as ResponsiveGrid, type Layout } from "react-grid-layout/legacy";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
@@ -11,8 +10,6 @@ import { DashboardWidgetRenderer } from "./dashboard-widget-renderer";
 import { DASHBOARD_COLUMN_COUNT } from "../models/dashboard-model";
 import type { DashboardRunResult, CrmDashboardWidget } from "../models/dashboard-types";
 import type { DashboardPointSelection } from "./renderers/dashboard-echarts-options";
-
-const ResponsiveGrid = ResponsiveGridLayout as any;
 
 interface DashboardGridProps {
   runResult?: DashboardRunResult;
@@ -35,9 +32,9 @@ export function DashboardGrid({ runResult, loading, onPointSelect }: DashboardGr
     }));
   }, [draftPlacements]);
 
-  const handleLayoutChange = (currentLayout: any) => {
+  const handleLayoutChange = (currentLayout: Layout) => {
     if (!editMode || !Array.isArray(currentLayout)) return;
-    currentLayout.forEach((item: any) => {
+    currentLayout.forEach((item) => {
       updatePlacement(item.i, item.x, item.y, item.w, item.h);
     });
   };

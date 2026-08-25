@@ -2,7 +2,7 @@
 
 Status: **Current**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 ## Protected assets
 
@@ -33,8 +33,8 @@ Last verified: **2026-07-25**
 | Cross-tenant IDOR | Backend tenant predicates and current trusted context; negative tests |
 | Cross-branch/company/channel access | Guard and repository scope checks; never body-only scope |
 | JWT audience confusion | Canonical master-to-audience binding in Gateway and owner apps |
-| Stale/revoked session | Database session version plus monotonic rejection watermark |
-| Refresh/login race | Generation-scoped session and coordinated refresh |
+| Stale/revoked session | Active database Auth Session plus exact security, authorization, profile, and session epochs; Redis can reject/cache but never grant |
+| Refresh/login race | Row-locked reusable session credential, independent counters, and optional cross-tab coordination |
 | Caller-forged trusted headers | Strip at Next/Gateway; inject only verified context |
 | Permission or entitlement bypass | Independent owning-app checks and subscription/seat enforcement |
 | Duplicate financial/lifecycle writes | Durable idempotency, exact replay fingerprints, concurrency locks |

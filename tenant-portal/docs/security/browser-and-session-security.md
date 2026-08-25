@@ -2,7 +2,7 @@
 
 Status: **Required replacement contract**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-09**
 
 ## Token handling
 
@@ -15,20 +15,32 @@ Last verified: **2026-07-25**
 - Redact `Authorization`, cookies, refresh tokens, invitation/reset tokens,
   payment checkout evidence, SIP passwords, and signed URLs.
 
-The exact tenant token storage mechanism must match the current Core contract.
-Changing to HttpOnly cookie mode requires verified backend support and is not a
-frontend-only decision.
+The accepted direct-cutover contract uses Secure HttpOnly cookies for the
+short-lived access token and reusable opaque session credential. Browser
+JavaScript rejects a cookie-mode response containing raw token fields.
+
+Unsafe cookie-authenticated requests copy the non-HttpOnly,
+session-bound `__Host-mutakamel-tenant-csrf` cookie into `x-csrf-token`.
+The proof is not stored in application state, logs, diagnostics, or events.
 
 ## Generation isolation
 
-Every authenticated request is associated with one session generation.
+Every authenticated request is associated with one server `sid`.
 
-- A new login creates a new generation.
-- Refresh rotates only the expected generation.
-- Logout removes/tombstones before navigation.
-- Storage events invalidate other tabs.
-- Delayed work from an old generation fails closed.
-- Cache keys include or are cleared by generation.
+- A new browser/device login creates another independent `sid`.
+- Refresh reuses the credential and cannot revoke sibling tabs.
+- Logout/revoke tombstones the exact `sid` only after durable server success,
+  before navigation; a transient failure retains authenticated/degraded state.
+- BroadcastChannel and storage events carry only a non-secret event ID, `sid`,
+  kind, source ID, and timestamp. A changed `sid` blocks old-request replay.
+- Permission `403` does not refresh or clear auth; terminal session codes do.
+- Network/`429`/`5xx` failures retain auth and expose degraded state.
+
+Only trusted pointer, keyboard, or touch events in a visible tab may mark human
+activity. Synthetic events, polling, refresh, timers, hidden tabs, and WSS
+traffic cannot extend auth idle time. Core owns all idle-deadline writes;
+CRM/Trade activity is checkpointed through Core first. Employee WSS-duration
+accounting remains independent from authentication session TTLs.
 
 ## Cross-site protections
 

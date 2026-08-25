@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { safeStorage } from "@/lib/safeStorage";
 import { ar, Dictionary } from "./dictionaries/ar";
 import { en } from "./dictionaries/en";
@@ -22,9 +22,15 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const savedLang = (safeStorage.getItem("tenant_lang") as Language) || "ar";
-    setLangState(savedLang);
     document.documentElement.setAttribute("dir", savedLang === "ar" ? "rtl" : "ltr");
     document.documentElement.setAttribute("lang", savedLang);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setLangState(savedLang);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const setLang = (newLang: Language) => {

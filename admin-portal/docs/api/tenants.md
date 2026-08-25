@@ -3,7 +3,7 @@
 Verified against the current API Gateway route contracts, Core controllers,
 DTOs, services, repositories, entities, subscription quoting, provisioning
 contracts, error catalogue, and active Admin Portal screens on
-**2026-08-05**.
+**2026-08-12**.
 
 This is the implementation contract for `/tenants`, `/tenants/new`, and the
 tenant-detail shell. It covers identity validation, creation, list/detail,
@@ -22,31 +22,31 @@ permissioned nested resources.
 | Entity identifiers | UUIDv7 |
 | Active frontend routes | `/tenants`, `/tenants/new`, `/tenants/[id]` |
 | Legacy frontend routes | `/tenant` and `/tenant/new` redirect to the plural family; `/tenant/[id]` currently loses the id and redirects to `/tenants` |
-| Current integration | `/tenants/new` now uses the real identity-availability endpoint, one least-privilege tenant-create Application/readiness/tier snapshot, Application-aware database placement, Storage placement, provisioning preview, quote, and explicit UUIDv7 placement IDs. List/detail remain partial. |
+| Current integration | `/tenants` has server pagination/filters and authoritative database options; `/tenants/new` uses identity, create-options, quote, reverse-geocode, and canonical geography contracts; `/tenants/:id` is a tenant-first, permission-isolated workspace for profile/lifecycle/FQDN, provisioning, tenant access, subscription/items, wallet/ledger, invoices, and payments. |
 
-The Gateway currently exposes exactly **69** routes whose browser paths start
-with `/api/admin/core/v1/tenants`. They are divided as follows:
+The historical migration design is absent from current source. The Gateway
+currently exposes **62** routes whose browser paths start with
+`/api/admin/core/v1/tenants`. They are divided as follows:
 
 | Family | Count | Detailed reference |
 |:---|---:|:---|
-| Tenant creation, registry, lifecycle, and FQDNs | 19 | This document |
+| Tenant creation, registry, lifecycle, and FQDNs | 20 | This document |
 | Operation history and tenant-scoped provisioning | 15 | [Tenant Operations and Provisioning](tenant-operations.md) |
 | Tenant users and access catalogues | 18 | [Tenant Users](tenant-users.md) |
 | Subscription and billing summary | 4 | [Subscriptions](subscriptions.md), [Invoices](invoices.md) |
 | Wallet, ledger, adjustments, and payments | 5 | [Wallet and Ledger](wallet.md) |
-| Tenant Storage Server migrations | 8 | [Tenant Storage Server Migrations](tenant-storage-migrations.md) |
+| Tenant Storage Server migrations | 0 | [Historical design only](tenant-storage-migrations.md) |
 
-The creation wizard also needs two Core routes outside that 69-route prefix:
+The creation wizard also needs two Core routes outside that 62-route prefix:
 the FQDN preflight and subscription quote documented below.
 
 Browser code must use the canonical Gateway paths. Controller-relative
 `/admin/tenants/...` paths are not frontend URLs.
 
-### Other nested tenant routes in the 69-route inventory
+### Other nested tenant routes in the 62-route inventory
 
-The nine billing/wallet routes below and the eight migration routes in the
-dedicated migration document complete the accounting above. Their detailed
-DTOs and response models live in the linked domain documents.
+The nine billing/wallet routes below complete the current accounting above.
+Their detailed DTOs and response models live in the linked domain documents.
 
 | Method and browser path | Permission | Success | Idempotency key | Detailed reference |
 |:---|:---|:---:|:---:|:---|
@@ -105,9 +105,9 @@ write above has a `WRITE_SENSITIVE`, `idempotent: true` Gateway contract,
 including update, lifecycle, delete, and destroy routes.
 
 Every protected browser request must use the shared authenticated client with
-`credentials: "include"` and `x-auth-cookie-mode: 1`, preserving the
-coordinated refresh retry. Browser code must not store or attach a legacy
-access token and must not call Core directly.
+`credentials: "include"`, preserving the coordinated refresh retry. Browser
+code must not choose an authentication mode, store or attach a legacy access
+token, or call Core directly.
 
 ## HTTP envelopes and errors
 
@@ -526,8 +526,8 @@ interface TenantCreateDatabasePlacementOptionsView {
     id: string;
     name: string;
     status: DatabaseServerStatusEnum;
-    countryName?: string;
-    countryIsoCode?: string;
+    countryName?: string | null;
+    countryIsoCode?: string | null;
     currentTenants: number;
     maxTenants: number;
   }>;
@@ -540,6 +540,9 @@ deduplicated selected Application keys. A returned server is active, has spare
 capacity, has both fixed system principals ready, and has ready current
 bindings for all mandatory and selected Applications. Refetch this list when
 the Application-key set changes and clear any previous database selection.
+PostgreSQL-backed optional location fields can be `null`; the response adapter
+normalizes them to absent display metadata without rejecting the eligible
+server.
 
 The Admin Portal V1 requires an explicit returned UUIDv7 and sends it as
 `databaseServerId`. It never sends `placementMode`, never displays the complete
@@ -673,9 +676,18 @@ prefix:
 `POST /api/admin/core/v1/subscriptions/quote`
 
 Permission: either `admin.catalog.read` or `admin.tenants.create` (`ANY`). This
-route is an authenticated read-like POST and does not require an idempotency
-header. The tenant-create wizard uses `admin.tenants.create`; standalone
-catalogue/pricing surfaces may use `admin.catalog.read`.
+authenticated POST issues a new short-lived quote row and does not require an
+idempotency header. Its Gateway contract permits one exact request replay after
+a pre-handler authentication `401`; the portal therefore refreshes silently
+and resubmits the unchanged body once. It does not perform arbitrary UI-level
+retries after an ambiguous outcome. Non-terminal refresh failures are retried
+behind the still-locked submission, while a session switch rejects the old
+quote intent instead of replaying it under the new login. If bounded repair is
+exhausted, the session is retained and the wizard shows one retryable quote
+error; terminal auth and permission-denied UI remain globally owned. The
+tenant-create wizard uses
+`admin.tenants.create`; standalone catalogue/pricing surfaces may use
+`admin.catalog.read`.
 
 ```ts
 interface QuoteSubscriptionDto {
@@ -1032,17 +1044,12 @@ Do not put a Storage Server selector in existing-tenant profile edit, do not
 send `storageServerId` as an unknown field, and do not mutate the displayed
 assignment optimistically.
 
-The backend now has a separate eight-route, default-off migration authority
-covering write fencing, copy/verification, cutover, rollback, finalization,
-retry, and cancel. It is not a profile-update contract. The public Admin read
-model still omits the revisions and operation discovery needed to initiate and
-recover the workflow safely, and live operational release gates remain open.
-The Admin Portal must therefore keep “Change storage” unavailable for now.
-
-See [Tenant Storage Server Migrations](tenant-storage-migrations.md) for the
-complete endpoint, DTO, permission, state, idempotency, readiness-blocker, and
-future UI contract. A read-permitted admin may still follow
-`storageServerId` to `/storage-servers/[storageServerId]`.
+The historical eight-route migration design is absent from current Core and
+Gateway source. It is not a profile-update contract, and the Admin Portal must
+keep "Change storage" unavailable. See
+[Tenant Storage Server Migrations](tenant-storage-migrations.md) for the
+historical proposal and current removal status. A read-permitted admin may
+still follow `storageServerId` to `/storage-servers/[storageServerId]`.
 
 ## Lifecycle
 
@@ -1244,7 +1251,7 @@ disable promotion until the row is `VALID` with `verifiedAt`.
 Operation-command errors are detailed in
 [Tenant Operations and Provisioning](tenant-operations.md).
 
-## Current frontend gaps
+## Current frontend integration and runtime gates
 
 The `/tenants/new` authoritative catalogue and placement slice is
 source-integrated:
@@ -1261,6 +1268,9 @@ source-integrated:
   nested `subscription` object;
 - ambiguous create outcomes retain only a minimal status-recovery marker and
   block a new submit; no tenant DTO or PII is persisted for replay;
+- a response discarded after a cross-tab session change retains that marker
+  because the old-session create may already have committed, while exhausted
+  pre-handler auth repair clears it so the operator can safely retry;
 - success remains `PROVISIONING` and redirects with the returned tenant id.
 
 Identity availability is now source-integrated through the canonical endpoint,
@@ -1275,36 +1285,31 @@ The least-privilege composite create-options call and identity flow still need
 authenticated runtime and browser proof against the migrated development
 database.
 
-The tenant directory and detail areas remain partial: their lifecycle, nested
-access, FQDN, subscription, wallet, and operation behavior must be corrected
-independently. Source integration is not authenticated runtime or deployment
-proof.
+The tenant detail workspace is source-integrated:
 
-## Recommended implementation sequence
+- the tenant projection loads first and alone controls the shell;
+- `PROVISIONING` opens the provisioning workspace and polls boundedly;
+- tenant-database users/access reads remain completely disabled until status is
+  `ACTIVE` or `SUSPENDED`;
+- FQDN rows load from exact `GET /tenants/:id/fqdns`; the list is reconciled
+  after mutations and tenant detail remains an independent resource;
+- profile concurrency, lifecycle, delete/destroy, and every FQDN command use
+  caller-owned UUIDv7 intent keys and exact permission/state gates;
+- all 15 tenant provisioning routes and all 18 tenant access routes have typed
+  UI surfaces;
+- subscription, billing summary, wallet, ledger, payment, refund, and payment
+  reconciliation resources load independently by permission and only when the
+  billing tab is opened.
 
-1. Add exact envelopes, error normalization, tenant/FQDN models, and
-   idempotency-key support.
-2. Replace the directory with paginated server data and valid status/server
-   filters.
-3. Implement detail loading and derive only fields supported by `TenantView`.
-4. Implement optimistic profile update and lifecycle permissions/states.
-5. Rebuild the creation wizard around catalogue IDs/keys, database placement,
-   required explicit Storage Server placement, plan preview, server quote, and
-   one durable create command.
-6. Poll/open the returned provisioning operation instead of marking the tenant
-   active.
-7. Implement FQDN preflight and add/remove; hide primary promotion for normal
-   platform domains.
-8. Integrate users, subscriptions, wallet, and operations as independently
-   loaded and permissioned tabs.
-9. Add soft-delete and permanent-destroy flows with their distinct retention
-   constraints.
-10. Remove mock datasets only after loading, empty, forbidden, conflict,
-    retry/replay, stale, and terminal states exist.
-11. Keep existing-tenant Storage Server placement read-only until the
-    migration-specific safe target/revision/current-operation read model and
-    live four-app, Worker, broker, Garage, monitoring, and operational release
-    gates pass.
+The tenant directory is source-integrated with server paging/filtering and an
+independently loaded authoritative Database Server registry. Tenant creation
+uses canonical country/calling-code/timezone data and exact reverse geocoding.
+Source integration is not authenticated runtime or deployment proof.
+
+Existing-tenant Storage Server placement remains read-only. The eight routes
+from the historical migration design are absent from current Core/Gateway
+source, so no migration action may be exposed until a new released contract is
+inventoried and independently audited.
 
 ## Backend source map
 
@@ -1324,7 +1329,7 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/fqdn-policy.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/dto/`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/repo/`
-- `../backend/mutakamel-apps/core-app/src/admin/subscriptions/subscription-v2.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/subscriptions/subscription-v1.controller.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/subscriptions/subscription-items.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/subscriptions/dto/subscription-item.dto.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/database-servers/database-servers.service.ts`

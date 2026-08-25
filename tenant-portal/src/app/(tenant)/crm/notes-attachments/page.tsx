@@ -4,16 +4,13 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, FileText, Paperclip, Download } from "lucide-react";
+import { Eye, Trash2, FileText, Paperclip } from "lucide-react";
 import { useCrmNotesAttachments, NoteAttachmentItem } from "./hooks/useCrmNotesAttachments";
 import { CreateCrmNotesAttachmentsModal } from "./components/CreateCrmNotesAttachmentsModal";
 import { DeleteCrmNotesAttachmentsConfirmModal } from "./components/DeleteCrmNotesAttachmentsConfirmModal";
-import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmNotesAttachmentsPage() {
-//     const { t } = useI18n();
   const {
     t,
     items,

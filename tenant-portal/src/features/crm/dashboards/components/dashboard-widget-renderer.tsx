@@ -17,7 +17,6 @@ import {
   TrendingUp,
   SlidersHorizontal,
   Layers,
-  Sparkles,
 } from "lucide-react";
 
 // Renderers
@@ -36,42 +35,43 @@ interface DashboardWidgetRendererProps {
   className?: string;
 }
 
-function getWidgetIcon(type: DashboardVisualizationType) {
+function WidgetIcon({ type }: { type: DashboardVisualizationType }) {
+  const className = "w-3.5 h-3.5";
   switch (type) {
     case "METRIC_CARD":
-      return TrendingUp;
+      return <TrendingUp className={className} />;
     case "PROGRESS_CARD":
-      return Target;
+      return <Target className={className} />;
     case "TABLE":
-      return TableIcon;
+      return <TableIcon className={className} />;
     case "LEADERBOARD":
-      return Trophy;
+      return <Trophy className={className} />;
     case "LINE":
     case "AREA":
     case "LINE_AREA":
-      return LineChart;
+      return <LineChart className={className} />;
     case "COLUMN":
     case "BAR":
     case "STACKED_BAR":
     case "STACKED_BAR_100":
     case "COMBO":
-      return BarChart3;
+      return <BarChart3 className={className} />;
     case "PIE":
     case "DONUT":
-      return PieChart;
+      return <PieChart className={className} />;
     case "SCATTER":
     case "BUBBLE":
     case "HEATMAP":
-      return Activity;
+      return <Activity className={className} />;
     case "FUNNEL":
-      return SlidersHorizontal;
+      return <SlidersHorizontal className={className} />;
     case "SEMI_CIRCLE_GAUGE":
     case "THREE_QUARTER_GAUGE":
     case "CIRCULAR_PROGRESS_GAUGE":
     case "DETAILED_SPEEDOMETER":
-      return Gauge;
+      return <Gauge className={className} />;
     default:
-      return Layers;
+      return <Layers className={className} />;
   }
 }
 
@@ -83,7 +83,6 @@ export function DashboardWidgetRenderer({
   className = "",
 }: DashboardWidgetRendererProps) {
   const type = widget.visualizationType;
-  const Icon = getWidgetIcon(type);
 
   const content = useMemo(() => {
     if (loading || !result) {
@@ -163,7 +162,7 @@ export function DashboardWidgetRenderer({
       <div className="h-[42px] px-4 border-b border-slate-200/50 dark:border-slate-800/40 bg-slate-50/40 dark:bg-slate-900/40 flex items-center justify-between flex-shrink-0 select-none transition-colors group-hover:bg-slate-50/80 dark:group-hover:bg-slate-900/60">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="p-1.5 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/40 dark:to-indigo-900/20 text-blue-600 dark:text-blue-400 flex-shrink-0 shadow-sm border border-blue-100/50 dark:border-blue-800/30">
-            <Icon className="w-3.5 h-3.5" />
+            <WidgetIcon type={type} />
           </span>
           <h3
             className="text-[13px] sm:text-sm font-semibold bg-gradient-to-r from-slate-800 to-slate-600 dark:from-slate-100 dark:to-slate-300 text-transparent bg-clip-text truncate"

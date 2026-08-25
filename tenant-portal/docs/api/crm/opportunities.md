@@ -1,13 +1,13 @@
 # CRM opportunities and stage history
 
 > Status: `verified-current`
-> Last source verification: `2026-07-25`
+> Last source verification: `2026-08-25`
 > Owner: CRM (`crm-app`)
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
-> Tenant Portal replacement: `not-started`
-> Legacy frontend: `live`
-> Authorship: hand-written from current source
+> Tenant Portal replacement: `server-backed-board-minimal`
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
 Opportunities belong to a branch, customer, pipeline, and pipeline-stage membership. Stage transitions derive lifecycle status and append immutable history snapshots.
 
@@ -17,6 +17,7 @@ Opportunities belong to a branch, customer, pipeline, and pipeline-stage members
 |---|---|---|---|---|
 | `POST` | `/api/tenant/crm/v1/opportunities` | `/api/v1/crm/opportunities` | `crm.opportunities.create.{own|team|all}` | `201`, opportunity |
 | `GET` | `/api/tenant/crm/v1/opportunities` | `/api/v1/crm/opportunities` | `crm.opportunities.read.{own|team|all}` | `200`, page |
+| `GET` | `/api/tenant/crm/v1/opportunities/capabilities` | `/api/v1/crm/opportunities/capabilities` | accessible branch; actions are projected separately | `200`, owner-aware capabilities |
 | `GET` | `/api/tenant/crm/v1/opportunities/:id` | `/api/v1/crm/opportunities/:id` | `crm.opportunities.read.{own|team|all}` | `200`, opportunity |
 | `PATCH` | `/api/tenant/crm/v1/opportunities/:id` | `/api/v1/crm/opportunities/:id` | `crm.opportunities.update.{own|team|all}` | `200`, opportunity |
 | `POST` | `/api/tenant/crm/v1/opportunities/:id/stage` | `/api/v1/crm/opportunities/:id/stage` | `crm.opportunities.update.{own|team|all}` | `201`, opportunity |
@@ -25,6 +26,8 @@ Opportunities belong to a branch, customer, pipeline, and pipeline-stage members
 | `DELETE` | `/api/tenant/crm/v1/opportunities/:id` | `/api/v1/crm/opportunities/:id` | `crm.opportunities.delete.{own|team|all}` | `204` |
 
 Pipeline board/list routes are documented in [Pipelines and opportunity stages](./pipelines-opportunity-stages.md).
+
+The capabilities response exposes `create`, `update`, and `delete`. Each action is either `null`, `{ scope, ownerUserIds }`, or all-scope with `ownerUserIds: null`. The Tenant Portal uses the update boundary to disable drag-and-drop and importance changes for records the current actor cannot modify.
 
 ## Wire enums
 

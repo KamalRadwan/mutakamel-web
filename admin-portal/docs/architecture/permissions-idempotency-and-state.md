@@ -2,12 +2,12 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
 ## Permission semantics
 
 A permission list joined with `+` requires ALL permissions. The FQDN validation
-route is the single explicit ANY-permission route in the current 235-route
+route is the single explicit ANY-permission route in the current 240-route
 Admin Core inventory.
 
 ```ts
@@ -22,8 +22,9 @@ The frontend foundation must expose `adminCan`, `adminCanAll`, and
 buttons, lifecycle/destructive actions, notification actions, and async
 controls.
 
-Current source has `adminCan` and `adminCanAll`; it lacks `adminCanAny`, and
-`RequirePermission` accepts only one key.
+Current source has `adminCan`, `adminCanAll`, and `adminCanAny`.
+`RequirePermission` accepts one exclusive requirement shape: `permission`,
+`allOf`, or `anyOf`, and fails closed for empty/invalid policies.
 
 ## Stable UUIDv7 intent
 
@@ -40,7 +41,10 @@ For a write-sensitive mutation:
 
 The current shared interceptor auto-generates a new key for a mutation that
 does not supply one. That is a transport safety net, not sufficient intent
-ownership.
+ownership. The settled production Admin Portal does not rely on that fallback:
+a TypeScript AST scan found 151 Axios write calls and 0 bare/implicit-policy
+calls. Idempotent operations pass caller-owned keys; Gateway non-idempotent
+operations explicitly use `skipAutoIdempotency` and `nonReplayable`.
 
 For reload-sensitive high-impact commands, persist only a route-specific,
 tab-scoped recovery marker before the POST: key, canonical route, a SHA-256

@@ -33,7 +33,7 @@ export function CreateTradeControlTowerModal({ isOpen, onClose, onSubmit }: Crea
         <Select
           label="فئة المؤشر Category"
           value={category}
-          onChange={(e) => setCategory(e.target.value as any)}
+          onChange={(e) => setCategory(e.target.value as typeof category)}
           options={[
             { label: "سلسلة الإمداد (Supply Chain)", value: "supply_chain" },
             { label: "سرعة مبيعات القنوات (Sales Velocity)", value: "sales_velocity" },

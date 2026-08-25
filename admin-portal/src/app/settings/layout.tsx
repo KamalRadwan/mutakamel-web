@@ -1,21 +1,16 @@
 import { ReactNode } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { SettingsSidebar } from "./components/SettingsSidebar";
-import { RequirePermission } from "@/components/auth/RequirePermission";
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
+      <main className="flex-1 w-full px-[10px] py-4 sm:py-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
         <SettingsSidebar />
 
-        <div className="flex-1 min-w-0">
-          <RequirePermission permission="admin.settings.read">
-            {children}
-          </RequirePermission>
-        </div>
+        <div className="flex-1 min-w-0">{children}</div>
       </main>
     </div>
   );

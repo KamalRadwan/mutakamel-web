@@ -9,7 +9,9 @@ import {
   Bell,
   Phone,
   Mail,
-  Server
+  Server,
+  Siren,
+  HardDrive,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 
@@ -54,6 +56,18 @@ export function SettingsSidebar() {
       label: t.settings.tabs.smtp,
       icon: Mail,
       color: "text-rose-500",
+    },
+    {
+      href: "/settings/fatal-alerts",
+      label: t.settings.tabs.fatalAlerts,
+      icon: Siren,
+      color: "text-red-500",
+    },
+    {
+      href: "/settings/storage",
+      label: t.settings.tabs.storageRuntime,
+      icon: HardDrive,
+      color: "text-cyan-500",
     },
   ];
 

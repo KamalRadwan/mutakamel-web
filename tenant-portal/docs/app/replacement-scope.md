@@ -2,14 +2,17 @@
 
 Status: **Approved target**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
-Frontend status: **Not started beyond the bootstrap shell**
+Frontend status: **Active split-portal implementation; capability status is tracked independently**
 
 ## Decision
 
-`tenant-portal` will replace all tenant-facing application behavior currently
-hosted in `../backend/mutakamel-apps/mutakamel-web-app`.
+The standalone `tenant-portal` is the current Tenant frontend in the split
+portal workspace. Its migration inventory was originally derived from a
+consolidated `../backend/mutakamel-apps/mutakamel-web-app` snapshot, but that
+workspace is absent from the current checkout and is not current runtime
+evidence.
 
 The replacement does not include:
 
@@ -21,7 +24,7 @@ The replacement does not include:
 
 ## Replacement source inventory
 
-The old web application is inspected for migration coverage in:
+The 2026-07-25 historical inventory recorded these consolidated paths:
 
 ```text
 ../backend/mutakamel-apps/mutakamel-web-app/src/app
@@ -31,8 +34,10 @@ The old web application is inspected for migration coverage in:
 ../backend/mutakamel-apps/mutakamel-web-app/e2e
 ```
 
-It provides evidence for routes, request sequencing, state handling, and tests.
-It does not override Gateway or backend contracts.
+When an artifact from that snapshot is available, it provides dated migration
+context for routes, request sequencing, state handling, and tests. The absent
+workspace does not prove current behavior and never overrides Gateway or
+backend contracts.
 
 ## Capabilities to replace
 
@@ -113,12 +118,13 @@ tested, and independently deployable.
 - Every migrated page uses canonical Gateway paths.
 - Permissions, module seats, subscriptions, and organization scope are
   enforced by the backend and reflected in the client.
-- All live old-web routes are either replaced or intentionally redirected.
+- All routes in the dated consolidated-frontend inventory are either replaced
+  or intentionally redirected after current-source verification.
 - No frontend mock or local-only mutation is reported as production behavior.
 - Unit, integration, browser, accessibility, and failure-state checks pass for
   the migrated scope.
-- Rollback can direct traffic back to the previous web application until the
-  cutover is accepted.
+- Rollback targets a verified deployable artifact; it must not assume the
+  absent consolidated workspace is runnable.
 
 ## Backend edit boundary
 

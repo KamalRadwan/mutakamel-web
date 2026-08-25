@@ -6,14 +6,12 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Kanban, Layers, GitMerge } from "lucide-react";
+import { Eye, Trash2, Kanban } from "lucide-react";
 import { usePipelinesBoards, PipelineBoardItem } from "./hooks/usePipelinesBoards";
 import { CreatePipelinesBoardsModal } from "./components/CreatePipelinesBoardsModal";
 import { DeletePipelinesBoardsConfirmModal } from "./components/DeletePipelinesBoardsConfirmModal";
-import { useI18n } from "@/i18n/I18nContext";
 
 export default function PipelinesBoardsPage() {
-//     const { t } = useI18n();
   const {
     t,
     items,

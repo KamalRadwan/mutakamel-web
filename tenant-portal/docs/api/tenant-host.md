@@ -5,7 +5,7 @@
 > **Backend owner:** Core (`core-app`)
 > **Canonical browser path:** `/api/tenant/core/v1/public/tenant-host/status`
 > **Controller-relative path:** `/tenant/host-status` (mounted under `/api/v1`)
-> **Tenant Portal status:** Planned. The legacy server-side gate is live in `../backend/mutakamel-apps/mutakamel-web-app`; the replacement must preserve server-before-render validation.
+> **Tenant Portal status:** Planned. A dated 2026-07-25 inventory referenced a consolidated server-side gate; that `mutakamel-web-app` workspace is absent from the current checkout and is not live-runtime evidence. The standalone portal must still preserve server-before-render validation.
 > **Documentation:** Hand-written and source-verified; not generated.
 
 ## Source of truth
@@ -14,7 +14,7 @@
 - Controller/service: `../backend/mutakamel-apps/core-app/src/tenant/tenant-host/tenant-host-status.controller.ts` and `../backend/mutakamel-apps/core-app/src/tenant/tenant-host/tenant-host-status.service.ts`
 - Resolver guard: `../backend/mutakamel-apps/core-app/src/common/fqdn/fqdn-tenant-resolver.guard.ts`
 - Platform validation controller/service: `../backend/mutakamel-apps/core-app/src/admin/tenants/fqdn-validation.controller.ts` and `../backend/mutakamel-apps/core-app/src/admin/tenants/fqdn-validation.service.ts`
-- Legacy server client/gate: `../backend/mutakamel-apps/mutakamel-web-app/src/shared/auth/tenant-host-status.ts` and `../backend/mutakamel-apps/mutakamel-web-app/src/app/layout.tsx`
+- Historical consolidated server client/gate references (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/shared/auth/tenant-host-status.ts` and `../backend/mutakamel-apps/mutakamel-web-app/src/app/layout.tsx`
 
 ## Contract
 

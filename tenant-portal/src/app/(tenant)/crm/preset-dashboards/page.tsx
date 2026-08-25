@@ -6,14 +6,12 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, LayoutTemplate, Layers, ShieldCheck } from "lucide-react";
+import { Eye, Trash2, LayoutTemplate } from "lucide-react";
 import { usePresetDashboards, PresetDashboardItem } from "./hooks/usePresetDashboards";
 import { CreatePresetDashboardsModal } from "./components/CreatePresetDashboardsModal";
 import { DeletePresetDashboardsConfirmModal } from "./components/DeletePresetDashboardsConfirmModal";
-import { useI18n } from "@/i18n/I18nContext";
 
 export default function PresetDashboardsPage() {
-//     const { t } = useI18n();
   const {
     t,
     items,

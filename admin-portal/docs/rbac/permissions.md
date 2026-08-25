@@ -10,7 +10,7 @@ Last source verification: **2026-08-02**.
 
 | Guard / Decorator | Scope & Behavior | Frontend Action / Integration |
 |:---|:---|:---|
-| **`AdminGuard`** | Primary auth guard applied across all `/admin/*` controllers. Validates the Gateway-forwarded admin access token and ensures identity belongs to an admin user (`SUPER_ADMIN`, `ADMIN`, or `USER` tier). | Use the shared cookie-mode client with `credentials: "include"` and `x-auth-cookie-mode: 1`; browser feature code must not read or attach a bearer token. |
+| **`AdminGuard`** | Primary auth guard applied across all `/admin/*` controllers. Validates the Gateway-forwarded admin access token and ensures identity belongs to an admin user (`SUPER_ADMIN`, `ADMIN`, or `USER` tier). | Use the shared cookie client with `credentials: "include"`; browser feature code must not select an auth mode or read/attach a bearer token. |
 | **`@Public()`** | Bypasses `AdminGuard` for unauthenticated routes (`login`, `refresh`, `accept-invite`, `forgot-password`, `reset-password`, `logout`). | Use the documented public auth flow through the same-origin Gateway; do not invent service-direct or browser bearer-token behavior. |
 | **`@RequirePermissions(...)`** | Method/Controller level RBAC check. Verifies that `actor.permissions` contains all specified keys. | Use ONE/ALL frontend requirements and render `403` as forbidden. |
 | **`@RequireAnyPermissions(...)`** | Explicit ANY-permission check. The current Admin route inventory uses it for FQDN validation. | Use an ANY requirement; do not convert it to ALL. |
@@ -93,7 +93,7 @@ authoritative for its exact route permissions.
 
 ### 8. Provisioning Operations (`admin.provisioning.*`)
 - **Guard**: `AdminGuard`
-- `admin.provisioning.add-module` — Add module to active tenant
+- `admin.provisioning.add-application` — Provision a newly entitled application for an active tenant
 - `admin.provisioning.repair` — Repair tenant provisioning state
 - `admin.provisioning.decommission` — Decommission tenant components
 - `admin.provisioning.prerequisites.request` — Request backup or maintenance evidence for a blocked provisioning update
@@ -168,11 +168,12 @@ workflow. See
 
 ### 16. System Settings (`admin.settings.*`)
 - **Guard**: `AdminGuard`
-- `admin.settings.read` — List/get the 31-key platform registry, read the SMTP singleton, and view its latest 25 audit entries
-- `admin.settings.update` — Upsert generic setting overrides, patch the SMTP singleton, and verify its saved connection
+- `admin.settings.read` — List/get the 31-key platform registry, read the SMTP and Realtime fatal-alert singletons, and view the latest 25 SMTP audit entries
+- `admin.settings.update` — Upsert generic setting overrides, patch the SMTP and Realtime fatal-alert singletons, and verify the saved SMTP connection
 
-All three settings mutations are also Gateway `WRITE_SENSITIVE` routes and
-require an `x-idempotency-key` UUIDv7.
+All four settings mutations are also Gateway `WRITE_SENSITIVE` routes and
+require an `x-idempotency-key` UUIDv7. Fatal-alert and generic/SMTP updates
+also require `admin.settings.critical`.
 
 ### 17. Application Catalogue (`admin.applications.*`, `admin.catalog.*`, and `admin.billing.*`)
 - **Guard**: `AdminGuard`

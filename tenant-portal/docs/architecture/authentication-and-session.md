@@ -1,8 +1,8 @@
 # Authentication and Session Architecture
 
-Status: **Verified backend and old-web behavior; new portal pending**
+Status: **Accepted session architecture; Tenant Portal source-integrated**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 Backend owner: **Core through API Gateway**
 
@@ -11,7 +11,7 @@ Backend owner: **Core through API Gateway**
 Core owns:
 
 - login;
-- refresh-token rotation;
+- reusable server-side session refresh;
 - invitation acceptance;
 - forgot/reset password;
 - logout;
@@ -25,55 +25,74 @@ Exact routes, DTOs, and response fields are documented in
 
 Session acceptance is database-authoritative in the owning backend.
 
-- The signed JWT includes identity, tenant, audience, and session version.
+- The short-lived signed access JWT includes identity, tenant, audience, the
+  exact server session, and security/authorization/profile/session epochs.
 - Gateway validates signature/audience and can reject a token when a Redis
   watermark is greater than the token version.
 - A missing or lower Redis value does not grant access.
 - Core, CRM, and Trade verify current database identity/session state.
-- Logout-all and security-sensitive identity changes advance the session
-  version so older tokens are rejected.
+- Logout-all and security-sensitive identity changes terminate the applicable
+  sessions. RBAC/profile changes stale only the access projection.
 
 ## Browser replacement requirements
 
-The current old-web implementation uses generation-scoped tenant records,
-cross-tab coordination, proactive refresh, and stale-response rejection. The
-new portal must preserve these security properties even if its storage format
-changes.
+The Tenant Portal uses HttpOnly access/session cookies and server-authoritative
+bootstrap. A tab never treats browser storage as evidence of authentication.
 
 Required behavior:
 
-1. A successful login creates a new random session generation.
-2. Each tab adopts a generation and binds requests to it.
-3. Concurrent refresh callers elect one refresh operation.
-4. Rotated tokens replace only the generation that requested them.
-5. Logout writes a tombstone/removes the generation before navigation.
-6. Storage events invalidate other tabs.
-7. A response from an older generation is rejected even when its HTTP status is
-   successful.
-8. A failed refresh clears only the matching session and returns to login.
-9. Login/logout races use an intent counter so a delayed request cannot replace
-   a newer account.
+1. Every cold/new tab bootstraps through `/auth/me`.
+2. One browser cookie jar shares one server `sid`; another browser/device login
+   receives another `sid`.
+3. Web Locks elect one refresh where supported; a non-secret
+   BroadcastChannel/storage event lets waiters recheck after the lock.
+4. The reusable credential makes duplicate cross-tab refreshes safe when those
+   browser coordination APIs are unavailable.
+5. Logout and exact-session revoke publish a terminal tombstone only after
+   durable server success (or an explicit terminal error), then navigate.
+6. Non-replayable writes may repair authentication but are never resubmitted.
+7. Safe mutation replay requires a verified caller-owned UUIDv7 intent key (or
+   an explicitly documented naturally idempotent route) and preserves the
+   exact original body.
+8. A post-refresh replay is allowed only when the cross-tab event remains bound
+   to the same `sid`; a login in another tab fails the old request closed.
 
 ## Storage rules
 
 - Do not put access or refresh tokens in URLs, query strings, error messages,
   analytics, or logs.
 - Do not expose token material to server-rendered HTML.
-- Prefer the narrowest browser storage consistent with the current Core
-  contract; document any persistence choice and its XSS implications.
-- Never copy the Admin Portal cookie-mode contract into tenant auth without
-  verifying tenant controller support.
+- Access and session credentials exist only in Secure HttpOnly cookies.
+- Session storage contains only non-secret expiry/session/epoch metadata.
+- Local storage contains only the remember-session preference plus the
+  non-secret event ID, session ID, event kind, and timestamp used by the
+  BroadcastChannel/storage fallback.
+- Remember-session is selected only at login. Core stores the cookie-
+  persistence policy on the Auth Session and reapplies it on refresh; the local
+  preference cannot override that row or extend idle/absolute deadlines.
 - Public action tokens should be read, submitted once, and removed from visible
   browser history where practical.
 
 ## Refresh policy
 
-- Refresh proactively near access-token expiry when token metadata supports it.
+- Refresh reactively on an eligible non-terminal `401`; background timers do
+  not extend idle or absolute session duration.
 - Retry an ordinary protected request at most once after a coordinated refresh.
 - Do not refresh for login, refresh, logout, invite, or password-reset paths.
 - Do not retry a write blindly unless its idempotency contract makes the exact
   replay safe.
-- An in-flight request remains bound to its original generation after refresh.
+- An in-flight request remains bound to its original `sid` across refresh.
+
+## Human activity and WSS
+
+- Only trusted pointer, keyboard, or touch events in a visible tab may produce
+  `x-auth-user-activity: 1`; synthetic DOM events are ignored.
+- Core requests carry the marker directly. Before an activity-marked CRM or
+  Trade request, the client first calls Core `POST /auth/activity` so Core
+  remains the only session-idle writer.
+- Refresh, polling, timers, hidden tabs, and WSS traffic never extend the idle
+  deadline. WSS employee-duration accounting is a separate clock and data
+  flow, not an auth-session TTL.
 
 ## Authorization bootstrap
 
@@ -94,7 +113,13 @@ After authentication:
 ../backend/mutakamel-apps/core-app/src/common/guards/session-version.guard.ts
 ../backend/mutakamel-apps/api-gateway-app/src/auth/gateway-jwt.guard.ts
 ../backend/mutakamel-apps/api-gateway-app/src/auth/session-version.guard.ts
-../backend/mutakamel-apps/mutakamel-web-app/src/shared/auth/tenant-session.ts
-../backend/mutakamel-apps/mutakamel-web-app/src/shared/auth/tenant-refresh-coordinator.ts
-../backend/mutakamel-apps/mutakamel-web-app/src/shared/api/tenant-api-client.ts
+src/lib/auth/sessionApi.ts
+src/lib/auth/sessionCoordinator.ts
+src/lib/api/axiosClient.ts
+src/shared/api/tenant-api-client.ts
 ```
+
+Earlier documentation referenced auth files under the consolidated
+`../backend/mutakamel-apps/mutakamel-web-app` path. That workspace is absent
+from the current checkout as of 2026-08-10; those paths are historical design
+context only and cannot establish current source or runtime behavior.

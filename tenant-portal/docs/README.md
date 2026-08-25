@@ -1,10 +1,17 @@
 # Tenant Portal Documentation
 
-Last documentation verification: **2026-07-25**
+Last documentation verification: **2026-08-10**
 
-This is the source-verified build guide for the standalone Tenant Portal. The
-new application will replace the tenant-facing area currently implemented in
-`backend/mutakamel-apps/mutakamel-web-app`.
+This is the source-verified build guide for the standalone `tenant-portal`, the
+current Tenant browser application in the split
+`C:\mutakamel.ai\frontend\{admin-portal,tenant-portal,partner-portal}`
+workspace. Local Tenant ingress targets this application on port `5002`.
+
+The historically documented consolidated
+`../backend/mutakamel-apps/mutakamel-web-app` workspace is absent from the
+current checkout and is not a live frontend or runtime source. Any retained
+reference to that path must be explicitly labelled as dated historical
+replacement evidence.
 
 Documentation describes both backend capability and intended replacement
 coverage. Every page must state whether the new `tenant-portal` implementation
@@ -112,6 +119,11 @@ to `C:\mutakamel.ai\frontend`:
 ../backend/mutakamel-apps/trade-app
 ../backend/mutakamel-apps/worker-app
 ../backend/mutakamel-apps/shared-libs
+```
+
+Historical only and absent from the current checkout:
+
+```text
 ../backend/mutakamel-apps/mutakamel-web-app
 ```
 

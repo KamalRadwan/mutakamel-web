@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Webhook, UploadCloud, CheckCircle2 } from "lucide-react";
+import { Eye, Trash2, Webhook } from "lucide-react";
 import { useTradeImportsWebhooks, ImportWebhookItem } from "./hooks/useTradeImportsWebhooks";
 import { CreateTradeImportsWebhooksModal } from "./components/CreateTradeImportsWebhooksModal";
 import { DeleteTradeImportsWebhooksConfirmModal } from "./components/DeleteTradeImportsWebhooksConfirmModal";
 
 export default function TradeImportsWebhooksPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

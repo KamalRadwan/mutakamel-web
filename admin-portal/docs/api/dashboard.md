@@ -12,16 +12,17 @@ Core internal controller: `GET /admin/dashboard`
 The browser must call the Gateway endpoint, never Core directly.
 
 Authentication:
-- Admin Bearer access token.
-- Same-origin request through the web application.
-- Include credentials for the admin refresh-cookie flow.
+- Secure HttpOnly Admin access cookie, emitted automatically by the browser.
+- Same-origin request through the web application with credentials included.
+- Browser code must not read, store, or attach a bearer token.
 - Endpoint access requires `admin.reports.read`.
 
 Example request:
-```http
-GET /api/admin/core/v1/dashboard
-Accept: application/json
-Authorization: Bearer <admin-access-token>
+```ts
+await fetch("/api/admin/core/v1/dashboard", {
+  credentials: "include",
+  headers: { Accept: "application/json" },
+});
 ```
 
 Example with a single date:

@@ -4,6 +4,7 @@ import {
   getPermissionName,
   adminCan,
   adminCanAll,
+  adminCanAny,
   ADMIN_RBAC_CRITICAL,
   AdminAuthorizationContext,
 } from "./rbac";
@@ -75,6 +76,27 @@ describe("Bilingual RBAC System", () => {
   });
 
   describe("Authorization Guards", () => {
+    it("supports explicit ANY permission contracts without weakening ALL checks", () => {
+      const fqdnCreator: AdminAuthorizationContext = {
+        isSuperAdmin: false,
+        permissions: ["admin.tenants.create"],
+      };
+
+      expect(
+        adminCanAny(fqdnCreator, [
+          "admin.tenants.create",
+          "admin.tenants.manage_fqdns",
+        ]),
+      ).toBe(true);
+      expect(
+        adminCanAll(fqdnCreator, [
+          "admin.tenants.create",
+          "admin.tenants.manage_fqdns",
+        ]),
+      ).toBe(false);
+      expect(adminCanAny(fqdnCreator, [])).toBe(false);
+    });
+
     const normalAdmin: AdminAuthorizationContext = {
       isSuperAdmin: false,
       permissions: ["admin.database_servers.read", "admin.database_servers.update"],

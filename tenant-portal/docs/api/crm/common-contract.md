@@ -2,12 +2,13 @@
 
 > Status: `verified-current`
 > Last source verification: `2026-07-25`
+> Auth/session boundary reverified: `2026-08-10`
 > Owner: CRM (`crm-app`)
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
-> Tenant Portal replacement: `not-started`
-> Legacy frontend: `live-partial`
-> Authorship: hand-written from current source
+> Tenant Portal replacement: `partial-source`
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
 This page defines behavior shared by all 137 Gateway-exposed CRM routes. A domain page overrides it only where explicitly stated.
 
@@ -38,9 +39,13 @@ Requests use the portal's canonical tenant session. The Gateway establishes trus
 - `x-tenant`
 - forwarded tenant, user, permission, branch, team, or entitlement headers
 
-CRM accepts a tenant user actor with `identityId`, `tenantId`, and a nonnegative session version. A non-owner also needs an active CRM seat. Typical access failures include:
+CRM accepts a tenant user actor only with `identityId`, `tenantId`, UUIDv7
+`sid`, and positive safe-integer `securityEpoch`, `authorizationVersion`,
+`profileVersion`, and `sessionEpoch`. It rechecks all of them against the active
+database identity/session. A non-owner also needs an active CRM seat. Typical
+access failures include:
 
-- `SESSION_VERSION_REQUIRED`
+- `SESSION_CONTEXT_REQUIRED`
 - `SESSION_IDENTITY_INACTIVE`
 - `SESSION_INVALIDATED`
 - `CRM_MODULE_SEAT_REQUIRED`

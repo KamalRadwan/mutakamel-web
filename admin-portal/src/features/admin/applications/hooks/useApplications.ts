@@ -3,16 +3,16 @@ import { applicationsApi } from "../api/applications.api";
 import { useIdempotency } from "@/shared/hooks/useIdempotency";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
 import { useToast } from "@/components/ui/ToastContext";
+import { useApplicationRegistration } from "./useApplicationRegistration";
 import {
   ApplicationListQueryDto,
   ApplicationView,
-  CreateApplicationDto,
   UpdateApplicationDatabasePolicyDto,
   ApplicationType,
   ApplicationCommercialMode,
   ApplicationCatalogueVisibility,
   ApplicationLifecycleStatus,
-  ApplicationDatabaseAccessMode,
+  ApplicationDatabaseDeployment,
   ApplicationPublicationStatus,
 } from "../types";
 
@@ -34,7 +34,7 @@ export function useApplications() {
   const [visibilityFilter, setVisibilityFilter] = useState<ApplicationCatalogueVisibility | "ALL">("ALL");
   const [lifecycleFilter, setLifecycleFilter] = useState<ApplicationLifecycleStatus | "ALL">("ALL");
   const [publicationFilter, setPublicationFilter] = useState<ApplicationPublicationStatus | "ALL">("ALL");
-  const [dbAccessFilter, setDbAccessFilter] = useState<ApplicationDatabaseAccessMode | "ALL">("ALL");
+  const [deploymentFilter, setDeploymentFilter] = useState<ApplicationDatabaseDeployment | "ALL">("ALL");
 
   const [meta, setMeta] = useState({
     total: 0,
@@ -65,7 +65,7 @@ export function useApplications() {
         ...(visibilityFilter !== "ALL" ? { catalogueVisibility: visibilityFilter } : {}),
         ...(lifecycleFilter !== "ALL" ? { lifecycleStatus: lifecycleFilter } : {}),
         ...(publicationFilter !== "ALL" ? { publicationStatus: publicationFilter } : {}),
-        ...(dbAccessFilter !== "ALL" ? { databaseAccessMode: dbAccessFilter } : {}),
+        ...(deploymentFilter !== "ALL" ? { databaseDeployment: deploymentFilter } : {}),
       };
       const response = await applicationsApi.list(query);
       setApplications(response.data);
@@ -79,7 +79,7 @@ export function useApplications() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, debouncedSearch, typeFilter, commercialFilter, visibilityFilter, lifecycleFilter, publicationFilter, dbAccessFilter, toast]);
+  }, [page, limit, debouncedSearch, typeFilter, commercialFilter, visibilityFilter, lifecycleFilter, publicationFilter, deploymentFilter, toast]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -87,20 +87,10 @@ export function useApplications() {
     });
   }, [fetchApplications]);
 
-  const createApplication = async (dto: CreateApplicationDto) => {
-    try {
-      const key = getIdempotencyKey(dto);
-      const receipt = await applicationsApi.create(dto, key);
-      toast.success("Success", "Application drafted successfully.");
-      resetKey();
-      fetchApplications();
-      return receipt;
-    } catch (err) {
-      const normalized = normalizeApiError(err);
-      toast.error("Error", normalized.message);
-      throw normalized;
-    }
-  };
+  const { createApplication, onboardApplication } =
+    useApplicationRegistration(() => {
+      void fetchApplications();
+    });
 
   const updateDatabasePolicy = async (applicationKey: string, dto: UpdateApplicationDatabasePolicyDto) => {
     try {
@@ -137,10 +127,11 @@ export function useApplications() {
     setLifecycleFilter,
     publicationFilter,
     setPublicationFilter,
-    dbAccessFilter,
-    setDbAccessFilter,
+    deploymentFilter,
+    setDeploymentFilter,
     meta,
     createApplication,
+    onboardApplication,
     updateDatabasePolicy,
     refresh: fetchApplications,
   };

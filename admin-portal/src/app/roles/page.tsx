@@ -8,13 +8,18 @@ import {
   Plus,
   Trash2,
   Lock,
-  Edit2
+  Edit2,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  Eye,
 } from "lucide-react";
 import { useRoles } from "./hooks/useRoles";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { CreateRoleModal } from "./components/CreateRoleModal";
 import { useAuth } from "@/context/AuthContext";
-import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export default function RolesDirectoryPage() {
   const {
@@ -24,7 +29,14 @@ export default function RolesDirectoryPage() {
     isSystemFilter,
     setIsSystemFilter,
     roles,
+    rolesOnPage,
     totalItems,
+    totalPages,
+    page,
+    pageSize,
+    hasNext,
+    hasPrev,
+    setPage,
     isCreateModalOpen,
     setIsCreateModalOpen,
     activeModalRole,
@@ -34,11 +46,17 @@ export default function RolesDirectoryPage() {
     confirmDelete,
     refreshRoles,
     isLoading,
+    isRefreshing,
+    listError,
+    isDeleting,
+    deleteError,
+    isDeleteAmbiguous,
     lang,
     t
   } = useRoles();
 
   const { user } = useAuth();
+  const canUpdate = adminCan(user, "admin.roles.update");
   const canCreate = adminCanAll(user, ADMIN_RBAC_CRITICAL.ROLES_CREATE);
   const canDelete = adminCanAll(user, ADMIN_RBAC_CRITICAL.ROLES_DELETE);
 
@@ -46,26 +64,26 @@ export default function RolesDirectoryPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
-        {/* Header Title Section with Indigo/Purple Gradient Banner */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-6 rounded-3xl border border-purple-500/20 shadow-xl">
+      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
+        {/* Header Title Section with Compact Gradient Banner */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl border border-purple-500/20 shadow-md">
           <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-purple-500/20 via-indigo-500/20 to-pink-500/0 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-            <div className="flex items-center gap-4">
-              <div className="p-3.5 bg-gradient-to-tr from-indigo-500 via-purple-600 to-pink-600 text-white rounded-2xl shadow-lg shadow-purple-500/30 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-7 h-7" />
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-gradient-to-tr from-indigo-500 via-purple-600 to-pink-600 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-black tracking-tight text-white">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-base sm:text-lg font-bold tracking-tight text-white">
                     {t.roles.pageTitle}
                   </h1>
-                  <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full">
+                  <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-md">
                     RBAC Manifest
                   </span>
                 </div>
-                <p className="text-xs text-purple-100/80 mt-1 max-w-xl leading-relaxed">
+                <p className="text-[11px] text-purple-100/80 mt-0.5 max-w-xl leading-tight">
                   {t.roles.pageSubtitle}
                 </p>
               </div>
@@ -74,9 +92,9 @@ export default function RolesDirectoryPage() {
             {canCreate && (
               <button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="px-5 py-2.5 text-xs font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white rounded-xl shadow-lg shadow-purple-500/25 transition-all transform hover:-translate-y-0.5 flex items-center gap-2 cursor-pointer shrink-0 border border-white/20"
+                className="px-3.5 py-2 text-xs font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0 border border-white/20"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>{t.roles.createRole}</span>
               </button>
             )}
@@ -153,6 +171,11 @@ export default function RolesDirectoryPage() {
               placeholder={t.roles.searchPlaceholder}
               className="w-full ps-10 pe-4 py-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
             />
+            <p className="mt-1 px-1 text-[10px] text-slate-500">
+              {lang === "ar"
+                ? "يُطبّق البحث على الصفحة الحالية فقط."
+                : "Search filters the current server page only."}
+            </p>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -167,6 +190,44 @@ export default function RolesDirectoryPage() {
             </select>
           </div>
         </div>
+
+        {listError ? (
+          <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 sm:flex-row sm:items-center sm:justify-between dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-bold">
+                  {listError.httpStatus === 403
+                    ? lang === "ar" ? "لا تملك صلاحية قراءة الأدوار." : "You do not have permission to read roles."
+                    : [502, 503, 504].includes(listError.httpStatus)
+                      ? lang === "ar" ? "خدمة الأدوار غير متاحة مؤقتاً." : "The roles service is temporarily unavailable."
+                      : listError.message}
+                </p>
+                {rolesOnPage.length ? (
+                  <p className="mt-1">
+                    {lang === "ar" ? "تُعرض آخر صفحة مؤكدة." : "The last confirmed page remains visible."}
+                  </p>
+                ) : null}
+                {listError.correlationId ? <p className="mt-1 font-mono">{listError.correlationId}</p> : null}
+              </div>
+            </div>
+            <button type="button" onClick={refreshRoles} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-300 px-3 py-2 font-bold hover:bg-rose-100 dark:border-rose-800 dark:hover:bg-rose-900/50">
+              <RefreshCw className="h-3.5 w-3.5" />
+              {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+            </button>
+          </div>
+        ) : null}
+
+        {deleteError ? (
+          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            <p className="font-bold">
+              {isDeleteAmbiguous
+                ? lang === "ar" ? "نتيجة الحذف غير مؤكدة؛ أعد التأكيد لإعادة استخدام العملية نفسها." : "Delete outcome is unconfirmed; confirm again to retry the exact operation."
+                : deleteError.message}
+            </p>
+            {deleteError.correlationId ? <p className="mt-1 font-mono">{deleteError.correlationId}</p> : null}
+          </div>
+        ) : null}
 
         {/* High-Density Data Table */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
@@ -232,9 +293,13 @@ export default function RolesDirectoryPage() {
                           <Link
                             href={`/roles/${role.id}`}
                             className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors cursor-pointer"
-                            title={lang === "ar" ? "تعديل" : "Edit"}
+                            title={
+                              canUpdate
+                                ? lang === "ar" ? "تعديل" : "Edit"
+                                : lang === "ar" ? "عرض" : "View"
+                            }
                           >
-                            <Edit2 className="w-3.5 h-3.5" />
+                            {canUpdate ? <Edit2 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </Link>
                           {!role.isSystem && canDelete && (
                             <button
@@ -253,10 +318,50 @@ export default function RolesDirectoryPage() {
               </tbody>
             </table>
           </div>
-          <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-[10px] text-slate-500 flex justify-between items-center">
-            <span>
+          <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/50 p-3 text-[10px] text-slate-500 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-800/30">
+            <span className="sr-only">
               {lang === "ar" ? `عرض ${roles.length} من أصل ${totalItems} دور` : `Showing ${roles.length} of ${totalItems} roles`}
             </span>
+            <div className="flex items-center gap-2">
+              {isRefreshing ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
+              <span>
+                {totalItems === 0
+                  ? lang === "ar" ? "لا توجد أدوار" : "No roles"
+                  : lang === "ar"
+                    ? `عرض ${Math.min((page - 1) * pageSize + 1, totalItems)}–${Math.min((page - 1) * pageSize + rolesOnPage.length, totalItems)} من ${totalItems}`
+                    : `Showing ${Math.min((page - 1) * pageSize + 1, totalItems)}–${Math.min((page - 1) * pageSize + rolesOnPage.length, totalItems)} of ${totalItems}`}
+                {search.trim()
+                  ? lang === "ar"
+                    ? ` (${roles.length} مطابق في الصفحة)`
+                    : ` (${roles.length} page matches)`
+                  : ""}
+              </span>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <span>
+                {lang === "ar"
+                  ? `صفحة ${page} من ${Math.max(totalPages, 1)}`
+                  : `Page ${page} of ${Math.max(totalPages, 1)}`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={!hasPrev || isLoading}
+                aria-label={lang === "ar" ? "الصفحة السابقة" : "Previous page"}
+                className="rounded-lg border border-slate-200 p-1.5 disabled:opacity-40 dark:border-slate-700"
+              >
+                {lang === "ar" ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((current) => current + 1)}
+                disabled={!hasNext || isLoading}
+                aria-label={lang === "ar" ? "الصفحة التالية" : "Next page"}
+                className="rounded-lg border border-slate-200 p-1.5 disabled:opacity-40 dark:border-slate-700"
+              >
+                {lang === "ar" ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+            </div>
           </div>
         </div>
       </main>
@@ -270,6 +375,8 @@ export default function RolesDirectoryPage() {
           isOpen={isDeleteModalOpen}
           onClose={closeDeleteModal}
           onConfirm={confirmDelete}
+          isSubmitting={isDeleting}
+          confirmLabel={isDeleteAmbiguous ? (lang === "ar" ? "إعادة الحذف بنفس العملية" : "Retry exact delete") : undefined}
           title={lang === "ar" ? "حذف الدور" : "Delete Role"}
           description={lang === "ar" ? `هل أنت متأكد من رغبتك في حذف هذا الدور؟` : `Are you sure you want to delete this role?`}
           targetName={activeModalRole.name}

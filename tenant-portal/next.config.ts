@@ -4,9 +4,6 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', 'date-fns', 'recharts'],
   },
-  typescript: {
-    ignoreBuildErrors: true, // as requested to save RAM during dev
-  },
   webpack: (config) => {
     config.watchOptions = {
       ...config.watchOptions,

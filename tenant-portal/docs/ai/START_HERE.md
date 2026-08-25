@@ -1,11 +1,14 @@
 # AI Start Here
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 ## Mission
 
-Build `tenant-portal` as the complete replacement for tenant-facing behavior
-in `../backend/mutakamel-apps/mutakamel-web-app`.
+Build the standalone `tenant-portal` in the current split frontend workspace.
+The previously inventoried consolidated
+`../backend/mutakamel-apps/mutakamel-web-app` path is absent from the current
+checkout; references to it are dated historical migration context, not current
+source or runtime evidence.
 
 Do not modify backend files. Read them to verify contracts.
 
@@ -55,7 +58,8 @@ security, failure states, and tests are in scope.
 Gateway typed route contract
 -> owning controller and global/module guards
 -> DTOs, response/service/contracts, entities, tests
--> old-web live client/tests
+-> current tenant-portal source/tests
+-> explicitly dated historical consolidated-frontend evidence, if available
 -> Tenant Portal docs
 -> mocks/comments
 ```
@@ -68,7 +72,8 @@ See [SOURCE_OF_TRUTH.md](SOURCE_OF_TRUTH.md).
 2. Convert it to the canonical tenant browser namespace.
 3. Read controller, guards, DTOs, service/response types, and tests.
 4. Check module entitlement and organization scope.
-5. Check old-web code for replacement evidence and hazards.
+5. Check current `tenant-portal` source/tests, then consult explicitly dated
+   historical consolidated-frontend evidence only when it is available.
 6. Update/verify the API page.
 7. Create feature API/types/schema/hook/page code using shared boundaries.
 8. Add success, invalid, unauthenticated, forbidden, conflict, and unavailable

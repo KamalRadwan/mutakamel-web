@@ -33,7 +33,7 @@ export function CreateTradeDashboardWidgetsModal({ isOpen, onClose, onSubmit }: 
           <Select
             label="نوع العرض Widget Type"
             value={widgetType}
-            onChange={(e) => setWidgetType(e.target.value as any)}
+            onChange={(e) => setWidgetType(e.target.value as typeof widgetType)}
             options={[
               { label: "رسم بياني (Chart)", value: "chart" },
               { label: "بطاقة مؤشر (KPI Card)", value: "kpi_card" },
@@ -44,7 +44,7 @@ export function CreateTradeDashboardWidgetsModal({ isOpen, onClose, onSubmit }: 
           <Select
             label="الأبعاد Size"
             value={size}
-            onChange={(e) => setSize(e.target.value as any)}
+            onChange={(e) => setSize(e.target.value as typeof size)}
             options={[
               { label: "1x1 (مربع صغير)", value: "1x1" },
               { label: "2x1 (مستطيل أفقي)", value: "2x1" },

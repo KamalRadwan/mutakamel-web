@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, FileCheck2, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { Eye, Trash2, FileCheck2 } from "lucide-react";
 import { useTradeDocumentProfile, DocumentProfileItem } from "./hooks/useTradeDocumentProfile";
 import { CreateTradeDocumentProfileModal } from "./components/CreateTradeDocumentProfileModal";
 import { DeleteTradeDocumentProfileConfirmModal } from "./components/DeleteTradeDocumentProfileConfirmModal";
 
 export default function TradeDocumentProfilePage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

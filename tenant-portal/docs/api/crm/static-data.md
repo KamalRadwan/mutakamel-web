@@ -1,13 +1,13 @@
 # CRM static data catalogue
 
 > Status: `verified-current`
-> Last source verification: `2026-07-25`
+> Last source verification: `2026-08-25`
 > Owner: CRM (`crm-app`)
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
-> Tenant Portal replacement: `not-started`
-> Legacy frontend: `live-partial`
-> Authorship: hand-written from current source
+> Tenant Portal replacement: `tested`
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
 The static-data endpoint returns runtime wire enums, bilingual labels, permission names, event names, owner options, and derived rules. It is the preferred form/catalogue source except for the attachment-policy discrepancy below.
 
@@ -18,6 +18,17 @@ The static-data endpoint returns runtime wire enums, bilingual labels, permissio
 | `GET` | `/api/tenant/crm/v1/static-data` | `/api/v1/crm/static-data` | `crm.settings.read` | `200`, catalogue object |
 
 There is no query or request body. The result is raw JSON and should be fetched with authenticated `no-store` behavior. The route is synchronous and has no idempotency concerns.
+
+## Current Tenant Portal implementation
+
+`src/app/(tenant)/crm/static-data-catalogue/` now exposes only the canonical
+read operation. It validates the raw CRM fields consumed by the screen, retains
+additive option groups, bounds the response body, and shows explicit loading,
+failure, search, and retry states without a local fallback. The previous create,
+delete, detail, history, settings, and invented Core sync flows were removed
+because no such
+CRM contract exists. Contract coverage lives in
+`src/app/(tenant)/crm/static-data-catalogue/hooks/useCrmStaticCatalogue.test.ts`.
 
 ## Response contract
 

@@ -1,4 +1,6 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import { isAmbiguousWriteOutcome } from "@/shared/api/write-command-recovery";
+import { Country } from "country-state-city";
 import type {
   TenantApplicationCandidate,
   TenantApplicationSelection,
@@ -14,6 +16,50 @@ import type {
 
 export const UUID_V7_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export interface CanonicalCountrySelection {
+  countryName: string;
+  countryIsoCode: string;
+  callingCode: string;
+  timezones: readonly string[];
+}
+
+export function getCanonicalCountrySelection(
+  countryIsoCode: string,
+): CanonicalCountrySelection | null {
+  const normalizedCode = countryIsoCode.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalizedCode)) return null;
+  const country = Country.getCountryByCode(normalizedCode);
+  if (!country || country.isoCode !== normalizedCode) return null;
+  const timezones = [
+    ...new Set(
+    (country.timezones ?? [])
+        .map((timezone) => timezone.zoneName.trim())
+        .filter((timezone) => timezone.length > 0),
+    ),
+  ];
+  const digits = country.phonecode.replace(/[^0-9]/g, "");
+  if (!country.name.trim() || !digits || timezones.length === 0) return null;
+  return {
+    countryName: country.name.trim(),
+    countryIsoCode: normalizedCode,
+    callingCode: `+${digits}`,
+    timezones,
+  };
+}
+
+export function isCanonicalCountrySelection(input: {
+  countryName: string;
+  countryIsoCode: string;
+  timezone: string;
+}): boolean {
+  const country = getCanonicalCountrySelection(input.countryIsoCode);
+  return Boolean(
+    country &&
+    input.countryName === country.countryName &&
+    country.timezones.includes(input.timezone),
+  );
+}
 
 export function getTenantRegistrationLoadState({
   permitted,
@@ -42,7 +88,9 @@ export function buildTenantSubscriptionLines(
   return Object.entries(selections)
     .map(([applicationKey, selection]) => {
       const candidate = candidates.find((item) => item.key === applicationKey);
-      const tier = candidate?.tiers.find((item) => item.id === selection.tierId);
+      const tier = candidate?.tiers.find(
+        (item) => item.id === selection.tierId,
+      );
       if (
         !candidate ||
         !candidate.selectionAllowed ||
@@ -85,10 +133,7 @@ const TENANT_CREATE_READINESS_REASONS = new Set([
   "DATABASE_PERMISSION_MANIFEST_REQUIRED",
   "DATABASE_PERMISSION_MANIFEST_INVALID",
 ]);
-const TENANT_CREATE_OPTIONS_KEYS = new Set([
-  "contractVersion",
-  "applications",
-]);
+const TENANT_CREATE_OPTIONS_KEYS = new Set(["contractVersion", "applications"]);
 const TENANT_CREATE_APPLICATION_KEYS = new Set([
   "applicationId",
   "key",
@@ -241,8 +286,11 @@ export function readDatabasePlacementOptions(
       !isNonNegativeInteger(item.currentTenants) ||
       !isPositiveInteger(item.maxTenants) ||
       item.currentTenants >= item.maxTenants ||
-      (item.countryName !== undefined && !isNonEmptyString(item.countryName)) ||
+      (item.countryName !== undefined &&
+        item.countryName !== null &&
+        !isNonEmptyString(item.countryName)) ||
       (item.countryIsoCode !== undefined &&
+        item.countryIsoCode !== null &&
         (typeof item.countryIsoCode !== "string" ||
           !/^[A-Z]{2}$/.test(item.countryIsoCode)))
     ) {
@@ -339,11 +387,7 @@ export function readSubscriptionQuote(
 export function shouldRetainTenantCreateIntent(
   error: NormalizedApiError,
 ): boolean {
-  return (
-    error.errorCode === "GW.IDEM.IN.FLIGHT" ||
-    error.httpStatus >= 500 ||
-    error.errorCode === "UNKNOWN_ERROR"
-  );
+  return isAmbiguousWriteOutcome(error);
 }
 
 const IDENTITY_RESULT_KEYS = new Set(["valid", "fields", "message"]);
@@ -397,7 +441,8 @@ export function readTenantIdentityValidation(
       typeof field.available !== "boolean" ||
       !isNonEmptyString(field.message) ||
       (field.reason !== undefined &&
-        (typeof field.reason !== "string" || !IDENTITY_REASONS.has(field.reason)))
+        (typeof field.reason !== "string" ||
+          !IDENTITY_REASONS.has(field.reason)))
     ) {
       throw new Error("INVALID_TENANT_IDENTITY_VALIDATION_RESPONSE");
     }
@@ -411,10 +456,17 @@ export function readTenantIdentityValidation(
 
   const name = readField(fields.name);
   const companyName = readField(fields.companyName);
-  if (root.valid !== (name.valid && name.available && companyName.valid && companyName.available)) {
+  if (
+    root.valid !==
+    (name.valid && name.available && companyName.valid && companyName.available)
+  ) {
     throw new Error("INVALID_TENANT_IDENTITY_VALIDATION_RESPONSE");
   }
-  return { valid: root.valid, fields: { name, companyName }, message: root.message };
+  return {
+    valid: root.valid,
+    fields: { name, companyName },
+    message: root.message,
+  };
 }
 
 export function readTenantCreateResult(payload: unknown): TenantCreateResult {
@@ -436,9 +488,7 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function isApplicationKey(value: unknown): value is string {
-  return (
-    typeof value === "string" && /^[a-z][a-z0-9_]{0,31}$/.test(value)
-  );
+  return typeof value === "string" && /^[a-z][a-z0-9_]{0,31}$/.test(value);
 }
 
 function isPositiveIntegerString(value: unknown): value is string {

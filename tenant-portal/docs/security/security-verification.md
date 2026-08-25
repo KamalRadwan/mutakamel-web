@@ -2,7 +2,7 @@
 
 Status: **Required**
 
-Last verified: **2026-07-25**
+Last source verification: **2026-08-10**
 
 ## Host and tenancy
 
@@ -18,7 +18,12 @@ Last verified: **2026-07-25**
 
 - [ ] Invalid/expired access token fails.
 - [ ] One coordinated refresh handles concurrent `401`s.
-- [ ] Refresh rotation cannot be replayed.
+- [ ] The same active session credential can refresh sequentially or
+      concurrently in multiple tabs without rotating it or revoking siblings.
+- [ ] Ordinary refresh increments use/issue counters independently and leaves
+      `credentialVersion` unchanged.
+- [ ] Remember-me is selected only at login, remains server-authoritative on
+      refresh, and never extends idle or absolute session deadlines.
 - [ ] Logout and logout-all invalidate appropriate sessions.
 - [ ] Cross-tab logout/account replacement invalidates stale work.
 - [ ] Delayed response cannot revive an old generation.

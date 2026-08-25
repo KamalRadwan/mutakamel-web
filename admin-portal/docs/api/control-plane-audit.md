@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
 Owner: **Core**
 
@@ -85,8 +85,27 @@ interface ControlPlaneAuditEventView {
 
 ## Current frontend status
 
-The existing `AuditLogViewer` document/component concept is not a live
-control-plane audit explorer. No route or API client implements these endpoints.
+Status: **[Source Integrated]**
+
+The Admin Portal now exposes `/audit` for operators with `admin.audit.read`.
+The page implements both routes, exact filter validation, list and entity-history
+modes, pagination, retry/forbidden/empty/unavailable states, stale-request
+cancellation, and defensive secret-safe JSON evidence rendering. The navigation
+entry is permission-filtered.
+
+Source integration was verified with focused API, utility, hook, and component
+tests plus TypeScript and targeted ESLint. Authenticated deployment verification
+is still required before changing this status to runtime verified.
+
+## Frontend implementation map
+
+- Page: `src/app/audit/page.tsx`
+- Screen: `src/features/admin/control-plane-audit/components/control-plane-audit-screen.tsx`
+- Hook: `src/features/admin/control-plane-audit/hooks/use-control-plane-audit.ts`
+- API: `src/features/admin/control-plane-audit/api/control-plane-audit-api.ts`
+- Validation and redaction: `src/features/admin/control-plane-audit/lib/control-plane-audit-utils.ts`
+- Tests: `src/features/admin/control-plane-audit/**/*.test.ts*` and
+  `src/components/layout/hooks/useNavbar.test.ts`
 
 ## Source map
 

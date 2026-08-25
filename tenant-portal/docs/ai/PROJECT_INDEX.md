@@ -1,6 +1,6 @@
 # AI Project Index
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 Executable source wins over target documentation.
 
@@ -21,16 +21,19 @@ TypeScript strict mode. Port is fixed at `5002`.
 
 | Path | Current responsibility |
 | --- | --- |
-| `src/app/layout.tsx` | Default root layout; tenant admission not implemented |
-| `src/app/page.tsx` | Bootstrap “Hello world” page |
-| `src/app/globals.css` | Tailwind import only |
-| `next.config.ts` | Empty config |
-| `package.json` | Runtime, lint, typecheck, and documentation audit commands |
-| `docs/` | Replacement build documentation |
+| `src/app/` | Current App Router pages, layouts, login, and tenant feature source |
+| `src/context/AuthContext.tsx` | Current browser authentication context |
+| `src/lib/auth/` | Reusable-session API and cross-tab coordination |
+| `src/lib/api/axiosClient.ts` | Same-origin cookie/CSRF-aware HTTP client |
+| `src/shared/api/tenant-api-client.ts` | Canonical tenant API boundary |
+| `package.json` | Runtime, lint, typecheck, test, and documentation commands |
+| `docs/` | Source-verified implementation documentation |
 
-No shared API client, auth/session layer, host guard, route tree, feature
-modules, unit tests, or browser tests currently exist. Documentation route
-generation and drift/link checks live under `scripts/docs/`.
+Auth/session and API-client source is integrated, and the portal contains a
+substantial route/feature tree. Capability pages remain responsible for
+separating source presence, tested behavior, authenticated runtime proof, and
+release status. Documentation route generation and drift/link checks live
+under `scripts/docs/`.
 
 ## Documentation index
 
@@ -83,7 +86,6 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 | `../backend/mutakamel-apps/trade-app` | Trade domain |
 | `../backend/mutakamel-apps/worker-app` | Background effects |
 | `../backend/mutakamel-apps/shared-libs` | Cross-app infrastructure packages |
-| `../backend/mutakamel-apps/mutakamel-web-app` | Old tenant implementation to replace |
 | `../backend/docs/ai` | Backend path/decision summaries |
 | `../backend/docs/LLD` | Detailed contracts; verify against source |
 
@@ -97,7 +99,11 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 ../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/upstream-app.registry.ts
 ```
 
-## Important old-web evidence
+## Historical consolidated-frontend evidence
+
+The following paths were recorded in the 2026-07-25 migration inventory but
+are absent from the current checkout. They may explain dated decisions only;
+they cannot prove current source or live behavior.
 
 ```text
 ../backend/mutakamel-apps/mutakamel-web-app/src/app/

@@ -31,7 +31,7 @@ export function CreateTradeImportsWebhooksModal({ isOpen, onClose, onSubmit }: C
         <Select
           label="النوع Type"
           value={type}
-          onChange={(e) => setType(e.target.value as any)}
+          onChange={(e) => setType(e.target.value as typeof type)}
           options={[
             { label: "رابط صادر (Outbound Webhook)", value: "outbound_webhook" },
             { label: "رابط مستقبِل (Webhook Listener)", value: "webhook_listener" },

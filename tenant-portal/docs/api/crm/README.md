@@ -1,13 +1,13 @@
 # CRM API documentation index
 
 > Status: `verified-current`
-> Last source verification: `2026-07-25`
+> Last source verification: `2026-08-25`
 > Owner: CRM (`crm-app`)
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
-> Tenant Portal replacement: `not-started`
-> Legacy frontend: `live-partial`
-> Authorship: hand-written from current Gateway, controller, DTO, service, guard, seed, test, and legacy-client source
+> Tenant Portal replacement: `in-progress-server-backed-slices`
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current Gateway, controller, DTO, service, guard, seed, and test source plus non-authoritative historical frontend evidence
 
 This directory is the implementation contract for CRM in the new Tenant Portal. It covers every CRM route currently exposed by the API Gateway. It deliberately does not describe UI or visual design.
 
@@ -20,12 +20,12 @@ Start with [Common contract](./common-contract.md). Client authors should use on
 | Shared behavior | [Common contract](./common-contract.md) | — |
 | Activities, tasks, calendar, reminders | [Activities](./activities-tasks-calendar-reminders.md) | 11 |
 | Custom fields and values | [Custom fields](./custom-fields.md) | 12 |
-| Customer profiles and contacts | [Customer profiles](./customer-profiles.md) | 5 |
+| Customer profiles and contacts | [Customer profiles](./customer-profiles.md) | 7 |
 | Preset analytics | [Preset dashboards](./dashboards.md) | 7 |
-| User dashboards, widgets, placements, shares | [Dashboard builder and widgets](./dashboard-builder-widgets.md) | 32 |
+| User dashboards, widgets, placements, shares | [Dashboard builder and widgets](./dashboard-builder-widgets.md) | 33 |
 | Lead-stage catalogue | [Lead stages](./lead-stages.md) | 6 |
 | Acquisition-source catalogue and icons | [Acquisition sources](./acquisition-sources.md) | 8 |
-| Leads and conversion | [Leads](./leads.md) | 8 |
+| Leads and conversion | [Leads](./leads.md) | 10 |
 | Notes, attachment metadata, upload, download | [Notes and attachments](./notes-attachments.md) | 9 |
 | Opportunities and stage history | [Opportunities](./opportunities.md) | 8 |
 | Pipelines, boards, assignments, opportunity stages | [Pipelines and opportunity stages](./pipelines-opportunity-stages.md) | 22 |
@@ -33,29 +33,29 @@ Start with [Common contract](./common-contract.md). Client authors should use on
 | Runtime enum/static catalogue | [Static data](./static-data.md) | 1 |
 | Transactional outbound email | [Outbound emails](./outbound-emails.md) | 6 |
 | Safe client patterns | [Examples](./examples.md) | — |
-| **Total current Gateway CRM surface** |  | **137** |
+| **Total current Gateway CRM surface** |  | **143** |
 
-Every one of the 137 manifest routes is assigned once in the domain pages above. The six `/settings/custom-fields...` entries are compatibility aliases of the six canonical `/custom-fields...` entries and are counted because the Gateway exposes both.
+Every one of the 143 manifest routes is assigned once in the domain pages above. The six `/settings/custom-fields...` entries are compatibility aliases of the six canonical `/custom-fields...` entries and are counted because the Gateway exposes both.
 
-## Known Gateway gaps
+## Gateway/controller parity
 
-The CRM controllers expose five additional tenant routes which are absent from the Gateway manifest. They are not internal APIs, but they cannot be called through `/api/tenant/crm/v1` today:
-
-| Controller route | Intended permission | Legacy usage | Documentation decision |
-|---|---|---|---|
-| `GET /api/v1/crm/customer-profiles/capabilities` | branch capability evaluation | called | excluded until Gateway contract exists |
-| `POST /api/v1/crm/customer-profiles/:id/contacts` | `crm.customer_profiles.update.*` | called | excluded until Gateway contract exists |
-| `GET /api/v1/crm/leads/capabilities` | branch capability evaluation | called | excluded until Gateway contract exists |
-| `GET /api/v1/crm/leads/company-options/:companyPartyId/contacts` | `crm.leads.create.*` | called | excluded until Gateway contract exists |
-| `POST /api/v1/crm/dashboards/:id/widgets/:widgetId/drilldown` | `crm.dashboards.read.*` | called | excluded until Gateway contract exists |
-
-Do not add speculative browser URLs for these endpoints. The legacy frontend currently calls all five, so those flows require a Gateway fix or removal before the new portal can reach feature parity.
-
-No other CRM controller route was found outside the Gateway after normalizing parameter names, and no Gateway CRM route was found without a controller.
+The five former browser-contract gaps—lead and customer-profile capabilities,
+company contact options, adding a customer contact, and dashboard widget
+drill-down—are now explicit Gateway routes and are documented in their domain
+pages. No other CRM controller route was found outside the Gateway after
+normalizing parameter names, and no Gateway CRM route was found without a
+controller.
 
 ## Replacement status
 
-The old `mutakamel-web-app` has live CRM pages and API clients for leads, customers, opportunities, activities, dashboards, settings, notes, sources, stages, pipelines, and outbound email. It is only a behavioral reference: the backend contracts documented here are authoritative. The new `tenant-portal` has no CRM implementation yet, so every CRM domain remains `not-started`.
+An earlier repository snapshot documented CRM pages and API clients under the
+old `mutakamel-web-app`. That path is absent from the current checkout, so the
+description is historical behavior only, not current source evidence; the
+backend contracts documented here remain authoritative. The current
+`tenant-portal` now has verified server-backed slices for Leads, Pipeline,
+static data, lead stages, acquisition sources, custom fields, and the safe
+settings subset. Other scaffold cohorts remain intentionally unclaimed until
+each browser contract is verified and implemented or removed.
 
 Minimum replacement gate:
 
@@ -63,7 +63,7 @@ Minimum replacement gate:
 2. Enforce server-backed permissions, branch access, subscription state, and feature state; hiding controls is not authorization.
 3. Preserve UUIDv7 idempotency keys for the 14 protected mutations.
 4. Handle raw successful payloads, paginated shapes, `204`, streams, `202`, and both CRM and Gateway error formats.
-5. Resolve or intentionally retire all five Gateway gaps.
+5. Consume newly exposed capability/contact/drill-down routes only after their exact response contracts are validated in the implementing slice.
 6. Validate enum values against [Static data](./static-data.md) where the runtime catalogue is authoritative.
 
 ## Authoritative sources

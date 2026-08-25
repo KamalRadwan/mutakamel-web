@@ -2,7 +2,7 @@
 
 Status: **Current**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 Owner: **Tenant Portal**
 
@@ -23,10 +23,14 @@ Use this order for every endpoint or behavior:
    route, authentication, authorization, parameters, and HTTP status.
 3. Request DTOs, response types, contracts, entities, services, and tests for
    validation, wire values, response shape, state transitions, and errors.
-4. Existing `mutakamel-web-app` API clients and tests for currently exercised
-   frontend behavior.
-5. Tenant Portal Markdown and examples.
-6. Frontend mocks, fixtures, labels, and comments, which are never contract
+4. Current `tenant-portal` source and tests for currently exercised frontend
+   behavior.
+5. Explicitly dated historical consolidated-frontend evidence, when the
+   referenced artifact is actually available. The absent
+   `../backend/mutakamel-apps/mutakamel-web-app` workspace cannot prove current
+   or live behavior.
+6. Tenant Portal Markdown and examples.
+7. Frontend mocks, fixtures, labels, and comments, which are never contract
    evidence.
 
 Installed immutable package artifacts can differ from package source. When a
@@ -91,8 +95,11 @@ sections:
 - **Migration target**
 - **Known gap**
 
-The previous `mutakamel-web-app` tenant code is a replacement inventory, not
-the final architecture and not the API source of truth.
+The current browser topology is the split frontend workspace, including this
+standalone `tenant-portal`. The previously documented consolidated
+`mutakamel-web-app` is absent from the current checkout; retained references
+are dated historical replacement context only, not current source, runtime
+evidence, final architecture, or an API source of truth.
 
 ## Links and paths
 

@@ -2,7 +2,6 @@ import type {
   CreateDatabaseServerDto,
   DatabaseServerConnectivityResult,
   DatabaseServerCredentialCheckName,
-  DatabaseServerView,
 } from "../types";
 
 export const DATABASE_SECURITY_ADMIN_POSTURE = {
@@ -105,24 +104,4 @@ export function failedCredentialChecks(
   result: DatabaseServerConnectivityResult,
 ) {
   return (result.checks ?? []).filter((check) => !check.connected);
-}
-
-export function needsActiveApplicationBindingBackfill(
-  server: Pick<DatabaseServerView, "credentialBootstrap" | "systemPrincipals">,
-  applicationBindingCount: number,
-  bindingsSettled: boolean,
-): boolean {
-  return (
-    bindingsSettled &&
-    applicationBindingCount === 0 &&
-    server.systemPrincipals.some(
-      (binding) =>
-        binding.purpose === "PROVISIONING" &&
-        binding.databasePrincipal === "mutakamel_provisioner" &&
-        binding.status === "READY",
-    ) &&
-    server.credentialBootstrap.totalPrincipals === 2 &&
-    server.credentialBootstrap.readyPrincipals === 2 &&
-    server.credentialBootstrap.status === "PENDING"
-  );
 }

@@ -7,6 +7,9 @@ import { useAuth } from "@/context/AuthContext";
 import NewDatabaseServerPage from "./page";
 
 vi.mock("@/context/AuthContext", () => ({ useAuth: vi.fn() }));
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({ lang: "en", dir: "ltr" }),
+}));
 vi.mock("@/components/layout/Navbar", () => ({
   Navbar: () => <div data-testid="navbar" />,
 }));
@@ -30,10 +33,15 @@ describe("NewDatabaseServerPage", () => {
   it("does not mount the registration wizard without create permission", () => {
     mockedUseAuth.mockReturnValue({
       user: { isSuperAdmin: false, permissions: [] } as never,
+      authState: "AUTHENTICATED",
       isAuthenticated: true,
       isLoading: false,
       login: vi.fn(),
+      acceptInvite: vi.fn(),
+      resetPassword: vi.fn(),
       logout: vi.fn(),
+      logoutAll: vi.fn(),
+      retryBootstrap: vi.fn(),
     });
 
     render(<NewDatabaseServerPage />);
@@ -50,10 +58,15 @@ describe("NewDatabaseServerPage", () => {
         isSuperAdmin: false,
         permissions: ["admin.database_servers.create"],
       } as never,
+      authState: "AUTHENTICATED",
       isAuthenticated: true,
       isLoading: false,
       login: vi.fn(),
+      acceptInvite: vi.fn(),
+      resetPassword: vi.fn(),
       logout: vi.fn(),
+      logoutAll: vi.fn(),
+      retryBootstrap: vi.fn(),
     });
 
     render(<NewDatabaseServerPage />);

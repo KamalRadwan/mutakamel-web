@@ -3,3 +3,24 @@ packages:
   - 'tenant-portal'
   - 'partner-portal'
   - 'packages/*'
+
+# pnpm 11 otherwise performs a workspace-wide dependency verification before
+# every script. That check cannot authenticate to our private GitHub Packages
+# registry and needlessly blocks unrelated portals whose dependencies are
+# already installed.
+verifyDepsBeforeRun: false
+
+# This is a closed-source workspace with a reviewed, integrity-pinned lockfile.
+# Trusting it avoids pnpm 11 re-fetching private registry metadata solely to
+# re-validate packages that are already locked and present in the local store.
+trustLockfile: true
+
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
+
+overrides:
+  minimatch: '>=5.0.0'
+  nanoid: '3.3.18'
+  postcss: '>=8.5.23'
+  sharp: '>=0.35.0'

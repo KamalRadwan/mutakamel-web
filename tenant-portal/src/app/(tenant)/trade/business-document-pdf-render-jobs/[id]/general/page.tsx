@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/ToastContext";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { Save, Download, Printer } from "lucide-react";
+import { Save, Download } from "lucide-react";
 
 export default function PdfJobGeneralPage() {
   const toast = useToast();

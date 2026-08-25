@@ -3,10 +3,10 @@
 > Contract status: source-verified backend contract; replacement frontend not implemented
 > Verification date: 2026-07-25
 > Backend owner: Trade
-> Documentation: source-generated from verified Gateway routes, Trade controllers/DTOs/services/tests, and legacy frontend evidence
+> Documentation: source-generated from verified Gateway routes, Trade controllers/DTOs/services/tests, and dated historical frontend evidence
 > Canonical browser prefix: `/api/tenant/trade/v1`
 > Controller-relative prefixes: `/trade/extensions/targets`, `/trade/extensions/profiles`
-> Tenant Portal status: `tenant-portal` replaces the legacy tenant Trade UI; Legacy `mutakamel-web-app` has live extension profile clients/editor. The replacement `tenant-portal` is not implemented.
+> Tenant Portal status: The standalone `tenant-portal` replacement is not implemented. The consolidated `mutakamel-web-app` references below are dated 2026-07-25 historical evidence; that workspace is absent from the current checkout and does not prove a live frontend.
 
 ## Capability
 
@@ -18,7 +18,9 @@ Extension target registry reads plus governed profile definitions, versions, val
 
 ## Source evidence
 
-Backend source references below are relative to `C:\mutakamel.ai\frontend`.
+Current backend source references below are relative to
+`C:\mutakamel.ai\frontend`. Consolidated frontend paths are explicitly dated
+historical references; their absent workspace is not current runtime evidence.
 
 - `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts`
 - `../backend/mutakamel-apps/trade-app/src/modules/extensions-automation/extensions-automation.controller.ts`
@@ -32,7 +34,12 @@ Backend source references below are relative to `C:\mutakamel.ai\frontend`.
 
 ## Authorization and scope
 
-Every route requires an authenticated active `TENANT_USER`, a current session version, a Trade/Sales module seat unless the actor is the tenant owner, an enabled Trade entitlement, the feature gate above when declared, the exact permission in the table, and an authorized company/branch context. Tenant owners bypass permission-row lookup, not session, entitlement, feature, or scope validation. Dashboard-context exceptions are called out below.
+Every route requires an authenticated active `TENANT_USER`, an active unexpired
+`sid` with all four exact Auth epochs, a Trade/Sales module seat unless the actor
+is the tenant owner, an enabled Trade entitlement, the feature gate above when
+declared, the exact permission in the table, and an authorized company/branch
+context. Tenant owners bypass permission-row lookup, not session, entitlement,
+feature, or scope validation. Dashboard-context exceptions are called out below.
 
 - `COMPANY`: send an authorized `X-Mutakamel-Company-Id`.
 - `BRANCH`: send both company and branch UUIDv7 headers.

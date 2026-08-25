@@ -36,7 +36,7 @@ export function CreateCrmActivitiesTasksModal({ isOpen, onClose, onSubmit }: Cre
           <Select
             label={t.crm.typeOfEvent}
             value={taskType}
-            onChange={(e) => setTaskType(e.target.value as any)}
+            onChange={(e) => setTaskType(e.target.value as typeof taskType)}
             options={[
               { label: t.crm.demo, value: "demo" },
               { label: t.crm.call, value: "call" },

@@ -1,12 +1,12 @@
 # Trade API Security Contract
 
 > Contract status: source-verified cross-cutting security contract
-> Verification date: 2026-07-25
+> Verification date: 2026-08-10
 > Backend owner: Trade, with Core identity and Gateway edge enforcement
 > Documentation: hand-written from guards, middleware, services, tests, and Gateway contracts
 > Canonical browser prefix: `/api/tenant/trade/v1`
 > Controller-relative prefix: `/trade` under upstream `/api/v1`
-> Tenant Portal status: replacement Trade client is not implemented; these controls are mandatory for its shared API layer and feature modules.
+> Tenant Portal status: partial Trade client/feature source exists; these controls remain mandatory and authenticated runtime proof is open.
 
 ## Enforcement chain
 
@@ -14,7 +14,8 @@ Trade registers global guards in this order:
 
 1. JWT authentication.
 2. Trusted Gateway tenant reconciliation.
-3. active tenant-user/session-version/module-seat validation.
+3. active tenant-user, active unexpired `sid`, exact Auth-epoch, and module-seat
+   validation.
 4. provisioning maintenance, module subscription, and feature entitlement validation.
 5. company/branch/channel scope validation.
 6. scoped permission validation.
@@ -29,7 +30,14 @@ Sources:
 - `../backend/mutakamel-apps/trade-app/src/common/guards/trade-scope.guard.ts`
 - `../backend/mutakamel-apps/trade-app/src/common/guards/trade-permissions.guard.ts`
 
-The actor must be an active `TENANT_USER` whose token session version matches the current Core-owned tenant-user row. A non-owner must have a live `trade` or `sales` module assignment. Tenant owners bypass the module-seat check and scoped permission-row lookup; they do not bypass authentication, active-session, module entitlement, feature, scope, validation, or concurrency controls.
+The actor must be an active `TENANT_USER` whose JWT supplies a UUIDv7 `sid` and
+positive safe-integer `securityEpoch`, `authorizationVersion`,
+`profileVersion`, and `sessionEpoch`. Trade rechecks the active unexpired Auth
+Session and all four exact values in the current tenant database. A non-owner
+must have a live `trade` or `sales` module
+assignment. Tenant owners bypass the module-seat check and scoped permission-
+row lookup; they do not bypass authentication, active-session, module
+entitlement, feature, scope, validation, or concurrency controls.
 
 Provisioning maintenance fails closed with `TRADE.PROVISIONING.MAINTENANCE_ACTIVE`. Missing/failed entitlement resolution returns a forbidden or dependency-unavailable result; the UI must not reinterpret either as a successful empty state.
 
@@ -37,7 +45,7 @@ Provisioning maintenance fails closed with `TRADE.PROVISIONING.MAINTENANCE_ACTIV
 
 | Header | Browser use | Rule |
 |---|---|---|
-| `Authorization` or established authenticated session | Through the shared tenant API client | Follow the portal/Gateway authentication mechanism; never persist access tokens in documentation, logs, URLs, analytics, or static state. |
+| Secure HttpOnly access cookie | Browser cookie jar through the shared tenant API client with `credentials: include` | Feature code never reads the cookie or constructs an `Authorization` bearer; never persist access tokens in documentation, logs, URLs, analytics, or static state. |
 | `X-Mutakamel-Company-Id` | Allowed when the route scope requires/accepts company context | UUIDv7; must identify an active company authorized for the actor. |
 | `X-Mutakamel-Branch-Id` | Allowed for branch context | UUIDv7; requires company and must belong to that active company. |
 | `X-Mutakamel-Channel-Id` | Allowed only where execution context uses a channel | UUIDv7; requires company, must be active, and must be assigned to the branch when a branch is present. |

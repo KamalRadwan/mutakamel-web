@@ -65,6 +65,18 @@ export function adminCanAll(
   );
 }
 
+export function adminCanAny(
+  user: AdminAuthorizationContext | null | undefined,
+  requiredPermissions: readonly string[],
+): boolean {
+  return (
+    user?.isSuperAdmin === true ||
+    requiredPermissions.some((permission) =>
+      user?.permissions?.includes(permission) === true
+    )
+  );
+}
+
 // Critical Action Semantics
 export const ADMIN_RBAC_CRITICAL = {
   USERS_INVITE: ["admin.users.invite", "admin.users.critical"] as const,

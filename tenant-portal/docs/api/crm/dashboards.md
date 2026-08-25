@@ -6,8 +6,8 @@
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
 > Tenant Portal replacement: `not-started`
-> Legacy frontend: `live`
-> Authorship: hand-written from current source
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
 Preset dashboards are server-defined, read-only analytical projections. User-authored definitions and widgets are documented in [Dashboard builder and widgets](./dashboard-builder-widgets.md).
 

@@ -42,7 +42,11 @@ export async function createMyWebphoneCallLog(
 ) {
   const response = await axiosClient.post<
     SuccessResponse<WebphoneCallLog>
-  >(`${WEBPHONE_BASE}/call-logs`, payload);
+  >(`${WEBPHONE_BASE}/call-logs`, payload, {
+    skipAutoIdempotency: true,
+    nonReplayable: true,
+    cache: "no-store",
+  });
 
   return response.data.data;
 }

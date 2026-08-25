@@ -58,8 +58,6 @@ export const en: Dictionary = {
     authentication: "Authentication & Security",
     moduleAssignments: "User Module Assignments",
     provisioningUpdates: "Provisioning Updates",
-    signedDownloads: "Signed File Downloads",
-    hostStatus: "Host Status",
     workspaceSettings: "Workspace Settings & Branding",
 
     // CRM Navigation items
@@ -79,9 +77,6 @@ export const en: Dictionary = {
     presetDashboards: "Preset Dashboards",
     staticData: "Static Data Catalogue",
     crmSettings: "CRM Settings",
-    apiDocs: "API Documentation",
-    browserContracts: "Common Browser Contracts",
-    browserExamples: "Browser Examples",
 
     // Trade Navigation items
     tradeDashboard: "Trade Dashboard",
@@ -102,7 +97,6 @@ export const en: Dictionary = {
     extensionProfiles: "Extension Profiles",
     workflowVersions: "Workflow Versions",
     importsWebhooks: "Imports & Webhooks",
-    aiGuide: "AI Implementation Guide"
   },
   dashboard: {
     title: "Dashboard",

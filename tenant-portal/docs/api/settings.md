@@ -1,11 +1,11 @@
 # Tenant workspace settings and branding API
 
 > **Contract status:** Current
-> **Last verified:** 2026-07-25
+> **Last verified:** 2026-08-25
 > **Backend owner:** Core (`core-app`)
 > **Canonical browser prefixes:** `/api/tenant/core/v1/workspace-settings`, `/api/tenant/core/v1/branding`
 > **Controller-relative prefixes:** `/tenant/workspace-settings`, `/tenant/branding`
-> **Tenant Portal status:** Planned. The legacy settings implementation is live in `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings/tenant-settings-page.tsx`.
+> **Tenant Portal status:** Planned. A dated 2026-07-25 inventory referenced a consolidated settings implementation, but that `mutakamel-web-app` workspace is absent from the current checkout and is not live-runtime evidence.
 > **Documentation:** Hand-written and source-verified; not generated.
 
 Currency, tax, and numbering contracts are documented separately in [finance-configuration.md](finance-configuration.md).
@@ -15,13 +15,16 @@ Currency, tax, and numbering contracts are documented separately in [finance-con
 - Gateway routes: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
 - Workspace controller, DTO, service: `../backend/mutakamel-apps/core-app/src/tenant/workspace-settings`
 - Branding controller, DTO, service: `../backend/mutakamel-apps/core-app/src/tenant/branding`
-- Legacy API/page: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
+- Historical consolidated API/page reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
 
 ## Common contract
 
-All routes except public branding require a tenant JWT, a verified host matching the token tenant, active session version, subscription access, and the listed permission. The browser calls same-origin canonical paths and must not send trusted tenant/company/branch headers.
+All routes except public branding require a tenant JWT, a verified host matching
+the token tenant, an active unexpired `sid` with all four exact Auth epochs,
+subscription access, and the listed permission. The browser calls same-origin
+canonical paths and must not send trusted tenant/company/branch headers.
 
-Core rejects unknown DTO fields. The standard success envelope is `{success:true,data,correlationId,timestamp}`. The error envelope is `{success:false,statusCode,errorCode,errorCategory,message,details?,correlationId,timestamp,path}`. These settings commands are not explicitly replay-safe: do not automatically retry them after an ambiguous network failure.
+Core rejects unknown DTO fields. JSON success responses use `{success:true,data,correlationId,timestamp}`. The public logo and icon reads below instead stream raw image bytes. The error envelope is `{success:false,statusCode,errorCode,errorCategory,message,details?,correlationId,timestamp,path}`. These settings commands are not explicitly replay-safe: do not automatically retry them after an ambiguous network failure.
 
 Security is tenant/session/permission based, with host-only access for public branding. Workspace/branding updates have no application idempotency contract and expose no asynchronous job.
 
@@ -43,7 +46,8 @@ Safe workspace-update example:
 
 ```http
 PUT /api/tenant/core/v1/workspace-settings
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 
 {"defaultLanguage":"ar","defaultCurrencyCode":"EGP","timezone":"Africa/Cairo","allowSupport":false}
@@ -56,6 +60,8 @@ Content-Type: application/json
 | Method and canonical browser path | Permission/access | Body/result |
 |---|---|---|
 | `GET /api/tenant/core/v1/branding/public` | Public, verified tenant host | Display-only pre-auth branding |
+| `GET /api/tenant/core/v1/branding/public/logo` | Public, verified tenant host | Raw PNG, JPEG, or WebP logo bytes |
+| `GET /api/tenant/core/v1/branding/public/icon` | Public, verified tenant host | Raw PNG, JPEG, or WebP icon bytes |
 | `GET /api/tenant/core/v1/branding` | `branding.read` | Full branding singleton |
 | `PUT /api/tenant/core/v1/branding` | `branding.manage` | Partial `UpdateBrandingDto` |
 | `POST /api/tenant/core/v1/branding/logo` | `branding.manage` | Multipart `file`; replaces logo |
@@ -71,7 +77,9 @@ Content-Type: application/json
 
 Uploads use exactly one `file` field. Allowed MIME types are `image/png`, `image/jpeg`, and `image/webp`; maximum size is 2 MiB. Do not trust filename extensions or attempt to create storage paths in the portal.
 
-Expected errors include `BRANDING_FILE_REQUIRED`, `BRANDING_FILE_TYPE_UNSUPPORTED`, `BRANDING_FILE_TOO_LARGE`, and `BRANDING_STORAGE_UNAVAILABLE`. Public branding is one of the few reads allowed while a tenant is suspended, so it must remain free of private tenant configuration. Treat both branding reads as tenant-specific; never cache them globally or across hosts.
+The public branding projection supplies the same-origin logo/icon paths. Those asset routes re-resolve the tenant from the verified host and return `Content-Length`, `X-Content-Type-Options: nosniff`, an inline `Content-Disposition`, and `Cache-Control: public, max-age=300`. An unresolved tenant or missing, invalid, or unavailable asset is a `404` (`TENANT_NOT_RESOLVABLE` or `BRANDING_ASSET_NOT_FOUND`); no Storage credential or object key is exposed.
+
+Expected errors include `BRANDING_FILE_REQUIRED`, `BRANDING_FILE_TYPE_UNSUPPORTED`, `BRANDING_FILE_TOO_LARGE`, and `BRANDING_STORAGE_UNAVAILABLE`. Public branding is one of the few reads allowed while a tenant is suspended, so it must remain free of private tenant configuration. Treat every public branding response as tenant-specific; never cache it globally or across hosts.
 
 ## AI implementation rules
 

@@ -4,13 +4,21 @@ Status: **Pattern examples**
 
 Last verified: **2026-07-25**
 
+These browser examples assume a same-origin signed-in client using
+`credentials: include`. The browser cookie jar attaches the Secure HttpOnly
+access cookie; application JavaScript never reads that cookie or constructs an
+`Authorization` header. For every unsafe cookie-authenticated method, the
+shared client also reads `__Host-mutakamel-tenant-csrf` and sends its decoded
+value in the matching `X-CSRF-Token` header. The raw `Cookie` lines below show
+the resulting wire request only.
+
 ## Core read
 
 ```http
 GET /api/tenant/core/v1/auth/me HTTP/1.1
 Host: tenant.example.test
 Accept: application/json
-Authorization: Bearer <access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>
 ```
 
 Illustrative success envelope:
@@ -37,7 +45,7 @@ The exact `/auth/me` projection is defined in [Auth API](../api/auth.md).
 GET /api/tenant/crm/v1/leads?branchId=01900000-0000-7000-8000-000000000020&page=1&limit=20 HTTP/1.1
 Host: tenant.example.test
 Accept: application/json
-Authorization: Bearer <access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>
 ```
 
 CRM successes are raw service projections. A common page is:
@@ -62,7 +70,7 @@ Do not run this response through the Core/Trade envelope unwrapping path.
 GET /api/tenant/trade/v1/quotations/01900000-0000-7000-8000-000000000030 HTTP/1.1
 Host: tenant.example.test
 Accept: application/json
-Authorization: Bearer <access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>
 ```
 
 Trade operating context requirements are route-specific. Never add a
@@ -89,7 +97,8 @@ POST /api/tenant/core/v1/<documented-write-route> HTTP/1.1
 Host: tenant.example.test
 Accept: application/json
 Content-Type: application/json
-Authorization: Bearer <access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 X-Idempotency-Key: 01900000-0000-7000-8000-000000000040
 
 {
@@ -118,6 +127,11 @@ and owner-app contract supports/requires it.
   "path": "/api/v1/tenant/auth/login"
 }
 ```
+
+The `path` member above is the owner app's upstream error-envelope value after
+Gateway mapping. It is diagnostic only: browser code continues to call the
+canonical `/api/tenant/{app}/v1/*` route and must not construct a retry URL from
+that field.
 
 Trade does not use this shared error envelope. Codes/messages can be
 app-specific; branch on normalized stable code/category/status, not English

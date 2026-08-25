@@ -13,10 +13,10 @@ import {
   CheckCircle2,
   Clock,
   Activity,
-  XCircle
+  XCircle,
 } from "lucide-react";
 import { DashboardMetric } from "@/types/dashboard";
-import { formatDashboardMetric, toneToColorClass } from "../utils/formatters";
+import { formatDashboardMetric, toneToColorStyle } from "../utils/formatters";
 
 interface KpiCardProps {
   card: DashboardMetric;
@@ -45,36 +45,36 @@ export function getCardIcon(key: string, label: string) {
 
 export function KpiCard({ card, currencyCode = "USD" }: KpiCardProps) {
   const formattedValue = formatDashboardMetric(card, currencyCode);
-  const toneColor = toneToColorClass(card.tone);
+  const style = toneToColorStyle(card.tone);
   const icon = getCardIcon(card.key, card.label);
 
   return (
-    <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3 flex flex-col justify-between overflow-hidden relative group hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+    <div
+      className={`bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 ${style.topBorder} shadow-2xs space-y-3 flex flex-col justify-between overflow-hidden relative group hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all`}
+    >
       <div className="space-y-2">
         <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-          <span className="text-xs font-semibold truncate max-w-[140px]" title={card.label}>
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate max-w-[150px]" title={card.label}>
             {card.label}
           </span>
-          <div className={`p-1.5 sm:p-2 rounded-xl ${toneColor.split(" ")[1]}`}>
-            <div className={toneColor.split(" ")[0]}>
-              {icon}
-            </div>
+          <div className={`p-2 rounded-xl ${style.iconBg} ${style.iconColor} shrink-0`}>
+            {icon}
           </div>
         </div>
 
-        <div className="flex items-baseline justify-between">
-          <span className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100">
+        <div className="flex items-baseline justify-between pt-1">
+          <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
             {formattedValue}
           </span>
         </div>
 
-        <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
+        <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-tight">
           {card.description}
         </p>
       </div>
 
       <div
-        className={`h-1 w-10 rounded-full bg-current ${toneColor.split(" ")[0]}`}
+        className={`h-1 w-12 rounded-full ${style.iconColor} opacity-60 bg-current`}
         aria-hidden="true"
       />
     </div>

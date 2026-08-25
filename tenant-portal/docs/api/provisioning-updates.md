@@ -12,7 +12,7 @@
 
 - Gateway contracts: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
 - Controllers/DTO/read model/command service: `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning`
-- Legacy client/types: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings/tenant-provisioning-updates-api.ts` and `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings/tenant-provisioning-updates-types.ts`
+- Historical consolidated client/types references (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings/tenant-provisioning-updates-api.ts` and `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings/tenant-provisioning-updates-types.ts`
 - Worker execution contracts: `../backend/mutakamel-apps/worker-app`
 
 ## Security and routes
@@ -55,7 +55,8 @@ Safe pinned-apply example:
 
 ```http
 POST /api/tenant/core/v1/provisioning/updates/apply
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 X-Idempotency-Key: 019f9871-fd40-7680-bfbb-fd535b5880c8
 

@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Shield, Scale, Code } from "lucide-react";
+import { Eye, Trash2, Scale } from "lucide-react";
 import { useTradePolicyStudio, PolicyRuleItem } from "./hooks/useTradePolicyStudio";
 import { CreateTradePolicyStudioModal } from "./components/CreateTradePolicyStudioModal";
 import { DeleteTradePolicyStudioConfirmModal } from "./components/DeleteTradePolicyStudioConfirmModal";
 
 export default function TradePolicyStudioPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

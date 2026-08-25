@@ -2,7 +2,7 @@
 
 Status: **SOURCE-INTEGRATED**
 
-Last source verification: **2026-08-05**
+Last source verification: **2026-08-25**
 
 Core owns the Storage Server registry, encrypted Garage/S3 credentials,
 lifecycle, connection evidence, placement eligibility, and durable probe
@@ -83,7 +83,7 @@ routing-profile, attestation, or migration control in this module.
 ## DTOs
 
 ```ts
-type StorageServerStatus = "DRAFT" | "ACTIVE" | "OFFLINE";
+type StorageServerStatus = "DRAFT" | "ACTIVE" | "DRAINING" | "OFFLINE";
 type StorageConnectionTestStatus = "NOT_TESTED" | "PASSED" | "FAILED";
 
 interface StorageCredentialsDto {
@@ -125,6 +125,8 @@ Create example:
 
 ```http
 POST /api/admin/core/v1/storage-servers
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-000000000020
 Content-Type: application/json
 
@@ -148,6 +150,37 @@ preallocates the returned `id`, and persists only the safe completed projection.
 The create body and write-only credentials are never stored in the registration
 command. An exact retry after an unknown response returns the original result
 or recovers that same DRAFT identity even after Gateway replay state is lost.
+
+## Admin Portal setup intent
+
+The create screen presents one operator setup action without pretending the two
+backend effects are atomic:
+
+1. `POST /storage-servers` durably creates the DRAFT with the create intent's
+   UUIDv7 key.
+2. When the actor also has `admin.storage_servers.update` plus
+   `admin.storage_servers.critical`, the screen immediately calls
+   `POST /storage-servers/:id/activate` with a separate UUIDv7 key. Activation
+   performs the authoritative bounded connection check.
+
+The create screen does not run a pre-probe. `probe` requires an existing server
+and remains an independent diagnostic that never changes lifecycle state. An
+actor with create+critical but without update+critical stops after the durable
+DRAFT and is redirected according to read permission.
+
+If activation receives a definitive client rejection, the activation key is
+retired and the already-created server remains a reviewable DRAFT; the portal
+never reports full setup success. Activation is also domain-idempotent: an
+exact retry after a lost response returns the current `ACTIVE` projection, and
+if another activation completes against the same `configRevision` while the
+connection check is running, Core returns that `ACTIVE` result instead of a
+state-change conflict. A changed configuration still fails its revision fence.
+
+If activation is in flight or returns a network/`5xx`/otherwise ambiguous
+outcome, the screen retains the exact created server ID and activation key. The
+retry button repeats only activation and cannot recreate the Storage Server or
+resubmit its credentials. The domain-idempotent success rule therefore
+prevents a lost successful response from being presented as a DRAFT failure.
 
 ## Safe projection and list contract
 
@@ -205,10 +238,12 @@ present page counts as global metrics.
 
 Activation and a safe probe are different commands:
 
-- `activate` accepts only `DRAFT` or `OFFLINE`, performs the bounded connection
-  test, and transitions to `ACTIVE` only if the same configuration revision
-  still exists;
+- `activate` transitions only `DRAFT` or `OFFLINE`, performs the bounded
+  connection test, and writes `ACTIVE` only if the same configuration revision
+  still exists; an already-`ACTIVE` exact retry and a concurrent same-revision
+  completion both return the current `ACTIVE` projection;
 - `probe` can test the current server without changing lifecycle state;
+- `probe` is diagnostic and is not required before create or activate;
 - a failed manual or scheduled probe records only a safe code and timestamp;
   an existing `ACTIVE` server stays `ACTIVE` and assigned runtime is not
   interrupted;
@@ -218,10 +253,16 @@ Activation and a safe probe are different commands:
   absent or 12 hours old. Worker publishes only command/server/revision/time;
   Core alone resolves credentials and performs network I/O.
 
+`DRAINING` is a real lifecycle projection while existing tenant storage is
+evacuated: it remains list/filter-visible and usable for existing routes, but
+is excluded from new placement.
+
 Probe request and secret-free result:
 
 ```http
 POST /api/admin/core/v1/storage-servers/019f0000-0000-7000-8000-000000000010/probe
+Cookie: __Host-mutakamel-admin-access=<redacted>; __Host-mutakamel-admin-session=<redacted>; __Host-mutakamel-admin-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 019f0000-0000-7000-8000-000000000021
 Content-Type: application/json
 
@@ -312,6 +353,15 @@ UI rules:
   stale. Lifecycle and connection evidence are separate UI concepts.
 
 ## Current frontend implementation
+
+The create screen owns registration directly and does not mount the registry
+list query. With the complete create and activation permission pairs it offers
+one setup submit, then preserves the durable partial-success boundary described
+above. Create-only actors retain the DRAFT workflow. The two commands never
+share an idempotency key, and ambiguous activation retries never replay create.
+Core's domain-idempotent activation returns `ACTIVE` for exact replay or a
+same-revision concurrent completion, so the UI can reconcile a lost success
+without recreating the server, resending credentials, or misreporting DRAFT.
 
 The active detail hook clears the prior server, probe result, credential
 editor, and confirmation state as soon as the route `id` changes. Reads are

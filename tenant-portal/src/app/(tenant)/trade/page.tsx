@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import { UnavailableCapability } from "@/components/layout/UnavailableCapability";
+import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 
 export default function TradeIndexPage() {
-  redirect("/trade/dashboard-builder");
+  return <UnavailableCapability backHref={TENANT_ROUTES.home} />;
 }

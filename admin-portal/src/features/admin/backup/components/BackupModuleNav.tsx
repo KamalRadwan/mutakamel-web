@@ -35,7 +35,7 @@ export function BackupModuleNav() {
 
   return (
     <section className="border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-      <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 sm:pt-5">
+      <div className="w-full px-[10px] pt-4 sm:pt-5">
         <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900/70 dark:bg-cyan-950/50 dark:text-cyan-300">

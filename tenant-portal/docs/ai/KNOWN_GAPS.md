@@ -10,12 +10,15 @@ implementing files/tests and changing capability status.
 - Root source remains the default Next bootstrap.
 - Server-side tenant host admission is absent.
 - Same-origin Gateway proxy is absent.
-- Canonical API client with per-app success parsing and normalized error
-  handling is absent.
-- Tenant auth/session/refresh coordination is absent.
+- The canonical client now provides cookie credentials, normalized Core/Gateway
+  auth errors, UUIDv7 intent preservation, and one safe refresh replay; full
+  per-app Core/CRM/Trade success parsing remains incomplete.
+- Tenant login, `/auth/me` bootstrap, reusable refresh coordination, logout,
+  cross-tab session events, and self-session list/revoke are source-integrated;
+  authenticated runtime verification remains open.
 - Public invite/reset routes are absent.
-- `/auth/me`, permissions, organization context, module/seat bootstrap are
-  absent.
+- `/auth/me` identity/permission bootstrap is integrated; organization,
+  module, seat, and entitlement bootstrap remain absent.
 - Core, CRM, and Trade feature routes are absent.
 - Unit, integration, and browser-test runners are absent.
 - Typecheck and documentation drift/link checks exist, but no application
@@ -69,8 +72,6 @@ implementing files/tests and changing capability status.
 - Whether every old consolidated `/trade/[view]` screen becomes an explicit
   route or a stable section route.
 - Cutover and rollback ownership at ingress.
-- Tenant token storage/cookie contract if a change from the current bearer and
-  refresh-token behavior is desired.
 - Runtime schema library, server-state library, and browser-test framework,
   selected after checking workspace conventions and current Next compatibility.
 

@@ -83,15 +83,15 @@ export default function UsersDirectoryPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
+      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
         {/* Header Title Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               <span>{t.users.pageTitle}</span>
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight">
               {t.users.pageSubtitle}
             </p>
           </div>

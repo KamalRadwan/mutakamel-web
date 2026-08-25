@@ -2,13 +2,13 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-11**
 
 Verified against the current Gateway contracts, Core controllers, DTOs,
 operation/read-model services, provisioning command services, database enums,
 and the Admin Portal tenant-detail source.
 
-This document covers the 16 tenant-prefixed operation/provisioning routes used
+This document covers the 15 tenant-prefixed operation/provisioning routes used
 to observe and manage a single tenant. Fleet rollout and release-publishing
 routes under `/api/admin/core/v1/provisioning/...` are a separate platform
 governance surface.
@@ -29,11 +29,10 @@ All paths below are canonical browser paths.
 
 The two command endpoints require **both** permissions.
 
-### Updates, reconciliation, and prerequisites
+### Updates and prerequisites
 
 | Method and path | Permission | Success | UUIDv7 key | Purpose |
 |:---|:---|:---:|:---:|:---|
-| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/reconcile` | `admin.tenants.reprovision` + `admin.tenants.critical` + `admin.provisioning.critical` | `202` | Yes | Reconcile eligible legacy-discovered state |
 | `GET /api/admin/core/v1/tenants/:tenantId/provisioning/updates` | `admin.tenants.read` | `200` | No | Paginated server-computed update choices |
 | `POST /api/admin/core/v1/tenants/:tenantId/provisioning/updates/apply` | `admin.tenants.reprovision` + `admin.tenants.critical` + `admin.provisioning.critical` | `202` | Yes | Apply an exact update selection |
 | `POST /api/admin/core/v1/tenants/:tenantId/provisioning/prerequisite-requests` | `admin.provisioning.prerequisites.request` + `admin.provisioning.critical` | `202` | Yes | Request backup/maintenance evidence |
@@ -43,15 +42,15 @@ The two command endpoints require **both** permissions.
 
 | Method and path | Permission | Success | UUIDv7 key | Purpose |
 |:---|:---|:---:|:---:|:---|
-| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/add-module` | `admin.provisioning.add-module` + `admin.provisioning.critical` | `202` | Yes | Materialize an already-entitled module |
+| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/add-application` | `admin.provisioning.add-application` + `admin.provisioning.critical` | `202` | Yes | Materialize an already-entitled Application |
 | `POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/repair` | `admin.provisioning.repair` + `admin.provisioning.critical` | `202` | Yes | Repair one component closure |
 | `POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/decommission` | `admin.provisioning.decommission` + `admin.provisioning.critical` | `202` | Yes | Disable/retain a component |
-| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/seed-conflicts/:seedStateId/resolve` | `admin.provisioning.conflicts.resolve` + `admin.provisioning.critical` | `202` | Yes | Resolve an eligible seed conflict |
+| `POST /api/admin/core/v1/tenants/:tenantId/provisioning/seed-conflicts/:seedStateId/resolve` | `admin.provisioning.conflicts.resolve` + `admin.provisioning.critical` | `200` | Yes | Resolve an eligible seed conflict |
 | `GET /api/admin/core/v1/tenants/:tenantId/provisioning-state/components` | `admin.tenants.read` | `200` | No | Paginated installation evidence |
 | `GET /api/admin/core/v1/tenants/:tenantId/provisioning-state/seeds` | `admin.tenants.read` | `200` | No | Paginated seed-state evidence |
 
-The seed-conflict command is present in the current Gateway contract. It
-remains frontend `MISSING` and requires both permissions shown.
+The seed-conflict command is source-integrated in the tenant provisioning
+workspace and requires both permissions shown.
 
 ## Shared envelopes and idempotency
 
@@ -83,9 +82,8 @@ same key return an idempotency conflict.
 enum TenantOperationTypeEnum {
   INITIAL_PROVISION = "INITIAL_PROVISION",
   RETRY = "RETRY",
-  RECONCILE = "RECONCILE",
   UPDATE = "UPDATE",
-  ADD_MODULE = "ADD_MODULE",
+  ADD_APPLICATION = "ADD_APPLICATION",
   REPAIR = "REPAIR",
   DECOMMISSION = "DECOMMISSION",
 }
@@ -375,21 +373,6 @@ ids, versions, or checksums. Core rejects stale/changed evidence and
 incompatible release combinations. Success returns
 `TenantProvisioningCommandResult`.
 
-## Legacy reconciliation
-
-`POST /api/admin/core/v1/tenants/:tenantId/provisioning/reconcile`
-
-```ts
-interface ReconcileTenantProvisioningDto {
-  componentKeys?: string[]; // optional 1..100 unique component keys
-}
-```
-
-Omitting `componentKeys` lets Core select all eligible legacy-discovered drift.
-The tenant must be `ACTIVE` or `SUSPENDED`, and any latest operation must have
-succeeded. This command is discovery-based and intentionally has no client
-release pin. It returns `TenantProvisioningCommandResult`.
-
 ## Provisioning state
 
 ### Component installations
@@ -453,6 +436,7 @@ interface TenantSeedStateQueryDto {
 
 interface TenantSeedStateView {
   id: string;
+  revision: number; // exact optimistic-concurrency input for conflict resolve
   tenantId: string;
   componentId: string;
   componentKey: string;
@@ -594,30 +578,28 @@ not a substitute for UI consent.
 | `422` | `TENANT_PROVISIONING_UPDATE_SELECTION_INVALID` | Correct duplicate/incomplete selection |
 | `422` | `TENANT_PROVISIONING_UPDATE_INCOMPATIBLE` | Present compatibility conflict |
 | `422` | `TENANT_PROVISIONING_NO_ADMIN_MANAGED_UPDATES` | Empty state, not generic failure |
-| `422` | `TENANT_PROVISIONING_NO_LEGACY_DRIFT` | Nothing requires reconciliation |
 | `503` | `TENANT_PROVISIONING_CATALOG_INVALID` | Operational catalogue failure |
 
 Gateway idempotency errors use Problem Details `code`:
 `GW.IDEM.MISSING`, `GW.IDEM.BAD_VALUE`, `GW.IDEM.IN_FLIGHT`, and
 `GW.IDEM.MISMATCH`.
 
-## Current frontend gaps
+## Current frontend integration
 
-The tenant detail prototype:
+The tenant workspace implements all 15 routes in this document with strict
+response readers, independent permission states, bounded live polling, and
+caller-owned UUIDv7 command identities. Operation selection exposes weighted
+progress, the complete step DAG, safe errors, generation/current phase, and the
+bounded event timeline. Retry and cancel visibility follows the latest
+operation and exact terminal/nonterminal status rules.
 
-1. uses two local operations with invalid types/status `TENANT_PROVISIONING`,
-   `MODULE_ENABLEMENT`, and `COMPLETED`;
-2. has no list, detail, timeline, retry, or cancel request;
-3. displays a fabricated percentage instead of the weighted server progress;
-4. has no step DAG, safe error, generation, digest, or access-policy evidence;
-5. has no update, installation, seed, prerequisite, add-module, repair, or
-   decommission views;
-6. does not permission-gate advanced provisioning actions;
-7. supplies no UUIDv7 command keys;
-8. lacks polling/backoff and terminal-state handling.
-
-Start with the five operation-history routes. Add advanced commands only after
-their no-store read models and exact evidence-copying UI are implemented.
+Updates copy the current and target release evidence returned by Core. The
+state workspace exposes component installations and seed state, including the
+exact `revision` required for a conflict decision. Prerequisite requests and
+evidence, add-Application, repair, retained decommission, and conflict resolve
+are separately permission-gated. Raw Worker logs, secrets, and unbounded
+provider payloads are intentionally not browser APIs; the safe timeline is the
+operator-facing log surface.
 
 ## Backend source map
 

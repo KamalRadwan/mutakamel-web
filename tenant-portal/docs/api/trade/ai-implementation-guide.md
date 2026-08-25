@@ -228,7 +228,7 @@ Stop and request a contract decision when:
 
 - a desired browser path is not in [route-coverage.md](route-coverage.md);
 - a DTO/type union and runtime validator disagree in a way that changes product behavior;
-- legacy UI sends a field the current DTO rejects;
+- dated historical UI evidence sends a field the current DTO rejects;
 - a response lacks the ID/version/ETag needed by the documented next command;
 - a 202 route has no observable terminal projection;
 - ownership between Core, CRM, Trade, Accounting, or Worker is unclear;

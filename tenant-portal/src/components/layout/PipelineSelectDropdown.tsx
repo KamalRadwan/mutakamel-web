@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Kanban, ChevronDown, Check } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 
@@ -11,18 +11,24 @@ export interface PipelineOption {
   code: string;
 }
 
-const mockPipelines: PipelineOption[] = [
-  { id: "pipe-1", code: "STD_SALES", nameAr: "مبيعات قياسية", nameEn: "Standard Sales" },
-  { id: "pipe-2", code: "KEY_ACC", nameAr: "مسار كبار العملاء", nameEn: "Key Accounts Pipeline" },
-  { id: "pipe-3", code: "ENT_DEALS", nameAr: "صفقات الشركات الكبرى", nameEn: "Enterprise Deals" },
-  { id: "pipe-4", code: "SME_SW", nameAr: "حزم برمجيات الشركات", nameEn: "SME Software Packages" },
-];
+interface PipelineSelectDropdownProps {
+  pipelines: PipelineOption[];
+  selectedPipelineId: string | null;
+  onChange: (pipelineId: string) => void;
+  disabled?: boolean;
+}
 
-export function PipelineSelectDropdown() {
+export function PipelineSelectDropdown({
+  pipelines,
+  selectedPipelineId,
+  onChange,
+  disabled = false,
+}: PipelineSelectDropdownProps) {
   const { lang } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedPipeline, setSelectedPipeline] = useState<PipelineOption>(mockPipelines[0]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const selectedPipeline =
+    pipelines.find(({ id }) => id === selectedPipelineId) ?? null;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -39,6 +45,7 @@ export function PipelineSelectDropdown() {
       <button
         onClick={() => setIsOpen((prev) => !prev)}
         type="button"
+        disabled={disabled || pipelines.length === 0}
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer"
       >
         <div className="w-4 h-4 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
@@ -48,7 +55,13 @@ export function PipelineSelectDropdown() {
           {lang === "ar" ? "المسار:" : "Pipeline:"}
         </span>
         <span className="truncate max-w-[110px] sm:max-w-[130px]">
-          {lang === "ar" ? selectedPipeline.nameAr : selectedPipeline.nameEn}
+          {selectedPipeline
+            ? lang === "ar"
+              ? selectedPipeline.nameAr
+              : selectedPipeline.nameEn
+            : lang === "ar"
+              ? "لا يوجد مسار"
+              : "No pipeline"}
         </span>
         <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
       </button>
@@ -58,14 +71,14 @@ export function PipelineSelectDropdown() {
           <div className="px-3 py-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             {lang === "ar" ? "اختر مسار المبيعات" : "Select Sales Pipeline"}
           </div>
-          {mockPipelines.map((pipe) => {
-            const isSelected = selectedPipeline.id === pipe.id;
+          {pipelines.map((pipe) => {
+            const isSelected = selectedPipeline?.id === pipe.id;
             return (
               <button
                 key={pipe.id}
                 type="button"
                 onClick={() => {
-                  setSelectedPipeline(pipe);
+                  onChange(pipe.id);
                   setIsOpen(false);
                 }}
                 className={`w-full flex items-center justify-between p-2 rounded-xl text-xs transition-colors cursor-pointer ${

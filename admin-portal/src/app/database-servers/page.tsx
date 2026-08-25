@@ -2,18 +2,12 @@
 
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
-import {
-  Server,
-  Search,
-  Plus,
-  ShieldAlert,
-  Trash2,
-} from "lucide-react";
+import { Server, Search, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { useDatabaseServers } from "@/features/admin/database-servers/hooks/useDatabaseServers";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { TablePagination } from "@/components/shared/TablePagination";
 import { useAuth } from "@/context/AuthContext";
-import { ADMIN_RBAC_CRITICAL, adminCanAll } from "@/lib/auth/rbac";
+import { ADMIN_RBAC_CRITICAL, adminCan, adminCanAll } from "@/lib/auth/rbac";
 import { CountrySelect } from "@/components/shared/CountrySelect";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import {
@@ -23,6 +17,39 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 
 export default function DatabaseServersPage() {
+  const { user, isLoading } = useAuth();
+  const { lang } = useI18n();
+  const canRead = adminCan(user, "admin.database_servers.read");
+
+  if (isLoading) {
+    return (
+      <DatabaseServersBoundary
+        lang={lang}
+        loading
+        message={
+          lang === "ar"
+            ? "جارٍ التحقق من الصلاحيات..."
+            : "Checking database-server access..."
+        }
+      />
+    );
+  }
+  if (!canRead) {
+    return (
+      <DatabaseServersBoundary
+        lang={lang}
+        message={
+          lang === "ar"
+            ? "لا تملك صلاحية عرض خوادم قواعد البيانات."
+            : "You do not have permission to view database servers."
+        }
+      />
+    );
+  }
+  return <DatabaseServersContent />;
+}
+
+function DatabaseServersContent() {
   const {
     search,
     setSearch,
@@ -58,37 +85,34 @@ export default function DatabaseServersPage() {
     "admin.database_servers.delete",
     "admin.database_servers.critical",
   ]);
-  const canDestroy = adminCanAll(
-    user,
-    ADMIN_RBAC_CRITICAL.DB_SERVERS_DESTROY,
-  );
+  const canDestroy = adminCanAll(user, ADMIN_RBAC_CRITICAL.DB_SERVERS_DESTROY);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
-        {/* Header Title Section with Vibrant Gradient Accents */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-6 rounded-3xl border border-blue-500/20 shadow-xl">
+      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
+        {/* Header Title Section with Compact Gradient Accents */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl border border-blue-500/20 shadow-md">
           <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-blue-500/20 via-cyan-500/20 to-teal-500/0 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 start-1/3 -mb-10 w-60 h-60 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-            <div className="flex items-center gap-4">
-              <div className="p-3.5 bg-gradient-to-tr from-blue-600 via-cyan-600 to-teal-500 text-white rounded-2xl shadow-lg shadow-blue-500/30 flex items-center justify-center shrink-0">
-                <Server className="w-7 h-7" />
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-gradient-to-tr from-blue-600 via-cyan-600 to-teal-500 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0">
+                <Server className="w-5 h-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-black tracking-tight text-white">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-base sm:text-lg font-bold tracking-tight text-white">
                     Database Servers
                   </h1>
-                  <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full">
+                  <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-md">
                     PostgreSQL Nodes
                   </span>
                 </div>
-                <p className="text-xs text-blue-200/80 mt-1 max-w-xl leading-relaxed">
-                  Physical PostgreSQL database host nodes, application placement targets, and tenant schema allocations.
+                <p className="text-[11px] text-blue-200/80 mt-0.5 max-w-xl leading-tight">
+                  Physical PostgreSQL database host nodes, application placement
+                  targets, and tenant schema allocations.
                 </p>
               </div>
             </div>
@@ -96,9 +120,9 @@ export default function DatabaseServersPage() {
             {canCreate && (
               <Link
                 href="/database-servers/new"
-                className="px-5 py-2.5 text-xs font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white rounded-xl shadow-lg shadow-cyan-500/25 transition-all transform hover:-translate-y-0.5 flex items-center gap-2 cursor-pointer shrink-0 border border-white/20"
+                className="px-3.5 py-2 text-xs font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0 border border-white/20"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>Register Server</span>
               </Link>
             )}
@@ -220,7 +244,9 @@ export default function DatabaseServersPage() {
 
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as typeof statusFilter)
+              }
               className="px-4 py-2.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="ALL">All Statuses</option>
@@ -250,25 +276,45 @@ export default function DatabaseServersPage() {
                   <th className="py-4 px-5 text-start">Location</th>
                   <th className="py-4 px-5 text-start">Tenant Capacity</th>
                   <th className="py-4 px-5 text-start">Status</th>
-                  <th className="py-4 px-5 text-end">{lang === "ar" ? "الإجراءات" : "Actions"}</th>
+                  <th className="py-4 px-5 text-end">
+                    {lang === "ar" ? "الإجراءات" : "Actions"}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-500 font-medium">Loading database servers...</td>
+                    <td
+                      colSpan={6}
+                      className="py-12 text-center text-slate-500 font-medium"
+                    >
+                      Loading database servers...
+                    </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-rose-500 font-bold">{error}</td>
+                    <td
+                      colSpan={6}
+                      className="py-12 text-center text-rose-500 font-bold"
+                    >
+                      {error}
+                    </td>
                   </tr>
                 ) : servers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-16 text-center text-slate-400 font-semibold">No database servers found</td>
+                    <td
+                      colSpan={6}
+                      className="py-16 text-center text-slate-400 font-semibold"
+                    >
+                      No database servers found
+                    </td>
                   </tr>
                 ) : (
                   servers.map((srv) => (
-                    <tr key={srv.id} className="group hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-all">
+                    <tr
+                      key={srv.id}
+                      className="group hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-all"
+                    >
                       <td className="py-4 px-5">
                         {srv.deletedAt ? (
                           <span className="inline-block font-bold text-sm text-slate-500 dark:text-slate-400">
@@ -298,7 +344,9 @@ export default function DatabaseServersPage() {
                           <div className="w-24 bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                             <div
                               className="bg-gradient-to-r from-blue-500 to-cyan-500 h-full rounded-full"
-                              style={{ width: `${Math.min(100, (srv.currentTenants / Math.max(1, srv.maxTenants)) * 100)}%` }}
+                              style={{
+                                width: `${Math.min(100, (srv.currentTenants / Math.max(1, srv.maxTenants)) * 100)}%`,
+                              }}
                             />
                           </div>
                           <span className="font-bold text-slate-700 dark:text-slate-300 font-mono">
@@ -342,7 +390,10 @@ export default function DatabaseServersPage() {
                             disabled={deletingServerId === srv.id}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/60 dark:focus-visible:ring-offset-slate-900"
                           >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            <Trash2
+                              className="h-3.5 w-3.5"
+                              aria-hidden="true"
+                            />
                             {lang === "ar" ? "حذف" : "Delete"}
                           </button>
                         ) : (
@@ -364,10 +415,14 @@ export default function DatabaseServersPage() {
         isOpen={serverPendingDelete !== null}
         onClose={closeSoftDelete}
         onConfirm={() => void confirmSoftDelete()}
-        title={lang === "ar" ? "حذف خادم قاعدة البيانات" : "Delete database server"}
-        description={lang === "ar"
-          ? "حذف منطقي لخادم فارغ في حالة التفريغ أو عدم الاتصال. لن يعود متاحًا للتوزيع."
-          : "Soft delete this empty drained or offline server. It will no longer be available for placement."}
+        title={
+          lang === "ar" ? "حذف خادم قاعدة البيانات" : "Delete database server"
+        }
+        description={
+          lang === "ar"
+            ? "حذف منطقي لخادم فارغ في حالة التفريغ أو عدم الاتصال. لن يعود متاحًا للتوزيع."
+            : "Soft delete this empty drained or offline server. It will no longer be available for placement."
+        }
         targetName={serverPendingDelete?.name ?? ""}
         actionType="delete"
         requireNameTyping
@@ -393,6 +448,38 @@ export default function DatabaseServersPage() {
         requireNameTyping
         isSubmitting={serverPendingDestroy?.id === destroyingServerId}
       />
+    </div>
+  );
+}
+
+function DatabaseServersBoundary({
+  lang,
+  message,
+  loading = false,
+}: {
+  lang: "ar" | "en";
+  message: string;
+  loading?: boolean;
+}) {
+  return (
+    <div
+      dir={lang === "ar" ? "rtl" : "ltr"}
+      className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100"
+    >
+      <Navbar />
+      <main className="grid flex-1 place-items-center p-6">
+        <section
+          role={loading ? "status" : undefined}
+          className="flex max-w-xl flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-950"
+        >
+          {loading ? (
+            <Server className="size-8 animate-pulse text-blue-500" />
+          ) : (
+            <ShieldAlert className="size-8 text-amber-500" />
+          )}
+          <h1 className="mt-3 font-black">{message}</h1>
+        </section>
+      </main>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 Status: **Verified cross-application rules**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 ## Layers
 
@@ -10,7 +10,8 @@ Tenant authorization is the intersection of:
 
 1. recognized active/supported tenant host;
 2. valid tenant-audience JWT;
-3. current non-deleted identity and session version;
+3. current non-deleted identity, active unexpired `sid`, and exact security,
+   authorization, profile, and session epochs;
 4. current tenant lifecycle/access policy;
 5. subscribed module and feature entitlement;
 6. assigned module seat where required;
@@ -28,7 +29,7 @@ Current Core global order is:
 ```text
 JWT
 -> FQDN tenant resolution
--> database session version
+-> active Auth Session and four database epochs
 -> permissions
 -> branch access
 -> subscription enforcement

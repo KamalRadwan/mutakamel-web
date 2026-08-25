@@ -98,7 +98,8 @@ async operation ownership.
   Gateway; see [Business letters](business-letters.md).
 - Two Gateway template production-readiness entries have no Core handlers; see
   [Templates](templates.md).
-- Five old-web-used CRM controller routes have no Gateway entry; see the
+- Five CRM controller routes recorded as used by the dated consolidated-
+  frontend inventory have no Gateway entry; see the
   [CRM gap table](crm/README.md#known-gateway-gaps).
 - Four Trade UOM CRUD controller routes are unrouted; only the catalogue read
   is public; see the [Trade index](trade/README.md).
@@ -118,8 +119,14 @@ Do not synthesize canonical URLs for controller-only routes or bypass Gateway.
 
 ## Shared request rules
 
-- Let the shared client own bearer/session behavior, correlation IDs, language,
-  retry classification, and response normalization.
+- Let the shared client send same-origin requests with `credentials: include`
+  so the browser cookie jar attaches the Secure HttpOnly access cookie. Feature
+  code must never read token cookies or construct an `Authorization` bearer
+  header. For unsafe methods, the shared client reads the non-HttpOnly
+  `__Host-mutakamel-tenant-csrf` cookie and sends its decoded value in
+  `X-CSRF-Token`; browser code never logs or persists that proof. The shared
+  client also owns correlation IDs, language, retry classification, and
+  response normalization.
 - Never set trusted tenant, actor, permission, scope, service, internal secret,
   or forwarded-host headers from feature code.
 - Preserve exact UUIDv7 idempotency keys for exact retries.

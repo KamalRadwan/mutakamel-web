@@ -11,11 +11,13 @@ import {
   readTenantCreateResult,
   readTenantIdentityValidation,
 } from "../lib/tenant-registration";
+import { readTenantReverseGeocodedAddress } from "../lib/tenant-reverse-geocode";
 import { readTenantCreateStatus } from "../lib/tenant-create-recovery";
 import type {
   TenantBillingCycle,
   TenantCreateCommand,
   TenantProvisioningPlanPreview,
+  ReverseGeocodeTenantAddressDto,
   TenantSubscriptionLine,
   TenantSubscriptionQuote,
   ValidateTenantIdentityDto,
@@ -25,13 +27,36 @@ const TENANTS_BASE_URL = "/api/admin/core/v1/tenants";
 const QUOTE_URL = "/api/admin/core/v1/subscriptions/quote";
 
 export const tenantRegistrationApi = {
-  validateIdentity: async (dto: ValidateTenantIdentityDto, signal?: AbortSignal) => {
+  validateIdentity: async (
+    dto: ValidateTenantIdentityDto,
+    signal?: AbortSignal,
+  ) => {
     const response = await axiosClient.post<SuccessResponse<unknown>>(
       `${TENANTS_BASE_URL}/validate-identity`,
       dto,
-      { skipAutoIdempotency: true, signal },
+      {
+        skipAutoIdempotency: true,
+        replayAfterRefresh: true,
+        signal,
+      },
     );
     return readTenantIdentityValidation(extractCoreData(response));
+  },
+
+  reverseGeocode: async (
+    dto: ReverseGeocodeTenantAddressDto,
+    signal?: AbortSignal,
+  ) => {
+    const response = await axiosClient.post<SuccessResponse<unknown>>(
+      `${TENANTS_BASE_URL}/reverse-geocode`,
+      dto,
+      {
+        skipAutoIdempotency: true,
+        replayAfterRefresh: true,
+        ...(signal ? { signal } : {}),
+      },
+    );
+    return readTenantReverseGeocodedAddress(extractCoreData(response));
   },
 
   listCandidateApplications: async (signal?: AbortSignal) => {
@@ -58,6 +83,7 @@ export const tenantRegistrationApi = {
     const response = await axiosClient.post<SuccessResponse<unknown>>(
       `${TENANTS_BASE_URL}/provisioning-plans`,
       { moduleKeys: keys },
+      { skipAutoIdempotency: true, replayAfterRefresh: true },
     );
     return readProvisioningPlanPreview(extractCoreData(response), keys);
   },
@@ -65,6 +91,7 @@ export const tenantRegistrationApi = {
   quote: async (
     lines: readonly TenantSubscriptionLine[],
     billingCycle: TenantBillingCycle,
+    signal?: AbortSignal,
   ): Promise<TenantSubscriptionQuote> => {
     const response = await axiosClient.post<SuccessResponse<unknown>>(
       QUOTE_URL,
@@ -76,6 +103,11 @@ export const tenantRegistrationApi = {
           tierId: line.tierId,
           seats: line.seats,
         })),
+      },
+      {
+        skipAutoIdempotency: true,
+        replayAfterRefresh: true,
+        ...(signal ? { signal } : {}),
       },
     );
     return readSubscriptionQuote(
@@ -100,10 +132,7 @@ export const tenantRegistrationApi = {
     return readTenantCreateStatus(extractCoreData(response), tenantName);
   },
 
-  create: async (
-    command: TenantCreateCommand,
-    idempotencyKey: string,
-  ) => {
+  create: async (command: TenantCreateCommand, idempotencyKey: string) => {
     const response = await axiosClient.post<SuccessResponse<unknown>>(
       TENANTS_BASE_URL,
       command,

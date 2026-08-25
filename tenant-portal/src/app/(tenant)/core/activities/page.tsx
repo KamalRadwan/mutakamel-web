@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, CalendarCheck, PhoneCall, Mail, Users } from "lucide-react";
+import { Eye, Trash2, CalendarCheck, PhoneCall, Mail } from "lucide-react";
 import { useActivities, ActivityItem } from "./hooks/useActivities";
 import { CreateActivitiesModal } from "./components/CreateActivitiesModal";
 import { DeleteActivitiesConfirmModal } from "./components/DeleteActivitiesConfirmModal";
 
 export default function ActivitiesPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

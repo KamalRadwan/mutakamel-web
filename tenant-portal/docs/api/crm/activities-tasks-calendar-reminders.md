@@ -6,8 +6,8 @@
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
 > Tenant Portal replacement: `not-started`
-> Legacy frontend: `live-partial`
-> Authorship: hand-written from current source
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
 These resources attach operational work to a CRM source inside one branch. All successful JSON responses are raw CRM projections; list routes use the [common offset page](./common-contract.md#validation).
 
@@ -106,6 +106,8 @@ An inaccessible record can be returned as not found. Do not reveal whether an ID
 
 ```http
 POST /api/tenant/crm/v1/tasks
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 
 {

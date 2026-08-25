@@ -1,7 +1,11 @@
 "use client";
 
 import { useI18n } from "@/i18n/I18nContext";
-import type { DashboardWidgetResult, CrmDashboardWidget } from "../../models/dashboard-types";
+import type {
+  DashboardP2RowsResult,
+  DashboardWidgetResult,
+  CrmDashboardWidget,
+} from "../../models/dashboard-types";
 import { formatDashboardValue } from "../../models/dashboard-utils";
 import { exportToCSV } from "../../utils/export-utils";
 import { Download } from "lucide-react";
@@ -9,6 +13,27 @@ import { Download } from "lucide-react";
 interface TableRendererProps {
   widget: CrmDashboardWidget;
   result: DashboardWidgetResult;
+}
+
+type DashboardTableRow = DashboardP2RowsResult["rows"][number];
+
+function rowLabel(row: DashboardTableRow): string {
+  return "label" in row ? row.label : row.title;
+}
+
+function rowValue(row: DashboardTableRow): string {
+  if ("primaryMeasure" in row) {
+    return formatDashboardValue(row.primaryMeasure.value, { compact: true });
+  }
+  if ("reasonCode" in row) return row.reasonCode;
+
+  const measure = row.measures[0];
+  return measure ? formatDashboardValue(measure.value, { compact: true }) : "-";
+}
+
+function rowStatus(row: DashboardTableRow): string | undefined {
+  if ("status" in row) return row.status;
+  return "severity" in row ? row.severity : undefined;
 }
 
 function getStatusBadge(status?: string, severity?: string) {
@@ -61,30 +86,27 @@ export function TableRenderer({ widget, result }: TableRendererProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100/50 dark:divide-slate-800/50">
-            {rows.map((row: any, i) => (
+            {rows.map((row, i) => (
               <tr
                 key={row.id || i}
                 className="group hover:bg-white dark:hover:bg-slate-800/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(0,0,0,0.03)] h-12 relative"
               >
                 <td className="px-4 py-2 font-bold text-[13px] text-slate-800 dark:text-slate-200 max-w-[180px] sm:max-w-[240px] truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                  {row.label || row.title}
+                  {rowLabel(row)}
                 </td>
                 <td
                   className="px-4 py-2 font-extrabold text-[13px] text-slate-700 dark:text-slate-300"
                   style={{ fontFamily: "Outfit, Inter, sans-serif" }}
                 >
-                  {row.primaryMeasure
-                    ? formatDashboardValue(row.primaryMeasure.value, { compact: true })
-                    : row.amount ?? row.reasonCode ?? "-"}
+                  {rowValue(row)}
                 </td>
                 <td className="px-4 py-2">
                   <span
                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md uppercase tracking-wider ${getStatusBadge(
-                      row.status,
-                      row.severity
+                      rowStatus(row),
                     )}`}
                   >
-                    {row.status || row.severity || "Active"}
+                    {rowStatus(row) || "Active"}
                   </span>
                 </td>
               </tr>

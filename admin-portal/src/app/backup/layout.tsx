@@ -10,7 +10,7 @@ export default function BackupLayout({ children }: { children: ReactNode }) {
 
       <RequirePermission permission="admin.backups.read">
         <BackupModuleNav />
-        <main className="mx-auto w-full max-w-7xl flex-1 p-4 sm:p-6">
+        <main className="w-full flex-1 px-[10px] py-4 sm:py-6">
           {children}
         </main>
       </RequirePermission>

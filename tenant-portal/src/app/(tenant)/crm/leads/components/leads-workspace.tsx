@@ -1,8 +1,16 @@
 "use client";
 
-import { Search, LayoutGrid, Columns3, List, Filter, UserPlus } from "lucide-react";
+import {
+  AlertCircle,
+  Columns3,
+  LayoutGrid,
+  List,
+  Loader2,
+  Search,
+} from "lucide-react";
 import { useLeads } from "../hooks/useLeads";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 
 // View imports
 import { LeadsBoardView } from "./views/leads-board-view";
@@ -23,15 +31,30 @@ export function LeadsWorkspace() {
     activeView,
     setActiveView,
     items,
+    stages,
+    branchIds,
+    branchId,
+    selectBranch,
+    canCreate,
+    canUpdateLead,
+    canDeleteLead,
+    isLoading,
+    isDeleting,
+    isMovePending,
+    error,
     searchQuery,
     setSearchQuery,
+    pageInfo,
+    setPage,
     isCreateOpen,
     setIsCreateOpen,
+    openCreate,
     selectedForDelete,
     setSelectedForDelete,
     handleCreate,
     handleDelete,
     moveLead,
+    fetchLeads,
   } = useLeads();
 
   return (
@@ -40,8 +63,14 @@ export function LeadsWorkspace() {
         <PageHeader
           title={isRtl ? t.crm.leadsManagement : "Leads Management"}
           subtitle={isRtl ? t.crm.followUpOnRequestsForAtte : "Track interests and assign sales representatives"}
-          actionLabel={isRtl ? t.crm.addAPotentialClient : "Add Lead"}
-          onAction={() => setIsCreateOpen(true)}
+          actionLabel={
+            canCreate
+              ? isRtl
+                ? t.crm.addAPotentialClient
+                : "Add Lead"
+              : undefined
+          }
+          onAction={canCreate ? openCreate : undefined}
         />
       </div>
 
@@ -54,12 +83,19 @@ export function LeadsWorkspace() {
             suppressHydrationWarning
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            disabled={isMovePending}
             placeholder={isRtl ? t.crm.searchByPotentialClientNam : "Search leads..."}
             className="w-full h-8 ps-9 pe-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 dark:text-slate-100"
           />
         </div>
 
         <div className="flex items-center gap-2">
+          <TenantBranchSelect
+            branchIds={branchIds}
+            branchId={branchId}
+            onChange={selectBranch}
+            disabled={isLoading || isDeleting || isMovePending}
+          />
           <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700/60 gap-0.5">
             <button
               type="button"
@@ -99,42 +135,98 @@ export function LeadsWorkspace() {
             </button>
           </div>
 
-          <button
-            type="button"
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/50 transition-colors cursor-pointer"
-            title={isRtl ? t.crm.filtering : "Filter"}
-          >
-            <Filter className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden relative">
-        {activeView === "board" && (
+        {error && (
+          <div
+            role="alert"
+            className="m-4 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <AlertCircle className="size-4 shrink-0" />
+              <span className="truncate">{error}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => void fetchLeads()}
+              className="shrink-0 font-semibold underline underline-offset-2"
+            >
+              {isRtl ? "إعادة المحاولة" : "Retry"}
+            </button>
+          </div>
+        )}
+        {isLoading && items.length === 0 ? (
+          <div className="flex h-full items-center justify-center gap-2 text-sm text-slate-500">
+            <Loader2 className="size-4 animate-spin" />
+            <span>{isRtl ? "جارٍ تحميل العملاء المحتملين" : "Loading leads"}</span>
+          </div>
+        ) : activeView === "board" ? (
           <LeadsBoardView
             items={items}
+            stages={stages}
             moveLead={moveLead}
+            canUpdate={canUpdateLead}
+            isMovePending={isMovePending}
+            canDelete={canDeleteLead}
             onDelete={(lead) => setSelectedForDelete(lead)}
           />
-        )}
-        {activeView === "card" && (
+        ) : activeView === "card" ? (
           <LeadsCardsView
             items={items}
+            stages={stages}
+            canDelete={canDeleteLead}
             onDelete={(lead) => setSelectedForDelete(lead)}
           />
-        )}
-        {activeView === "list" && (
+        ) : (
           <LeadsListView
             items={items}
+            stages={stages}
+            canDelete={canDeleteLead}
             onDelete={(lead) => setSelectedForDelete(lead)}
           />
         )}
       </div>
 
+      {pageInfo.total > 0 ? (
+        <div className="flex flex-none items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+          <span>
+            {isRtl
+              ? `${pageInfo.total} عميل محتمل`
+              : `${pageInfo.total} leads`}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage(pageInfo.page - 1)}
+              disabled={!pageInfo.hasPrev || isLoading || isMovePending}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
+            >
+              {isRtl ? "السابق" : "Previous"}
+            </button>
+            <span aria-live="polite">
+              {pageInfo.page} / {pageInfo.totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage(pageInfo.page + 1)}
+              disabled={!pageInfo.hasNext || isLoading || isMovePending}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
+            >
+              {isRtl ? "التالي" : "Next"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <CreateLeadsModal
+        key={isCreateOpen ? "open" : "closed"}
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
+        stages={stages}
         onSubmit={handleCreate}
+        error={isCreateOpen ? error : null}
       />
 
       <DeleteLeadsConfirmModal
@@ -142,6 +234,8 @@ export function LeadsWorkspace() {
         item={selectedForDelete}
         onClose={() => setSelectedForDelete(null)}
         onConfirm={handleDelete}
+        isDeleting={isDeleting}
+        error={selectedForDelete ? error : null}
       />
     </div>
   );

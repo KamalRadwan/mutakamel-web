@@ -44,10 +44,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
   Do not treat source integration as authenticated runtime or deployment
   evidence.
 - **Shared HTTP Behavior**: Use the shared API client so protected calls use
-  HttpOnly cookie auth, `credentials: "include"`, `x-auth-cookie-mode: 1`, and
-  the coordinated single refresh retry. Browser feature code must not read or
-  attach JWT bearer tokens or introduce raw `fetch` paths that bypass session
-  handling.
+  HttpOnly cookie auth, `credentials: "include"`, and the coordinated single
+  refresh retry. The server infers the browser channel; feature code must not
+  select an authentication mode, read or attach JWT bearer tokens, or introduce
+  raw `fetch` paths that bypass session handling.
   Routes explicitly documented as non-idempotent and non-replayable must opt
   out of both automatic idempotency-key injection and the automatic 401
   refresh replay. Persist only minimal, non-secret attempt evidence until the

@@ -11,9 +11,10 @@ npm run dev
 ```
 
 In development, same-origin `/api/*` calls are rewritten to `DEV_API_TARGET`
-(the API Gateway, default `http://localhost:9000`). Production does not add this
-rewrite; configure `NEXT_PUBLIC_API_URL` or the deployment ingress to reach the
-gateway.
+(the API Gateway, default `http://localhost:9000`). Production ingress must
+proxy the same-origin `/api/*` namespace to Gateway. Do not configure a
+cross-origin public API base: the Secure HttpOnly cookie channel and readable
+double-submit CSRF proof are deliberately origin-bound.
 
 ## Documentation
 

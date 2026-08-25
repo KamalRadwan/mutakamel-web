@@ -1,64 +1,59 @@
 "use client";
 
-import { useSettings } from "../hooks/useSettings";
+import { Phone } from "lucide-react";
 import { SettingField } from "../components/SettingField";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { AlertCircle, Loader2, Phone, RefreshCw } from "lucide-react";
-
 import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
+import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
+import { useSettings } from "../hooks/useSettings";
 
 export default function AsteriskSettingsPage() {
-  const {
-    lang,
-    settings,
-    isLoading,
-    isSaving,
-    hasUnsavedChanges,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    loadError,
-    updateSetting,
-    saveAllSettings,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    refetch,
-  } = useSettings("asterisk.");
-
+  const settingsState = useSettings("asterisk.");
+  const { lang } = settingsState;
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Phone className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            {lang === "ar" ? "بوابة WebRTC (Asterisk)" : "WebRTC (Asterisk)"}
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {lang === "ar" ? "إعدادات اتصال WebSockets وسيرفرات STUN/TURN الخاصة بالمكالمات الصوتية." : "Asterisk WebSocket integration, STUN/TURN servers, and SIP behavior configuration."}
-          </p>
-        </div>
-      </div>
-
-      <SaveSettingsBanner
-        hasUnsavedChanges={hasUnsavedChanges}
-        isSaving={isSaving}
-        onSave={saveAllSettings}
+      <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+        <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
+          <Phone className="size-5 text-blue-600 dark:text-blue-400" />
+          {lang === "ar" ? "بوابة WebRTC (Asterisk)" : "WebRTC (Asterisk)"}
+        </h1>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {lang === "ar"
+            ? "إعدادات WebSocket وSTUN/TURN وسلوك SIP."
+            : "WebSocket, STUN/TURN, and SIP behavior settings."}
+        </p>
+      </header>
+      <SettingsResourceBoundary
+        state={settingsState.loadState}
+        error={settingsState.loadError}
         lang={lang}
-      />
-
-      <div className="space-y-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center p-12 text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin" />
-          </div>
-        ) : (
-          settings.map((setting) => (
-            <SettingField
-              key={setting.key}
-              setting={setting}
-              lang={lang}
-              onUpdate={updateSetting}
-            />
-          ))
-        )}
-      </div>
+        onRetry={() => void settingsState.refetch()}
+      >
+        <SaveSettingsBanner
+          hasUnsavedChanges={settingsState.hasUnsavedChanges}
+          isSaving={settingsState.isSaving}
+          onSave={settingsState.saveAllSettings}
+          lang={lang}
+        />
+        <div className="space-y-4">
+          {settingsState.settings.length ? (
+            settingsState.settings.map((setting) => (
+              <SettingField
+                key={setting.key}
+                setting={setting}
+                lang={lang}
+                onUpdate={settingsState.updateSetting}
+                onReload={settingsState.reloadSetting}
+              />
+            ))
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900">
+              {lang === "ar"
+                ? "لا توجد إعدادات Asterisk مسجلة."
+                : "No Asterisk settings are registered."}
+            </div>
+          )}
+        </div>
+      </SettingsResourceBoundary>
     </div>
   );
 }

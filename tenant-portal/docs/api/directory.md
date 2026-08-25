@@ -14,7 +14,7 @@
 - Controller/service/DTOs: `../backend/mutakamel-apps/core-app/src/tenant/directory`
 - Wire enums: `../backend/mutakamel-apps/core-app/packages/common/src/enums/party-*.enum.ts`
 - Storage policy: `../backend/mutakamel-apps/shared-libs/packages/storage/src/constants/buckets.constant.ts`
-- Legacy consumers: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/crm/tenant-customer-party-page.tsx` and `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/crm/party-image.tsx`
+- Historical consolidated-consumer references (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/crm/tenant-customer-party-page.tsx` and `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/crm/party-image.tsx`
 
 ## Security and response contract
 
@@ -47,7 +47,7 @@ Safe party-list example:
 
 ```http
 GET /api/tenant/core/v1/directory/parties?page=1&limit=20&partyType=ORGANIZATION
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>
 ```
 
 ## Contact methods and addresses

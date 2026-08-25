@@ -1,13 +1,13 @@
 # CRM leads
 
 > Status: `verified-current`
-> Last source verification: `2026-07-25`
+> Last source verification: `2026-08-25`
 > Owner: CRM (`crm-app`)
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
-> Tenant Portal replacement: `not-started`
-> Legacy frontend: `live-partial`
-> Authorship: hand-written from current source
+> Tenant Portal replacement: `server-backed-supported-operations`
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
 Leads capture an individual or corporate prospect, move through tenant-defined lead stages, and can be converted transactionally into a customer profile and optional opportunity.
 
@@ -15,16 +15,18 @@ Leads capture an individual or corporate prospect, move through tenant-defined l
 
 | Method | Canonical browser path | Controller/upstream path | Permission | Success |
 |---|---|---|---|---|
+| `GET` | `/api/tenant/crm/v1/leads/capabilities` | `/api/v1/crm/leads/capabilities` | branch membership; returns effective action scopes | `200`, capability object |
 | `POST` | `/api/tenant/crm/v1/leads` | `/api/v1/crm/leads` | `crm.leads.create.{own|team|all}` | `201`, lead |
 | `GET` | `/api/tenant/crm/v1/leads` | `/api/v1/crm/leads` | `crm.leads.read.{own|team|all}` | `200`, page |
 | `GET` | `/api/tenant/crm/v1/leads/company-options` | `/api/v1/crm/leads/company-options` | `crm.leads.create.{own|team|all}` | `200`, array |
+| `GET` | `/api/tenant/crm/v1/leads/company-options/:companyPartyId/contacts` | `/api/v1/crm/leads/company-options/:companyPartyId/contacts` | `crm.leads.create.{own|team|all}` plus requested branch membership | `200`, contact array |
 | `GET` | `/api/tenant/crm/v1/leads/:id` | `/api/v1/crm/leads/:id` | `crm.leads.read.{own|team|all}` | `200`, lead |
 | `PATCH` | `/api/tenant/crm/v1/leads/:id` | `/api/v1/crm/leads/:id` | `crm.leads.update.{own|team|all}` | `200`, lead |
 | `POST` | `/api/tenant/crm/v1/leads/:id/stage` | `/api/v1/crm/leads/:id/stage` | `crm.leads.update.{own|team|all}` | `201`, lead |
 | `POST` | `/api/tenant/crm/v1/leads/:id/convert` | `/api/v1/crm/leads/:id/convert` | `crm.leads.convert.{own|team|all}` | `201`, conversion result |
 | `DELETE` | `/api/tenant/crm/v1/leads/:id` | `/api/v1/crm/leads/:id` | `crm.leads.delete.{own|team|all}` | `204` |
 
-Controller routes `GET /leads/capabilities` and `GET /leads/company-options/:companyPartyId/contacts` are absent from the Gateway. They are not valid browser routes even though the legacy client calls them.
+`GET /leads/capabilities` requires UUIDv7 `branchId` and returns nullable scoped actions across leads and related resources; a null action is unavailable. The company-contact route requires the same branch query and a UUIDv7 company party ID, and returns only active contacts for an eligible organization in that branch.
 
 ## Wire enums
 

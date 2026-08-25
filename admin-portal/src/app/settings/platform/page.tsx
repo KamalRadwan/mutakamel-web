@@ -1,107 +1,113 @@
 "use client";
 
 import { useState } from "react";
-import { useSettings } from "../hooks/useSettings";
+import { Server } from "lucide-react";
 import { SettingField } from "../components/SettingField";
 import { SettingSearch } from "../components/SettingSearch";
-import { Server, Loader2 } from "lucide-react";
-
 import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
+import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
+import {
+  combineSettingsLoadStates,
+  useSettings,
+  type SystemSettingValue,
+} from "../hooks/useSettings";
 
 export default function PlatformSettingsPage() {
   const [search, setSearch] = useState("");
-  const {
-    lang,
-    settings: platformSettings,
-    isLoading: isPlatformLoading,
-    updateSetting: updatePlatformSetting,
-    hasUnsavedChanges: platformHasUnsaved,
-    isSaving: platformIsSaving,
-    saveAllSettings: savePlatformSettings
-  } = useSettings("platform.");
-
-  const {
-    settings: supportSettings,
-    isLoading: isSupportLoading,
-    updateSetting: updateSupportSetting,
-    hasUnsavedChanges: supportHasUnsaved,
-    isSaving: supportIsSaving,
-    saveAllSettings: saveSupportSettings
-  } = useSettings("support.");
-
-  const allSettings = [...platformSettings, ...supportSettings];
-  const isLoading = isPlatformLoading || isSupportLoading;
-  const hasUnsavedChanges = platformHasUnsaved || supportHasUnsaved;
-  const isSaving = platformIsSaving || supportIsSaving;
-
-  const updateSetting = (key: string, newValue: string | number | boolean) => {
-    if (key.startsWith("platform.")) {
-      updatePlatformSetting(key, newValue);
-    } else {
-      updateSupportSetting(key, newValue);
-    }
-  };
-
-  const handleSaveAll = async () => {
-    const promises = [];
-    if (platformHasUnsaved) promises.push(savePlatformSettings());
-    if (supportHasUnsaved) promises.push(saveSupportSettings());
-    await Promise.all(promises);
-  };
-
-  const filteredSettings = allSettings.filter((s) => {
+  const platform = useSettings("platform.");
+  const support = useSettings("support.");
+  const lang = platform.lang;
+  const allSettings = [...platform.settings, ...support.settings];
+  const loadState = combineSettingsLoadStates([
+    platform.loadState,
+    support.loadState,
+  ]);
+  const hasUnsavedChanges =
+    platform.hasUnsavedChanges || support.hasUnsavedChanges;
+  const isSaving = platform.isSaving || support.isSaving;
+  const filteredSettings = allSettings.filter((setting) => {
     if (!search.trim()) return true;
     const term = search.toLowerCase();
-    const titleEn = s.uiMeta?.titleEn?.toLowerCase() || "";
-    const titleAr = s.uiMeta?.titleAr?.toLowerCase() || "";
-    const descEn = s.descriptionI18n?.en?.toLowerCase() || "";
-    const descAr = s.descriptionI18n?.ar?.toLowerCase() || "";
-    return titleEn.includes(term) || titleAr.includes(term) || descEn.includes(term) || descAr.includes(term);
+    return [
+      setting.uiMeta?.titleEn,
+      setting.uiMeta?.titleAr,
+      setting.descriptionI18n.en,
+      setting.descriptionI18n.ar,
+    ].some((value) => value?.toLowerCase().includes(term));
   });
+
+  const updateSetting = (key: string, value: SystemSettingValue) => {
+    return key.startsWith("platform.")
+      ? platform.updateSetting(key, value)
+      : support.updateSetting(key, value);
+  };
+  const saveAll = async () => {
+    await Promise.all([
+      platform.hasUnsavedChanges ? platform.saveAllSettings() : Promise.resolve(),
+      support.hasUnsavedChanges ? support.saveAllSettings() : Promise.resolve(),
+    ]);
+  };
+  const retry = () => {
+    void Promise.all([platform.refetch(), support.refetch()]);
+  };
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <header className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Server className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
+            <Server className="size-5 text-blue-600 dark:text-blue-400" />
             {lang === "ar" ? "المنصة والدعم" : "Platform & Support"}
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {lang === "ar" ? "إعدادات صيانة النظام وجهات الاتصال الأساسية." : "Core platform maintenance mode and support contact details."}
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {lang === "ar"
+              ? "إعدادات سجل المنصة وجهات الاتصال الأساسية."
+              : "Platform registry and support contact settings."}
           </p>
         </div>
-
         <SettingSearch value={search} onChange={setSearch} />
-      </div>
+      </header>
 
-      <SaveSettingsBanner
-        hasUnsavedChanges={hasUnsavedChanges}
-        isSaving={isSaving}
-        onSave={handleSaveAll}
+      <SettingsResourceBoundary
+        state={loadState}
+        error={platform.loadError ?? support.loadError}
         lang={lang}
-      />
-
-      <div className="space-y-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center p-12 text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin" />
-          </div>
-        ) : filteredSettings.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
-            {lang === "ar" ? "لا توجد نتائج مطابقة لبحثك." : "No settings match your search query."}
-          </div>
-        ) : (
-          filteredSettings.map((setting) => (
-            <SettingField
-              key={setting.key}
-              setting={setting}
-              lang={lang}
-              onUpdate={updateSetting}
-            />
-          ))
-        )}
-      </div>
+        onRetry={retry}
+      >
+        <SaveSettingsBanner
+          hasUnsavedChanges={hasUnsavedChanges}
+          isSaving={isSaving}
+          onSave={saveAll}
+          lang={lang}
+        />
+        <div className="space-y-4">
+          {filteredSettings.length ? (
+            filteredSettings.map((setting) => (
+              <SettingField
+                key={setting.key}
+                setting={setting}
+                lang={lang}
+                onUpdate={updateSetting}
+                onReload={(key) =>
+                  key.startsWith("platform.")
+                    ? platform.reloadSetting(key)
+                    : support.reloadSetting(key)
+                }
+              />
+            ))
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900">
+              {allSettings.length
+                ? lang === "ar"
+                  ? "لا توجد نتائج مطابقة لبحثك."
+                  : "No settings match your search."
+                : lang === "ar"
+                  ? "لا توجد إعدادات مسجلة في هذه المجموعة."
+                  : "No settings are registered in this group."}
+            </div>
+          )}
+        </div>
+      </SettingsResourceBoundary>
     </div>
   );
 }

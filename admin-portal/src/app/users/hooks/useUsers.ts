@@ -2,13 +2,14 @@
  
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import {
   listAdminUsers,
+  getAdminUser,
   listRoles,
   suspendAdminUser,
   activateAdminUser,
@@ -17,6 +18,20 @@ import {
 } from "../api/adminUsersApi";
 import { getErrorMessageAndDetails } from "../utils/errorMapping";
 import type { AdminUser, AdminRole, AdminUserErrorCode } from "../types";
+import {
+  claimAdminUserWriteIntent,
+  retainAdminUserWriteIntent,
+  settleAdminUserWriteIntent,
+  type AdminUserWriteIntent,
+} from "../model/writeIntent";
+import { normalizeApiError } from "@/shared/api/normalized-api-error";
+
+type DirectoryAction = "suspend" | "activate" | "delete";
+type DirectoryActionCommand = {
+  userId: string;
+  action: DirectoryAction;
+  body: Record<string, never> | null;
+};
 
 export function useUsers() {
   const router = useRouter();
@@ -49,6 +64,7 @@ export function useUsers() {
   const [activeModalUserId, setActiveModalUserId] = useState<string | null>(null);
   const [modalActionType, setModalActionType] = useState<"suspend" | "activate" | "delete" | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const actionIntentRef = useRef<AdminUserWriteIntent<DirectoryActionCommand> | null>(null);
 
   const [summaryMetrics, setSummaryMetrics] = useState({
     total: 0,
@@ -176,39 +192,84 @@ export function useUsers() {
   };
 
   const closeModal = () => {
-    if (isActionLoading) return;
+    if (isActionLoading || actionIntentRef.current?.ambiguous) return;
     setActiveModalUserId(null);
     setModalActionType(null);
+    actionIntentRef.current = null;
   };
 
   const confirmModalAction = async () => {
     if (!activeModalUserId || !modalActionType) return;
 
+    const command: DirectoryActionCommand = {
+      userId: activeModalUserId,
+      action: modalActionType,
+      body: modalActionType === "delete" ? null : {},
+    };
+    const path = `/api/admin/core/v1/users/${encodeURIComponent(activeModalUserId)}${
+      modalActionType === "delete" ? "" : `/${modalActionType}`
+    }`;
+    const intent = claimAdminUserWriteIntent(
+      actionIntentRef.current,
+      modalActionType === "delete" ? "DELETE" : "POST",
+      path,
+      command,
+    );
+    actionIntentRef.current = intent;
     setIsActionLoading(true);
     try {
       if (modalActionType === "delete") {
-        await deleteAdminUser(activeModalUserId);
+        await deleteAdminUser(activeModalUserId, intent.idempotencyKey);
         toast.success(
           lang === "ar" ? "تم الحذف" : "Deleted",
           lang === "ar" ? "تم حذف المستخدم بنجاح" : "User deleted successfully"
         );
       } else if (modalActionType === "suspend") {
-        await suspendAdminUser(activeModalUserId);
+        await suspendAdminUser(activeModalUserId, intent.idempotencyKey);
         toast.success(
           lang === "ar" ? "تم التعليق" : "Suspended",
           lang === "ar" ? "تم تعليق حساب المستخدم بنجاح" : "User suspended successfully"
         );
       } else if (modalActionType === "activate") {
-        await activateAdminUser(activeModalUserId);
+        await activateAdminUser(activeModalUserId, intent.idempotencyKey);
         toast.success(
           lang === "ar" ? "تم التنشيط" : "Activated",
           lang === "ar" ? "تم تنشيط حساب المستخدم بنجاح" : "User activated successfully"
         );
       }
 
-      closeModal();
-      fetchUsers();
+      actionIntentRef.current = null;
+      setActiveModalUserId(null);
+      setModalActionType(null);
+      await fetchUsers();
     } catch (err: any) {
+      const normalized = normalizeApiError(err);
+      actionIntentRef.current = settleAdminUserWriteIntent(intent, err, normalized);
+
+      if (retainAdminUserWriteIntent(err, normalized)) {
+        let current: AdminUser | null | undefined;
+        try {
+          current = await getAdminUser(activeModalUserId);
+        } catch (readError: unknown) {
+          const readCode = normalizeErrorCode(readError);
+          current =
+            readCode === "ADMIN_USER_NOT_FOUND" ||
+            (readError as { response?: { status?: number } })?.response?.status === 404
+              ? null
+              : undefined;
+        }
+        const reconciled =
+          modalActionType === "delete"
+            ? current === null
+            : current?.status === (modalActionType === "activate" ? "ACTIVE" : "SUSPENDED");
+        if (reconciled) {
+          actionIntentRef.current = null;
+          setActiveModalUserId(null);
+          setModalActionType(null);
+          await fetchUsers();
+          return;
+        }
+      }
       const details = getErrorMessageAndDetails(err, lang);
       toast.error(
         lang === "ar" ? "فشل الإجراء" : "Action Failed",

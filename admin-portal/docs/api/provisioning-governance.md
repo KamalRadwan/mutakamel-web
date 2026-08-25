@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
 Owner: **Core**
 
@@ -81,8 +81,13 @@ keys remain outside the browser and platform.
 
 ## Current frontend status
 
-There is no global provisioning governance route or typed domain client in
-`src/app/`. Status is `MISSING`, not `GATED`: Gateway/Core capability exists.
+All 31 current routes are source-integrated. `/provisioning` owns component and
+discovery governance; `/provisioning/fleet` owns preview, rollout, tenant-impact,
+lifecycle, report, and attestation; `/provisioning/publisher-keys` owns key and
+challenge workflows; `/provisioning/releases` owns drafts, validation,
+publication, releases, and retirement. Each module has typed readers, exact
+permission gates, validation, mutation identity, bilingual states, and focused
+tests. Authenticated runtime and deployment verification remain separate gates.
 
 ## Source map
 

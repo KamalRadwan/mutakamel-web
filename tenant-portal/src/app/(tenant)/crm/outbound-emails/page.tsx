@@ -6,14 +6,12 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Mail, Send, CheckCircle2 } from "lucide-react";
+import { Eye, Trash2, Mail } from "lucide-react";
 import { useOutboundEmails, OutboundEmailItem } from "./hooks/useOutboundEmails";
 import { CreateOutboundEmailsModal } from "./components/CreateOutboundEmailsModal";
 import { DeleteOutboundEmailsConfirmModal } from "./components/DeleteOutboundEmailsConfirmModal";
-import { useI18n } from "@/i18n/I18nContext";
 
 export default function OutboundEmailsPage() {
-//     const { t } = useI18n();
   const {
     t,
     items,

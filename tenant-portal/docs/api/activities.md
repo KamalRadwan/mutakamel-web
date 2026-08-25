@@ -5,7 +5,7 @@
 > **Backend owner:** Core (`core-app`), with target authorization delegated to Core/CRM/Trade resolvers
 > **Canonical browser prefixes:** `/api/tenant/core/v1/activities`, `/api/tenant/core/v1/activity-types`
 > **Controller-relative prefixes:** `/tenant/activities`, `/tenant/activity-types`
-> **Tenant Portal status:** Planned. A live legacy client exists at `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/activities/activity-api.ts`.
+> **Tenant Portal status:** Planned. A dated 2026-07-25 inventory referenced a consolidated activity client, but that `mutakamel-web-app` workspace is absent from the current checkout and is not live-runtime evidence.
 > **Documentation:** Hand-written and source-verified; not generated.
 
 ## Source of truth
@@ -13,7 +13,7 @@
 - Gateway contracts: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
 - Controller, DTO, service, authorizer: `../backend/mutakamel-apps/core-app/src/tenant/activities`
 - Wire enums: `../backend/mutakamel-apps/core-app/packages/common/src/enums/activity.enum.ts`
-- Legacy client: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/activities/activity-api.ts`
+- Historical consolidated-client reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/activities/activity-api.ts`
 
 ## Routes
 
@@ -60,7 +60,8 @@ Safe command example:
 
 ```http
 POST /api/tenant/core/v1/activities
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 X-Idempotency-Key: 019f9871-fd40-7680-bfbb-fd535b5880c8
 

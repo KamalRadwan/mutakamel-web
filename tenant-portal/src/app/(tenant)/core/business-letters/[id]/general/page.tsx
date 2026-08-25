@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useToast } from "@/components/ui/ToastContext";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { Save, FileText, Printer } from "lucide-react";
+import { Save, Printer } from "lucide-react";
 
 export default function BusinessLetterGeneralPage() {
   const toast = useToast();

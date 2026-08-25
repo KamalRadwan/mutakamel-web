@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-11**
 
 Owner: **Core**
 
@@ -53,8 +53,11 @@ type PaymentReconciliationAction =
 
 ## Current frontend status
 
-No payments/refunds/reconciliation Admin screen or typed domain client exists.
-The tenant detail prototype does not implement these routes.
+The tenant billing tab includes paginated payment history, eligible refund
+controls, safe reconciliation context, evidence-bound proposal, and explicit
+approve/reject decisions. Every mutation keeps decimal strings intact, uses a
+caller-owned UUIDv7 identity, and refreshes payment/reconciliation state after
+an accepted command.
 
 ## Source map
 

@@ -94,6 +94,13 @@ Changing only the URL host cannot move a token into another tenant.
 ../backend/mutakamel-apps/core-app/src/tenant/tenant-host/
 ../backend/mutakamel-apps/core-app/src/common/fqdn/fqdn-tenant-resolver.guard.ts
 ../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts
+```
+
+The following paths are retained from the dated 2026-07-25 consolidated-
+frontend inventory. Their workspace is absent from the current checkout, so
+they are historical design context only and do not prove a current host gate:
+
+```text
 ../backend/mutakamel-apps/mutakamel-web-app/src/shared/auth/tenant-host-status.ts
 ../backend/mutakamel-apps/mutakamel-web-app/src/shared/auth/tenant-host-status.server.ts
 ../backend/mutakamel-apps/mutakamel-web-app/src/app/layout.tsx

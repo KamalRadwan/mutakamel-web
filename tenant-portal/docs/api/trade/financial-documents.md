@@ -29,7 +29,12 @@ Backend source references below are relative to `C:\mutakamel.ai\frontend`.
 
 ## Authorization and scope
 
-Every route requires an authenticated active `TENANT_USER`, a current session version, a Trade/Sales module seat unless the actor is the tenant owner, an enabled Trade entitlement, the feature gate above when declared, the exact permission in the table, and an authorized company/branch context. Tenant owners bypass permission-row lookup, not session, entitlement, feature, or scope validation. Dashboard-context exceptions are called out below.
+Every route requires an authenticated active `TENANT_USER`, an active unexpired
+`sid` with all four exact Auth epochs, a Trade/Sales module seat unless the actor
+is the tenant owner, an enabled Trade entitlement, the feature gate above when
+declared, the exact permission in the table, and an authorized company/branch
+context. Tenant owners bypass permission-row lookup, not session, entitlement,
+feature, or scope validation. Dashboard-context exceptions are called out below.
 
 - `COMPANY`: send an authorized `X-Mutakamel-Company-Id`.
 - `BRANCH`: send both company and branch UUIDv7 headers.

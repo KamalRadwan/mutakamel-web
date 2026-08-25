@@ -41,12 +41,16 @@ export function Navbar(props: UseNavbarProps) {
     navRoutes,
     filteredAdminItems,
     filteredInfrastructureItems,
+    homeHref,
+    canViewDashboard,
+    canViewTenants,
+    canViewApplications,
     canViewBackup,
   } = useNavbar(props);
 
   return (
     <header className="sticky top-0 z-30 w-full h-15 bg-[#0f172a] dark:bg-[#0b132b] text-slate-100 border-b border-slate-800/90 shadow-md transition-colors">
-      <div className="h-full px-4 flex items-center justify-between gap-4">
+      <div className="h-full px-[10px] flex items-center justify-between gap-4">
         {/* Left (RTL Start): Brand Logo & Mobile Toggle */}
         <div className="flex items-center gap-3 shrink-0">
           <button
@@ -54,14 +58,19 @@ export function Navbar(props: UseNavbarProps) {
             onClick={handleMobileMenuToggle}
             aria-expanded={isMobileMenuOpen}
             aria-controls="admin-mobile-navigation"
-            aria-label={lang === "ar" ? "فتح القائمة الرئيسية" : "Open main navigation"}
+            aria-label={
+              lang === "ar" ? "فتح القائمة الرئيسية" : "Open main navigation"
+            }
             className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             title="القائمة الرئيسية"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          <Link href={navRoutes.dashboard.href} className="flex items-center gap-2.5 group me-3">
+          <Link
+            href={homeHref}
+            className="flex items-center gap-2.5 group me-3"
+          >
             <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-blue-400 text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
               <ShieldCheck className="w-5.5 h-5.5" />
             </div>
@@ -79,70 +88,80 @@ export function Navbar(props: UseNavbarProps) {
         {/* Middle Section: Top Nav Routes */}
         <nav className="hidden lg:flex items-center gap-1.5 flex-1">
           {/* Dashboard Route */}
-          <Link
-            href={navRoutes.dashboard.href}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              isLinkActive(navRoutes.dashboard.href)
-                ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
-                : "text-slate-300 hover:text-white hover:bg-slate-800/70"
-            }`}
-          >
-            <LayoutDashboard className="w-4.5 h-4.5 text-blue-400 shrink-0" />
-            <span>{navRoutes.dashboard.label}</span>
-          </Link>
-
-          {/* Infrastructure Dropdown */}
-          <div className="relative">
-            <button
-              onClick={toggleInfrastructureDropdown}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                isInfrastructureChildActive || isInfrastructureDropdownOpen
+          {canViewDashboard ? (
+            <Link
+              href={navRoutes.dashboard.href}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                isLinkActive(navRoutes.dashboard.href)
                   ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
                   : "text-slate-300 hover:text-white hover:bg-slate-800/70"
               }`}
             >
-              <Network className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-              <span>{navRoutes.infrastructureDropdown.label}</span>
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isInfrastructureDropdownOpen ? "rotate-180" : ""}`} />
-            </button>
+              <LayoutDashboard className="w-4.5 h-4.5 text-blue-400 shrink-0" />
+              <span>{navRoutes.dashboard.label}</span>
+            </Link>
+          ) : null}
 
-            {isInfrastructureDropdownOpen && (
-              <div
-                className="absolute top-full start-0 mt-1 w-48 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl py-1.5 z-40 animate-in fade-in"
-                onMouseLeave={closeInfrastructureDropdown}
+          {/* Infrastructure Dropdown */}
+          {filteredInfrastructureItems.length ? (
+            <div className="relative">
+              <button
+                onClick={toggleInfrastructureDropdown}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isInfrastructureChildActive || isInfrastructureDropdownOpen
+                    ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800/70"
+                }`}
               >
-                {filteredInfrastructureItems.length === 0 ? (
-                  <div className="px-4 py-2 text-xs font-semibold text-slate-500 italic">
-                    {lang === "ar" ? "لا توجد صلاحيات" : "No permissions"}
-                  </div>
-                ) : (
-                  filteredInfrastructureItems.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={closeInfrastructureDropdown}
-                      className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold hover:bg-slate-800 transition-colors ${
-                        isLinkActive(item.href) ? "text-blue-400 font-bold" : "text-slate-300"
-                      }`}
-                    >
-                    {item.href.includes("database") ? (
-                      <Database className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-                    ) : (
-                      <HardDrive className="w-4.5 h-4.5 text-blue-400 shrink-0" />
-                    )}
-                    <span>{item.label}</span>
-                  </Link>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
+                <Network className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+                <span>{navRoutes.infrastructureDropdown.label}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform ${isInfrastructureDropdownOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {isInfrastructureDropdownOpen && (
+                <div
+                  className="absolute top-full start-0 mt-1 w-48 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl py-1.5 z-40 animate-in fade-in"
+                  onMouseLeave={closeInfrastructureDropdown}
+                >
+                  {filteredInfrastructureItems.length === 0 ? (
+                    <div className="px-4 py-2 text-xs font-semibold text-slate-500 italic">
+                      {lang === "ar" ? "لا توجد صلاحيات" : "No permissions"}
+                    </div>
+                  ) : (
+                    filteredInfrastructureItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={closeInfrastructureDropdown}
+                        className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold hover:bg-slate-800 transition-colors ${
+                          isLinkActive(item.href)
+                            ? "text-blue-400 font-bold"
+                            : "text-slate-300"
+                        }`}
+                      >
+                        {item.href.includes("database") ? (
+                          <Database className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+                        ) : (
+                          <HardDrive className="w-4.5 h-4.5 text-blue-400 shrink-0" />
+                        )}
+                        <span>{item.label}</span>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ) : null}
 
           {/* Backup & Restore is a separate operational module. */}
           {canViewBackup && (
             <Link
               href={navRoutes.backup.href}
-              aria-current={isLinkActive(navRoutes.backup.href) ? "page" : undefined}
+              aria-current={
+                isLinkActive(navRoutes.backup.href) ? "page" : undefined
+              }
               aria-label={navRoutes.backup.label}
               title={navRoutes.backup.label}
               className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
@@ -157,77 +176,87 @@ export function Navbar(props: UseNavbarProps) {
           )}
 
           {/* Tenants Route */}
-          <Link
-            href={navRoutes.tenants.href}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              isLinkActive(navRoutes.tenants.href)
-                ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
-                : "text-slate-300 hover:text-white hover:bg-slate-800/70"
-            }`}
-          >
-            <Building2 className="w-4.5 h-4.5 text-indigo-400 shrink-0" />
-            <span>{navRoutes.tenants.label}</span>
-          </Link>
-
-          {/* Application Catalogue Route */}
-          <Link
-            href={navRoutes.applications.href}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              isLinkActive(navRoutes.applications.href)
-                ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
-                : "text-slate-300 hover:text-white hover:bg-slate-800/70"
-            }`}
-          >
-            <Package className="w-4.5 h-4.5 text-amber-400 shrink-0" />
-            <span>{navRoutes.applications.label}</span>
-          </Link>
-
-          {/* Admin Controls Dropdown */}
-          <div className="relative">
-            <button
-              onClick={toggleAdminDropdown}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                isAdminChildActive || isAdminDropdownOpen
+          {canViewTenants ? (
+            <Link
+              href={navRoutes.tenants.href}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                isLinkActive(navRoutes.tenants.href)
                   ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
                   : "text-slate-300 hover:text-white hover:bg-slate-800/70"
               }`}
             >
-              <Shield className="w-4.5 h-4.5 text-purple-400 shrink-0" />
-              <span>{navRoutes.adminDropdown.label}</span>
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isAdminDropdownOpen ? "rotate-180" : ""}`} />
-            </button>
+              <Building2 className="w-4.5 h-4.5 text-indigo-400 shrink-0" />
+              <span>{navRoutes.tenants.label}</span>
+            </Link>
+          ) : null}
 
-            {isAdminDropdownOpen && (
-              <div
-                className="absolute top-full start-0 mt-1 w-48 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl py-1.5 z-40 animate-in fade-in"
-                onMouseLeave={closeAdminDropdown}
+          {/* Application Catalogue Route */}
+          {canViewApplications ? (
+            <Link
+              href={navRoutes.applications.href}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                isLinkActive(navRoutes.applications.href)
+                  ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
+                  : "text-slate-300 hover:text-white hover:bg-slate-800/70"
+              }`}
+            >
+              <Package className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+              <span>{navRoutes.applications.label}</span>
+            </Link>
+          ) : null}
+
+          {/* Admin Controls Dropdown */}
+          {filteredAdminItems.length ? (
+            <div className="relative">
+              <button
+                onClick={toggleAdminDropdown}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isAdminChildActive || isAdminDropdownOpen
+                    ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
+                    : "text-slate-300 hover:text-white hover:bg-slate-800/70"
+                }`}
               >
-                {filteredAdminItems.length === 0 ? (
-                  <div className="px-4 py-2 text-xs font-semibold text-slate-500 italic">
-                    {lang === "ar" ? "لا توجد صلاحيات" : "No permissions"}
-                  </div>
-                ) : (
-                  filteredAdminItems.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={closeAdminDropdown}
-                      className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold hover:bg-slate-800 transition-colors ${
-                        isLinkActive(item.href) ? "text-blue-400 font-bold" : "text-slate-300"
-                      }`}
-                    >
-                    {item.href.includes("users") ? (
-                      <Users className="w-4.5 h-4.5 text-cyan-400 shrink-0" />
-                    ) : (
-                      <Shield className="w-4.5 h-4.5 text-purple-400 shrink-0" />
-                    )}
-                    <span>{item.label}</span>
-                  </Link>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
+                <Shield className="w-4.5 h-4.5 text-purple-400 shrink-0" />
+                <span>{navRoutes.adminDropdown.label}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform ${isAdminDropdownOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {isAdminDropdownOpen && (
+                <div
+                  className="absolute top-full start-0 mt-1 w-48 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl py-1.5 z-40 animate-in fade-in"
+                  onMouseLeave={closeAdminDropdown}
+                >
+                  {filteredAdminItems.length === 0 ? (
+                    <div className="px-4 py-2 text-xs font-semibold text-slate-500 italic">
+                      {lang === "ar" ? "لا توجد صلاحيات" : "No permissions"}
+                    </div>
+                  ) : (
+                    filteredAdminItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={closeAdminDropdown}
+                        className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold hover:bg-slate-800 transition-colors ${
+                          isLinkActive(item.href)
+                            ? "text-blue-400 font-bold"
+                            : "text-slate-300"
+                        }`}
+                      >
+                        {item.href.includes("users") ? (
+                          <Users className="w-4.5 h-4.5 text-cyan-400 shrink-0" />
+                        ) : (
+                          <Shield className="w-4.5 h-4.5 text-purple-400 shrink-0" />
+                        )}
+                        <span>{item.label}</span>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ) : null}
         </nav>
 
         {/* Right (RTL End): Controls, Theme, Lang, User */}
@@ -246,26 +275,88 @@ export function Navbar(props: UseNavbarProps) {
           className="absolute inset-x-0 top-full max-h-[calc(100vh-3.75rem)] overflow-y-auto border-b border-slate-800 bg-slate-950 p-4 shadow-2xl lg:hidden"
         >
           <div className="grid gap-2">
-            <MobileNavLink href={navRoutes.dashboard.href} label={navRoutes.dashboard.label} active={isLinkActive(navRoutes.dashboard.href)} onClick={closeMobileMenu} icon={<LayoutDashboard className="size-4 text-blue-400" />} />
+            {canViewDashboard ? (
+              <MobileNavLink
+                href={navRoutes.dashboard.href}
+                label={navRoutes.dashboard.label}
+                active={isLinkActive(navRoutes.dashboard.href)}
+                onClick={closeMobileMenu}
+                icon={<LayoutDashboard className="size-4 text-blue-400" />}
+              />
+            ) : null}
 
             {filteredInfrastructureItems.length ? (
               <div className="rounded-xl border border-slate-800 p-2">
-                <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">{navRoutes.infrastructureDropdown.label}</p>
+                <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  {navRoutes.infrastructureDropdown.label}
+                </p>
                 {filteredInfrastructureItems.map((item) => (
-                  <MobileNavLink key={item.href} href={item.href} label={item.label} active={isLinkActive(item.href)} onClick={closeMobileMenu} icon={item.href.includes("database") ? <Database className="size-4 text-emerald-400" /> : <HardDrive className="size-4 text-blue-400" />} />
+                  <MobileNavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    active={isLinkActive(item.href)}
+                    onClick={closeMobileMenu}
+                    icon={
+                      item.href.includes("database") ? (
+                        <Database className="size-4 text-emerald-400" />
+                      ) : (
+                        <HardDrive className="size-4 text-blue-400" />
+                      )
+                    }
+                  />
                 ))}
               </div>
             ) : null}
 
-            {canViewBackup ? <MobileNavLink href={navRoutes.backup.href} label={navRoutes.backup.label} active={isLinkActive(navRoutes.backup.href)} onClick={closeMobileMenu} icon={<DatabaseBackup className="size-4 text-cyan-400" />} /> : null}
-            <MobileNavLink href={navRoutes.tenants.href} label={navRoutes.tenants.label} active={isLinkActive(navRoutes.tenants.href)} onClick={closeMobileMenu} icon={<Building2 className="size-4 text-indigo-400" />} />
-            <MobileNavLink href={navRoutes.applications.href} label={navRoutes.applications.label} active={isLinkActive(navRoutes.applications.href)} onClick={closeMobileMenu} icon={<Package className="size-4 text-amber-400" />} />
+            {canViewBackup ? (
+              <MobileNavLink
+                href={navRoutes.backup.href}
+                label={navRoutes.backup.label}
+                active={isLinkActive(navRoutes.backup.href)}
+                onClick={closeMobileMenu}
+                icon={<DatabaseBackup className="size-4 text-cyan-400" />}
+              />
+            ) : null}
+            {canViewTenants ? (
+              <MobileNavLink
+                href={navRoutes.tenants.href}
+                label={navRoutes.tenants.label}
+                active={isLinkActive(navRoutes.tenants.href)}
+                onClick={closeMobileMenu}
+                icon={<Building2 className="size-4 text-indigo-400" />}
+              />
+            ) : null}
+            {canViewApplications ? (
+              <MobileNavLink
+                href={navRoutes.applications.href}
+                label={navRoutes.applications.label}
+                active={isLinkActive(navRoutes.applications.href)}
+                onClick={closeMobileMenu}
+                icon={<Package className="size-4 text-amber-400" />}
+              />
+            ) : null}
 
             {filteredAdminItems.length ? (
               <div className="rounded-xl border border-slate-800 p-2">
-                <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">{navRoutes.adminDropdown.label}</p>
+                <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  {navRoutes.adminDropdown.label}
+                </p>
                 {filteredAdminItems.map((item) => (
-                  <MobileNavLink key={item.href} href={item.href} label={item.label} active={isLinkActive(item.href)} onClick={closeMobileMenu} icon={item.href.includes("users") ? <Users className="size-4 text-cyan-400" /> : <Shield className="size-4 text-purple-400" />} />
+                  <MobileNavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    active={isLinkActive(item.href)}
+                    onClick={closeMobileMenu}
+                    icon={
+                      item.href.includes("users") ? (
+                        <Users className="size-4 text-cyan-400" />
+                      ) : (
+                        <Shield className="size-4 text-purple-400" />
+                      )
+                    }
+                  />
                 ))}
               </div>
             ) : null}
@@ -276,7 +367,19 @@ export function Navbar(props: UseNavbarProps) {
   );
 }
 
-function MobileNavLink({ href, label, active, onClick, icon }: { href: string; label: string; active: boolean; onClick: () => void; icon: ReactNode }) {
+function MobileNavLink({
+  href,
+  label,
+  active,
+  onClick,
+  icon,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+}) {
   return (
     <Link
       href={href}

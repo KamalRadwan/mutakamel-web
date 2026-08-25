@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   getStoragePlacementState,
   readStoragePlacementOptions,
-  sanitizeTenantStoragePlacement,
   type TenantStoragePlacementOption,
 } from "./storage-placement";
 
@@ -103,39 +102,5 @@ describe("tenant storage placement contract", () => {
         optionCount: 0,
       }),
     ).toBe("empty");
-  });
-
-  it("keeps only the safe read-only storage summary on tenant detail", () => {
-    const tenant = sanitizeTenantStoragePlacement({
-      id: "019f0000-0000-7000-8000-000000000020",
-      storageServerId: option.id,
-      storageServer: {
-        id: option.id,
-        code: option.code,
-        name: option.name,
-        region: option.region,
-        bucketName: "mutakamel-tenants-1",
-        status: option.status,
-        internalEndpoint: "http://storage.internal:3900",
-        credentialRef: "env:S3_STORAGE_1_CORE_OPERATION",
-      },
-    });
-
-    expect(tenant.storageServer).toEqual({
-      id: option.id,
-      code: option.code,
-      name: option.name,
-      region: option.region,
-      bucketName: "mutakamel-tenants-1",
-      status: option.status,
-    });
-    expect(tenant.storageServer).not.toHaveProperty("internalEndpoint");
-    expect(tenant.storageServer).not.toHaveProperty("credentialRef");
-    expect(() =>
-      sanitizeTenantStoragePlacement({
-        storageServerId: option.id,
-        storageServer: { ...option, id: "019f0000-0000-7000-8000-000000000099" },
-      }),
-    ).toThrow("INVALID_TENANT_STORAGE_PLACEMENT_RESPONSE");
   });
 });

@@ -1,13 +1,31 @@
 "use client";
- 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { axiosClient } from "@/lib/api/axiosClient";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { axiosClient, getApiRequestOutcome } from "@/lib/api/axiosClient";
+import { generateUUIDv7 } from "@/lib/utils/uuid";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
 import type { SuccessResponse } from "@/types/common";
 import type { AdminUserProfile } from "@/app/users/types";
+import {
+  normalizeApiError,
+  type NormalizedApiError,
+} from "@/shared/api/normalized-api-error";
+import {
+  isAmbiguousWriteOutcome,
+  shouldRotateWriteCommandKey,
+} from "@/shared/api/write-command-recovery";
+
+interface ProfileWriteIntent {
+  fingerprint: string;
+  payload: {
+    themeKey: string;
+    language: string;
+    extensions: Record<string, unknown>;
+  };
+  idempotencyKey: string;
+  ambiguous: boolean;
+}
 
 export function useMyProfile() {
   const { lang, setLang } = useI18n();
@@ -20,24 +38,33 @@ export function useMyProfile() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
+  const [saveError, setSaveError] = useState<NormalizedApiError | null>(null);
+  const profileIntentRef = useRef<ProfileWriteIntent | null>(null);
 
   const loadMyProfile = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
+    setLoadError(null);
+    setProfile(null);
     try {
       const res = await axiosClient.get<SuccessResponse<AdminUserProfile>>(
-        "/api/admin/core/v1/users/me/profile"
+        "/api/admin/core/v1/users/me/profile",
       );
       const data = res.data.data;
       setProfile(data);
       if (data.themeKey) setThemeKey(data.themeKey);
       if (data.language) setLanguage(data.language);
-      if (data.extensions?.tableDensity) setTableDensity(data.extensions.tableDensity as string);
-    } catch (err: any) {
-      const message = err?.response?.data?.message || "Failed to load profile.";
-      setError(message);
-      toast.error(lang === "ar" ? "فشل تحميل الملف الشخصي" : "Profile Load Failed", message);
+      if (data.extensions?.tableDensity)
+        setTableDensity(data.extensions.tableDensity as string);
+    } catch (caught: unknown) {
+      const normalized = normalizeApiError(caught);
+      setLoadError(normalized);
+      toast.error(
+        lang === "ar" ? "فشل تحميل الملف الشخصي" : "Profile Load Failed",
+        lang === "ar"
+          ? "تعذر تحميل تفضيلات الملف الشخصي. يمكنك إعادة المحاولة بأمان."
+          : "Profile preferences could not be loaded. You can retry safely.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -59,10 +86,10 @@ export function useMyProfile() {
   const saveProfile = async () => {
     if (isSaving) return;
     setIsSaving(true);
-    setError(null);
+    setSaveError(null);
 
     try {
-      const payload = {
+      const payload: ProfileWriteIntent["payload"] = {
         themeKey,
         language,
         extensions: {
@@ -70,13 +97,35 @@ export function useMyProfile() {
           tableDensity,
         },
       };
+      const fingerprint = JSON.stringify(payload);
+      const current = profileIntentRef.current;
+      if (current?.ambiguous && current.fingerprint !== fingerprint) {
+        throw new Error("PENDING_PROFILE_WRITE_MUST_BE_RECONCILED");
+      }
+      const intent =
+        current?.fingerprint === fingerprint
+          ? current
+          : {
+              fingerprint,
+              payload,
+              idempotencyKey: generateUUIDv7(),
+              ambiguous: false,
+            };
+      profileIntentRef.current = intent;
 
       const res = await axiosClient.patch<SuccessResponse<AdminUserProfile>>(
         "/api/admin/core/v1/users/me/profile",
-        payload
+        intent.payload,
+        {
+          headers: { "x-idempotency-key": intent.idempotencyKey },
+          skipAutoIdempotency: true,
+          replayAfterRefresh: true,
+          cache: "no-store",
+        },
       );
 
       const updated = res.data.data;
+      profileIntentRef.current = null;
       setProfile(updated);
 
       if (language === "ar" || language === "en") {
@@ -87,12 +136,37 @@ export function useMyProfile() {
         lang === "ar" ? "تم الحفظ" : "Preferences Saved",
         lang === "ar"
           ? "تم تحديث تفضيلات الحساب الشخصي بنجاح."
-          : "Your profile preferences have been updated."
+          : "Your profile preferences have been updated.",
       );
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || "Failed to update profile.";
-      setError(msg);
-      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", msg);
+    } catch (caught: unknown) {
+      const normalized = normalizeApiError(caught);
+      const current = profileIntentRef.current;
+      const ambiguous =
+        getApiRequestOutcome(caught) === "settled-before-session-change" ||
+        isAmbiguousWriteOutcome(normalized) ||
+        /(?:UPSTREAM|UNAVAILABLE|TIMEOUT)/u.test(normalized.errorCode);
+      if (current && ambiguous) {
+        profileIntentRef.current = { ...current, ambiguous: true };
+        const confirmed = await loadProfileForReconciliation(current.payload);
+        if (confirmed) {
+          profileIntentRef.current = null;
+          setProfile(confirmed);
+          setSaveError(null);
+          if (confirmed.language === "ar" || confirmed.language === "en") {
+            setLang(confirmed.language);
+          }
+          return;
+        }
+      } else if (current && shouldRotateWriteCommandKey(normalized)) {
+        profileIntentRef.current = null;
+      }
+      setSaveError(normalized);
+      toast.error(
+        lang === "ar" ? "خطأ في الحفظ" : "Save Error",
+        lang === "ar"
+          ? "تعذر حفظ التفضيلات. لم تُعتبر التغييرات محفوظة."
+          : "Preferences could not be saved. The changes are not treated as persisted.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -109,9 +183,29 @@ export function useMyProfile() {
     setTableDensity,
     isLoading,
     isSaving,
-    error,
+    loadError,
+    saveError,
     hasChanges,
     saveProfile,
     reload: loadMyProfile,
   };
+}
+
+async function loadProfileForReconciliation(
+  payload: ProfileWriteIntent["payload"],
+): Promise<AdminUserProfile | null> {
+  try {
+    const response = await axiosClient.get<SuccessResponse<AdminUserProfile>>(
+      "/api/admin/core/v1/users/me/profile",
+      { cache: "no-store" },
+    );
+    const profile = response.data.data;
+    return profile.themeKey === payload.themeKey &&
+      profile.language === payload.language &&
+      profile.extensions?.tableDensity === payload.extensions.tableDensity
+      ? profile
+      : null;
+  } catch {
+    return null;
+  }
 }

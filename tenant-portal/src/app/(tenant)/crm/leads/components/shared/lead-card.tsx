@@ -1,22 +1,30 @@
 "use client";
 
-import { Building2, Mail, Phone, Flame, Share2, Trash2 } from "lucide-react";
+import { Building2, Mail, Phone, Share2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
-import type { LeadItem } from "../../hooks/useLeads";
-import { LEAD_STAGES } from "../../hooks/useLeads";
+import type { LeadItem, LeadStage } from "../../hooks/useLeads";
 import { useI18n } from "@/i18n/I18nContext";
 
 interface LeadCardProps {
   lead: LeadItem;
+  stages: LeadStage[];
   onDelete?: (lead: LeadItem) => void;
+  canDelete?: boolean;
   className?: string;
 }
 
-export function LeadCard({ lead, onDelete, className = "" }: LeadCardProps) {
+export function LeadCard({
+  lead,
+  stages,
+  onDelete,
+  canDelete = false,
+  className = "",
+}: LeadCardProps) {
   const { lang } = useI18n();
   const isRtl = lang === "ar";
+  const sourceName = isRtl ? lead.sourceNameAr : lead.sourceNameEn;
   
-  const stage = LEAD_STAGES.find((s) => s.id === lead.stageId);
+  const stage = stages.find((candidate) => candidate.id === lead.stageId);
   const stageName = stage ? (isRtl ? stage.nameAr : stage.nameEn) : lead.stageId;
 
   return (
@@ -32,29 +40,33 @@ export function LeadCard({ lead, onDelete, className = "" }: LeadCardProps) {
           </div>
         </div>
         
-        {onDelete && (
+        {onDelete && canDelete ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
               onDelete(lead);
             }}
             className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg transition-all"
-            title={isRtl ? "I18N_FALLBACK" : "Delete"}
+            title={isRtl ? "حذف" : "Delete"}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
-        )}
+        ) : null}
       </div>
 
       <div className="space-y-1.5 mb-3">
-        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
-          <Mail className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
-          <span className="truncate">{lead.email}</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
-          <Phone className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
-          <span className="truncate" dir="ltr">{lead.phone}</span>
-        </div>
+        {lead.email ? (
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+            <Mail className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+            <span className="truncate">{lead.email}</span>
+          </div>
+        ) : null}
+        {lead.phone ? (
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+            <Phone className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+            <span className="truncate" dir="ltr">{lead.phone}</span>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
@@ -62,19 +74,15 @@ export function LeadCard({ lead, onDelete, className = "" }: LeadCardProps) {
           {stageName}
         </Badge>
         
-        <div className="flex items-center gap-2">
-          {lead.source && (
-            <div className="flex items-center gap-1 text-[10px] text-slate-400" title={isRtl ? "I18N_FALLBACK" : "Source"}>
-              <Share2 className="w-3 h-3" />
-              <span className="truncate max-w-[60px]">{lead.source}</span>
-            </div>
-          )}
-          
-          <div className="flex items-center gap-1 font-bold text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded-md" title={isRtl ? "I18N_FALLBACK" : "Score"}>
-            <Flame className="w-3 h-3" />
-            <span>{lead.score}</span>
+        {sourceName ? (
+          <div
+            className="flex items-center gap-1 text-[10px] text-slate-400"
+            title={isRtl ? "المصدر" : "Source"}
+          >
+            <Share2 className="w-3 h-3" />
+            <span className="truncate max-w-[80px]">{sourceName}</span>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );

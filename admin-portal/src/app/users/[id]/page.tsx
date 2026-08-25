@@ -115,7 +115,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
         <Navbar />
-        <main className="flex-1 p-4 sm:p-6 max-w-6xl w-full mx-auto">
+        <main className="flex-1 w-full px-[10px] py-4 sm:py-6">
           <UserNotFoundState />
         </main>
       </div>
@@ -126,7 +126,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
         <Navbar />
-        <main className="flex-1 p-4 sm:p-6 max-w-6xl w-full mx-auto">
+        <main className="flex-1 w-full px-[10px] py-4 sm:py-6">
           <UserPermissionDenied />
         </main>
       </div>
@@ -137,7 +137,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 p-4 sm:p-6 max-w-6xl w-full mx-auto space-y-6">
+      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
         {/* Header Title Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center gap-3">

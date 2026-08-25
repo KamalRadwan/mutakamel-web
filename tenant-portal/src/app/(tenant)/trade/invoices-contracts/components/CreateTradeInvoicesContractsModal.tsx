@@ -34,7 +34,7 @@ export function CreateTradeInvoicesContractsModal({ isOpen, onClose, onSubmit }:
         <Select
           label="نوع المستند"
           value={documentType}
-          onChange={(e) => setDocumentType(e.target.value as any)}
+          onChange={(e) => setDocumentType(e.target.value as typeof documentType)}
           options={[
             { label: "فاتورة ضريبية (Invoice)", value: "invoice" },
             { label: "عقد تجاري سنوي (Contract)", value: "contract" },

@@ -13,7 +13,7 @@
 - Gateway contracts: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
 - Controller/service/DTOs: `../backend/mutakamel-apps/core-app/src/tenant/organization`
 - Database enums/entities: `../backend/mutakamel-apps/core-app/packages/database/src/entities/tenant`
-- Legacy use: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
+- Historical consolidated-frontend reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
 
 ## Security and shared transport
 
@@ -67,7 +67,8 @@ Safe branch-create example:
 
 ```http
 POST /api/tenant/core/v1/organization/branches
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 
 {

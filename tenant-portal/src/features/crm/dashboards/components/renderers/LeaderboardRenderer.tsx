@@ -1,6 +1,5 @@
 "use client";
 
-import { useI18n } from "@/i18n/I18nContext";
 import { Trophy, Medal, Award } from "lucide-react";
 import type { DashboardWidgetResult, CrmDashboardWidget } from "../../models/dashboard-types";
 import { formatDashboardValue } from "../../models/dashboard-utils";
@@ -10,10 +9,7 @@ interface LeaderboardRendererProps {
   result: DashboardWidgetResult;
 }
 
-export function LeaderboardRenderer({ widget, result }: LeaderboardRendererProps) {
-  const { lang } = useI18n();
-  const isRtl = lang === "ar";
-
+export function LeaderboardRenderer({ result }: LeaderboardRendererProps) {
   if (result.result?.shape !== "ROWS" || result.result.rowKind !== "RANKED") {
     return <div className="p-4 text-xs text-slate-400">Leaderboard data not available</div>;
   }

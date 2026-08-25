@@ -1,15 +1,21 @@
 # CRM tenant settings
 
 > Status: `verified-current`
-> Last source verification: `2026-07-25`
+> Last source verification: `2026-08-25`
 > Owner: CRM (`crm-app`)
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
-> Tenant Portal replacement: `not-started`
-> Legacy frontend: `live-partial`
-> Authorship: hand-written from current source
+> Tenant Portal replacement: `server-backed-supported-operations`
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
 CRM settings are a tenant singleton. This page covers only the two settings routes; pipeline/stage/source/custom-field administration has separate pages.
+
+## Current Tenant Portal scope
+
+The portal reads the singleton from the canonical raw CRM response and permits only two low-risk, fully specified updates: `requireQualifiedStageForConversion` and `outboundEmailContentRetentionDays`. It sends only changed fields and re-reads the singleton after an ambiguous `PUT` instead of replaying the non-idempotent request.
+
+The server-owned pipeline/revision values and Asterisk enablement/TLS-risk flags are read-only. The portal deliberately does not expose the unresolved TURN/ICE object schemas or a generic Asterisk editor, and the unsupported scaffold create/delete/detail/history routes have been removed.
 
 ## Endpoint catalogue
 
@@ -94,6 +100,8 @@ Settings can expose infrastructure topology. Keep responses out of client analyt
 
 ```http
 PUT /api/tenant/crm/v1/settings
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 
 {

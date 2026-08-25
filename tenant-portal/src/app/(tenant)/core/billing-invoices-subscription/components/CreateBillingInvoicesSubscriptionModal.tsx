@@ -13,7 +13,7 @@ interface CreateModalProps {
 }
 
 export function CreateBillingInvoicesSubscriptionModal({ isOpen, onClose, onSubmit }: CreateModalProps) {
-  const [invoiceNumber, setInvoiceNumber] = useState(`INV-2026-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [invoiceNumber, setInvoiceNumber] = useState("");
   const [planName, setPlanName] = useState("الخطة الاحترافية (Enterprise Plan)");
   const [amount, setAmount] = useState("1200.00");
   const [currency, setCurrency] = useState("USD");

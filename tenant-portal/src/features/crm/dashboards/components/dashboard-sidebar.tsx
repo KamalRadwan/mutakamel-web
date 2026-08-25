@@ -2,7 +2,7 @@
 
 import { useI18n } from "@/i18n/I18nContext";
 import { useDashboardStore } from "../models/useDashboardStore";
-import { Plus, Layout, Palette, Settings2, X } from "lucide-react";
+import { Plus, Layout, Palette, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function DashboardSidebar() {

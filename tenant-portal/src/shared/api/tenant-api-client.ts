@@ -1,12 +1,19 @@
 type TenantApiFetchOptions = Omit<RequestInit, "body"> & {
-  body?: any;
+  body?: unknown;
   errorMessage?: boolean | string;
   successMessage?: boolean | string;
 };
 
-export async function tenantApiFetch<T = any>(url: string, options?: TenantApiFetchOptions): Promise<T> {
-  const { body, ...restOptions } = options || {};
-  
+export async function tenantApiFetch<T = unknown>(url: string, options?: TenantApiFetchOptions): Promise<T> {
+  const {
+    body,
+    errorMessage,
+    successMessage,
+    ...restOptions
+  } = options || {};
+  void errorMessage;
+  void successMessage;
+
   const requestInit: RequestInit = { ...restOptions };
   
   if (body !== undefined) {
@@ -21,22 +28,7 @@ export async function tenantApiFetch<T = any>(url: string, options?: TenantApiFe
     }
   }
 
-  const res = await fetch(url, requestInit);
-  
-  if (!res.ok) {
-    let message = "API Error";
-    try {
-      const errJson = await res.json();
-      message = errJson.message || message;
-    } catch (e) {
-      // Ignore JSON parse error
-    }
-    throw new Error(message);
-  }
-  
-  try {
-    return await res.json();
-  } catch (e) {
-    return {} as T;
-  }
+  const response = await customTenantFetch<T>(url, requestInit);
+  return response.data;
 }
+import { customTenantFetch } from "@/lib/api/axiosClient";

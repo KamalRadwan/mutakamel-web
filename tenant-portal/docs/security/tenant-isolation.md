@@ -2,7 +2,7 @@
 
 Status: **Verified backend boundary; frontend requirements current**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 ## Tenant selection
 
@@ -41,7 +41,8 @@ trusted context from the verified route/token/request.
 The owning backend must:
 
 - load current non-deleted actor state;
-- verify tenant lifecycle and session version;
+- verify tenant lifecycle, active unexpired `sid`, and all four exact Auth
+  epochs;
 - verify module subscription/feature and seat;
 - evaluate permission and organization/resource scope;
 - resolve the tenant DataSource through the registry/router;

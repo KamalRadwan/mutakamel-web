@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import type { CrmDashboardPlacement, CrmDashboardFilters } from "./dashboard-types";
+import type {
+  CrmDashboard,
+  CrmDashboardPlacement,
+  CrmDashboardFilters,
+} from "./dashboard-types";
 
 interface DashboardState {
   // Mode
@@ -12,8 +16,7 @@ interface DashboardState {
   filters: Record<string, string>;
   updatePlacement: (widgetId: string, x: number, y: number, w: number, h: number) => void;
   removePlacement: (widgetId: string) => void;
-  initDashboard: (dashboard: any) => void;
-  setDateRange: (range: any) => void;
+  initDashboard: (dashboard: CrmDashboard) => void;
   setFilters: (filters: Record<string, string>) => void;
   resetDraftLayout: (originalPlacements: CrmDashboardPlacement[]) => void;
 
@@ -53,7 +56,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     draftPlacements: state.draftPlacements.filter(p => p.widgetId !== widgetId)
   })),
   initDashboard: (dashboard) => set({ draftPlacements: dashboard.placements || [], isDirty: false, editMode: false }),
-  setDateRange: () => {},
   setFilters: (filters) => set({ filters }),
   resetDraftLayout: (originalPlacements) => set({ 
     draftPlacements: [...originalPlacements],

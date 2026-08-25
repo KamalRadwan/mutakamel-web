@@ -11,6 +11,9 @@ import type {
   AdminUserErrorCode,
 } from "../types";
 
+const UUID_V7_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 export interface ListUsersParams {
   page?: number;
   limit?: number;
@@ -65,51 +68,66 @@ export async function getAdminUser(id: string) {
   return res.data.data;
 }
 
-export async function inviteAdminUser(dto: CreateAdminUserDto) {
+export async function inviteAdminUser(
+  dto: CreateAdminUserDto,
+  idempotencyKey: string,
+) {
   const res = await axiosClient.post<SuccessResponse<AdminUser>>(
     "/api/admin/core/v1/users",
-    dto
+    dto,
+    idempotentWrite(idempotencyKey),
   );
   return res.data.data;
 }
 
-export async function updateAdminUser(id: string, dto: UpdateAdminUserDto) {
+export async function updateAdminUser(
+  id: string,
+  dto: UpdateAdminUserDto,
+  idempotencyKey: string,
+) {
   const res = await axiosClient.patch<SuccessResponse<AdminUser>>(
     `/api/admin/core/v1/users/${encodeURIComponent(id)}`,
-    dto
+    dto,
+    idempotentWrite(idempotencyKey),
   );
   return res.data.data;
 }
 
-export async function assignUserRole(id: string, dto: AssignRoleDto) {
-  const res = await axiosClient.patch(
+export async function assignUserRole(
+  id: string,
+  dto: AssignRoleDto,
+  idempotencyKey: string,
+) {
+  await axiosClient.patch(
     `/api/admin/core/v1/users/${encodeURIComponent(id)}/roles`,
-    dto
+    dto,
+    idempotentWrite(idempotencyKey),
   );
-  return res;
 }
 
-export async function suspendAdminUser(id: string) {
+export async function suspendAdminUser(id: string, idempotencyKey: string) {
   const res = await axiosClient.post<SuccessResponse<AdminUser>>(
     `/api/admin/core/v1/users/${encodeURIComponent(id)}/suspend`,
-    {}
+    {},
+    idempotentWrite(idempotencyKey),
   );
   return res.data.data;
 }
 
-export async function activateAdminUser(id: string) {
+export async function activateAdminUser(id: string, idempotencyKey: string) {
   const res = await axiosClient.post<SuccessResponse<AdminUser>>(
     `/api/admin/core/v1/users/${encodeURIComponent(id)}/activate`,
-    {}
+    {},
+    idempotentWrite(idempotencyKey),
   );
   return res.data.data;
 }
 
-export async function deleteAdminUser(id: string) {
-  const res = await axiosClient.delete(
-    `/api/admin/core/v1/users/${encodeURIComponent(id)}`
+export async function deleteAdminUser(id: string, idempotencyKey: string) {
+  await axiosClient.delete(
+    `/api/admin/core/v1/users/${encodeURIComponent(id)}`,
+    idempotentWrite(idempotencyKey),
   );
-  return res;
 }
 
 export async function getUserWebphone(id: string) {
@@ -119,10 +137,15 @@ export async function getUserWebphone(id: string) {
   return res.data.data;
 }
 
-export async function updateUserWebphone(id: string, dto: AdminWebphoneUpdateDto) {
+export async function updateUserWebphone(
+  id: string,
+  dto: AdminWebphoneUpdateDto,
+  idempotencyKey: string,
+) {
   const res = await axiosClient.patch<SuccessResponse<AdminWebphoneConfig>>(
     `/api/admin/core/v1/users/${encodeURIComponent(id)}/webphone`,
-    dto
+    dto,
+    idempotentWrite(idempotencyKey),
   );
   return res.data.data;
 }
@@ -140,4 +163,16 @@ export async function listRoles(params: ListRolesParams = {}) {
     `/api/admin/core/v1/roles?${query.toString()}`
   );
   return res.data;
+}
+
+function idempotentWrite(idempotencyKey: string) {
+  if (!UUID_V7_PATTERN.test(idempotencyKey)) {
+    throw new TypeError("INVALID_IDEMPOTENCY_KEY");
+  }
+  return {
+    headers: { "x-idempotency-key": idempotencyKey },
+    skipAutoIdempotency: true,
+    replayAfterRefresh: true,
+    cache: "no-store" as const,
+  };
 }

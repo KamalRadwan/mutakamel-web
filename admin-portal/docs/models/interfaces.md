@@ -1,6 +1,6 @@
 # Admin Portal — Key Interfaces & Types
 
-Selected high-use response types. Last verified: **2026-08-02**.
+Selected high-use response types. Last verified: **2026-08-09**.
 
 ---
 
@@ -13,7 +13,8 @@ interface AdminMe {
   email: string;
   firstName: string;
   lastName: string;
-  tier: AdminTierEnum;
+  isSuperAdmin: boolean;
+  role: { id: string; name: string };
   status: UserStatusEnum;
   permissions: string[];
 }
@@ -24,16 +25,29 @@ interface AdminMe {
 ### `AdminAuthCookieResponse` (Admin Portal Login/Refresh)
 ```typescript
 interface AdminAuthCookieResponse {
-  accessToken: string;
-  tokenType: string;
+  tokenType: "Bearer";
   expiresIn: number;
-  refreshExpiresIn: number;
+  sessionExpiresIn: number;
+  session: {
+    id: string;
+    clientType: string;
+    createdAt: string;
+    lastRefreshAt: string | null;
+    lastUserActivityAt: string | null;
+    idleExpiresAt: string;
+    absoluteExpiresAt: string;
+    refreshUseCount: string;
+    accessIssueCount: string;
+    credentialVersion: number;
+    authorizationVersion: number;
+    profileVersion: number;
+  };
 }
 ```
 
-In browser cookie mode the refresh token is stored only in an HttpOnly cookie
-and is intentionally absent from the JSON response. Non-cookie clients receive
-the full token pair, but that is not the Admin Portal contract.
+In browser cookie mode both credentials are HttpOnly and intentionally absent
+from JSON. The Portal rejects any cookie-mode response containing raw token
+fields.
 
 ---
 

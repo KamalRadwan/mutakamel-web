@@ -1,15 +1,21 @@
 # CRM custom fields
 
 > Status: `verified-current`
-> Last source verification: `2026-07-25`
+> Last source verification: `2026-08-25`
 > Owner: CRM (`crm-app`)
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
-> Tenant Portal replacement: `not-started`
-> Legacy frontend: `live-partial`
-> Authorship: hand-written from current source
+> Tenant Portal replacement: `server-backed-supported-operations`
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
 CRM custom fields have definitions, operation-specific requirements, and per-record values. The Gateway exposes six canonical routes and six compatibility aliases.
+
+## Tenant Portal implementation
+
+`/crm/custom-fields` reads the raw definition array through the canonical Gateway route and validates the fields it renders. It has no local fallback catalogue. The create form posts only the four accepted owner types and the non-option field types; it does not auto-replay the non-idempotent request after an authentication or transport failure.
+
+The former local delete, detail, history, and settings screens were removed because no delete or single-definition read contract exists and those screens did not call the supported patch/requirements APIs. Select-option editing, definition patching, requirements, and per-record values remain backend capabilities that this minimal catalogue UI does not claim to expose.
 
 ## Endpoint catalogue
 
@@ -127,6 +133,8 @@ None of the 12 canonical/alias routes requires Gateway idempotency. After an amb
 
 ```http
 POST /api/tenant/crm/v1/custom-fields/values
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 
 {

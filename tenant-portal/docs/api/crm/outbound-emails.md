@@ -6,8 +6,8 @@
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
 > Tenant Portal replacement: `not-started`
-> Legacy frontend: `live`
-> Authorship: hand-written from current source
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
 Outbound email resolves an approved CRM recipient and compatible template, creates an auditable activity/email intent, and delivers asynchronously through Worker infrastructure.
 
@@ -166,6 +166,8 @@ Gateway idempotency errors are listed in the [common contract](./common-contract
 
 ```http
 POST /api/tenant/crm/v1/outbound-emails
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 x-idempotency-key: 0191e9a8-7f51-7b32-8d72-19f9217a41b3
 Content-Type: application/json
 

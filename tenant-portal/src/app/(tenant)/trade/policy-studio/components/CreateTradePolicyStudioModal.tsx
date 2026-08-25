@@ -34,7 +34,7 @@ export function CreateTradePolicyStudioModal({ isOpen, onClose, onSubmit }: Crea
           <Select
             label="نوع السياسة Policy Type"
             value={policyType}
-            onChange={(e) => setPolicyType(e.target.value as any)}
+            onChange={(e) => setPolicyType(e.target.value as typeof policyType)}
             options={[
               { label: "قواعد التسعير (Pricing Rule)", value: "pricing_rule" },
               { label: "مسار الموافقات (Approval Workflow)", value: "approval_workflow" },

@@ -9,7 +9,6 @@ import {
   failedCredentialChecks,
   isDatabaseSecurityAdminStepValid,
   isDatabaseServerConnectionStepValid,
-  needsActiveApplicationBindingBackfill,
 } from "./registration-state";
 
 describe("database server registration state", () => {
@@ -163,46 +162,4 @@ describe("database server registration state", () => {
     expect(DATABASE_SECURITY_ADMIN_USERNAME_PATTERN.test("pg_admin")).toBe(false);
   });
 
-  it("identifies a system-ready DRAFT that is waiting for active Application bindings", () => {
-    expect(
-      needsActiveApplicationBindingBackfill(
-        {
-          credentialBootstrap: {
-            status: "PENDING",
-            totalPrincipals: 2,
-            readyPrincipals: 2,
-          },
-          systemPrincipals: [
-            {
-              purpose: "PROVISIONING",
-              databasePrincipal: "mutakamel_provisioner",
-              status: "READY",
-            },
-          ],
-        } as never,
-        0,
-        true,
-      ),
-    ).toBe(true);
-  });
-
-  it("does not claim an Application blocker before bindings settle or when a system principal is incomplete", () => {
-    const server = {
-      credentialBootstrap: {
-        status: "PENDING",
-        totalPrincipals: 2,
-        readyPrincipals: 1,
-      },
-      systemPrincipals: [
-        {
-          purpose: "PROVISIONING",
-          databasePrincipal: "mutakamel_provisioner",
-          status: "READY",
-        },
-      ],
-    } as never;
-
-    expect(needsActiveApplicationBindingBackfill(server, 0, false)).toBe(false);
-    expect(needsActiveApplicationBindingBackfill(server, 0, true)).toBe(false);
-  });
 });

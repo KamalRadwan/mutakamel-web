@@ -1,8 +1,8 @@
 # Tenant Portal System Context
 
-Status: **Verified current backend; replacement frontend pending**
+Status: **Verified current backend and standalone Portal boundary**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 ## Context
 
@@ -66,8 +66,9 @@ New code must use canonical paths.
 3. Gateway verifies Core-issued JWTs and canonical tenant audience.
 4. Gateway removes caller-controlled internal identity/session headers and
    injects trusted context.
-5. The owning app independently verifies current identity, session version,
-   tenant/host binding, permission, scope, and subscription/module access.
+5. The owning app independently verifies the current identity, active `sid`,
+   exact security/authorization/profile/session epochs, tenant/host binding,
+   permission, scope, and subscription/module access.
 6. The application repository/data layer applies tenant and organization scope.
 
 No single browser or Gateway check replaces owning-app authorization.

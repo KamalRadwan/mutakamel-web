@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-11**
 
 Owner: **Core**
 
@@ -72,14 +72,18 @@ subscription from the nested tenant summary.
 
 ## Current frontend status
 
-The tenant detail hook reads some subscription data but calls the wrong
-cancellation route. There is no complete subscription list, seed, quote
-administration, or plan-change UI.
+The tenant billing tab loads detail and canonical items independently, supports
+initial subscription seed, displays the exact server-priced plan-change
+preview before apply, and uses the canonical cancellation route. Every command
+has a caller-owned UUIDv7 intent and refreshes subscription, collection, and
+effective state after success. `/subscriptions` also provides the exact
+cross-tenant directory with server pagination, permission/resource states,
+bilingual copy, and focused tests.
 
 ## Source map
 
 - `../backend/mutakamel-apps/core-app/src/admin/subscriptions/subscriptions.controller.ts`
-- `../backend/mutakamel-apps/core-app/src/admin/subscriptions/subscription-v2.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/subscriptions/subscription-v1.controller.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/subscriptions/subscription-items.controller.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/subscriptions/dto/`
 - `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`

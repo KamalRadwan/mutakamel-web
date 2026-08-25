@@ -31,7 +31,8 @@ describe('Admin Portal - RBAC Verification Gate', () => {
     );
 
     expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
-    expect(screen.getByText('Unauthorized')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Permission required');
+    expect(screen.getByRole('alert')).toHaveTextContent('admin.critical.action');
   });
 
   it('allows access when user has permission', () => {
@@ -45,7 +46,7 @@ describe('Admin Portal - RBAC Verification Gate', () => {
     );
 
     expect(screen.getByTestId('protected-content')).toBeInTheDocument();
-    expect(screen.queryByText('Unauthorized')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('renders fallback when user lacks permission and fallback is provided', () => {
@@ -60,6 +61,6 @@ describe('Admin Portal - RBAC Verification Gate', () => {
 
     expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
     expect(screen.getByTestId('fallback')).toBeInTheDocument();
-    expect(screen.queryByText('Unauthorized')).not.toBeInTheDocument();
+    expect(screen.queryByText('Permission required')).not.toBeInTheDocument();
   });
 });

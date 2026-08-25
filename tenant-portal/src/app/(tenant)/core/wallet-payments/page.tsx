@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Wallet, ArrowDownRight, ArrowUpRight, CreditCard } from "lucide-react";
+import { Eye, Trash2, Wallet } from "lucide-react";
 import { useWalletPayments, TransactionItem } from "./hooks/useWalletPayments";
 import { CreateWalletPaymentsModal } from "./components/CreateWalletPaymentsModal";
 import { DeleteWalletPaymentsConfirmModal } from "./components/DeleteWalletPaymentsConfirmModal";
 
 export default function WalletPaymentsPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

@@ -11,9 +11,11 @@ export interface DestructiveActionModalProps {
   title: string;
   description: string;
   targetName: string;
-  actionType: "drain" | "offline" | "suspend" | "delete" | "destroy" | "activate" | "reset-password" | "change-password";
+  actionType: "drain" | "offline" | "suspend" | "delete" | "destroy" | "activate" | "reset-password" | "change-password" | "revoke-session";
   requireNameTyping?: boolean;
   isSubmitting?: boolean;
+  confirmLabel?: string;
+  submittingLabel?: string;
   extraToggle?: {
     label: string;
     checked: boolean;
@@ -31,6 +33,8 @@ export function DestructiveActionModal({
   actionType,
   requireNameTyping = true,
   isSubmitting = false,
+  confirmLabel,
+  submittingLabel,
   extraToggle,
 }: DestructiveActionModalProps) {
   const { lang } = useI18n();
@@ -49,7 +53,7 @@ export function DestructiveActionModal({
       setTypedInput("");
       const initialTarget = requireNameTyping
         ? dialogRef.current?.querySelector<HTMLElement>("input:not([disabled])")
-        : dialogRef.current?.querySelector<HTMLElement>(focusableSelector);
+        : dialogRef.current?.querySelector<HTMLElement>("[data-dialog-cancel]");
       initialTarget?.focus();
     });
 
@@ -96,6 +100,7 @@ export function DestructiveActionModal({
       case "destroy":
         return "bg-rose-700 hover:bg-rose-800 text-white shadow-rose-700/30";
       case "delete":
+      case "revoke-session":
         return "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/30";
       case "suspend":
         return "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/30";
@@ -118,6 +123,8 @@ export function DestructiveActionModal({
         return <ShieldAlert className="w-5 h-5 text-rose-600" />;
       case "delete":
         return <Trash2 className="w-5 h-5 text-rose-600" />;
+      case "revoke-session":
+        return <ShieldAlert className="w-5 h-5 text-rose-600" />;
       case "suspend":
         return <PauseCircle className="w-5 h-5 text-amber-600" />;
       case "drain":
@@ -129,7 +136,7 @@ export function DestructiveActionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !isSubmitting) onClose(); }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} onKeyDown={handleKeyDown} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={isSubmitting} onKeyDown={handleKeyDown} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 shadow-2xl relative">
         <button
           type="button"
           onClick={onClose}
@@ -196,7 +203,9 @@ export function DestructiveActionModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+            disabled={isSubmitting}
+            data-dialog-cancel
+            className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
           >
             {lang === "ar" ? "إلغاء" : "Cancel"}
           </button>
@@ -214,10 +223,10 @@ export function DestructiveActionModal({
             {isSubmitting ? (
               <span className="flex items-center gap-1.5">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>{lang === "ar" ? "جاري التنفيذ..." : "Executing..."}</span>
+                <span>{submittingLabel ?? (lang === "ar" ? "جاري التنفيذ..." : "Executing...")}</span>
               </span>
             ) : (
-              <span>{lang === "ar" ? "تأكيد التنفيذ" : "Confirm Action"}</span>
+              <span>{confirmLabel ?? (lang === "ar" ? "تأكيد التنفيذ" : "Confirm Action")}</span>
             )}
           </button>
         </div>

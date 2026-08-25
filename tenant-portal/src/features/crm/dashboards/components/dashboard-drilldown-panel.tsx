@@ -4,7 +4,6 @@ import { useI18n } from "@/i18n/I18nContext";
 import { X, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
-import { Table } from "@/components/ui/Table";
 import { useState } from "react";
 import type { DashboardDrilldownRecord } from "../models/dashboard-types";
 import { exportToCSV } from "../utils/export-utils";
@@ -100,7 +99,7 @@ export function DashboardDrilldownPanel({ open, onClose, title, subtitle, record
                     <tbody className="divide-y dark:divide-slate-800 bg-white dark:bg-slate-900">
                       {visibleRecords.map((row, i) => (
                         <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                          {Object.values(row).map((val: any, j) => (
+                          {Object.values(row).map((val, j) => (
                             <td key={j} className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[200px] truncate">
                               {typeof val === 'object' ? JSON.stringify(val) : String(val)}
                             </td>

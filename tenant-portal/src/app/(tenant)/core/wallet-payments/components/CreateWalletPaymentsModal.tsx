@@ -13,7 +13,7 @@ interface CreateModalProps {
 }
 
 export function CreateWalletPaymentsModal({ isOpen, onClose, onSubmit }: CreateModalProps) {
-  const [txNumber, setTxNumber] = useState(`TX-2026-${Math.floor(100 + Math.random() * 900)}`);
+  const [txNumber, setTxNumber] = useState("");
   const [type, setType] = useState<"deposit" | "withdrawal" | "charge">("deposit");
   const [amount, setAmount] = useState("1000.00");
   const [currency, setCurrency] = useState("USD");
@@ -33,7 +33,7 @@ export function CreateWalletPaymentsModal({ isOpen, onClose, onSubmit }: CreateM
           <Select
             label="نوع الحركة"
             value={type}
-            onChange={(e) => setType(e.target.value as any)}
+            onChange={(e) => setType(e.target.value as typeof type)}
             options={[
               { label: "شحن رصيد (Deposit)", value: "deposit" },
               { label: "خصم / استقطاع (Charge)", value: "charge" },

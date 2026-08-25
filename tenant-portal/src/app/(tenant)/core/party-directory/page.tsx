@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Users, Building, UserCheck } from "lucide-react";
+import { Eye, Trash2, Building, UserCheck } from "lucide-react";
 import { usePartyDirectory, PartyItem } from "./hooks/usePartyDirectory";
 import { CreatePartyDirectoryModal } from "./components/CreatePartyDirectoryModal";
 import { DeletePartyDirectoryConfirmModal } from "./components/DeletePartyDirectoryConfirmModal";
 
 export default function PartyDirectoryPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

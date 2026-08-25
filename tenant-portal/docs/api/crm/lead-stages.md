@@ -5,11 +5,13 @@
 > Owner: CRM (`crm-app`)
 > Canonical browser prefix: `/api/tenant/crm/v1`
 > Controller-relative prefix: `/api/v1/crm`
-> Tenant Portal replacement: `not-started`
-> Legacy frontend: `live`
-> Authorship: hand-written from current source
+> Tenant Portal replacement: `server-backed-supported-operations`
+> Historical consolidated frontend: `absent-from-current-checkout`
+> Authorship: hand-written from current backend source; historical frontend evidence is non-authoritative
 
 Lead stages are a tenant-wide ordered catalogue. Their semantic flag/category drives lead lifecycle and conversion rules.
+
+The current portal reads the canonical catalogue and exposes create, delete, and set-default operations. It deliberately does not fabricate detail/history/settings pages, and does not expose update or reorder controls until those workflows have approved UX. Ambiguous mutation failures trigger a catalogue re-read rather than a second write intent.
 
 ## Endpoint catalogue
 

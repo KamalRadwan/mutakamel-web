@@ -29,11 +29,17 @@ export const en: Dictionary = {
     adminDropdown: "Admin Controls",
     users: "Staff Users",
     roles: "Roles & Permissions",
+    reports: "Reports",
+    subscriptions: "Subscriptions",
+    invoices: "Invoices",
+    logging: "Logging control",
+    provisioning: "Provisioning governance",
     settings: "System Settings",
   },
   login: {
     title: "Admin Portal Sign-In",
-    subtitle: "Enter your administrative credentials to access the control plane",
+    subtitle:
+      "Enter your administrative credentials to access the control plane",
     emailLabel: "Admin Email Address",
     passwordLabel: "Password",
     rememberMe: "Remember my session",
@@ -43,9 +49,196 @@ export const en: Dictionary = {
     footerNote: "Secure & Encrypted Control Plane Infrastructure",
     invalidCredentials: "Invalid administrative email or password",
   },
+  authActions: {
+    common: {
+      checkingLink: "Checking the secure link...",
+      missingTokenTitle: "This link is incomplete",
+      missingTokenDescription:
+        "The URL does not contain a valid action token. Open the complete link from your invitation or password-reset email.",
+      backToSignIn: "Back to sign in",
+      newPassword: "New password",
+      confirmPassword: "Confirm new password",
+      showPassword: "Show password",
+      hidePassword: "Hide password",
+      passwordRequirements: "Password requirements",
+      rules: {
+        length: "At least 12 characters",
+        lowercase: "At least one lowercase letter",
+        uppercase: "At least one uppercase letter",
+        number: "At least one number",
+        symbol: "At least one symbol",
+      },
+      errors: {
+        tokenMissing: "The action token is missing from this link.",
+        tokenInvalid: "The action token has an invalid format.",
+        passwordRequired: "Enter a new password.",
+        passwordTooLong: "The password must not exceed 128 characters.",
+        passwordWeak:
+          "The password must satisfy every strength requirement shown above.",
+        confirmationMismatch: "The password confirmation does not match.",
+        invalidOrExpiredToken:
+          "This link has expired or was already used. Request a new link.",
+        rateLimited:
+          "Too many attempts were made. Wait a moment and try again.",
+        sessionChanged:
+          "The sign-in session changed in another tab. Reopen the link and try again.",
+        unavailable:
+          "The request could not be completed. It was not retried automatically; verify your account state before trying again.",
+      },
+    },
+    acceptInvite: {
+      eyebrow: "Administrator invitation",
+      title: "Activate your admin account",
+      subtitle:
+        "Create a strong password to activate your account and start a secure Admin Portal session.",
+      submit: "Accept invitation and sign in",
+      submitting: "Activating account...",
+    },
+    resetPassword: {
+      eyebrow: "Secure account recovery",
+      title: "Set a new password",
+      subtitle:
+        "A successful reset ends every existing session and returns you to sign in.",
+      submit: "Set new password",
+      submitting: "Updating password...",
+    },
+    sessions: {
+      title: "Sign-in sessions",
+      description:
+        "Each browser or device has an independent session. Revoke one session, or end every session if you suspect a security issue.",
+      refresh: "Refresh sessions",
+      loading: "Loading sign-in sessions...",
+      error:
+        "The sessions could not be loaded or the action could not be completed. Try again.",
+      current: "Current session",
+      lastUsed: "Last used",
+      refreshes: "Refreshes",
+      accessIssuances: "Access issuances",
+      endCurrent: "End this session",
+      revoke: "Revoke session",
+      empty: "No sessions available.",
+      endCurrentTitle: "End the current session?",
+      revokeTitle: "Revoke this sign-in session?",
+      endCurrentDescription:
+        "This browser will be signed out immediately. Other sessions remain active.",
+      revokeDescription: "That browser or device will lose access immediately.",
+      endingCurrent: "Ending session...",
+      revoking: "Revoking session...",
+      logoutAllButton: "Sign out every device",
+      logoutAllTitle: "End every session?",
+      logoutAllDescription:
+        "Every session for your account, including this browser, will end. Use this if a device is lost or you suspect unauthorized access.",
+      logoutAllTarget: "All account sessions",
+      logoutAllConfirm: "End every session",
+      logoutAllSubmitting: "Ending every session...",
+    },
+    invalidationReplay: {
+      title: "Authentication invalidation recovery",
+      description:
+        "Validate and requeue explicit terminal session-invalidation events. This operator action never changes stored routing or payload data.",
+      warningTitle: "Security recovery operation",
+      warningDescription:
+        "Name every failed event explicitly. Validate the exact intent with a dry run before applying it; transport failures are never retried automatically.",
+      target: "Outbox target",
+      controlPlaneTarget: "Control plane (admin sessions)",
+      tenantTarget: "Tenant database (tenant sessions)",
+      tenantId: "Tenant ID",
+      tenantIdPlaceholder: "Canonical UUIDv7 tenant ID",
+      eventIds: "Failed event IDs",
+      eventIdsHint:
+        "Enter 1–25 unique UUIDv7 IDs, separated by a new line, space, or comma.",
+      eventIdsPlaceholder: "One canonical UUIDv7 per line",
+      reason: "Recovery reason",
+      reasonHint:
+        "8–500 characters. The trimmed reason is written to immutable audit evidence.",
+      characters: "characters",
+      events: "events",
+      dryRun: "Validate dry run",
+      dryRunning: "Validating dry run...",
+      apply: "Apply replay",
+      applying: "Scheduling replay...",
+      dryRunRequired:
+        "Complete a successful dry run for this exact target, event list, and reason before applying.",
+      confirmation: {
+        dryTitle: "Validate this replay intent?",
+        dryDescription:
+          "Core will lock and validate the named terminal events and append audit evidence. No event will be requeued.",
+        dryConfirm: "Run validation",
+        drySubmitting: "Validating...",
+        applyTitle: "Requeue these authentication invalidations?",
+        applyDescription:
+          "The exact events validated by the dry run will return to the durable dispatcher. Routing and payload data remain unchanged.",
+        applyToken: "APPLY",
+        applyConfirm: "Apply replay",
+        applySubmitting: "Scheduling replay...",
+      },
+      success: {
+        dryTitle: "Dry run validated",
+        applyTitle: "Replay scheduled",
+        dryDescription:
+          "The exact events are eligible. Review the receipt before applying.",
+        applyDescription:
+          "The exact events were returned to the durable dispatcher.",
+        commandId: "Command ID",
+        eligible: "Eligible events",
+        replayed: "Requeued events",
+        correlation: "Correlation ID",
+      },
+      failure: {
+        title: "The recovery command was not completed",
+        code: "Error code",
+        correlation: "Correlation ID",
+        retryExact: "Retry the exact request",
+        retryNotice:
+          "The outcome may be ambiguous. Retry uses the same body and UUIDv7 command ID; no automatic transport retry occurred.",
+      },
+      validation: {
+        tenantRequired:
+          "Enter the exact tenant UUIDv7 for a tenant outbox target.",
+        tenantInvalid: "Tenant ID must be a canonical UUIDv7.",
+        eventRequired: "Enter at least one failed event ID.",
+        eventTooMany: "Enter no more than 25 event IDs.",
+        eventDuplicate: "Each event ID must be unique.",
+        eventInvalid: "Every event ID must be a canonical UUIDv7.",
+        reasonRequired: "Enter an audit reason.",
+        reasonTooShort:
+          "The trimmed reason must contain at least 8 characters.",
+        reasonTooLong: "The trimmed reason must not exceed 500 characters.",
+        dryRunRequired:
+          "A successful dry run for this exact intent is required before apply.",
+      },
+      apiErrors: {
+        permission:
+          "Your current administrator session does not have the replay permission.",
+        commandInvalid:
+          "The command identity was rejected. Start a new operator intent.",
+        targetInvalid:
+          "The target, tenant, event list, mode, or reason is invalid.",
+        tenantUnavailable:
+          "The exact tenant database target is currently unavailable.",
+        commandConflict:
+          "This command ID belongs to another actor or a different intent.",
+        eventNotFound:
+          "One or more named events do not exist in the selected outbox.",
+        eventNotEligible:
+          "Only failed, unpublished authentication invalidations from the exact target are eligible.",
+        eventInvalid:
+          "Stored event evidence failed integrity validation and was not changed.",
+        auditInvalid: "Immutable replay audit evidence is missing or invalid.",
+        inFlight:
+          "The same command is still being processed. Verify its outcome before retrying.",
+        sessionChanged:
+          "The administrator session changed while the command was pending.",
+        validation: "Core rejected one or more command fields.",
+        unknown:
+          "The command could not be completed. Use the error and correlation evidence when investigating.",
+      },
+    },
+  },
   dashboard: {
     title: "Platform Admin Console",
-    welcome: "Welcome back, Mona Ali. Overview of tenant health, hosting servers, and active subscriptions.",
+    welcome:
+      "Welcome back, Mona Ali. Overview of tenant health, hosting servers, and active subscriptions.",
     addTenant: "+ Provision New Tenant",
     refresh: "Refresh Telemetry",
     thisMonth: "This Month",
@@ -78,12 +271,14 @@ export const en: Dictionary = {
       recentTenantsTitle: "Recently Provisioned Tenants",
       viewAllTenants: "View All",
       growthTitle: "Tenant Growth & Revenue Curve",
-      growthSubtext: "Cumulative trend comparison of onboarded tenants vs. recurring revenue collection",
+      growthSubtext:
+        "Cumulative trend comparison of onboarded tenants vs. recurring revenue collection",
       liveSync: "Live Sync",
       collectedRevenue: "Collected Revenue",
       tenantCount: "Tenant Count",
       revenueByPlanTitle: "Revenue Distribution by Plan",
-      revenueByPlanSubtext: "Volumetric financial contribution per subscription tier",
+      revenueByPlanSubtext:
+        "Volumetric financial contribution per subscription tier",
       viewDetailedFinancials: "View Detailed Financial Reports",
       tenantName: "Tenant Name",
       status: "Status",
@@ -92,7 +287,8 @@ export const en: Dictionary = {
     },
     tenantsTab: {
       statusBreakdownTitle: "Tenant Status Distribution",
-      statusDistributionSubtitle: "Proportion of Active, Suspended, and Provisioning accounts",
+      statusDistributionSubtitle:
+        "Proportion of Active, Suspended, and Provisioning accounts",
       activeCount: "Active",
       provisioningCount: "Provisioning",
       failedCount: "Failed",
@@ -107,14 +303,16 @@ export const en: Dictionary = {
     serversTab: {
       capacityTitle: "Database Placement Capacity",
       capacityComparisonTitle: "Database Cluster Capacity Comparison",
-      capacityComparisonSubtext: "Distribution of active tenants vs available capacity",
+      capacityComparisonSubtext:
+        "Distribution of active tenants vs available capacity",
       activeTenants: "Active Tenants",
       availableCapacity: "Available Headroom",
       utilization: "Utilization Rate",
       currentVsMax: "Current Tenants / Max Capacity",
       serverStatus: "Server Status",
       highCapacityAlertTitle: "High Utilization Alerts (85%+)",
-      capacityNormal: "All database hosts operating within safe capacity boundaries",
+      capacityNormal:
+        "All database hosts operating within safe capacity boundaries",
     },
     billingTab: {
       subscriptionLifecycleTitle: "Active Subscription Statuses",
@@ -123,7 +321,8 @@ export const en: Dictionary = {
       pastDueSubscriptions: "Past Due",
       cancelledSubscriptions: "Cancelled",
       collectionRatioTitle: "Financial Collection Ratio",
-      collectionRatioSubtext: "Percentage of collected funds out of total issued invoice volume",
+      collectionRatioSubtext:
+        "Percentage of collected funds out of total issued invoice volume",
       collectedVsIssued: "Collected Funds vs Issued Revenue",
       totalIssuedLabel: "Total Issued:",
       actualCollectedRatio: "Actual Collection Rate",
@@ -137,7 +336,8 @@ export const en: Dictionary = {
   },
   dbServers: {
     pageTitle: "Database Hosts & Clusters",
-    pageSubtitle: "Manage database infrastructure hosts, placement capacity, and status for tenant databases.",
+    pageSubtitle:
+      "Manage database infrastructure hosts, placement capacity, and status for tenant databases.",
     registerServer: "Register New Host",
     totalServers: "Total Clusters",
     activePlacement: "Active Placement Targets",
@@ -158,7 +358,8 @@ export const en: Dictionary = {
     history: "Audit Log History",
     delete: "Delete Host",
     registerTitle: "Register New Database Server",
-    registerSubtitle: "Enter database host connection credentials and tenant placement capacity",
+    registerSubtitle:
+      "Enter database host connection credentials and tenant placement capacity",
     hostName: "Server Name",
     hostNamePlaceholder: "e.g. DB-PRIMARY-EG-02",
     hostAddress: "Hostname / IP Address",
@@ -174,13 +375,15 @@ export const en: Dictionary = {
     testingConnectivity: "Testing database connection...",
     testConnectionBtn: "Test Connectivity First",
     connectionSuccess: "Database connection test succeeded!",
-    connectionFailed: "Connection failed. Please verify hostname, port, and credentials.",
+    connectionFailed:
+      "Connection failed. Please verify hostname, port, and credentials.",
     saveServer: "Register & Save Host",
     historyTitle: "Server Audit Log History",
   },
   tenants: {
     pageTitle: "Tenants Directory",
-    pageSubtitle: "Manage tenant organizations, subscriptions, FQDN domains, and automated provisioning operations.",
+    pageSubtitle:
+      "Manage tenant organizations, subscriptions, FQDN domains, and automated provisioning operations.",
     registerTenant: "Register New Tenant",
     totalTenants: "Total Organizations",
     activeTenants: "Active Tenants",
@@ -202,7 +405,8 @@ export const en: Dictionary = {
     delete: "Soft Delete",
     destroy: "Destroy Permanently",
     wizardTitle: "Tenant Provisioning Wizard",
-    wizardSubtitle: "Provide tenant identity, owner details, application modules, and database placement to provision an environment.",
+    wizardSubtitle:
+      "Provide tenant identity, owner details, application modules, and database placement to provision an environment.",
     step1: "1. Identity & Geocoding",
     step2: "2. Owner & Admin User",
     step3: "3. Applications & Subscription",
@@ -257,7 +461,8 @@ export const en: Dictionary = {
   },
   applications: {
     pageTitle: "Applications Catalogue",
-    pageSubtitle: "Manage registered applications, versions, and database schemas",
+    pageSubtitle:
+      "Manage registered applications, versions, and database schemas",
     registerApplication: "Register New Application",
     totalApplications: "Total Applications",
     activeApplications: "Active",
@@ -295,8 +500,10 @@ export const en: Dictionary = {
       editMetadata: "Edit metadata",
       databasePolicy: "Database policy",
       delete: "Delete",
-      activationBlocked: "Publish the current revision and complete technical provisioning before activation.",
-      activationUnavailable: "Technical readiness is unavailable. Activation remains disabled.",
+      activationBlocked:
+        "Publish the current revision and complete technical provisioning before activation.",
+      activationUnavailable:
+        "Technical readiness is unavailable. Activation remains disabled.",
       facts: {
         applicationType: "Application type",
         commercialMode: "Commercial mode",
@@ -307,7 +514,8 @@ export const en: Dictionary = {
       releaseAuthority: {
         eyebrow: "Release authority",
         title: "Publication and adoption state",
-        subtitle: "Definition, publication, lifecycle, and tenant selection are independent controls.",
+        subtitle:
+          "Definition, publication, lifecycle, and tenant selection are independent controls.",
         definition: "Definition",
         publication: "Publication",
         lifecycle: "Lifecycle",
@@ -323,17 +531,22 @@ export const en: Dictionary = {
         publishedAt: "Published at",
         publish: "Publish revision",
         publishing: "Publishing…",
-        permissionRequired: "Publishing requires admin.applications.update + admin.applications.critical.",
-        unpublishedHint: "The current catalogue revision is not published. Activation and new tenant selection remain blocked.",
-        publishedHint: "This catalogue revision has an attributable publication record.",
+        permissionRequired:
+          "Publishing requires admin.applications.update + admin.applications.critical.",
+        unpublishedHint:
+          "The current catalogue revision is not published. Activation and new tenant selection remain blocked.",
+        publishedHint:
+          "This catalogue revision has an attributable publication record.",
       },
       publication: {
         title: "Publish Application revision",
-        description: "Publication approves the exact current catalogue revision. It does not activate the Application or override technical readiness.",
+        description:
+          "Publication approves the exact current catalogue revision. It does not activate the Application or override technical readiness.",
         catalogueRevision: "Catalogue revision",
         publicationRevision: "Publication revision",
         reason: "Publication reason",
-        reasonPlaceholder: "Explain why this revision is approved for publication",
+        reasonPlaceholder:
+          "Explain why this revision is approved for publication",
         reasonRequired: "A publication reason is required.",
         failed: "The Application revision could not be published.",
         confirm: "Publish revision",
@@ -353,9 +566,11 @@ export const en: Dictionary = {
       active: "Active",
       historical: "Historical",
       serverSummaryTitle: "Server binding summary unavailable",
-      serverSummaryDescription: "Application Catalogue does not aggregate live Database Server bindings. Review each server from Database Servers.",
+      serverSummaryDescription:
+        "Application Catalogue does not aggregate live Database Server bindings. Review each server from Database Servers.",
       deleteTitle: "Delete Application",
-      deleteDescription: "Only an unused catalogue-only DRAFT can be deleted. This action has no password or credential export.",
+      deleteDescription:
+        "Only an unused catalogue-only DRAFT can be deleted. This action has no password or credential export.",
       deleteReason: "Delete unused catalogue draft",
       lifecycle: {
         activate: "Activate",
@@ -393,17 +608,21 @@ export const en: Dictionary = {
         reasonRequired: "A change reason is required.",
         failed: "The change could not be saved.",
         save: "Save changes",
-        publicationInvalidationTitle: "This edit invalidates the current publication",
-        publicationInvalidationDescription: "Saving metadata changes the catalogue revision to UNPUBLISHED. Activation and new tenant selection remain blocked until the updated revision is published explicitly.",
+        publicationInvalidationTitle:
+          "This edit invalidates the current publication",
+        publicationInvalidationDescription:
+          "Saving metadata changes the catalogue revision to UNPUBLISHED. Activation and new tenant selection remain blocked until the updated revision is published explicitly.",
       },
     },
     technicalProvisioning: {
       eyebrow: "Provisioning authority",
       title: "Technical readiness",
-      subtitle: "Application → runtime → database principal → component → immutable release.",
+      subtitle:
+        "Application → runtime → database principal → component → immutable release.",
       refresh: "Refresh",
       loading: "Loading technical readiness…",
-      unavailable: "Technical readiness is unavailable. Activation remains disabled.",
+      unavailable:
+        "Technical readiness is unavailable. Activation remains disabled.",
       correlationId: "Correlation ID",
       revisionLabel: "Technical definition revision",
       passed: "Passed",
@@ -412,7 +631,8 @@ export const en: Dictionary = {
       contractShort: "contract v",
       release: "Release",
       releaseRequired: "Release required",
-      noCredential: "Worker routing is server-authoritative. No password, secret, SQL, or migration body is exposed.",
+      noCredential:
+        "Worker routing is server-authoritative. No password, secret, SQL, or migration body is exposed.",
       checks: {
         runtimeTarget: "Runtime target",
         componentBinding: "Component binding",
@@ -427,51 +647,69 @@ export const en: Dictionary = {
         BLOCKED: "Blocked",
       },
       reasons: {
-        runtimeTargetRequired: "A signed runtime target must be adopted before a component can be linked.",
-        componentBindingRequired: "A primary provisioning component is not linked.",
+        runtimeTargetRequired:
+          "A signed runtime target must be adopted before a component can be linked.",
+        componentBindingRequired:
+          "A primary provisioning component is not linked.",
         activeComponentRequired: "Every linked component must be active.",
-        publishedReleaseRequired: "Every active component needs a published immutable release.",
-        minimumReleaseNotSatisfied: "A linked component has not reached its required minimum release.",
-        databasePermissionManifestRequired: "The database Application needs an active permission manifest.",
-        databasePermissionManifestInvalid: "The active database permission manifest failed validation.",
+        publishedReleaseRequired:
+          "Every active component needs a published immutable release.",
+        minimumReleaseNotSatisfied:
+          "A linked component has not reached its required minimum release.",
+        databasePermissionManifestRequired:
+          "The database Application needs an active permission manifest.",
+        databasePermissionManifestInvalid:
+          "The active database permission manifest failed validation.",
       },
       selectionTitle: "New tenant selection blockers",
       selectionBlockers: {
-        applicationLifecycleNotActive: "The Application lifecycle is not ACTIVE.",
-        applicationNotPublished: "The current Application revision is not published.",
+        applicationLifecycleNotActive:
+          "The Application lifecycle is not ACTIVE.",
+        applicationNotPublished:
+          "The current Application revision is not published.",
         applicationNotPublic: "The Application is not public in the catalogue.",
-        applicationNonBillable: "The Application is not a tenant-selectable commercial offering.",
+        applicationNonBillable:
+          "The Application is not a tenant-selectable commercial offering.",
         technicalReadinessBlocked: "Technical readiness is blocked.",
       },
       bindingCalloutTitle: "Link the primary component",
-      bindingCalloutDescription: "Core links the deterministic primary component after the technical identity is adopted. The browser cannot choose a component key or contract version.",
+      bindingCalloutDescription:
+        "Core links the deterministic primary component after the technical identity is adopted. The browser cannot choose a component key or contract version.",
       adoptionCalloutTitle: "Adopt the technical identity",
-      adoptionCalloutDescription: "While this Application is DRAFT, ask Core to reserve its deterministic runtime target, PostgreSQL principal, and primary component identity.",
-      permissionRequired: "Requires admin.applications.update + admin.applications.critical",
+      adoptionCalloutDescription:
+        "While this Application is DRAFT, ask Core to reserve its deterministic runtime target, PostgreSQL principal, and primary component identity.",
+      permissionRequired:
+        "Requires admin.applications.update + admin.applications.critical",
       adoptIdentity: "Adopt identity",
       adopting: "Adopting…",
       linkComponent: "Link component",
       linking: "Linking…",
       bindingEyebrow: "Controlled metadata command",
       bindingTitle: "Link primary provisioning component",
-      bindingDescription: "Review the server-derived identity and record an audit reason. Core fixes the component key and contract version.",
+      bindingDescription:
+        "Review the server-derived identity and record an audit reason. Core fixes the component key and contract version.",
       adoptionEyebrow: "Immutable identity command",
       adoptionTitle: "Adopt technical package identity",
-      adoptionDescription: "Review the deterministic preview. Core is authoritative and returns the reserved runtime, role, component, and revision without exposing credentials.",
+      adoptionDescription:
+        "Review the deterministic preview. Core is authoritative and returns the reserved runtime, role, component, and revision without exposing credentials.",
       closeAdoptionDialog: "Close technical identity dialog",
       closeDialog: "Close component binding dialog",
       authoritativeMapping: "Authoritative runtime mapping",
       applicationKey: "Application",
       componentKey: "Component",
       componentKeyPlaceholder: "e.g. crm or crm.foundation",
-      componentKeyError: "Enter a canonical component key using lowercase letters, numbers, dots, underscores, or hyphens.",
+      componentKeyError:
+        "Enter a canonical component key using lowercase letters, numbers, dots, underscores, or hyphens.",
       ownerApplication: "Owner Application",
       workerTarget: "Worker target",
       databasePrincipal: "Database principal",
       notAdopted: "Not adopted",
-      identityPreview: "Deterministic preview only. The next command response and refreshed Core projection are authoritative.",
-      identityAuthoritative: "This identity comes from the refreshed Core projection and cannot be edited in the browser.",
-      safeBoundary: "Only the expected revision and audit reason are submitted. Passwords, secrets, SQL, migrations, and arbitrary identities are outside this command.",
+      identityPreview:
+        "Deterministic preview only. The next command response and refreshed Core projection are authoritative.",
+      identityAuthoritative:
+        "This identity comes from the refreshed Core projection and cannot be edited in the browser.",
+      safeBoundary:
+        "Only the expected revision and audit reason are submitted. Passwords, secrets, SQL, migrations, and arbitrary identities are outside this command.",
       contractVersion: "Contract version",
       changeReason: "Change reason",
       reasonPlaceholder: "Explain why this technical change is being made",
@@ -479,22 +717,30 @@ export const en: Dictionary = {
       reasonError: "A change reason is required.",
       retryExactIntent: "Retry same intent",
       toastSuccessTitle: "Component linked",
-      toastSuccessMessage: "The primary provisioning component is linked and readiness was refreshed.",
+      toastSuccessMessage:
+        "The primary provisioning component is linked and readiness was refreshed.",
       adoptionSuccessTitle: "Identity adopted",
-      adoptionSuccessMessage: "Core reserved the technical identity and refreshed the Application projection.",
+      adoptionSuccessMessage:
+        "Core reserved the technical identity and refreshed the Application projection.",
       adoptionErrorTitle: "Identity adoption failed",
-      reconciledSuccess: "The original command completed; the refreshed Core projection contains its result.",
+      reconciledSuccess:
+        "The original command completed; the refreshed Core projection contains its result.",
       processingTitle: "Command outcome pending",
-      processingMessage: "Core was refreshed. Retry only the same retained intent while its authoritative result is still absent.",
+      processingMessage:
+        "Core was refreshed. Retry only the same retained intent while its authoritative result is still absent.",
       toastErrorTitle: "Component link failed",
-      staleMessage: "The technical definition changed. Readiness was refreshed; review the new revision before submitting again.",
-      forbiddenMessage: "You do not have both permissions required for this critical command.",
-      readinessForbidden: "You do not have permission to read technical provisioning state.",
+      staleMessage:
+        "The technical definition changed. Readiness was refreshed; review the new revision before submitting again.",
+      forbiddenMessage:
+        "You do not have both permissions required for this critical command.",
+      readinessForbidden:
+        "You do not have permission to read technical provisioning state.",
     },
   },
   users: {
     pageTitle: "Control Plane Staff Users",
-    pageSubtitle: "Manage system admin accounts, role assignments, and WebPhone SIP extensions.",
+    pageSubtitle:
+      "Manage system admin accounts, role assignments, and WebPhone SIP extensions.",
     inviteMember: "Invite Admin",
     totalMembers: "Total Staff Members",
     activeAccounts: "Active Accounts",
@@ -531,7 +777,8 @@ export const en: Dictionary = {
     pageOf: "Page {page} of {total}",
     showingCountOfTotal: "Showing {from}–{to} of {total} staff members",
     inviteTitle: "Invite New Admin User",
-    inviteSubtitle: "Send an email invitation to onboard a new control plane staff member.",
+    inviteSubtitle:
+      "Send an email invitation to onboard a new control plane staff member.",
     roleLabel: "Assigned Role",
     superAdminCheckbox: "Grant Super Admin Privileges",
     sendInvite: "Send Invitation Email",
@@ -563,21 +810,26 @@ export const en: Dictionary = {
     clearSipPassword: "Clear SIP Password",
     confirmClearPassword: "Are you sure you want to clear the SIP password?",
     permissionDeniedTitle: "Access Denied",
-    permissionDeniedDesc: "You do not have permission to view or manage staff accounts.",
+    permissionDeniedDesc:
+      "You do not have permission to view or manage staff accounts.",
     userNotFoundTitle: "User Not Found",
-    userNotFoundDesc: "The requested admin user could not be found or may have been deleted.",
+    userNotFoundDesc:
+      "The requested admin user could not be found or may have been deleted.",
     backToUsers: "Back to Staff Directory",
     retryLoad: "Retry",
     loadError: "Failed to load user details.",
-    roleChangeWarning: "Changing a user's role or Super Admin status will automatically invalidate their active sessions.",
+    roleChangeWarning:
+      "Changing a user's role or Super Admin status will automatically invalidate their active sessions.",
     saveChanges: "Save Changes",
     discardChanges: "Discard Changes",
     rolesUnavailable: "Roles list is unavailable due to missing permissions.",
-    invitedInfoBanner: "The account will remain in INVITED status until the recipient accepts the email invitation.",
+    invitedInfoBanner:
+      "The account will remain in INVITED status until the recipient accepts the email invitation.",
   },
   roles: {
     pageTitle: "Admin Roles & Permissions",
-    pageSubtitle: "Manage control plane admin roles and permissions assignments.",
+    pageSubtitle:
+      "Manage control plane admin roles and permissions assignments.",
     createRole: "Create Role",
     searchPlaceholder: "Search roles...",
     allTypes: "All Types",
@@ -601,7 +853,8 @@ export const en: Dictionary = {
   backup: {
     eyebrow: "Data protection",
     title: "Backup & Restore",
-    subtitle: "Manage database access, protection policies, backup evidence, and controlled recovery workflows.",
+    subtitle:
+      "Manage database access, protection policies, backup evidence, and controlled recovery workflows.",
     serviceBoundary: "Worker operations",
     navigationLabel: "Backup and restore sections",
     navigation: {
@@ -615,7 +868,8 @@ export const en: Dictionary = {
   },
   storageServers: {
     pageTitle: "Storage Infrastructure Hosts",
-    pageSubtitle: "Manage distributed storage servers, S3 compatibility, bucket profiles, and attestation keys.",
+    pageSubtitle:
+      "Manage distributed storage servers, S3 compatibility, bucket profiles, and attestation keys.",
     registerServer: "Register Storage Host",
     totalServers: "Total Storage Nodes",
     activePlacement: "Active Storage Nodes",
@@ -635,13 +889,189 @@ export const en: Dictionary = {
     offline: "Take Offline",
     delete: "Delete Host",
   },
+  createStorageServer: {
+    backToList: "Back to Storage Servers",
+    tag: "Secure Host Registration",
+    title: "New Storage Server (Garage / S3)",
+    subtitle:
+      "Core registers the server as DRAFT. Credentials are stored encrypted and saving does not imply connectivity passed.",
+    accessDeniedTitle: "Access Denied",
+    accessDeniedDesc:
+      "Registering storage hosts requires both create and critical permissions.",
+    checkingPermissions: "Checking permissions…",
+    sections: {
+      identity: "Server Identity & Endpoint",
+      identityDesc:
+        "Host identity code, endpoint URL, and placement bucket configuration.",
+      credentials: "Garage / S3 Access Credentials",
+      credentialsDesc:
+        "Sent once over HTTPS to Core and never returned by an API to the browser.",
+      preview: "Live Configuration Preview",
+      previewDesc: "Summary of the draft configuration being registered.",
+    },
+    fields: {
+      name: "Server Name",
+      code: "Immutable Code",
+      codeHint:
+        "Lowercase letters, numbers, and hyphens only (e.g. garage-primary).",
+      endpoint: "HTTPS Endpoint",
+      endpointHint: "Example: https://garage.example.com with no path.",
+      region: "Region",
+      bucketName: "Bucket Name",
+      maxTenants: "Maximum Tenants",
+      maxTenantsHint: "Leave empty for no numeric cap.",
+      accessKeyId: "Access Key ID",
+      secretAccessKey: "Secret Access Key",
+    },
+    previewCard: {
+      targetEndpoint: "Endpoint Target",
+      bucketTarget: "Bucket & Region",
+      tenantCap: "Placement Limit",
+      unlimited: "Unlimited",
+      securityMode: "Credential Security",
+      encryptedNotice: "Cryptographically Encrypted",
+    },
+    actions: {
+      cancel: "Cancel",
+      submit: "Register Draft Storage Server",
+      submitting: "Saving & Encrypting…",
+    },
+    runtimeSetup: {
+      title: "Storage runtime setup is required",
+      keyUnavailableDescription:
+        "Core cannot encrypt these credentials until a storage runtime key is generated. Configure Storage Runtime, then return and retry this registration.",
+      disabledDescription:
+        "The server was saved, but setup cannot continue while Storage Runtime is disabled. Enable it, then retry activation only.",
+      openSettings: "Open Storage Runtime settings",
+      askAdministrator:
+        "Ask an administrator with System Settings permissions to configure Storage Runtime, then retry.",
+      correlationId: "Correlation ID",
+    },
+    errors: {
+      endpointHttpsOnly:
+        "Enter an HTTPS root origin only, without a path, credentials, query string, or fragment.",
+      registrationFailed: "Storage server registration failed.",
+    },
+    success: {
+      title: "Storage Server Registered",
+      message:
+        "Credentials were stored encrypted. Run a connection test before activation.",
+    },
+  },
+  databaseServerDetail: {
+    backToList: "Back to Database Servers",
+    editMetadata: "Edit Metadata",
+    activateServer: "Activate Server",
+    drainConnections: "Drain Connections",
+    takeOffline: "Take Offline",
+    deleteHost: "Delete Host",
+    tabs: {
+      overview: "Overview & Metrics",
+      readiness: "Access Readiness & System Principals",
+      bindings: "Application Bindings",
+      security: "Security & SSL",
+      history: "Audit & History",
+    },
+    overview: {
+      maxCapacity: "Max Capacity",
+      maxCapacitySub: "Tenant Placement Limit",
+      currentTenants: "Current Tenants",
+      currentTenantsSub: "Active Schema Allocations",
+      sslSecurityMode: "SSL Security Mode",
+      connectTimeout: "Connect Timeout",
+      connectTimeoutSub: "Host Health Check Window",
+      capacityUtilization: "Server Capacity Utilization",
+      tenantPlacementStatus: "Tenant Placement Status",
+      hostInformation: "Host & Server Information",
+      hostAddress: "Host Address (IP / Domain)",
+      port: "Port",
+      countryRegion: "Country / Region",
+      placementStatus: "Capacity Placement Status",
+      createdAt: "Created At",
+      updatedAt: "Last Updated",
+      connectionParameters: "Recommended Connection Parameters",
+    },
+    readiness: {
+      title: "Database Access Readiness",
+      subtitle:
+        "Core verifies every required service and Application binding before this server can be activated.",
+      retrySetup: "Retry Registration Setup",
+      backupNeedsAttentionTitle: "Backup access requires attention",
+      backupNeedsAttentionSub:
+        "Server activation remains blocked until this dependency is ready.",
+      openBackup: "Open Backup",
+      provisioningAccount: "Provisioning Service Account",
+      provisioningDesc:
+        "Used for tenant database creation and migrations. Its password remains encrypted inside Core.",
+      rotatePassword: "Rotate Password",
+      reconcile: "Reconcile Credential",
+      provisioningUnavailableTitle: "Provisioning access is unavailable",
+      provisioningUnavailableSub:
+        "Retry server registration setup to restore the required provisioning binding.",
+    },
+    bindings: {
+      title: "Application Database Access Bindings",
+      subtitle:
+        "Fixed principals, independent password revisions, and least-privilege bindings for this server.",
+      addApplication: "Add Application",
+      searchPlaceholder: "Search application or principal...",
+      boundaryNotice:
+        "Passwords remain inside Core's encrypted credential boundary. This portal receives only principals, status, and revision evidence—never password files or reveal responses.",
+      lastOpTitle: "Last Operation",
+      affectedTitle: "Affected",
+      resultTitle: "Result",
+      accessInit: "Access Initialized",
+      credUpdated: "Credential Updated",
+      readyReceipt: "READY · Secret-Free Receipt",
+      table: {
+        application: "Application",
+        principalKey: "Principal / Key",
+        status: "Status",
+        credRev: "Credential Rev",
+        schedule: "Rotation Schedule",
+        actions: "Actions",
+        stagedCandidate: "Staged Candidate",
+        disabled: "Disabled",
+        loading: "Loading Application bindings…",
+        empty: "No applications bound to this server",
+        retry: "Retry",
+      },
+    },
+    security: {
+      title: "SSL/TLS Security & Encryption Setup",
+      subtitle:
+        "Details of transport encryption mode, SSL certificate configuration, and credential security boundaries.",
+      modeLabel: "Detected SSL Transport Encryption Mode",
+      certStatus: "Certificate Bundle Status",
+      verification: "Host Identity Verification",
+      strictVerification: "Strict Verification",
+      relaxedVerification: "Relaxed Verification",
+      tlsDisabled: "TLS is disabled (Not recommended for production)",
+      certConfigured: "Certificate bundle configured",
+      encryptedBoundaryTitle: "Encrypted Credential Boundary",
+      encryptedBoundaryDesc:
+        "Core ensures strict security by never revealing database passwords to the browser storage or UI logs. Access is managed via cryptographically secured principles.",
+    },
+    history: {
+      title: "Database Server Modification History",
+      subtitle:
+        "Audit log of all parameter updates and status lifecycle transitions for this server.",
+      totalEntries: "Total Log Entries: {{count}}",
+      loading: "Loading history logs...",
+      empty: "No modification history logged yet.",
+      retry: "Retry",
+    },
+  },
   settings: {
     pageTitle: "System & Control Plane Settings",
-    pageSubtitle: "Configure authentication, platform branding, email transport, WebPhone SIP trunks, and alert notifications.",
+    pageSubtitle:
+      "Configure authentication, platform branding, email transport, WebPhone SIP trunks, and alert notifications.",
     tabs: {
       platform: "Platform & Branding",
       auth: "Auth & Security",
       smtp: "Email (SMTP)",
+      fatalAlerts: "Fatal Alerts",
+      storageRuntime: "Storage Runtime",
       webphone: "WebPhone (Asterisk SIP)",
       notifications: "Notifications & Alerts",
       billing: "Billing & Gateways",

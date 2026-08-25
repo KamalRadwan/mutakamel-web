@@ -9,9 +9,18 @@ interface DeleteModalProps {
   item: LeadItem | null;
   onClose: () => void;
   onConfirm: () => void;
+  isDeleting: boolean;
+  error: string | null;
 }
 
-export function DeleteLeadsConfirmModal({ isOpen, item, onClose, onConfirm }: DeleteModalProps) {
+export function DeleteLeadsConfirmModal({
+  isOpen,
+  item,
+  onClose,
+  onConfirm,
+  isDeleting,
+  error,
+}: DeleteModalProps) {
     const { t, lang } = useI18n();
   return (
     <ConfirmModal
@@ -19,9 +28,11 @@ export function DeleteLeadsConfirmModal({ isOpen, item, onClose, onConfirm }: De
       onClose={onClose}
       onConfirm={onConfirm}
       title={t.crm.deleteTheLead}
-      message={lang === "ar" ? `هل أنت متأكد من حذف العميل المحتمل "${item?.leadName || ""}" (${item?.company || ""})؟` : `Are you sure you want to delete the lead "${item?.leadName || ""}" (${item?.company || ""})?`}
+      message={`${lang === "ar" ? `هل أنت متأكد من حذف العميل المحتمل "${item?.leadName || ""}" (${item?.company || ""})؟` : `Are you sure you want to delete the lead "${item?.leadName || ""}" (${item?.company || ""})?`}${error ? ` ${error}` : ""}`}
       confirmText={t.crm.deleteClient}
       isDanger
+      isSubmitting={isDeleting}
+      closeOnConfirm={false}
     />
   );
 }

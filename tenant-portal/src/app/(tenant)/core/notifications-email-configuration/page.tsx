@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Mail, Bell, Server } from "lucide-react";
+import { Eye, Trash2, Mail } from "lucide-react";
 import { useNotificationsEmailConfig, NotificationConfigItem } from "./hooks/useNotificationsEmailConfig";
 import { CreateNotificationsEmailConfigModal } from "./components/CreateNotificationsEmailConfigModal";
 import { DeleteNotificationsEmailConfigConfirmModal } from "./components/DeleteNotificationsEmailConfigConfirmModal";
 
 export default function NotificationsEmailConfigPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

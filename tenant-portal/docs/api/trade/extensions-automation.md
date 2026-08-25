@@ -1,24 +1,26 @@
 # Trade Imports and Webhooks API
 
 > Contract status: source-verified backend contract; replacement frontend not implemented
-> Verification date: 2026-07-25
+> Verification date: 2026-08-25
 > Backend owner: Trade
-> Documentation: source-generated from verified Gateway routes, Trade controllers/DTOs/services/tests, and legacy frontend evidence
+> Documentation: source-generated from verified Gateway routes, Trade controllers/DTOs/services/tests, and dated historical frontend evidence
 > Canonical browser prefix: `/api/tenant/trade/v1`
 > Controller-relative prefixes: `/trade/import-mappings`, `/trade/imports`, `/trade/webhooks`
-> Tenant Portal status: `tenant-portal` replaces the legacy tenant Trade UI; Legacy `mutakamel-web-app` has live import and webhook clients/panels. The replacement `tenant-portal` is not implemented.
+> Tenant Portal status: The standalone `tenant-portal` replacement is not implemented. The consolidated `mutakamel-web-app` references below are dated 2026-07-25 historical evidence; that workspace is absent from the current checkout and does not prove a live frontend.
 
 ## Capability
 
-Import mapping governance, immutable source upload, asynchronous preview/execute/results, webhook subscription secret operations, delivery logs, and replay.
+Import mapping governance, immutable source upload and controlled release, asynchronous preview/execute/results, webhook subscription secret operations, delivery logs, and replay.
 
 - Controller feature requirements: extension/webhook routes require all of `trade.automation` and any of `trade.catalog`, `trade.sales`, `trade.purchasing`, or `trade.inventory`; import mapping/source/run routes override this with all of `trade.automation` and `trade.catalog`.
-- Gateway routes assigned to this page: **21**.
+- Gateway routes assigned to this page: **22**.
 - These are browser contracts. The Trade upstream remains `/api/v1/trade/...`; the browser must use the canonical prefix above.
 
 ## Source evidence
 
-Backend source references below are relative to `C:\mutakamel.ai\frontend`.
+Current backend source references below are relative to
+`C:\mutakamel.ai\frontend`. Consolidated frontend paths are explicitly dated
+historical references; their absent workspace is not current runtime evidence.
 
 - `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts`
 - `../backend/mutakamel-apps/trade-app/src/modules/extensions-automation/extensions-automation.controller.ts`
@@ -33,7 +35,12 @@ Backend source references below are relative to `C:\mutakamel.ai\frontend`.
 
 ## Authorization and scope
 
-Every route requires an authenticated active `TENANT_USER`, a current session version, a Trade/Sales module seat unless the actor is the tenant owner, an enabled Trade entitlement, the feature gate above when declared, the exact permission in the table, and an authorized company/branch context. Tenant owners bypass permission-row lookup, not session, entitlement, feature, or scope validation. Dashboard-context exceptions are called out below.
+Every route requires an authenticated active `TENANT_USER`, an active unexpired
+`sid` with all four exact Auth epochs, a Trade/Sales module seat unless the actor
+is the tenant owner, an enabled Trade entitlement, the feature gate above when
+declared, the exact permission in the table, and an authorized company/branch
+context. Tenant owners bypass permission-row lookup, not session, entitlement,
+feature, or scope validation. Dashboard-context exceptions are called out below.
 
 - `COMPANY`: send an authorized `X-Mutakamel-Company-Id`.
 - `BRANCH`: send both company and branch UUIDv7 headers.
@@ -51,6 +58,7 @@ Every route requires an authenticated active `TENANT_USER`, a current session ve
 | POST | `/api/tenant/trade/v1/import-mappings` | `/trade/import-mappings` | `trade.import.manage` | `OPERATING_CONTEXT` | `body: CreateImportMappingDto` | `X-Idempotency-Key` | 201 | `WRITE_SENSITIVE`; gateway-idempotent=true |
 | PATCH | `/api/tenant/trade/v1/import-mappings/:id` | `/trade/import-mappings/:id` | `trade.import.manage` | `OPERATING_CONTEXT` | `body: UpdateImportMappingDto` | `X-Idempotency-Key`, `If-Match` | 200 | `WRITE_SENSITIVE`; gateway-idempotent=true |
 | POST | `/api/tenant/trade/v1/imports/sources` | `/trade/imports/sources` | `trade.import.execute` | `OPERATING_CONTEXT` | — | `X-Idempotency-Key` | 201 | `WRITE_SENSITIVE`; gateway-idempotent=true |
+| POST | `/api/tenant/trade/v1/imports/sources/:id/release` | `/trade/imports/sources/:id/release` | `trade.import.manage` | `OPERATING_CONTEXT` | UUIDv7 `id` | `X-Idempotency-Key` | 202 | `WRITE_SENSITIVE`; gateway-idempotent=true |
 | GET | `/api/tenant/trade/v1/imports` | `/trade/imports` | `trade.import.execute` | `OPERATING_CONTEXT` | `query: ImportRunListQueryDto` | — | 200 | `AUTHENTICATED`; gateway-idempotent=true |
 | POST | `/api/tenant/trade/v1/imports/preview` | `/trade/imports/preview` | `trade.import.execute` | `OPERATING_CONTEXT` | `body: PreviewImportDto` | `X-Idempotency-Key` | 202 | `WRITE_SENSITIVE`; gateway-idempotent=true |
 | POST | `/api/tenant/trade/v1/imports/:runId/execute` | `/trade/imports/:runId/execute` | `trade.import.execute` | `OPERATING_CONTEXT` | — | `X-Idempotency-Key`, `If-Match` | 202 | `WRITE_SENSITIVE`; gateway-idempotent=true |
@@ -90,7 +98,7 @@ The global validation pipe transforms primitive query values, whitelists declare
 - Common failures: 400 validation/missing precondition; 401 absent, stale or invalidated tenant session; 403 missing seat/entitlement/feature/permission; 404 missing scoped resource; 409 stale aggregate or in-flight duplicate; 422 semantic/scope/idempotency mismatch; 503 entitlement or dependency unavailable. Gateway-originated failures use Problem Details. Trade-originated validation, guard, and domain errors remain raw Nest exception bodies and are passed through unchanged by the Gateway; successes use the envelope above.
 - Domain error codes observed in the owning module: `TRADE.APPROVAL.MAKER_CHECKER_REQUIRED`, `TRADE.AUTH.TARGET_DENIED`, `TRADE.CONCURRENCY.STALE_VERSION`, `TRADE.DEPENDENCY.TIMEOUT`, `TRADE.EXTENSION.DEFINITION_INVALID`, `TRADE.EXTENSION.PROFILE_INCOMPATIBLE`, `TRADE.EXTENSION.RESERVED_FIELD`, `TRADE.EXTENSION.VALUE_INVALID`, `TRADE.IDEMPOTENCY.KEY_REQUIRED`, `TRADE.IDEMPOTENCY.MISMATCH`, `TRADE.IMPORT.FILE_UNSAFE`, `TRADE.IMPORT.MAPPING_INVALID`, `TRADE.IMPORT.SCOPE_MISMATCH`, `TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE`, `TRADE.WEBHOOK.ENDPOINT_FORBIDDEN`, `TRADE.WEBHOOK.PAYLOAD_FORBIDDEN`, `TRADE.WEBHOOK.SECRET_VERSION_INVALID`.
 
-- Upload returns 201. Preview and execute return 202; poll `GET /imports/:runId` and paged results. Worker owns parsing/execution, but browser calls only the Trade projection routes.
+- Upload returns 201. Source release returns 202 whose `data` is `{sourceId,lifecycleCommandId,storageState:"PURGED",idempotentReplay}` after deleting the stored object, soft-deleting the source record, and recording its audit event. It requires the exact authorized company/branch scope of the upload; a mismatch returns `TRADE.IMPORT.SOURCE_RELEASE_FORBIDDEN`. Preview and execute return 202; poll `GET /imports/:runId` and paged results. Worker owns parsing/execution, but browser calls only the Trade projection routes.
 - Secret rotate/revoke/test and delivery retry return 202. Poll subscription/delivery detail or list; do not assume dispatch success from acceptance.
 - All writes require UUIDv7 idempotency; updates/execute/secret mutations/replay require `If-Match` where shown. The Gateway explicitly disables transport retry for multipart upload.
 
@@ -117,4 +125,4 @@ Do not add `x-mutakamel-tenant-id`, `x-mutakamel-tenant-db-name`, or `x-internal
 - There is no browser endpoint to read uploaded file bytes. Import and webhook worker internals are not Tenant Portal APIs.
 - Never infer writable fields from response entities. Use only the DTO named in the route table.
 - Never call Trade directly from the browser and never call Worker. Use the canonical Gateway path.
-- See [examples.md](examples.md) for safe request patterns and [route-coverage.md](route-coverage.md) for the complete 226-route assignment.
+- See [examples.md](examples.md) for safe request patterns and the [generated tenant route inventory](../../generated/tenant-api-routes.md) for current Gateway coverage.

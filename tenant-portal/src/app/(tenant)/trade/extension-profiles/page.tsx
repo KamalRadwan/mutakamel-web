@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Puzzle, Wrench, ShieldCheck } from "lucide-react";
+import { Eye, Trash2, Puzzle } from "lucide-react";
 import { useTradeExtensionProfiles, ExtensionProfileItem } from "./hooks/useTradeExtensionProfiles";
 import { CreateTradeExtensionProfilesModal } from "./components/CreateTradeExtensionProfilesModal";
 import { DeleteTradeExtensionProfilesConfirmModal } from "./components/DeleteTradeExtensionProfilesConfirmModal";
 
 export default function TradeExtensionProfilesPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

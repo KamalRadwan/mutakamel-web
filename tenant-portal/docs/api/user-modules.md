@@ -5,7 +5,7 @@
 > **Backend owner:** Core (`core-app`)
 > **Canonical browser prefix:** `/api/tenant/core/v1/users/:userId/modules`
 > **Controller-relative prefix:** `/tenant/users/:userId/modules`
-> **Tenant Portal status:** Planned. The legacy portal reads the current user's modules for navigation but has no complete assignment-management UI.
+> **Tenant Portal status:** Planned. A dated consolidated-frontend inventory recorded module-aware navigation but no complete assignment UI; that workspace is absent from the current checkout and does not prove live behavior.
 > **Documentation:** Hand-written and source-verified; not generated.
 
 ## Source of truth
@@ -13,7 +13,7 @@
 - Gateway contracts: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
 - Controller/service/DTO: `../backend/mutakamel-apps/core-app/src/tenant/user-modules`
 - Subscription seat logic: `../backend/mutakamel-apps/core-app/src/tenant/subscription`
-- Legacy module use: `../backend/mutakamel-apps/mutakamel-web-app/src`
+- Historical consolidated module-use reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src`
 
 ## Routes
 

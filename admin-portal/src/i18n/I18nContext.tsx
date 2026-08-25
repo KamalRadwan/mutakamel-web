@@ -1,6 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+} from "react";
 import { safeStorage } from "@/lib/safeStorage";
 import { ar, Dictionary } from "./dictionaries/ar";
 import { en } from "./dictionaries/en";
@@ -16,14 +21,15 @@ interface I18nContextType {
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
+const LANGUAGE_STORAGE_KEY = "app_lang";
+const LANGUAGE_CHANGE_EVENT = "mutakamel:language-change";
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Language>(() => {
-    if (typeof window !== "undefined") {
-      return (safeStorage.getItem("app_lang") as Language) || "ar";
-    }
-    return "ar";
-  });
+  const lang = useSyncExternalStore(
+    subscribeToLanguage,
+    readStoredLanguage,
+    defaultLanguage,
+  );
 
   useEffect(() => {
     document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
@@ -31,10 +37,10 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, [lang]);
 
   const setLang = (newLang: Language) => {
-    setLangState(newLang);
-    safeStorage.setItem("app_lang", newLang);
-    document.documentElement.setAttribute("dir", newLang === "ar" ? "rtl" : "ltr");
-    document.documentElement.setAttribute("lang", newLang);
+    safeStorage.setItem(LANGUAGE_STORAGE_KEY, newLang);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(LANGUAGE_CHANGE_EVENT));
+    }
   };
 
   const toggleLang = () => {
@@ -49,6 +55,27 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       {children}
     </I18nContext.Provider>
   );
+}
+
+function defaultLanguage(): Language {
+  return "ar";
+}
+
+function readStoredLanguage(): Language {
+  return safeStorage.getItem(LANGUAGE_STORAGE_KEY) === "en" ? "en" : "ar";
+}
+
+function subscribeToLanguage(onStoreChange: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === LANGUAGE_STORAGE_KEY) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(LANGUAGE_CHANGE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(LANGUAGE_CHANGE_EVENT, onStoreChange);
+  };
 }
 
 export function useI18n() {

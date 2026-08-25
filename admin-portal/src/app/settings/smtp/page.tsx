@@ -1,357 +1,342 @@
 "use client";
 
 import { useState } from "react";
-import { useSmtpSettings } from "./hooks/useSmtpSettings";
-import { Mail, Save, Loader2, PlayCircle, Eye, EyeOff, History, UserCheck, AlertTriangle } from "lucide-react";
-
+import {
+  Eye,
+  EyeOff,
+  History,
+  Loader2,
+  Mail,
+  PlayCircle,
+  Save,
+  UserCheck,
+} from "lucide-react";
 import { useToast } from "@/components/ui/ToastContext";
+import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
+import { useSmtpSettings } from "./hooks/useSmtpSettings";
+import {
+  SMTP_ALLOWED_PORTS,
+  type SmtpFormState,
+  type SmtpValidationErrors,
+} from "./smtp-contract";
 
 export default function SmtpSettingsPage() {
+  const smtp = useSmtpSettings();
   const toast = useToast();
-  const {
-    lang,
-    config,
-    auditLogs,
-    isLoading,
-    isSaving,
-    handleUpdate,
-    saveConfig,
-    verifyConnection,
-    isVerifying,
-    hasUpdatePermission,
-    hasFetchError,
-  } = useSmtpSettings();
-
-  const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const { lang } = smtp;
+  const pending = smtp.mutation.phase === "PENDING";
 
-  const onSave = async () => {
-    try {
-      await saveConfig(passwordInput || undefined);
-      setPasswordInput("");
+  const save = async () => {
+    const succeeded = await smtp.saveConfig();
+    if (succeeded) {
       toast.success(
-        lang === "ar" ? "تم حفظ إعدادات البريد" : "SMTP Settings Saved",
-        lang === "ar" ? "تمت تحديثات الخادم البريدي بنجاح." : "SMTP Gateway configuration has been updated."
+        lang === "ar" ? "تم حفظ إعدادات SMTP" : "SMTP settings saved",
+        lang === "ar"
+          ? "أصبحت استجابة Core الموثوقة هي الحالة المعروضة."
+          : "The authoritative Core response is now displayed.",
       );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } else {
       toast.error(
-        lang === "ar" ? "فشل الحفظ" : "Save Failed",
-        err?.message || (lang === "ar" ? "تعذر حفظ الإعدادات" : "Could not save SMTP configuration")
+        lang === "ar" ? "تعذر الحفظ" : "Save failed",
+        safeMutationMessage(smtp.mutation.localCode ?? smtp.mutation.error?.errorCode, lang),
       );
     }
   };
-
-  const onTestConnection = async () => {
-    toast.info(
-      lang === "ar" ? "اختبار الاتصال" : "Testing Connection",
-      lang === "ar" ? "جاري الاتصال بخادم SMTP..." : "Attempting socket connection to SMTP host..."
-    );
-    try {
-      await verifyConnection();
+  const verify = async () => {
+    const succeeded = await smtp.verifyConnection();
+    if (succeeded) {
       toast.success(
-        lang === "ar" ? "تم الاتصال بنجاح" : "Connection Verified",
-        lang === "ar" ? "تم الاتصال بخادم البريد الإلكتروني بنجاح." : "SMTP host is reachable and active."
+        lang === "ar" ? "تم التحقق من الاتصال" : "Connection verified",
+        lang === "ar"
+          ? "تحققت Core من الإعداد المحفوظ دون إرسال بريد."
+          : "Core verified the saved configuration without sending email.",
       );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } else {
       toast.error(
-        lang === "ar" ? "فشل اختبار الاتصال" : "Verification Failed",
-        err?.message || (lang === "ar" ? "تعذر الاتصال بالخادم" : "SMTP connection failed")
+        lang === "ar" ? "فشل التحقق" : "Verification failed",
+        safeMutationMessage(smtp.mutation.localCode ?? smtp.mutation.error?.errorCode, lang),
       );
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <header className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 md:flex-row md:items-center">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            {lang === "ar" ? "إعدادات البريد (SMTP Gateway)" : "SMTP Email Gateway"}
+          <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
+            <Mail className="size-5 text-blue-600 dark:text-blue-400" />
+            {lang === "ar" ? "بوابة البريد SMTP" : "SMTP Email Gateway"}
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {lang === "ar" ? "إعدادات الخادم البريدي لإرسال الدعوات وإشعارات النظام." : "Configure the SMTP gateway used for dispatching platform emails and invites."}
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {lang === "ar"
+              ? "إعداد منفصل عن سجل إعدادات النظام؛ كلمة المرور للكتابة فقط."
+              : "Independent from the generic settings registry; the password is write-only."}
           </p>
         </div>
-
-        <div className="flex items-center gap-3">
-          {hasUpdatePermission && (
+        <div className="flex flex-wrap items-center gap-2">
+          {smtp.canVerify ? (
             <button
-              onClick={onTestConnection}
-              disabled={isVerifying || isLoading}
-              className="px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              type="button"
+              onClick={() => void verify()}
+              disabled={!smtp.canTestSavedConfig || pending}
+              title={
+                smtp.hasUnsavedChanges
+                  ? lang === "ar"
+                    ? "احفظ التغييرات قبل اختبار الإعداد المحفوظ."
+                    : "Save changes before testing the persisted configuration."
+                  : undefined
+              }
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-100 px-3.5 text-xs font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             >
-              {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
-              {lang === "ar" ? "اختبار الاتصال" : "Test Connection"}
-            </button>
-          )}
-
-          {hasUpdatePermission && (
-            <button
-              onClick={onSave}
-              disabled={isSaving || isLoading}
-              className="px-3.5 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-600/20 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {lang === "ar" ? "حفظ التغييرات" : "Save Settings"}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center p-12 text-slate-400">
-          <Loader2 className="w-6 h-6 animate-spin" />
-        </div>
-      ) : hasFetchError ? (
-        <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-3">
-          <div className="p-3 bg-rose-100 dark:bg-rose-900/50 rounded-full text-rose-600 dark:text-rose-400">
-            <AlertTriangle className="w-8 h-8" />
-          </div>
-          <h3 className="text-lg font-bold text-rose-900 dark:text-rose-100">
-            {lang === "ar" ? "تعذر تحميل إعدادات مزود البريد" : "SMTP Configuration Unavailable"}
-          </h3>
-          <p className="text-sm text-rose-700 dark:text-rose-300 max-w-md">
-            {lang === "ar" 
-              ? "فشل النظام في استرداد بيانات الخادم البريدي. هذا قد يشير إلى عطل حرج، ولن يتم إرسال أي رسائل." 
-              : "The system failed to retrieve the SMTP gateway configuration. This indicates a critical fault and emails will not be dispatched."}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
-              <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-                <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  {lang === "ar" ? "إعدادات المرسل" : "Sender Configuration"}
-                </h2>
-              </div>
-              <div className="p-5 space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    {lang === "ar" ? "البريد المرسل (From Address)" : "From Address"}
-                  </label>
-                  <input
-                    type="email"
-                    value={config.fromAddress || ""}
-                    onChange={(e) => handleUpdate("fromAddress", e.target.value)}
-                    disabled={!hasUpdatePermission}
-                    placeholder="no-reply@mutakamel.ai"
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 disabled:opacity-70 disabled:cursor-not-allowed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    {lang === "ar" ? "اسم المرسل (From Name)" : "From Name"}
-                  </label>
-                  <input
-                    type="text"
-                    value={config.fromName || ""}
-                    onChange={(e) => handleUpdate("fromName", e.target.value)}
-                    disabled={!hasUpdatePermission}
-                    placeholder="Mutakamel Platform"
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 disabled:opacity-70 disabled:cursor-not-allowed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    {lang === "ar" ? "نطاق المرسل (Sender Domain)" : "Sender Domain"}
-                  </label>
-                  <input
-                    type="text"
-                    value={config.senderDomain || ""}
-                    onChange={(e) => handleUpdate("senderDomain", e.target.value)}
-                    disabled={!hasUpdatePermission}
-                    placeholder="mutakamel.ai"
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 disabled:opacity-70 disabled:cursor-not-allowed"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
-              <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-                <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  {lang === "ar" ? "إعدادات الخادم والاتصال" : "Server & Connection"}
-                </h2>
-              </div>
-              <div className="p-5 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      {lang === "ar" ? "خادم SMTP (Host)" : "SMTP Host"}
-                    </label>
-                    <input
-                      type="text"
-                      value={config.smtpHost || ""}
-                      onChange={(e) => handleUpdate("smtpHost", e.target.value)}
-                      disabled={!hasUpdatePermission}
-                      placeholder="smtp.example.com"
-                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono disabled:opacity-70 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      {lang === "ar" ? "المنفذ (Port)" : "SMTP Port"}
-                    </label>
-                    <input
-                      type="number"
-                      value={config.smtpPort || ""}
-                      onChange={(e) => handleUpdate("smtpPort", Number(e.target.value))}
-                      disabled={!hasUpdatePermission}
-                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono disabled:opacity-70 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      {lang === "ar" ? "البروتوكول (Protocol)" : "Protocol"}
-                    </label>
-                    <select
-                      value={config.smtpProtocol || "smtp"}
-                      onChange={(e) => handleUpdate("smtpProtocol", e.target.value)}
-                      disabled={!hasUpdatePermission}
-                      className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
-                    >
-                      <option value="smtp">SMTP (TLS/STARTTLS)</option>
-                      <option value="smtps">SMTPS (SSL)</option>
-                    </select>
-                  </div>
-
-                  <div className="col-span-2 flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/30 mt-1">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                        {lang === "ar" ? "اتصال آمن (Secure)" : "Secure Connection"}
-                      </div>
-                      <div className="text-[10px] text-slate-500">
-                        {lang === "ar" ? "يفضل تفعيله للمنافذ 465" : "Recommended true for port 465"}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={!hasUpdatePermission}
-                      onClick={() => handleUpdate("smtpSecure", !config.smtpSecure)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${config.smtpSecure ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-700"}`}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.smtpSecure ? "translate-x-6" : "translate-x-1"}`} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden lg:col-span-2">
-              <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-                <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  {lang === "ar" ? "الاعتمادات (Credentials)" : "Authentication Credentials"}
-                </h2>
-              </div>
-              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    {lang === "ar" ? "اسم المستخدم (Username)" : "SMTP Username"}
-                  </label>
-                  <input
-                    type="text"
-                    value={config.smtpUsername || ""}
-                    onChange={(e) => handleUpdate("smtpUsername", e.target.value)}
-                    disabled={!hasUpdatePermission}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono disabled:opacity-70 disabled:cursor-not-allowed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    {lang === "ar" ? "كلمة المرور (Password)" : "SMTP Password"}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={passwordInput}
-                      onChange={(e) => setPasswordInput(e.target.value)}
-                      disabled={!hasUpdatePermission}
-                      placeholder={config.smtpPasswordConfigured ? (lang === "ar" ? "تم الحفظ. اكتب قيمة جديدة لتغييرها." : "Configured. Type to overwrite.") : ""}
-                      className="w-full ps-3 pe-10 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-mono disabled:opacity-70 disabled:cursor-not-allowed"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute top-2.5 end-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Audit Trail Section */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <History className="w-4 h-4 text-blue-500" />
-                {lang === "ar" ? "سجل التعديلات (SMTP Audit Trail)" : "SMTP Audit Trail Log"}
-              </h2>
-              {config.revision !== undefined && config.revision !== null && (
-                <span className="px-2 py-0.5 text-xs font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md border border-blue-200 dark:border-blue-800/40">
-                  Revision #{config.revision}
-                </span>
-              )}
-            </div>
-
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {auditLogs.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400">
-                  {lang === "ar" ? "لا توجد سجلات تعديل سابقة." : "No audit trail records found."}
-                </div>
+              {pending && smtp.mutation.action === "VERIFY" ? (
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                auditLogs.map((log) => (
-                  <div key={log.id} className="p-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wider ${
-                          log.action === "CONFIGURED" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" :
-                          log.action === "CONNECTION_VERIFIED" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" :
-                          "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                        }`}>
-                          {log.action}
-                        </span>
-                        {log.revision && (
-                          <span className="text-xs font-mono text-slate-400">r{log.revision}</span>
-                        )}
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                          <UserCheck className="w-3.5 h-3.5 text-slate-400" />
-                          {log.actor}
-                        </span>
-                      </div>
-
-                      {log.changes && log.changes.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-1.5">
-                          {log.changes.map((c, idx) => (
-                            <span key={idx} className="text-[11px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-600 dark:text-slate-400 font-mono">
-                              {c.label}: <span className="line-through text-slate-400 me-1">{String(c.previousValue ?? "null")}</span> &rarr; <span className="font-semibold text-slate-900 dark:text-slate-200">{String(c.newValue)}</span>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="text-[11px] text-slate-400 font-mono shrink-0">
-                      {new Date(log.createdAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
-                    </div>
-                  </div>
-                ))
+                <PlayCircle className="size-4" />
               )}
-            </div>
-          </div>
+              {lang === "ar" ? "اختبار الإعداد المحفوظ" : "Test saved configuration"}
+            </button>
+          ) : null}
+          {smtp.canSaveCritical ? (
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={!smtp.hasUnsavedChanges || pending || smtp.configState !== "READY"}
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-blue-700 px-3.5 text-xs font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {pending && smtp.mutation.action === "SAVE" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              {lang === "ar" ? "حفظ الإعداد" : "Save configuration"}
+            </button>
+          ) : null}
         </div>
-      )}
+      </header>
+
+      <SettingsResourceBoundary
+        state={smtp.configState}
+        error={smtp.configError}
+        lang={lang}
+        onRetry={() => void smtp.refetchConfig()}
+      >
+        {smtp.snapshot && smtp.form ? (
+          <>
+            <SmtpEvidence smtp={smtp} />
+            <SmtpMutationNotice smtp={smtp} />
+            {smtp.hasUnsavedChanges ? (
+              <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                {lang === "ar"
+                  ? "لديك تغييرات غير محفوظة. اختبار الاتصال معطل حتى يحفظ Core الإعداد ويعيد استجابته الموثوقة."
+                  : "Unsaved changes are present. Connection testing stays disabled until Core saves and returns the authoritative configuration."}
+              </p>
+            ) : null}
+            {!smtp.canSaveCritical ? (
+              <p role="note" className="rounded-xl border border-slate-300 bg-slate-100 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                {lang === "ar"
+                  ? "القراءة متاحة، لكن الحفظ يتطلب admin.settings.update و admin.settings.critical معاً."
+                  : "Read-only view. Saving requires both admin.settings.update and admin.settings.critical."}
+              </p>
+            ) : null}
+            <SmtpForm
+              form={smtp.form}
+              password={smtp.password}
+              errors={smtp.fieldErrors}
+              lang={lang}
+              disabled={!smtp.canSaveCritical || pending}
+              showPassword={showPassword}
+              onTogglePassword={() => setShowPassword((current) => !current)}
+              onUpdate={smtp.handleUpdate}
+              onPassword={smtp.setPassword}
+            />
+          </>
+        ) : null}
+      </SettingsResourceBoundary>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-800">
+          <h2 className="flex items-center gap-2 text-sm font-black">
+            <History className="size-4 text-blue-500" />
+            {lang === "ar" ? "سجل SMTP الآمن" : "Redacted SMTP audit"}
+          </h2>
+        </div>
+        <div className="p-4">
+          <SettingsResourceBoundary
+            state={smtp.auditState}
+            error={smtp.auditError}
+            lang={lang}
+            onRetry={() => void smtp.refetchAudit()}
+          >
+            {smtp.auditLogs.length ? (
+              <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                {smtp.auditLogs.map((log) => (
+                  <article key={log.id} className="space-y-2 py-4 first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <strong className="rounded-md bg-blue-50 px-2 py-1 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                        {log.action}
+                      </strong>
+                      {log.revision === null ? null : <code>r{log.revision}</code>}
+                      <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300">
+                        <UserCheck className="size-3.5" />
+                        {log.actor}
+                      </span>
+                      <time className="text-slate-500" dateTime={log.createdAt}>
+                        {new Date(log.createdAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
+                      </time>
+                    </div>
+                    {log.changes.length ? (
+                      <ul className="flex flex-wrap gap-2">
+                        {log.changes.map((change, index) => (
+                          <li key={`${change.field}-${index}`} className="rounded-lg bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                            {change.label}: {String(change.previousValue ?? "—")} → {String(change.newValue ?? "—")}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="p-5 text-center text-xs text-slate-500">
+                {lang === "ar" ? "لا توجد سجلات SMTP بعد." : "No SMTP audit entries yet."}
+              </p>
+            )}
+          </SettingsResourceBoundary>
+        </div>
+      </section>
     </div>
   );
+}
+
+function SmtpEvidence({ smtp }: { smtp: ReturnType<typeof useSmtpSettings> }) {
+  const { lang } = smtp;
+  const config = smtp.snapshot?.data;
+  if (!config) return null;
+  return (
+    <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-3">
+      <Evidence label={lang === "ar" ? "الحالة" : "Status"} value={config.configured ? (lang === "ar" ? "مهيأ" : "Configured") : (lang === "ar" ? "غير مهيأ" : "Not configured")} />
+      <Evidence label={lang === "ar" ? "المراجعة" : "Revision"} value={config.revision === null ? "—" : String(config.revision)} />
+      <Evidence label={lang === "ar" ? "آخر تحديث" : "Updated"} value={config.updatedAt ? new Date(config.updatedAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US") : "—"} />
+    </section>
+  );
+}
+
+function Evidence({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800"><span className="block text-xs font-bold text-slate-500">{label}</span><strong className="mt-1 block">{value}</strong></div>;
+}
+
+function SmtpMutationNotice({ smtp }: { smtp: ReturnType<typeof useSmtpSettings> }) {
+  if (smtp.mutation.phase === "IDLE" || smtp.mutation.phase === "PENDING") return null;
+  const succeeded = smtp.mutation.phase === "SUCCEEDED";
+  return (
+    <p role={succeeded ? "status" : "alert"} className={`rounded-xl border p-3 text-sm font-bold ${succeeded ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100" : "border-rose-300 bg-rose-50 text-rose-950 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"}`}>
+      {succeeded
+        ? smtp.lang === "ar" ? "اكتملت العملية بنجاح." : "The operation completed successfully."
+        : safeMutationMessage(smtp.mutation.localCode ?? smtp.mutation.error?.errorCode, smtp.lang)}
+      {smtp.mutation.correlationId ? <code dir="ltr" className="ms-2">{smtp.mutation.correlationId}</code> : null}
+    </p>
+  );
+}
+
+function SmtpForm({ form, password, errors, lang, disabled, showPassword, onTogglePassword, onUpdate, onPassword }: {
+  form: SmtpFormState;
+  password: string;
+  errors: SmtpValidationErrors;
+  lang: "ar" | "en";
+  disabled: boolean;
+  showPassword: boolean;
+  onTogglePassword: () => void;
+  onUpdate: <K extends keyof SmtpFormState>(field: K, value: SmtpFormState[K]) => void;
+  onPassword: (value: string) => void;
+}) {
+  return (
+    <form aria-label={lang === "ar" ? "إعداد SMTP" : "SMTP configuration"} onSubmit={(event) => event.preventDefault()} className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 lg:grid-cols-2">
+      <TextField id="smtp-from-address" label={lang === "ar" ? "عنوان المرسل" : "From address"} type="email" value={form.fromAddress} maxLength={320} disabled={disabled} error={errors.fromAddress} lang={lang} onChange={(value) => onUpdate("fromAddress", value)} />
+      <TextField id="smtp-from-name" label={lang === "ar" ? "اسم المرسل" : "From name"} value={form.fromName} maxLength={200} disabled={disabled} error={errors.fromName} lang={lang} onChange={(value) => onUpdate("fromName", value)} />
+      <TextField id="smtp-sender-domain" label={lang === "ar" ? "نطاق المرسل" : "Sender domain"} value={form.senderDomain} maxLength={253} disabled={disabled} error={errors.senderDomain} lang={lang} onChange={(value) => onUpdate("senderDomain", value)} />
+      <TextField id="smtp-host" label={lang === "ar" ? "مضيف SMTP" : "SMTP host"} value={form.smtpHost} maxLength={253} disabled={disabled} error={errors.smtpHost} lang={lang} onChange={(value) => onUpdate("smtpHost", value)} />
+      <SelectField id="smtp-port" label={lang === "ar" ? "منفذ SMTP" : "SMTP port"} value={form.smtpPort} disabled={disabled} error={errors.smtpPort} lang={lang} onChange={(value) => onUpdate("smtpPort", value)} options={SMTP_ALLOWED_PORTS.map((port) => ({ value: String(port), label: String(port) }))} />
+      <SelectField id="smtp-protocol" label={lang === "ar" ? "البروتوكول" : "Protocol"} value={form.smtpProtocol ?? ""} disabled={disabled} error={errors.smtpProtocol} lang={lang} onChange={(value) => onUpdate("smtpProtocol", value === "smtp" || value === "smtps" ? value : null)} options={[{ value: "smtp", label: "SMTP" }, { value: "smtps", label: "SMTPS" }]} />
+      <SelectField id="smtp-secure" label={lang === "ar" ? "TLS آمن" : "Secure TLS"} value={form.smtpSecure === null ? "" : String(form.smtpSecure)} disabled={disabled} error={errors.smtpSecure} lang={lang} onChange={(value) => onUpdate("smtpSecure", value === "true" ? true : value === "false" ? false : null)} options={[{ value: "true", label: lang === "ar" ? "مفعّل" : "Enabled" }, { value: "false", label: lang === "ar" ? "غير مفعّل" : "Disabled" }]} />
+      <TextField id="smtp-username" label={lang === "ar" ? "اسم مستخدم SMTP" : "SMTP username"} value={form.smtpUsername} maxLength={320} disabled={disabled} error={errors.smtpUsername} lang={lang} onChange={(value) => onUpdate("smtpUsername", value)} />
+      <div className="grid gap-1.5">
+        <label htmlFor="smtp-password" className="text-xs font-bold">{lang === "ar" ? "كلمة مرور SMTP (للكتابة فقط)" : "SMTP password (write-only)"}</label>
+        <div className="relative">
+          <input id="smtp-password" type={showPassword ? "text" : "password"} autoComplete="new-password" value={password} maxLength={1024} disabled={disabled} aria-invalid={Boolean(errors.smtpPassword)} aria-describedby={errors.smtpPassword ? "smtp-password-error" : undefined} onChange={(event) => onPassword(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-300 bg-slate-50 ps-3 pe-11 font-mono text-sm outline-none focus:border-blue-600 dark:border-slate-700 dark:bg-slate-950 disabled:opacity-50" />
+          <button type="button" onClick={onTogglePassword} disabled={disabled} aria-label={showPassword ? (lang === "ar" ? "إخفاء كلمة المرور" : "Hide password") : (lang === "ar" ? "إظهار كلمة المرور" : "Show password")} className="absolute end-3 top-3 text-slate-500 disabled:opacity-40">{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button>
+        </div>
+        <FieldError id="smtp-password-error" code={errors.smtpPassword} lang={lang} />
+      </div>
+      <p className="text-xs leading-5 text-slate-500 lg:col-span-2">
+        {lang === "ar"
+          ? "المنافذ المدعومة حالياً: 25 و465 و587 و2525. يتطلب SMTPS اتصالاً آمناً، ويتطلب المنفذ 465 بروتوكول SMTPS مع TLS آمن."
+          : "Current Core ports: 25, 465, 587, and 2525. SMTPS requires secure TLS; port 465 requires SMTPS with secure TLS."}
+      </p>
+    </form>
+  );
+}
+
+function TextField({ id, label, type = "text", value, maxLength, disabled, error, lang, onChange }: { id: string; label: string; type?: "text" | "email"; value: string; maxLength: number; disabled: boolean; error?: string; lang: "ar" | "en"; onChange: (value: string) => void }) {
+  const errorId = `${id}-error`;
+  return <div className="grid gap-1.5"><label htmlFor={id} className="text-xs font-bold">{label}</label><input id={id} type={type} value={value} maxLength={maxLength} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm outline-none focus:border-blue-600 dark:border-slate-700 dark:bg-slate-950 disabled:opacity-50" /><FieldError id={errorId} code={error} lang={lang} /></div>;
+}
+
+function SelectField({ id, label, value, disabled, error, lang, options, onChange }: { id: string; label: string; value: string; disabled: boolean; error?: string; lang: "ar" | "en"; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
+  const errorId = `${id}-error`;
+  return <div className="grid gap-1.5"><label htmlFor={id} className="text-xs font-bold">{label}</label><select id={id} value={value} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm outline-none focus:border-blue-600 dark:border-slate-700 dark:bg-slate-950 disabled:opacity-50"><option value="">{lang === "ar" ? "اختر…" : "Select…"}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><FieldError id={errorId} code={error} lang={lang} /></div>;
+}
+
+function FieldError({ id, code, lang }: { id: string; code?: string; lang: "ar" | "en" }) {
+  if (!code) return null;
+  return <p id={id} role="alert" className="text-xs font-bold text-rose-700 dark:text-rose-300">{fieldErrorCopy(code, lang)}</p>;
+}
+
+function fieldErrorCopy(code: string, lang: "ar" | "en"): string {
+  const english: Record<string, string> = {
+    INVALID_EMAIL: "Enter a valid email address up to 320 characters.",
+    INVALID_FROM_NAME: "Enter 1–200 characters without line breaks.",
+    INVALID_DOMAIN: "Enter a valid multi-label domain name.",
+    INVALID_PORT: "Select an integer SMTP port.",
+    UNSUPPORTED_PORT: "Select port 25, 465, 587, or 2525.",
+    SECURITY_REQUIRED: "Select whether secure TLS is enabled.",
+    PROTOCOL_REQUIRED: "Select SMTP or SMTPS.",
+    INVALID_USERNAME: "Enter an SMTP username up to 320 characters.",
+    PASSWORD_REQUIRED: "Initial configuration requires a password.",
+    PASSWORD_TOO_LONG: "Password must not exceed 1024 characters.",
+    SMTPS_REQUIRES_SECURE: "SMTPS requires secure TLS.",
+    PORT_465_REQUIRES_SMTPS: "Port 465 requires SMTPS with secure TLS.",
+  };
+  if (lang === "en") return english[code] ?? "This field is invalid.";
+  const arabic: Record<string, string> = {
+    INVALID_EMAIL: "أدخل عنوان بريد صحيحاً بحد أقصى 320 حرفاً.",
+    INVALID_FROM_NAME: "أدخل من 1 إلى 200 حرف بدون فواصل أسطر.",
+    INVALID_DOMAIN: "أدخل اسم نطاق متعدد المقاطع صالحاً.",
+    INVALID_PORT: "اختر منفذ SMTP صحيحاً.",
+    UNSUPPORTED_PORT: "اختر المنفذ 25 أو 465 أو 587 أو 2525.",
+    SECURITY_REQUIRED: "حدد ما إذا كان TLS الآمن مفعلاً.",
+    PROTOCOL_REQUIRED: "اختر SMTP أو SMTPS.",
+    INVALID_USERNAME: "أدخل اسم مستخدم بحد أقصى 320 حرفاً.",
+    PASSWORD_REQUIRED: "يتطلب الإعداد الأولي كلمة مرور.",
+    PASSWORD_TOO_LONG: "يجب ألا تتجاوز كلمة المرور 1024 حرفاً.",
+    SMTPS_REQUIRES_SECURE: "يتطلب SMTPS تفعيل TLS الآمن.",
+    PORT_465_REQUIRES_SMTPS: "يتطلب المنفذ 465 بروتوكول SMTPS مع TLS آمن.",
+  };
+  return arabic[code] ?? "هذه القيمة غير صالحة.";
+}
+
+function safeMutationMessage(code: string | undefined, lang: "ar" | "en"): string {
+  const safeCode = code ?? "UNKNOWN_ERROR";
+  if (safeCode === "SAVE_BEFORE_VERIFY") {
+    return lang === "ar" ? "احفظ التغييرات قبل اختبار الاتصال." : "Save changes before testing the connection.";
+  }
+  if (safeCode === "SMTP_VALIDATION_FAILED") {
+    return lang === "ar" ? "راجع الحقول المميزة وأصلحها." : "Review and correct the highlighted fields.";
+  }
+  if (safeCode === "NO_SMTP_CHANGES") {
+    return lang === "ar" ? "لا توجد تغييرات لإرسالها." : "There are no changes to save.";
+  }
+  return lang === "ar"
+    ? `تعذر إكمال العملية بأمان. رمز الخطأ: ${safeCode}`
+    : `The operation could not be completed safely. Error code: ${safeCode}`;
 }

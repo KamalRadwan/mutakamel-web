@@ -1,136 +1,435 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, HardDrive, KeyRound, Save, ShieldAlert } from "lucide-react";
-import { useToast } from "@/components/ui/ToastContext";
-import { useI18n } from "@/i18n/I18nContext";
-import { useStorageServers } from "../hooks/useStorageServers";
-import { isSecureStorageEndpoint } from "../lib/storage-server-contract";
-import type { CreateStorageServerDto } from "../types";
-
-const initialForm: CreateStorageServerDto = {
-  code: "",
-  name: "",
-  endpoint: "",
-  region: "",
-  bucketName: "",
-  maxTenants: null,
-  credentials: { accessKeyId: "", secretAccessKey: "" },
-};
+import {
+  ArrowLeft,
+  ArrowRight,
+  HardDrive,
+  KeyRound,
+  Save,
+  ShieldAlert,
+  ShieldCheck,
+  Globe,
+  Database,
+  Users,
+} from "lucide-react";
+import { useCreateStorageServerScreen } from "../hooks/useCreateStorageServerScreen";
+import { STORAGE_SERVER_DNS_LABEL_PATTERN } from "../lib/storage-server-contract";
 
 export function CreateStorageServerScreen() {
-  const { lang } = useI18n();
-  const isArabic = lang === "ar";
-  const router = useRouter();
-  const toast = useToast();
-  const view = useStorageServers();
-  const [form, setForm] = useState<CreateStorageServerDto>(initialForm);
-  const [maxTenants, setMaxTenants] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const {
+    dir,
+    c,
+    isAuthLoading,
+    canCreate,
+    canActivate,
+    canConfigureStorageRuntime,
+    storageRuntimeSetupRequired,
+    setupPending,
+    form,
+    setForm,
+    maxTenants,
+    setMaxTenants,
+    isSubmitting,
+    formError,
+    handleSubmit,
+  } = useCreateStorageServerScreen();
 
-  if (view.isAuthLoading) {
-    return <div className="grid min-h-80 place-items-center text-sm font-semibold text-slate-500">{isArabic ? "جارٍ التحقق من الصلاحيات…" : "Checking permissions…"}</div>;
+  const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
+
+  if (isAuthLoading) {
+    return (
+      <div className="grid min-h-80 place-items-center text-sm font-semibold text-slate-500 dark:text-slate-400">
+        {c.checkingPermissions}
+      </div>
+    );
   }
 
-  if (!view.canCreate) {
+  if (!canCreate) {
     return (
-      <section className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
-        <ShieldAlert className="mx-auto size-10" aria-hidden="true" />
-        <h1 className="mt-3 text-lg font-black">{isArabic ? "تم رفض الوصول" : "Access denied"}</h1>
-        <p className="mt-2 text-sm">{isArabic ? "يتطلب التسجيل صلاحيات الإنشاء والإجراء الحرج." : "Registration requires both create and critical permissions."}</p>
+      <section className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100 shadow-md">
+        <ShieldAlert className="mx-auto size-10 text-rose-600 dark:text-rose-400" aria-hidden="true" />
+        <h1 className="mt-3 text-lg font-black">{c.accessDeniedTitle}</h1>
+        <p className="mt-2 text-sm">{c.accessDeniedDesc}</p>
       </section>
     );
   }
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setFormError(null);
-    const endpoint = form.endpoint.trim();
-    if (!isSecureStorageEndpoint(endpoint)) {
-      setFormError(isArabic ? "أدخل أصلاً آمناً بصيغة HTTPS فقط، من دون مسار أو بيانات اعتماد أو query string." : "Enter an HTTPS root origin only, without a path, credentials, query string, or fragment.");
-      return;
-    }
-
-    const dto: CreateStorageServerDto = {
-      ...form,
-      code: form.code.trim().toLowerCase(),
-      name: form.name.trim(),
-      endpoint: new URL(endpoint).origin,
-      region: form.region.trim().toLowerCase(),
-      bucketName: form.bucketName.trim().toLowerCase(),
-      maxTenants: maxTenants ? Number(maxTenants) : null,
-      credentials: {
-        accessKeyId: form.credentials.accessKeyId.trim(),
-        secretAccessKey: form.credentials.secretAccessKey,
-      },
-    };
-
-    setIsSubmitting(true);
-    try {
-      const created = await view.createServer(dto);
-      toast.success(isArabic ? "تم تسجيل الخادم" : "Storage server registered", isArabic ? "تم حفظ بيانات الاعتماد بشكل مشفر. اختبر الاتصال قبل التفعيل." : "Credentials were stored encrypted. Run a connection test before activation.");
-      router.push(`/storage-servers/${created.id}`);
-    } catch (caught) {
-      const message = readErrorMessage(caught, isArabic ? "فشل تسجيل الخادم." : "Storage server registration failed.");
-      setFormError(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <header className="flex items-start gap-3">
-        <Link href="/storage-servers" aria-label={isArabic ? "العودة إلى خوادم التخزين" : "Back to storage servers"} className="grid size-11 shrink-0 place-items-center rounded-xl border border-slate-300 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900">
-          <ArrowLeft className={`size-4 ${isArabic ? "rotate-180" : ""}`} aria-hidden="true" />
-        </Link>
-        <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">{isArabic ? "تسجيل آمن" : "Secure registration"}</p><h1 className="mt-1 text-2xl font-black">{isArabic ? "خادم تخزين جديد" : "New storage server"}</h1><p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{isArabic ? "يسجل Core الخادم كمسودة. لا تعني عملية الحفظ أن الاتصال نجح." : "Core registers the server as DRAFT. Saving does not claim that connectivity passed."}</p></div>
+    <div className="w-full space-y-6">
+      {/* Glassmorphism Compact Header */}
+      <header className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl border border-indigo-500/20 shadow-md">
+        <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/0 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/storage-servers"
+              aria-label={c.backToList}
+              className="p-2 bg-white/10 hover:bg-white/20 border border-white/15 text-white rounded-xl transition-all shrink-0 shadow-xs backdrop-blur-md"
+            >
+              <BackIcon className="w-4 h-4" />
+            </Link>
+
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                  {c.title}
+                </h1>
+                <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md">
+                  {c.tag}
+                </span>
+              </div>
+              <p className="text-[11px] text-indigo-200/80 mt-0.5 max-w-2xl leading-tight">
+                {c.subtitle}
+              </p>
+            </div>
+          </div>
+        </div>
       </header>
 
-      <form onSubmit={submit} className="space-y-5">
-        {formError ? <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">{formError}</div> : null}
+      {/* Main Grid: Left = Form Fields, Right = Live Preview Card */}
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {storageRuntimeSetupRequired && (
+            <div
+              role="alert"
+              className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              <div className="flex items-start gap-3">
+                <KeyRound className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+                <div className="min-w-0">
+                  <h2 className="text-sm font-black">
+                    {c.runtimeSetup.title}
+                  </h2>
+                  <p className="mt-1 text-xs leading-relaxed">
+                    {storageRuntimeSetupRequired.errorCode ===
+                    "CORE.STORAGE_RUNTIME.DISABLED"
+                      ? c.runtimeSetup.disabledDescription
+                      : c.runtimeSetup.keyUnavailableDescription}
+                  </p>
+                  {storageRuntimeSetupRequired.correlationId ? (
+                    <p className="mt-2 break-all font-mono text-[11px] opacity-80">
+                      {c.runtimeSetup.correlationId}: {storageRuntimeSetupRequired.correlationId}
+                    </p>
+                  ) : null}
+                  {canConfigureStorageRuntime ? (
+                    <Link
+                      href="/settings/storage"
+                      className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-amber-900 px-4 text-xs font-bold text-white transition hover:bg-amber-800 dark:bg-amber-200 dark:text-amber-950 dark:hover:bg-amber-100"
+                    >
+                      {c.runtimeSetup.openSettings}
+                    </Link>
+                  ) : (
+                    <p className="mt-3 text-xs font-bold">
+                      {c.runtimeSetup.askAdministrator}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
-        <FormSection icon={<HardDrive className="size-4" />} title={isArabic ? "هوية الخادم وموقعه" : "Server identity and location"}>
-          <Field label={isArabic ? "الاسم" : "Name"}><input required minLength={1} maxLength={120} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={inputClass} /></Field>
-          <Field label={isArabic ? "الرمز الثابت" : "Immutable code"} hint={isArabic ? "أحرف إنجليزية صغيرة وأرقام وشرطة فقط." : "Lowercase letters, numbers, and hyphens only."}><input required pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value.toLowerCase() })} className={`${inputClass} font-mono`} placeholder="garage-primary" /></Field>
-          <Field wide label={isArabic ? "نقطة النهاية HTTPS" : "HTTPS endpoint"} hint={isArabic ? "مثال: https://garage.example.com من دون مسار." : "Example: https://garage.example.com with no path."}><input required type="url" value={form.endpoint} onChange={(event) => setForm({ ...form, endpoint: event.target.value })} className={`${inputClass} font-mono`} placeholder="https://garage.example.com" /></Field>
-          <Field label={isArabic ? "المنطقة" : "Region"}><input required pattern="[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?" value={form.region} onChange={(event) => setForm({ ...form, region: event.target.value.toLowerCase() })} className={`${inputClass} font-mono`} placeholder="garage" /></Field>
-          <Field label={isArabic ? "اسم الحاوية" : "Bucket name"}><input required minLength={3} maxLength={63} value={form.bucketName} onChange={(event) => setForm({ ...form, bucketName: event.target.value.toLowerCase() })} className={`${inputClass} font-mono`} placeholder="mutakamel-files" /></Field>
-          <Field label={isArabic ? "الحد الأقصى للمستأجرين" : "Maximum tenants"} hint={isArabic ? "اتركه فارغاً لعدم وضع حد عددي." : "Leave empty for no numeric cap."}><input type="number" min={1} max={1_000_000} value={maxTenants} onChange={(event) => setMaxTenants(event.target.value)} className={inputClass} /></Field>
-        </FormSection>
+          {formError && (
+            <div
+              role="alert"
+              className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-950 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100 shadow-sm whitespace-pre-line"
+            >
+              {formError}
+            </div>
+          )}
 
-        <FormSection icon={<KeyRound className="size-4" />} title={isArabic ? "بيانات اعتماد Garage / S3" : "Garage / S3 credentials"} description={isArabic ? "ترسل مرة عبر HTTPS إلى Core ولا يعيدها أي API إلى المتصفح." : "Sent once over HTTPS to Core and never returned by an API to the browser."}>
-          <Field wide label={isArabic ? "معرف مفتاح الوصول" : "Access key ID"}><input required minLength={3} maxLength={128} autoComplete="off" value={form.credentials.accessKeyId} onChange={(event) => setForm({ ...form, credentials: { ...form.credentials, accessKeyId: event.target.value } })} className={`${inputClass} font-mono`} /></Field>
-          <Field wide label={isArabic ? "مفتاح الوصول السري" : "Secret access key"}><input required type="password" minLength={16} maxLength={256} autoComplete="new-password" value={form.credentials.secretAccessKey} onChange={(event) => setForm({ ...form, credentials: { ...form.credentials, secretAccessKey: event.target.value } })} className={`${inputClass} font-mono`} /></Field>
-        </FormSection>
+          {setupPending && !formError && (
+            <div
+              role="status"
+              className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100 shadow-sm"
+            >
+              {dir === "rtl"
+                ? "تم حفظ الخادم بالفعل. أعد محاولة التفعيل فقط؛ لن تُرسل بيانات الاعتماد ولن يُنشأ خادم آخر."
+                : "The server is already saved. Retry activation only; credentials are not resent and no second server is created."}
+            </div>
+          )}
 
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Link href="/storage-servers" className="inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900">{isArabic ? "إلغاء" : "Cancel"}</Link>
-          <button type="submit" disabled={isSubmitting} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"><Save className="size-4" aria-hidden="true" />{isSubmitting ? isArabic ? "جارٍ الحفظ…" : "Saving…" : isArabic ? "تسجيل المسودة" : "Register draft"}</button>
+          <fieldset disabled={setupPending || isSubmitting} className="contents">
+            {/* Section 1: Host Identity & Location */}
+            <FormSection
+              icon={<HardDrive className="size-4 text-indigo-600 dark:text-indigo-400" />}
+              title={c.sections.identity}
+              description={c.sections.identityDesc}
+            >
+            <Field label={c.fields.name}>
+              <input
+                required
+                minLength={1}
+                maxLength={120}
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className={inputClass}
+                placeholder="Garage Primary S3 Cluster"
+              />
+            </Field>
+
+            <Field label={c.fields.code} hint={c.fields.codeHint}>
+              <input
+                required
+                pattern={STORAGE_SERVER_DNS_LABEL_PATTERN}
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: e.target.value.toLowerCase() })}
+                className={`${inputClass} font-mono`}
+                placeholder="garage-primary"
+              />
+            </Field>
+
+            <Field wide label={c.fields.endpoint} hint={c.fields.endpointHint}>
+              <input
+                required
+                type="url"
+                value={form.endpoint}
+                onChange={(e) => setForm({ ...form, endpoint: e.target.value })}
+                className={`${inputClass} font-mono`}
+                placeholder="https://garage.example.com"
+              />
+            </Field>
+
+            <Field label={c.fields.region}>
+              <input
+                required
+                pattern={STORAGE_SERVER_DNS_LABEL_PATTERN}
+                value={form.region}
+                onChange={(e) => setForm({ ...form, region: e.target.value.toLowerCase() })}
+                className={`${inputClass} font-mono`}
+                placeholder="garage"
+              />
+            </Field>
+
+            <Field label={c.fields.bucketName}>
+              <input
+                required
+                minLength={3}
+                maxLength={63}
+                value={form.bucketName}
+                onChange={(e) => setForm({ ...form, bucketName: e.target.value.toLowerCase() })}
+                className={`${inputClass} font-mono`}
+                placeholder="mutakamel-files"
+              />
+            </Field>
+
+            <Field label={c.fields.maxTenants} hint={c.fields.maxTenantsHint}>
+              <input
+                type="number"
+                min={1}
+                max={1_000_000}
+                value={maxTenants}
+                onChange={(e) => setMaxTenants(e.target.value)}
+                className={inputClass}
+                placeholder="100"
+              />
+            </Field>
+            </FormSection>
+
+            {/* Section 2: Garage / S3 Access Credentials */}
+            <FormSection
+              icon={<KeyRound className="size-4 text-purple-600 dark:text-purple-400" />}
+              title={c.sections.credentials}
+              description={c.sections.credentialsDesc}
+            >
+            <Field wide label={c.fields.accessKeyId}>
+              <input
+                required
+                minLength={3}
+                maxLength={128}
+                autoComplete="off"
+                value={form.credentials.accessKeyId}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    credentials: { ...form.credentials, accessKeyId: e.target.value },
+                  })
+                }
+                className={`${inputClass} font-mono`}
+                placeholder="GK1234567890EXAMPLE"
+              />
+            </Field>
+
+            <Field wide label={c.fields.secretAccessKey}>
+              <input
+                required
+                type="password"
+                minLength={16}
+                maxLength={256}
+                autoComplete="new-password"
+                value={form.credentials.secretAccessKey}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    credentials: { ...form.credentials, secretAccessKey: e.target.value },
+                  })
+                }
+                className={`${inputClass} font-mono`}
+                placeholder="••••••••••••••••••••••••••••••••"
+              />
+            </Field>
+            </FormSection>
+          </fieldset>
+
+          {/* Form Action Buttons */}
+          <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400 sm:text-end">
+            {canActivate
+              ? dir === "rtl"
+                ? "سيحفظ النظام الخادم ثم يفحص الاتصال ويُفعّله تلقائياً؛ لا تحتاج إلى Probe مسبق."
+                : "One setup action saves the server, performs the authoritative connection check, and activates it; no pre-probe is required."
+              : dir === "rtl"
+                ? "سيتم حفظ الخادم كمسودة لأن حسابك لا يملك صلاحية التفعيل."
+                : "The server will be saved as a DRAFT because this account cannot activate it."}
+          </p>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end pt-2">
+            <Link
+              href="/storage-servers"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl px-5 text-xs font-bold text-slate-700 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800 transition"
+            >
+              {c.actions.cancel}
+            </Link>
+
+            <button
+              type="submit"
+              formNoValidate={setupPending}
+              disabled={isSubmitting}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 px-6 text-xs font-bold text-white shadow-lg shadow-indigo-500/25 transition disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+            >
+              <Save className="size-4" aria-hidden="true" />
+              {isSubmitting
+                ? c.actions.submitting
+                : setupPending
+                  ? dir === "rtl"
+                    ? "إعادة محاولة التفعيل"
+                    : "Retry activation"
+                  : canActivate
+                    ? dir === "rtl"
+                      ? "حفظ وإعداد الخادم"
+                      : "Save and set up server"
+                    : c.actions.submit}
+            </button>
+          </div>
+        </div>
+
+        {/* Right Column: Live Configuration Preview Card */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-6 bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-5">
+            <div>
+              <h3 className="text-xs font-extrabold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <Globe className="w-4 h-4 text-indigo-500" />
+                {c.sections.preview}
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                {c.sections.previewDesc}
+              </p>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                  {c.previewCard.targetEndpoint}
+                </span>
+                <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs break-all block">
+                  {form.endpoint.trim() || "https://..."}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                  <Database className="w-3 h-3 text-purple-500" />
+                  {c.previewCard.bucketTarget}
+                </span>
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-xs block">
+                  {form.bucketName.trim() || "bucket-name"} @ {form.region.trim() || "region"}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                  <Users className="w-3 h-3 text-cyan-500" />
+                  {c.previewCard.tenantCap}
+                </span>
+                <span className="font-mono font-bold text-cyan-600 dark:text-cyan-400 text-xs block">
+                  {maxTenants ? `${maxTenants} tenants` : c.previewCard.unlimited}
+                </span>
+              </div>
+
+              {/* Security Boundary Highlight */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/60 flex items-start gap-2.5 text-emerald-900 dark:text-emerald-300">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-500 mt-0.5" />
+                <div className="text-[11px] leading-relaxed">
+                  <span className="font-bold block">{c.previewCard.securityMode}</span>
+                  {c.previewCard.encryptedNotice}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </form>
     </div>
   );
 }
 
-function FormSection({ icon, title, description, children }: { icon: ReactNode; title: string; description?: string; children: ReactNode }) {
-  return <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 sm:p-6"><div className="mb-5 flex items-start gap-3 border-b border-slate-200 pb-4 dark:border-slate-800"><span className="grid size-9 place-items-center rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">{icon}</span><div><h2 className="font-black">{title}</h2>{description ? <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p> : null}</div></div><div className="grid gap-5 md:grid-cols-2">{children}</div></section>;
+function FormSection({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6 shadow-md">
+      <div className="mb-5 flex items-start gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
+        <span className="grid size-9 place-items-center rounded-xl bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 shrink-0">
+          {icon}
+        </span>
+        <div>
+          <h2 className="font-black text-sm uppercase tracking-wider text-slate-900 dark:text-slate-100">
+            {title}
+          </h2>
+          {description ? (
+            <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              {description}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <div className="grid gap-5 md:grid-cols-2">{children}</div>
+    </section>
+  );
 }
 
-function Field({ label, hint, wide, children }: { label: string; hint?: string; wide?: boolean; children: ReactNode }) {
-  return <label className={`block ${wide ? "md:col-span-2" : ""}`}><span className="mb-2 block text-sm font-bold">{label}</span>{children}{hint ? <span className="mt-2 block text-xs text-slate-500">{hint}</span> : null}</label>;
+function Field({
+  label,
+  hint,
+  wide,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  wide?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label className={`block ${wide ? "md:col-span-2" : ""}`}>
+      <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+        {label}
+      </span>
+      {children}
+      {hint ? (
+        <span className="mt-1.5 block text-[11px] text-slate-500 dark:text-slate-400">
+          {hint}
+        </span>
+      ) : null}
+    </label>
+  );
 }
 
-const inputClass = "min-h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white";
-
-function readErrorMessage(value: unknown, fallback: string): string {
-  if (typeof value !== "object" || value === null) return fallback;
-  const candidate = value as { message?: unknown; correlationId?: unknown };
-  const message = typeof candidate.message === "string" ? candidate.message : fallback;
-  return typeof candidate.correlationId === "string"
-    ? `${message}\nCorrelation ID: ${candidate.correlationId}`
-    : message;
-}
+const inputClass =
+  "min-h-11 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 px-3.5 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition focus:border-indigo-600 dark:focus:border-indigo-400 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500/20";

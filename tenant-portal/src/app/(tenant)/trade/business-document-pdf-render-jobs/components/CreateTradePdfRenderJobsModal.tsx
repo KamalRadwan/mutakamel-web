@@ -30,7 +30,7 @@ export function CreateTradePdfRenderJobsModal({ isOpen, onClose, onSubmit }: Cre
         <Select
           label="نوع المستند"
           value={documentType}
-          onChange={(e) => setDocumentType(e.target.value as any)}
+          onChange={(e) => setDocumentType(e.target.value as typeof documentType)}
           options={[
             { label: "فاتورة ضريبية (Tax Invoice)", value: "invoice" },
             { label: "عرض سعر (Quotation)", value: "quotation" },

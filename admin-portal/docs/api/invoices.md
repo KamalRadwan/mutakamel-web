@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-12**
 
 Owner: **Core**
 
@@ -77,8 +77,12 @@ truth.
 
 ## Current frontend status
 
-No invoice list, detail, editor, issue, offline-payment, or void workflow exists
-in Admin Portal source.
+`/invoices`, `/invoices/new`, and `/invoices/[id]` source-integrate the full
+seven-route family: directory, detail, metadata update, generation, issue,
+void, and tenant offline payment. The screens apply exact permission/critical
+gates, DTO-aligned validation, caller-owned intents, bilingual resource states,
+and focused tests. Authenticated runtime and deployment verification remain
+separate gates.
 
 ## Source map
 

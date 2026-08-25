@@ -6,7 +6,8 @@
     "dev": "next dev -p 5003",
     "build": "next build",
     "start": "next start -p 5003",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "next": "16.2.11",

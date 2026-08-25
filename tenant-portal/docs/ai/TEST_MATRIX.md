@@ -44,8 +44,12 @@ required.
 
 - login and invalid credentials;
 - proactive and `401` refresh;
-- concurrent refresh;
-- refresh rotation/replay rejection;
+- sequential and concurrent multi-tab refresh using the same reusable session
+  credential without sibling-tab revocation;
+- independent `refreshUseCount`/`accessIssueCount` increments while ordinary
+  refresh leaves `credentialVersion` unchanged;
+- login-only remember-cookie preference remains server-authoritative on later
+  refresh and does not change idle/absolute deadlines;
 - logout and logout-all;
 - invite/reset single use and invalid/expired token;
 - cross-tab logout/account replacement;

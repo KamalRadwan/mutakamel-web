@@ -7,8 +7,6 @@ import { useI18n } from "@/i18n/I18nContext";
 import { shouldResetDatabaseServerWriteKey } from "../lib/database-server-idempotency";
 import {
   DatabaseServerView,
-  CreateDatabaseServerDto,
-  CheckDatabaseServerConnectivityDto,
   DatabaseServerQueryDto,
   DatabaseServerStatus,
 } from "../types";
@@ -144,37 +142,6 @@ export function useDatabaseServers() {
     return () => requestAbort.current?.abort();
   }, [fetchServers]);
 
-  const createServer = async (dto: CreateDatabaseServerDto) => {
-    try {
-      const key = getIdempotencyKey(dto);
-      const server = await databaseServersApi.create(dto, key);
-      toast.success("Success", "Database Server created in DRAFT state.");
-      resetKey();
-      fetchServers();
-      return server;
-    } catch (err) {
-      const normalized = normalizeApiError(err);
-      if (shouldResetDatabaseServerWriteKey(normalized)) {
-        resetKey();
-      }
-      toast.error("Error", normalized.message);
-      throw normalized;
-    }
-  };
-
-  const checkConnectivity = async (dto: CheckDatabaseServerConnectivityDto) => {
-    try {
-      const key = getIdempotencyKey(dto);
-      const result = await databaseServersApi.checkConnectivity(dto, key);
-      resetKey();
-      return result;
-    } catch (err) {
-      const normalized = normalizeApiError(err);
-      if (shouldResetDatabaseServerWriteKey(normalized)) resetKey();
-      throw normalized;
-    }
-  };
-
   const openSoftDelete = (server: DatabaseServerView) => {
     if (
       deletionFilter !== "CURRENT" ||
@@ -302,8 +269,6 @@ export function useDatabaseServers() {
     meta,
     summaryMetrics,
     fetchServers,
-    createServer,
-    checkConnectivity,
     serverPendingDelete,
     deletingServerId,
     openSoftDelete,

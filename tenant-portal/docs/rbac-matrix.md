@@ -2,11 +2,11 @@
 
 Status: **verified-current**
 
-Last source verification: **2026-07-25**
+Last source verification: **2026-08-10**
 
 Owning apps: **Core, CRM, Trade**
 
-Tenant Portal implementation: **not-started**
+Tenant Portal implementation: **partial source; capability-specific runtime proof open**
 
 Authoring mode: **hand-written from current permission catalogues and guards**
 
@@ -33,7 +33,7 @@ The current high-level order is:
 
 | App | Global authorization chain |
 | --- | --- |
-| Core | JWT, FQDN tenant, session version, permission, branch access, subscription enforcement, rate limit |
+| Core | JWT, FQDN tenant, active `sid` plus four exact Auth epochs, permission, branch access, subscription enforcement, rate limit |
 | CRM | JWT, trusted Gateway tenant, current tenant user/CRM seat, permission, branch plus own/team/all access, subscription, rate limit |
 | Trade | JWT, trusted Gateway tenant, current user/Trade seat, subscription, company/branch/channel scope, permission, rate limit |
 

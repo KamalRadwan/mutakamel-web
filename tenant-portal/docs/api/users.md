@@ -16,7 +16,7 @@ Directory parties are a separate Core resource documented in [directory.md](dire
 - Controller/service/DTOs: `../backend/mutakamel-apps/core-app/src/tenant/tenant-users`
 - User/team enums: `../backend/mutakamel-apps/core-app/packages/common/src/enums`
 - Database entities: `../backend/mutakamel-apps/core-app/packages/database/src/entities/tenant`
-- Legacy UI: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
+- Historical consolidated UI reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
 
 ## Security and transport
 
@@ -24,7 +24,12 @@ Every route requires a tenant JWT, verified host matching the token, current ses
 
 Core rejects unknown DTO fields. All IDs are UUIDv7. Paginated routes use `page` default 1, `limit` default 20/max 100, `search` max 200, and return `data` plus `meta`. Standard JSON envelopes apply; `204` has no body.
 
-Mutations do not expose application-level idempotency. Refetch before retrying an ambiguous create/update. User status changes and access-role changes invalidate affected sessions.
+Mutations do not expose application-level idempotency. Refetch before retrying
+an ambiguous create/update. Role and access-scope changes advance the affected
+user's `authorizationVersion`: stale access JWTs must be reissued and
+`/auth/me` reloaded, but the reusable Auth Sessions remain active. A separate
+security action such as suspension, password change, compromise response, or
+logout-all can end the applicable sessions.
 
 User/profile/Webphone responses are private and must not be shared-cached; Webphone self runtime explicitly requires no-store handling. These routes are synchronous from the portal contract. Invitation email delivery does not expose a client-polled async job.
 
@@ -81,7 +86,8 @@ Safe invitation example:
 
 ```http
 POST /api/tenant/core/v1/users
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>; __Host-mutakamel-tenant-session=<redacted>; __Host-mutakamel-tenant-csrf=<csrf-proof>
+X-CSRF-Token: <csrf-proof>
 Content-Type: application/json
 
 {
@@ -124,5 +130,8 @@ Expected errors include:
 
 - Never expose `sipPassword` outside the in-memory self runtime.
 - Build placement choices top-down and submit the full consistent tuple.
-- Refetch current user/session after self-profile or access-affecting changes.
+- Refetch current user/session after self-profile changes. After an
+  access-affecting mutation, refresh/reissue the access JWT and reload
+  `/auth/me`; do not force login merely because `authorizationVersion`
+  advanced.
 - Treat owner-protection failures as product constraints, not errors to bypass.

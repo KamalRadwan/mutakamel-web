@@ -1,18 +1,20 @@
 # Tenant Portal Decisions
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-10**
 
 ## ADR-001: Standalone replacement
 
-Decision: `frontend/tenant-portal` replaces tenant-facing behavior in the
-backend repository's combined `mutakamel-web-app`.
+Decision: `frontend/tenant-portal` is the current standalone Tenant frontend.
+The backend repository's formerly combined `mutakamel-web-app` source is absent
+from the current checkout.
 
 Consequences:
 
-- old-web tenant routes/features/tests are migration evidence;
+- retained old-web documentation is dated migration/design evidence only;
 - admin and partner behavior are not copied into this app;
 - cutover requires an explicit route-by-route replacement inventory;
-- the old app remains rollback evidence until cutover is accepted.
+- the absent old app is not runnable rollback source and cannot prove current
+  behavior, build success, or route coverage.
 
 ## ADR-002: Gateway-only browser API
 

@@ -6,14 +6,13 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, KeyRound, ShieldAlert, Users } from "lucide-react";
+import { Eye, Trash2, KeyRound } from "lucide-react";
 import { useRolesRoleAssignments, RoleItem } from "./hooks/useRolesRoleAssignments";
 import { CreateRolesRoleAssignmentsModal } from "./components/CreateRolesRoleAssignmentsModal";
 import { DeleteRolesRoleAssignmentsConfirmModal } from "./components/DeleteRolesRoleAssignmentsConfirmModal";
 
 export default function RolesRoleAssignmentsPage() {
   const {
-    t,
     items,
     searchQuery,
     setSearchQuery,

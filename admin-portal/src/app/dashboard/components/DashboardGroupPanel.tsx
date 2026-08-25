@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   CircleAlert,
   Info,
-  ShieldCheck,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import type {
@@ -16,7 +15,6 @@ import type {
 import { KpiCard } from "./KpiCard";
 import { UnavailableDashboardPanel } from "./DashboardDataState";
 import {
-  getDashboardGroupDescription,
   getDashboardGroupLabel,
   humanizeDashboardField,
   isUnavailableProjection,
@@ -39,12 +37,6 @@ export function DashboardGroupPanel({
   if (!group.available) {
     return (
       <div className="space-y-4">
-        <ReportHeading
-          title={title}
-          description={getDashboardGroupDescription(groupKey, lang)}
-          permission={group.permission}
-          asOf={group.asOf}
-        />
         <UnavailableDashboardPanel title={title} dataset={group} />
       </div>
     );
@@ -52,12 +44,6 @@ export function DashboardGroupPanel({
 
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
-      <ReportHeading
-        title={title}
-        description={getDashboardGroupDescription(groupKey, lang)}
-        permission={group.permission}
-        asOf={group.asOf}
-      />
 
       {group.alerts.length > 0 && <ReportAlerts alerts={group.alerts} />}
 
@@ -93,43 +79,6 @@ export function DashboardGroupPanel({
         wide
       />
     </div>
-  );
-}
-
-function ReportHeading({
-  title,
-  description,
-  permission,
-  asOf,
-}: {
-  title: string;
-  description: string;
-  permission: string;
-  asOf: string;
-}) {
-  const { lang } = useI18n();
-  return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-start sm:justify-between">
-      <div className="max-w-2xl">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="size-5 text-blue-500" aria-hidden="true" />
-          <h2 className="text-lg font-extrabold text-slate-950 dark:text-white">
-            {title}
-          </h2>
-        </div>
-        <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-          {description}
-        </p>
-      </div>
-      <div className="space-y-1 text-start sm:text-end">
-        <code className="inline-block rounded-md bg-slate-100 px-2 py-1 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          {permission}
-        </code>
-        <p className="text-[11px] text-slate-400">
-          {lang === "ar" ? "آخر تحديث" : "As of"} {formatDateTime(asOf, lang)}
-        </p>
-      </div>
-    </section>
   );
 }
 
@@ -300,15 +249,6 @@ function formatValue(fieldKey: string, value: unknown, lang: "ar" | "en"): strin
   }
   if (typeof value === "string" && /usd$/i.test(fieldKey)) return `$${value}`;
   return String(value);
-}
-
-function formatDateTime(value: string, lang: "ar" | "en"): string {
-  const timestamp = new Date(value);
-  if (Number.isNaN(timestamp.getTime())) return value;
-  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

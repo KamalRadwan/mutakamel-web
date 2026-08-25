@@ -35,7 +35,7 @@ export function CreateCrmDashboardBuilderModal({ isOpen, onClose, onSubmit }: Cr
           <Select
             label={t.crm.drawingWidgetType}
             value={type}
-            onChange={(e) => setType(e.target.value as any)}
+            onChange={(e) => setType(e.target.value as typeof type)}
             options={[
               { label: t.crm.barChart, value: "chart_bar" },
               { label: t.crm.lineChart, value: "chart_line" },

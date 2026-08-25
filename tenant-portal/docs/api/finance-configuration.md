@@ -14,7 +14,7 @@
 - Currency controller/DTO/service: `../backend/mutakamel-apps/core-app/src/tenant/currencies`
 - Tax controller/DTO/service: `../backend/mutakamel-apps/core-app/src/tenant/taxes`
 - Numbering controller/DTO/service: `../backend/mutakamel-apps/core-app/src/tenant/numbering-sequences`
-- Legacy client/page: `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
+- Historical consolidated client/page reference (absent from the current checkout): `../backend/mutakamel-apps/mutakamel-web-app/src/features/tenant/settings`
 
 ## Common contract and pagination
 
@@ -84,7 +84,7 @@ Safe read example:
 
 ```http
 GET /api/tenant/core/v1/currencies?page=1&limit=20&sortBy=code&sortDir=ASC
-Authorization: Bearer <tenant-access-token>
+Cookie: __Host-mutakamel-tenant-access=<redacted>
 ```
 
 Validation is performed by the DTOs listed above and by database/domain checks. Non-paginated JSON uses `{success:true,data,correlationId,timestamp}`; errors use the standard Core error envelope.

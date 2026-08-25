@@ -6,14 +6,12 @@ import { TableToolbar } from "@/components/ui/TableToolbar";
 import { Table } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Calendar, Clock, CheckCircle } from "lucide-react";
+import { Eye, Trash2, Calendar } from "lucide-react";
 import { useCrmActivitiesTasks, CrmTaskItem } from "./hooks/useCrmActivitiesTasks";
 import { CreateCrmActivitiesTasksModal } from "./components/CreateCrmActivitiesTasksModal";
 import { DeleteCrmActivitiesTasksConfirmModal } from "./components/DeleteCrmActivitiesTasksConfirmModal";
-import { useI18n } from "@/i18n/I18nContext";
 
 export default function CrmActivitiesTasksPage() {
-//     const { t } = useI18n();
   const {
     t,
     items,
