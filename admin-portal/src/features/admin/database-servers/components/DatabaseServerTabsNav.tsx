@@ -1,5 +1,6 @@
 import { LayoutDashboard, ShieldCheck, Database, Lock, History } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { Tabs, TabsList, TabsTrigger, Badge } from "@/design-system";
 import type { DatabaseServerTab } from "../hooks/useDatabaseServerDetailPage";
 
 interface DatabaseServerTabsNavProps {
@@ -25,82 +26,39 @@ export function DatabaseServerTabsNav({
     label: string;
     icon: typeof LayoutDashboard;
     badge?: string | number;
-    badgeColor?: string;
+    badgeTone?: "brand" | "warn" | "danger" | "neutral";
   }[] = [
-    {
-      id: "overview",
-      label: d.overview,
-      icon: LayoutDashboard,
-    },
+    { id: "overview", label: d.overview, icon: LayoutDashboard },
     {
       id: "readiness",
       label: d.readiness,
       icon: ShieldCheck,
       badge: bootstrapStatus,
-      badgeColor:
-        bootstrapStatus === "READY"
-          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-          : bootstrapStatus === "DEGRADED"
-            ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
-            : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+      badgeTone: bootstrapStatus === "READY" ? "brand" : bootstrapStatus === "DEGRADED" ? "danger" : "warn",
     },
-    {
-      id: "bindings",
-      label: d.bindings,
-      icon: Database,
-      badge: bindingsCount,
-      badgeColor: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-    },
-    {
-      id: "security",
-      label: d.security,
-      icon: Lock,
-    },
-    {
-      id: "history",
-      label: d.history,
-      icon: History,
-      badge: historyCount,
-      badgeColor: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
-    },
+    { id: "bindings", label: d.bindings, icon: Database, badge: bindingsCount, badgeTone: "neutral" },
+    { id: "security", label: d.security, icon: Lock },
+    { id: "history", label: d.history, icon: History, badge: historyCount, badgeTone: "neutral" },
   ];
 
   return (
-    <div
-      role="tablist"
-      aria-label="Database Server Details Tabs"
-      className="flex items-center gap-1.5 overflow-x-auto p-1.5 bg-slate-200/60 dark:bg-slate-850 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner no-scrollbar"
-    >
-      {tabs.map((tab) => {
-        const Icon = tab.icon;
-        const isActive = activeTab === tab.id;
-
-        return (
-          <button
-            key={tab.id}
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onTabChange(tab.id)}
-            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
-              isActive
-                ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-md border border-slate-200/80 dark:border-slate-700 scale-[1.01]"
-                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/50 dark:hover:bg-slate-800/40"
-            }`}
-          >
-            <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400"}`} />
-            <span>{tab.label}</span>
-            {tab.badge !== undefined && (
-              <span
-                className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-semibold ${
-                  tab.badgeColor || "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
-                }`}
-              >
-                {tab.badge}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
+    <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as DatabaseServerTab)}>
+      <TabsList aria-label="Database Server Details Tabs" className="h-auto flex-wrap gap-1 border-b-0 bg-ink-100 p-1.5 dark:bg-ink-900/60">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <TabsTrigger
+              key={tab.id}
+              value={tab.id}
+              className="h-9 gap-2 rounded-md px-3 data-[state=active]:bg-card data-[state=active]:text-brand-700 data-[state=active]:shadow-sm dark:data-[state=active]:text-brand-400 after:hidden"
+            >
+              <Icon className="size-4 shrink-0" aria-hidden="true" />
+              {tab.label}
+              {tab.badge !== undefined && <Badge tone={tab.badgeTone ?? "neutral"}>{tab.badge}</Badge>}
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
+    </Tabs>
   );
 }

@@ -6,6 +6,7 @@ import { CreateDatabaseServerWizard } from "@/features/admin/database-servers/co
 import { useAuth } from "@/context/AuthContext";
 import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { useI18n } from "@/i18n/I18nContext";
+import { Button } from "@/design-system";
 
 const NEW_DATABASE_SERVER_PAGE_COPY = {
   ar: {
@@ -40,45 +41,32 @@ export default function NewDatabaseServerPage() {
 
   return (
     <div dir={dir} className="space-y-6 w-full">
-        <Link
-          href={canReadDetails ? "/database-servers" : "/dashboard"}
-          className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
-        >
-          {lang === "ar" ? (
-            <ArrowRight className="w-4 h-4 me-1" aria-hidden="true" />
-          ) : (
-            <ArrowLeft className="w-4 h-4 me-1" aria-hidden="true" />
-          )}
+      <Button variant="link" size="sm" asChild className="px-0">
+        <Link href={canReadDetails ? "/database-servers" : "/dashboard"}>
+          {lang === "ar" ? <ArrowRight className="size-4" aria-hidden="true" /> : <ArrowLeft className="size-4" aria-hidden="true" />}
           {canReadDetails ? copy.backToServers : copy.backToDashboard}
         </Link>
+      </Button>
 
-        {isLoading ? (
-          <section
-            role="status"
-            className="mx-auto grid min-h-72 max-w-3xl place-items-center rounded-xl border border-slate-200 bg-white p-8 text-sm font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
-          >
-            {copy.checkingPermissions}
-          </section>
-        ) : canCreate ? (
-          <CreateDatabaseServerWizard
-            activateAfterRegistration={canActivate}
-            canReadDetails={canReadDetails}
-            canRetrySetup={canRetrySetup}
-          />
-        ) : (
-          <section
-            role="alert"
-            className="mx-auto flex min-h-72 max-w-3xl flex-col items-center justify-center rounded-xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
-          >
-            <ShieldAlert className="h-10 w-10" aria-hidden="true" />
-            <h1 className="mt-4 text-lg font-semibold">{copy.unavailable}</h1>
-            <p className="mt-2 max-w-md text-sm leading-6">
-              {copy.permissionRequired}{" "}
-              <code dir="ltr">admin.database_servers.create</code>{" "}
-              {copy.permissionRequiredTail}
-            </p>
-          </section>
-        )}
+      {isLoading ? (
+        <section role="status" className="mx-auto grid min-h-72 max-w-3xl place-items-center rounded-lg border border-border bg-card p-8 text-sm font-semibold text-muted-foreground">
+          {copy.checkingPermissions}
+        </section>
+      ) : canCreate ? (
+        <CreateDatabaseServerWizard
+          activateAfterRegistration={canActivate}
+          canReadDetails={canReadDetails}
+          canRetrySetup={canRetrySetup}
+        />
+      ) : (
+        <section role="alert" className="mx-auto flex min-h-72 max-w-3xl flex-col items-center justify-center rounded-lg border border-warn-200 bg-warn-50 p-8 text-center text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-200">
+          <ShieldAlert className="size-10" aria-hidden="true" />
+          <h1 className="mt-4 text-lg font-semibold">{copy.unavailable}</h1>
+          <p className="mt-2 max-w-md text-sm leading-6">
+            {copy.permissionRequired} <code dir="ltr">admin.database_servers.create</code> {copy.permissionRequiredTail}
+          </p>
+        </section>
+      )}
     </div>
   );
 }

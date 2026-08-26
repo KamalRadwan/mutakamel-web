@@ -8,12 +8,22 @@ import {
   HardDrive,
   KeyRound,
   Save,
-  ShieldAlert,
   ShieldCheck,
   Globe,
   Database,
   Users,
 } from "lucide-react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Field as DsField,
+  Input,
+  Button,
+  ErrorState,
+} from "@/design-system";
 import { useCreateStorageServerScreen } from "../hooks/useCreateStorageServerScreen";
 import { STORAGE_SERVER_DNS_LABEL_PATTERN } from "../lib/storage-server-contract";
 
@@ -39,92 +49,63 @@ export function CreateStorageServerScreen() {
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
 
   if (isAuthLoading) {
-    return (
-      <div className="grid min-h-80 place-items-center text-sm font-semibold text-slate-500 dark:text-slate-400">
-        {c.checkingPermissions}
-      </div>
-    );
+    return <div className="grid min-h-80 place-items-center text-sm font-semibold text-muted-foreground">{c.checkingPermissions}</div>;
   }
 
   if (!canCreate) {
     return (
-      <section className="mx-auto max-w-xl rounded-xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100 shadow-md">
-        <ShieldAlert className="mx-auto size-10 text-rose-600 dark:text-rose-400" aria-hidden="true" />
-        <h1 className="mt-3 text-lg font-semibold">{c.accessDeniedTitle}</h1>
-        <p className="mt-2 text-sm">{c.accessDeniedDesc}</p>
-      </section>
+      <div className="mx-auto max-w-xl rounded-lg border border-border bg-card">
+        <ErrorState
+          title={c.accessDeniedTitle}
+          error={{
+            isNormalized: true,
+            httpStatus: 403,
+            errorCode: "ADMIN_PERMISSION_DENIED",
+            errorCategory: "AUTHORIZATION",
+            message: c.accessDeniedDesc,
+          }}
+        />
+      </div>
     );
   }
 
   return (
     <div className="w-full space-y-6">
-      {/* Glassmorphism Compact Header */}
-      <header className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-xl border border-indigo-500/20 shadow-md">
-        <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/0 rounded-full blur-3xl pointer-events-none" />
+      <Button variant="link" size="sm" asChild className="w-fit px-0">
+        <Link href="/storage-servers" aria-label={c.backToList}>
+          <BackIcon className="size-4" />
+          {c.backToList}
+        </Link>
+      </Button>
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">{c.title}</h1>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{c.subtitle}</p>
+      </div>
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/storage-servers"
-              aria-label={c.backToList}
-              className="p-2 bg-white/10 hover:bg-white/20 border border-white/15 text-white rounded-xl transition-all shrink-0 shadow-xs backdrop-blur-md"
-            >
-              <BackIcon className="w-4 h-4" />
-            </Link>
-
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-base sm:text-lg font-semibold text-white tracking-tight">
-                  {c.title}
-                </h1>
-                <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-2xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">
-                  {c.tag}
-                </span>
-              </div>
-              <p className="text-xs text-indigo-200/80 mt-0.5 max-w-2xl leading-tight">
-                {c.subtitle}
-              </p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Grid: Left = Form Fields, Right = Live Preview Card */}
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
           {storageRuntimeSetupRequired && (
-            <div
-              role="alert"
-              className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
-            >
+            <div role="alert" className="rounded-lg border border-warn-200 bg-warn-50 p-4 text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-200">
               <div className="flex items-start gap-3">
                 <KeyRound className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold">
-                    {c.runtimeSetup.title}
-                  </h2>
+                  <h2 className="text-sm font-semibold">{c.runtimeSetup.title}</h2>
                   <p className="mt-1 text-xs leading-relaxed">
-                    {storageRuntimeSetupRequired.errorCode ===
-                    "CORE.STORAGE_RUNTIME.DISABLED"
+                    {storageRuntimeSetupRequired.errorCode === "CORE.STORAGE_RUNTIME.DISABLED"
                       ? c.runtimeSetup.disabledDescription
                       : c.runtimeSetup.keyUnavailableDescription}
                   </p>
-                  {storageRuntimeSetupRequired.correlationId ? (
+                  {storageRuntimeSetupRequired.correlationId && (
                     <p className="mt-2 break-all font-mono text-xs opacity-80">
                       {c.runtimeSetup.correlationId}: {storageRuntimeSetupRequired.correlationId}
                     </p>
-                  ) : null}
+                  )}
                   {canConfigureStorageRuntime ? (
-                    <Link
-                      href="/settings/storage"
-                      className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-amber-900 px-4 text-xs font-semibold text-white transition hover:bg-amber-800 dark:bg-amber-200 dark:text-amber-950 dark:hover:bg-amber-100"
-                    >
-                      {c.runtimeSetup.openSettings}
-                    </Link>
+                    <Button variant="primary" size="sm" className="mt-3" asChild>
+                      <Link href="/settings/storage">{c.runtimeSetup.openSettings}</Link>
+                    </Button>
                   ) : (
-                    <p className="mt-3 text-xs font-semibold">
-                      {c.runtimeSetup.askAdministrator}
-                    </p>
+                    <p className="mt-3 text-xs font-semibold">{c.runtimeSetup.askAdministrator}</p>
                   )}
                 </div>
               </div>
@@ -132,19 +113,13 @@ export function CreateStorageServerScreen() {
           )}
 
           {formError && (
-            <div
-              role="alert"
-              className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-950 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100 shadow-sm whitespace-pre-line"
-            >
+            <div role="alert" className="whitespace-pre-line rounded-lg border border-danger-200 bg-danger-50 p-4 text-xs font-semibold text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-200">
               {formError}
             </div>
           )}
 
           {setupPending && !formError && (
-            <div
-              role="status"
-              className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100 shadow-sm"
-            >
+            <div role="status" className="rounded-lg border border-warn-200 bg-warn-50 p-4 text-xs font-semibold text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-200">
               {dir === "rtl"
                 ? "تم حفظ الخادم بالفعل. أعد محاولة التفعيل فقط؛ لن تُرسل بيانات الاعتماد ولن يُنشأ خادم آخر."
                 : "The server is already saved. Retry activation only; credentials are not resent and no second server is created."}
@@ -152,129 +127,60 @@ export function CreateStorageServerScreen() {
           )}
 
           <fieldset disabled={setupPending || isSubmitting} className="contents">
-            {/* Section 1: Host Identity & Location */}
-            <FormSection
-              icon={<HardDrive className="size-4 text-indigo-600 dark:text-indigo-400" />}
-              title={c.sections.identity}
-              description={c.sections.identityDesc}
-            >
-            <Field label={c.fields.name}>
-              <input
-                required
-                minLength={1}
-                maxLength={120}
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className={inputClass}
-                placeholder="Garage Primary S3 Cluster"
-              />
-            </Field>
+            <Card>
+              <SectionHeader icon={<HardDrive className="size-4 text-brand-600 dark:text-brand-400" />} title={c.sections.identity} description={c.sections.identityDesc} />
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <DsField label={c.fields.name}>
+                  {(fp) => (
+                    <Input {...fp} required minLength={1} maxLength={120} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Garage Primary S3 Cluster" />
+                  )}
+                </DsField>
+                <DsField label={c.fields.code} hint={c.fields.codeHint}>
+                  {(fp) => (
+                    <Input {...fp} required pattern={STORAGE_SERVER_DNS_LABEL_PATTERN} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toLowerCase() })} className="font-mono" placeholder="garage-primary" />
+                  )}
+                </DsField>
+                <DsField label={c.fields.endpoint} hint={c.fields.endpointHint} className="md:col-span-2">
+                  {(fp) => (
+                    <Input {...fp} required type="url" value={form.endpoint} onChange={(e) => setForm({ ...form, endpoint: e.target.value })} className="font-mono" placeholder="https://garage.example.com" />
+                  )}
+                </DsField>
+                <DsField label={c.fields.region}>
+                  {(fp) => (
+                    <Input {...fp} required pattern={STORAGE_SERVER_DNS_LABEL_PATTERN} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value.toLowerCase() })} className="font-mono" placeholder="garage" />
+                  )}
+                </DsField>
+                <DsField label={c.fields.bucketName}>
+                  {(fp) => (
+                    <Input {...fp} required minLength={3} maxLength={63} value={form.bucketName} onChange={(e) => setForm({ ...form, bucketName: e.target.value.toLowerCase() })} className="font-mono" placeholder="mutakamel-files" />
+                  )}
+                </DsField>
+                <DsField label={c.fields.maxTenants} hint={c.fields.maxTenantsHint}>
+                  {(fp) => (
+                    <Input {...fp} type="number" min={1} max={1_000_000} value={maxTenants} onChange={(e) => setMaxTenants(e.target.value)} placeholder="100" />
+                  )}
+                </DsField>
+              </CardContent>
+            </Card>
 
-            <Field label={c.fields.code} hint={c.fields.codeHint}>
-              <input
-                required
-                pattern={STORAGE_SERVER_DNS_LABEL_PATTERN}
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value.toLowerCase() })}
-                className={`${inputClass} font-mono`}
-                placeholder="garage-primary"
-              />
-            </Field>
-
-            <Field wide label={c.fields.endpoint} hint={c.fields.endpointHint}>
-              <input
-                required
-                type="url"
-                value={form.endpoint}
-                onChange={(e) => setForm({ ...form, endpoint: e.target.value })}
-                className={`${inputClass} font-mono`}
-                placeholder="https://garage.example.com"
-              />
-            </Field>
-
-            <Field label={c.fields.region}>
-              <input
-                required
-                pattern={STORAGE_SERVER_DNS_LABEL_PATTERN}
-                value={form.region}
-                onChange={(e) => setForm({ ...form, region: e.target.value.toLowerCase() })}
-                className={`${inputClass} font-mono`}
-                placeholder="garage"
-              />
-            </Field>
-
-            <Field label={c.fields.bucketName}>
-              <input
-                required
-                minLength={3}
-                maxLength={63}
-                value={form.bucketName}
-                onChange={(e) => setForm({ ...form, bucketName: e.target.value.toLowerCase() })}
-                className={`${inputClass} font-mono`}
-                placeholder="mutakamel-files"
-              />
-            </Field>
-
-            <Field label={c.fields.maxTenants} hint={c.fields.maxTenantsHint}>
-              <input
-                type="number"
-                min={1}
-                max={1_000_000}
-                value={maxTenants}
-                onChange={(e) => setMaxTenants(e.target.value)}
-                className={inputClass}
-                placeholder="100"
-              />
-            </Field>
-            </FormSection>
-
-            {/* Section 2: Garage / S3 Access Credentials */}
-            <FormSection
-              icon={<KeyRound className="size-4 text-purple-600 dark:text-purple-400" />}
-              title={c.sections.credentials}
-              description={c.sections.credentialsDesc}
-            >
-            <Field wide label={c.fields.accessKeyId}>
-              <input
-                required
-                minLength={3}
-                maxLength={128}
-                autoComplete="off"
-                value={form.credentials.accessKeyId}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    credentials: { ...form.credentials, accessKeyId: e.target.value },
-                  })
-                }
-                className={`${inputClass} font-mono`}
-                placeholder="GK1234567890EXAMPLE"
-              />
-            </Field>
-
-            <Field wide label={c.fields.secretAccessKey}>
-              <input
-                required
-                type="password"
-                minLength={16}
-                maxLength={256}
-                autoComplete="new-password"
-                value={form.credentials.secretAccessKey}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    credentials: { ...form.credentials, secretAccessKey: e.target.value },
-                  })
-                }
-                className={`${inputClass} font-mono`}
-                placeholder="••••••••••••••••••••••••••••••••"
-              />
-            </Field>
-            </FormSection>
+            <Card>
+              <SectionHeader icon={<KeyRound className="size-4 text-brand-600 dark:text-brand-400" />} title={c.sections.credentials} description={c.sections.credentialsDesc} />
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <DsField label={c.fields.accessKeyId} className="md:col-span-2">
+                  {(fp) => (
+                    <Input {...fp} required minLength={3} maxLength={128} autoComplete="off" value={form.credentials.accessKeyId} onChange={(e) => setForm({ ...form, credentials: { ...form.credentials, accessKeyId: e.target.value } })} className="font-mono" placeholder="GK1234567890EXAMPLE" />
+                  )}
+                </DsField>
+                <DsField label={c.fields.secretAccessKey} className="md:col-span-2">
+                  {(fp) => (
+                    <Input {...fp} required type="password" minLength={16} maxLength={256} autoComplete="new-password" value={form.credentials.secretAccessKey} onChange={(e) => setForm({ ...form, credentials: { ...form.credentials, secretAccessKey: e.target.value } })} className="font-mono" placeholder="••••••••••••••••••••••••••••••••" />
+                  )}
+                </DsField>
+              </CardContent>
+            </Card>
           </fieldset>
 
-          {/* Form Action Buttons */}
-          <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400 sm:text-end">
+          <p className="text-xs leading-relaxed text-muted-foreground sm:text-end">
             {canActivate
               ? dir === "rtl"
                 ? "سيحفظ النظام الخادم ثم يفحص الاتصال ويُفعّله تلقائياً؛ لا تحتاج إلى Probe مسبق."
@@ -283,153 +189,78 @@ export function CreateStorageServerScreen() {
                 ? "سيتم حفظ الخادم كمسودة لأن حسابك لا يملك صلاحية التفعيل."
                 : "The server will be saved as a DRAFT because this account cannot activate it."}
           </p>
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end pt-2">
-            <Link
-              href="/storage-servers"
-              className="inline-flex min-h-11 items-center justify-center rounded-xl px-5 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800 transition"
-            >
-              {c.actions.cancel}
-            </Link>
-
-            <button
-              type="submit"
-              formNoValidate={setupPending}
-              disabled={isSubmitting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 px-6 text-xs font-semibold text-white shadow-lg shadow-indigo-500/25 transition disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-            >
-              <Save className="size-4" aria-hidden="true" />
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" asChild>
+              <Link href="/storage-servers">{c.actions.cancel}</Link>
+            </Button>
+            <Button type="submit" variant="primary" formNoValidate={setupPending} disabled={isSubmitting} loading={isSubmitting}>
+              <Save className="size-4" />
               {isSubmitting
                 ? c.actions.submitting
                 : setupPending
-                  ? dir === "rtl"
-                    ? "إعادة محاولة التفعيل"
-                    : "Retry activation"
+                  ? dir === "rtl" ? "إعادة محاولة التفعيل" : "Retry activation"
                   : canActivate
-                    ? dir === "rtl"
-                      ? "حفظ وإعداد الخادم"
-                      : "Save and set up server"
+                    ? dir === "rtl" ? "حفظ وإعداد الخادم" : "Save and set up server"
                     : c.actions.submit}
-            </button>
+            </Button>
           </div>
         </div>
 
-        {/* Right Column: Live Configuration Preview Card */}
         <div className="lg:col-span-1">
-          <div className="sticky top-6 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-md space-y-5">
-            <div>
-              <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-                <Globe className="w-4 h-4 text-indigo-500" />
+          <Card className="sticky top-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xs uppercase tracking-wider">
+                <Globe className="size-4 text-brand-500" />
                 {c.sections.preview}
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-                {c.sections.previewDesc}
-              </p>
-            </div>
-
-            <div className="space-y-3.5 text-xs">
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                  {c.previewCard.targetEndpoint}
-                </span>
-                <span className="font-mono font-semibold text-indigo-600 dark:text-indigo-400 text-xs break-all block">
-                  {form.endpoint.trim() || "https://..."}
-                </span>
+              </CardTitle>
+              <CardDescription>{c.sections.previewDesc}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3.5 text-xs">
+              <div className="space-y-1 rounded-md border border-border bg-ink-50 p-3.5 dark:bg-ink-900/40">
+                <span className="block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{c.previewCard.targetEndpoint}</span>
+                <span className="block break-all font-mono text-xs font-semibold text-brand-700 dark:text-brand-400">{form.endpoint.trim() || "https://..."}</span>
               </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                  <Database className="w-3 h-3 text-purple-500" />
+              <div className="space-y-1 rounded-md border border-border bg-ink-50 p-3.5 dark:bg-ink-900/40">
+                <span className="flex items-center gap-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Database className="size-3" />
                   {c.previewCard.bucketTarget}
                 </span>
-                <span className="font-mono font-semibold text-slate-900 dark:text-slate-100 text-xs block">
+                <span className="block font-mono text-xs font-semibold text-foreground">
                   {form.bucketName.trim() || "bucket-name"} @ {form.region.trim() || "region"}
                 </span>
               </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                  <Users className="w-3 h-3 text-cyan-500" />
+              <div className="space-y-1 rounded-md border border-border bg-ink-50 p-3.5 dark:bg-ink-900/40">
+                <span className="flex items-center gap-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Users className="size-3" />
                   {c.previewCard.tenantCap}
                 </span>
-                <span className="font-mono font-semibold text-cyan-600 dark:text-cyan-400 text-xs block">
+                <span className="block font-mono text-xs font-semibold text-foreground">
                   {maxTenants ? `${maxTenants} tenants` : c.previewCard.unlimited}
                 </span>
               </div>
-
-              {/* Security Boundary Highlight */}
-              <div className="p-3.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/60 flex items-start gap-2.5 text-emerald-900 dark:text-emerald-300">
-                <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-500 mt-0.5" />
+              <div className="flex items-start gap-2.5 rounded-md border border-brand-200 bg-brand-500/5 p-3.5 text-brand-900 dark:border-brand-800/60 dark:text-brand-300">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-600 dark:text-brand-400" />
                 <div className="text-xs leading-relaxed">
-                  <span className="font-semibold block">{c.previewCard.securityMode}</span>
+                  <span className="block font-semibold">{c.previewCard.securityMode}</span>
                   {c.previewCard.encryptedNotice}
                 </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </form>
     </div>
   );
 }
 
-function FormSection({
-  icon,
-  title,
-  description,
-  children,
-}: {
-  icon: ReactNode;
-  title: string;
-  description?: string;
-  children: ReactNode;
-}) {
+function SectionHeader({ icon, title, description }: { icon: ReactNode; title: string; description?: string }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6 shadow-md">
-      <div className="mb-5 flex items-start gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
-        <span className="grid size-9 place-items-center rounded-xl bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 shrink-0">
-          {icon}
-        </span>
-        <div>
-          <h2 className="font-semibold text-sm uppercase tracking-wider text-slate-900 dark:text-slate-100">
-            {title}
-          </h2>
-          {description ? (
-            <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-              {description}
-            </p>
-          ) : null}
-        </div>
+    <CardHeader className="flex-row items-start gap-3 space-y-0">
+      <span className="grid size-9 shrink-0 place-items-center rounded-md bg-brand-500/10 text-brand-700 dark:text-brand-400">{icon}</span>
+      <div>
+        <CardTitle className="text-sm uppercase tracking-wider">{title}</CardTitle>
+        {description && <CardDescription className="mt-1">{description}</CardDescription>}
       </div>
-      <div className="grid gap-5 md:grid-cols-2">{children}</div>
-    </section>
+    </CardHeader>
   );
 }
-
-function Field({
-  label,
-  hint,
-  wide,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  wide?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <label className={`block ${wide ? "md:col-span-2" : ""}`}>
-      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-        {label}
-      </span>
-      {children}
-      {hint ? (
-        <span className="mt-1.5 block text-xs text-slate-500 dark:text-slate-400">
-          {hint}
-        </span>
-      ) : null}
-    </label>
-  );
-}
-
-const inputClass =
-  "min-h-11 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 px-3.5 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition focus:border-indigo-600 dark:focus:border-indigo-400 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500/20";

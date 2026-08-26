@@ -1,7 +1,8 @@
 "use client";
 
 import { use } from "react";
-import { AlertCircle, Loader2, ShieldAlert } from "lucide-react";
+import { Loader2, ShieldAlert } from "lucide-react";
+import { ErrorState } from "@/design-system";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { EditDatabaseServerModal } from "@/features/admin/database-servers/components/EditDatabaseServerModal";
 import { DatabaseCredentialActionDialog } from "@/features/admin/database-servers/components/DatabaseCredentialActionDialog";
@@ -52,10 +53,8 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
 
   if (page.error || !page.server) {
     return (
-      <div className="py-6">
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-xl text-center text-red-500 max-w-md mx-auto shadow-md border border-slate-200 dark:border-slate-800">
-          {page.error || "Server not found"}
-        </div>
+      <div className="rounded-lg border border-border bg-card">
+        <ErrorState title={page.error || "Server not found"} />
       </div>
     );
   }
@@ -108,48 +107,6 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
           requireNameTyping={page.lifecycleAction === "offline"}
           isSubmitting={page.isLifecycleSubmitting}
         />
-
-        {/* Lifecycle Error Alert */}
-        {page.lifecycleError && (
-          <section
-            role="alert"
-            className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-950 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
-          >
-            <div className="flex items-start gap-3">
-              <AlertCircle
-                className="mt-0.5 size-5 shrink-0"
-                aria-hidden="true"
-              />
-              <div className="min-w-0">
-                <p className="font-semibold">{page.lifecycleError.message}</p>
-                <p className="mt-1 font-mono text-xs">
-                  {page.lifecycleError.errorCode}
-                </p>
-                {page.lifecycleError.details ? (
-                  <ul className="mt-3 space-y-1 text-xs leading-5">
-                    {Object.entries(page.lifecycleError.details).flatMap(
-                      ([field, values]) =>
-                        values.map((value) => (
-                          <li
-                            key={`${field}:${value}`}
-                            className="break-words font-mono"
-                          >
-                            {field}: {value}
-                          </li>
-                        )),
-                    )}
-                  </ul>
-                ) : null}
-                {page.lifecycleError.correlationId ? (
-                  <p className="mt-2 text-xs">
-                    Correlation ID:{" "}
-                    <code>{page.lifecycleError.correlationId}</code>
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </section>
-        )}
 
         {/* Header Hero */}
         <DatabaseServerHeaderHero
