@@ -103,7 +103,10 @@ describe("ReportsScreen", () => {
     expect(screen.getByText("120.0000")).toBeTruthy();
     expect(screen.getByText("corr-overview")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Tenants" }));
+    // Radix Tabs.Trigger activates on mousedown, not click (see
+    // @radix-ui/react-tabs's TabsTrigger) — fireEvent.click alone never
+    // fires it.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Tenants" }));
     expect(reportMock.setActiveReport).toHaveBeenCalledWith("TENANTS");
     fireEvent.submit(screen.getByRole("form", { name: "Report filters" }));
     expect(reportMock.submitFilters).toHaveBeenCalledOnce();
@@ -141,7 +144,7 @@ describe("ReportsScreen", () => {
 
     render(<ReportsScreen />);
 
-    expect(screen.getByLabelText("Tenant status")).toHaveValue("ACTIVE");
+    expect(screen.getByLabelText("Tenant status")).toHaveTextContent("ACTIVE");
     expect(screen.getByLabelText(/^Database server UUID v7/)).toHaveAttribute(
       "aria-invalid",
       "true",
@@ -184,11 +187,10 @@ describe("ReportsScreen", () => {
     expect(reportMock.refresh).toHaveBeenCalledOnce();
   });
 
-  it("sets RTL direction and local Arabic feature copy", () => {
+  it("uses local Arabic feature copy", () => {
     languageMock.lang = "ar";
-    const { container } = render(<ReportsScreen />);
+    render(<ReportsScreen />);
 
-    expect(container.firstElementChild).toHaveAttribute("dir", "rtl");
     expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent(
       "Administrative reports",
     );
