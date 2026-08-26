@@ -1,3 +1,5 @@
+import type { CopyShape } from "@/i18n/copy-shape";
+
 export type NotificationLanguage = "ar" | "en";
 
 const en = {
@@ -109,10 +111,6 @@ const en = {
     uuid: "Enter a canonical UUIDv7.",
   },
 } as const;
-
-type CopyShape<T> = {
-  -readonly [K in keyof T]: T[K] extends string ? string : CopyShape<T[K]>;
-};
 
 const ar: CopyShape<typeof en> = {
   title: "مركز الإشعارات",
