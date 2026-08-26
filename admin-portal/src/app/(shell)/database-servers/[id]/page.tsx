@@ -1,7 +1,6 @@
 "use client";
 
 import { use } from "react";
-import { Navbar } from "@/components/layout/Navbar";
 import { AlertCircle, Loader2, ShieldAlert } from "lucide-react";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { EditDatabaseServerModal } from "@/features/admin/database-servers/components/EditDatabaseServerModal";
@@ -45,24 +44,18 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
 
   if (page.isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-canvas flex flex-col">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-        </main>
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
   }
 
   if (page.error || !page.server) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-canvas flex flex-col">
-        <Navbar />
-        <main className="flex-1 p-6">
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-xl text-center text-red-500 max-w-md mx-auto shadow-md border border-slate-200 dark:border-slate-800">
-            {page.error || "Server not found"}
-          </div>
-        </main>
+      <div className="py-6">
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-xl text-center text-red-500 max-w-md mx-auto shadow-md border border-slate-200 dark:border-slate-800">
+          {page.error || "Server not found"}
+        </div>
       </div>
     );
   }
@@ -70,10 +63,7 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
   const { server } = page;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-      <Navbar />
-
-      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
+    <div className="space-y-6 w-full">
         {/* Modals & Dialogs */}
         <EditDatabaseServerModal
           isOpen={page.isEditModalOpen}
@@ -243,7 +233,6 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
             />
           )}
         </div>
-      </main>
 
       {/* Action Dialogs */}
       <DatabaseCredentialActionDialog
@@ -274,12 +263,7 @@ function DatabaseServerDetailBoundary({
   loading?: boolean;
 }) {
   return (
-    <div
-      dir={lang === "ar" ? "rtl" : "ltr"}
-      className="flex min-h-screen flex-col bg-slate-50 dark:bg-canvas"
-    >
-      <Navbar />
-      <main className="grid flex-1 place-items-center p-6">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="grid place-items-center py-16">
         <section
           role={loading ? "status" : undefined}
           className="flex max-w-xl flex-col items-center rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
@@ -299,7 +283,6 @@ function DatabaseServerDetailBoundary({
                 : "You do not have permission to view this database server."}
           </h1>
         </section>
-      </main>
     </div>
   );
 }

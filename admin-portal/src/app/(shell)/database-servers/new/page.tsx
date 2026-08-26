@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Navbar } from "@/components/layout/Navbar";
 import { ArrowLeft, ArrowRight, ShieldAlert } from "lucide-react";
 import { CreateDatabaseServerWizard } from "@/features/admin/database-servers/components/CreateDatabaseServerWizard";
 import { useAuth } from "@/context/AuthContext";
@@ -40,13 +39,7 @@ export default function NewDatabaseServerPage() {
   );
 
   return (
-    <div
-      dir={dir}
-      className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col"
-    >
-      <Navbar />
-
-      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
+    <div dir={dir} className="space-y-6 w-full">
         <Link
           href={canReadDetails ? "/database-servers" : "/dashboard"}
           className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
@@ -86,7 +79,6 @@ export default function NewDatabaseServerPage() {
             </p>
           </section>
         )}
-      </main>
     </div>
   );
 }

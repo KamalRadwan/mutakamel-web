@@ -1,6 +1,5 @@
 "use client";
 
-import { Navbar } from "@/components/layout/Navbar";
 import {
   AlertTriangle,
   Sliders,
@@ -37,19 +36,13 @@ export default function MyProfilePage() {
 
   if (isLoading) {
     return (
-      <div
-        dir={isAr ? "rtl" : "ltr"}
-        className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100"
-      >
-        <Navbar />
-        <main className="grid flex-1 place-items-center p-6">
-          <span className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-            {isAr
-              ? "جارٍ تحميل التفضيلات..."
-              : "Loading profile preferences..."}
-          </span>
-        </main>
+      <div dir={isAr ? "rtl" : "ltr"} className="grid place-items-center py-16">
+        <span className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+          {isAr
+            ? "جارٍ تحميل التفضيلات..."
+            : "Loading profile preferences..."}
+        </span>
       </div>
     );
   }
@@ -58,12 +51,7 @@ export default function MyProfilePage() {
     const forbidden = loadError.httpStatus === 403;
     const unavailable = [0, 502, 503, 504].includes(loadError.httpStatus);
     return (
-      <div
-        dir={isAr ? "rtl" : "ltr"}
-        className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100"
-      >
-        <Navbar />
-        <main className="grid flex-1 place-items-center p-6">
+      <div dir={isAr ? "rtl" : "ltr"} className="grid place-items-center py-16">
           <section
             role={forbidden ? undefined : "alert"}
             className="w-full max-w-xl rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950"
@@ -115,19 +103,12 @@ export default function MyProfilePage() {
               </button>
             ) : null}
           </section>
-        </main>
       </div>
     );
   }
 
   return (
-    <div
-      dir={isAr ? "rtl" : "ltr"}
-      className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col"
-    >
-      <Navbar />
-
-      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
+    <div dir={isAr ? "rtl" : "ltr"} className="space-y-6 w-full">
         {/* Header */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -290,7 +271,6 @@ export default function MyProfilePage() {
             </div>
           </div>
         </div>
-      </main>
     </div>
   );
 }

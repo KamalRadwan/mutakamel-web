@@ -40,9 +40,6 @@ const { auditMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <nav>Admin navigation</nav>,
-}));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en" }),
 }));

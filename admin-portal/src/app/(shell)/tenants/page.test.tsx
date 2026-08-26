@@ -17,9 +17,6 @@ vi.mock("./hooks/useTenants", async (importOriginal) => {
   return { ...actual, useTenants: hookMock };
 });
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => i18nMock }));
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <nav aria-label="navbar" />,
-}));
 vi.mock("next/link", () => ({
   default: ({
     href,

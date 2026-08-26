@@ -1,7 +1,6 @@
 "use client";
 
 import { use, useState } from "react";
-import { Navbar } from "@/components/layout/Navbar";
 import {
   ArrowLeft,
   ArrowRight,
@@ -99,45 +98,33 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const [isEditingWebphone, setIsEditingWebphone] = useState(false);
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100">
-        <Navbar />
-        <main className="grid flex-1 place-items-center p-6">
-          <span className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-            {lang === "ar" ? "جارٍ تحميل بيانات المستخدم..." : "Loading user details..."}
-          </span>
-        </main>
+      <div className="grid place-items-center py-16">
+        <span className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+          {lang === "ar" ? "جارٍ تحميل بيانات المستخدم..." : "Loading user details..."}
+        </span>
       </div>
     );
   }
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-        <Navbar />
-        <main className="flex-1 w-full px-4 py-4 sm:py-6">
-          <UserNotFoundState />
-        </main>
+      <div className="w-full">
+        <UserNotFoundState />
       </div>
     );
   }
 
   if (permissionDenied) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-        <Navbar />
-        <main className="flex-1 w-full px-4 py-4 sm:py-6">
-          <UserPermissionDenied />
-        </main>
+      <div className="w-full">
+        <UserPermissionDenied />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-      <Navbar />
-
-      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
+    <div className="space-y-6 w-full">
         {/* Header Title Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center gap-3">
@@ -610,7 +597,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             )}
           </div>
         </div>
-      </main>
 
       <DestructiveActionModal
         isOpen={isDeleteModalOpen}

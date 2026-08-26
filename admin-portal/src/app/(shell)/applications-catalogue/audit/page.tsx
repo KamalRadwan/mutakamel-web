@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, History, Loader2, RefreshCw } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { useAuth } from "@/context/AuthContext";
 import { applicationsApi } from "@/features/admin/applications/api/applications.api";
 import type {
@@ -64,12 +63,7 @@ export default function CatalogueAuditPage() {
   }, [load]);
 
   return (
-    <div
-      dir={dir}
-      className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100"
-    >
-      <Navbar />
-      <main className="w-full flex-1 space-y-5 px-4 py-4 sm:py-6">
+    <div dir={dir} className="w-full space-y-5">
         <header className="rounded-xl border border-violet-500/20 bg-slate-950 px-4 py-3 text-white shadow-md sm:px-5 sm:py-3.5">
           <div className="flex items-center gap-3">
             <Link
@@ -241,7 +235,6 @@ export default function CatalogueAuditPage() {
             </section>
           </>
         )}
-      </main>
     </div>
   );
 }

@@ -33,9 +33,6 @@ const { reportMock, languageMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <nav aria-label="Admin navigation">Admin navigation</nav>,
-}));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => languageMock,
 }));
@@ -89,9 +86,6 @@ describe("ReportsScreen", () => {
   it("renders all report tabs, overview filters, evidence, and correlation", () => {
     render(<ReportsScreen />);
 
-    expect(
-      screen.getByRole("navigation", { name: "Admin navigation" }),
-    ).toBeTruthy();
     expect(
       screen.getByRole("heading", { name: "Administrative reports" }),
     ).toBeTruthy();

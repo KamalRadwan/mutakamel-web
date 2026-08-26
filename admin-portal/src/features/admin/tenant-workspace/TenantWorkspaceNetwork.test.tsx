@@ -15,7 +15,6 @@ const http = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
-vi.mock("@/components/layout/Navbar", () => ({ Navbar: () => <div>navbar</div> }));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en", dir: "ltr" }),
 }));

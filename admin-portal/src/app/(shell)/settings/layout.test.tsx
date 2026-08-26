@@ -3,7 +3,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/components/layout/Navbar", () => ({ Navbar: () => <nav>Navbar</nav> }));
 vi.mock("./components/SettingsSidebar", () => ({
   SettingsSidebar: () => <aside>Settings navigation</aside>,
 }));

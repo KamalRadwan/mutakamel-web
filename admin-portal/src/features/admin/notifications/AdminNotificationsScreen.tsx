@@ -22,7 +22,6 @@ import {
   Trash2,
   Wifi,
 } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -78,28 +77,25 @@ export function AdminNotificationsScreen() {
 
   const pending = view.actionStatus.state === "PENDING";
   const shell = (content: ReactNode) => (
-    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100">
-      <Navbar />
-      <main className="mx-auto w-full max-w-[1500px] space-y-5 px-3 py-5 sm:px-6">
-        <header className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-950 to-blue-950 p-5 text-white shadow-sm dark:border-slate-800">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-                <Bell className="size-5 text-cyan-300" aria-hidden="true" />
-                {copy.title}
-              </h1>
-              <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-300">{copy.description}</p>
-            </div>
-            {view.canRead ? (
-              <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold">
-                <Inbox className="size-4 text-cyan-300" aria-hidden="true" />
-                {copy.unread}: {view.unreadCount}
-              </div>
-            ) : null}
+    <div className="mx-auto w-full max-w-[1500px] space-y-5">
+      <header className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-950 to-blue-950 p-5 text-white shadow-sm dark:border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+              <Bell className="size-5 text-cyan-300" aria-hidden="true" />
+              {copy.title}
+            </h1>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-300">{copy.description}</p>
           </div>
-        </header>
-        {content}
-      </main>
+          {view.canRead ? (
+            <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold">
+              <Inbox className="size-4 text-cyan-300" aria-hidden="true" />
+              {copy.unread}: {view.unreadCount}
+            </div>
+          ) : null}
+        </div>
+      </header>
+      {content}
     </div>
   );
 

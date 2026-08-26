@@ -15,9 +15,6 @@ vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en", dir: "ltr", t: {} }),
 }));
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <nav data-testid="navbar" />,
-}));
 vi.mock(
   "@/features/admin/database-servers/hooks/useDatabaseServerDetailPage",
   () => ({ useDatabaseServerDetailPage: detailHookMock }),

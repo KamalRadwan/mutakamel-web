@@ -10,9 +10,6 @@ vi.mock("@/context/AuthContext", () => ({ useAuth: vi.fn() }));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en", dir: "ltr" }),
 }));
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <div data-testid="navbar" />,
-}));
 vi.mock("@/features/admin/database-servers/components/CreateDatabaseServerWizard", () => ({
   CreateDatabaseServerWizard: () => <div data-testid="database-server-wizard" />,
 }));

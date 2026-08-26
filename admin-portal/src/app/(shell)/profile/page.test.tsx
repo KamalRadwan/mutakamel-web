@@ -6,9 +6,6 @@ import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 
 const { hookMock } = vi.hoisted(() => ({ hookMock: vi.fn() }));
 
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <nav data-testid="navbar" />,
-}));
 vi.mock("./hooks/useMyProfile", () => ({ useMyProfile: hookMock }));
 
 import MyProfilePage from "./page";

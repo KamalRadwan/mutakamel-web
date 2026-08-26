@@ -16,7 +16,6 @@ const { languageMock, viewBox } = vi.hoisted(() => ({
   viewBox: { current: null as unknown },
 }));
 
-vi.mock("@/components/layout/Navbar", () => ({ Navbar: () => <nav>Navbar</nav> }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => languageMock }));
 vi.mock("./usePublisherKeys", () => ({
   usePublisherKeys: () => viewBox.current,

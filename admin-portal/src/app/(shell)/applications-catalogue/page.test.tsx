@@ -16,9 +16,6 @@ vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => i18nMock,
 }));
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <nav data-testid="navbar" />,
-}));
 vi.mock("@/features/admin/applications/hooks/useApplications", () => ({
   useApplications: applicationsHookMock,
 }));

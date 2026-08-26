@@ -1,7 +1,6 @@
 "use client";
 
 import { use } from "react";
-import { Navbar } from "@/components/layout/Navbar";
 import {
   ArrowLeft,
   ArrowRight,
@@ -67,24 +66,19 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-        <Navbar />
-        <main className="flex-1 p-4 flex items-center justify-center">
-          <div className="flex items-center gap-3 text-slate-500 animate-pulse">
-            <Sparkles className="w-5 h-5 text-indigo-500 animate-spin" />
-            <span>{lang === "ar" ? "جاري تحميل تفاصيل الدور..." : "Loading role details..."}</span>
-          </div>
-        </main>
+      <div className="flex items-center justify-center py-16">
+        <div className="flex items-center gap-3 text-slate-500 animate-pulse">
+          <Sparkles className="w-5 h-5 text-indigo-500 animate-spin" />
+          <span>{lang === "ar" ? "جاري تحميل تفاصيل الدور..." : "Loading role details..."}</span>
+        </div>
       </div>
     );
   }
 
   if (roleError && !role) {
     return (
-      <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100">
-        <Navbar />
-        <main className="flex flex-1 items-center justify-center p-4">
-          <div role="alert" className="w-full max-w-lg rounded-xl border border-rose-200 bg-white p-6 text-sm shadow-sm dark:border-rose-900 dark:bg-slate-900">
+      <div className="flex items-center justify-center py-16">
+        <div role="alert" className="w-full max-w-lg rounded-xl border border-rose-200 bg-white p-6 text-sm shadow-sm dark:border-rose-900 dark:bg-slate-900">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
               <div className="min-w-0">
@@ -110,7 +104,6 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
           </div>
-        </main>
       </div>
     );
   }
@@ -119,10 +112,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
   const permissionsReadOnly = !canReplacePermissions || permissionsAmbiguous;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-      <Navbar />
-
-      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
+    <div className="space-y-6 w-full">
         {/* Header Title with Save Status */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center gap-3">
@@ -458,7 +448,6 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           ) : null}
         </div>
-      </main>
     </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { AlertTriangle, FileText, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import type {
   CoreSnapshot,
   Invoice,
@@ -263,11 +262,8 @@ export function InvoicePageFrame({
   dir: "rtl" | "ltr";
 }) {
   return (
-    <div dir={dir} className="min-h-screen bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100">
-      <Navbar />
-      <main className="mx-auto w-full max-w-[1600px] space-y-4 px-4 py-5 sm:px-6 lg:px-8">
-        {children}
-      </main>
+    <div dir={dir} className="mx-auto w-full max-w-[1600px] space-y-4">
+      {children}
     </div>
   );
 }

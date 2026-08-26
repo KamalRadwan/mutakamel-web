@@ -1,19 +1,18 @@
 import type { ReactNode } from "react";
 import { RequirePermission } from "@/components/auth/RequirePermission";
-import { Navbar } from "@/components/layout/Navbar";
 import { BackupModuleNav } from "@/features/admin/backup/components/BackupModuleNav";
 
+// The negative margin cancels AppShell's <main> padding so BackupModuleNav's
+// own edge-to-edge header keeps spanning full width — it was designed to sit
+// flush below the old full-bleed Navbar. Phase 18 converts BackupModuleNav's
+// tab row onto the shared SubNav component; this layout is untouched then.
 export default function BackupLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100">
-      <Navbar />
-
-      <RequirePermission permission="admin.backups.read">
+    <RequirePermission permission="admin.backups.read">
+      <div className="-mx-4 -mt-4 md:-mx-6 md:-mt-6">
         <BackupModuleNav />
-        <main className="w-full flex-1 px-4 py-4 sm:py-6">
-          {children}
-        </main>
-      </RequirePermission>
-    </div>
+      </div>
+      <div className="pt-4">{children}</div>
+    </RequirePermission>
   );
 }

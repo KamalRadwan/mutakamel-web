@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
 }));
-vi.mock("@/components/layout/Navbar", () => ({ Navbar: () => <div>navbar</div> }));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en", dir: "ltr" }),
 }));

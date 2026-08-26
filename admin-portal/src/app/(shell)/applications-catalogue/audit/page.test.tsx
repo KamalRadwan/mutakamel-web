@@ -14,7 +14,6 @@ const { authMock, i18nMock, getGlobalAuditMock } = vi.hoisted(() => ({
 
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => i18nMock }));
-vi.mock("@/components/layout/Navbar", () => ({ Navbar: () => <nav /> }));
 vi.mock("@/features/admin/applications/api/applications.api", () => ({
   applicationsApi: { getGlobalAudit: getGlobalAuditMock },
 }));

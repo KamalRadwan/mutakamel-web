@@ -57,3 +57,13 @@ export * from "./patterns/code-ref/CodeRef";
 export * from "./patterns/confirm-action/ConfirmActionModal";
 export * from "./patterns/status-badge/StatusBadge";
 export * from "./patterns/status-badge/tone-map";
+
+export * from "./shell/nav-config";
+export * from "./shell/useNavTree";
+export * from "./shell/useSidebar";
+export * from "./shell/AppShell";
+export * from "./shell/Sidebar";
+export * from "./shell/Topbar";
+export * from "./shell/MobileNav";
+export * from "./shell/SubNav";
+export * from "./shell/CommandPalette";

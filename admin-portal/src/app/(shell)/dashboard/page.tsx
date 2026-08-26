@@ -1,7 +1,6 @@
 "use client";
 
 import { AlertTriangle, Lock, RotateCw } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { useI18n } from "@/i18n/I18nContext";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { DashboardTabsNav } from "./components/DashboardTabsNav";
@@ -105,14 +104,7 @@ export default function DashboardPage() {
 }
 
 function PageShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100">
-      <Navbar />
-      <main className="w-full flex-1 space-y-5 px-4 py-4 sm:py-6">
-        {children}
-      </main>
-    </div>
-  );
+  return <div className="w-full space-y-5">{children}</div>;
 }
 
 function ErrorBanner({

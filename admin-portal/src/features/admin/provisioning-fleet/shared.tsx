@@ -17,7 +17,6 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { Navbar } from "@/components/layout/Navbar";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type { ProvisioningFleetCopy } from "./copy";
 import type {
@@ -34,14 +33,8 @@ export function FleetPageFrame({
   children: ReactNode;
 }) {
   return (
-    <div
-      dir={dir}
-      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100"
-    >
-      <Navbar />
-      <main className="mx-auto w-full max-w-[1500px] space-y-5 px-4 py-5 sm:px-6">
-        {children}
-      </main>
+    <div dir={dir} className="mx-auto w-full max-w-[1500px] space-y-5">
+      {children}
     </div>
   );
 }

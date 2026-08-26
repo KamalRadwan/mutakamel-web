@@ -1,6 +1,5 @@
 "use client";
 
-import { Navbar } from "@/components/layout/Navbar";
 import {
   Building2,
   ArrowLeft,
@@ -78,10 +77,7 @@ export default function RegisterTenantWizardPage() {
   const wizardLocked = isSubmitting || pendingCreateRecovery !== null;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-      <Navbar />
-
-      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
+    <div className="space-y-6 w-full">
         {/* Header Title with Back Button */}
         <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center gap-3">
@@ -926,7 +922,6 @@ export default function RegisterTenantWizardPage() {
             </div>
           </fieldset>
         </form>
-      </main>
     </div>
   );
 }

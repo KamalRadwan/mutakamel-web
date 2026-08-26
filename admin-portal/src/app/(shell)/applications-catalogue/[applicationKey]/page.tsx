@@ -4,7 +4,6 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppWindow, ArrowLeft, Database, FileCheck, Loader2, Pencil, Settings, Shield, Trash2 } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/context/AuthContext";
@@ -206,7 +205,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   </PageFrame>;
 }
 
-function PageFrame({ children }: { children: React.ReactNode }) { return <div className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100"><Navbar /><main className="w-full flex-1 space-y-6 px-4 py-4 sm:py-6">{children}</main></div>; }
+function PageFrame({ children }: { children: React.ReactNode }) { return <div className="w-full space-y-6">{children}</div>; }
 function Fact({ label, value, tone, mono = false }: { label: string; value: string; tone: "violet" | "amber" | "blue" | "emerald"; mono?: boolean }) { const tones = { violet: "border-violet-200 dark:border-violet-900", amber: "border-amber-200 dark:border-amber-900", blue: "border-blue-200 dark:border-blue-900", emerald: "border-emerald-200 dark:border-emerald-900" }; return <div className={`rounded-xl border bg-white p-4 shadow-sm dark:bg-slate-900 ${tones[tone]}`}><div className="text-2xs font-semibold uppercase tracking-wider text-slate-500">{label}</div><div className={`mt-2 truncate text-sm font-semibold ${mono ? "font-mono" : ""}`} title={value}>{value}</div></div>; }
 function Item({ label, value }: { label: string; value: string }) { return <div><dt className="text-2xs font-semibold uppercase tracking-wider text-slate-500">{label}</dt><dd className="mt-1 font-mono font-semibold text-slate-900 dark:text-slate-100">{value}</dd></div>; }
 

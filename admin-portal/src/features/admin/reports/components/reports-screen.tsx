@@ -18,7 +18,6 @@ import {
   Users,
   Workflow,
 } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatDecimalString } from "../lib/report-filters";
 import { useReports } from "../hooks/use-reports";
@@ -188,10 +187,8 @@ export function ReportsScreen() {
   return (
     <div
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100"
+      className="mx-auto w-full max-w-[1440px] space-y-4"
     >
-      <Navbar />
-      <main className="mx-auto w-full max-w-[1440px] space-y-4 px-4 py-5 sm:px-6">
         <header className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 px-5 py-4 text-white shadow-md">
           <div className="absolute end-0 top-0 size-48 -translate-y-1/2 translate-x-1/3 rounded-full bg-cyan-400/15 blur-3xl rtl:-translate-x-1/3" />
           <div className="relative flex flex-wrap items-center justify-between gap-3">
@@ -336,7 +333,6 @@ export function ReportsScreen() {
             </section>
           </>
         )}
-      </main>
     </div>
   );
 }

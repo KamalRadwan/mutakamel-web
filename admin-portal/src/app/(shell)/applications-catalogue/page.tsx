@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Navbar } from "@/components/layout/Navbar";
 import {
   AppWindow,
   Search,
@@ -37,7 +36,7 @@ export default function ApplicationsPage() {
 
 function ApplicationRegistrationOnlyContent() {
   const { user } = useAuth();
-  const { lang, dir } = useI18n();
+  const { lang } = useI18n();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { createApplication, onboardApplication } =
     useApplicationRegistration();
@@ -64,12 +63,8 @@ function ApplicationRegistrationOnlyContent() {
         };
 
   return (
-    <div
-      dir={dir}
-      className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100"
-    >
-      <Navbar />
-      <main className="grid flex-1 place-items-center p-6">
+    <>
+      <div className="grid place-items-center py-16">
         <section className="w-full max-w-xl rounded-xl border border-violet-200 bg-white p-8 text-center shadow-lg dark:border-violet-900 dark:bg-slate-950">
           <AppWindow className="mx-auto size-10 text-violet-600" aria-hidden="true" />
           <h1 className="mt-4 text-xl font-semibold">{copy.title}</h1>
@@ -93,7 +88,7 @@ function ApplicationRegistrationOnlyContent() {
             </Link>
           </div>
         </section>
-      </main>
+      </div>
       <CreateApplicationModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
@@ -101,7 +96,7 @@ function ApplicationRegistrationOnlyContent() {
         onOnboard={onboardApplication}
         canOnboard={canOnboard}
       />
-    </div>
+    </>
   );
 }
 
@@ -145,10 +140,7 @@ function ApplicationsCatalogueContent() {
   const canReadAudit = adminCanAll(user, ["admin.catalog.read"]);
 
   return (
-    <div dir={dir} className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-      <Navbar />
-
-      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
+    <div dir={dir} className="space-y-6 w-full">
         <CreateApplicationModal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
@@ -462,7 +454,6 @@ function ApplicationsCatalogueContent() {
 
           <TablePagination meta={meta} page={page} setPage={setPage} />
         </div>
-      </main>
     </div>
   );
 }
@@ -475,12 +466,7 @@ function ApplicationsReadBoundary({
   loading?: boolean;
 }) {
   return (
-    <div
-      dir={lang === "ar" ? "rtl" : "ltr"}
-      className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100"
-    >
-      <Navbar />
-      <main className="grid flex-1 place-items-center p-6">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="grid place-items-center py-16">
         <section
           role={loading ? "status" : undefined}
           className="flex max-w-xl flex-col items-center rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-950"
@@ -500,7 +486,6 @@ function ApplicationsReadBoundary({
                 : "You do not have permission to view the Application Catalogue."}
           </h1>
         </section>
-      </main>
     </div>
   );
 }

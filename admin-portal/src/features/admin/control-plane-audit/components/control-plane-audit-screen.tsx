@@ -14,7 +14,6 @@ import {
   ShieldAlert,
   UserRound,
 } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatAuditValue } from "../lib/control-plane-audit-utils";
 import { useControlPlaneAudit } from "../hooks/use-control-plane-audit";
@@ -141,9 +140,7 @@ export function ControlPlaneAuditScreen() {
   const audit = useControlPlaneAudit();
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100">
-      <Navbar />
-      <main className="w-full flex-1 space-y-4 px-4 py-4 sm:py-6">
+    <div className="w-full space-y-4">
         <header className="overflow-hidden rounded-xl border border-cyan-500/20 bg-slate-950 px-4 py-4 text-white shadow-md sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
@@ -188,7 +185,6 @@ export function ControlPlaneAuditScreen() {
             tone="warning"
           />
         )}
-      </main>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Navbar } from "@/components/layout/Navbar";
 import {
   ShieldCheck,
   Search,
@@ -61,10 +60,7 @@ export default function RolesDirectoryPage() {
   const canDelete = adminCanAll(user, ADMIN_RBAC_CRITICAL.ROLES_DELETE);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-      <Navbar />
-
-      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
+    <div className="space-y-6 w-full">
         {/* Header Title Section with Compact Gradient Banner */}
         <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-xl border border-purple-500/20 shadow-md">
           <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-purple-500/20 via-indigo-500/20 to-pink-500/0 rounded-full blur-3xl pointer-events-none" />
@@ -364,7 +360,6 @@ export default function RolesDirectoryPage() {
             </div>
           </div>
         </div>
-      </main>
 
       {isCreateModalOpen && (
         <CreateRoleModal onClose={() => setIsCreateModalOpen(false)} onSuccess={refreshRoles} />

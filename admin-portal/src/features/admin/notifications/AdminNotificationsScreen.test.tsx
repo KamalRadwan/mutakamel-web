@@ -41,7 +41,6 @@ const { viewMock } = vi.hoisted(() => ({
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en", dir: "ltr" }),
 }));
-vi.mock("@/components/layout/Navbar", () => ({ Navbar: () => <nav /> }));
 vi.mock("@/components/shared/DestructiveActionModal", () => ({
   DestructiveActionModal: ({
     isOpen,

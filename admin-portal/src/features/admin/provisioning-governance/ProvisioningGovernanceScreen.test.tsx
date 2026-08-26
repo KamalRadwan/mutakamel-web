@@ -8,9 +8,6 @@ const { languageMock, hookMock } = vi.hoisted(() => ({
   hookMock: vi.fn(),
 }));
 
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <nav data-testid="navbar" />,
-}));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => languageMock }));
 vi.mock("./useProvisioningGovernance", () => ({
   useProvisioningGovernance: hookMock,

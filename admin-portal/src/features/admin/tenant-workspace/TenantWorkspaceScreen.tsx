@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Database, ReceiptText, Settings2, Users } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantAccessPanel } from "./access";
 import { TenantBillingPanel } from "./billing/components/TenantBillingPanel";
@@ -175,12 +174,7 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
 }
 
 function PageFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-900 dark:text-white">
-      <Navbar />
-      <main className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">{children}</main>
-    </div>
-  );
+  return <div className="mx-auto max-w-[1600px]">{children}</div>;
 }
 
 function WorkspaceState({ children, alert = false }: { children: React.ReactNode; alert?: boolean }) {

@@ -41,9 +41,6 @@ const { languageMock, creatorMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <nav aria-label="Admin navigation">Admin navigation</nav>,
-}));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => languageMock }));
 vi.mock("../hooks/use-create-release-draft", () => ({
   useCreateReleaseDraft: () => creatorMock,

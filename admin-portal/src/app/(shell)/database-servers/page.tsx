@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Navbar } from "@/components/layout/Navbar";
 import { Server, Search, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { useDatabaseServers } from "@/features/admin/database-servers/hooks/useDatabaseServers";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -88,10 +87,7 @@ function DatabaseServersContent() {
   const canDestroy = adminCanAll(user, ADMIN_RBAC_CRITICAL.DB_SERVERS_DESTROY);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-      <Navbar />
-
-      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
+    <div className="space-y-6 w-full">
         {/* Header Title Section with Compact Gradient Accents */}
         <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-xl border border-blue-500/20 shadow-md">
           <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-blue-500/20 via-cyan-500/20 to-teal-500/0 rounded-full blur-3xl pointer-events-none" />
@@ -409,7 +405,6 @@ function DatabaseServersContent() {
 
           <TablePagination meta={meta} page={page} setPage={setPage} />
         </div>
-      </main>
 
       <DestructiveActionModal
         isOpen={serverPendingDelete !== null}
@@ -462,12 +457,7 @@ function DatabaseServersBoundary({
   loading?: boolean;
 }) {
   return (
-    <div
-      dir={lang === "ar" ? "rtl" : "ltr"}
-      className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100"
-    >
-      <Navbar />
-      <main className="grid flex-1 place-items-center p-6">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="grid place-items-center py-16">
         <section
           role={loading ? "status" : undefined}
           className="flex max-w-xl flex-col items-center rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-950"
@@ -479,7 +469,6 @@ function DatabaseServersBoundary({
           )}
           <h1 className="mt-3 font-semibold">{message}</h1>
         </section>
-      </main>
     </div>
   );
 }

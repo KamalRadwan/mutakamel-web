@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { useI18n } from "@/i18n/I18nContext";
 import { COPY, type PublisherKeyCopy } from "./copy";
 import type {
@@ -40,10 +39,8 @@ export function PublisherKeysScreen() {
   return (
     <div
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100"
+      className="mx-auto w-full max-w-[1500px] space-y-4"
     >
-      <Navbar />
-      <main className="mx-auto w-full max-w-[1500px] space-y-4 px-3 py-5 sm:px-6">
         <header className="relative overflow-hidden rounded-xl border border-violet-500/25 bg-gradient-to-r from-slate-950 via-violet-950 to-slate-950 px-5 py-5 text-white shadow-lg">
           <div className="absolute end-0 top-0 size-64 -translate-y-1/2 translate-x-1/3 rounded-full bg-violet-400/15 blur-3xl rtl:-translate-x-1/3" />
           <div className="relative flex flex-wrap items-start justify-between gap-4">
@@ -101,7 +98,6 @@ export function PublisherKeysScreen() {
         <RevokePanel view={view} copy={copy} />
 
         <MutationFeedback view={view} copy={copy} />
-      </main>
       <ConfirmationDialog view={view} copy={copy} />
     </div>
   );

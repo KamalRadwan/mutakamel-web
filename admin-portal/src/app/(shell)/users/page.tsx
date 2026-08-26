@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Navbar } from "@/components/layout/Navbar";
 import {
   Users,
   Search,
@@ -80,10 +79,7 @@ export default function UsersDirectoryPage() {
   const endRecord = Math.min(page * limit, totalCount);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
-      <Navbar />
-
-      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
+    <div className="space-y-6 w-full">
         {/* Header Title Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 px-4 py-3 sm:px-5 sm:py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
           <div>
@@ -455,7 +451,6 @@ export default function UsersDirectoryPage() {
             )}
           </>
         )}
-      </main>
 
       {isInviteModalOpen && (
         <InviteUserModal

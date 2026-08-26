@@ -16,7 +16,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   useTenants,
@@ -63,10 +62,7 @@ export default function TenantsDirectoryPage() {
   const copy = directoryCopy(lang);
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100">
-      <Navbar />
-
-      <main className="w-full flex-1 space-y-4 px-4 py-4 sm:py-6">
+    <div className="w-full space-y-4">
         <header className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 px-4 py-3 text-white shadow-md sm:px-5 sm:py-3.5">
           <div className="pointer-events-none absolute end-0 top-0 -me-10 -mt-10 size-72 rounded-full bg-gradient-to-br from-cyan-500/20 via-blue-500/20 to-indigo-500/0 blur-3xl" />
           <div className="relative z-10 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -312,7 +308,6 @@ export default function TenantsDirectoryPage() {
             </div>
           </footer>
         </section>
-      </main>
 
       {activeModalTenant && modalActionType ? (
         <TenantActionModal
