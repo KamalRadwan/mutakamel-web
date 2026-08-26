@@ -26,9 +26,9 @@ export function ChartTooltip({
   }
 
   return (
-    <div className="bg-card border border-slate-200 dark:border-slate-800 p-3 rounded-xl shadow-xl text-xs space-y-1.5 min-w-[140px] z-50 animate-in fade-in duration-100">
+    <div className="min-w-[140px] z-50 animate-in fade-in duration-100 space-y-1.5 rounded-lg border border-border bg-card p-3 text-xs shadow-pop">
       {label && (
-        <div className="font-semibold text-slate-700 dark:text-slate-200 border-b border-slate-100 dark:border-slate-800/80 pb-1">
+        <div className="border-b border-border pb-1 font-semibold text-foreground">
           {label}
         </div>
       )}
@@ -40,11 +40,11 @@ export function ChartTooltip({
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ backgroundColor: item.color || item.fill }}
               />
-              <span className="text-slate-500 dark:text-slate-400 font-medium">
+              <span className="font-medium text-muted-foreground">
                 {item.name || item.dataKey}
               </span>
             </div>
-            <span className="font-semibold font-mono text-slate-900 dark:text-slate-100">
+            <span className="font-semibold font-mono text-foreground">
               {valueFormatter(item.value)}
             </span>
           </div>

@@ -48,14 +48,14 @@ export function DomainHealthGaugeChart({
         </ResponsiveContainer>
       </div>
 
-      <div className="flex items-center justify-between text-2xs font-semibold text-slate-500 dark:text-slate-400">
+      <div className="flex items-center justify-between text-2xs font-semibold text-muted-foreground">
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span>{names.verified}: <strong className="text-slate-900 dark:text-slate-100">{verified}</strong></span>
+          <span className="w-2 h-2 rounded-full bg-brand-500" />
+          <span>{names.verified}: <strong className="text-foreground">{verified}</strong></span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-amber-500" />
-          <span>{names.invalid}: <strong className="text-slate-900 dark:text-slate-100">{invalid}</strong></span>
+          <span className="w-2 h-2 rounded-full bg-warn-500" />
+          <span>{names.invalid}: <strong className="text-foreground">{invalid}</strong></span>
         </div>
       </div>
     </div>

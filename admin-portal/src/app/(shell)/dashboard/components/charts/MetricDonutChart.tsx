@@ -54,12 +54,12 @@ export function MetricDonutChart({
       {(centerValue !== undefined || centerLabel) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
           {centerValue !== undefined && (
-            <span className="text-2xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
+            <span className="text-2xl font-semibold text-foreground tracking-tight">
               {centerValue}
             </span>
           )}
           {centerLabel && (
-            <span className="text-2xs font-semibold text-slate-400 dark:text-slate-500">
+            <span className="text-2xs font-semibold text-muted-foreground">
               {centerLabel}
             </span>
           )}

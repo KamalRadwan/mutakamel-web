@@ -43,10 +43,10 @@ export function CollectionGaugeChart({
       </ResponsiveContainer>
 
       <div className="absolute bottom-4 flex flex-col items-center justify-center text-center">
-        <span className="text-3xl font-semibold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+        <span className="text-2xl font-semibold text-brand-600 dark:text-brand-400 font-mono tracking-tight">
           {percentage.toFixed(1)}%
         </span>
-        <span className="text-2xs font-semibold text-slate-400 dark:text-slate-500">
+        <span className="text-2xs font-semibold text-muted-foreground">
           {t.dashboard.billingTab.actualCollectedRatio}
         </span>
       </div>

@@ -45,7 +45,7 @@ export function TenantGrowthRevenueChart({
 
   if (!points || points.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-xs text-slate-400">
+      <div className="flex items-center justify-center h-48 text-xs text-muted-foreground">
         No growth data available for the selected period.
       </div>
     );
@@ -63,7 +63,7 @@ export function TenantGrowthRevenueChart({
     return (
       <div className="flex flex-wrap items-center justify-end gap-4 text-xs mb-3">
         {payload?.map((entry, index) => (
-          <div key={`item-${index}`} className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
+          <div key={`item-${index}`} className="flex items-center gap-1.5 font-semibold text-foreground">
             <span
               className="w-2.5 h-2.5 rounded-xs inline-block shrink-0"
               style={{ backgroundColor: entry.color }}
