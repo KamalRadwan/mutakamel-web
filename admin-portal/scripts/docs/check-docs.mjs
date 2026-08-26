@@ -45,6 +45,16 @@ const requiredFiles = [
   "audit/documentation-coverage.md",
   "generated/admin-core-api-routes.json",
   "generated/admin-core-api-routes.md",
+  "design-system/README.md",
+  "design-system/tokens.md",
+  "design-system/typography.md",
+  "design-system/geometry-and-density.md",
+  "design-system/primitives.md",
+  "design-system/patterns.md",
+  "design-system/shell-and-navigation.md",
+  "design-system/theming-and-direction.md",
+  "design-system/toast-contract.md",
+  "design-system/migration.md",
 ];
 for (const requiredFile of requiredFiles) {
   if (!existsSync(resolve(docsRoot, requiredFile))) {

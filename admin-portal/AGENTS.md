@@ -70,7 +70,16 @@ This version has breaking changes — APIs, conventions, and file structure may 
   adapter, or live/mock boundary changes, update the relevant file under
   `docs/` and refresh its verification date in the same task.
 - **Styling**: Use Tailwind CSS first and keep admin dashboards, tables, and
-  metric layouts compact and space-efficient.
+  metric layouts compact and space-efficient — but density is not an excuse
+  for text below `text-xs` (13px) or heavier-than-`font-semibold` weight.
+  Compact and dense means small spacing and a controlled type scale, not
+  microscopic type; see `docs/design-system/typography.md` for the exact
+  7-step scale and 3-weight policy this app enforces everywhere else.
+- **Design system imports**: Feature code (`src/app/**`, `src/features/**`)
+  must import design-system pieces only from the `@/design-system` barrel
+  (`import { Button, DataTable } from "@/design-system"`), never by reaching
+  into `src/design-system/primitives/Button` or `src/design-system/patterns/
+  data-table/DataTable` directly. See `docs/design-system/README.md`.
 - **Navigation**: Use `Link` from `next/link` for internal routes.
 - **Bilingual and Theme Support**: Every screen must support Arabic RTL and
   English LTR plus dark and light themes. Prefer logical Tailwind properties

@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-12**
+Last source verification: **2026-08-26**
 
 This documentation describes the current Admin Portal source, all
 browser-visible Core Admin capabilities, exact integration defects, required
@@ -60,6 +60,7 @@ Do not store JWT access or refresh tokens in browser-readable storage.
 | Permission catalogue | [rbac/permissions.md](rbac/permissions.md) |
 | Navigation mapping | [guides/sidebar-navigation.md](guides/sidebar-navigation.md) |
 | Reusable component behavior | [components/README.md](components/README.md) |
+| Design system: tokens, primitives, patterns, shell, migration record | [design-system/README.md](design-system/README.md) |
 
 ## Current route evidence
 

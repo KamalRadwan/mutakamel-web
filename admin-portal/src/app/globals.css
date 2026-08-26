@@ -125,8 +125,11 @@
   --input: var(--color-ink-200);
   --ring: var(--color-brand-500);
 
-  /* Chart series placeholders — Phase 22 revisits this with a proper
-     qualitative palette when the dashboard charts are restored. */
+  /* Chart series placeholder palette. Phase 22 restored the dashboard
+     charts but each one encodes its own chart-specific categorical
+     colors rather than drawing from a generic 5-slot palette — see
+     docs/design-system/tokens.md. These stay defined, themed, for the
+     next chart that does want a generic series palette. */
   --chart-1: var(--color-brand-500);
   --chart-2: var(--color-ink-500);
   --chart-3: var(--color-warn-500);
