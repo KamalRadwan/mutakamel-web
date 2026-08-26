@@ -17,6 +17,11 @@ vi.mock("./hooks/useTenants", async (importOriginal) => {
   return { ...actual, useTenants: hookMock };
 });
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => i18nMock }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => "/tenants",
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("next/link", () => ({
   default: ({
     href,
@@ -131,10 +136,10 @@ describe("TenantsDirectoryPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "019ff251-184d-715c-8ee3-77104f14c446",
     );
-    expect(screen.getByText("Page 2 of 3 · 30 total")).toBeInTheDocument();
+    expect(screen.getByText("Showing 11–20 of 30 · Page 2 of 3")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Previous page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(controller.setPage).toHaveBeenNthCalledWith(1, 1);
@@ -180,12 +185,12 @@ describe("TenantsDirectoryPage", () => {
     expect(
       screen.getByRole("heading", { name: "Confirm tenant soft deletion" }),
     ).toBeInTheDocument();
-    const confirm = screen.getByRole("button", { name: "Confirm action" });
+    const confirm = screen.getByRole("button", { name: "Confirm Action" });
     expect(confirm).toBeDisabled();
 
     fireEvent.change(
       screen.getByRole("textbox", {
-        name: "Type the exact tenant name to confirm",
+        name: "Type the exact name to confirm",
       }),
       { target: { value: tenant.name } },
     );

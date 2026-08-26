@@ -1,22 +1,27 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
-  AlertCircle,
-  Building2,
   ExternalLink,
   Globe,
   HardDrive,
   Loader2,
   Plus,
   RotateCcw,
-  Search,
   Server,
   Trash2,
-  X,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import {
+  Badge,
+  Button,
+  ConfirmActionModal,
+  DataTable,
+  ErrorState,
+  FilterBar,
+  PageHeader,
+  type ColumnDef,
+} from "@/design-system";
 import {
   useTenants,
   type TenantDirectoryModalAction,
@@ -39,6 +44,7 @@ export default function TenantsDirectoryPage() {
     retryDatabaseServerOptions,
     page,
     setPage,
+    limit,
     tenants,
     totalItems,
     pagination,
@@ -61,110 +67,164 @@ export default function TenantsDirectoryPage() {
   const { lang } = useI18n();
   const copy = directoryCopy(lang);
 
+  const columns: ColumnDef<TenantRecord>[] = [
+    {
+      key: "tenant",
+      headerEn: "Tenant",
+      headerAr: "المستأجر",
+      cell: (tenant) => (
+        <Link href={`/tenants/${tenant.id}`} className="group inline-flex flex-col">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-brand-700 group-hover:underline dark:text-brand-400">
+              {tenant.companyName}
+            </span>
+            <span className="rounded-sm bg-ink-100 px-1.5 py-0.5 font-mono text-xs text-muted-foreground dark:bg-ink-800">
+              {tenant.name}
+            </span>
+          </div>
+          <span className="font-mono text-xs font-normal text-muted-foreground">
+            {tenant.ownerEmail ?? "—"}
+          </span>
+        </Link>
+      ),
+    },
+    {
+      key: "fqdn",
+      headerEn: "Primary FQDN",
+      headerAr: "النطاق الأساسي",
+      cell: (tenant) => (
+        <div className="flex items-center gap-1.5">
+          <Globe className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="text-xs font-semibold text-foreground">{tenant.primaryFqdn ?? "—"}</span>
+          {tenant.secondaryFqdnsCount > 0 ? (
+            <span className="text-xs text-muted-foreground">+{tenant.secondaryFqdnsCount}</span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "infrastructure",
+      headerEn: "Infrastructure",
+      headerAr: "البنية التحتية",
+      cell: (tenant) => (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5" title={copy.databaseServer}>
+            <Server className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="font-mono text-xs font-semibold text-foreground">
+              {tenant.databaseServerName ?? "—"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5" title={copy.storageServer}>
+            <HardDrive className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="font-mono text-xs font-semibold text-foreground">
+              {tenant.storageServer?.name ?? tenant.storageServerId}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground">{tenant.countryName}</div>
+        </div>
+      ),
+    },
+    {
+      key: "subscription",
+      headerEn: "Subscription",
+      headerAr: "الاشتراك",
+      cell: (tenant) => (
+        <div>
+          <span className="text-xs font-semibold text-foreground">{tenant.subscriptionStatus ?? "—"}</span>
+          <div className="font-mono text-xs text-muted-foreground">
+            {tenant.seats === null ? "—" : copy.seats(tenant.seats)}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      headerEn: "Status",
+      headerAr: "الحالة",
+      cell: (tenant) => <TenantStatusBadge status={tenant.status} lang={lang} />,
+    },
+    {
+      key: "actions",
+      headerEn: "Actions",
+      headerAr: "الإجراءات",
+      align: "end",
+      cell: (tenant) => (
+        <TenantRowActions
+          tenant={tenant}
+          copy={copy}
+          canSuspendOrActivate={permissions.canSuspendOrActivate}
+          canReprovision={permissions.canReprovision}
+          canSoftDelete={permissions.canSoftDelete}
+          pendingAction={pendingAction}
+          onActivate={openActivateModal}
+          onSuspend={openSuspendModal}
+          onDelete={openDeleteModal}
+          onReprovision={handleReprovision}
+        />
+      ),
+    },
+  ];
+
   return (
     <div className="w-full space-y-4">
-        <header className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 px-4 py-3 text-white shadow-md sm:px-5 sm:py-3.5">
-          <div className="pointer-events-none absolute end-0 top-0 -me-10 -mt-10 size-72 rounded-full bg-gradient-to-br from-cyan-500/20 via-blue-500/20 to-indigo-500/0 blur-3xl" />
-          <div className="relative z-10 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-3">
-              <div className="flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-600 p-2.5 text-white shadow-xs">
-                <Building2 className="size-5" />
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-base font-semibold tracking-tight text-white sm:text-lg">
-                    {t.tenants.pageTitle}
-                  </h1>
-                  <span className="rounded-md border border-cyan-500/30 bg-cyan-500/20 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider text-cyan-300">
-                    {copy.isolation}
-                  </span>
-                </div>
-                <p className="mt-0.5 max-w-xl text-xs leading-tight text-cyan-100/80">
-                  {t.tenants.pageSubtitle}
-                </p>
-              </div>
-            </div>
-
-            {permissions.canCreate ? (
-              <Link
-                href="/tenants/new"
-                className="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 px-3.5 py-2 text-xs font-semibold text-white shadow-md transition-all hover:from-cyan-400 hover:to-indigo-400"
-              >
-                <Plus className="size-3.5" />
-                <span>{t.tenants.registerTenant}</span>
+      <PageHeader
+        title={t.tenants.pageTitle}
+        description={t.tenants.pageSubtitle}
+        status={<Badge tone="neutral">{copy.isolation}</Badge>}
+        action={
+          permissions.canCreate ? (
+            <Button asChild variant="primary" size="sm">
+              <Link href="/tenants/new">
+                <Plus className="size-3.5" aria-hidden="true" />
+                {t.tenants.registerTenant}
               </Link>
-            ) : null}
-          </div>
-        </header>
+            </Button>
+          ) : undefined
+        }
+      />
 
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs shadow-xs dark:border-slate-800 dark:bg-slate-900/90">
-          <div>
-            <span className="font-semibold text-slate-500 dark:text-slate-400">
-              {copy.matchingTenants}
-            </span>
-            <strong className="ms-2 font-mono text-base text-slate-950 dark:text-white">
-              {totalItems}
-            </strong>
-          </div>
-          <span className="text-slate-500 dark:text-slate-400">
-            {copy.visibleRows(tenants.length)}
-          </span>
-        </section>
+      {loadError ? (
+        <ErrorState error={loadError} onRetry={() => void refresh()} />
+      ) : null}
+      {actionError && !activeModalTenant ? (
+        <ErrorBanner
+          message={actionError.message}
+          errorCode={actionError.errorCode}
+          correlationId={actionError.correlationId}
+          dismissLabel={copy.dismiss}
+          onDismiss={clearActionError}
+        />
+      ) : null}
 
-        {loadError ? (
-          <ErrorBanner
-            message={loadError.message}
-            errorCode={loadError.errorCode}
-            correlationId={loadError.correlationId}
-            retryLabel={copy.retry}
-            dismissLabel={copy.dismiss}
-            onRetry={() => void refresh()}
-          />
-        ) : null}
-        {actionError && !activeModalTenant ? (
-          <ErrorBanner
-            message={actionError.message}
-            errorCode={actionError.errorCode}
-            correlationId={actionError.correlationId}
-            dismissLabel={copy.dismiss}
-            onDismiss={clearActionError}
-          />
-        ) : null}
-
-        <section className="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900/90 sm:flex-row">
-          <div className="relative w-full sm:w-96">
-            <Search className="absolute start-3.5 top-3 size-4 text-cyan-500" />
-            <input
-              type="search"
-              value={search}
-              maxLength={200}
-              aria-label={copy.search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={copy.searchPlaceholder}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pe-4 ps-10 text-xs text-slate-900 outline-none transition-all focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 dark:border-slate-700/80 dark:bg-slate-800/60 dark:text-slate-100"
+      <div className="rounded-lg border border-border bg-card">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-start">
+          <div className="flex-1">
+            <FilterBar
+              fields={[
+                {
+                  key: "search",
+                  type: "search",
+                  placeholderEn: "Search name, company, country, database, or owner email",
+                  placeholderAr: "ابحث بالاسم أو الشركة أو الدولة أو قاعدة البيانات أو بريد المالك",
+                },
+              ]}
+              values={{ search }}
+              onChange={(next) => setSearch(typeof next.search === "string" ? next.search : "")}
             />
           </div>
 
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div className="flex flex-wrap items-start gap-2">
             <select
               aria-label={copy.statusFilter}
               value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value as TenantStatusFilter)
-              }
-              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-cyan-500 dark:border-slate-700/80 dark:bg-slate-800/60 dark:text-slate-100"
+              onChange={(event) => setStatusFilter(event.target.value as TenantStatusFilter)}
+              className="h-(--size-control-lg) rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="ALL">{t.tenants.allStatuses}</option>
               <option value="ACTIVE">{t.tenants.statusNames.ACTIVE}</option>
-              <option value="PROVISIONING">
-                {t.tenants.statusNames.PROVISIONING}
-              </option>
-              <option value="PROVISIONING_FAILED">
-                {copy.provisioningFailed}
-              </option>
-              <option value="SUSPENDED">
-                {t.tenants.statusNames.SUSPENDED}
-              </option>
+              <option value="PROVISIONING">{t.tenants.statusNames.PROVISIONING}</option>
+              <option value="PROVISIONING_FAILED">{copy.provisioningFailed}</option>
+              <option value="SUSPENDED">{t.tenants.statusNames.SUSPENDED}</option>
               <option value="DELETED">{t.tenants.statusNames.DELETED}</option>
             </select>
 
@@ -174,12 +234,10 @@ export default function TenantsDirectoryPage() {
                 value={serverFilter}
                 disabled={databaseServerOptionsState !== "ready"}
                 onChange={(event) => setServerFilter(event.target.value)}
-                className="min-w-48 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700/80 dark:bg-slate-800/60 dark:text-slate-100"
+                className="h-(--size-control-lg) min-w-48 rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <option value="ALL">
-                  {databaseServerOptionsState === "loading"
-                    ? copy.databaseServerLoading
-                    : t.tenants.allServers}
+                  {databaseServerOptionsState === "loading" ? copy.databaseServerLoading : t.tenants.allServers}
                 </option>
                 {databaseServerOptions.map((server) => (
                   <option key={server.id} value={server.id}>
@@ -188,136 +246,54 @@ export default function TenantsDirectoryPage() {
                 ))}
               </select>
               {databaseServerOptionsState === "forbidden" ? (
-                <span className="text-xs text-amber-700 dark:text-amber-300">
-                  {copy.databaseServerForbidden}
-                </span>
+                <span className="text-xs text-warn-700 dark:text-warn-300">{copy.databaseServerForbidden}</span>
               ) : databaseServerOptionsState === "error" ? (
-                <span
-                  role="alert"
-                  className="text-xs text-rose-700 dark:text-rose-300"
-                >
+                <span role="alert" className="text-xs text-danger-700 dark:text-danger-300">
                   {copy.databaseServerUnavailable}
-                  {databaseServerOptionsError?.errorCode
-                    ? ` · ${databaseServerOptionsError.errorCode}`
-                    : ""}
-                  {databaseServerOptionsError?.correlationId
-                    ? ` · ${databaseServerOptionsError.correlationId}`
-                    : ""}
-                  <button
+                  {databaseServerOptionsError?.errorCode ? ` · ${databaseServerOptionsError.errorCode}` : ""}
+                  {databaseServerOptionsError?.correlationId ? ` · ${databaseServerOptionsError.correlationId}` : ""}
+                  <Button
                     type="button"
+                    variant="link"
+                    size="sm"
                     onClick={() => void retryDatabaseServerOptions()}
-                    className="ms-1 font-semibold underline"
+                    className="ms-1 h-auto p-0 text-xs"
                   >
                     {copy.retry}
-                  </button>
+                  </Button>
                 </span>
               ) : null}
             </div>
           </div>
-        </section>
+        </div>
 
-        <section
-          className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-900"
-          aria-busy={isLoading}
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[940px] text-start text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-100/70 font-semibold uppercase tracking-wider text-slate-600 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300">
-                  <th className="px-5 py-3 text-start">
-                    {t.tenants.tenantName}
-                  </th>
-                  <th className="px-5 py-3 text-start">
-                    {t.tenants.primaryFqdn}
-                  </th>
-                  <th className="px-5 py-3 text-start">
-                    {copy.infrastructure}
-                  </th>
-                  <th className="px-5 py-3 text-start">{copy.subscription}</th>
-                  <th className="px-5 py-3 text-start">{t.tenants.status}</th>
-                  <th className="px-5 py-3 text-end">{t.tenants.actions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {isLoading && tenants.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="py-10 text-center text-slate-500"
-                    >
-                      <Loader2 className="mx-auto mb-2 size-6 animate-spin text-blue-500" />
-                      {copy.loading}
-                    </td>
-                  </tr>
-                ) : tenants.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="py-10 text-center text-slate-500"
-                    >
-                      {loadError ? copy.noTrustedResults : t.tenants.emptyState}
-                    </td>
-                  </tr>
-                ) : (
-                  tenants.map((tenant) => (
-                    <TenantRow
-                      key={tenant.id}
-                      tenant={tenant}
-                      lang={lang}
-                      copy={copy}
-                      canSuspendOrActivate={permissions.canSuspendOrActivate}
-                      canReprovision={permissions.canReprovision}
-                      canSoftDelete={permissions.canSoftDelete}
-                      pendingAction={pendingAction}
-                      onActivate={openActivateModal}
-                      onSuspend={openSuspendModal}
-                      onDelete={openDeleteModal}
-                      onReprovision={handleReprovision}
-                    />
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-            <span>
-              {copy.pagination(
-                page,
-                Math.max(1, pagination.totalPages),
-                totalItems,
-              )}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={!pagination.hasPrev || isLoading}
-                onClick={() => setPage(Math.max(1, page - 1))}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                {copy.previous}
-              </button>
-              <button
-                type="button"
-                disabled={!pagination.hasNext || isLoading}
-                onClick={() => setPage(page + 1)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                {copy.next}
-              </button>
-            </div>
-          </footer>
-        </section>
+        <DataTable
+          columns={columns}
+          data={tenants}
+          isLoading={isLoading && tenants.length === 0}
+          pagination={{
+            page,
+            limit,
+            totalItems,
+            totalPages: pagination.totalPages,
+            onPageChange: setPage,
+          }}
+          emptyState={{
+            titleEn: loadError ? "Trusted results could not be displayed" : "No tenants found",
+            titleAr: loadError ? "تعذر عرض نتائج موثوقة" : t.tenants.emptyState,
+            descriptionEn: loadError ? "Retry the request." : undefined,
+            descriptionAr: loadError ? "أعد المحاولة." : undefined,
+          }}
+        />
+      </div>
 
       {activeModalTenant && modalActionType ? (
         <TenantActionModal
           tenant={activeModalTenant}
           action={modalActionType}
-          lang={lang}
           error={actionError}
           isSubmitting={
-            pendingAction?.action === modalActionType &&
-            pendingAction.tenantId === activeModalTenant.id
+            pendingAction?.action === modalActionType && pendingAction.tenantId === activeModalTenant.id
           }
           onClose={closeModal}
           onConfirm={() => void confirmModalAction()}
@@ -327,9 +303,8 @@ export default function TenantsDirectoryPage() {
   );
 }
 
-function TenantRow({
+function TenantRowActions({
   tenant,
-  lang,
   copy,
   canSuspendOrActivate,
   canReprovision,
@@ -341,7 +316,6 @@ function TenantRow({
   onReprovision,
 }: {
   tenant: TenantRecord;
-  lang: "ar" | "en";
   copy: ReturnType<typeof directoryCopy>;
   canSuspendOrActivate: boolean;
   canReprovision: boolean;
@@ -355,185 +329,83 @@ function TenantRow({
   const busy = pendingAction !== null;
   const thisRowBusy = pendingAction?.tenantId === tenant.id;
   return (
-    <tr className="h-11 transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-      <td className="px-4 py-2.5 font-semibold text-slate-900 dark:text-slate-100">
-        <Link
-          href={`/tenants/${tenant.id}`}
-          className="group inline-flex flex-col"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-blue-600 group-hover:underline dark:text-blue-400">
-              {tenant.companyName}
-            </span>
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-500 dark:bg-slate-800">
-              {tenant.name}
-            </span>
-          </div>
-          <span className="font-mono text-xs font-normal text-slate-400">
-            {tenant.ownerEmail ?? "—"}
-          </span>
+    <div className="flex items-center justify-end gap-1">
+      <Button asChild variant="ghost" size="sm">
+        <Link href={`/tenants/${tenant.id}`}>
+          {copy.details}
+          <ExternalLink className="size-3" aria-hidden="true" />
         </Link>
-      </td>
-      <td className="px-4 py-2.5 font-mono text-slate-700 dark:text-slate-300">
-        <div className="flex items-center gap-1.5">
-          <Globe className="size-3.5 shrink-0 text-blue-500" />
-          <span className="text-xs font-semibold">
-            {tenant.primaryFqdn ?? "—"}
-          </span>
-          {tenant.secondaryFqdnsCount > 0 ? (
-            <span className="text-xs text-slate-400">
-              +{tenant.secondaryFqdnsCount}
-            </span>
-          ) : null}
-        </div>
-      </td>
-      <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">
-        <div className="flex flex-col gap-1.5">
-          <div
-            className="flex items-center gap-1.5"
-            title={copy.databaseServer}
-          >
-            <Server className="size-3.5 shrink-0 text-purple-500" />
-            <span className="font-mono text-xs font-semibold">
-              {tenant.databaseServerName ?? "—"}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5" title={copy.storageServer}>
-            <HardDrive className="size-3.5 shrink-0 text-blue-500" />
-            <span className="font-mono text-xs font-semibold">
-              {tenant.storageServer?.name ?? tenant.storageServerId}
-            </span>
-          </div>
-        </div>
-        <div className="mt-1 text-xs text-slate-400">
-          {tenant.countryName}
-        </div>
-      </td>
-      <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">
-        <span className="text-xs font-semibold">
-          {tenant.subscriptionStatus ?? "—"}
-        </span>
-        <div className="font-mono text-xs text-slate-400">
-          {tenant.seats === null ? "—" : copy.seats(tenant.seats)}
-        </div>
-      </td>
-      <td className="px-4 py-2.5">
-        <TenantStatusBadge status={tenant.status} lang={lang} />
-      </td>
-      <td className="px-4 py-2.5 text-end">
-        <div className="flex items-center justify-end gap-1">
-          <Link
-            href={`/tenants/${tenant.id}`}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/60"
-          >
-            <span>{copy.details}</span>
-            <ExternalLink className="size-3" />
-          </Link>
+      </Button>
 
-          {canSuspendOrActivate && tenant.status === "SUSPENDED" ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onActivate(tenant)}
-              className="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-950/60"
-            >
-              {thisRowBusy ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                copy.activate
-              )}
-            </button>
-          ) : null}
-          {canSuspendOrActivate && tenant.status === "ACTIVE" ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onSuspend(tenant)}
-              className="rounded-lg px-2 py-1 text-xs font-semibold text-amber-600 hover:bg-amber-50 disabled:opacity-40 dark:text-amber-400 dark:hover:bg-amber-950/60"
-            >
-              {thisRowBusy ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                copy.suspend
-              )}
-            </button>
-          ) : null}
-          {canReprovision && tenant.status === "PROVISIONING_FAILED" ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void onReprovision(tenant)}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-40 dark:text-blue-400 dark:hover:bg-blue-950/60"
-            >
-              {thisRowBusy ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <RotateCcw className="size-3" />
-              )}
-              <span>{copy.reprovision}</span>
-            </button>
-          ) : null}
-          {canSoftDelete && tenant.status !== "DELETED" ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onDelete(tenant)}
-              aria-label={`${copy.delete} ${tenant.companyName}`}
-              title={copy.delete}
-              className="rounded-lg p-1.5 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40 dark:hover:bg-rose-950/60"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          ) : null}
-        </div>
-      </td>
-    </tr>
+      {canSuspendOrActivate && tenant.status === "SUSPENDED" ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          onClick={() => onActivate(tenant)}
+          className="text-brand-700 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950/30"
+        >
+          {thisRowBusy ? <Loader2 className="size-3 animate-spin" aria-hidden="true" /> : copy.activate}
+        </Button>
+      ) : null}
+      {canSuspendOrActivate && tenant.status === "ACTIVE" ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          onClick={() => onSuspend(tenant)}
+          className="text-warn-700 hover:bg-warn-50 dark:text-warn-400 dark:hover:bg-warn-950/30"
+        >
+          {thisRowBusy ? <Loader2 className="size-3 animate-spin" aria-hidden="true" /> : copy.suspend}
+        </Button>
+      ) : null}
+      {canReprovision && tenant.status === "PROVISIONING_FAILED" ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          onClick={() => void onReprovision(tenant)}
+        >
+          {thisRowBusy ? <Loader2 className="size-3 animate-spin" aria-hidden="true" /> : <RotateCcw className="size-3" aria-hidden="true" />}
+          {copy.reprovision}
+        </Button>
+      ) : null}
+      {canSoftDelete && tenant.status !== "DELETED" ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          onClick={() => onDelete(tenant)}
+          aria-label={`${copy.delete} ${tenant.companyName}`}
+          title={copy.delete}
+          className="text-danger-600 hover:bg-danger-50 hover:text-danger-700 dark:text-danger-400 dark:hover:bg-danger-950/30"
+        >
+          <Trash2 className="size-3.5" aria-hidden="true" />
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
-function TenantStatusBadge({
-  status,
-  lang,
-}: {
-  status: TenantRecord["status"];
-  lang: "ar" | "en";
-}) {
+function TenantStatusBadge({ status, lang }: { status: TenantRecord["status"]; lang: "ar" | "en" }) {
   const labels = {
-    ACTIVE: { en: "Active", ar: "نشط", tone: "emerald" },
-    PROVISIONING: { en: "Provisioning", ar: "جارٍ التجهيز", tone: "blue" },
-    PROVISIONING_FAILED: {
-      en: "Provisioning failed",
-      ar: "فشل التجهيز",
-      tone: "rose",
-    },
-    SUSPENDED: { en: "Suspended", ar: "معلّق", tone: "amber" },
-    DELETED: { en: "Deleted", ar: "محذوف", tone: "slate" },
+    ACTIVE: { en: "Active", ar: "نشط", tone: "brand" },
+    PROVISIONING: { en: "Provisioning", ar: "جارٍ التجهيز", tone: "neutral" },
+    PROVISIONING_FAILED: { en: "Provisioning failed", ar: "فشل التجهيز", tone: "danger" },
+    SUSPENDED: { en: "Suspended", ar: "معلّق", tone: "warn" },
+    DELETED: { en: "Deleted", ar: "محذوف", tone: "neutral" },
   } as const;
   const value = labels[status];
-  const tones = {
-    emerald:
-      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400",
-    blue: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-400",
-    rose: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-400",
-    amber:
-      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-400",
-    slate:
-      "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400",
-  } as const;
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${tones[value.tone]}`}
-    >
-      <span className="size-1.5 rounded-full bg-current" />
-      {value[lang]}
-    </span>
-  );
+  return <Badge tone={value.tone}>{value[lang]}</Badge>;
 }
 
 function TenantActionModal({
   tenant,
   action,
-  lang,
   error,
   isSubmitting,
   onClose,
@@ -541,113 +413,48 @@ function TenantActionModal({
 }: {
   tenant: TenantRecord;
   action: TenantDirectoryModalAction;
-  lang: "ar" | "en";
   error: { message: string; correlationId?: string } | null;
   isSubmitting: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  const copy = directoryCopy(lang);
-  const [confirmation, setConfirmation] = useState("");
-  const requiresName = action !== "activate";
-  const confirmed =
-    !requiresName ||
-    confirmation.trim().toLowerCase() === tenant.name.trim().toLowerCase();
-  const title =
+  const copyEn = directoryCopy("en");
+  const copyAr = directoryCopy("ar");
+  const titleEn =
+    action === "activate" ? copyEn.modalActivateTitle : action === "suspend" ? copyEn.modalSuspendTitle : copyEn.modalDeleteTitle;
+  const titleAr =
+    action === "activate" ? copyAr.modalActivateTitle : action === "suspend" ? copyAr.modalSuspendTitle : copyAr.modalDeleteTitle;
+  const baseDescriptionEn =
     action === "activate"
-      ? copy.modalActivateTitle
+      ? copyEn.modalActivateDescription
       : action === "suspend"
-        ? copy.modalSuspendTitle
-        : copy.modalDeleteTitle;
-  const description =
+        ? copyEn.modalSuspendDescription
+        : copyEn.modalDeleteDescription;
+  const baseDescriptionAr =
     action === "activate"
-      ? copy.modalActivateDescription
+      ? copyAr.modalActivateDescription
       : action === "suspend"
-        ? copy.modalSuspendDescription
-        : copy.modalDeleteDescription;
+        ? copyAr.modalSuspendDescription
+        : copyAr.modalDeleteDescription;
+  // error.message is produced by the transport/hook in a single language
+  // (see localError() in useTenants.ts) — the original inline error text
+  // was never bilingual either, so the same literal string is appended to
+  // both descriptions here rather than only one.
+  const errorSuffix = error ? ` — ${error.message}${error.correlationId ? ` · ${error.correlationId}` : ""}` : "";
+
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-xs"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !isSubmitting) onClose();
-      }}
-    >
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="tenant-action-title"
-        className="relative w-full max-w-md space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
-      >
-        <button
-          type="button"
-          aria-label={copy.close}
-          disabled={isSubmitting}
-          onClick={onClose}
-          className="absolute end-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-800"
-        >
-          <X className="size-4" />
-        </button>
-        <div className="pe-8">
-          <h2 id="tenant-action-title" className="text-sm font-semibold">
-            {title}
-          </h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
-        </div>
-        <div className="rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-800/60">
-          <strong>{tenant.companyName}</strong>
-          <div className="font-mono text-slate-500">{tenant.name}</div>
-        </div>
-        {requiresName ? (
-          <label className="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
-            <span>{copy.typeTenantName}</span>
-            <input
-              autoFocus
-              value={confirmation}
-              onChange={(event) => setConfirmation(event.target.value)}
-              placeholder={tenant.name}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono outline-none focus:border-rose-500 dark:border-slate-700 dark:bg-slate-800"
-            />
-          </label>
-        ) : null}
-        {error ? (
-          <p
-            role="alert"
-            className="rounded-lg bg-rose-50 p-3 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-          >
-            {error.message}
-            {error.correlationId ? ` · ${error.correlationId}` : ""}
-          </p>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={onClose}
-            className="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200"
-          >
-            {copy.cancel}
-          </button>
-          <button
-            type="button"
-            disabled={!confirmed || isSubmitting}
-            onClick={onConfirm}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 ${
-              action === "activate"
-                ? "bg-emerald-600 hover:bg-emerald-700"
-                : action === "suspend"
-                  ? "bg-amber-600 hover:bg-amber-700"
-                  : "bg-rose-600 hover:bg-rose-700"
-            }`}
-          >
-            {isSubmitting ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : null}
-            {isSubmitting ? copy.executing : copy.confirm}
-          </button>
-        </div>
-      </section>
-    </div>
+    <ConfirmActionModal
+      isOpen
+      onClose={onClose}
+      onConfirm={onConfirm}
+      titleEn={titleEn}
+      titleAr={titleAr}
+      descriptionEn={`${baseDescriptionEn} ${tenant.companyName} (${tenant.name})${errorSuffix}`}
+      descriptionAr={`${baseDescriptionAr} ${tenant.companyName} (${tenant.name})${errorSuffix}`}
+      variant={action === "delete" ? "danger" : action === "suspend" ? "warning" : "info"}
+      requiredConfirmationText={action === "activate" ? undefined : tenant.name}
+      isLoading={isSubmitting}
+    />
   );
 }
 
@@ -655,53 +462,27 @@ function ErrorBanner({
   message,
   errorCode,
   correlationId,
-  retryLabel,
   dismissLabel,
-  onRetry,
   onDismiss,
 }: {
   message: string;
   errorCode: string;
   correlationId?: string;
-  retryLabel?: string;
   dismissLabel: string;
-  onRetry?: () => void;
-  onDismiss?: () => void;
+  onDismiss: () => void;
 }) {
   return (
     <div
       role="alert"
-      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-xs text-danger-800 dark:border-danger-900/70 dark:bg-danger-950/30 dark:text-danger-300"
     >
-      <div className="flex min-w-0 items-start gap-2">
-        <AlertCircle className="mt-0.5 size-4 shrink-0" />
-        <p>
-          <strong>{errorCode}</strong> · {message}
-          {correlationId ? (
-            <span className="ms-2 font-mono text-xs">{correlationId}</span>
-          ) : null}
-        </p>
-      </div>
-      <div className="flex gap-2">
-        {onRetry && retryLabel ? (
-          <button
-            type="button"
-            className="font-semibold underline"
-            onClick={onRetry}
-          >
-            {retryLabel}
-          </button>
-        ) : null}
-        {onDismiss ? (
-          <button
-            type="button"
-            className="font-semibold underline"
-            onClick={onDismiss}
-          >
-            {dismissLabel}
-          </button>
-        ) : null}
-      </div>
+      <p>
+        <strong>{errorCode}</strong> · {message}
+        {correlationId ? <span className="ms-2 font-mono text-xs">{correlationId}</span> : null}
+      </p>
+      <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>
+        {dismissLabel}
+      </Button>
     </div>
   );
 }
@@ -710,20 +491,13 @@ function directoryCopy(lang: "ar" | "en") {
   return lang === "ar"
     ? {
         isolation: "عزل متعدد المستأجرين",
-        matchingTenants: "المستأجرون المطابقون",
-        visibleRows: (count: number) => `${count} صف في الصفحة الحالية`,
-        search: "بحث المستأجرين",
-        searchPlaceholder:
-          "ابحث بالاسم أو الشركة أو الدولة أو قاعدة البيانات أو بريد المالك",
         statusFilter: "تصفية حسب الحالة",
-        provisioningFailed: "فشل التجهيز",
         databaseServerFilter: "تصفية حسب خادم قاعدة البيانات",
         databaseServerLoading: "جارٍ تحميل سجل خوادم قاعدة البيانات…",
         databaseServerForbidden:
           "تحتاج صلاحية قراءة خوادم قاعدة البيانات لاستخدام هذه التصفية.",
         databaseServerUnavailable: "تعذر تحميل سجل خوادم قاعدة البيانات.",
-        infrastructure: "البنية التحتية",
-        subscription: "الاشتراك",
+        provisioningFailed: "فشل التجهيز",
         databaseServer: "خادم قاعدة البيانات",
         storageServer: "خادم التخزين",
         seats: (count: number) => `${count} مقعد`,
@@ -732,45 +506,23 @@ function directoryCopy(lang: "ar" | "en") {
         suspend: "إيقاف مؤقت",
         reprovision: "إعادة محاولة التجهيز",
         delete: "حذف مؤقت",
-        loading: "جارٍ تحميل المستأجرين…",
-        noTrustedResults: "تعذر عرض نتائج موثوقة. أعد المحاولة.",
         retry: "إعادة المحاولة",
         dismiss: "إخفاء",
-        previous: "السابق",
-        next: "التالي",
-        pagination: (page: number, totalPages: number, total: number) =>
-          `الصفحة ${page} من ${totalPages} · الإجمالي ${total}`,
         modalActivateTitle: "تأكيد تفعيل المستأجر",
         modalSuspendTitle: "تأكيد إيقاف المستأجر",
         modalDeleteTitle: "تأكيد الحذف المؤقت للمستأجر",
-        modalActivateDescription:
-          "سيصبح المستأجر نشطاً وسيُسمح لمستخدميه بالوصول مجدداً.",
-        modalSuspendDescription:
-          "سيُعلّق وصول مستخدمي المستأجر حتى تتم إعادة تفعيله.",
-        modalDeleteDescription:
-          "سيُنقل المستأجر إلى حالة الحذف المؤقت وفق قيود الفوترة والعمليات.",
-        typeTenantName: "اكتب اسم المستأجر بالضبط للتأكيد",
-        close: "إغلاق",
-        cancel: "إلغاء",
-        confirm: "تأكيد الإجراء",
-        executing: "جارٍ التنفيذ…",
+        modalActivateDescription: "سيصبح المستأجر نشطاً وسيُسمح لمستخدميه بالوصول مجدداً:",
+        modalSuspendDescription: "سيُعلّق وصول مستخدمي المستأجر حتى تتم إعادة تفعيله:",
+        modalDeleteDescription: "سيُنقل المستأجر إلى حالة الحذف المؤقت وفق قيود الفوترة والعمليات:",
       }
     : {
         isolation: "Multi-tenant isolation",
-        matchingTenants: "Matching tenants",
-        visibleRows: (count: number) => `${count} rows on this page`,
-        search: "Search tenants",
-        searchPlaceholder:
-          "Search name, company, country, database, or owner email",
         statusFilter: "Filter by status",
-        provisioningFailed: "Provisioning failed",
         databaseServerFilter: "Filter by database server",
         databaseServerLoading: "Loading database server registry…",
-        databaseServerForbidden:
-          "Database-server read permission is required for this filter.",
+        databaseServerForbidden: "Database-server read permission is required for this filter.",
         databaseServerUnavailable: "Database server registry is unavailable.",
-        infrastructure: "Infrastructure",
-        subscription: "Subscription",
+        provisioningFailed: "Provisioning failed",
         databaseServer: "Database server",
         storageServer: "Storage server",
         seats: (count: number) => `${count} seats`,
@@ -779,28 +531,13 @@ function directoryCopy(lang: "ar" | "en") {
         suspend: "Suspend",
         reprovision: "Retry provisioning",
         delete: "Soft delete",
-        loading: "Loading tenants…",
-        noTrustedResults:
-          "Trusted results could not be displayed. Retry the request.",
         retry: "Retry",
         dismiss: "Dismiss",
-        previous: "Previous",
-        next: "Next",
-        pagination: (page: number, totalPages: number, total: number) =>
-          `Page ${page} of ${totalPages} · ${total} total`,
         modalActivateTitle: "Confirm tenant activation",
         modalSuspendTitle: "Confirm tenant suspension",
         modalDeleteTitle: "Confirm tenant soft deletion",
-        modalActivateDescription:
-          "The tenant becomes active and its users can access it again.",
-        modalSuspendDescription:
-          "Tenant-user access remains suspended until the tenant is activated again.",
-        modalDeleteDescription:
-          "The tenant is soft-deleted subject to billing and operation safeguards.",
-        typeTenantName: "Type the exact tenant name to confirm",
-        close: "Close",
-        cancel: "Cancel",
-        confirm: "Confirm action",
-        executing: "Executing…",
+        modalActivateDescription: "The tenant becomes active and its users can access it again:",
+        modalSuspendDescription: "Tenant-user access remains suspended until the tenant is activated again:",
+        modalDeleteDescription: "The tenant is soft-deleted subject to billing and operation safeguards:",
       };
 }

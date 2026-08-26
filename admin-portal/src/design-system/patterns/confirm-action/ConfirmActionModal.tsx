@@ -132,6 +132,7 @@ export function ConfirmActionModal({
               value={typedInput}
               onChange={(e) => setTypedInput(e.target.value)}
               placeholder={requiredConfirmationText}
+              aria-label={lang === "ar" ? "اكتب الاسم بالضبط للتأكيد" : "Type the exact name to confirm"}
               autoFocus
               className="h-(--size-control-lg) w-full rounded-md border border-border bg-card px-3 font-mono text-xs text-foreground outline-none focus-visible:border-danger-500 focus-visible:ring-2 focus-visible:ring-danger-500"
             />
