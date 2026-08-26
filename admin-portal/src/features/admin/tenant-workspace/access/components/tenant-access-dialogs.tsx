@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Button,
+} from "@/design-system";
 import type { TenantAccessController } from "../use-tenant-access";
 import type { TenantAccessCopy, TenantAccessLocale } from "../copy";
 import type {
@@ -11,12 +19,8 @@ import type {
   UpdateTenantUserWebphoneInput,
 } from "../types";
 
-const inputClass =
-  "h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-100";
-const primaryClass =
-  "inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50";
-const secondaryClass =
-  "inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+const selectClass =
+  "h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20 disabled:bg-muted";
 
 interface SharedDialogProps {
   controller: TenantAccessController;
@@ -124,23 +128,23 @@ export function TenantUserEditorDialog({
     >
       <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
         <Field label={copy.firstName}>
-          <input className={inputClass} value={firstName} maxLength={80} required onChange={(event) => setFirstName(event.target.value)} />
+          <Input value={firstName} maxLength={80} required onChange={(event) => setFirstName(event.target.value)} />
         </Field>
         <Field label={copy.lastName}>
-          <input className={inputClass} value={lastName} maxLength={80} required onChange={(event) => setLastName(event.target.value)} />
+          <Input value={lastName} maxLength={80} required onChange={(event) => setLastName(event.target.value)} />
         </Field>
         <Field label={copy.email} wide>
-          <input className={inputClass} type="email" value={email} maxLength={255} required disabled={mode === "edit"} onChange={(event) => setEmail(event.target.value)} />
+          <Input type="email" value={email} maxLength={255} required disabled={mode === "edit"} onChange={(event) => setEmail(event.target.value)} />
         </Field>
         <Field label={copy.employeeCode}>
-          <input className={inputClass} value={employeeCode} maxLength={32} onChange={(event) => setEmployeeCode(event.target.value)} />
+          <Input value={employeeCode} maxLength={32} onChange={(event) => setEmployeeCode(event.target.value)} />
         </Field>
         <Field label={copy.jobTitle}>
-          <input className={inputClass} value={jobTitle} maxLength={120} onChange={(event) => setJobTitle(event.target.value)} />
+          <Input value={jobTitle} maxLength={120} onChange={(event) => setJobTitle(event.target.value)} />
         </Field>
         <Field label={copy.branch}>
           <select
-            className={inputClass}
+            className={selectClass}
             required
             value={branchId}
             onChange={(event) => {
@@ -161,7 +165,7 @@ export function TenantUserEditorDialog({
         </Field>
         <Field label={copy.department}>
           <select
-            className={inputClass}
+            className={selectClass}
             required
             disabled={!branchId}
             value={departmentId}
@@ -180,7 +184,7 @@ export function TenantUserEditorDialog({
           </select>
         </Field>
         <Field label={copy.team}>
-          <select className={inputClass} disabled={!departmentId} value={teamId} onChange={(event) => setTeamId(event.target.value)}>
+          <select className={selectClass} disabled={!departmentId} value={teamId} onChange={(event) => setTeamId(event.target.value)}>
             <option value="">—</option>
             {user?.organization.team && !teams.some((row) => row.id === user.organization.team?.id) ? (
               <option value={user.organization.team.id}>{user.organization.team.name ?? user.organization.team.id}</option>
@@ -189,19 +193,19 @@ export function TenantUserEditorDialog({
           </select>
         </Field>
         <Field label={copy.managerId}>
-          <input className={inputClass} value={managerId} onChange={(event) => setManagerId(event.target.value)} />
+          <Input value={managerId} onChange={(event) => setManagerId(event.target.value)} />
         </Field>
         {mode === "invite" ? (
           <Field label={copy.partyId}>
-            <input className={inputClass} value={partyId} onChange={(event) => setPartyId(event.target.value)} />
+            <Input value={partyId} onChange={(event) => setPartyId(event.target.value)} />
           </Field>
         ) : null}
         {mode === "invite" && controller.permissions.canAssignRoles ? (
-          <fieldset className="sm:col-span-2 rounded-lg border border-slate-200 p-3">
-            <legend className="px-1 text-xs font-semibold text-slate-600">{copy.roles}</legend>
+          <fieldset className="sm:col-span-2 rounded-lg border border-border p-3">
+            <legend className="px-1 text-xs font-semibold text-muted-foreground">{copy.roles}</legend>
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => (
-                <label key={role.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs">
+                <label key={role.id} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs">
                   <input
                     type="checkbox"
                     checked={roleIds.includes(role.id)}
@@ -215,8 +219,8 @@ export function TenantUserEditorDialog({
         ) : null}
         <DialogError controller={controller} localError={localError} />
         <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-          <button type="button" className={secondaryClass} onClick={onClose}>{copy.cancel}</button>
-          <button type="submit" className={primaryClass} disabled={controller.command.pending}>{copy.save}</button>
+          <Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
+          <Button type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button>
         </div>
       </form>
     </DialogFrame>
@@ -255,10 +259,10 @@ export function PasswordDialog({
   return (
     <DialogFrame title={copy.changePassword} onClose={onClose} locale={locale}>
       <form onSubmit={submit} className="grid gap-3">
-        <Field label={copy.password}><input className={inputClass} type="password" minLength={12} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
-        <Field label={copy.passwordConfirmation}><input className={inputClass} type="password" minLength={12} maxLength={128} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></Field>
+        <Field label={copy.password}><Input type="password" minLength={12} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
+        <Field label={copy.passwordConfirmation}><Input type="password" minLength={12} maxLength={128} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></Field>
         <DialogError controller={controller} localError={localError} />
-        <div className="flex justify-end gap-2"><button type="button" className={secondaryClass} onClick={onClose}>{copy.cancel}</button><button type="submit" className={primaryClass} disabled={controller.command.pending}>{copy.save}</button></div>
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button><Button type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button></div>
       </form>
     </DialogFrame>
   );
@@ -304,15 +308,15 @@ export function WebphoneDialog({
     <DialogFrame title={copy.configureWebphone} onClose={onClose} locale={locale}>
       <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
         <label className="sm:col-span-2 inline-flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />{copy.enabled}</label>
-        <Field label={copy.extension}><input className={inputClass} value={extension} maxLength={32} onChange={(event) => setExtension(event.target.value)} /></Field>
-        <Field label={copy.sipUsername}><input className={inputClass} value={sipUsername} maxLength={120} onChange={(event) => setSipUsername(event.target.value)} /></Field>
-        <Field label={copy.sipPassword} wide><input className={inputClass} type="password" value={sipPassword} maxLength={255} autoComplete="new-password" onChange={(event) => setSipPassword(event.target.value)} /></Field>
-        <Field label={copy.displayName}><input className={inputClass} value={displayName} maxLength={120} onChange={(event) => setDisplayName(event.target.value)} /></Field>
-        <Field label={copy.outboundCallerId}><input className={inputClass} value={outboundCallerId} maxLength={64} onChange={(event) => setOutboundCallerId(event.target.value)} /></Field>
-        <Field label={copy.transport}><select className={inputClass} value={transport} onChange={(event) => setTransport(event.target.value as "ws" | "wss")}><option value="wss">wss</option><option value="ws">ws</option></select></Field>
-        <p className="self-end pb-2 text-xs text-slate-500">{copy.passwordConfigured}: {current.passwordConfigured ? "✓" : "—"}</p>
+        <Field label={copy.extension}><Input value={extension} maxLength={32} onChange={(event) => setExtension(event.target.value)} /></Field>
+        <Field label={copy.sipUsername}><Input value={sipUsername} maxLength={120} onChange={(event) => setSipUsername(event.target.value)} /></Field>
+        <Field label={copy.sipPassword} wide><Input type="password" value={sipPassword} maxLength={255} autoComplete="new-password" onChange={(event) => setSipPassword(event.target.value)} /></Field>
+        <Field label={copy.displayName}><Input value={displayName} maxLength={120} onChange={(event) => setDisplayName(event.target.value)} /></Field>
+        <Field label={copy.outboundCallerId}><Input value={outboundCallerId} maxLength={64} onChange={(event) => setOutboundCallerId(event.target.value)} /></Field>
+        <Field label={copy.transport}><select className={selectClass} value={transport} onChange={(event) => setTransport(event.target.value as "ws" | "wss")}><option value="wss">wss</option><option value="ws">ws</option></select></Field>
+        <p className="self-end pb-2 text-xs text-muted-foreground">{copy.passwordConfigured}: {current.passwordConfigured ? "✓" : "—"}</p>
         <DialogError controller={controller} />
-        <div className="sm:col-span-2 flex justify-end gap-2"><button type="button" className={secondaryClass} onClick={onClose}>{copy.cancel}</button><button type="submit" className={primaryClass} disabled={controller.command.pending}>{copy.save}</button></div>
+        <div className="sm:col-span-2 flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button><Button type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button></div>
       </form>
     </DialogFrame>
   );
@@ -365,23 +369,23 @@ export function RolesDialog({
     <DialogFrame title={copy.manageRoles} onClose={onClose} locale={locale}>
       <form onSubmit={submit} className="grid gap-3">
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-          <select className={inputClass} value={branchId} onChange={(event) => setBranchId(event.target.value)}>
+          <select className={selectClass} value={branchId} onChange={(event) => setBranchId(event.target.value)}>
             {!branches.some((row) => row.id === user.organization.branch.id) ? <option value={user.organization.branch.id}>{user.organization.branch.name ?? user.organization.branch.id}</option> : null}
             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.company.name} · {branch.name}</option>)}
           </select>
-          <select className={inputClass} value={roleId} onChange={(event) => setRoleId(event.target.value)}><option value="">—</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
-          <button type="button" className={secondaryClass} onClick={add}>{copy.addAssignment}</button>
+          <select className={selectClass} value={roleId} onChange={(event) => setRoleId(event.target.value)}><option value="">—</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
+          <Button type="button" variant="outline" onClick={add}>{copy.addAssignment}</Button>
         </div>
-        <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        <div className="divide-y divide-border rounded-lg border border-border">
           {assignments.length ? assignments.map((assignment) => (
             <div key={`${assignment.branchId}:${assignment.roleId}`} className="flex items-center justify-between gap-3 p-2 text-sm">
               <span>{branchNames.get(assignment.branchId) ?? assignment.branchId} · {roleNames.get(assignment.roleId) ?? assignment.roleId}</span>
-              <button type="button" className="text-xs font-semibold text-rose-600" onClick={() => setAssignments((current) => current.filter((entry) => entry.branchId !== assignment.branchId || entry.roleId !== assignment.roleId))}>{copy.remove}</button>
+              <button type="button" className="text-xs font-semibold text-danger-600 dark:text-danger-400" onClick={() => setAssignments((current) => current.filter((entry) => entry.branchId !== assignment.branchId || entry.roleId !== assignment.roleId))}>{copy.remove}</button>
             </div>
-          )) : <p className="p-3 text-sm text-slate-500">{copy.noAssignments}</p>}
+          )) : <p className="p-3 text-sm text-muted-foreground">{copy.noAssignments}</p>}
         </div>
         <DialogError controller={controller} />
-        <div className="flex justify-end gap-2"><button type="button" className={secondaryClass} onClick={onClose}>{copy.cancel}</button><button type="submit" className={primaryClass} disabled={controller.command.pending}>{copy.save}</button></div>
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button><Button type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button></div>
       </form>
     </DialogFrame>
   );
@@ -428,10 +432,13 @@ export function ConfirmationDialog({
   };
   return (
     <DialogFrame title={definition[0]} onClose={onClose} locale={locale}>
-      <p className="text-sm leading-6 text-slate-700">{definition[1]}</p>
-      <p className="mt-2 rounded-lg bg-slate-50 p-2 text-sm font-semibold text-slate-900">{user.firstName} {user.lastName} · {user.email}</p>
+      <p className="text-sm leading-6 text-foreground/90">{definition[1]}</p>
+      <p className="mt-2 rounded-lg bg-muted p-2 text-sm font-semibold text-foreground">{user.firstName} {user.lastName} · {user.email}</p>
       <DialogError controller={controller} />
-      <div className="mt-5 flex justify-end gap-2"><button type="button" className={secondaryClass} onClick={onClose}>{copy.cancel}</button><button type="button" className={action === "delete" ? `${primaryClass} !bg-rose-600 hover:!bg-rose-700` : primaryClass} disabled={controller.command.pending} onClick={() => void confirm()}>{copy.confirm}</button></div>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
+        <Button type="button" variant={action === "delete" ? "destructive" : "primary"} disabled={controller.command.pending} onClick={() => void confirm()}>{copy.confirm}</Button>
+      </div>
     </DialogFrame>
   );
 }
@@ -448,22 +455,24 @@ function DialogFrame({
   children: ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="tenant-access-dialog-title" dir={locale === "ar" ? "rtl" : "ltr"} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
-        <header className="mb-4 flex items-center justify-between gap-3"><h3 id="tenant-access-dialog-title" className="text-lg font-semibold text-slate-950">{title}</h3><button type="button" className="grid size-8 place-items-center rounded-full text-xl text-slate-500 hover:bg-slate-100" aria-label="Close" onClick={onClose}>×</button></header>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent dir={locale === "ar" ? "rtl" : "ltr"} className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-lg">{title}</DialogTitle>
+        </DialogHeader>
         {children}
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function Field({ label, wide = false, children }: { label: string; wide?: boolean; children: ReactNode }) {
-  return <label className={`grid gap-1 text-xs font-semibold text-slate-600 ${wide ? "sm:col-span-2" : ""}`}><span>{label}</span>{children}</label>;
+  return <label className={`grid gap-1 text-xs font-semibold text-muted-foreground ${wide ? "sm:col-span-2" : ""}`}><span>{label}</span>{children}</label>;
 }
 
 function DialogError({ controller, localError }: { controller: TenantAccessController; localError?: string | null }) {
   const message = localError ?? controller.command.error?.message;
-  return message ? <p role="alert" className="sm:col-span-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{message}{controller.command.error?.correlationId ? ` · ${controller.command.error.correlationId}` : ""}</p> : null;
+  return message ? <p role="alert" className="sm:col-span-2 rounded-lg bg-danger-50 p-3 text-sm text-danger-700 dark:bg-danger-950/40 dark:text-danger-300">{message}{controller.command.error?.correlationId ? ` · ${controller.command.error.correlationId}` : ""}</p> : null;
 }
 
 function changedProfile(

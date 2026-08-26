@@ -8,6 +8,17 @@ vi.mock("../use-tenant-access", () => ({
   useTenantAccess: () => state.controller,
 }));
 
+// TenantAccessPanel takes `locale` as a prop and builds its own copy via
+// tenantAccessCopy(locale) rather than calling useI18n() — but its table
+// (DataTable/Pagination) and success notices (useToast) both call useI18n()
+// internally. No test here asserts on toast content or DataTable's own
+// chrome text, so a single static "en" answer is safe across every case,
+// including the Arabic-copy test (which only checks tenantAccessCopy's own
+// heading text and the panel's own dir attribute).
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({ lang: "en" as const }),
+}));
+
 import { TenantAccessPanel } from "./tenant-access-panel";
 import {
   BRANCH_ID,
