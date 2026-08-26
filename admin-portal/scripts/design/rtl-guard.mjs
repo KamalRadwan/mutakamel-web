@@ -1,10 +1,11 @@
-// Hard gate: the codebase is 98% RTL-logical today (364 logical utilities vs
-// 7 physical ones — see docs/design-system/migration.md). This script fails
-// the build if physical direction utilities creep past that count, so a new
-// PR can't silently reintroduce ml-/mr-/pl-/pr-/left-/right-/text-left/
+// Hard gate: the codebase was 98% RTL-logical to start (364 logical
+// utilities vs 7 physical ones), and Phase 4 of the design-system migration
+// (docs/design-system/migration.md) fixed the remaining 7. This script fails
+// the build if physical direction utilities creep back in, so a new PR
+// can't silently reintroduce ml-/mr-/pl-/pr-/left-/right-/text-left/
 // text-right in place of the logical ms-/me-/ps-/pe-/start-/end- forms.
 //
-// Usage: node scripts/design/rtl-guard.mjs [--limit=7]
+// Usage: node scripts/design/rtl-guard.mjs [--limit=0]
 
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, extname, relative, resolve } from "node:path";
@@ -45,7 +46,7 @@ const VIOLATION_PATTERNS = [
 ];
 
 const limitArg = process.argv.find((a) => a.startsWith("--limit="));
-const LIMIT = limitArg ? Number(limitArg.split("=")[1]) : 7;
+const LIMIT = limitArg ? Number(limitArg.split("=")[1]) : 0;
 
 const files = walk(srcRoot);
 const hits = [];

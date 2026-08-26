@@ -225,7 +225,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           <div className="space-y-6">
             {/* Identity Profile Card */}
             <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs hover:shadow-xl hover:border-blue-500/30 transition-all duration-300 overflow-hidden relative group">
-              <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-colors duration-500" />
+              <div className="absolute top-0 start-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-colors duration-500" />
               <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between relative z-10">
                 <h2 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                   <User className="w-4 h-4 text-blue-500" />
@@ -355,7 +355,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           <div className="lg:col-span-2 space-y-6">
             {/* Roles Assignment Card */}
             <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs hover:shadow-xl hover:border-indigo-500/30 transition-all duration-300 overflow-hidden relative group">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-indigo-500/10 transition-colors duration-500" />
+              <div className="absolute top-0 end-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-indigo-500/10 transition-colors duration-500" />
               <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between relative z-10">
                 <h2 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                   <Shield className="w-4 h-4 text-blue-500" />

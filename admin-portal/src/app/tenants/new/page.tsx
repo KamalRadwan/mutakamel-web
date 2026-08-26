@@ -246,7 +246,7 @@ export default function RegisterTenantWizardPage() {
             {/* Step 1: Identity & Geocoding & Address */}
             {currentStep === 1 && (
               <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute top-0 end-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
                 <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 relative z-10">
                   <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span>

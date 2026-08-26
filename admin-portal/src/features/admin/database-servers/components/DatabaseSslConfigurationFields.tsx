@@ -157,7 +157,7 @@ export function DatabaseSslConfigurationFields({
         onChange={(event) =>
           void handleFileChange(field, label, event.target.files?.[0])
         }
-        className="mt-3 block w-full cursor-pointer text-[11px] text-slate-500 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-bold file:text-blue-700 hover:file:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:file:bg-blue-950/50 dark:file:text-blue-300"
+        className="mt-3 block w-full cursor-pointer text-[11px] text-slate-500 file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-bold file:text-blue-700 hover:file:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:file:bg-blue-950/50 dark:file:text-blue-300"
       />
       {config[field] && (
         <p className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">

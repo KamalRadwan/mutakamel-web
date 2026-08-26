@@ -127,7 +127,7 @@ export function DashboardHeader({
             <select
               value={autoRefreshInterval}
               onChange={(e) => onAutoRefreshChange(e.target.value as AutoRefreshInterval)}
-              className="bg-transparent border-none text-xs font-semibold text-white focus:outline-none cursor-pointer pr-1"
+              className="bg-transparent border-none text-xs font-semibold text-white focus:outline-none cursor-pointer pe-1"
             >
               <option value="off" className="bg-slate-900 text-white">{t.dashboard.autoRefreshOff}</option>
               <option value="30s" className="bg-slate-900 text-white">{t.dashboard.autoRefresh30s}</option>
