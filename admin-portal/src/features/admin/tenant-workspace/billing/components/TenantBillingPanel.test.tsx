@@ -17,6 +17,16 @@ import type {
 } from "../types";
 import { TenantBillingPanel } from "./TenantBillingPanel";
 
+// TenantBillingPanel takes `lang` as a prop (its parent, TenantWorkspaceScreen,
+// owns the language state) and never called useI18n() itself — until this
+// panel's tables moved onto the design-system DataTable/Pagination, which do
+// call useI18n() internally for header/label language selection. Every test
+// below renders with lang="en", so this mock just gives DataTable/Pagination
+// the same answer the prop already provides.
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({ lang: "en" as const }),
+}));
+
 const TENANT_ID = "019f0000-0000-7000-8000-000000000001";
 const SUBSCRIPTION_ID = "019f0000-0000-7000-8000-000000000002";
 const ITEM_ID = "019f0000-0000-7000-8000-000000000003";
