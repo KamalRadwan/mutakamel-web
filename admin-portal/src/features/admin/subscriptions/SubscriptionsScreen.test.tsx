@@ -61,9 +61,8 @@ describe("SubscriptionsScreen", () => {
     expect(screen.getByLabelText("Order")).toBeTruthy();
     expect(screen.getByLabelText("Rows per page")).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Lifecycle status"), {
-      target: { value: "PAST_DUE" },
-    });
+    fireEvent.click(screen.getByLabelText("Lifecycle status"));
+    fireEvent.click(screen.getByRole("option", { name: "PAST DUE" }));
     fireEvent.change(screen.getByLabelText("Tenant UUIDv7"), {
       target: { value: TENANT_ID },
     });

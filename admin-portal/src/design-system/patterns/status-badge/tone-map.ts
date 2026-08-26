@@ -60,6 +60,7 @@ const STATUS_ENTRIES: Record<string, [StatusTone, string, string]> = {
   RUNNING: ["progress", "Running", "قيد التشغيل"],
   TRIAL: ["progress", "Trial", "تجريبي"],
   PARTIALLY_PAID: ["progress", "Partially Paid", "مدفوع جزئياً"],
+  PENDING_ACTIVATION: ["progress", "Pending Activation", "بانتظار التفعيل"],
   // Storage credential rotation (STAGED/ACTIVATED) and tenant storage
   // migration (ACCEPTED/COPYING/COPIED/PLACEMENT_COMMITTED) — every
   // non-terminal step of both flows is "progress" until their respective
@@ -75,6 +76,7 @@ const STATUS_ENTRIES: Record<string, [StatusTone, string, string]> = {
   ISSUED: ["warning", "Issued", "صادر"],
   DRAINING: ["warning", "Draining", "قيد الإفراغ"],
   PENDING: ["warning", "Pending", "قيد الانتظار"],
+  PAST_DUE: ["warning", "Past Due", "متأخر السداد"],
   // A migration actively unwinding after a failure — not yet the terminal
   // ROLLED_BACK state, so it reads as an active caution, not a hard danger.
   ROLLING_BACK: ["warning", "Rolling Back", "جارٍ التراجع"],
