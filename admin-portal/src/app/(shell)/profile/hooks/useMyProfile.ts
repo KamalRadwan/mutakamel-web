@@ -6,7 +6,7 @@ import { generateUUIDv7 } from "@/lib/utils/uuid";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
 import type { SuccessResponse } from "@/types/common";
-import type { AdminUserProfile } from "@/app/users/types";
+import type { AdminUserProfile } from "@/app/(shell)/users/types";
 import {
   normalizeApiError,
   type NormalizedApiError,
