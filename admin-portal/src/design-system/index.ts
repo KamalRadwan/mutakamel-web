@@ -45,6 +45,7 @@ export * from "./patterns/pagination/Pagination";
 export * from "./patterns/filter-bar/types";
 export * from "./patterns/filter-bar/FilterBar";
 
+export * from "./patterns/form-drawer/FormDrawer";
 export * from "./patterns/page-header/PageHeader";
 export * from "./patterns/empty-state/EmptyState";
 export * from "./patterns/error-state/ErrorState";

@@ -56,7 +56,12 @@ describe("CreateRoleModal", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Create & Continue" }));
 
-    expect(await screen.findByText(/admin\.roles\.critical/u)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringContaining("admin.roles.critical"),
+      ),
+    );
     expect(rolesApi.create).not.toHaveBeenCalled();
   });
 
@@ -85,7 +90,7 @@ describe("CreateRoleModal", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Create & Continue" }));
 
-    expect(await screen.findByText(/outcome is not confirmed/u)).toBeInTheDocument();
+    expect(await screen.findByText(/outcome unconfirmed/iu)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry exact operation" }));
     await waitFor(() => expect(rolesApi.create).toHaveBeenCalledTimes(2));
 

@@ -72,6 +72,8 @@ export function useRoleDetail(id: string) {
     useState<NormalizedApiError | null>(null);
   const [metadataAmbiguous, setMetadataAmbiguous] = useState(false);
   const [permissionsAmbiguous, setPermissionsAmbiguous] = useState(false);
+  const [metadataIdempotencyKey, setMetadataIdempotencyKey] = useState<string | undefined>(undefined);
+  const [permissionsIdempotencyKey, setPermissionsIdempotencyKey] = useState<string | undefined>(undefined);
   const metadataIntentRef = useRef<OwnedIntent<UpdateRoleCommand> | null>(null);
   const permissionsIntentRef =
     useRef<OwnedIntent<ReplaceRolePermissionsCommand> | null>(null);
@@ -89,6 +91,7 @@ export function useRoleDetail(id: string) {
       metadataIntentRef.current = null;
       setMetadataAmbiguous(false);
       setMetadataError(null);
+      setMetadataIdempotencyKey(undefined);
     }
     if (!metadataIntent?.ambiguous || metadataConfirmed) {
       setName(next.name);
@@ -108,6 +111,7 @@ export function useRoleDetail(id: string) {
       permissionsIntentRef.current = null;
       setPermissionsAmbiguous(false);
       setPermissionsError(null);
+      setPermissionsIdempotencyKey(undefined);
     }
     if (!permissionsIntent?.ambiguous || permissionsConfirmed) {
       setAssignedPermissions(authoritativeIds);
@@ -238,12 +242,14 @@ export function useRoleDetail(id: string) {
             ambiguous: false,
           };
     metadataIntentRef.current = intent;
+    setMetadataIdempotencyKey(intent.idempotencyKey);
     setIsSavingMetadata(true);
     setMetadataError(null);
     try {
       const result = await rolesApi.update(id, command, intent.idempotencyKey);
       metadataIntentRef.current = null;
       setMetadataAmbiguous(false);
+      setMetadataIdempotencyKey(undefined);
       applyAuthoritativeRole(result.data);
       toast.success(
         lang === "ar" ? "تم الحفظ" : "Role updated",
@@ -254,10 +260,17 @@ export function useRoleDetail(id: string) {
     } catch (caught) {
       const error = normalizeApiError(caught);
       const ambiguous = retainWriteIntent(caught, error);
-      if (ambiguous) metadataIntentRef.current = { ...intent, ambiguous: true };
-      else if (shouldRotateWriteCommandKey(error)) metadataIntentRef.current = null;
+      if (ambiguous) {
+        metadataIntentRef.current = { ...intent, ambiguous: true };
+      } else if (shouldRotateWriteCommandKey(error)) {
+        metadataIntentRef.current = null;
+        setMetadataIdempotencyKey(undefined);
+      }
       setMetadataAmbiguous(ambiguous);
       setMetadataError(error);
+      if (!ambiguous) {
+        toast.error(lang === "ar" ? "فشل الحفظ" : "Update failed", error.message);
+      }
     } finally {
       setIsSavingMetadata(false);
     }
@@ -294,6 +307,7 @@ export function useRoleDetail(id: string) {
             ambiguous: false,
           };
     permissionsIntentRef.current = intent;
+    setPermissionsIdempotencyKey(intent.idempotencyKey);
     setIsSavingPermissions(true);
     setPermissionsError(null);
     try {
@@ -304,6 +318,7 @@ export function useRoleDetail(id: string) {
       );
       permissionsIntentRef.current = null;
       setPermissionsAmbiguous(false);
+      setPermissionsIdempotencyKey(undefined);
       applyAuthoritativeRole(result.data);
       toast.success(
         lang === "ar" ? "تم حفظ الصلاحيات" : "Permissions updated",
@@ -314,10 +329,17 @@ export function useRoleDetail(id: string) {
     } catch (caught) {
       const error = normalizeApiError(caught);
       const ambiguous = retainWriteIntent(caught, error);
-      if (ambiguous) permissionsIntentRef.current = { ...intent, ambiguous: true };
-      else if (shouldRotateWriteCommandKey(error)) permissionsIntentRef.current = null;
+      if (ambiguous) {
+        permissionsIntentRef.current = { ...intent, ambiguous: true };
+      } else if (shouldRotateWriteCommandKey(error)) {
+        permissionsIntentRef.current = null;
+        setPermissionsIdempotencyKey(undefined);
+      }
       setPermissionsAmbiguous(ambiguous);
       setPermissionsError(error);
+      if (!ambiguous) {
+        toast.error(lang === "ar" ? "فشل الحفظ" : "Update failed", error.message);
+      }
     } finally {
       setIsSavingPermissions(false);
     }
@@ -406,6 +428,8 @@ export function useRoleDetail(id: string) {
     permissionsError,
     metadataAmbiguous,
     permissionsAmbiguous,
+    metadataIdempotencyKey,
+    permissionsIdempotencyKey,
     saveMetadata,
     savePermissions,
     togglePermission,
