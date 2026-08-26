@@ -3,14 +3,23 @@ import { DashboardMetric } from "@/types/dashboard";
 export function formatDashboardMetric(
   metric: DashboardMetric | { kind: string; value: string | number },
   currencyCode = "USD",
+  lang: "ar" | "en" = "en",
 ): string {
+  const locale = lang === "ar" ? "ar-EG" : "en-US";
+
   if (metric.kind === "money") {
-    return `${currencyCode} ${String(metric.value)}`;
+    const num = typeof metric.value === "string" ? parseFloat(metric.value) : metric.value;
+    if (Number.isNaN(num)) return `${currencyCode} ${String(metric.value)}`;
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: currencyCode,
+      maximumFractionDigits: 2,
+    }).format(num);
   }
 
   if (metric.kind === "percent" || metric.kind === "ratio") {
     const num = typeof metric.value === "string" ? parseFloat(metric.value) : metric.value;
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(locale, {
       style: "percent",
       maximumFractionDigits: 1,
     }).format(num);
@@ -27,65 +36,46 @@ export interface ToneColorStyle {
   badgeText: string;
 }
 
+// Collapses the backend's 6-hue DashboardMetricTone onto the design
+// system's 4 roles (brand/warn/danger/neutral) — docs/design-system: no
+// fifth hue, and "in progress"/informational tones (blue, cyan, purple)
+// are neutral, not decorative color, per the theme-flip rules.
 export function toneToColorStyle(tone: string): ToneColorStyle {
-  switch (tone) {
-    case "amber":
-      return {
-        iconColor: "text-amber-500 dark:text-amber-400",
-        iconBg: "bg-amber-500/15 border border-amber-500/30 dark:bg-amber-500/20",
-        topBorder: "border-t-2 border-t-amber-500",
-        badgeBg: "bg-amber-50 dark:bg-amber-950/50",
-        badgeText: "text-amber-700 dark:text-amber-300",
-      };
-    case "blue":
-      return {
-        iconColor: "text-blue-500 dark:text-blue-400",
-        iconBg: "bg-blue-500/15 border border-blue-500/30 dark:bg-blue-500/20",
-        topBorder: "border-t-2 border-t-blue-500",
-        badgeBg: "bg-blue-50 dark:bg-blue-950/50",
-        badgeText: "text-blue-700 dark:text-blue-300",
-      };
-    case "cyan":
-      return {
-        iconColor: "text-cyan-500 dark:text-cyan-400",
-        iconBg: "bg-cyan-500/15 border border-cyan-500/30 dark:bg-cyan-500/20",
-        topBorder: "border-t-2 border-t-cyan-500",
-        badgeBg: "bg-cyan-50 dark:bg-cyan-950/50",
-        badgeText: "text-cyan-700 dark:text-cyan-300",
-      };
-    case "green":
-      return {
-        iconColor: "text-emerald-500 dark:text-emerald-400",
-        iconBg: "bg-emerald-500/15 border border-emerald-500/30 dark:bg-emerald-500/20",
-        topBorder: "border-t-2 border-t-emerald-500",
-        badgeBg: "bg-emerald-50 dark:bg-emerald-950/50",
-        badgeText: "text-emerald-700 dark:text-emerald-300",
-      };
-    case "purple":
-      return {
-        iconColor: "text-purple-500 dark:text-purple-400",
-        iconBg: "bg-purple-500/15 border border-purple-500/30 dark:bg-purple-500/20",
-        topBorder: "border-t-2 border-t-purple-500",
-        badgeBg: "bg-purple-50 dark:bg-purple-950/50",
-        badgeText: "text-purple-700 dark:text-purple-300",
-      };
-    case "red":
-      return {
-        iconColor: "text-rose-500 dark:text-rose-400",
-        iconBg: "bg-rose-500/15 border border-rose-500/30 dark:bg-rose-500/20",
-        topBorder: "border-t-2 border-t-rose-500",
-        badgeBg: "bg-rose-50 dark:bg-rose-950/50",
-        badgeText: "text-rose-700 dark:text-rose-300",
-      };
-    default:
-      return {
-        iconColor: "text-indigo-500 dark:text-indigo-400",
-        iconBg: "bg-indigo-500/15 border border-indigo-500/30 dark:bg-indigo-500/20",
-        topBorder: "border-t-2 border-t-indigo-500",
-        badgeBg: "bg-slate-100 dark:bg-slate-800",
-        badgeText: "text-slate-700 dark:text-slate-300",
-      };
-  }
+  const role =
+    tone === "amber" ? "warn" : tone === "green" ? "brand" : tone === "red" ? "danger" : "neutral";
+
+  const byRole: Record<string, ToneColorStyle> = {
+    warn: {
+      iconColor: "text-warn-600 dark:text-warn-400",
+      iconBg: "bg-warn-500/15 border border-warn-500/30",
+      topBorder: "border-t-2 border-t-warn-500",
+      badgeBg: "bg-warn-50 dark:bg-warn-950/50",
+      badgeText: "text-warn-700 dark:text-warn-300",
+    },
+    brand: {
+      iconColor: "text-brand-600 dark:text-brand-400",
+      iconBg: "bg-brand-500/15 border border-brand-500/30",
+      topBorder: "border-t-2 border-t-brand-500",
+      badgeBg: "bg-brand-50 dark:bg-brand-950/50",
+      badgeText: "text-brand-700 dark:text-brand-300",
+    },
+    danger: {
+      iconColor: "text-danger-600 dark:text-danger-400",
+      iconBg: "bg-danger-500/15 border border-danger-500/30",
+      topBorder: "border-t-2 border-t-danger-500",
+      badgeBg: "bg-danger-50 dark:bg-danger-950/50",
+      badgeText: "text-danger-700 dark:text-danger-300",
+    },
+    neutral: {
+      iconColor: "text-muted-foreground",
+      iconBg: "bg-ink-500/15 border border-ink-500/30",
+      topBorder: "border-t-2 border-t-ink-400",
+      badgeBg: "bg-ink-100 dark:bg-ink-800",
+      badgeText: "text-ink-700 dark:text-ink-300",
+    },
+  };
+
+  return byRole[role];
 }
 
 export function toneToColorClass(tone: string): string {

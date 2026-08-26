@@ -16,6 +16,7 @@ import {
   getDashboardGroupDescription,
   getDashboardGroupLabel,
 } from "../utils/dashboard-groups";
+import { DashboardOverviewCharts } from "./DashboardOverviewCharts";
 
 interface DashboardGroupsOverviewProps {
   data: DashboardResponse;
@@ -64,6 +65,8 @@ export function DashboardGroupsOverview({
           tone={alerts > 0 ? "amber" : "green"}
         />
       </div>
+
+      <DashboardOverviewCharts data={data} />
 
       <section>
         <div className="mb-3 flex items-center justify-between gap-3 px-1">

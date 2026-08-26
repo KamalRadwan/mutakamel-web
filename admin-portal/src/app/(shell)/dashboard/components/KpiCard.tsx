@@ -16,6 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { DashboardMetric } from "@/types/dashboard";
+import { useI18n } from "@/i18n/I18nContext";
 import { formatDashboardMetric, toneToColorStyle } from "../utils/formatters";
 
 interface KpiCardProps {
@@ -44,7 +45,8 @@ export function getCardIcon(key: string, label: string) {
 }
 
 export function KpiCard({ card, currencyCode = "USD" }: KpiCardProps) {
-  const formattedValue = formatDashboardMetric(card, currencyCode);
+  const { lang } = useI18n();
+  const formattedValue = formatDashboardMetric(card, currencyCode, lang);
   const style = toneToColorStyle(card.tone);
   const icon = getCardIcon(card.key, card.label);
 

@@ -48,10 +48,16 @@ describe("grouped admin dashboard contract", () => {
     ).toBe(true);
   });
 
-  it("preserves exact decimal money strings when formatting cards", () => {
+  it("formats money strings as locale-aware currency, rounded to 2 decimals", () => {
     expect(
       formatDashboardMetric({ kind: "money", value: "1000.2500" }),
-    ).toBe("USD 1000.2500");
+    ).toBe("$1,000.25");
+  });
+
+  it("falls back to a raw currency-code prefix when the value cannot be parsed", () => {
+    expect(
+      formatDashboardMetric({ kind: "money", value: "not-a-number" }),
+    ).toBe("USD not-a-number");
   });
 
   it("builds the previous UTC month without timestamp query values", () => {
