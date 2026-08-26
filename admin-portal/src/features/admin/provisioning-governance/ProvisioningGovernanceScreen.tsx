@@ -5,20 +5,52 @@ import { useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Boxes,
-  ChevronLeft,
-  ChevronRight,
   FlaskConical,
-  Loader2,
   KeyRound,
   RefreshCw,
   Rocket,
   RotateCcw,
-  Search,
   ShieldAlert,
   Tags,
-  X,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { useToast } from "@/components/ui/ToastContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AmbiguousOutcomePanel,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
+  ErrorState,
+  Field,
+  Input,
+  PageHeader,
+  Pagination,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  type ColumnDef,
+} from "@/design-system";
 import { COPY, type ProvisioningGovernanceCopy } from "./copy";
 import type {
   AsyncView,
@@ -34,67 +66,41 @@ import {
   type ProvisioningGovernanceView,
 } from "./useProvisioningGovernance";
 
-type Tab = "CATALOGUE" | "DISCOVERY";
-
 export function ProvisioningGovernanceScreen() {
   const { lang } = useI18n();
   const copy = COPY[lang];
   const view = useProvisioningGovernance();
-  const [tab, setTab] = useState<Tab>("CATALOGUE");
 
   return (
-    <div
-      dir={lang === "ar" ? "rtl" : "ltr"}
-      className="mx-auto w-full max-w-[1500px] space-y-4"
-    >
-        <header className="relative overflow-hidden rounded-xl border border-indigo-500/20 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 px-5 py-4 text-white shadow-md">
-          <div className="absolute end-0 top-0 size-64 -translate-y-1/2 translate-x-1/3 rounded-full bg-indigo-400/15 blur-3xl rtl:-translate-x-1/3" />
-          <div className="relative flex items-start gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-indigo-300/30 bg-indigo-400/15 text-indigo-200">
-              <Boxes className="size-5" aria-hidden="true" />
-            </span>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-                  {copy.title}
-                </h1>
-                <span className="rounded-md border border-indigo-300/30 bg-indigo-400/10 px-2 py-1 text-xs font-semibold text-indigo-100">
-                  {copy.readOnly}
-                </span>
-              </div>
-              <p className="mt-1 max-w-4xl text-sm leading-6 text-indigo-100/80">
-                {copy.subtitle}
-              </p>
-            </div>
-          </div>
-        </header>
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="mx-auto w-full max-w-[1500px]">
+      <PageHeader
+        title={copy.title}
+        description={copy.subtitle}
+        status={<Badge tone="neutral">{copy.readOnly}</Badge>}
+      />
 
-        <nav
-          role="tablist"
-          aria-label={copy.title}
-          className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-950"
-        >
-          <TabButton
-            selected={tab === "CATALOGUE"}
-            onClick={() => setTab("CATALOGUE")}
-            label={copy.catalogue}
-            icon={<Boxes className="size-4" />}
-          />
-          <TabButton
-            selected={tab === "DISCOVERY"}
-            onClick={() => setTab("DISCOVERY")}
-            label={copy.discovery}
-            icon={<FlaskConical className="size-4" />}
-          />
-        </nav>
-
+      <div className="space-y-4">
         <ProvisioningModuleLinks view={view} copy={copy} />
 
-        {tab === "CATALOGUE" ? (
-          <CatalogueWorkspace view={view} copy={copy} lang={lang} />
-        ) : (
-          <DiscoveryWorkspace view={view} copy={copy} lang={lang} />
-        )}
+        <Tabs defaultValue="CATALOGUE">
+          <TabsList>
+            <TabsTrigger value="CATALOGUE">
+              <Boxes className="me-1.5 size-4" aria-hidden="true" />
+              {copy.catalogue}
+            </TabsTrigger>
+            <TabsTrigger value="DISCOVERY">
+              <FlaskConical className="me-1.5 size-4" aria-hidden="true" />
+              {copy.discovery}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="CATALOGUE">
+            <CatalogueWorkspace view={view} copy={copy} lang={lang} />
+          </TabsContent>
+          <TabsContent value="DISCOVERY">
+            <DiscoveryWorkspace view={view} copy={copy} lang={lang} />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
@@ -130,18 +136,16 @@ function ProvisioningModuleLinks({
   return (
     <nav aria-label={copy.openWorkspace} className="grid gap-2 md:grid-cols-3">
       {modules.map((module) => (
-        <Link
-          key={module.href}
-          href={module.href}
-          className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-400 hover:text-indigo-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-300"
-        >
-          <span className="inline-flex items-center gap-2">
-            {module.icon}
-            {module.label}
-          </span>
-          <span className="text-xs font-semibold text-slate-400">
-            {copy.openWorkspace}
-          </span>
+        <Link key={module.href} href={module.href}>
+          <Card className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-brand-400 dark:hover:border-brand-500">
+            <span className="inline-flex items-center gap-2">
+              {module.icon}
+              {module.label}
+            </span>
+            <span className="text-xs font-semibold text-muted-foreground">
+              {copy.openWorkspace}
+            </span>
+          </Card>
         </Link>
       ))}
     </nav>
@@ -165,152 +169,165 @@ function CatalogueWorkspace({
   return (
     <div className="space-y-4">
       {catalogue.state !== "FORBIDDEN" ? (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            setValidateFilters(true);
-            if (
-              Object.keys(componentFilterErrors(view.componentDraft, copy))
-                .length
-            ) {
-              return;
-            }
-            view.applyComponentFilters();
-          }}
-          className={cardClass}
-        >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <TextField
-              label={copy.search}
-              value={view.componentDraft.search ?? ""}
-              onChange={(search) =>
-                view.setComponentDraft((current) => ({
-                  ...current,
-                  search: search || undefined,
-                }))
+        <Card>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              setValidateFilters(true);
+              if (
+                Object.keys(componentFilterErrors(view.componentDraft, copy))
+                  .length
+              ) {
+                return;
               }
-              maxLength={100}
-            />
-            <TextField
-              label={copy.componentKey}
-              value={view.componentDraft.componentKey ?? ""}
-              onChange={(componentKey) =>
-                view.setComponentDraft((current) => ({
-                  ...current,
-                  componentKey: componentKey || undefined,
-                }))
-              }
-              maxLength={96}
-              dir="ltr"
-              error={filterErrors.componentKey}
-            />
-            <TextField
-              label={copy.ownerApp}
-              value={view.componentDraft.ownerApp ?? ""}
-              onChange={(ownerApp) =>
-                view.setComponentDraft((current) => ({
-                  ...current,
-                  ownerApp: ownerApp || undefined,
-                }))
-              }
-              maxLength={32}
-              dir="ltr"
-              error={filterErrors.ownerApp}
-            />
-            <SelectField
-              label={copy.kind}
-              value={view.componentDraft.kind ?? ""}
-              onChange={(kind) =>
-                view.setComponentDraft((current) => ({
-                  ...current,
-                  kind:
-                    kind === "FOUNDATION" || kind === "MODULE"
-                      ? kind
-                      : undefined,
-                }))
-              }
-              options={[
-                { value: "", label: copy.allKinds },
-                { value: "FOUNDATION", label: "FOUNDATION" },
-                { value: "MODULE", label: "MODULE" },
-              ]}
-            />
-            <SelectField
-              label={copy.sortBy}
-              value={view.componentDraft.sortBy}
-              onChange={(sortBy) =>
-                view.setComponentDraft((current) => ({
-                  ...current,
-                  sortBy:
-                    sortBy === "ownerApp" ||
-                    sortBy === "kind" ||
-                    sortBy === "createdAt" ||
-                    sortBy === "updatedAt"
-                      ? sortBy
-                      : "key",
-                }))
-              }
-              options={[
-                { value: "key", label: copy.componentKey },
-                { value: "ownerApp", label: copy.ownerApp },
-                { value: "kind", label: copy.kind },
-                { value: "createdAt", label: copy.createdAt },
-                { value: "updatedAt", label: copy.updated },
-              ]}
-            />
-            <SelectField
-              label={copy.sortDirection}
-              value={view.componentDraft.sortDir}
-              onChange={(sortDir) =>
-                view.setComponentDraft((current) => ({
-                  ...current,
-                  sortDir: sortDir === "DESC" ? "DESC" : "ASC",
-                }))
-              }
-              options={[
-                { value: "ASC", label: copy.ascending },
-                { value: "DESC", label: copy.descending },
-              ]}
-            />
-            <SelectField
-              label={copy.pageSize}
-              value={String(view.componentDraft.limit)}
-              onChange={(limit) =>
-                view.setComponentDraft((current) => ({
-                  ...current,
-                  limit: Number(limit),
-                }))
-              }
-              options={[20, 50, 100].map((value) => ({
-                value: String(value),
-                label: String(value),
-              }))}
-            />
-          </div>
-          <div className="mt-4 flex flex-wrap justify-end gap-2">
-            <ActionButton
-              onClick={() => {
-                setValidateFilters(false);
-                view.resetComponentFilters();
-              }}
-              label={copy.reset}
-              icon={<RotateCcw className="size-3.5" />}
-            />
-            <ActionButton
-              onClick={view.refreshComponents}
-              label={copy.refresh}
-              icon={
-                <RefreshCw
-                  className={`size-3.5 ${catalogue.isRefreshing ? "animate-spin" : ""}`}
-                />
-              }
-            />
-            <button type="submit" className={primaryButtonClass}>
-              <Search className="size-3.5" />
-              {copy.apply}
-            </button>
-          </div>
-        </form>
+              view.applyComponentFilters();
+            }}
+          >
+            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <Field label={copy.search}>
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    value={view.componentDraft.search ?? ""}
+                    onChange={(event) =>
+                      view.setComponentDraft((current) => ({
+                        ...current,
+                        search: event.target.value || undefined,
+                      }))
+                    }
+                    maxLength={100}
+                  />
+                )}
+              </Field>
+              <Field label={copy.componentKey} error={filterErrors.componentKey}>
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    value={view.componentDraft.componentKey ?? ""}
+                    onChange={(event) =>
+                      view.setComponentDraft((current) => ({
+                        ...current,
+                        componentKey: event.target.value || undefined,
+                      }))
+                    }
+                    maxLength={96}
+                    dir="ltr"
+                  />
+                )}
+              </Field>
+              <Field label={copy.ownerApp} error={filterErrors.ownerApp}>
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    value={view.componentDraft.ownerApp ?? ""}
+                    onChange={(event) =>
+                      view.setComponentDraft((current) => ({
+                        ...current,
+                        ownerApp: event.target.value || undefined,
+                      }))
+                    }
+                    maxLength={32}
+                    dir="ltr"
+                  />
+                )}
+              </Field>
+              <SelectField
+                label={copy.kind}
+                value={view.componentDraft.kind ?? ""}
+                onChange={(kind) =>
+                  view.setComponentDraft((current) => ({
+                    ...current,
+                    kind:
+                      kind === "FOUNDATION" || kind === "MODULE"
+                        ? kind
+                        : undefined,
+                  }))
+                }
+                options={[
+                  { value: "__any__", label: copy.allKinds },
+                  { value: "FOUNDATION", label: "FOUNDATION" },
+                  { value: "MODULE", label: "MODULE" },
+                ]}
+              />
+              <SelectField
+                label={copy.sortBy}
+                value={view.componentDraft.sortBy}
+                onChange={(sortBy) =>
+                  view.setComponentDraft((current) => ({
+                    ...current,
+                    sortBy:
+                      sortBy === "ownerApp" ||
+                      sortBy === "kind" ||
+                      sortBy === "createdAt" ||
+                      sortBy === "updatedAt"
+                        ? sortBy
+                        : "key",
+                  }))
+                }
+                options={[
+                  { value: "key", label: copy.componentKey },
+                  { value: "ownerApp", label: copy.ownerApp },
+                  { value: "kind", label: copy.kind },
+                  { value: "createdAt", label: copy.createdAt },
+                  { value: "updatedAt", label: copy.updated },
+                ]}
+              />
+              <SelectField
+                label={copy.sortDirection}
+                value={view.componentDraft.sortDir}
+                onChange={(sortDir) =>
+                  view.setComponentDraft((current) => ({
+                    ...current,
+                    sortDir: sortDir === "DESC" ? "DESC" : "ASC",
+                  }))
+                }
+                options={[
+                  { value: "ASC", label: copy.ascending },
+                  { value: "DESC", label: copy.descending },
+                ]}
+              />
+              <SelectField
+                label={copy.pageSize}
+                value={String(view.componentDraft.limit)}
+                onChange={(limit) =>
+                  view.setComponentDraft((current) => ({
+                    ...current,
+                    limit: Number(limit),
+                  }))
+                }
+                options={[20, 50, 100].map((value) => ({
+                  value: String(value),
+                  label: String(value),
+                }))}
+              />
+              <div className="flex items-end justify-end gap-2 md:col-span-2 xl:col-span-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setValidateFilters(false);
+                    view.resetComponentFilters();
+                  }}
+                >
+                  <RotateCcw className="size-3.5" />
+                  {copy.reset}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={view.refreshComponents}
+                  loading={catalogue.isRefreshing}
+                >
+                  <RefreshCw className="size-3.5" />
+                  {copy.refresh}
+                </Button>
+                <Button type="submit" variant="primary">
+                  {copy.apply}
+                </Button>
+              </div>
+            </CardContent>
+          </form>
+        </Card>
       ) : null}
 
       <PagedState
@@ -351,81 +368,92 @@ function ComponentTable({
   onInspect: (value: ProvisioningComponent) => void;
   onPage: (value: number) => void;
 }) {
+  const columns: ColumnDef<ProvisioningComponent>[] = [
+    {
+      key: "component",
+      headerEn: COPY.en.component,
+      headerAr: COPY.ar.component,
+      cell: (component) => (
+        <div>
+          <p className="font-mono text-xs font-semibold text-brand-700 dark:text-brand-300">
+            {component.key}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {component.isMandatory ? copy.mandatory : copy.optional} ·{" "}
+            {copy.contract} {component.contractVersion}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "ownerApp",
+      headerEn: COPY.en.ownerApp,
+      headerAr: COPY.ar.ownerApp,
+      cell: (component) => <span className="font-mono text-xs">{component.ownerApp}</span>,
+    },
+    {
+      key: "kind",
+      headerEn: COPY.en.kind,
+      headerAr: COPY.ar.kind,
+      cell: (component) => <Badge tone="neutral">{component.kind}</Badge>,
+    },
+    {
+      key: "latestRelease",
+      headerEn: COPY.en.latestRelease,
+      headerAr: COPY.ar.latestRelease,
+      cell: (component) =>
+        component.latestPublishedRelease ? (
+          <div className="text-xs">
+            <p className="font-mono font-semibold">
+              {component.latestPublishedRelease.releaseVersion}
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              {component.latestPublishedRelease.riskLevel} ·{" "}
+              {formatDate(component.latestPublishedRelease.publishedAt, lang)}
+            </p>
+          </div>
+        ) : (
+          <span className="text-muted-foreground">{copy.noRelease}</span>
+        ),
+    },
+    {
+      key: "updated",
+      headerEn: COPY.en.updated,
+      headerAr: COPY.ar.updated,
+      cell: (component) => (
+        <span className="text-xs text-muted-foreground">
+          {formatDate(component.updatedAt, lang, true)}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      headerEn: "",
+      headerAr: "",
+      align: "end",
+      cell: (component) => (
+        <Button type="button" variant="outline" size="sm" onClick={() => onInspect(component)}>
+          {copy.inspectReleases}
+        </Button>
+      ),
+    },
+  ];
+
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] text-sm">
-          <thead className="bg-slate-50 text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-            <tr>
-              {[
-                copy.component,
-                copy.ownerApp,
-                copy.kind,
-                copy.latestRelease,
-                copy.updated,
-                "",
-              ].map((label, index) => (
-                <th key={`${label}:${index}`} className="px-4 py-3 text-start">
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {data.items.map((component) => (
-              <tr key={component.id} className="align-top">
-                <td className="px-4 py-4">
-                  <p className="font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-                    {component.key}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {component.isMandatory ? copy.mandatory : copy.optional} ·{" "}
-                    {copy.contract} {component.contractVersion}
-                  </p>
-                </td>
-                <td className="px-4 py-4 font-mono text-xs">
-                  {component.ownerApp}
-                </td>
-                <td className="px-4 py-4">
-                  <Pill>{component.kind}</Pill>
-                </td>
-                <td className="px-4 py-4 text-xs">
-                  {component.latestPublishedRelease ? (
-                    <>
-                      <p className="font-mono font-semibold">
-                        {component.latestPublishedRelease.releaseVersion}
-                      </p>
-                      <p className="mt-1 text-slate-500">
-                        {component.latestPublishedRelease.riskLevel} ·{" "}
-                        {formatDate(
-                          component.latestPublishedRelease.publishedAt,
-                          lang,
-                        )}
-                      </p>
-                    </>
-                  ) : (
-                    <span className="text-slate-400">{copy.noRelease}</span>
-                  )}
-                </td>
-                <td className="px-4 py-4 text-xs text-slate-500">
-                  {formatDate(component.updatedAt, lang, true)}
-                </td>
-                <td className="px-4 py-4 text-end">
-                  <button
-                    type="button"
-                    onClick={() => onInspect(component)}
-                    className={secondaryButtonClass}
-                  >
-                    {copy.inspectReleases}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <PaginationFooter data={data} copy={copy} lang={lang} onPage={onPage} />
-    </section>
+    <Card>
+      <DataTable
+        columns={columns}
+        data={data.items}
+        getRowId={(row) => row.id}
+        pagination={{
+          page: data.page,
+          limit: data.limit,
+          totalItems: data.total,
+          totalPages: data.totalPages,
+          onPageChange: onPage,
+        }}
+      />
+    </Card>
   );
 }
 
@@ -439,167 +467,155 @@ function ReleaseDialog({
   lang: "ar" | "en";
 }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="provisioning-release-dialog-title"
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
-    >
-      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2
-              id="provisioning-release-dialog-title"
-              className="text-lg font-semibold"
-            >
-              {copy.releases}: {view.selectedComponent?.key}
-            </h2>
-            <p className="mt-1 font-mono text-xs text-slate-500">
-              {view.selectedComponent?.id}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => view.selectComponent(null)}
-            aria-label={copy.close}
-            className="rounded-lg p-2 hover:bg-slate-200 dark:hover:bg-slate-800"
+    <Dialog open onOpenChange={(open) => !open && view.selectComponent(null)}>
+      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {copy.releases}: {view.selectedComponent?.key}
+          </DialogTitle>
+          <p className="font-mono text-xs text-muted-foreground">
+            {view.selectedComponent?.id}
+          </p>
+        </DialogHeader>
+        <Card>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              view.applyReleaseFilters();
+            }}
           >
-            <X className="size-4" />
-          </button>
-        </div>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            view.applyReleaseFilters();
-          }}
-          className="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-2 xl:grid-cols-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <TextField
-            label={copy.search}
-            value={view.releaseDraft.search ?? ""}
-            onChange={(search) =>
-              view.setReleaseDraft((current) => ({
-                ...current,
-                search: search || undefined,
-              }))
-            }
-            maxLength={100}
-          />
-          <SelectField
-            label={copy.risk}
-            value={view.releaseDraft.riskLevel ?? ""}
-            onChange={(riskLevel) =>
-              view.setReleaseDraft((current) => ({
-                ...current,
-                riskLevel:
-                  riskLevel === "LOW" ||
-                  riskLevel === "MEDIUM" ||
-                  riskLevel === "HIGH"
-                    ? riskLevel
-                    : undefined,
-              }))
-            }
-            options={[
-              { value: "", label: copy.allRisks },
-              ...["LOW", "MEDIUM", "HIGH"].map((value) => ({
-                value,
-                label: value,
-              })),
-            ]}
-          />
-          <BooleanSelect
-            label={copy.selfService}
-            value={view.releaseDraft.selfServiceAllowed}
-            onChange={(selfServiceAllowed) =>
-              view.setReleaseDraft((current) => ({
-                ...current,
-                selfServiceAllowed,
-              }))
-            }
-            copy={copy}
-          />
-          <BooleanSelect
-            label={copy.backup}
-            value={view.releaseDraft.requiresBackup}
-            onChange={(requiresBackup) =>
-              view.setReleaseDraft((current) => ({
-                ...current,
-                requiresBackup,
-              }))
-            }
-            copy={copy}
-          />
-          <BooleanSelect
-            label={copy.maintenance}
-            value={view.releaseDraft.requiresMaintenance}
-            onChange={(requiresMaintenance) =>
-              view.setReleaseDraft((current) => ({
-                ...current,
-                requiresMaintenance,
-              }))
-            }
-            copy={copy}
-          />
-          <SelectField
-            label={copy.sortBy}
-            value={view.releaseDraft.sortBy}
-            onChange={(sortBy) =>
-              view.setReleaseDraft((current) => ({
-                ...current,
-                sortBy:
-                  sortBy === "releaseVersion" ||
-                  sortBy === "manifestVersion" ||
-                  sortBy === "riskLevel"
-                    ? sortBy
-                    : "publishedAt",
-              }))
-            }
-            options={[
-              { value: "publishedAt", label: copy.published },
-              { value: "releaseVersion", label: copy.version },
-              { value: "manifestVersion", label: copy.contract },
-              { value: "riskLevel", label: copy.risk },
-            ]}
-          />
-          <SelectField
-            label={copy.sortDirection}
-            value={view.releaseDraft.sortDir}
-            onChange={(sortDir) =>
-              view.setReleaseDraft((current) => ({
-                ...current,
-                sortDir: sortDir === "ASC" ? "ASC" : "DESC",
-              }))
-            }
-            options={[
-              { value: "ASC", label: copy.ascending },
-              { value: "DESC", label: copy.descending },
-            ]}
-          />
-          <SelectField
-            label={copy.pageSize}
-            value={String(view.releaseDraft.limit)}
-            onChange={(limit) =>
-              view.setReleaseDraft((current) => ({
-                ...current,
-                limit: Number(limit),
-              }))
-            }
-            options={[20, 50, 100].map((value) => ({
-              value: String(value),
-              label: String(value),
-            }))}
-          />
-          <div className="flex items-end gap-2">
-            <button type="submit" className={primaryButtonClass}>
-              {copy.apply}
-            </button>
-            <ActionButton
-              label={copy.reset}
-              onClick={view.resetReleaseFilters}
-              icon={<RotateCcw className="size-3.5" />}
-            />
-          </div>
-        </form>
+            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <Field label={copy.search}>
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    value={view.releaseDraft.search ?? ""}
+                    onChange={(event) =>
+                      view.setReleaseDraft((current) => ({
+                        ...current,
+                        search: event.target.value || undefined,
+                      }))
+                    }
+                    maxLength={100}
+                  />
+                )}
+              </Field>
+              <SelectField
+                label={copy.risk}
+                value={view.releaseDraft.riskLevel ?? ""}
+                onChange={(riskLevel) =>
+                  view.setReleaseDraft((current) => ({
+                    ...current,
+                    riskLevel:
+                      riskLevel === "LOW" ||
+                      riskLevel === "MEDIUM" ||
+                      riskLevel === "HIGH"
+                        ? riskLevel
+                        : undefined,
+                  }))
+                }
+                options={[
+                  { value: "__any__", label: copy.allRisks },
+                  ...["LOW", "MEDIUM", "HIGH"].map((value) => ({
+                    value,
+                    label: value,
+                  })),
+                ]}
+              />
+              <BooleanSelect
+                label={copy.selfService}
+                value={view.releaseDraft.selfServiceAllowed}
+                onChange={(selfServiceAllowed) =>
+                  view.setReleaseDraft((current) => ({
+                    ...current,
+                    selfServiceAllowed,
+                  }))
+                }
+                copy={copy}
+              />
+              <BooleanSelect
+                label={copy.backup}
+                value={view.releaseDraft.requiresBackup}
+                onChange={(requiresBackup) =>
+                  view.setReleaseDraft((current) => ({
+                    ...current,
+                    requiresBackup,
+                  }))
+                }
+                copy={copy}
+              />
+              <BooleanSelect
+                label={copy.maintenance}
+                value={view.releaseDraft.requiresMaintenance}
+                onChange={(requiresMaintenance) =>
+                  view.setReleaseDraft((current) => ({
+                    ...current,
+                    requiresMaintenance,
+                  }))
+                }
+                copy={copy}
+              />
+              <SelectField
+                label={copy.sortBy}
+                value={view.releaseDraft.sortBy}
+                onChange={(sortBy) =>
+                  view.setReleaseDraft((current) => ({
+                    ...current,
+                    sortBy:
+                      sortBy === "releaseVersion" ||
+                      sortBy === "manifestVersion" ||
+                      sortBy === "riskLevel"
+                        ? sortBy
+                        : "publishedAt",
+                  }))
+                }
+                options={[
+                  { value: "publishedAt", label: copy.published },
+                  { value: "releaseVersion", label: copy.version },
+                  { value: "manifestVersion", label: copy.contract },
+                  { value: "riskLevel", label: copy.risk },
+                ]}
+              />
+              <SelectField
+                label={copy.sortDirection}
+                value={view.releaseDraft.sortDir}
+                onChange={(sortDir) =>
+                  view.setReleaseDraft((current) => ({
+                    ...current,
+                    sortDir: sortDir === "ASC" ? "ASC" : "DESC",
+                  }))
+                }
+                options={[
+                  { value: "ASC", label: copy.ascending },
+                  { value: "DESC", label: copy.descending },
+                ]}
+              />
+              <SelectField
+                label={copy.pageSize}
+                value={String(view.releaseDraft.limit)}
+                onChange={(limit) =>
+                  view.setReleaseDraft((current) => ({
+                    ...current,
+                    limit: Number(limit),
+                  }))
+                }
+                options={[20, 50, 100].map((value) => ({
+                  value: String(value),
+                  label: String(value),
+                }))}
+              />
+              <div className="flex items-end gap-2">
+                <Button type="submit" variant="primary">
+                  {copy.apply}
+                </Button>
+                <Button type="button" variant="outline" onClick={view.resetReleaseFilters}>
+                  <RotateCcw className="size-3.5" />
+                  {copy.reset}
+                </Button>
+              </div>
+            </CardContent>
+          </form>
+        </Card>
         <div className="mt-4">
           <PagedState
             view={view.releases}
@@ -618,8 +634,8 @@ function ReleaseDialog({
             )}
           </PagedState>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -635,23 +651,20 @@ function ReleaseList({
   onPage: (value: number) => void;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+    <Card>
       <div className="grid gap-3 p-3 lg:grid-cols-2">
         {data.items.map((release) => (
-          <article
-            key={release.id}
-            className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"
-          >
+          <Card key={release.id} className="p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h3 className="font-mono text-sm font-semibold">
                   {release.releaseVersion}
                 </h3>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {copy.schema}: {release.schemaTarget}
                 </p>
               </div>
-              <Pill>{release.riskLevel}</Pill>
+              <Badge tone="neutral">{release.riskLevel}</Badge>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <Stat
@@ -680,15 +693,21 @@ function ReleaseList({
               />
             </dl>
             {!release.manifestSummaryAvailable ? (
-              <p className="mt-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              <p className="mt-3 rounded-md bg-warn-50 p-2 text-xs text-warn-800 dark:bg-warn-950/40 dark:text-warn-200">
                 {copy.manifestUnavailable}
               </p>
             ) : null}
-          </article>
+          </Card>
         ))}
       </div>
-      <PaginationFooter data={data} copy={copy} lang={lang} onPage={onPage} />
-    </section>
+      <Pagination
+        page={data.page}
+        limit={data.limit}
+        totalItems={data.total}
+        totalPages={data.totalPages}
+        onPageChange={onPage}
+      />
+    </Card>
   );
 }
 
@@ -701,6 +720,8 @@ function DiscoveryWorkspace({
   copy: ProvisioningGovernanceCopy;
   lang: "ar" | "en";
 }) {
+  const { lang: currentLang } = useI18n();
+  const toast = useToast();
   const [command, setCommand] = useState<CreateDiscoveryRunCommand>({
     mode: "DRY_RUN",
     cutoffAt: currentUtcMinute(),
@@ -719,123 +740,118 @@ function DiscoveryWorkspace({
     }
   };
 
+  const submit = async () => {
+    setConfirming(false);
+    const result = await view.runDiscovery(command);
+    if (result) {
+      toast.success(
+        currentLang === "ar" ? "تم إنشاء عملية الاكتشاف" : "Discovery run created",
+        `${copy.created} ${result.runId}`,
+      );
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <section className={cardClass}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="font-semibold">{copy.startDiscovery}</h2>
-            <p className="mt-1 max-w-3xl text-xs text-slate-500">
-              {copy.permissionRun}
-            </p>
-          </div>
-          <ActionButton
-            onClick={view.refreshDiscovery}
-            label={copy.refresh}
-            icon={
-              <RefreshCw
-                className={`size-3.5 ${view.discovery.isRefreshing ? "animate-spin" : ""}`}
-              />
-            }
-          />
-        </div>
-        {view.permissions.canRunDiscovery ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <SelectField
-              label={copy.mode}
-              value={command.mode}
-              onChange={(mode) =>
-                setCommand((current) => ({
-                  ...current,
-                  mode: mode === "MANUAL" ? "MANUAL" : "DRY_RUN",
-                }))
-              }
-              options={[
-                { value: "DRY_RUN", label: copy.dryRun },
-                { value: "MANUAL", label: copy.manual },
-              ]}
-            />
-            <label className={labelClass}>
-              <span>{copy.cutoff}</span>
-              <input
-                type="datetime-local"
-                step="1"
-                value={isoToLocalInput(command.cutoffAt)}
-                onChange={(event) =>
-                  setCommand((current) => ({
-                    ...current,
-                    cutoffAt: localInputToIso(event.target.value),
-                  }))
-                }
-                className={inputClass}
-              />
-            </label>
-            <label className={labelClass}>
-              <span>{copy.maxTenants}</span>
-              <input
-                type="number"
-                min={1}
-                max={10_000}
-                step={1}
-                value={command.maxTenants}
-                onChange={(event) =>
-                  setCommand((current) => ({
-                    ...current,
-                    maxTenants: Number(event.target.value),
-                  }))
-                }
-                className={inputClass}
-              />
-            </label>
-            <div className="md:col-span-3 flex justify-end">
-              <button
-                type="button"
-                onClick={requestConfirmation}
-                className={primaryButtonClass}
-              >
-                {copy.validate}
-              </button>
+      <Card>
+        <CardContent>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-foreground">{copy.startDiscovery}</h2>
+              <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
+                {copy.permissionRun}
+              </p>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={view.refreshDiscovery}
+              loading={view.discovery.isRefreshing}
+            >
+              <RefreshCw className="size-3.5" />
+              {copy.refresh}
+            </Button>
           </div>
-        ) : null}
-        {validation ? (
-          <p role="alert" className="mt-3 text-xs font-semibold text-rose-600">
-            {validation}
-          </p>
-        ) : null}
-        {view.mutation.error ? (
-          <ErrorCard
-            error={view.mutation.error}
-            copy={copy}
-            action={
-              view.mutation.exactRetryAvailable ? (
-                <button
-                  type="button"
-                  onClick={() => void view.runDiscovery(command)}
-                  className={dangerButtonClass}
-                >
-                  {copy.exactRetry}
-                </button>
-              ) : undefined
-            }
-          />
-        ) : null}
-        {view.mutation.result ? (
-          <p
-            role="status"
-            className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
-          >
-            {copy.created}{" "}
-            <span className="font-mono">{view.mutation.result.runId}</span>
-          </p>
-        ) : null}
-      </section>
+          {view.permissions.canRunDiscovery ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <SelectField
+                label={copy.mode}
+                value={command.mode}
+                onChange={(mode) =>
+                  setCommand((current) => ({
+                    ...current,
+                    mode: mode === "MANUAL" ? "MANUAL" : "DRY_RUN",
+                  }))
+                }
+                options={[
+                  { value: "DRY_RUN", label: copy.dryRun },
+                  { value: "MANUAL", label: copy.manual },
+                ]}
+              />
+              <Field label={copy.cutoff}>
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    type="datetime-local"
+                    step={1}
+                    value={isoToLocalInput(command.cutoffAt)}
+                    onChange={(event) =>
+                      setCommand((current) => ({
+                        ...current,
+                        cutoffAt: localInputToIso(event.target.value),
+                      }))
+                    }
+                  />
+                )}
+              </Field>
+              <Field label={copy.maxTenants}>
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    type="number"
+                    min={1}
+                    max={10_000}
+                    step={1}
+                    value={command.maxTenants}
+                    onChange={(event) =>
+                      setCommand((current) => ({
+                        ...current,
+                        maxTenants: Number(event.target.value),
+                      }))
+                    }
+                  />
+                )}
+              </Field>
+              <div className="flex justify-end md:col-span-3">
+                <Button type="button" variant="primary" onClick={requestConfirmation}>
+                  {copy.validate}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {validation ? (
+            <p role="alert" className="mt-3 text-xs font-semibold text-danger-600 dark:text-danger-400">
+              {validation}
+            </p>
+          ) : null}
+          {view.mutation.error ? (
+            <AmbiguousOutcomePanel
+              className="mt-3"
+              message={view.mutation.error.message}
+              correlationId={view.mutation.error.correlationId}
+              retrying={view.mutation.isPending}
+              onRetryExact={
+                view.mutation.exactRetryAvailable
+                  ? () => void view.runDiscovery(command)
+                  : undefined
+              }
+            />
+          ) : null}
+        </CardContent>
+      </Card>
 
-      <DiscoveryState
-        view={view.discovery}
-        copy={copy}
-        retry={view.refreshDiscovery}
-      >
+      <DiscoveryState view={view.discovery} copy={copy} retry={view.refreshDiscovery}>
         {(data) => (
           <DiscoveryTable
             runs={data.items}
@@ -852,20 +868,38 @@ function DiscoveryWorkspace({
         <DiscoveryDetailDialog view={view} copy={copy} lang={lang} />
       ) : null}
 
-      {confirming ? (
-        <ConfirmationDialog
-          copy={copy}
-          value={confirmation}
-          onChange={setConfirmation}
-          pending={view.mutation.isPending}
-          onClose={() => setConfirming(false)}
-          onConfirm={() => {
-            if (confirmation !== "RUN") return;
-            setConfirming(false);
-            void view.runDiscovery(command);
-          }}
-        />
-      ) : null}
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{copy.confirmationTitle}</AlertDialogTitle>
+            <p className="text-sm text-muted-foreground">{copy.confirmationText}</p>
+          </AlertDialogHeader>
+          <Field label={copy.confirmationToken}>
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                value={confirmation}
+                onChange={(event) => setConfirmation(event.target.value)}
+                autoComplete="off"
+              />
+            )}
+          </Field>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{copy.close}</AlertDialogCancel>
+            <AlertDialogAction
+              destructive
+              disabled={confirmation !== "RUN" || view.mutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (confirmation !== "RUN") return;
+                void submit();
+              }}
+            >
+              {view.mutation.isPending ? copy.running : copy.run}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -885,78 +919,84 @@ function DiscoveryTable({
   lang: "ar" | "en";
   onInspect: (runId: string) => void;
 }) {
+  const columns: ColumnDef<DiscoveryRun>[] = [
+    {
+      key: "mode",
+      headerEn: COPY.en.mode,
+      headerAr: COPY.ar.mode,
+      cell: (run) => (
+        <div>
+          <Badge tone="neutral">{run.mode}</Badge>
+          <p className="mt-2 max-w-44 break-all font-mono text-xs text-muted-foreground">
+            {run.runId}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      headerEn: COPY.en.status,
+      headerAr: COPY.ar.status,
+      cell: (run) => (
+        <div>
+          <Badge tone="neutral">{run.status}</Badge>
+          {run.safeErrorCode ? (
+            <p className="mt-2 text-xs text-danger-600 dark:text-danger-400">{run.safeErrorCode}</p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "scheduled",
+      headerEn: COPY.en.scheduled,
+      headerAr: COPY.ar.scheduled,
+      cell: (run) => <span className="text-xs">{formatDate(run.scheduledAt, lang, true)}</span>,
+    },
+    {
+      key: "scanned",
+      headerEn: COPY.en.scanned,
+      headerAr: COPY.ar.scanned,
+      cell: (run) => (
+        <div className="font-mono text-xs">
+          {run.scannedCount} / {run.eligibleTenantCount}
+          <p className="mt-1 text-muted-foreground">
+            {copy.remaining}: {run.remainingTenantCount}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "drifted",
+      headerEn: COPY.en.drifted,
+      headerAr: COPY.ar.drifted,
+      cell: (run) => <span className="font-mono font-semibold">{run.driftedCount}</span>,
+    },
+    {
+      key: "incompatible",
+      headerEn: COPY.en.incompatible,
+      headerAr: COPY.ar.incompatible,
+      cell: (run) => <span className="font-mono font-semibold">{run.incompatibleCount}</span>,
+    },
+    {
+      key: "actions",
+      headerEn: "",
+      headerAr: "",
+      align: "end",
+      cell: (run) => (
+        <Button type="button" variant="outline" size="sm" onClick={() => onInspect(run.runId)}>
+          {copy.inspect}
+        </Button>
+      ),
+    },
+  ];
+
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1050px] text-sm">
-          <thead className="bg-slate-50 text-2xs font-semibold uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-            <tr>
-              {[
-                copy.mode,
-                copy.status,
-                copy.scheduled,
-                copy.scanned,
-                copy.drifted,
-                copy.incompatible,
-                "",
-              ].map((label, index) => (
-                <th key={`${label}:${index}`} className="px-4 py-3 text-start">
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {runs.map((run) => (
-              <tr key={run.runId}>
-                <td className="px-4 py-4">
-                  <Pill>{run.mode}</Pill>
-                  <p className="mt-2 max-w-44 break-all font-mono text-xs text-slate-500">
-                    {run.runId}
-                  </p>
-                </td>
-                <td className="px-4 py-4">
-                  <Pill>{run.status}</Pill>
-                  {run.safeErrorCode ? (
-                    <p className="mt-2 text-xs text-rose-600">
-                      {run.safeErrorCode}
-                    </p>
-                  ) : null}
-                </td>
-                <td className="px-4 py-4 text-xs">
-                  {formatDate(run.scheduledAt, lang, true)}
-                </td>
-                <td className="px-4 py-4 font-mono text-xs">
-                  {run.scannedCount} / {run.eligibleTenantCount}
-                  <p className="mt-1 text-slate-500">
-                    {copy.remaining}: {run.remainingTenantCount}
-                  </p>
-                </td>
-                <td className="px-4 py-4 font-mono font-semibold">
-                  {run.driftedCount}
-                </td>
-                <td className="px-4 py-4 font-mono font-semibold">
-                  {run.incompatibleCount}
-                </td>
-                <td className="px-4 py-4 text-end">
-                  <button
-                    type="button"
-                    onClick={() => onInspect(run.runId)}
-                    className={secondaryButtonClass}
-                  >
-                    {copy.inspect}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="border-t border-slate-200 px-4 py-3 break-all font-mono text-xs text-slate-500 dark:border-slate-800">
-        {copy.correlation}: {correlationId} · {copy.responseAt}:{" "}
-        {formatDate(timestamp, lang, true)}
+    <Card>
+      <DataTable columns={columns} data={runs} getRowId={(row) => row.runId} pagination={{ page: 1, limit: runs.length || 1, totalItems: runs.length, totalPages: 1, onPageChange: () => undefined }} />
+      <p className="border-t border-border px-4 py-3 break-all font-mono text-xs text-muted-foreground">
+        {copy.correlation}: {correlationId} · {copy.responseAt}: {formatDate(timestamp, lang, true)}
       </p>
-    </section>
+    </Card>
   );
 }
 
@@ -970,40 +1010,17 @@ function DiscoveryDetailDialog({
   lang: "ar" | "en";
 }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="discovery-detail-title"
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
-    >
-      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-white p-4 shadow-2xl dark:bg-slate-950">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 id="discovery-detail-title" className="text-lg font-semibold">
-              {copy.results}
-            </h2>
-            <p className="mt-1 break-all font-mono text-xs text-slate-500">
-              {view.selectedRunId}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => view.selectRun(null)}
-            aria-label={copy.close}
-            className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-        <div className="mt-4">
-          <DetailState view={view.detail} copy={copy}>
-            {(detail) => (
-              <DiscoveryResults detail={detail} copy={copy} lang={lang} />
-            )}
-          </DetailState>
-        </div>
-      </div>
-    </div>
+    <Dialog open onOpenChange={(open) => !open && view.selectRun(null)}>
+      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{copy.results}</DialogTitle>
+          <p className="break-all font-mono text-xs text-muted-foreground">{view.selectedRunId}</p>
+        </DialogHeader>
+        <DetailState view={view.detail} copy={copy}>
+          {(detail) => <DiscoveryResults detail={detail} copy={copy} lang={lang} />}
+        </DetailState>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1016,118 +1033,58 @@ function DiscoveryResults({
   copy: ProvisioningGovernanceCopy;
   lang: "ar" | "en";
 }) {
+  const columns: ColumnDef<DiscoveryRunDetail["results"][number]>[] = [
+    {
+      key: "tenant",
+      headerEn: COPY.en.tenant,
+      headerAr: COPY.ar.tenant,
+      cell: (result) => <span className="break-all font-mono text-xs">{result.tenantId}</span>,
+    },
+    {
+      key: "component",
+      headerEn: COPY.en.component,
+      headerAr: COPY.ar.component,
+      cell: (result) => <span className="break-all font-mono text-xs">{result.componentId}</span>,
+    },
+    {
+      key: "status",
+      headerEn: COPY.en.status,
+      headerAr: COPY.ar.status,
+      cell: (result) => <Badge tone="neutral">{result.discoveredState}</Badge>,
+    },
+    {
+      key: "observed",
+      headerEn: COPY.en.observed,
+      headerAr: COPY.ar.observed,
+      cell: (result) => <span className="text-xs">{formatDate(result.observedAt, lang, true)}</span>,
+    },
+    {
+      key: "safeCode",
+      headerEn: COPY.en.safeCode,
+      headerAr: COPY.ar.safeCode,
+      cell: (result) => <span className="text-xs">{result.safeCode ?? "—"}</span>,
+    },
+  ];
+
   return (
     <div className="space-y-3">
       {detail.resultsTruncated ? (
-        <p
-          role="status"
-          className="rounded-lg bg-amber-50 p-2 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-        >
+        <p role="status" className="rounded-md bg-warn-50 p-2 text-xs font-semibold text-warn-800 dark:bg-warn-950/40 dark:text-warn-200">
           {copy.truncated}
         </p>
       ) : null}
       {detail.results.length ? (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="w-full min-w-[900px] text-xs">
-            <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900">
-              <tr>
-                {[
-                  copy.tenant,
-                  copy.component,
-                  copy.status,
-                  copy.observed,
-                  copy.safeCode,
-                ].map((label) => (
-                  <th key={label} className="px-3 py-2 text-start">
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {detail.results.map((result) => (
-                <tr key={`${result.tenantId}:${result.componentId}`}>
-                  <td className="px-3 py-3 break-all font-mono">
-                    {result.tenantId}
-                  </td>
-                  <td className="px-3 py-3 break-all font-mono">
-                    {result.componentId}
-                  </td>
-                  <td className="px-3 py-3">
-                    <Pill>{result.discoveredState}</Pill>
-                  </td>
-                  <td className="px-3 py-3">
-                    {formatDate(result.observedAt, lang, true)}
-                  </td>
-                  <td className="px-3 py-3">{result.safeCode ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <StatePanel title={copy.emptyRuns} />
-      )}
-    </div>
-  );
-}
-
-function ConfirmationDialog({
-  copy,
-  value,
-  onChange,
-  pending,
-  onClose,
-  onConfirm,
-}: {
-  copy: ProvisioningGovernanceCopy;
-  value: string;
-  onChange: (value: string) => void;
-  pending: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="discovery-confirm-title"
-      className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/75 p-4"
-    >
-      <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl dark:bg-slate-950">
-        <h2 id="discovery-confirm-title" className="text-lg font-semibold">
-          {copy.confirmationTitle}
-        </h2>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          {copy.confirmationText}
-        </p>
-        <label className={`${labelClass} mt-4`}>
-          <span>{copy.confirmationToken}</span>
-          <input
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            autoComplete="off"
-            className={inputClass}
+        <Card>
+          <DataTable
+            columns={columns}
+            data={detail.results}
+            getRowId={(row) => `${row.tenantId}:${row.componentId}`}
+            pagination={{ page: 1, limit: detail.results.length || 1, totalItems: detail.results.length, totalPages: 1, onPageChange: () => undefined }}
           />
-        </label>
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className={secondaryButtonClass}
-          >
-            {copy.close}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={value !== "RUN" || pending}
-            className={dangerButtonClass}
-          >
-            {pending ? copy.running : copy.run}
-          </button>
-        </div>
-      </div>
+        </Card>
+      ) : (
+        <EmptyState title={copy.emptyRuns} />
+      )}
     </div>
   );
 }
@@ -1147,52 +1104,12 @@ function PagedState<T>({
   retry: () => void;
   children: (data: Paginated<T>) => ReactNode;
 }) {
-  if (view.state === "LOADING")
-    return (
-      <StatePanel
-        title={copy.loading}
-        icon={<Loader2 className="size-6 animate-spin" />}
-      />
-    );
-  if (view.state === "FORBIDDEN")
-    return (
-      <StatePanel
-        title={forbidden}
-        icon={<ShieldAlert className="size-6" />}
-        tone="warning"
-      />
-    );
-  if (view.state === "UNAVAILABLE")
-    return (
-      <StatePanel
-        title={copy.unavailable}
-        icon={<AlertTriangle className="size-6" />}
-        tone="danger"
-        action={
-          <button type="button" onClick={retry} className={dangerButtonClass}>
-            {copy.retry}
-          </button>
-        }
-        detail={errorDetail(view.error, copy)}
-      />
-    );
-  if (view.state === "ERROR")
-    return (
-      <StatePanel
-        title={copy.error}
-        icon={<AlertTriangle className="size-6" />}
-        tone="danger"
-        action={
-          <button type="button" onClick={retry} className={dangerButtonClass}>
-            {copy.retry}
-          </button>
-        }
-        detail={errorDetail(view.error, copy)}
-      />
-    );
-  if (view.state === "EMPTY" || !view.data?.items.length)
-    return <StatePanel title={empty} />;
-  return children(view.data);
+  if (view.state === "LOADING") return <Skeleton className="h-48 w-full rounded-lg" />;
+  if (view.state === "FORBIDDEN") return <PermissionRequiredPanel title={forbidden} />;
+  if (view.state === "UNAVAILABLE" || view.state === "ERROR")
+    return <ErrorState title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error} error={view.error} onRetry={retry} />;
+  if (view.state === "EMPTY" || !view.data?.items.length) return <EmptyState title={empty} />;
+  return <>{children(view.data)}</>;
 }
 
 function DiscoveryState<T>({
@@ -1206,38 +1123,12 @@ function DiscoveryState<T>({
   retry: () => void;
   children: (data: T) => ReactNode;
 }) {
-  if (view.state === "LOADING")
-    return (
-      <StatePanel
-        title={copy.loading}
-        icon={<Loader2 className="size-6 animate-spin" />}
-      />
-    );
-  if (view.state === "FORBIDDEN")
-    return (
-      <StatePanel
-        title={copy.forbiddenDiscovery}
-        icon={<ShieldAlert className="size-6" />}
-        tone="warning"
-      />
-    );
+  if (view.state === "LOADING") return <Skeleton className="h-48 w-full rounded-lg" />;
+  if (view.state === "FORBIDDEN") return <PermissionRequiredPanel title={copy.forbiddenDiscovery} />;
   if (view.state === "UNAVAILABLE" || view.state === "ERROR")
-    return (
-      <StatePanel
-        title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error}
-        icon={<AlertTriangle className="size-6" />}
-        tone="danger"
-        action={
-          <button type="button" onClick={retry} className={dangerButtonClass}>
-            {copy.retry}
-          </button>
-        }
-        detail={errorDetail(view.error, copy)}
-      />
-    );
-  if (view.state === "EMPTY" || !view.data)
-    return <StatePanel title={copy.emptyRuns} />;
-  return children(view.data);
+    return <ErrorState title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error} error={view.error} onRetry={retry} />;
+  if (view.state === "EMPTY" || !view.data) return <EmptyState title={copy.emptyRuns} />;
+  return <>{children(view.data)}</>;
 }
 
 function DetailState<T>({
@@ -1249,195 +1140,23 @@ function DetailState<T>({
   copy: ProvisioningGovernanceCopy;
   children: (data: T) => ReactNode;
 }) {
-  if (view.state === "LOADING")
-    return (
-      <StatePanel
-        title={copy.loading}
-        icon={<Loader2 className="size-6 animate-spin" />}
-      />
-    );
-  if (view.state === "FORBIDDEN")
-    return <StatePanel title={copy.forbiddenDiscovery} tone="warning" />;
+  if (view.state === "LOADING") return <Skeleton className="h-48 w-full rounded-lg" />;
+  if (view.state === "FORBIDDEN") return <PermissionRequiredPanel title={copy.forbiddenDiscovery} />;
   if (view.state === "UNAVAILABLE" || view.state === "ERROR")
-    return (
-      <StatePanel
-        title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error}
-        detail={errorDetail(view.error, copy)}
-        tone="danger"
-      />
-    );
-  if (!view.data) return <StatePanel title={copy.emptyRuns} />;
-  return children(view.data);
+    return <ErrorState title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error} error={view.error} />;
+  if (!view.data) return <EmptyState title={copy.emptyRuns} />;
+  return <>{children(view.data)}</>;
 }
 
-function ErrorCard({
-  error,
-  copy,
-  action,
-}: {
-  error: { message: string; errorCode?: string; correlationId?: string };
-  copy: ProvisioningGovernanceCopy;
-  action?: ReactNode;
-}) {
+function PermissionRequiredPanel({ title }: { title: string }) {
   return (
-    <div
-      role="alert"
-      className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
-    >
-      <p>{error.message}</p>
-      <p className="mt-1 break-all font-mono text-xs">
-        {error.errorCode ? `${copy.errorCode}: ${error.errorCode}` : ""}
-        {error.correlationId
-          ? ` · ${copy.correlation}: ${error.correlationId}`
-          : ""}
-      </p>
-      {action ? <div className="mt-3">{action}</div> : null}
-    </div>
-  );
-}
-
-function PaginationFooter<T>({
-  data,
-  copy,
-  lang,
-  onPage,
-}: {
-  data: Paginated<T>;
-  copy: ProvisioningGovernanceCopy;
-  lang: "ar" | "en";
-  onPage: (value: number) => void;
-}) {
-  return (
-    <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs dark:border-slate-800">
-      <div className="text-slate-500">
-        <p>
-          {copy.page} {data.page} {copy.of} {Math.max(1, data.totalPages)} ·{" "}
-          {data.total}
-        </p>
-        <p className="mt-1 break-all font-mono text-xs">
-          {copy.correlation}: {data.correlationId} · {copy.responseAt}:{" "}
-          {formatDate(data.timestamp, lang, true)}
-        </p>
-      </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={!data.hasPrev}
-          onClick={() => onPage(data.page - 1)}
-          className={secondaryButtonClass}
-        >
-          <ChevronLeft className="size-4 rtl:rotate-180" />
-          {copy.previous}
-        </button>
-        <button
-          type="button"
-          disabled={!data.hasNext}
-          onClick={() => onPage(data.page + 1)}
-          className={secondaryButtonClass}
-        >
-          {copy.next}
-          <ChevronRight className="size-4 rtl:rotate-180" />
-        </button>
-      </div>
-    </footer>
-  );
-}
-
-function StatePanel({
-  title,
-  detail,
-  icon,
-  tone = "neutral",
-  action,
-}: {
-  title: string;
-  detail?: string;
-  icon?: ReactNode;
-  tone?: "neutral" | "warning" | "danger";
-  action?: ReactNode;
-}) {
-  const colors =
-    tone === "danger"
-      ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
-      : tone === "warning"
-        ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-        : "border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300";
-  return (
-    <section
-      role={tone === "danger" ? "alert" : undefined}
-      className={`flex min-h-48 flex-col items-center justify-center rounded-xl border p-6 text-center ${colors}`}
-    >
-      {icon ? <span className="mb-3">{icon}</span> : null}
-      <h2 className="font-semibold">{title}</h2>
-      {detail ? (
-        <p className="mt-2 max-w-3xl break-all text-xs">{detail}</p>
-      ) : null}
-      {action ? <div className="mt-4">{action}</div> : null}
+    <section role="alert" className="flex min-h-48 flex-col items-center justify-center gap-1 rounded-lg border border-border p-6 text-center">
+      <ShieldAlert className="mb-2 size-8 text-ink-300 dark:text-ink-600" aria-hidden="true" />
+      <h2 className="font-semibold text-foreground">{title}</h2>
     </section>
   );
 }
 
-function TabButton({
-  selected,
-  onClick,
-  label,
-  icon,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  label: string;
-  icon: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={selected}
-      onClick={onClick}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold ${selected ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"}`}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-function TextField({
-  label,
-  value,
-  onChange,
-  maxLength,
-  dir,
-  error,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  maxLength: number;
-  dir?: "ltr";
-  error?: string;
-}) {
-  return (
-    <label className={labelClass}>
-      <span>{label}</span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        maxLength={maxLength}
-        dir={dir}
-        aria-invalid={Boolean(error)}
-        className={inputClass}
-      />
-      {error ? (
-        <span
-          role="alert"
-          className="text-xs font-semibold text-rose-600 dark:text-rose-300"
-        >
-          {error}
-        </span>
-      ) : null}
-    </label>
-  );
-}
 function SelectField({
   label,
   value,
@@ -1449,23 +1168,30 @@ function SelectField({
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
 }) {
+  const resolved = value === "" ? "__any__" : value;
   return (
-    <label className={labelClass}>
-      <span>{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={inputClass}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Field label={label}>
+      {(fieldProps) => (
+        <Select
+          value={resolved}
+          onValueChange={(next) => onChange(next === "__any__" ? "" : next)}
+        >
+          <SelectTrigger id={fieldProps.id} aria-describedby={fieldProps["aria-describedby"]}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value === "" ? "__any__" : option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </Field>
   );
 }
+
 function BooleanSelect({
   label,
   value,
@@ -1492,34 +1218,12 @@ function BooleanSelect({
     />
   );
 }
-function ActionButton({
-  onClick,
-  label,
-  icon,
-}: {
-  onClick: () => void;
-  label: string;
-  icon: ReactNode;
-}) {
-  return (
-    <button type="button" onClick={onClick} className={secondaryButtonClass}>
-      {icon}
-      {label}
-    </button>
-  );
-}
-function Pill({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-      {children}
-    </span>
-  );
-}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="mt-1 font-semibold">{value}</dd>
+    <div className="rounded-md bg-ink-100 p-2 dark:bg-ink-800">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="mt-1 font-semibold text-foreground">{value}</dd>
     </div>
   );
 }
@@ -1535,19 +1239,6 @@ function formatDate(
     ...(includeTime ? { hour: "2-digit", minute: "2-digit" } : {}),
     timeZone: "UTC",
   }).format(new Date(value));
-}
-function errorDetail(
-  error: { message: string; errorCode?: string; correlationId?: string } | null,
-  copy: ProvisioningGovernanceCopy,
-): string | undefined {
-  if (!error) return undefined;
-  return [
-    error.message,
-    error.errorCode ? `${copy.errorCode}: ${error.errorCode}` : null,
-    error.correlationId ? `${copy.correlation}: ${error.correlationId}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 }
 function currentUtcMinute(): string {
   const value = new Date(Date.now() - 60_000);
@@ -1593,16 +1284,3 @@ function componentFilterErrors(
     errors.ownerApp = copy.validationOwnerApp;
   return errors;
 }
-
-const cardClass =
-  "rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950";
-const labelClass =
-  "grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300";
-const inputClass =
-  "min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-normal text-slate-950 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
-const primaryButtonClass =
-  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-40";
-const secondaryButtonClass =
-  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 text-xs font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";
-const dangerButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-xl bg-rose-600 px-4 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-40";

@@ -166,7 +166,10 @@ describe("ProvisioningGovernanceScreen", () => {
     hookMock.mockReturnValue(view);
     render(<ProvisioningGovernanceScreen />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Discovery runs" }));
+    // Radix Tabs.Trigger activates on mousedown, not click (see
+    // @radix-ui/react-tabs's TabsTrigger) — fireEvent.click alone never
+    // fires it.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Discovery runs" }));
     fireEvent.click(screen.getByRole("button", { name: "Review command" }));
     const confirmation = screen.getByLabelText("Type RUN");
     const submit = screen.getByRole("button", { name: "Start discovery" });
