@@ -32,8 +32,18 @@ function paletteColor(index: number): string {
   return NAMED_VALUE_PALETTE[index % NAMED_VALUE_PALETTE.length];
 }
 
+// The dashboard response's declared types (src/types/dashboard.ts) mark
+// every array field as always present, but live responses have been
+// observed to omit one (overview.domainHealth.regions came back
+// `undefined`) — the backend doesn't always match its own documented
+// contract. Every array read from `data` in this file goes through this
+// so a missing field renders as empty rather than throwing.
+function safeArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
 function namedValuesToDonut(items: DashboardNamedValue[]): DonutSegment[] {
-  return items.map((item, index) => ({
+  return safeArray(items).map((item, index) => ({
     key: item.key,
     name: item.label,
     value: item.value,
@@ -58,13 +68,22 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
   const { t, lang } = useI18n();
   const { overview, panels, analytics } = data;
 
+  const kpis = safeArray(overview.kpis);
+  const tenantLifecycleItems = safeArray(overview.tenantLifecycle.items);
+  const domainRegions = safeArray(overview.domainHealth.regions);
+  const databaseCapacityItems = safeArray(panels.databaseCapacity.items);
+  const subscriptionStatusItems = safeArray(overview.subscriptionStatus.items);
+  const billingSummaryItems = safeArray(overview.billingSummary.items);
+  const recentTenants = safeArray(overview.recentTenants.items);
+  const tenantGrowthPoints = safeArray(overview.tenantBillingGrowth.points);
+
   return (
     <div className="space-y-5">
-      {overview.kpis.length > 0 && (
+      {kpis.length > 0 && (
         <section>
           <SectionHeading title={t.dashboard.overviewTab.kpisTitle} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {overview.kpis.map((kpi) => (
+            {kpis.map((kpi) => (
               <KpiCard key={kpi.key} card={kpi} />
             ))}
           </div>
@@ -78,7 +97,7 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
           subtitle={t.dashboard.overviewTab.growthSubtext}
         >
           <TenantGrowthRevenueChart
-            points={overview.tenantBillingGrowth.points}
+            points={tenantGrowthPoints}
             currencyCode={overview.tenantBillingGrowth.currencyCode}
           />
         </ChartCard>
@@ -94,14 +113,14 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
             </Link>
           }
         >
-          <RecentTenantsList items={overview.recentTenants.items} />
+          <RecentTenantsList items={recentTenants} />
         </ChartCard>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartCard title={t.dashboard.tenantsTab.statusBreakdownTitle} subtitle={t.dashboard.tenantsTab.statusDistributionSubtitle}>
           <TenantStatusDonutChart
-            items={overview.tenantLifecycle.items.map((item) => ({
+            items={tenantLifecycleItems.map((item) => ({
               key: item.key,
               label: item.label,
               count: item.value,
@@ -120,20 +139,20 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
               invalid={overview.domainHealth.invalidDomains}
               total={overview.domainHealth.totalDomains}
             />
-            {overview.domainHealth.regions.length > 0 && (
+            {domainRegions.length > 0 && (
               <div>
                 <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {t.dashboard.tenantsTab.regionalDistributionTitle}
                 </p>
-                <RegionalDistributionBarChart regions={overview.domainHealth.regions} height={160} />
+                <RegionalDistributionBarChart regions={domainRegions} height={160} />
               </div>
             )}
           </div>
         </ChartCard>
 
         <ChartCard title={t.dashboard.serversTab.capacityComparisonTitle} subtitle={t.dashboard.serversTab.capacityComparisonSubtext}>
-          {panels.databaseCapacity.items.length > 0 ? (
-            <ServerCapacityChart servers={panels.databaseCapacity.items} />
+          {databaseCapacityItems.length > 0 ? (
+            <ServerCapacityChart servers={databaseCapacityItems} />
           ) : (
             <UnavailableDashboardPanel title={t.dashboard.serversTab.capacityComparisonTitle} className="min-h-0" />
           )}
@@ -142,13 +161,13 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartCard title={t.dashboard.billingTab.subscriptionLifecycleTitle}>
-          <BreakdownDonut items={overview.subscriptionStatus.items} total={overview.subscriptionStatus.total} />
+          <BreakdownDonut items={subscriptionStatusItems} total={overview.subscriptionStatus.total} />
         </ChartCard>
 
         <ChartCard title={t.dashboard.overviewTab.revenueByPlanTitle} subtitle={t.dashboard.overviewTab.revenueByPlanSubtext}>
           <BreakdownDonut
-            items={overview.billingSummary.items}
-            total={overview.billingSummary.items.reduce((sum, item) => sum + item.value, 0)}
+            items={billingSummaryItems}
+            total={billingSummaryItems.reduce((sum, item) => sum + item.value, 0)}
           />
         </ChartCard>
 
@@ -168,7 +187,7 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
             <AnalyticsChartCard title={lang === "ar" ? "متوسط الإيراد المحصل" : "Average collected revenue"} dataset={analytics.subscriptions.averageCollectedRevenue}>
               {(value) => (
                 <SubscriptionARPUSplineChart
-                  data={value.points.map((point) => ({ month: point.label, arpu: point.value }))}
+                  data={safeArray(value.points).map((point) => ({ month: point.label, arpu: point.value }))}
                   metricLabel={lang === "ar" ? "الإيراد المحصل" : "Collected revenue"}
                 />
               )}
@@ -181,7 +200,7 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
             <AnalyticsChartCard title={lang === "ar" ? "الاستحواذ والمغادرة" : "Acquisition vs. churn"} dataset={analytics.subscriptions.churnAndAcquisition} className="lg:col-span-2">
               {(value) => (
                 <SubscriptionChurnComposedChart
-                  data={value.points.map((point) => ({
+                  data={safeArray(value.points).map((point) => ({
                     month: point.label,
                     newAcquisitions: point.primary,
                     churned: point.secondary,
@@ -193,7 +212,7 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
             <AnalyticsChartCard title={lang === "ar" ? "التجديدات القادمة" : "Upcoming renewals"} dataset={analytics.subscriptions.upcomingRenewals}>
               {(value) => (
                 <SubscriptionRenewalsBarChart
-                  data={value.points.map((point) => ({ month: point.label, renewals: point.value }))}
+                  data={safeArray(value.points).map((point) => ({ month: point.label, renewals: point.value }))}
                 />
               )}
             </AnalyticsChartCard>
@@ -204,7 +223,7 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
             <AnalyticsChartCard title={lang === "ar" ? "التدفق النقدي" : "Cash flow"} dataset={analytics.billing.cashFlow}>
               {(value) => (
                 <BillingCashFlowComposedChart
-                  data={value.points.map((point) => ({
+                  data={safeArray(value.points).map((point) => ({
                     month: point.label,
                     expected: point.primary,
                     actual: point.secondary,
@@ -216,48 +235,48 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
             <AnalyticsChartCard title={lang === "ar" ? "تقادم المستحقات" : "Receivables aging"} dataset={analytics.billing.aging}>
               {(value) => (
                 <BillingAgingReportBarChart
-                  data={value.items.map((item) => ({ bucket: item.label, amount: item.value }))}
+                  data={safeArray(value.items).map((item) => ({ bucket: item.label, amount: item.value }))}
                 />
               )}
             </AnalyticsChartCard>
 
             <AnalyticsChartCard title={lang === "ar" ? "أيام المبيعات غير المحصلة" : "Days sales outstanding"} dataset={analytics.billing.daysSalesOutstanding}>
               {(value) => (
-                <BillingDSOAreaChart data={value.points.map((point) => ({ month: point.label, dso: point.value }))} />
+                <BillingDSOAreaChart data={safeArray(value.points).map((point) => ({ month: point.label, dso: point.value }))} />
               )}
             </AnalyticsChartCard>
 
             <AnalyticsChartCard title={lang === "ar" ? "الإيرادات حسب الغرض" : "Revenue by purpose"} dataset={analytics.billing.revenueByPurpose}>
               {(value) => (
-                <BillingRevenueByProductRadar data={value.items.map((item) => ({ product: item.label, revenue: item.value }))} />
+                <BillingRevenueByProductRadar data={safeArray(value.items).map((item) => ({ product: item.label, revenue: item.value }))} />
               )}
             </AnalyticsChartCard>
 
             <AnalyticsChartCard title={lang === "ar" ? "توزيع بوابات الدفع" : "Payment gateway split"} dataset={analytics.billing.paymentProviders}>
               {(value) => (
                 <BillingGatewaySplitDonut
-                  data={value.map((item, index) => ({ gateway: item.label, volume: item.value, color: paletteColor(index) }))}
+                  data={safeArray(value).map((item, index) => ({ gateway: item.label, volume: item.value, color: paletteColor(index) }))}
                 />
               )}
             </AnalyticsChartCard>
 
             <AnalyticsChartCard title={lang === "ar" ? "أسباب فشل الدفع" : "Payment failure reasons"} dataset={analytics.billing.paymentFailureReasons}>
               {(value) => (
-                <BillingFailureReasonsBarChart data={value.map((item) => ({ reason: item.label, count: item.value }))} />
+                <BillingFailureReasonsBarChart data={safeArray(value).map((item) => ({ reason: item.label, count: item.value }))} />
               )}
             </AnalyticsChartCard>
 
             <AnalyticsChartCard title={lang === "ar" ? "توزيع الضرائب حسب الدولة" : "Tax by country"} dataset={analytics.billing.taxByCountry}>
               {(value) => (
                 <BillingTaxDistributionPie
-                  data={value.items.map((item, index) => ({ region: item.label, amount: item.value, color: paletteColor(index) }))}
+                  data={safeArray(value.items).map((item, index) => ({ region: item.label, amount: item.value, color: paletteColor(index) }))}
                 />
               )}
             </AnalyticsChartCard>
 
             <AnalyticsChartCard title={lang === "ar" ? "توقعات التجديد" : "Renewal forecast"} dataset={analytics.billing.renewalForecast}>
               {(value) => (
-                <BillingForecastSplineChart data={value.points.map((point) => ({ month: point.label, forecast: point.value }))} />
+                <BillingForecastSplineChart data={safeArray(value.points).map((point) => ({ month: point.label, forecast: point.value }))} />
               )}
             </AnalyticsChartCard>
           </div>
