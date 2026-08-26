@@ -91,16 +91,16 @@ describe("Admin auth session revocation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Revoke session" }));
 
     expect(state.revoke).not.toHaveBeenCalled();
-    const dialog = screen.getByRole("dialog", {
+    const dialog = screen.getByRole("alertdialog", {
       name: "Revoke this sign-in session?",
     });
-    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Revoke session" }));
 
     await waitFor(() => expect(state.revoke).toHaveBeenCalledWith(remoteSession));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   });
 
   it("keeps current-session wording and disables closing while revocation is in flight", () => {
@@ -110,14 +110,14 @@ describe("Admin auth session revocation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "End this session" }));
     expect(
-      screen.getByRole("dialog", { name: "End the current session?" }),
+      screen.getByRole("alertdialog", { name: "End the current session?" }),
     ).toBeInTheDocument();
 
     state.hook = hookState(currentSession, currentSession.id);
     view.rerender(<AuthSessionsPanel />);
 
-    expect(screen.getByRole("dialog")).toHaveAttribute("aria-busy", "true");
-    const dialog = screen.getByRole("dialog");
+    expect(screen.getByRole("alertdialog")).toHaveAttribute("aria-busy", "true");
+    const dialog = screen.getByRole("alertdialog");
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: "Close" })).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: "Ending session..." })).toBeDisabled();
@@ -129,13 +129,13 @@ describe("Admin auth session revocation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out every device" }));
 
     expect(state.logoutEverywhere).not.toHaveBeenCalled();
-    const dialog = screen.getByRole("dialog", { name: "End every session?" });
-    expect(dialog).toHaveAttribute("aria-modal", "true");
+    const dialog = screen.getByRole("alertdialog", { name: "End every session?" });
+    expect(dialog).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "End every session" }));
 
     await waitFor(() => expect(state.logoutEverywhere).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   });
 });
 

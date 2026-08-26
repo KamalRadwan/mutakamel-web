@@ -16,17 +16,3 @@ function readCssVar(name: string, fallback = ""): string {
 export function getChartSeriesColors(): string[] {
   return [1, 2, 3, 4, 5].map((n) => readCssVar(`--chart-${n}`));
 }
-
-/** Status-tone colors used outside Tailwind class contexts (e.g. canvas). */
-export const STATUS_TONE_VARS = {
-  brand: "--color-brand-500",
-  danger: "--color-danger-600",
-  warn: "--color-warn-600",
-  neutral: "--color-ink-500",
-} as const;
-
-export type StatusTone = keyof typeof STATUS_TONE_VARS;
-
-export function getStatusToneColor(tone: StatusTone): string {
-  return readCssVar(STATUS_TONE_VARS[tone]);
-}

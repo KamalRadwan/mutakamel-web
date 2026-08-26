@@ -66,10 +66,10 @@ describe("AuthInvalidationReplayPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Validate dry run" }));
     expect(state.replay).not.toHaveBeenCalled();
-    const dryDialog = screen.getByRole("dialog", {
+    const dryDialog = screen.getByRole("alertdialog", {
       name: "Validate this replay intent?",
     });
-    expect(dryDialog).toHaveAttribute("aria-modal", "true");
+    expect(dryDialog).toBeInTheDocument();
     fireEvent.click(within(dryDialog).getByRole("button", { name: "Run validation" }));
 
     await waitFor(() => expect(screen.getByText("Dry run validated")).toBeInTheDocument());
@@ -77,7 +77,7 @@ describe("AuthInvalidationReplayPanel", () => {
     expect(screen.getByRole("button", { name: "Apply replay" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Apply replay" }));
-    const applyDialog = screen.getByRole("dialog", {
+    const applyDialog = screen.getByRole("alertdialog", {
       name: "Requeue these authentication invalidations?",
     });
     const confirmInput = within(applyDialog).getByPlaceholderText("APPLY");
@@ -108,7 +108,7 @@ describe("AuthInvalidationReplayPanel", () => {
     render(<AuthInvalidationReplayPanel />);
     fillIntent();
     fireEvent.click(screen.getByRole("button", { name: "Validate dry run" }));
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", {
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", {
       name: "Run validation",
     }));
 

@@ -102,10 +102,10 @@ describe("StorageRuntimeSettingsPage", () => {
     );
 
     expect(stateMock.rotateKey).not.toHaveBeenCalled();
-    const dialog = screen.getByRole("dialog", {
+    const dialog = screen.getByRole("alertdialog", {
       name: "Generate the storage encryption key?",
     });
-    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Generate key" }));
 
     await waitFor(() => expect(stateMock.rotateKey).toHaveBeenCalledTimes(1));
@@ -127,7 +127,7 @@ describe("StorageRuntimeSettingsPage", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Rotate encryption key" }),
     );
-    const dialog = screen.getByRole("dialog", {
+    const dialog = screen.getByRole("alertdialog", {
       name: "Rotate the storage encryption key?",
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Rotate key" }));

@@ -53,3 +53,7 @@ export * from "./patterns/permission-gate/PermissionGate";
 export * from "./patterns/ambiguous-outcome/AmbiguousOutcomePanel";
 export * from "./patterns/kpi/StatCard";
 export * from "./patterns/code-ref/CodeRef";
+
+export * from "./patterns/confirm-action/ConfirmActionModal";
+export * from "./patterns/status-badge/StatusBadge";
+export * from "./patterns/status-badge/tone-map";
