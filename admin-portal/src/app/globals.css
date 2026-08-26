@@ -136,6 +136,18 @@
   --chart-4: var(--color-danger-500);
   --chart-5: var(--color-brand-800);
 
+  /* Elevation (docs/design-system/geometry-and-density.md "Elevation"):
+     shadow means "floating above the document," nothing else — cards use
+     border + background step, never a shadow. `pop` is the small-surface
+     elevation (popover, tooltip, dropdown, select, switch thumb, toast,
+     surface.raised); `overlay` is the large-surface elevation (dialog,
+     sheet, alert-dialog). Bridged to the shadow-pop/shadow-overlay
+     utilities via the @theme inline block below so .dark's override
+     actually reaches them (same reason --background needs the inline
+     bridge, see the comment above that block). */
+  --elevation-pop: 0 4px 6px -1px rgb(15 23 32 / 0.08), 0 2px 4px -2px rgb(15 23 32 / 0.06);
+  --elevation-overlay: 0 20px 25px -5px rgb(15 23 32 / 0.12), 0 8px 10px -6px rgb(15 23 32 / 0.08);
+
   /* Sidebar (Phase 14) is bg-sidebar in BOTH themes — unlike the navbar it
      replaces, which is permanently dark. */
   --sidebar: white;
@@ -198,6 +210,12 @@
   --chart-4: var(--color-danger-400);
   --chart-5: var(--color-brand-300);
 
+  /* Dark mode substitutes a top inset hairline for shadow rather than a
+     darker shadow — a box-shadow reads poorly against an already-dark
+     canvas (docs/design-system/geometry-and-density.md "Elevation"). */
+  --elevation-pop: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+  --elevation-overlay: inset 0 1px 0 0 rgb(255 255 255 / 0.08);
+
   --sidebar: var(--color-ink-950);
   --sidebar-foreground: var(--color-ink-100);
   --sidebar-primary: var(--color-brand-400);
@@ -238,6 +256,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --shadow-pop: var(--elevation-pop);
+  --shadow-overlay: var(--elevation-overlay);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);

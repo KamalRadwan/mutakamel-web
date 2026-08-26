@@ -126,3 +126,55 @@ fade, `Skeleton`'s shimmer keyframe); the blur budget is 1 (the modal scrim).
 `node scripts/design/census.mjs --check` fails the build if either grows
 without an explicit baseline update, which is why Phase 22's recovered chart
 tooltip had its `backdrop-blur-md` removed rather than kept.
+
+## Elevation tokens: `--shadow-pop` / `--shadow-overlay`
+
+`--elevation-pop` / `--elevation-overlay` (bridged through `@theme inline` to
+the `shadow-pop` / `shadow-overlay` utilities, same reason `--background`
+needs the inline bridge — see "The theme flip" above) were referenced by 11
+call sites — `Dialog`, `AlertDialog`, `Sheet`, `Select`, `Popover`, `Tooltip`,
+`DropdownMenu`, `AppToast`, the `Switch` thumb, and `surface.raised` in
+`lib/variants.ts` — but were never defined anywhere in this file. Under
+Tailwind v4 an undefined `--shadow-*` theme key generates no utility, so
+every one of those surfaces rendered with **no shadow at all** until this was
+fixed. Light values are a two-layer `ink`-tinted shadow (small for `pop`,
+larger for `overlay`); per the "Dark mode substitutes a top inset hairline"
+rule in [geometry-and-density.md](geometry-and-density.md#elevation), the
+dark values are an inset top highlight instead of a heavier shadow.
+
+The third documented shadow, `sticky`, has no token and no `shadow-sticky`
+utility — `DashboardTabsNav.tsx`'s sticky tab strip uses Tailwind's stock
+`shadow-xs` instead. Treat `sticky` as aspirational until a token is built,
+the same way the density-toggle in geometry-and-density.md is aspirational.
+
+## Chart colors: `--chart-1..5` are a status ramp, not a categorical palette
+
+`--chart-1..5` alias onto the four semantic ramps (`brand-500`, `ink-500`,
+`warn-500`, `danger-500`, `brand-800` in light; the `-400`/`-300` steps in
+dark). Run through `scripts/validate_palette.js` from the `dataviz` skill
+(6-check colorblind/contrast validator), both modes **fail** as a 5-slot
+categorical palette:
+
+- Light on `#ffffff`: `brand-800` outside the lightness band; `ink-500` and
+  `brand-800` read as gray (below the chroma floor); contrast WARN on
+  `brand-500` (2.38:1) and `warn-500` (2.27:1), both under 3:1.
+- Dark on `#091219`: all 5 steps outside the lightness band; `ink-400` below
+  the chroma floor.
+
+This is structural, not a bad step choice: the token system has only **four
+hues** (`brand` ~165°, `ink` ~236°, `warn` ~74°, `danger` ~27°). `warn` and
+`danger` are ~47° apart, and at every step pairing tested they land at
+ΔE ≈15.0 normal-vision — at or below the hard floor of 15, which secondary
+encoding does not excuse. Re-stepping light to the `600` steps clears the
+contrast failures (all ≥3:1) but warn↔danger still cannot be adjacent fills.
+
+**Rule:** use `--chart-1..5` only where the category genuinely *is* a status
+(good/neutral/warn/bad) — most breakdowns in this app are `byStatus`, so this
+is usually correct as-is. Never use them as an arbitrary categorical palette
+for 5 unrelated series. A genuinely qualitative breakdown (`byCountry`,
+`byProvider`) needs hues this system doesn't have — take top-N + "Other"
+with a single hue, or add validated qualitative hues; never cycle or
+generate one. Phase 22's dashboard charts sidestepped this by hand-picking
+per-chart hex values instead of drawing from `--chart-*` — see
+`src/app/(shell)/dashboard/components/charts/`; those values are unvalidated
+and a candidate for a follow-up pass with the same validator.
