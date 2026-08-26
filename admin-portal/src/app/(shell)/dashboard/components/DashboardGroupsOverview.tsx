@@ -9,6 +9,7 @@ import {
   Unplug,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { Badge, Card } from "@/design-system";
 import type { DashboardGroup, DashboardGroupKey, DashboardResponse } from "@/types/dashboard";
 import type { DashboardTabKey } from "../hooks/useDashboardData";
 import {
@@ -38,31 +39,30 @@ export function DashboardGroupsOverview({
 
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
-
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <ScopeMetric
           label={lang === "ar" ? "المجموعات المصرح بها" : "Authorized groups"}
           value={groups.length}
           icon={ShieldCheck}
-          tone="blue"
+          tone="neutral"
         />
         <ScopeMetric
           label={lang === "ar" ? "مصادر متاحة" : "Available sources"}
           value={available}
           icon={CheckCircle2}
-          tone="green"
+          tone="brand"
         />
         <ScopeMetric
           label={lang === "ar" ? "مصادر غير متاحة" : "Unavailable sources"}
           value={unavailable}
           icon={Unplug}
-          tone="slate"
+          tone="neutral"
         />
         <ScopeMetric
           label={lang === "ar" ? "تنبيهات مفتوحة" : "Open alert signals"}
           value={alerts}
           icon={AlertTriangle}
-          tone={alerts > 0 ? "amber" : "green"}
+          tone={alerts > 0 ? "warn" : "brand"}
         />
       </div>
 
@@ -71,24 +71,24 @@ export function DashboardGroupsOverview({
       <section>
         <div className="mb-3 flex items-center justify-between gap-3 px-1">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+            <h2 className="text-sm font-semibold text-foreground">
               {lang === "ar" ? "مجموعات التقارير" : "Report groups"}
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {data.range.label}
             </p>
           </div>
-          <Layers3 className="size-5 text-indigo-500" aria-hidden="true" />
+          <Layers3 className="size-5 text-muted-foreground" aria-hidden="true" />
         </div>
 
         {groups.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+          <Card className="border-dashed p-8 text-center">
+            <p className="text-sm font-semibold text-muted-foreground">
               {lang === "ar"
                 ? "لا توجد مجموعات تقارير مصرح بها لحسابك."
                 : "No authorized report groups available."}
             </p>
-          </div>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map(([key, group]) => (
@@ -125,45 +125,41 @@ function GroupCard({
   const cardCount = group.cards.length;
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group relative flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 text-start shadow-xs transition-all hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500 cursor-pointer"
-    >
-      <div>
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-            {label}
-          </h3>
-          <ChevronRight className="size-4 text-slate-400 group-hover:text-indigo-500 transition-colors rtl:rotate-180" />
+    <Card className="p-0 transition-colors hover:border-brand-400 dark:hover:border-brand-500">
+      <button
+        type="button"
+        onClick={onClick}
+        className="group relative flex h-full w-full cursor-pointer flex-col justify-between p-4 text-start transition-all hover:shadow-md"
+      >
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-foreground transition-colors group-hover:text-brand-700 dark:group-hover:text-brand-400">
+              {label}
+            </h3>
+            <ChevronRight className="size-4 text-muted-foreground transition-colors group-hover:text-brand-600 rtl:rotate-180" />
+          </div>
+          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+            {description}
+          </p>
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2">
-          {description}
-        </p>
-      </div>
 
-      <div className="mt-4 flex items-center gap-2 text-2xs font-semibold uppercase tracking-wide">
-        <span
-          className={`rounded-md px-2 py-0.5 border ${
-            available
-              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50"
-              : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
-          }`}
-        >
-          {available ? (lang === "ar" ? "متاح" : "Available") : lang === "ar" ? "غير متاح" : "Unavailable"}
-        </span>
-        {available && (
-          <span className="text-slate-500 font-mono">
-            {cardCount} {lang === "ar" ? "مؤشرات" : "metrics"}
-          </span>
-        )}
-        {alertCount > 0 && (
-          <span className="text-amber-600 dark:text-amber-400 font-mono">
-            {alertCount} {lang === "ar" ? "تنبيهات" : "alerts"}
-          </span>
-        )}
-      </div>
-    </button>
+        <div className="mt-4 flex items-center gap-2 text-2xs font-semibold uppercase tracking-wide">
+          <Badge tone={available ? "brand" : "neutral"}>
+            {available ? (lang === "ar" ? "متاح" : "Available") : lang === "ar" ? "غير متاح" : "Unavailable"}
+          </Badge>
+          {available && (
+            <span className="font-mono text-muted-foreground">
+              {cardCount} {lang === "ar" ? "مؤشرات" : "metrics"}
+            </span>
+          )}
+          {alertCount > 0 && (
+            <span className="font-mono text-warn-700 dark:text-warn-400">
+              {alertCount} {lang === "ar" ? "تنبيهات" : "alerts"}
+            </span>
+          )}
+        </div>
+      </button>
+    </Card>
   );
 }
 
@@ -176,46 +172,39 @@ function ScopeMetric({
   label: string;
   value: number;
   icon: typeof ShieldCheck;
-  tone: "blue" | "green" | "amber" | "slate";
+  tone: "neutral" | "brand" | "warn";
 }) {
   const tones = {
-    blue: {
-      icon: "text-blue-500 dark:text-blue-400",
-      bg: "bg-blue-50 dark:bg-blue-950/40 border-blue-200/60 dark:border-blue-900/50",
-      topBorder: "border-t-2 border-t-blue-500",
+    neutral: {
+      icon: "text-muted-foreground",
+      bg: "bg-ink-100 dark:bg-ink-800 border-border",
+      topBorder: "border-t-2 border-t-ink-400",
     },
-    green: {
-      icon: "text-emerald-500 dark:text-emerald-400",
-      bg: "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/60 dark:border-emerald-900/50",
-      topBorder: "border-t-2 border-t-emerald-500",
+    brand: {
+      icon: "text-brand-600 dark:text-brand-400",
+      bg: "bg-brand-50 dark:bg-brand-950/40 border-brand-200/60 dark:border-brand-900/50",
+      topBorder: "border-t-2 border-t-brand-500",
     },
-    amber: {
-      icon: "text-amber-500 dark:text-amber-400",
-      bg: "bg-amber-50 dark:bg-amber-950/40 border-amber-200/60 dark:border-amber-900/50",
-      topBorder: "border-t-2 border-t-amber-500",
-    },
-    slate: {
-      icon: "text-slate-500 dark:text-slate-400",
-      bg: "bg-slate-100 dark:bg-slate-800 border-slate-200/60 dark:border-slate-700/50",
-      topBorder: "border-t-2 border-t-slate-400",
+    warn: {
+      icon: "text-warn-600 dark:text-warn-400",
+      bg: "bg-warn-50 dark:bg-warn-950/40 border-warn-200/60 dark:border-warn-900/50",
+      topBorder: "border-t-2 border-t-warn-500",
     },
   };
 
   const current = tones[tone];
 
   return (
-    <section
-      className={`rounded-xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900 ${current.topBorder}`}
-    >
-      <div className={`inline-flex rounded-xl p-2.5 border ${current.bg} ${current.icon}`}>
+    <Card className={`p-4 ${current.topBorder}`}>
+      <div className={`inline-flex rounded-lg border p-2.5 ${current.bg} ${current.icon}`}>
         <Icon className="size-4" aria-hidden="true" />
       </div>
-      <p className="mt-3 text-xl sm:text-2xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+      <p className="mt-3 text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
         {value}
       </p>
-      <p className="mt-0.5 text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+      <p className="mt-0.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
-    </section>
+    </Card>
   );
 }

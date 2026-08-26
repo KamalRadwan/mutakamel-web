@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Lock, RotateCw } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { Button, Skeleton } from "@/design-system";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { DashboardTabsNav } from "./components/DashboardTabsNav";
 import { DashboardGroupPanel } from "./components/DashboardGroupPanel";
@@ -32,19 +33,19 @@ export default function DashboardPage() {
   if (isForbidden && !data) {
     return (
       <PageShell>
-        <div className="mx-auto flex min-h-[55vh] max-w-md flex-col items-center justify-center text-center">
-          <div className="flex size-14 items-center justify-center rounded-xl bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-300">
+        <section role="alert" className="mx-auto flex min-h-[55vh] max-w-md flex-col items-center justify-center text-center">
+          <div className="flex size-14 items-center justify-center rounded-lg bg-danger-100 text-danger-600 dark:bg-danger-950/40 dark:text-danger-300">
             <Lock className="size-7" aria-hidden="true" />
           </div>
-          <h1 className="mt-4 text-xl font-semibold text-slate-950 dark:text-white">
+          <h1 className="mt-4 text-xl font-semibold text-foreground">
             {lang === "ar" ? "لا يمكنك فتح لوحة التحكم" : "Dashboard access denied"}
           </h1>
-          <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             {lang === "ar"
               ? "تحتاج إلى صلاحية admin.reports.read لفتح لوحة التحكم."
               : "The admin.reports.read permission is required to open this dashboard."}
           </p>
-        </div>
+        </section>
       </PageShell>
     );
   }
@@ -124,7 +125,10 @@ function ErrorBanner({
 }) {
   const { lang } = useI18n();
   return (
-    <section className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300 sm:flex-row sm:items-start sm:justify-between">
+    <section
+      role="alert"
+      className="flex flex-col gap-3 rounded-lg border border-danger-200 bg-danger-50 p-4 text-danger-800 dark:border-danger-900/70 dark:bg-danger-950/30 dark:text-danger-300 sm:flex-row sm:items-start sm:justify-between"
+    >
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
         <div>
@@ -151,14 +155,10 @@ function ErrorBanner({
           )}
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-red-300 px-3 text-xs font-semibold hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:border-red-800 dark:hover:bg-red-950/60"
-      >
+      <Button type="button" variant="outline" size="sm" onClick={onRetry} className="shrink-0 border-danger-300 dark:border-danger-800">
         <RotateCw className="size-3.5" aria-hidden="true" />
         {lang === "ar" ? "إعادة المحاولة" : "Retry"}
-      </button>
+      </Button>
     </section>
   );
 }
@@ -166,15 +166,15 @@ function ErrorBanner({
 function DashboardSkeleton() {
   return (
     <div className="space-y-4" aria-label="Loading dashboard" aria-busy="true">
-      <div className="h-14 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+      <Skeleton className="h-14 w-full" />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="h-28 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+          <Skeleton key={index} className="h-28 w-full" />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="h-36 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+          <Skeleton key={index} className="h-36 w-full" />
         ))}
       </div>
     </div>

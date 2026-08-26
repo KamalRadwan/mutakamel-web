@@ -7,6 +7,7 @@ import {
   Info,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/design-system";
 import type {
   DashboardGroup,
   DashboardGroupAlert,
@@ -93,7 +94,7 @@ function ReportAlerts({ alerts }: { alerts: DashboardGroupAlert[] }) {
           return (
             <div
               key={alert.key}
-              className={`flex items-start gap-3 rounded-xl border p-4 ${style.className}`}
+              className={`flex items-start gap-3 rounded-lg border p-4 ${style.className}`}
             >
               <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <div className="min-w-0">
@@ -124,25 +125,25 @@ function ReportObject({
   const entries = Object.entries(value);
   const { lang } = useI18n();
   return (
-    <section
-      className={`rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 ${wide ? "xl:col-span-2" : ""}`}
-    >
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
-        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
-      </div>
-      {entries.length === 0 ? (
-        <p className="rounded-xl bg-slate-50 p-4 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-          {lang === "ar" ? "لا توجد قيم إضافية لهذه الفترة." : "No additional values for this period."}
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {entries.map(([key, entryValue]) => (
-            <ReportValue key={key} fieldKey={key} value={entryValue} />
-          ))}
-        </div>
-      )}
-    </section>
+    <Card className={wide ? "xl:col-span-2" : ""}>
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+        <CardDescription>{subtitle}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {entries.length === 0 ? (
+          <p className="rounded-md bg-ink-100 p-4 text-xs text-muted-foreground dark:bg-ink-800/50">
+            {lang === "ar" ? "لا توجد قيم إضافية لهذه الفترة." : "No additional values for this period."}
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {entries.map(([key, entryValue]) => (
+              <ReportValue key={key} fieldKey={key} value={entryValue} />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -152,27 +153,27 @@ function ReportValue({ fieldKey, value }: { fieldKey: string; value: unknown }) 
 
   if (isUnavailableProjection(value)) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/40">
-        <p className="text-2xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-        <p className="mt-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+      <div className="rounded-md border border-dashed border-border bg-ink-100 p-3 dark:bg-ink-800/40">
+        <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="mt-1 text-xs font-semibold text-foreground">
           {lang === "ar" ? "غير متاح" : "Unavailable"}
         </p>
-        {value.message && <p className="mt-1 text-xs leading-5 text-slate-500">{value.message}</p>}
-        {value.reasonCode && <code className="mt-2 inline-block text-xs text-slate-400">{value.reasonCode}</code>}
+        {value.message && <p className="mt-1 text-xs leading-5 text-muted-foreground">{value.message}</p>}
+        {value.reasonCode && <code className="mt-2 inline-block text-xs text-muted-foreground">{value.reasonCode}</code>}
       </div>
     );
   }
 
   if (Array.isArray(value)) {
     return (
-      <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/40 sm:col-span-2">
-        <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <div className="rounded-md bg-ink-100 p-3 dark:bg-ink-800/40 sm:col-span-2">
+        <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
         {value.length === 0 ? (
-          <p className="text-xs text-slate-400">—</p>
+          <p className="text-xs text-muted-foreground">—</p>
         ) : (
           <div className="space-y-2">
             {value.map((item, index) => (
-              <div key={`${fieldKey}-${index}`} className="rounded-lg border border-slate-200 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-900">
+              <div key={`${fieldKey}-${index}`} className="rounded-md border border-border bg-card p-2 text-xs">
                 {renderScalarOrObject(item, lang)}
               </div>
             ))}
@@ -184,13 +185,13 @@ function ReportValue({ fieldKey, value }: { fieldKey: string; value: unknown }) 
 
   if (isRecord(value)) {
     return (
-      <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/40 sm:col-span-2">
-        <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <div className="rounded-md bg-ink-100 p-3 dark:bg-ink-800/40 sm:col-span-2">
+        <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {Object.entries(value).map(([nestedKey, nestedValue]) => (
-            <div key={nestedKey} className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-              <span className="text-xs text-slate-500 dark:text-slate-400">{humanizeDashboardField(nestedKey)}</span>
-              <span className="max-w-[60%] text-end text-xs font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+            <div key={nestedKey} className="flex items-start justify-between gap-3 rounded-md border border-border bg-card px-3 py-2">
+              <span className="text-xs text-muted-foreground">{humanizeDashboardField(nestedKey)}</span>
+              <span className="max-w-[60%] text-end text-xs font-semibold tabular-nums text-foreground">
                 {renderScalarOrObject(nestedValue, lang)}
               </span>
             </div>
@@ -201,9 +202,9 @@ function ReportValue({ fieldKey, value }: { fieldKey: string; value: unknown }) 
   }
 
   return (
-    <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/40">
-      <p className="text-2xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums text-slate-950 dark:text-white">
+    <div className="rounded-md bg-ink-100 p-3 dark:bg-ink-800/40">
+      <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
         {formatValue(fieldKey, value, lang)}
       </p>
     </div>
@@ -216,8 +217,8 @@ function renderScalarOrObject(value: unknown, lang: "ar" | "en"): ReactNode {
       <span className="space-y-1">
         {Object.entries(value).map(([key, item]) => (
           <span key={key} className="flex justify-between gap-3">
-            <span className="text-slate-500">{humanizeDashboardField(key)}</span>
-            <span className="font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+            <span className="text-muted-foreground">{humanizeDashboardField(key)}</span>
+            <span className="font-semibold tabular-nums text-foreground">
               {formatValue(key, item, lang)}
             </span>
           </span>
@@ -260,10 +261,10 @@ function alertStyle(severity: DashboardGroupAlert["severity"]): {
   className: string;
 } {
   if (severity === "critical") {
-    return { icon: CircleAlert, className: "border-red-200 bg-red-50 text-red-800 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300" };
+    return { icon: CircleAlert, className: "border-danger-200 bg-danger-50 text-danger-800 dark:border-danger-900/70 dark:bg-danger-950/30 dark:text-danger-300" };
   }
   if (severity === "warning") {
-    return { icon: AlertTriangle, className: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-300" };
+    return { icon: AlertTriangle, className: "border-warn-200 bg-warn-50 text-warn-800 dark:border-warn-900/70 dark:bg-warn-950/30 dark:text-warn-300" };
   }
-  return { icon: Info, className: "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-300" };
+  return { icon: Info, className: "border-border bg-ink-100 text-foreground dark:bg-ink-800/40" };
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useI18n } from "@/i18n/I18nContext";
+import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/design-system";
 import type { DashboardMetricTone, DashboardRegionItem, DashboardResponse } from "@/types/dashboard";
 import { KpiCard } from "./KpiCard";
 import { UnavailableDashboardPanel } from "./DashboardDataState";
@@ -184,7 +185,7 @@ function RecentTenantsList({
   const { lang } = useI18n();
   if (items.length === 0) {
     return (
-      <p className="rounded-xl bg-ink-100 p-4 text-xs text-muted-foreground dark:bg-ink-800">
+      <p className="rounded-md bg-ink-100 p-4 text-xs text-muted-foreground dark:bg-ink-800/50">
         {lang === "ar" ? "لا يوجد مستأجرون حديثون." : "No recently provisioned tenants."}
       </p>
     );
@@ -194,15 +195,15 @@ function RecentTenantsList({
       {items.slice(0, 6).map((tenant) => (
         <li
           key={tenant.id}
-          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900"
+          className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2"
         >
           <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">{tenant.name}</p>
+            <p className="truncate text-xs font-semibold text-foreground">{tenant.name}</p>
             <p className="text-2xs text-muted-foreground">{tenant.plan}</p>
           </div>
-          <span className="shrink-0 rounded-md border border-slate-200 px-2 py-0.5 text-2xs font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <Badge tone="neutral" className="shrink-0">
             {tenant.status}
-          </span>
+          </Badge>
         </li>
       ))}
     </ul>
@@ -210,7 +211,7 @@ function RecentTenantsList({
 }
 
 function SectionHeading({ title }: { title: string }) {
-  return <h2 className="mb-3 px-1 text-sm font-semibold text-slate-900 dark:text-white">{title}</h2>;
+  return <h2 className="mb-3 px-1 text-sm font-semibold text-foreground">{title}</h2>;
 }
 
 function ChartCard({
@@ -227,17 +228,15 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <section
-      className={`rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 ${className}`}
-    >
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <Card className={className}>
+      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+          <CardTitle className="text-sm">{title}</CardTitle>
           {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
         </div>
         {action}
-      </div>
-      {children}
-    </section>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
 }

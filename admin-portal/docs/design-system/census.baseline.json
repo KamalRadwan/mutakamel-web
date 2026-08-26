@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-26T17:28:47.840Z",
+  "generatedAt": "2026-08-26T17:31:59.032Z",
   "fileCount": 568,
   "counts": {
     "colorUtilityTotal": 4784,
@@ -11,7 +11,7 @@
     "rounded2xl": 0,
     "rounded3xl": 0,
     "gradients": 10,
-    "backdropBlur": 17,
+    "backdropBlur": 16,
     "navbarRenderSites": 0,
     "handRolledTables": 14,
     "physicalRtlViolations": 0,
