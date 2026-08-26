@@ -21,7 +21,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useToast } from "@/components/ui/ToastContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { useStorageServerDetail } from "../hooks/useStorageServerDetail";
@@ -42,6 +41,7 @@ import {
   CardContent,
   Field,
   Input,
+  StatusBadge,
   DegradedBanner,
   ErrorState as DsErrorState,
   FormDrawer,

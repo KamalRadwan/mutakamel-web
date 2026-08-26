@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { CheckCircle2, Clock3, HardDrive, Plus, RefreshCw } from "lucide-react";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   PageHeader,
@@ -12,6 +11,7 @@ import {
   DataTable,
   Badge,
   Button,
+  StatusBadge,
   ErrorState,
   DegradedBanner,
   type ColumnDef,

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Server, ShieldAlert, Trash2 } from "lucide-react";
 import { useDatabaseServers } from "@/features/admin/database-servers/hooks/useDatabaseServers";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/context/AuthContext";
 import { ADMIN_RBAC_CRITICAL, adminCan, adminCanAll } from "@/lib/auth/rbac";
 import { CountrySelect } from "@/components/shared/CountrySelect";
@@ -20,6 +19,7 @@ import {
   FilterBar,
   DataTable,
   Button,
+  StatusBadge,
   type ColumnDef,
 } from "@/design-system";
 import type { DatabaseServerView } from "@/features/admin/database-servers/types";

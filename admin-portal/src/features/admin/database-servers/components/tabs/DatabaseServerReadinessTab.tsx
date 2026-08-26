@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
-import { StatusBadge } from "@/components/shared/StatusBadge";
+import { StatusBadge } from "@/design-system";
 import { SystemPrincipalRotationPolicy } from "../SystemPrincipalRotationPolicy";
 import { useI18n } from "@/i18n/I18nContext";
 import type { DatabaseServerView, DatabaseServerProvisioningPrincipalBindingView, UpdateDatabaseServerSystemPrincipalRotationDto } from "../../types";

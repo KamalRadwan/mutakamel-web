@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Edit2, Play, StopCircle, PowerOff, Trash2 } from "lucide-react";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useI18n } from "@/i18n/I18nContext";
-import { PageHeader, Button } from "@/design-system";
+import { PageHeader, Button, StatusBadge } from "@/design-system";
 import type { DatabaseServerView } from "../types";
 import type { LifecycleAction } from "../hooks/useDatabaseServerDetailPage";
 

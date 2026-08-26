@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppWindow, ArrowLeft, Database, FileCheck, Loader2, Pencil, Settings, Shield, Trash2 } from "lucide-react";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
-import { StatusBadge } from "@/components/shared/StatusBadge";
+import { StatusBadge } from "@/design-system";
 import { useAuth } from "@/context/AuthContext";
 import { ApplicationCatalogueWorkspace } from "@/features/admin/applications/components/ApplicationCatalogueWorkspace";
 import { ApplicationConfigurationDialog } from "@/features/admin/applications/components/ApplicationConfigurationDialog";

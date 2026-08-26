@@ -1,5 +1,5 @@
 import { Database, Plus, ShieldCheck, AlertCircle, Loader2, RefreshCw, Search } from "lucide-react";
-import { StatusBadge } from "@/components/shared/StatusBadge";
+import { StatusBadge } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type {
   DatabaseServerView,
