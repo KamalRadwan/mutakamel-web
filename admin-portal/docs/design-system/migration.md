@@ -104,6 +104,34 @@ process at the time.
 
 **Phase 24 — Docs.** This file and its siblings.
 
+**Phase 25 — Hardening.** Attempted to flip the design-system ESLint rules
+from warn to error per the original plan, and found the rule had been
+**silently dead since it was introduced**: two `eslint.config.mjs` blocks
+both set `rules["no-restricted-syntax"]` for the same non-design-system
+`.ts`/`.tsx` files (one for the 7 migration patterns, one for the toast
+double-fire check), and flat config resolves duplicate rule ids per file by
+last-write-wins, not by merging arrays — so only one block's patterns were
+ever active, and it happened to be the toast-only block. None of the
+7 migration patterns (arbitrary text size, bold weight, raw palette color,
+gradient budget, blur budget, `rounded-2xl`/`3xl`) had ever actually fired
+in a `pnpm lint` run, in any phase of this migration, despite lint being a
+gate on every one of them. Fixed by merging same-scope patterns into one
+array; running lint against the fix surfaced 2,574 real warnings (mostly
+raw-palette-color, concentrated in the Phase 20/21 routes that were never
+converted) that had been invisible the entire time. Flipping the whole rule
+to "error" as originally planned would have failed the build on all 2,574 —
+not safe given Phases 20/21 remain unconverted. Instead: the two patterns
+with zero real violations (`font-(black|extrabold|bold)`,
+`rounded-(2xl|3xl)`) are now hard errors; the rest stay warnings until the
+deferred routes convert. Also: verified `.field`/`.primary-button`/
+`.secondary-button`/`.danger-button` and `useAccessibleDialog.ts` still have
+real call sites in those same deferred routes and left them in place rather
+than deleting live-dependency code — only `.webphone-user-input` (confirmed
+zero call sites) was removed. `Navbar.tsx` and the 3 passthrough layouts
+were already gone (Phase 14). Confirmed `recharts` and the Phase 22 chart
+components are imported only from `(shell)/dashboard/`, so their ~500KB
+chunk is route-split and not part of every page's shared bundle.
+
 ## Current state vs. the numbers this migration started from
 
 The plan that opened this migration measured, before Phase 0: 9,154
