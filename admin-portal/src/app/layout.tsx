@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { plexArabic, plexLatin, plexMono } from "./fonts";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { ToastProvider } from "@/components/ui/ToastContext";
 import { AuthProvider } from "@/context/AuthContext";
@@ -17,7 +18,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl" className="dark" suppressHydrationWarning>
+    <html
+      lang="ar"
+      dir="rtl"
+      className={`dark ${plexLatin.variable} ${plexArabic.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
+    >
       <body suppressHydrationWarning>
         <I18nProvider>
           <ToastProvider>

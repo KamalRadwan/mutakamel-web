@@ -2,7 +2,20 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme inline {
+  /* Latin first, Arabic second: the browser resolves font-family per
+     character, so Latin/digit runs render in Plex Sans and Arabic runs in
+     Plex Sans Arabic on the same line with no :lang() switching needed. */
+  --font-sans: var(--font-plex-latin), var(--font-plex-arabic), ui-sans-serif,
+    system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
 body {
+  font-family: var(--font-sans);
+  /* Only 400/500/600 are downloaded (src/app/fonts.ts) — this stops a
+     stray font-bold from faking a heavier weight the family doesn't have. */
+  font-synthesis-weight: none;
   background-color: #f1f5f9;
   color: #0f172a;
 }
