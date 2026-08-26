@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "docs:routes": "node scripts/docs/generate-admin-route-inventory.mjs",
-    "docs:check": "node scripts/docs/generate-admin-route-inventory.mjs --check && node scripts/docs/check-docs.mjs"
+    "docs:check": "node scripts/docs/generate-admin-route-inventory.mjs --check && node scripts/docs/check-docs.mjs",
+    "design:census": "node scripts/design/census.mjs",
+    "design:rtl": "node scripts/design/rtl-guard.mjs"
   },
   "dependencies": {
     "country-state-city": "^3.2.1",
