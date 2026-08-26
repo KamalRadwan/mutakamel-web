@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  publishTenantAuthEvent,
+  publishTenantAuthLifecycle,
+} from "@/lib/auth/sessionCoordinator";
+import { TenantAuthGuard } from "@/components/auth/TenantAuthGuard";
 import { TenantAuthProvider, useTenantAuth } from "./AuthContext";
 
 const replace = vi.fn();
@@ -10,6 +15,7 @@ const push = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, push }),
+  usePathname: () => "/",
 }));
 
 class MemoryStorage implements Storage {
@@ -23,7 +29,7 @@ class MemoryStorage implements Storage {
 }
 
 function LoginProbe() {
-  const { authState, user, login } = useTenantAuth();
+  const { authState, user, login, retryBootstrap } = useTenantAuth();
   const [error, setError] = useState("none");
   return (
     <div>
@@ -46,6 +52,9 @@ function LoginProbe() {
       >
         login
       </button>
+      <button type="button" onClick={() => void retryBootstrap()}>
+        retry
+      </button>
     </div>
   );
 }
@@ -64,6 +73,16 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     });
     vi.stubGlobal("localStorage", localStorage);
     vi.stubGlobal("sessionStorage", sessionStorage);
+    Object.defineProperty(window.navigator, "locks", {
+      configurable: true,
+      value: {
+        request: vi.fn((
+          _name: string,
+          _options: LockOptions,
+          callback: () => Promise<unknown>,
+        ) => callback()),
+      },
+    });
     replace.mockReset();
     push.mockReset();
   });
@@ -175,10 +194,230 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     expect(screen.getByText("UNAUTHENTICATED:none")).toBeTruthy();
     expect(rollbackCsrf).toBe("tenant-csrf-proof");
     expect(window.sessionStorage.getItem("tenant_session_meta")).toBeNull();
-    expect(JSON.parse(
-      window.localStorage.getItem("tenant_auth_session_event") ?? "null",
-    )).toMatchObject({ kind: "session-ended" });
+    expect(window.localStorage.getItem("tenant_auth_session_event")).toBeNull();
     expect(push).not.toHaveBeenCalledWith("/");
+  });
+
+  it.each([
+    [403, "FORBIDDEN"],
+    [404, "NOT_FOUND"],
+    [409, "CONFLICT"],
+    [503, "UNAVAILABLE"],
+  ] as const)(
+    "retains the authenticated profile when /me returns non-terminal %s",
+    async (status, code) => {
+      seedSessionState("session-a");
+      let requestCount = 0;
+      const fetchMock = vi.fn(async (url: string) => {
+        if (url !== "/api/tenant/core/v1/auth/me") {
+          throw new Error(`Unexpected request: ${url}`);
+        }
+        requestCount += 1;
+        return requestCount === 1
+          ? jsonResponse(profileResponse())
+          : jsonResponse({ code }, status);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      render(
+        <TenantAuthProvider>
+          <LoginProbe />
+        </TenantAuthProvider>,
+      );
+      await waitFor(() => expect(
+        screen.getByText("AUTHENTICATED:tenant@example.test"),
+      ).toBeTruthy());
+
+      fireEvent.click(screen.getByRole("button", { name: "retry" }));
+
+      await waitFor(() => expect(
+        screen.getByText("DEGRADED:tenant@example.test"),
+      ).toBeTruthy());
+      expect(window.sessionStorage.getItem("tenant_session_meta")).not.toBeNull();
+      expect(replace).not.toHaveBeenCalledWith("/login");
+    },
+  );
+
+  it("keeps the auth guard loading while a degraded bootstrap retry is pending", async () => {
+    seedSessionState("session-a");
+    let resolveRetry!: (response: Response) => void;
+    let requestCount = 0;
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url !== "/api/tenant/core/v1/auth/me") {
+        throw new Error(`Unexpected request: ${url}`);
+      }
+      requestCount += 1;
+      if (requestCount === 1) {
+        return Promise.resolve(jsonResponse({ code: "UNAVAILABLE" }, 503));
+      }
+      return new Promise<Response>((resolve) => {
+        resolveRetry = resolve;
+      });
+    }));
+
+    render(
+      <TenantAuthProvider>
+        <TenantAuthGuard>
+          <LoginProbe />
+        </TenantAuthGuard>
+      </TenantAuthProvider>,
+    );
+    await waitFor(() => expect(
+      screen.getByRole("button", { name: "إعادة المحاولة" }),
+    ).toBeTruthy());
+    replace.mockReset();
+
+    fireEvent.click(screen.getByRole("button", { name: "إعادة المحاولة" }));
+
+    await waitFor(() => expect(
+      screen.getByText("جاري التحقق من الجلسة..."),
+    ).toBeTruthy());
+    expect(replace).not.toHaveBeenCalledWith("/login");
+
+    resolveRetry(jsonResponse(profileResponse()));
+    await waitFor(() => expect(
+      screen.getByText("AUTHENTICATED:tenant@example.test"),
+    ).toBeTruthy());
+  });
+
+  it("ignores a tombstone for another SID and accepts the exact SID tombstone", async () => {
+    seedSessionState("session-a");
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(profileResponse())));
+    render(
+      <TenantAuthProvider>
+        <LoginProbe />
+      </TenantAuthProvider>,
+    );
+    await waitFor(() => expect(
+      screen.getByText("AUTHENTICATED:tenant@example.test"),
+    ).toBeTruthy());
+
+    publishTenantAuthEvent("session-ended", "session-b");
+    expect(screen.getByText("AUTHENTICATED:tenant@example.test")).toBeTruthy();
+    expect(window.sessionStorage.getItem("tenant_session_meta")).not.toBeNull();
+
+    publishTenantAuthEvent("session-ended", "session-a");
+    await waitFor(() => expect(screen.getByText("ENDED:none")).toBeTruthy());
+    expect(window.sessionStorage.getItem("tenant_session_meta")).toBeNull();
+    expect(replace).toHaveBeenCalledWith("/login");
+  });
+
+  it("does not commit a delayed bootstrap response after its SID ends", async () => {
+    seedSessionState("session-a");
+    let resolveProfile!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => {
+      resolveProfile = resolve;
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <TenantAuthProvider>
+        <LoginProbe />
+      </TenantAuthProvider>,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    publishTenantAuthEvent("session-ended", "session-a");
+    resolveProfile(jsonResponse(profileResponse()));
+
+    await waitFor(() => expect(screen.getByText("ENDED:none")).toBeTruthy());
+    expect(screen.queryByText("AUTHENTICATED:tenant@example.test")).toBeNull();
+  });
+
+  it("clears the old profile before bootstrapping an accepted account switch", async () => {
+    seedSessionState("session-a");
+    let requestCount = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url !== "/api/tenant/core/v1/auth/me") {
+        throw new Error(`Unexpected request: ${url}`);
+      }
+      requestCount += 1;
+      return requestCount === 1
+        ? jsonResponse(profileResponse())
+        : jsonResponse({ code: "UNAVAILABLE" }, 503);
+    }));
+    render(
+      <TenantAuthProvider>
+        <LoginProbe />
+      </TenantAuthProvider>,
+    );
+    await waitFor(() => expect(
+      screen.getByText("AUTHENTICATED:tenant@example.test"),
+    ).toBeTruthy());
+
+    const previousMetadata = JSON.parse(
+      window.sessionStorage.getItem("tenant_session_meta") ?? "null",
+    ) as { savedAt: number };
+    publishTenantAuthEvent("session-updated", "session-b", true, {
+      savedAt: previousMetadata.savedAt + 1,
+      expiresIn: 600,
+      sessionExpiresIn: 1_800,
+      authorizationVersion: 1,
+      profileVersion: 1,
+    });
+
+    await waitFor(() => expect(screen.getByText("DEGRADED:none")).toBeTruthy());
+    expect(requestCount).toBe(2);
+    expect(JSON.parse(
+      window.sessionStorage.getItem("tenant_session_meta") ?? "null",
+    )).toMatchObject({ sessionId: "session-b" });
+  });
+
+  it("keeps the auth guard loading while a new account bootstrap is pending", async () => {
+    seedSessionState("session-a");
+    let resolveSwitchedProfile!: (response: Response) => void;
+    let requestCount = 0;
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url !== "/api/tenant/core/v1/auth/me") {
+        throw new Error(`Unexpected request: ${url}`);
+      }
+      requestCount += 1;
+      if (requestCount === 1) {
+        return Promise.resolve(jsonResponse(profileResponse()));
+      }
+      return new Promise<Response>((resolve) => {
+        resolveSwitchedProfile = resolve;
+      });
+    }));
+    render(
+      <TenantAuthProvider>
+        <TenantAuthGuard>
+          <LoginProbe />
+        </TenantAuthGuard>
+      </TenantAuthProvider>,
+    );
+    await waitFor(() => expect(
+      screen.getByText("AUTHENTICATED:tenant@example.test"),
+    ).toBeTruthy());
+    replace.mockReset();
+
+    const previousMetadata = JSON.parse(
+      window.sessionStorage.getItem("tenant_session_meta") ?? "null",
+    ) as { savedAt: number };
+    publishTenantAuthEvent("session-updated", "session-b", true, {
+      savedAt: previousMetadata.savedAt + 1,
+      expiresIn: 600,
+      sessionExpiresIn: 1_800,
+      authorizationVersion: 1,
+      profileVersion: 1,
+    });
+
+    await waitFor(() => expect(
+      screen.getByText("جاري التحقق من الجلسة..."),
+    ).toBeTruthy());
+    expect(replace).not.toHaveBeenCalledWith("/login");
+
+    act(() => {
+      publishTenantAuthLifecycle("STALE");
+      publishTenantAuthLifecycle("REFRESHING");
+      publishTenantAuthLifecycle("AUTHENTICATED");
+    });
+    expect(screen.getByText("جاري التحقق من الجلسة...")).toBeTruthy();
+    expect(replace).not.toHaveBeenCalledWith("/login");
+
+    resolveSwitchedProfile(jsonResponse(profileResponse()));
+    await waitFor(() => expect(
+      screen.getByText("AUTHENTICATED:tenant@example.test"),
+    ).toBeTruthy());
   });
 });
 
@@ -216,4 +455,51 @@ function webAuthResponse(): Record<string, unknown> {
       },
     },
   };
+}
+
+function profileResponse(): Record<string, unknown> {
+  return {
+    data: {
+      id: "tenant-user-a",
+      email: "tenant@example.test",
+      firstName: "Tenant",
+      lastName: "User",
+      isTenantOwner: true,
+      status: "ACTIVE",
+      accessibleBranches: [],
+      accessibleCompanies: ["company-a"],
+      permissions: [],
+      teamMemberships: [],
+    },
+  };
+}
+
+function seedSessionState(sessionId: string): void {
+  const savedAt = Date.now();
+  const eventId = `event-${sessionId}`;
+  window.localStorage.setItem("tenant_auth_session_event", JSON.stringify({
+    realm: "tenant",
+    kind: "session-updated",
+    eventId,
+    sourceId: "test-source",
+    issuedAt: savedAt,
+    sessionId,
+    timing: {
+      expiresIn: 600,
+      sessionExpiresIn: 1_800,
+      authorizationVersion: 1,
+      profileVersion: 1,
+    },
+  }));
+  window.sessionStorage.setItem("tenant_session_meta", JSON.stringify({
+    savedAt,
+    expiresIn: 600,
+    sessionExpiresIn: 1_800,
+    tokenType: "Bearer",
+    sessionId,
+    remember: true,
+    authorizationVersion: 1,
+    profileVersion: 1,
+    authEventId: eventId,
+  }));
 }

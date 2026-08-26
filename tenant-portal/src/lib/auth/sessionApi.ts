@@ -1,6 +1,7 @@
 import {
   axiosClient,
   clearLocalTenantAuthState,
+  getStoredTenantSessionMeta,
   type AuthSessionClientType,
   unwrapCoreData,
 } from "../api/axiosClient";
@@ -47,9 +48,13 @@ export async function revokeTenantAuthSession(
     `/api/tenant/core/v1/auth/sessions/${encodeURIComponent(session.id)}`,
     { skipAutoIdempotency: true, replayAfterRefresh: true },
   );
-  if (session.current) {
+  if (!session.current || getStoredTenantSessionMeta()?.sessionId !== session.id) {
+    return;
+  }
+
+  publishTenantAuthEvent("session-ended", session.id, true);
+  if (getStoredTenantSessionMeta()?.sessionId === session.id) {
     clearLocalTenantAuthState();
-    publishTenantAuthEvent("session-ended", session.id, true);
   }
 }
 

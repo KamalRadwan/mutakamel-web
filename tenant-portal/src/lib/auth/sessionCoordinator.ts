@@ -111,9 +111,11 @@ export function subscribeToTenantAuthEvents(
   const seen = new Set<string>();
   const deliver = (candidate: unknown, allowCurrentSource = false) => {
     const event = parseTenantAuthEvent(candidate);
+    const latest = readLatestTenantAuthEvent();
     if (
       !event ||
       seen.has(event.eventId) ||
+      (!allowCurrentSource && latest !== null && latest.eventId !== event.eventId) ||
       (!allowCurrentSource && event.sourceId === sourceId)
     ) {
       return;

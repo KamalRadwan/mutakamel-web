@@ -15,6 +15,10 @@ authenticated deployment before treating it as complete.
 - Next.js 16.2.11 and React 19.
 - Fixed development and production port: `5002`.
 - Browser API traffic goes through API Gateway only.
+- In development, Next proxies same-origin `/api/*` calls to
+  `DEV_API_TARGET` (default `http://localhost:9000`). Production keeps this
+  rewrite disabled because deployment ingress owns the same-origin `/api/*`
+  namespace.
 - Canonical tenant API prefixes:
   - Core: `/api/tenant/core/v1`
   - CRM: `/api/tenant/crm/v1`

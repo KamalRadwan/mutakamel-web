@@ -2,7 +2,7 @@
 
 Status: **Required replacement contract**
 
-Last verified: **2026-08-09**
+Last verified: **2026-08-26**
 
 ## Token handling
 
@@ -33,14 +33,23 @@ Every authenticated request is associated with one server `sid`.
   before navigation; a transient failure retains authenticated/degraded state.
 - BroadcastChannel and storage events carry only a non-secret event ID, `sid`,
   kind, source ID, and timestamp. A changed `sid` blocks old-request replay.
+- A terminal cross-tab event affects a tab only when its `sid` exactly matches
+  that tab's current session. Successful responses and bootstrap results are
+  discarded after any newer session generation or matching tombstone.
 - Permission `403` does not refresh or clear auth; terminal session codes do.
-- Network/`429`/`5xx` failures retain auth and expose degraded state.
+- Network/`404`/`409`/`429`/`5xx` failures retain auth and expose degraded
+  state.
 
 Only trusted pointer, keyboard, or touch events in a visible tab may mark human
 activity. Synthetic events, polling, refresh, timers, hidden tabs, and WSS
 traffic cannot extend auth idle time. Core owns all idle-deadline writes;
 CRM/Trade activity is checkpointed through Core first. Employee WSS-duration
 accounting remains independent from authentication session TTLs.
+Activity checkpoint calls are leading, time-bounded, exact-`sid` fenced, and
+coalesced by one in-flight call plus bounded success/retry windows. They use the
+ordinary coordinated refresh path when access expires. Their safe failure
+diagnostics contain only status/code categories and never trigger logout unless
+the server returns a definitive terminal session code.
 
 ## Cross-site protections
 

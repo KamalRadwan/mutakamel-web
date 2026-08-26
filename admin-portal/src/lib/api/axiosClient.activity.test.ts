@@ -57,9 +57,26 @@ function stubActivityBrowser(
 ) {
   const listeners = new Map<string, (event: Event) => void>();
   const dispatchEvent = vi.fn();
+  const cookies = new Map([
+    ["__Host-mutakamel-admin-csrf", "csrf-proof"],
+  ]);
   const documentState = {
-    cookie: "__Host-mutakamel-admin-csrf=csrf-proof",
     visibilityState: "visible",
+    get cookie() {
+      return Array.from(cookies, ([name, value]) => `${name}=${value}`).join("; ");
+    },
+    set cookie(serialized: string) {
+      const [pair = "", ...attributes] = serialized.split(";");
+      const separator = pair.indexOf("=");
+      if (separator < 1) return;
+      const name = pair.slice(0, separator).trim();
+      const value = pair.slice(separator + 1).trim();
+      const removed = attributes.some((attribute) =>
+        attribute.trim().toLowerCase() === "max-age=0"
+      );
+      if (removed) cookies.delete(name);
+      else cookies.set(name, value);
+    },
   };
   vi.stubGlobal("window", {
     location: { pathname, href: "" },
@@ -110,6 +127,18 @@ function refreshedSessionResponse() {
   }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
+  });
+}
+
+function stubWebLocks() {
+  vi.stubGlobal("navigator", {
+    locks: {
+      request: async (
+        _name: string,
+        _options: unknown,
+        callback: () => Promise<unknown>,
+      ) => callback(),
+    },
   });
 }
 
@@ -312,6 +341,7 @@ describe("admin activity checkpoint liveness", () => {
       sessionStorage,
       localStorage,
     );
+    stubWebLocks();
 
     const urls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
@@ -334,16 +364,108 @@ describe("admin activity checkpoint liveness", () => {
 
     listeners.get("pointerdown")?.({ isTrusted: true } as Event);
     await vi.advanceTimersByTimeAsync(0);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(urls).toEqual([
-      "/api/admin/core/v1/auth/refresh",
-      "/api/admin/core/v1/auth/activity",
-    ]);
+    await vi.waitFor(() => {
+      expect(urls).toEqual([
+        "/api/admin/core/v1/auth/refresh",
+        "/api/admin/core/v1/auth/activity",
+      ]);
+    });
     expect(JSON.parse(
       sessionStorage.getItem("admin_session_meta") ?? "null",
     )).toMatchObject({ sessionId: SESSION_ONE, expiresIn: 600 });
+  });
+
+  it("refreshes once and retries a direct checkpoint after a non-terminal 401", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T13:30:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(sessionStorage, localStorage);
+    const { listeners } = stubActivityBrowser(
+      "/dashboard",
+      sessionStorage,
+      localStorage,
+    );
+    stubWebLocks();
+
+    const urls: string[] = [];
+    let activityAttempts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      urls.push(url);
+      if (url === "/api/admin/core/v1/auth/refresh") {
+        return refreshedSessionResponse();
+      }
+      if (url === "/api/admin/core/v1/auth/activity") {
+        activityAttempts += 1;
+        return activityAttempts === 1
+          ? new Response(JSON.stringify({
+              errorCode: "COMMON.AUTH.TOKEN_EXPIRED",
+            }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            })
+          : new Response(null, { status: 204 });
+      }
+      return new Response(JSON.stringify({ data: {} }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }));
+
+    await api.customFetch("/api/admin/core/v1/auth/me");
+    urls.length = 0;
+    listeners.get("pointerdown")?.({ isTrusted: true } as Event);
+
+    await vi.waitFor(() => {
+      expect(urls).toEqual([
+        "/api/admin/core/v1/auth/activity",
+        "/api/admin/core/v1/auth/refresh",
+        "/api/admin/core/v1/auth/activity",
+      ]);
+    });
+    expect(JSON.parse(
+      sessionStorage.getItem("admin_session_meta") ?? "null",
+    )?.sessionId).toBe(SESSION_ONE);
+  });
+
+  it("ends only the still-bound session on an explicit terminal checkpoint code", async () => {
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(sessionStorage, localStorage);
+    const { dispatchEvent, listeners } = stubActivityBrowser(
+      "/dashboard",
+      sessionStorage,
+      localStorage,
+    );
+
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/admin/core/v1/auth/activity") {
+        return new Response(JSON.stringify({
+          errorCode: "AUTH_SESSION_IDLE_EXPIRED",
+        }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ data: {} }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }));
+
+    await api.customFetch("/api/admin/core/v1/auth/me");
+    listeners.get("pointerdown")?.({ isTrusted: true } as Event);
+
+    await vi.waitFor(() => {
+      expect(sessionStorage.getItem("admin_session_meta")).toBeNull();
+    });
+    expect(JSON.parse(
+      localStorage.getItem("admin_auth_session_event") ?? "null",
+    )).toMatchObject({ kind: "session-ended", sessionId: SESSION_ONE });
+    expect(dispatchEvent.mock.calls.some(([event]) =>
+      (event as CustomEvent).type === "admin-auth-lifecycle" &&
+      (event as CustomEvent).detail === "ENDED"
+    )).toBe(true);
   });
 
   it("ignores a delayed terminal activity response after another session wins", async () => {

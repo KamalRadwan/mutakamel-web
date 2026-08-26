@@ -2,7 +2,7 @@
 
 Status: **Accepted session architecture; Tenant Portal source-integrated**
 
-Last verified: **2026-08-10**
+Last verified: **2026-08-26**
 
 Backend owner: **Core through API Gateway**
 
@@ -56,6 +56,8 @@ Required behavior:
    exact original body.
 8. A post-refresh replay is allowed only when the cross-tab event remains bound
    to the same `sid`; a login in another tab fails the old request closed.
+9. Successful requests and `/auth/me` bootstrap commits are generation-fenced;
+   a newer login or exact-session tombstone cancels or rejects stale work.
 
 ## Storage rules
 
@@ -75,8 +77,13 @@ Required behavior:
 
 ## Refresh policy
 
-- Refresh reactively on an eligible non-terminal `401`; background timers do
-  not extend idle or absolute session duration.
+- Refresh proactively before access expiry while the tab is visible and
+  online, and reactively on an eligible non-terminal `401`. Focus,
+  `visibilitychange`, `pageshow`, and `online` only wake the scheduler; they do
+  not count as activity or extend idle/absolute deadlines.
+- Keep refresh single-flight in the tab and use Web Locks across tabs where
+  available. Transient failures retry with a bounded backoff; only explicit
+  terminal session codes publish an exact-`sid` tombstone.
 - Retry an ordinary protected request at most once after a coordinated refresh.
 - Do not refresh for login, refresh, logout, invite, or password-reset paths.
 - Do not retry a write blindly unless its idempotency contract makes the exact
@@ -87,12 +94,18 @@ Required behavior:
 
 - Only trusted pointer, keyboard, or touch events in a visible tab may produce
   `x-auth-user-activity: 1`; synthetic DOM events are ignored.
-- Core requests carry the marker directly. Before an activity-marked CRM or
-  Trade request, the client first calls Core `POST /auth/activity` so Core
-  remains the only session-idle writer.
+- A trusted visible input starts a leading, bounded Core
+  `POST /auth/activity` checkpoint. Activity-marked CRM or Trade requests also
+  piggyback this checkpoint when one is due. One in-flight call plus bounded
+  success/retry windows coalesce later inputs, so Core remains the only
+  session-idle writer. Checkpoint failures retain auth and log only a safe
+  status/code category.
 - Refresh, polling, timers, hidden tabs, and WSS traffic never extend the idle
   deadline. WSS employee-duration accounting is a separate clock and data
   flow, not an auth-session TTL.
+- Realtime credential refresh uses the same HTTP refresh coordinator. A socket
+  permanent-stop reason clears socket-owned state but cannot end the REST
+  session until `/auth/me` returns a definitive terminal session code.
 
 ## Authorization bootstrap
 
@@ -115,6 +128,7 @@ After authentication:
 ../backend/mutakamel-apps/api-gateway-app/src/auth/session-version.guard.ts
 src/lib/auth/sessionApi.ts
 src/lib/auth/sessionCoordinator.ts
+src/lib/auth/sessionRefresh.ts
 src/lib/api/axiosClient.ts
 src/shared/api/tenant-api-client.ts
 ```

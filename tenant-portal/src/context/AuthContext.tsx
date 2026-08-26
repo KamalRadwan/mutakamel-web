@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -13,15 +14,19 @@ import { useRouter } from "next/navigation";
 import {
   axiosClient,
   clearLocalTenantAuthState,
+  coordinateTenantSessionRefresh,
   getStoredTenantSessionMeta,
   readWebAuthSessionResponse,
+  startTenantActivityTracking,
   storeTenantSessionMetadata,
   synchronizeTenantTabSession,
+  TenantApiClientError,
   unwrapCoreData,
   withTenantAuthLock,
 } from "@/lib/api/axiosClient";
 import {
   publishTenantAuthEvent,
+  readLatestTenantAuthEvent,
   subscribeToTenantAuthEvents,
   subscribeToTenantAuthLifecycle,
 } from "@/lib/auth/sessionCoordinator";
@@ -29,7 +34,9 @@ import {
   classifyAuthFailure,
   getAuthErrorCode,
   getAuthErrorStatus,
+  isDefinitiveAuthFailure,
 } from "@/lib/auth/sessionErrors";
+import { startTenantSessionRefreshScheduler } from "@/lib/auth/sessionRefresh";
 
 export interface TenantTeamMembership {
   id: string;
@@ -89,12 +96,24 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TenantUserProfile | null>(null);
   const [authState, setAuthState] = useState<TenantAuthState>("BOOTSTRAPPING");
   const [realtimeAuthGeneration, setRealtimeAuthGeneration] = useState<string | null>(null);
+  const authOperationGeneration = useRef(0);
+  const bootstrapAbort = useRef<AbortController | null>(null);
   const router = useRouter();
 
+  const invalidatePendingAuthWork = useCallback(() => {
+    authOperationGeneration.current += 1;
+    bootstrapAbort.current?.abort();
+    bootstrapAbort.current = null;
+    return authOperationGeneration.current;
+  }, []);
+
   const bootstrap = useCallback(async (markPending = true) => {
+    const generation = invalidatePendingAuthWork();
+    const controller = new AbortController();
+    bootstrapAbort.current = controller;
     if (markPending) {
       setAuthState((current) =>
-        current === "AUTHENTICATED" || current === "DEGRADED"
+        current === "AUTHENTICATED"
           ? "STALE"
           : "BOOTSTRAPPING",
       );
@@ -102,27 +121,35 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await axiosClient.get(
         "/api/tenant/core/v1/auth/me",
-        { cache: "no-store" },
+        { cache: "no-store", signal: controller.signal },
       );
+      if (controller.signal.aborted || generation !== authOperationGeneration.current) {
+        return;
+      }
       const profile = readTenantUserProfile(response.data);
       setUser(profile);
       setRealtimeAuthGeneration(readRealtimeAuthGeneration(profile.id));
       setAuthState("AUTHENTICATED");
     } catch (error) {
-      const disposition = classifyAuthFailure(
-        getAuthErrorStatus(error),
-        getAuthErrorCode(error),
-      );
-      if (disposition === "retain") {
+      if (
+        controller.signal.aborted ||
+        generation !== authOperationGeneration.current ||
+        isAbortError(error)
+      ) {
+        return;
+      }
+      if (!isInvalidAuthProfile(error) && !isDefinitiveAuthFailure(error)) {
         setAuthState("DEGRADED");
         return;
       }
       clearLocalTenantAuthState();
       setUser(null);
       setRealtimeAuthGeneration(null);
-      setAuthState(disposition === "end" ? "ENDED" : "UNAUTHENTICATED");
+      setAuthState(isDefinitiveAuthFailure(error) ? "ENDED" : "UNAUTHENTICATED");
+    } finally {
+      if (bootstrapAbort.current === controller) bootstrapAbort.current = null;
     }
-  }, []);
+  }, [invalidatePendingAuthWork]);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,12 +158,15 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       cancelled = true;
+      bootstrapAbort.current?.abort();
     };
   }, [bootstrap]);
 
   useEffect(() =>
     subscribeToTenantAuthEvents((event) => {
       if (event.kind === "session-ended") {
+        if (getStoredTenantSessionMeta()?.sessionId !== event.sessionId) return;
+        invalidatePendingAuthWork();
         clearLocalTenantAuthState();
         setUser(null);
         setRealtimeAuthGeneration(null);
@@ -144,35 +174,87 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         router.replace("/login");
         return;
       }
-      if (getStoredTenantSessionMeta()?.sessionId !== event.sessionId) {
-        setRealtimeAuthGeneration(null);
+      const previousSessionId = getStoredTenantSessionMeta()?.sessionId;
+      if (!synchronizeTenantTabSession(event)) {
+        const current = getStoredTenantSessionMeta();
+        if (
+          current?.sessionId === event.sessionId &&
+          current.authEventId === event.eventId
+        ) {
+          void bootstrap();
+        }
+        return;
       }
-      synchronizeTenantTabSession(event.sessionId);
-      void bootstrap();
-    }), [bootstrap, router]);
+      const sessionChanged = previousSessionId !== event.sessionId;
+      if (sessionChanged) {
+        setUser(null);
+        setRealtimeAuthGeneration(null);
+        setAuthState("BOOTSTRAPPING");
+      }
+      void bootstrap(!sessionChanged);
+    }), [bootstrap, invalidatePendingAuthWork, router]);
 
   useEffect(() =>
     subscribeToTenantAuthLifecycle((state) => {
       if (state === "ENDED") {
+        invalidatePendingAuthWork();
         setUser(null);
         setRealtimeAuthGeneration(null);
         setAuthState("ENDED");
         router.replace("/login");
         return;
       }
-      setAuthState(state);
-    }), [router]);
+      setAuthState((current) =>
+        current === "BOOTSTRAPPING" && state !== "DEGRADED"
+          ? current
+          : state,
+      );
+    }), [invalidatePendingAuthWork, router]);
+
+  useEffect(() => startTenantActivityTracking(), []);
+
+  useEffect(() => {
+    if (!user && !getStoredTenantSessionMeta()) return;
+    const scheduler = startTenantSessionRefreshScheduler({
+      getTiming: readStoredRefreshTiming,
+      canRefresh: canRefreshTenantSession,
+      refresh: async () => {
+        const sessionId = getStoredTenantSessionMeta()?.sessionId;
+        if (!sessionId) return;
+        await coordinateTenantSessionRefresh(sessionId);
+      },
+    });
+    const wake = () => scheduler.wake();
+    const wakeWhenVisible = () => {
+      if (document.visibilityState === "visible") scheduler.wake();
+    };
+    window.addEventListener("focus", wake);
+    window.addEventListener("pageshow", wake);
+    window.addEventListener("online", wake);
+    document.addEventListener("visibilitychange", wakeWhenVisible);
+    return () => {
+      scheduler.stop();
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("pageshow", wake);
+      window.removeEventListener("online", wake);
+      document.removeEventListener("visibilitychange", wakeWhenVisible);
+    };
+  }, [user]);
 
   const login = useCallback(async ({
     email,
     password,
     rememberMe = false,
   }: TenantLoginOptions) => {
+    const generation = invalidatePendingAuthWork();
     let sessionCommitted = false;
     setRealtimeAuthGeneration(null);
     setAuthState("BOOTSTRAPPING");
     try {
-      const profile = await withTenantAuthLock(async () => {
+      const profile = await withTenantAuthLock(async (signal) => {
+        if (generation !== authOperationGeneration.current) {
+          throw sessionChangedError();
+        }
         clearLocalTenantAuthState();
         const loginResponse = await axiosClient.post(
           "/api/tenant/core/v1/auth/login",
@@ -182,49 +264,65 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
             skipAuthRefresh: true,
             skipAutoIdempotency: true,
             cache: "no-store",
+            signal,
           },
         );
         const auth = readWebAuthSessionResponse(loginResponse.data);
         if (!auth) {
           const invalidResponse = new Error("INVALID_AUTH_RESPONSE");
-          await bestEffortTenantSessionRollback();
-          publishTenantAuthEvent("session-ended", undefined, false);
+          await bestEffortTenantSessionRollback(signal);
           throw invalidResponse;
         }
 
-        sessionCommitted = true;
+        const savedAt = Date.now();
         const event = publishTenantAuthEvent(
           "session-updated",
           auth.session.id,
           false,
+          {
+            savedAt,
+            expiresIn: auth.expiresIn,
+            sessionExpiresIn: auth.sessionExpiresIn,
+            authorizationVersion: auth.session.authorizationVersion,
+            profileVersion: auth.session.profileVersion,
+          },
         );
-        storeTenantSessionMetadata(auth, rememberMe, event.eventId);
+        storeTenantSessionMetadata(auth, rememberMe, event.eventId, savedAt);
+        sessionCommitted = true;
 
         try {
           const meResponse = await axiosClient.get(
             "/api/tenant/core/v1/auth/me",
-            { skipAuthRefresh: true, cache: "no-store" },
+            { skipAuthRefresh: true, cache: "no-store", signal },
           );
-          return readTenantUserProfile(meResponse.data);
+          const profile = readTenantUserProfile(meResponse.data);
+          if (
+            generation !== authOperationGeneration.current ||
+            getStoredTenantSessionMeta()?.sessionId !== auth.session.id
+          ) {
+            throw sessionChangedError();
+          }
+          return profile;
         } catch (error) {
           if (!shouldRetainCommittedTenantSession(error)) {
-            await bestEffortTenantSessionRollback();
-            clearLocalTenantAuthState();
-            publishTenantAuthEvent(
-              "session-ended",
-              auth.session.id,
-              false,
-            );
+            const sessionEnded = isDefinitiveAuthFailure(error) ||
+              await bestEffortTenantSessionRollback(signal);
+            const cleared = clearTenantSessionIfCurrent(auth.session.id);
+            if (sessionEnded && cleared) publishSessionEndOnce(auth.session.id);
           }
           throw error;
         }
       });
 
+      if (generation !== authOperationGeneration.current) {
+        throw sessionChangedError();
+      }
       setUser(profile);
       setRealtimeAuthGeneration(readRealtimeAuthGeneration(profile.id));
       setAuthState("AUTHENTICATED");
       router.push("/");
     } catch (error) {
+      if (generation !== authOperationGeneration.current) throw error;
       if (sessionCommitted && shouldRetainCommittedTenantSession(error)) {
         setUser(null);
         setAuthState("DEGRADED");
@@ -240,13 +338,18 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       setAuthState(disposition === "end" ? "ENDED" : "UNAUTHENTICATED");
       throw error;
     }
-  }, [router]);
+  }, [invalidatePendingAuthWork, router]);
 
   const logout = useCallback(async () => {
-    const sessionId = getStoredTenantSessionMeta()?.sessionId;
+    const generation = invalidatePendingAuthWork();
+    let sessionId: string | undefined;
     setRealtimeAuthGeneration(null);
     try {
-      await withTenantAuthLock(async () => {
+      const endedCurrentSession = await withTenantAuthLock(async (signal) => {
+        if (generation !== authOperationGeneration.current) {
+          throw sessionChangedError();
+        }
+        sessionId = getStoredTenantSessionMeta()?.sessionId;
         await axiosClient.post(
           "/api/tenant/core/v1/auth/logout",
           undefined,
@@ -254,33 +357,53 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
             skipAuthRefresh: true,
             nonReplayable: true,
             skipAutoIdempotency: true,
+            signal,
           },
         );
+        if (generation !== authOperationGeneration.current) return false;
+        if (!sessionId) {
+          clearLocalTenantAuthState();
+          return true;
+        }
+        if (!clearTenantSessionIfCurrent(sessionId)) return false;
+        publishSessionEndOnce(sessionId);
+        return true;
       });
+      if (!endedCurrentSession) return;
     } catch (error) {
-      const disposition = classifyAuthFailure(
-        getAuthErrorStatus(error),
-        getAuthErrorCode(error),
-      );
-      if (disposition === "end") {
+      if (isDefinitiveAuthFailure(error)) {
+        const latest = readLatestTenantAuthEvent();
+        if (latest?.kind === "session-ended" && latest.sessionId === sessionId) {
+          return;
+        }
+        if (generation !== authOperationGeneration.current) throw error;
         setUser(null);
+        setRealtimeAuthGeneration(null);
         setAuthState("ENDED");
         router.replace("/login");
         return;
       }
-      setAuthState(disposition === "retain" ? "DEGRADED" : "AUTHENTICATED");
+      if (generation !== authOperationGeneration.current) throw error;
+      const disposition = classifyAuthFailure(
+        getAuthErrorStatus(error),
+        getAuthErrorCode(error),
+      );
+      setAuthState(
+        disposition === "retain" || disposition === "refresh"
+          ? "DEGRADED"
+          : "AUTHENTICATED",
+      );
       setRealtimeAuthGeneration(
         user ? readRealtimeAuthGeneration(user.id) : null,
       );
       throw error;
     }
-    clearLocalTenantAuthState();
-    publishTenantAuthEvent("session-ended", sessionId, false);
+    if (generation !== authOperationGeneration.current) return;
     setUser(null);
     setRealtimeAuthGeneration(null);
     setAuthState("ENDED");
     router.replace("/login");
-  }, [router, user]);
+  }, [invalidatePendingAuthWork, router, user]);
 
   const value = useMemo<TenantAuthContextValue>(() => ({
     user,
@@ -362,16 +485,12 @@ function readRealtimeAuthGeneration(userId: string): string | null {
 }
 
 function shouldRetainCommittedTenantSession(error: unknown): boolean {
-  if (error instanceof Error && error.message === "INVALID_AUTH_PROFILE") {
-    return false;
-  }
-  return classifyAuthFailure(
-    getAuthErrorStatus(error),
-    getAuthErrorCode(error),
-  ) === "retain";
+  return !isInvalidAuthProfile(error) && !isDefinitiveAuthFailure(error);
 }
 
-async function bestEffortTenantSessionRollback(): Promise<void> {
+async function bestEffortTenantSessionRollback(
+  signal?: AbortSignal,
+): Promise<boolean> {
   try {
     await axiosClient.post(
       "/api/tenant/core/v1/auth/logout",
@@ -381,10 +500,61 @@ async function bestEffortTenantSessionRollback(): Promise<void> {
         nonReplayable: true,
         skipAutoIdempotency: true,
         cache: "no-store",
+        signal,
       },
     );
+    return true;
   } catch {
     // Preserve the original login/bootstrap failure. The server session will
     // still expire under its idle/absolute bounds if this cleanup cannot run.
+    return false;
   }
+}
+
+function readStoredRefreshTiming() {
+  const metadata = getStoredTenantSessionMeta();
+  return metadata
+    ? {
+        savedAt: metadata.savedAt,
+        expiresIn: metadata.expiresIn,
+        eventId: metadata.authEventId,
+      }
+    : null;
+}
+
+function canRefreshTenantSession(): boolean {
+  return (
+    document.visibilityState === "visible" &&
+    navigator.onLine &&
+    getStoredTenantSessionMeta() !== null
+  );
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function isInvalidAuthProfile(error: unknown): boolean {
+  return error instanceof Error && error.message === "INVALID_AUTH_PROFILE";
+}
+
+function sessionChangedError(): TenantApiClientError {
+  return new TenantApiClientError("AUTH_SESSION_CHANGED", {
+    status: 409,
+    statusText: "Conflict",
+    headers: new Headers({ "content-type": "application/json" }),
+    data: { code: "AUTH_SESSION_CHANGED" },
+  });
+}
+
+function clearTenantSessionIfCurrent(sessionId: string): boolean {
+  if (getStoredTenantSessionMeta()?.sessionId !== sessionId) return false;
+  clearLocalTenantAuthState();
+  return true;
+}
+
+function publishSessionEndOnce(sessionId: string): void {
+  const latest = readLatestTenantAuthEvent();
+  if (latest?.kind === "session-ended" && latest.sessionId === sessionId) return;
+  publishTenantAuthEvent("session-ended", sessionId, false);
 }

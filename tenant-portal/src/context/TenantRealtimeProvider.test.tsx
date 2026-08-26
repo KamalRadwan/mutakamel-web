@@ -9,7 +9,7 @@ import {
   type ConnectionTransport,
   type ConnectionTransportListener,
 } from "@mutakamel/realtime-app-client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { tenantNotificationRuntime } from "@/lib/notifications/tenant-notification-runtime";
 import {
   TENANT_REALTIME_SHELL_EVENTS,
@@ -22,6 +22,11 @@ const generationA = "tenant:session-a:user-a";
 const generationB = "tenant:session-b:user-b";
 
 describe("TenantRealtimeBinding", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
   afterEach(() => {
     tenantNotificationRuntime.clear();
     cleanup();
@@ -136,7 +141,7 @@ describe("TenantRealtimeBinding", () => {
     expect(harness.coordinator.getSnapshot().networkOnline).toBe(false);
   });
 
-  it("binds ready lifecycle, activity, heartbeat, and server drain to the typed client", async () => {
+  it("binds lifecycle and heartbeat but rejects synthetic activity", async () => {
     const harness = createHarness();
     render(
       <Binding coordinator={harness.coordinator} generation={generationA} />,
@@ -149,7 +154,7 @@ describe("TenantRealtimeBinding", () => {
     expect(eventNames(transport)).toContain("presence.lifecycle.v1");
 
     act(() => document.dispatchEvent(new Event("pointerdown")));
-    expect(eventNames(transport)).toContain("presence.activity.v1");
+    expect(eventNames(transport)).not.toContain("presence.activity.v1");
 
     act(() => vi.advanceTimersByTime(30_000));
     expect(eventNames(transport)).toContain("presence.heartbeat.v1");
@@ -269,13 +274,25 @@ describe("TenantRealtimeBinding", () => {
   });
 
   it.each([
-    ["system.access-revoked.v1", { reason: "ACCESS_REVOKED" }, "access_revoked"],
-    ["system.tenant-unavailable.v1", { reason: "TENANT_SUSPENDED" }, "tenant_unavailable"],
-  ] as const)("permanently stops and ends local auth for %s", async (
+    ["system.access-revoked.v1", { reason: "ACCESS_REVOKED" }, "access_revoked", 403],
+    ["system.tenant-unavailable.v1", { reason: "TENANT_SUSPENDED" }, "tenant_unavailable", 503],
+  ] as const)("keeps REST auth after non-terminal revalidation for %s", async (
     eventName,
     payload,
     stopReason,
+    revalidationStatus,
   ) => {
+    seedSessionState("session-a");
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "/api/tenant/core/v1/auth/me") {
+        return jsonResponse({ code: "SESSION_REVALIDATION_RETAINED" }, revalidationStatus);
+      }
+      return jsonResponse({
+        success: true,
+        data: { items: [], unreadCount: 0, nextCursor: null, hasNext: false },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
     const harness = createHarness();
     const stops: unknown[] = [];
     const authEvents: unknown[] = [];
@@ -303,15 +320,51 @@ describe("TenantRealtimeBinding", () => {
     ));
 
     expect(stops).toEqual([stopReason]);
-    expect(authEvents).toContainEqual(expect.objectContaining({
-      kind: "session-ended",
-    }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tenant/core/v1/auth/me",
+      expect.objectContaining({ credentials: "include" }),
+    ));
+    expect(authEvents).toEqual([]);
+    expect(window.sessionStorage.getItem("tenant_session_meta")).not.toBeNull();
     expect(tenantNotificationRuntime.getSnapshot()).toMatchObject({
       generation: null,
       items: [],
       unreadCount: 0,
     });
     expect(harness.coordinator.getSnapshot().phase).toBe("blocked");
+  });
+
+  it("ends REST auth only after a definitive server revalidation", async () => {
+    seedSessionState("session-a");
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/tenant/core/v1/auth/me") {
+        return jsonResponse({ code: "AUTH_SESSION_ENDED" }, 401);
+      }
+      return jsonResponse({
+        success: true,
+        data: { items: [], unreadCount: 0, nextCursor: null, hasNext: false },
+      });
+    }));
+    const harness = createHarness();
+    const authEvents: unknown[] = [];
+    window.addEventListener(
+      "tenant-auth-session-event",
+      (event) => authEvents.push((event as CustomEvent).detail),
+    );
+    render(
+      <Binding coordinator={harness.coordinator} generation={generationA} />,
+    );
+    await waitFor(() => expect(harness.transports).toHaveLength(1));
+
+    act(() => harness.transports[0].emitServer(
+      "system.access-revoked.v1",
+      serverEvent({ reason: "ACCESS_REVOKED" }),
+    ));
+
+    await waitFor(() => expect(authEvents).toContainEqual(
+      expect.objectContaining({ kind: "session-ended", sessionId: "session-a" }),
+    ));
+    expect(window.sessionStorage.getItem("tenant_session_meta")).toBeNull();
   });
 
   it("discards a credential completion from a stale authentication generation", async () => {
@@ -553,4 +606,25 @@ function notificationCreatedEvent() {
     silent: false,
     metadata: {},
   });
+}
+
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function seedSessionState(sessionId: string): void {
+  window.sessionStorage.setItem("tenant_session_meta", JSON.stringify({
+    savedAt: Date.now(),
+    expiresIn: 600,
+    sessionExpiresIn: 1_800,
+    tokenType: "Bearer",
+    sessionId,
+    remember: true,
+    authorizationVersion: 1,
+    profileVersion: 1,
+    authEventId: `event-${sessionId}`,
+  }));
 }

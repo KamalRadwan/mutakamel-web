@@ -15,7 +15,6 @@ export interface TenantRefreshTiming {
 }
 
 export interface TenantSessionRefreshScheduler {
-  reschedule: () => void;
   wake: () => void;
   stop: () => void;
 }
@@ -24,8 +23,6 @@ interface SchedulerOptions {
   getTiming: () => TenantRefreshTiming | null;
   refresh: () => Promise<void>;
   canRefresh: () => boolean;
-  onTerminal: (error: unknown) => void;
-  onTransient?: (error: unknown) => void;
   now?: () => number;
 }
 
@@ -48,8 +45,6 @@ export function startTenantSessionRefreshScheduler({
   getTiming,
   refresh,
   canRefresh,
-  onTerminal,
-  onTransient,
   now = Date.now,
 }: SchedulerOptions): TenantSessionRefreshScheduler {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -127,10 +122,8 @@ export function startTenantSessionRefreshScheduler({
       if (isDefinitiveAuthFailure(error)) {
         stopped = true;
         clearTimer();
-        onTerminal(error);
         return;
       }
-      onTransient?.(error);
       const latestTiming = readTiming();
       if (isNewerTiming(latestTiming, startedTiming)) {
         resetRetry();
@@ -149,7 +142,6 @@ export function startTenantSessionRefreshScheduler({
 
   schedule();
   return {
-    reschedule: schedule,
     wake: schedule,
     stop: () => {
       stopped = true;

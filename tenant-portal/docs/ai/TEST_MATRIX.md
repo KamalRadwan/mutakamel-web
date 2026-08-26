@@ -1,18 +1,22 @@
 # Tenant Portal Test Matrix
 
-Status: **Target; current app has lint/build only**
+Status: **Implemented command surface; capability coverage remains incremental**
 
-Last verified: **2026-07-25**
+Last verified: **2026-08-26**
 
 ## Current commands
 
 ```powershell
 pnpm --filter tenant-portal lint
+pnpm --filter tenant-portal typecheck
+pnpm --filter tenant-portal test
+pnpm --filter tenant-portal docs:check
 pnpm --filter tenant-portal build
 ```
 
-The project does not yet define `typecheck`, unit, integration, browser, or
-documentation commands.
+The project defines lint, typecheck, Vitest, documentation, and production
+build gates. Separate integration and browser commands remain future release
+work; source tests are not authenticated deployment proof.
 
 ## Required command surface
 
@@ -54,6 +58,12 @@ required.
 - invite/reset single use and invalid/expired token;
 - cross-tab logout/account replacement;
 - in-flight stale-generation response;
+- exact-`sid` tombstone rejection and non-matching tombstone retention;
+- pre-expiry timing, hidden/offline wake-up, single-flight, transient backoff,
+  and terminal-stop behavior;
+- trusted visible activity only, bounded checkpoint timeout, access-refresh
+  replay, and stale-`sid` success rejection;
+- Realtime permanent-stop revalidation without socket-owned logout;
 - host/token tenant mismatch;
 - suspended tenant pre-auth versus protected route.
 

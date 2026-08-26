@@ -18,11 +18,9 @@ import {
 } from "@mutakamel/realtime-app-client";
 import { useTenantAuth } from "@/context/AuthContext";
 import {
-  clearLocalTenantAuthState,
-  getStoredTenantSessionMeta,
-  refreshTenantCookieSession,
+  axiosClient,
+  coordinateTenantSessionRefresh,
 } from "@/lib/api/axiosClient";
-import { publishTenantAuthEvent } from "@/lib/auth/sessionCoordinator";
 import {
   resyncTenantNotifications,
   tenantNotificationRuntime,
@@ -262,7 +260,11 @@ export function TenantRealtimeBinding({
         visibility: "HIDDEN",
         focus: "BLURRED",
       });
-    const signalActivity = () => applicationClient?.signalActivity();
+    const signalActivity = (event: Event) => {
+      if (event.isTrusted && document.visibilityState === "visible") {
+        applicationClient?.signalActivity();
+      }
+    };
     const onVisibilityChange = () => { pushLifecycle(); };
     const onFocus = () => { pushLifecycle(); };
     const onBlur = () => { pushLifecycle(); };
@@ -320,7 +322,11 @@ export function createTenantRealtimeCoordinator(): TenantRealtimeCoordinator {
   return new GenerationBoundConnectionCoordinator<RealtimeHandshakeAuthV1>({
     mode: readDeploymentMode(),
     credentialProvider: async ({ generation, reason }) => {
-      if (reason === "token_refresh") await refreshTenantCookieSession();
+      if (reason === "token_refresh") {
+        const sessionId = readSessionIdFromGeneration(generation);
+        if (!sessionId) throw new Error("INVALID_REALTIME_AUTH_GENERATION");
+        await coordinateTenantSessionRefresh(sessionId);
+      }
       return createGenerationBoundRealtimeHandshake(generation, metadata);
     },
     transportFactory: createSocketIoTransportFactory(),
@@ -340,10 +346,19 @@ function readBrowserLifecycle() {
 function handlePermanentStop(reason: RealtimeApplicationStopReason): void {
   dispatchShellEvent(TENANT_REALTIME_SHELL_EVENTS.permanentStop, reason);
   if (reason !== "access_revoked" && reason !== "tenant_unavailable") return;
-  const sessionId = getStoredTenantSessionMeta()?.sessionId;
   tenantNotificationRuntime.clear();
-  clearLocalTenantAuthState();
-  publishTenantAuthEvent("session-ended", sessionId, true);
+  void revalidateTenantRestSession();
+}
+
+async function revalidateTenantRestSession(): Promise<void> {
+  try {
+    await axiosClient.get("/api/tenant/core/v1/auth/me", {
+      cache: "no-store",
+    });
+  } catch {
+    // The REST client owns definitive session termination. Forbidden and
+    // transient failures deliberately retain the browser session.
+  }
 }
 
 function dispatchShellEvent(name: string, detail: unknown): void {
@@ -360,4 +375,12 @@ function readTimezone(): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function readSessionIdFromGeneration(generation: string): string | null {
+  if (!generation.startsWith("tenant:")) return null;
+  const separator = generation.indexOf(":", "tenant:".length);
+  if (separator < 0) return null;
+  const sessionId = generation.slice("tenant:".length, separator);
+  return sessionId && sessionId.length <= 128 ? sessionId : null;
 }
