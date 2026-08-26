@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -142,6 +143,19 @@
   --sidebar-accent-foreground: var(--color-ink-900);
   --sidebar-border: var(--color-ink-200);
   --sidebar-ring: var(--color-brand-500);
+}
+
+/* Control height scale (docs/design-system/geometry-and-density.md) —
+   referenced by primitives via Tailwind v4's arbitrary-var syntax
+   (h-(--size-control-md)). Same in both themes, so plain :root, no .dark
+   override needed. Targets below 40px get a hit-area expansion rather than
+   a bigger box (src/design-system/lib/variants.ts hitArea). */
+:root {
+  --size-control-xs: 1.5rem; /* 24px */
+  --size-control-sm: 1.75rem; /* 28px */
+  --size-control-md: 2rem; /* 32px — default */
+  --size-control-lg: 2.25rem; /* 36px */
+  --size-control-xl: 2.5rem; /* 40px */
 }
 
 /* Semantic roles — dark overrides. Matches the ratio table in
@@ -591,6 +605,14 @@ html[lang="ar"] {
   --radius-md: 0.375rem; /* 6px — default: buttons, inputs, badges, tabs */
   --radius-lg: 0.5rem; /* 8px — cards, table shell, popovers */
   --radius-xl: 0.625rem; /* 10px — dialogs, drawers */
+}
+
+/* One of the 3-gradient budget — the Skeleton primitive's shimmer sweep
+   (src/design-system/primitives/Skeleton.tsx). */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 body {
