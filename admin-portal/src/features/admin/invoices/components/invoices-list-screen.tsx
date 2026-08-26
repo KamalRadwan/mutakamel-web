@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Filter, Plus, RefreshCw, RotateCcw } from "lucide-react";
+import { Filter, Plus, RefreshCw, RotateCcw } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useInvoicesList } from "../hooks/use-invoices-list";
-import { INVOICE_SORT_FIELDS, INVOICE_STATUSES, type InvoiceListFilterDraft } from "../types/invoices";
+import { INVOICE_SORT_FIELDS, INVOICE_STATUSES, type Invoice, type InvoiceListFilterDraft } from "../types/invoices";
 import {
   formatInvoiceDate,
   formatInvoiceMoney,
@@ -18,6 +18,20 @@ import {
   RetryInvoiceButton,
   type InvoiceCopy,
 } from "./invoice-shared";
+import {
+  Button,
+  Card,
+  CardContent,
+  DataTable,
+  Field,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  type ColumnDef,
+} from "@/design-system";
 
 export function InvoicesListScreen() {
   const { lang, dir } = useI18n();
@@ -28,12 +42,16 @@ export function InvoicesListScreen() {
     <InvoicePageFrame dir={dir}>
       <InvoiceHero
         copy={copy}
-        action={invoices.permissions.canCreate ? (
-          <Link href="/invoices/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-indigo-950 shadow-sm transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300">
-            <Plus className="size-4" aria-hidden="true" />
-            {copy.generate}
-          </Link>
-        ) : undefined}
+        action={
+          invoices.permissions.canCreate ? (
+            <Button variant="primary" asChild>
+              <Link href="/invoices/new">
+                <Plus className="size-4" aria-hidden="true" />
+                {copy.generate}
+              </Link>
+            </Button>
+          ) : undefined
+        }
       />
 
       {invoices.state === "FORBIDDEN" ? (
@@ -55,60 +73,146 @@ function InvoiceFilters({
   invoices: ReturnType<typeof useInvoicesList>;
   copy: InvoiceCopy;
 }) {
-  const inputClass = "min-h-10 min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
   return (
-    <form aria-label={copy.filters} onSubmit={invoices.submitFilters} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="inline-flex items-center gap-2 text-base font-semibold"><Filter className="size-4 text-indigo-600" aria-hidden="true" />{copy.filters}</h2>
-        <button type="button" onClick={invoices.refresh} disabled={invoices.isRefreshing} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-indigo-300 bg-indigo-50 px-3 text-sm font-semibold text-indigo-800 disabled:cursor-wait disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-          <RefreshCw className={`size-4 ${invoices.isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />{copy.refresh}
-        </button>
-      </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-        <FilterInput id="invoice-search" label={copy.search} value={invoices.draft.search} maxLength={201} error={invoices.validationErrors.search} copy={copy} onChange={(value) => invoices.updateFilter("search", value)} />
-        <FilterInput id="invoice-tenant" label={copy.tenantId} value={invoices.draft.tenantId} dir="ltr" error={invoices.validationErrors.tenantId} copy={copy} onChange={(value) => invoices.updateFilter("tenantId", value)} />
-        <FilterSelect label={copy.status} value={invoices.draft.status} className={inputClass} onChange={(value) => invoices.updateFilter("status", value as InvoiceListFilterDraft["status"])}>
-          <option value="">{copy.allStatuses}</option>
-          {INVOICE_STATUSES.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}
-        </FilterSelect>
-        <FilterSelect label={copy.sortBy} value={invoices.draft.sortBy} className={inputClass} onChange={(value) => invoices.updateFilter("sortBy", value as InvoiceListFilterDraft["sortBy"])}>
-          {INVOICE_SORT_FIELDS.map((field) => <option key={field} value={field}>{field}</option>)}
-        </FilterSelect>
-        <FilterSelect label={copy.sortDirection} value={invoices.draft.sortDir} className={inputClass} onChange={(value) => invoices.updateFilter("sortDir", value as InvoiceListFilterDraft["sortDir"])}>
-          <option value="DESC">{copy.descending}</option><option value="ASC">{copy.ascending}</option>
-        </FilterSelect>
-        <FilterSelect label={copy.pageSize} value={invoices.draft.limit} className={inputClass} onChange={(value) => invoices.updateFilter("limit", value)} error={invoices.validationErrors.limit} copy={copy}>
-          {[10, 20, 25, 50, 100].map((limit) => <option key={limit} value={limit}>{limit}</option>)}
-        </FilterSelect>
-      </div>
-      <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
-        <button type="button" onClick={invoices.clearFilters} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"><RotateCcw className="size-4" aria-hidden="true" />{copy.reset}</button>
-        <button type="submit" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-indigo-700 px-4 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"><Filter className="size-4" aria-hidden="true" />{copy.apply}</button>
-      </div>
-    </form>
+    <Card>
+      <CardContent>
+        <form aria-label={copy.filters} onSubmit={invoices.submitFilters} className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="inline-flex items-center gap-2 text-base font-semibold">
+              <Filter className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+              {copy.filters}
+            </h2>
+            <Button type="button" variant="outline" size="sm" onClick={invoices.refresh} disabled={invoices.isRefreshing}>
+              <RefreshCw className={`size-4 ${invoices.isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+              {copy.refresh}
+            </Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <Field label={copy.search} error={invoices.validationErrors.search ? errorText(invoices.validationErrors.search, copy) : undefined}>
+              {(fp) => (
+                <Input
+                  {...fp}
+                  value={invoices.draft.search}
+                  maxLength={201}
+                  invalid={Boolean(invoices.validationErrors.search)}
+                  onChange={(event) => invoices.updateFilter("search", event.target.value)}
+                />
+              )}
+            </Field>
+            <Field label={copy.tenantId} error={invoices.validationErrors.tenantId ? errorText(invoices.validationErrors.tenantId, copy) : undefined}>
+              {(fp) => (
+                <Input
+                  {...fp}
+                  dir="ltr"
+                  value={invoices.draft.tenantId}
+                  invalid={Boolean(invoices.validationErrors.tenantId)}
+                  onChange={(event) => invoices.updateFilter("tenantId", event.target.value)}
+                />
+              )}
+            </Field>
+            <Field label={copy.status}>
+              {(fp) => (
+                <Select
+                  value={invoices.draft.status || "ALL"}
+                  onValueChange={(value) => invoices.updateFilter("status", (value === "ALL" ? "" : value) as InvoiceListFilterDraft["status"])}
+                >
+                  <SelectTrigger id={fp.id}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">{copy.allStatuses}</SelectItem>
+                    {INVOICE_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status.replaceAll("_", " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+            <Field label={copy.sortBy}>
+              {(fp) => (
+                <Select value={invoices.draft.sortBy} onValueChange={(value) => invoices.updateFilter("sortBy", value as InvoiceListFilterDraft["sortBy"])}>
+                  <SelectTrigger id={fp.id}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INVOICE_SORT_FIELDS.map((field) => (
+                      <SelectItem key={field} value={field}>
+                        {field}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+            <Field label={copy.sortDirection}>
+              {(fp) => (
+                <Select value={invoices.draft.sortDir} onValueChange={(value) => invoices.updateFilter("sortDir", value as InvoiceListFilterDraft["sortDir"])}>
+                  <SelectTrigger id={fp.id}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DESC">{copy.descending}</SelectItem>
+                    <SelectItem value="ASC">{copy.ascending}</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+            <Field label={copy.pageSize} error={invoices.validationErrors.limit ? errorText(invoices.validationErrors.limit, copy) : undefined}>
+              {(fp) => (
+                <Select value={String(invoices.draft.limit)} onValueChange={(value) => invoices.updateFilter("limit", value)}>
+                  <SelectTrigger id={fp.id}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 20, 25, 50, 100].map((limit) => (
+                      <SelectItem key={limit} value={String(limit)}>
+                        {limit}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-3">
+            <Button type="button" variant="outline" onClick={invoices.clearFilters}>
+              <RotateCcw className="size-4" aria-hidden="true" />
+              {copy.reset}
+            </Button>
+            <Button type="submit" variant="primary">
+              <Filter className="size-4" aria-hidden="true" />
+              {copy.apply}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
-function FilterInput({ id, label, value, onChange, error, copy, maxLength, dir }: { id: string; label: string; value: string; onChange: (value: string) => void; error?: Parameters<typeof InvoiceFieldError>[0]["code"]; copy: InvoiceCopy; maxLength?: number; dir?: "ltr" }) {
-  const errorId = `${id}-error`;
-  return (
-    <label htmlFor={id} className="grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
-      <span>{label}</span>
-      <input id={id} value={value} dir={dir} maxLength={maxLength} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} className={`min-h-10 min-w-0 rounded-xl border bg-white px-3 text-sm font-normal text-slate-950 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-slate-950 dark:text-slate-100 ${error ? "border-rose-500" : "border-slate-300 dark:border-slate-700"}`} />
-      <InvoiceFieldError id={errorId} code={error} copy={copy} />
-    </label>
-  );
-}
-
-function FilterSelect({ label, value, onChange, className, children, error, copy }: { label: string; value: string; onChange: (value: string) => void; className: string; children: React.ReactNode; error?: Parameters<typeof InvoiceFieldError>[0]["code"]; copy?: InvoiceCopy }) {
-  const errorId = `invoice-select-${label.replaceAll(" ", "-")}-error`;
-  return (
-    <label className="grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
-      <span>{label}</span>
-      <select value={value} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} className={className}>{children}</select>
-      {copy ? <InvoiceFieldError id={errorId} code={error} copy={copy} /> : null}
-    </label>
-  );
+function errorText(code: Parameters<typeof InvoiceFieldError>[0]["code"], copy: InvoiceCopy): string {
+  if (!code) return "";
+  return {
+    INVALID_UUID_V7: copy.invalidUuid,
+    SEARCH_TOO_LONG: copy.searchTooLong,
+    INVALID_LIMIT: copy.invalidLimit,
+    INVALID_PERIOD_START: copy.invalidPeriodStart,
+    INVALID_PERIOD_END: copy.invalidPeriodEnd,
+    INVALID_PERIOD_RANGE: copy.invalidPeriodRange,
+    INVALID_DUE_DATE: copy.invalidDueDate,
+    DUE_DATE_CANNOT_CLEAR: copy.dueDateCannotClear,
+    LINES_REQUIRED: copy.linesRequired,
+    TOO_MANY_LINES: copy.tooManyLines,
+    DESCRIPTION_REQUIRED: copy.descriptionRequired,
+    DESCRIPTION_TOO_LONG: copy.descriptionTooLong,
+    INVALID_QUANTITY: copy.invalidQuantity,
+    INVALID_UNIT_PRICE: copy.invalidUnitPrice,
+    REASON_REQUIRED: copy.reasonRequired,
+    REASON_TOO_LONG: copy.reasonTooLong,
+    CONFIRMATION_REQUIRED: copy.confirmationRequired,
+  }[code];
 }
 
 function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof useInvoicesList>; copy: InvoiceCopy; lang: "ar" | "en" }) {
@@ -116,43 +220,83 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
   if (invoices.state === "UNAVAILABLE") return <InvoiceStatePanel kind="unavailable" title={copy.unavailable} detail={invoices.error?.message} correlationId={invoices.error?.correlationId} copy={copy} action={<RetryInvoiceButton label={copy.retry} onClick={invoices.refresh} />} />;
   if (invoices.state === "ERROR") return <InvoiceStatePanel kind="error" title={copy.error} detail={invoices.error?.message} correlationId={invoices.error?.correlationId} copy={copy} action={<RetryInvoiceButton label={copy.retry} onClick={invoices.refresh} />} />;
   if (!invoices.snapshot) return <InvoiceStatePanel kind="error" title={copy.error} copy={copy} />;
-  if (invoices.state === "EMPTY") return <div className="space-y-3"><InvoiceStatePanel kind="empty" title={copy.empty} copy={copy} /><InvoiceSnapshotMeta snapshot={invoices.snapshot} copy={copy} lang={lang} /></div>;
   const data = invoices.snapshot.data;
+
+  const columns: ColumnDef<Invoice>[] = [
+    {
+      key: "number",
+      headerEn: copy.number,
+      headerAr: copy.number,
+      cell: (invoice) => (
+        <div>
+          <Link href={`/invoices/${invoice.id}`} className="font-mono font-semibold text-brand-700 hover:underline dark:text-brand-400">
+            {invoice.number}
+          </Link>
+          <code dir="ltr" className="mt-1 block text-xs text-muted-foreground">{invoice.id}</code>
+        </div>
+      ),
+    },
+    { key: "status", headerEn: copy.status, headerAr: copy.status, cell: (invoice) => <InvoiceStatusBadge status={invoice.status} /> },
+    { key: "purpose", headerEn: copy.purpose, headerAr: copy.purpose, cell: (invoice) => <span className="font-mono text-xs font-semibold">{invoice.purpose}</span> },
+    {
+      key: "tenant",
+      headerEn: copy.tenant,
+      headerAr: copy.tenant,
+      cell: (invoice) => (
+        <Link href={`/tenants/${invoice.tenantId}`} className="font-mono text-xs text-brand-700 hover:underline dark:text-brand-400">
+          {invoice.tenantId}
+        </Link>
+      ),
+    },
+    {
+      key: "total",
+      headerEn: copy.total,
+      headerAr: copy.total,
+      cell: (invoice) => <span dir="ltr" className="font-mono font-semibold">{formatInvoiceMoney(invoice.total, invoice.currencyCode)}</span>,
+    },
+    {
+      key: "period",
+      headerEn: copy.period,
+      headerAr: copy.period,
+      cell: (invoice) => (
+        <span className="whitespace-nowrap">
+          {formatInvoiceDate(invoice.periodStart, lang)}
+          <span className="mx-1">→</span>
+          {formatInvoiceDate(invoice.periodEnd, lang)}
+        </span>
+      ),
+    },
+    { key: "dueAt", headerEn: copy.dueAt, headerAr: copy.dueAt, cell: (invoice) => <span className="whitespace-nowrap">{formatInvoiceDate(invoice.dueAt, lang)}</span> },
+    { key: "updatedAt", headerEn: copy.updatedAt, headerAr: copy.updatedAt, cell: (invoice) => <span className="whitespace-nowrap">{formatInvoiceDate(invoice.updatedAt, lang)}</span> },
+    {
+      key: "actions",
+      headerEn: copy.actions,
+      headerAr: copy.actions,
+      align: "end",
+      cell: (invoice) => (
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/invoices/${invoice.id}`}>{copy.open}</Link>
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <table className="w-full min-w-[1180px] text-start text-sm">
-          <caption className="sr-only">{copy.title}</caption>
-          <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300"><tr>{[copy.number, copy.status, copy.purpose, copy.tenant, copy.total, copy.period, copy.dueAt, copy.updatedAt, copy.actions].map((header) => <th key={header} scope="col" className="px-4 py-3 text-start">{header}</th>)}</tr></thead>
-          <tbody>
-            {data.items.map((invoice) => (
-              <tr key={invoice.id} className="border-t border-slate-200 hover:bg-indigo-50/50 dark:border-slate-800 dark:hover:bg-indigo-950/20">
-                <td className="px-4 py-3"><Link href={`/invoices/${invoice.id}`} className="font-mono font-semibold text-indigo-700 hover:underline dark:text-indigo-300">{invoice.number}</Link><code dir="ltr" className="mt-1 block text-xs text-slate-400">{invoice.id}</code></td>
-                <td className="px-4 py-3"><InvoiceStatusBadge status={invoice.status} /></td>
-                <td className="px-4 py-3 font-mono text-xs font-semibold">{invoice.purpose}</td>
-                <td className="px-4 py-3"><Link href={`/tenants/${invoice.tenantId}`} className="font-mono text-xs text-indigo-700 hover:underline dark:text-indigo-300">{invoice.tenantId}</Link></td>
-                <td dir="ltr" className="px-4 py-3 text-start font-mono font-semibold">{formatInvoiceMoney(invoice.total, invoice.currencyCode)}</td>
-                <td className="px-4 py-3 whitespace-nowrap">{formatInvoiceDate(invoice.periodStart, lang)}<span className="mx-1">→</span>{formatInvoiceDate(invoice.periodEnd, lang)}</td>
-                <td className="px-4 py-3 whitespace-nowrap">{formatInvoiceDate(invoice.dueAt, lang)}</td>
-                <td className="px-4 py-3 whitespace-nowrap">{formatInvoiceDate(invoice.updatedAt, lang)}</td>
-                <td className="px-4 py-3"><Link href={`/invoices/${invoice.id}`} className="inline-flex min-h-10 items-center rounded-xl border border-indigo-300 px-3 text-sm font-semibold text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">{copy.open}</Link></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-        <span className="text-sm text-slate-500 dark:text-slate-400">{copy.page} {data.page} {copy.of} {Math.max(data.totalPages, 1)} · {data.total} {copy.rows}</span>
-        <div className="flex gap-2">
-          <PageButton label={copy.previous} disabled={!data.hasPrev} onClick={invoices.previousPage} icon={<ChevronLeft className={`size-4 ${lang === "ar" ? "rotate-180" : ""}`} />} />
-          <PageButton label={copy.next} disabled={!data.hasNext} onClick={invoices.nextPage} icon={<ChevronRight className={`size-4 ${lang === "ar" ? "rotate-180" : ""}`} />} />
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={data.items}
+        getRowId={(invoice) => invoice.id}
+        pagination={{
+          page: data.page,
+          limit: data.limit,
+          totalItems: data.total,
+          totalPages: Math.max(data.totalPages, 1),
+          onPageChange: invoices.goToPage,
+        }}
+        emptyState={{ titleEn: copy.empty, titleAr: copy.empty }}
+      />
       <InvoiceSnapshotMeta snapshot={invoices.snapshot} copy={copy} lang={lang} />
     </div>
   );
-}
-
-function PageButton({ label, disabled, onClick, icon }: { label: string; disabled: boolean; onClick: () => void; icon: React.ReactNode }) {
-  return <button type="button" disabled={disabled} onClick={onClick} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-300 px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700">{icon}{label}</button>;
 }

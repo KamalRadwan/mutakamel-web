@@ -149,6 +149,10 @@ export function useInvoicesList() {
     nextPage: () => {
       if (snapshot?.data.hasNext) setPage((current) => current + 1);
     },
+    goToPage: (target: number) => {
+      const totalPages = Math.max(1, snapshot?.data.totalPages ?? 1);
+      setPage(Math.min(Math.max(1, target), totalPages));
+    },
   };
 }
 

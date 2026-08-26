@@ -13,7 +13,6 @@ import type {
 export const INVOICE_COPY = {
   en: {
     title: "Invoice operations",
-    subtitle: "Authoritative billing documents, exact decimal evidence, and reviewed lifecycle commands.",
     readOnly: "Control-plane billing",
     generate: "Generate invoice",
     backToInvoices: "Back to invoices",
@@ -133,7 +132,6 @@ export const INVOICE_COPY = {
   },
   ar: {
     title: "عمليات الفواتير",
-    subtitle: "مستندات فوترة موثوقة وأدلة عشرية دقيقة وأوامر دورة حياة خاضعة للمراجعة.",
     readOnly: "فوترة منصة التحكم",
     generate: "إنشاء فاتورة",
     backToInvoices: "العودة إلى الفواتير",
@@ -273,7 +271,6 @@ export function InvoiceHero({ copy, action }: { copy: InvoiceCopy; action?: Reac
   return (
     <PageHeader
       title={copy.title}
-      description={copy.subtitle}
       status={<Badge tone="neutral">{copy.readOnly}</Badge>}
       action={action}
     />
