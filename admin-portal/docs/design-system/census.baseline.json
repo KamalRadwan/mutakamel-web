@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-08-26T08:33:02.758Z",
+  "generatedAt": "2026-08-26T09:03:30.502Z",
   "fileCount": 563,
   "counts": {
-    "colorUtilityTotal": 9151,
+    "colorUtilityTotal": 9147,
     "arbitraryTypeSize": 32,
     "textXs": 1361,
     "fontBoldOrHeavier": 0,
@@ -18,7 +18,7 @@
     "toastCallSites": 149
   },
   "colorFamilyCounts": {
-    "slate": 5125,
+    "slate": 5121,
     "gray": 0,
     "zinc": 0,
     "neutral": 0,

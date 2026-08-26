@@ -44,3 +44,12 @@ export * from "./patterns/data-table/DataTable";
 export * from "./patterns/pagination/Pagination";
 export * from "./patterns/filter-bar/types";
 export * from "./patterns/filter-bar/FilterBar";
+
+export * from "./patterns/page-header/PageHeader";
+export * from "./patterns/empty-state/EmptyState";
+export * from "./patterns/error-state/ErrorState";
+export * from "./patterns/degraded-banner/DegradedBanner";
+export * from "./patterns/permission-gate/PermissionGate";
+export * from "./patterns/ambiguous-outcome/AmbiguousOutcomePanel";
+export * from "./patterns/kpi/StatCard";
+export * from "./patterns/code-ref/CodeRef";
