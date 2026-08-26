@@ -3,7 +3,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
-  Activity,
   AlertTriangle,
   Edit3,
   FileClock,
@@ -19,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { PageHeader } from "@/design-system";
 import { LOGGING_COPY, type LoggingCopy } from "./copy";
 import { useLiveLogging } from "./useLiveLogging";
 import { useLoggingConsole } from "./useLoggingConsole";
@@ -44,25 +44,7 @@ export function LoggingScreen() {
 
   return (
     <div className="space-y-4" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <header className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 px-4 py-4 text-white shadow-md sm:px-5">
-        <div className="pointer-events-none absolute end-0 top-0 -me-12 -mt-16 size-72 rounded-full bg-cyan-500/20 blur-3xl" />
-        <div className="relative flex items-start gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-cyan-600 shadow-sm">
-            <Activity className="size-5" aria-hidden="true" />
-          </span>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg font-semibold tracking-tight">{copy.title}</h1>
-              <span className="rounded-md border border-amber-300/30 bg-amber-300/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider text-amber-100">
-                {copy.critical}
-              </span>
-            </div>
-            <p className="mt-1 max-w-4xl text-xs leading-5 text-cyan-100/80">
-              {copy.subtitle}
-            </p>
-          </div>
-        </div>
-      </header>
+      <PageHeader title={copy.title} />
 
       {!view.canRead && view.directory.state === "FORBIDDEN" ? (
         <StatePanel
