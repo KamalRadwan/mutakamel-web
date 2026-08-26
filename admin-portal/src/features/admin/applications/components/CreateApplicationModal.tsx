@@ -43,8 +43,8 @@ export function CreateApplicationModal({
       onMouseDown={onBackdropMouseDown}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     >
-      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={form.isSubmitting} tabIndex={-1} onKeyDown={onKeyDown} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <h2 id={titleId} className="text-lg font-bold">
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={form.isSubmitting} tabIndex={-1} onKeyDown={onKeyDown} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+        <h2 id={titleId} className="text-lg font-semibold">
           {canOnboard ? copy.onboardTitle : copy.registerTitle}
         </h2>
         <p id={descriptionId} className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
@@ -118,7 +118,7 @@ export function CreateApplicationModal({
                 <option value="PREWARM">{copy.prewarm}</option>
                 <option value="REQUIRED">{copy.required}</option>
               </select>
-              <p id="application-onboarding-database-help" className="mt-1 text-[11px] text-slate-500">{copy.deploymentHelp}</p>
+              <p id="application-onboarding-database-help" className="mt-1 text-xs text-slate-500">{copy.deploymentHelp}</p>
             </div>
             <div>
               <label htmlFor="application-onboarding-reason" className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">{copy.reason}</label>

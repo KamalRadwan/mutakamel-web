@@ -10,9 +10,9 @@ export function UserProfileCard({ profile }: { profile?: AdminUserProfile | null
 
   if (!profile) {
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-          <h2 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <h2 className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
             <Sliders className="w-4 h-4 text-purple-500" />
             <span>{t.users.profilePreferences}</span>
           </h2>
@@ -25,9 +25,9 @@ export function UserProfileCard({ profile }: { profile?: AdminUserProfile | null
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
       <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-        <h2 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+        <h2 className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
           <Sliders className="w-4 h-4 text-purple-500" />
           <span>{t.users.profilePreferences}</span>
         </h2>

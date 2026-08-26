@@ -87,7 +87,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role={t.type === "error" ? "alert" : "status"}
-            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border shadow-xl backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-4 duration-300 ${
+            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-xl border shadow-xl backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-4 duration-300 ${
               t.type === "success"
                 ? "bg-emerald-50/95 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-100"
                 : t.type === "error"
@@ -105,7 +105,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             </div>
 
             <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-bold leading-tight">{t.title}</h4>
+              <h4 className="text-xs font-semibold leading-tight">{t.title}</h4>
               {t.message && <p className="text-xs opacity-90 mt-1 leading-relaxed whitespace-pre-line">{t.message}</p>}
             </div>
 

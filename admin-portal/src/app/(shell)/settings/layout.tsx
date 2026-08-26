@@ -4,10 +4,10 @@ import { SettingsSidebar } from "./components/SettingsSidebar";
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 w-full px-[10px] py-4 sm:py-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
+      <main className="flex-1 w-full px-4 py-4 sm:py-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
         <SettingsSidebar />
 
         <div className="flex-1 min-w-0">{children}</div>

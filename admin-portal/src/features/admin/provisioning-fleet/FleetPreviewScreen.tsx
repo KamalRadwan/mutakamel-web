@@ -75,16 +75,16 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
         <>
           <PreviewSummary preview={preview} copy={copy} />
           {view.preview.data ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
               <FleetMeta result={view.preview.data} copy={copy} />
             </div>
           ) : null}
           <PreviewTargets preview={preview} copy={copy} />
 
-          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <header className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl font-black">{copy.tenantEvidence}</h2>
-              <span className="text-sm font-bold text-slate-500">
+              <h2 className="text-xl font-semibold">{copy.tenantEvidence}</h2>
+              <span className="text-sm font-semibold text-slate-500">
                 {copy.total}: {view.tenants.data?.total ?? 0}
               </span>
             </header>
@@ -117,7 +117,7 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
                     {view.tenants.data.items.map((tenant) => (
                       <tr key={tenant.tenantId}>
                         <td dir="ltr" className="px-3 py-3 text-start font-mono text-xs">{tenant.tenantId}</td>
-                        <td className="px-3 py-3 font-bold">{tenant.eligible ? copy.yes : copy.no}</td>
+                        <td className="px-3 py-3 font-semibold">{tenant.eligible ? copy.yes : copy.no}</td>
                         <td className="px-3 py-3">{tenant.deterministicRank}</td>
                         <td dir="ltr" className="px-3 py-3 text-start font-mono text-xs">{tenant.safeReasonCode ?? copy.none}</td>
                         <td dir="ltr" className="px-3 py-3 text-start font-mono text-xs">{tenant.eligibilityDigest}</td>
@@ -142,13 +142,13 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
             ) : null}
           </section>
 
-          <section className="space-y-4 rounded-2xl border border-rose-300 bg-white p-5 shadow-sm dark:border-rose-900 dark:bg-slate-900">
+          <section className="space-y-4 rounded-xl border border-rose-300 bg-white p-5 shadow-sm dark:border-rose-900 dark:bg-slate-900">
             <header>
-              <h2 className="text-xl font-black">{copy.launchRollout}</h2>
+              <h2 className="text-xl font-semibold">{copy.launchRollout}</h2>
               <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{copy.launchHint}</p>
             </header>
             {!view.permissions.canCreateRollout ? (
-              <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                 {copy.forbiddenRolloutCreate}
               </p>
             ) : (
@@ -168,13 +168,13 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
                   onClear={view.clearRolloutCommand}
                   successAction={
                     view.rolloutCommand.result ? (
-                      <Link href={`/provisioning/fleet/rollouts/${view.rolloutCommand.result.data.rolloutId}`} className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-emerald-800 px-4 text-xs font-black text-white">
+                      <Link href={`/provisioning/fleet/rollouts/${view.rolloutCommand.result.data.rolloutId}`} className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-emerald-800 px-4 text-xs font-semibold text-white">
                         {copy.open}
                       </Link>
                     ) : null
                   }
                 />
-                <button type="submit" disabled={pending} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-black text-white disabled:opacity-50">
+                <button type="submit" disabled={pending} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-semibold text-white disabled:opacity-50">
                   {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
                   {pending ? copy.launching : copy.launch}
                 </button>
@@ -205,13 +205,13 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
 
 function PreviewSummary({ preview, copy }: { preview: FleetPreview; copy: ReturnType<typeof getProvisioningFleetCopy> }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black">{copy.previewDetail}</h2>
+          <h2 className="text-xl font-semibold">{copy.previewDetail}</h2>
           <code dir="ltr" className="mt-1 block break-all text-start text-xs text-slate-500">{preview.previewId}</code>
         </div>
-        <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-black text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100">{copy.operation[preview.operationType]}</span>
+        <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100">{copy.operation[preview.operationType]}</span>
       </div>
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <FleetDatum label={copy.eligible} value={preview.eligibleCount} />
@@ -229,8 +229,8 @@ function PreviewSummary({ preview, copy }: { preview: FleetPreview; copy: Return
 
 function PreviewTargets({ preview, copy }: { preview: FleetPreview; copy: ReturnType<typeof getProvisioningFleetCopy> }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="text-xl font-black">{copy.targets}</h2>
+    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h2 className="text-xl font-semibold">{copy.targets}</h2>
       {preview.targetSelection.length ? preview.targetSelection.map((target) => (
         <dl key={target.componentKey} className="grid gap-2 rounded-xl bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-4 dark:bg-slate-950/50">
           <FleetDatum label={copy.componentKey} value={target.componentKey} mono />
@@ -249,7 +249,7 @@ function PreviewTargets({ preview, copy }: { preview: FleetPreview; copy: Return
 function NumberField({ id, label, value, error, copy, onChange }: { id: string; label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; onChange: (value: string) => void }) {
   const errorId = `${id}-error`;
   return (
-    <label htmlFor={id} className="grid gap-1.5 text-sm font-bold">
+    <label htmlFor={id} className="grid gap-1.5 text-sm font-semibold">
       <span>{label}</span>
       <input id={id} type="number" min={1} step={1} inputMode="numeric" value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950" />
       <FleetFieldError id={errorId} code={error} copy={copy} />

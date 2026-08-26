@@ -45,7 +45,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         <button
           type="button"
           onClick={() => void retryBootstrap()}
-          className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+          className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
         >
           إعادة المحاولة
         </button>

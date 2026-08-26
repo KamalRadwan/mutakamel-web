@@ -62,13 +62,13 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
   };
 
   return (
-    <div className={`p-5 rounded-2xl border transition-colors ${readOnly ? "bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-800/50"} shadow-2xs group`}>
+    <div className={`p-5 rounded-xl border transition-colors ${readOnly ? "bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-800/50"} shadow-2xs group`}>
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
 
         {/* Left Side: Label and Description */}
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               {title}
               {readOnly && <Lock className="w-3.5 h-3.5 text-slate-400" />}
             </h3>
@@ -80,7 +80,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
           </p>
 
           {readOnly && (
-            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-2 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded w-fit">
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-2 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded w-fit">
               {permissionLocked
                 ? lang === "ar"
                   ? "يتطلب التعديل صلاحيتَي admin.settings.update و admin.settings.critical معاً."
@@ -161,7 +161,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
           </div>
 
           {/* Feedback States */}
-          <div className="h-5 flex items-center justify-end text-[11px] font-medium transition-opacity w-full">
+          <div className="h-5 flex items-center justify-end text-xs font-medium transition-opacity w-full">
             {isSaving ? (
               <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 animate-pulse">
                 <Save className="w-3.5 h-3.5" />

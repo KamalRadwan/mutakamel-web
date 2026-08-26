@@ -141,10 +141,10 @@ export function ControlPlaneAuditScreen() {
   const audit = useControlPlaneAudit();
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100">
+    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100">
       <Navbar />
-      <main className="w-full flex-1 space-y-4 px-[10px] py-4 sm:py-6">
-        <header className="overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950 px-4 py-4 text-white shadow-md sm:px-5">
+      <main className="w-full flex-1 space-y-4 px-4 py-4 sm:py-6">
+        <header className="overflow-hidden rounded-xl border border-cyan-500/20 bg-slate-950 px-4 py-4 text-white shadow-md sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
               <span className="rounded-xl border border-cyan-400/25 bg-cyan-500/15 p-2.5 text-cyan-300">
@@ -152,8 +152,8 @@ export function ControlPlaneAuditScreen() {
               </span>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-lg font-black sm:text-xl">{copy.title}</h1>
-                  <span className="rounded-md border border-cyan-400/30 bg-cyan-500/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-200">
+                  <h1 className="text-lg font-semibold sm:text-xl">{copy.title}</h1>
+                  <span className="rounded-md border border-cyan-400/30 bg-cyan-500/15 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-cyan-200">
                     {copy.immutable}
                   </span>
                 </div>
@@ -162,7 +162,7 @@ export function ControlPlaneAuditScreen() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-300">
+            <div className="flex items-center gap-2 text-xs text-slate-300">
               <span className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono">
                 {audit.data?.total ?? 0} {copy.events}
               </span>
@@ -203,9 +203,9 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
   };
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-        <h2 className="flex items-center gap-2 text-sm font-black">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
           <Filter className="size-4 text-cyan-500" />
           {copy.filters}
         </h2>
@@ -219,7 +219,7 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
               type="button"
               onClick={() => audit.setMode(mode)}
               aria-pressed={audit.mode === mode}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 audit.mode === mode
                   ? "bg-cyan-600 text-white shadow-sm"
                   : "text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
@@ -328,7 +328,7 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
         ) : null}
 
         <div className="flex flex-wrap items-end justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-          <label className="grid gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+          <label className="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
             <span>{copy.pageSize}</span>
             <select
               value={audit.limit}
@@ -344,7 +344,7 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
             <button
               type="button"
               onClick={audit.clearFilters}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
             >
               <RotateCcw className="size-3.5" />
               {copy.clear}
@@ -353,14 +353,14 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
               type="button"
               onClick={audit.refresh}
               disabled={audit.requestState === "IDLE"}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
             >
               <RefreshCw className={`size-3.5 ${audit.isRefreshing ? "animate-spin" : ""}`} />
               {copy.refresh}
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-black text-white shadow-sm hover:bg-cyan-500"
+              className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-cyan-500"
             >
               <Filter className="size-3.5" />
               {copy.apply}
@@ -403,7 +403,7 @@ function AuditResults({
         title={copy.unavailable}
         detail={detail}
         tone="danger"
-        action={<button type="button" onClick={audit.refresh} className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-500">{copy.retry}</button>}
+        action={<button type="button" onClick={audit.refresh} className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500">{copy.retry}</button>}
       />
     );
   }
@@ -412,9 +412,9 @@ function AuditResults({
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-        <h2 className="flex items-center gap-2 text-sm font-black">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
           <Activity className="size-4 text-cyan-500" />
           {audit.mode === "ENTITY_HISTORY" ? copy.entityHistory : copy.allEvents}
         </h2>
@@ -434,7 +434,7 @@ function AuditResults({
             type="button"
             disabled={!audit.data.hasPrev || audit.isRefreshing}
             onClick={() => audit.setPage(Math.max(1, audit.page - 1))}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 font-bold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
           >
             <ChevronLeft className="size-3.5 rtl:rotate-180" />
             {copy.previous}
@@ -443,7 +443,7 @@ function AuditResults({
             type="button"
             disabled={!audit.data.hasNext || audit.isRefreshing}
             onClick={() => audit.setPage(audit.page + 1)}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 font-bold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
           >
             {copy.next}
             <ChevronRight className="size-3.5 rtl:rotate-180" />
@@ -464,11 +464,11 @@ function AuditEventCard({
   lang: "ar" | "en";
 }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/50">
+    <article className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/50">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full px-2 py-1 text-[10px] font-black ${event.outcome === "SUCCESS" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"}`}>
+            <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${event.outcome === "SUCCESS" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"}`}>
               {event.outcome}
             </span>
             <strong className="break-all font-mono text-xs text-cyan-700 dark:text-cyan-300">
@@ -476,11 +476,11 @@ function AuditEventCard({
             </strong>
           </div>
           <p className="mt-2 break-all text-xs text-slate-600 dark:text-slate-300">
-            <span className="font-bold">{copy.entity}:</span> {event.entityType}
+            <span className="font-semibold">{copy.entity}:</span> {event.entityType}
             {event.entityId ? ` / ${event.entityId}` : ""}
           </p>
         </div>
-        <time dateTime={event.occurredAt} className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400">
+        <time dateTime={event.occurredAt} className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
           <Clock3 className="size-3.5" />
           {new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en", {
             dateStyle: "medium",
@@ -489,14 +489,14 @@ function AuditEventCard({
         </time>
       </div>
 
-      <div className="mt-3 grid gap-2 text-[11px] text-slate-600 sm:grid-cols-2 lg:grid-cols-3 dark:text-slate-300">
+      <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-3 dark:text-slate-300">
         <EvidenceDatum icon={<UserRound className="size-3.5" />} label={copy.actor} value={event.actorLabel || event.actorId || copy.systemActor} />
         <EvidenceDatum icon={<Activity className="size-3.5" />} label={copy.source} value={`${event.sourceApp} / ${event.sourceType}`} />
         <EvidenceDatum icon={<Braces className="size-3.5" />} label={copy.correlationId} value={event.correlationId || copy.notRecorded} mono />
       </div>
 
       <details className="mt-3 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-black text-cyan-700 marker:text-cyan-500 dark:text-cyan-300">
+        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-cyan-700 marker:text-cyan-500 dark:text-cyan-300">
           {copy.evidence}
         </summary>
         <div className="space-y-3 border-t border-slate-200 p-3 dark:border-slate-800">
@@ -521,7 +521,7 @@ function AuditEventCard({
             <AuditJson title={copy.diff} value={event.diff} empty={copy.noSnapshot} />
             <AuditJson title={copy.metadata} value={event.metadata} empty={copy.noSnapshot} />
           </div>
-          <div className="grid gap-2 text-[10px] text-slate-500 sm:grid-cols-2 dark:text-slate-400">
+          <div className="grid gap-2 text-xs text-slate-500 sm:grid-cols-2 dark:text-slate-400">
             <p><strong>IP:</strong> {event.ip || copy.notRecorded}</p>
             <p className="break-all"><strong>User-Agent:</strong> {event.userAgent || copy.notRecorded}</p>
           </div>
@@ -557,11 +557,11 @@ function AuditJson({ title, value, empty }: { title: string; value: unknown; emp
   const hasValue = value !== null && value !== undefined && (!Array.isArray(value) || value.length > 0);
   return (
     <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
-      <h3 className="border-b border-slate-200 bg-slate-100 px-3 py-2 text-[11px] font-black dark:border-slate-800 dark:bg-slate-950">{title}</h3>
+      <h3 className="border-b border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold dark:border-slate-800 dark:bg-slate-950">{title}</h3>
       {hasValue ? (
-        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all p-3 text-[10px] leading-5 text-slate-700 dark:text-slate-300">{formatAuditValue(value)}</pre>
+        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all p-3 text-xs leading-5 text-slate-700 dark:text-slate-300">{formatAuditValue(value)}</pre>
       ) : (
-        <p className="p-3 text-[11px] text-slate-500">{empty}</p>
+        <p className="p-3 text-xs text-slate-500">{empty}</p>
       )}
     </section>
   );
@@ -587,7 +587,7 @@ function AuditInput({
   hint?: string;
 }) {
   return (
-    <label className="grid min-w-0 gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+    <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
       <span>{label}{required ? " *" : ""}</span>
       <input
         type={type}
@@ -617,7 +617,7 @@ function AuditSelect({
   anyLabel: string;
 }) {
   return (
-    <label className="grid min-w-0 gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+    <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
       <span>{label}</span>
       <select
         value={value}
@@ -650,9 +650,9 @@ function StatusPanel({
       ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
       : "border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300";
   return (
-    <section className={`flex min-h-52 flex-col items-center justify-center rounded-2xl border p-6 text-center ${colors}`}>
+    <section className={`flex min-h-52 flex-col items-center justify-center rounded-xl border p-6 text-center ${colors}`}>
       <span className="mb-3 opacity-70">{icon}</span>
-      <h2 className="text-sm font-black">{title}</h2>
+      <h2 className="text-sm font-semibold">{title}</h2>
       {detail ? <p className="mt-1 max-w-2xl break-all text-xs opacity-80">{detail}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </section>

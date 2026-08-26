@@ -46,14 +46,14 @@ export function TenantProvisioningWorkspaceView({
   return (
     <section
       dir={model.dir}
-      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
+      className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
       aria-label={ar ? "إدارة تجهيز المستأجر" : "Tenant provisioning management"}
     >
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
         <div>
           <div className="flex items-center gap-2">
             <DatabaseZap className="size-5 text-indigo-600 dark:text-indigo-400" />
-            <h2 className="text-base font-bold text-slate-950 dark:text-white">
+            <h2 className="text-base font-semibold text-slate-950 dark:text-white">
               {ar ? "تجهيز المستأجر" : "Tenant provisioning"}
             </h2>
             {provisioning.polling && (
@@ -117,7 +117,7 @@ export function TenantProvisioningWorkspaceView({
               model.clearLocalError();
               provisioning.clearMutationError();
             }}
-            className="font-bold"
+            className="font-semibold"
             aria-label={ar ? "إغلاق الخطأ" : "Dismiss error"}
           >
             ×
@@ -161,17 +161,17 @@ function OperationsSection({ model }: TenantProvisioningWorkspaceViewProps) {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-bold text-slate-900 dark:text-white">
+                    <p className="truncate text-xs font-semibold text-slate-900 dark:text-white">
                       {operationTypeLabel(operation.type, ar)}
                     </p>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       {ar ? "الجيل" : "Generation"} {operation.generation} ·{" "}
                       {formatDate(operation.requestedAt, model.lang)}
                     </p>
                   </div>
                   <StatusBadge status={operation.status} ar={ar} />
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-slate-500">
                   <span className="truncate">{operation.currentPhase}</span>
                   <ChevronRight className="size-3.5 rtl:rotate-180" />
                 </div>
@@ -215,7 +215,7 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                 <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-bold text-slate-950 dark:text-white">
+                      <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
                         {operationTypeLabel(operation.type, ar)} · {ar ? "الجيل" : "generation"} {operation.generation}
                       </h3>
                       <p className="mt-1 text-xs text-slate-500">{operation.currentPhase}</p>
@@ -245,7 +245,7 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                     </div>
                   </div>
                   <div className="mt-4">
-                    <div className="mb-1 flex justify-between text-[11px] text-slate-500">
+                    <div className="mb-1 flex justify-between text-xs text-slate-500">
                       <span>{ar ? "التقدم الموزون" : "Weighted progress"}</span>
                       <span>{operation.progress.percent}%</span>
                     </div>
@@ -255,13 +255,13 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                         style={{ width: `${operation.progress.percent}%` }}
                       />
                     </div>
-                    <div className="mt-2 grid gap-2 text-[11px] text-slate-500 sm:grid-cols-3">
+                    <div className="mt-2 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
                       <span>{operation.progress.completedSteps}/{operation.progress.totalSteps} {ar ? "خطوات" : "steps"}</span>
                       <span>{operation.progress.failedSteps} {ar ? "فشلت" : "failed"}</span>
                       <span>{ar ? "مراجعة السياسة" : "Policy revision"}: {operation.accessPolicyRevision}</span>
                     </div>
                   </div>
-                  <dl className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
+                  <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
                     <Evidence label={ar ? "بصمة الخطة" : "Plan digest"} value={shortDigest(operation.planDigest)} />
                     <Evidence label={ar ? "وقت الطلب" : "Requested"} value={formatDate(operation.requestedAt, model.lang)} />
                   </dl>
@@ -274,7 +274,7 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                 </div>
 
                 <div>
-                  <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {ar ? "الخطوات" : "Steps"}
                   </h4>
                   <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
@@ -292,7 +292,7 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                           <tr key={step.id}>
                             <Td>
                               <span className="font-semibold text-slate-800 dark:text-slate-100">{step.stepKey}</span>
-                              {step.componentKey && <span className="block text-[10px] text-slate-500">{step.componentKey}</span>}
+                              {step.componentKey && <span className="block text-xs text-slate-500">{step.componentKey}</span>}
                             </Td>
                             <Td>{step.kind}</Td>
                             <Td><StepBadge status={step.status} /></Td>
@@ -305,7 +305,7 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                 </div>
 
                 <div>
-                  <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {ar ? "الخط الزمني" : "Timeline"} ({operation.timelineEventCount})
                   </h4>
                   <ResourceBoundary resource={provisioning.timeline} ar={ar} compact>
@@ -315,7 +315,7 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                           <span className="absolute -start-[1.18rem] top-3 size-2 rounded-full bg-indigo-500" />
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="font-semibold text-slate-800 dark:text-slate-100">{event.eventType}</span>
-                            <span className="text-[10px] text-slate-500">#{event.sequence} · {formatDate(event.occurredAt, model.lang)}</span>
+                            <span className="text-xs text-slate-500">#{event.sequence} · {formatDate(event.occurredAt, model.lang)}</span>
                           </div>
                           {event.message && <p className="mt-1 text-slate-600 dark:text-slate-300">{event.message}</p>}
                         </li>
@@ -340,7 +340,7 @@ function UpdatesSection({ model }: TenantProvisioningWorkspaceViewProps) {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">{ar ? "التحديثات المتاحة" : "Available updates"}</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{ar ? "التحديثات المتاحة" : "Available updates"}</h3>
             <p className="mt-1 text-xs text-slate-500">{ar ? "يُرسل الاختيار ببصمات الإصدار الحالي والهدف كما أعادها الخادم." : "Selections submit the exact current and target release evidence returned by Core."}</p>
           </div>
           <button
@@ -369,8 +369,8 @@ function UpdatesSection({ model }: TenantProvisioningWorkspaceViewProps) {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">{update.componentKey}</p>
-                      <p className="text-[11px] text-slate-500">{update.ownerApp} · {update.installationState}</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">{update.componentKey}</p>
+                      <p className="text-xs text-slate-500">{update.ownerApp} · {update.installationState}</p>
                     </div>
                     {checked ? <SquareCheckBig className="size-5 text-indigo-600" /> : <Square className="size-5 text-slate-400" />}
                   </div>
@@ -378,7 +378,7 @@ function UpdatesSection({ model }: TenantProvisioningWorkspaceViewProps) {
                     <Evidence label={ar ? "الحالي" : "Current"} value={update.current.releaseVersion} />
                     <Evidence label={ar ? "الهدف" : "Target"} value={update.availableRelease.releaseVersion} />
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1 text-[10px]">
+                  <div className="mt-2 flex flex-wrap gap-1 text-xs">
                     <Tag>{update.availableRelease.riskLevel}</Tag>
                     {update.availableRelease.requiresBackup && <Tag>{ar ? "نسخة احتياطية" : "Backup"}</Tag>}
                     {update.availableRelease.requiresMaintenance && <Tag>{ar ? "صيانة" : "Maintenance"}</Tag>}
@@ -401,13 +401,13 @@ function StateSection({ model }: TenantProvisioningWorkspaceViewProps) {
     <div className="space-y-5">
       <ResourceBoundary resource={provisioning.components} ar={ar}>
         <div>
-          <h3 className="mb-2 text-sm font-bold text-slate-900 dark:text-white">{ar ? "المكونات المثبتة" : "Installed components"}</h3>
+          <h3 className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">{ar ? "المكونات المثبتة" : "Installed components"}</h3>
           <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <table className="min-w-full text-xs">
               <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900"><tr><Th>{ar ? "المكون" : "Component"}</Th><Th>{ar ? "المصدر" : "Source"}</Th><Th>{ar ? "الحالة" : "State"}</Th><Th>{ar ? "المطلوب" : "Desired"}</Th><Th>{ar ? "المطبق" : "Applied"}</Th></tr></thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {provisioning.components.data.items.map((component) => (
-                  <tr key={component.id}><Td><strong>{component.componentKey}</strong><span className="block text-[10px] text-slate-500">{component.ownerApp}</span></Td><Td>{component.selectionSource}</Td><Td><Tag>{component.state}</Tag></Td><Td>{component.desired.releaseVersion ?? "—"}</Td><Td>{component.applied.releaseVersion ?? "—"}</Td></tr>
+                  <tr key={component.id}><Td><strong>{component.componentKey}</strong><span className="block text-xs text-slate-500">{component.ownerApp}</span></Td><Td>{component.selectionSource}</Td><Td><Tag>{component.state}</Tag></Td><Td>{component.desired.releaseVersion ?? "—"}</Td><Td>{component.applied.releaseVersion ?? "—"}</Td></tr>
                 ))}
               </tbody>
             </table>
@@ -419,7 +419,7 @@ function StateSection({ model }: TenantProvisioningWorkspaceViewProps) {
         <div>
           <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">{ar ? "حالة البذور" : "Seed state"}</h3>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{ar ? "حالة البذور" : "Seed state"}</h3>
               <p className="mt-1 text-xs text-slate-500">{ar ? "حل التعارض يتطلب مراجعة صريحة وبصمات حالية." : "Conflict resolution requires an explicit revision and exact checksums."}</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -435,8 +435,8 @@ function StateSection({ model }: TenantProvisioningWorkspaceViewProps) {
             {provisioning.seeds.data.items.map((seed) => (
               <div key={seed.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
                 <div>
-                  <p className="text-xs font-bold text-slate-900 dark:text-white">{seed.componentKey} / {seed.seedKey}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">{seed.policy} · {seed.status}{seed.conflictCode ? ` · ${seed.conflictCode}` : ""}</p>
+                  <p className="text-xs font-semibold text-slate-900 dark:text-white">{seed.componentKey} / {seed.seedKey}</p>
+                  <p className="mt-1 text-xs text-slate-500">{seed.policy} · {seed.status}{seed.conflictCode ? ` · ${seed.conflictCode}` : ""}</p>
                 </div>
                 {seed.status === "CONFLICT" && (
                   <div className="text-end">
@@ -449,7 +449,7 @@ function StateSection({ model }: TenantProvisioningWorkspaceViewProps) {
                       {ar ? "حل التعارض" : "Resolve conflict"}
                     </button>
                     {seed.revision === null && (
-                      <p className="mt-1 max-w-sm text-[10px] text-amber-700 dark:text-amber-300">
+                      <p className="mt-1 max-w-sm text-xs text-amber-700 dark:text-amber-300">
                         {ar ? "معطل بأمان: هذه الاستجابة لم تعرض expectedConflictRevision." : "Fail-closed: this response omitted expectedConflictRevision."}
                       </p>
                     )}
@@ -472,7 +472,7 @@ function PrerequisitesSection({ model }: TenantProvisioningWorkspaceViewProps) {
       <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">{ar ? "طلب متطلبات العملية المحددة" : "Request selected operation prerequisites"}</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{ar ? "طلب متطلبات العملية المحددة" : "Request selected operation prerequisites"}</h3>
             <p className="mt-1 text-xs text-slate-500">{provisioning.selectedOperation.data ? `${provisioning.selectedOperation.data.type} · ${shortDigest(provisioning.selectedOperation.data.planDigest)}` : (ar ? "اختر عملية من سجل العمليات أولًا." : "Select an operation in history first.")}</p>
           </div>
           <div className="flex gap-2">
@@ -490,7 +490,7 @@ function PrerequisitesSection({ model }: TenantProvisioningWorkspaceViewProps) {
             {provisioning.prerequisites.data.map((request) => (
               <article key={request.requestId} className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div><p className="text-xs font-bold text-slate-900 dark:text-white">{ar ? "طلب" : "Request"} {request.generation}</p><p className="mt-1 text-[10px] text-slate-500">{shortDigest(request.requestDigest)} · {formatDate(request.requestedAt, model.lang)}</p></div>
+                  <div><p className="text-xs font-semibold text-slate-900 dark:text-white">{ar ? "طلب" : "Request"} {request.generation}</p><p className="mt-1 text-xs text-slate-500">{shortDigest(request.requestDigest)} · {formatDate(request.requestedAt, model.lang)}</p></div>
                   <Tag>{request.status}</Tag>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1">{request.releasePins.map((pin) => <Tag key={`${request.requestId}-${pin.componentKey}`}>{pin.componentKey}{pin.requiresBackup ? " · backup" : ""}{pin.requiresMaintenance ? " · maintenance" : ""}</Tag>)}</div>
@@ -500,7 +500,7 @@ function PrerequisitesSection({ model }: TenantProvisioningWorkspaceViewProps) {
                   </div>
                 )}
                 {request.evidence.map((evidence) => (
-                  <div key={evidence.evidenceId} className="mt-2 grid gap-2 rounded-lg bg-slate-50 p-2 text-[11px] dark:bg-slate-900 sm:grid-cols-3">
+                  <div key={evidence.evidenceId} className="mt-2 grid gap-2 rounded-lg bg-slate-50 p-2 text-xs dark:bg-slate-900 sm:grid-cols-3">
                     <Evidence label={ar ? "الدليل" : "Evidence"} value={evidence.status} />
                     <Evidence label={ar ? "البصمة" : "Digest"} value={shortDigest(evidence.evidenceDigest)} />
                     <Evidence label={ar ? "الحجم" : "Backup bytes"} value={evidence.backupEvidence?.sizeBytes ?? "—"} />
@@ -529,7 +529,7 @@ function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
         <div className="space-y-2">
           {model.managedTargets.map((target, index) => (
             <div key={target.key} className="rounded-lg border border-slate-200 p-2 dark:border-slate-800">
-              <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-slate-500"><span>{ar ? "هدف" : "Target"} {index + 1}</span><button type="button" onClick={() => model.removeManagedTarget(target.key)} className="text-rose-600">{ar ? "إزالة" : "Remove"}</button></div>
+              <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-500"><span>{ar ? "هدف" : "Target"} {index + 1}</span><button type="button" onClick={() => model.removeManagedTarget(target.key)} className="text-rose-600">{ar ? "إزالة" : "Remove"}</button></div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {(["componentKey", "componentId", "targetReleaseId", "targetReleaseVersion", "targetManifestChecksum"] as const).map((field) => (
                   <input key={field} className={`${inputClass} ${field === "targetManifestChecksum" ? "sm:col-span-2" : ""}`} placeholder={field} value={target[field]} onChange={(event) => model.updateManagedTarget(target.key, field, event.target.value)} aria-label={field} />
@@ -572,7 +572,7 @@ function ResourceBoundary<T>({ resource, ar, compact = false, children }: { reso
 }
 
 function Notice({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
-  return <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-slate-300 p-4 text-center dark:border-slate-700"><div><span className="mx-auto mb-2 grid size-9 place-items-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-900">{icon}</span><p className="text-sm font-bold text-slate-800 dark:text-slate-100">{title}</p><p className="mt-1 text-xs text-slate-500">{description}</p></div></div>;
+  return <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-slate-300 p-4 text-center dark:border-slate-700"><div><span className="mx-auto mb-2 grid size-9 place-items-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-900">{icon}</span><p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p><p className="mt-1 text-xs text-slate-500">{description}</p></div></div>;
 }
 
 function EmptyState({ ar, labelEn, labelAr }: { ar: boolean; labelEn: string; labelAr: string }) {
@@ -581,7 +581,7 @@ function EmptyState({ ar, labelEn, labelAr }: { ar: boolean; labelEn: string; la
 
 function StatusBadge({ status, ar }: { status: TenantOperationStatus; ar: boolean }) {
   const colors = status === "SUCCEEDED" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : status === "FAILED_RETRYABLE" || status === "MANUAL_RECOVERY_REQUIRED" ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300" : status === "CANCELLED" ? "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300" : status === "CANCEL_REQUESTED" ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300" : "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300";
-  return <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${colors}`}>{operationStatusLabel(status, ar)}</span>;
+  return <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${colors}`}>{operationStatusLabel(status, ar)}</span>;
 }
 
 function StepBadge({ status }: { status: string }) {
@@ -590,7 +590,7 @@ function StepBadge({ status }: { status: string }) {
 }
 
 function CommandCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
-  return <article className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-800"><div><h3 className="text-sm font-bold text-slate-900 dark:text-white">{title}</h3><p className="mt-1 text-xs text-slate-500">{description}</p></div>{children}</article>;
+  return <article className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-800"><div><h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3><p className="mt-1 text-xs text-slate-500">{description}</p></div>{children}</article>;
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

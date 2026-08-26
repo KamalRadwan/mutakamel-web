@@ -127,7 +127,7 @@ export function CountrySelect({
                 }}
                 className={`w-full px-3 py-2 text-start flex items-center justify-between hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors ${
                   value === "ALL"
-                    ? "font-bold text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/30"
+                    ? "font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/30"
                     : "text-slate-700 dark:text-slate-300"
                 }`}
               >
@@ -142,7 +142,7 @@ export function CountrySelect({
             )}
 
             {filteredCountries.length === 0 ? (
-              <div className="px-3 py-4 text-center text-slate-400 text-[11px]">
+              <div className="px-3 py-4 text-center text-slate-400 text-xs">
                 {emptyLabel}
               </div>
             ) : (
@@ -159,14 +159,14 @@ export function CountrySelect({
                     }}
                     className={`w-full px-3 py-2 text-start flex items-center justify-between hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors ${
                       isSelected
-                        ? "font-bold text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/30"
+                        ? "font-semibold text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/30"
                         : "text-slate-700 dark:text-slate-300"
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
                       <span className="text-sm shrink-0">{c.flag}</span>
                       <span className="truncate">{c.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">
+                      <span className="text-xs text-slate-400 font-mono">
                         ({c.isoCode})
                       </span>
                     </div>

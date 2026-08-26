@@ -134,7 +134,7 @@ export function WebRTCPhoneWidget() {
             onClick={() => phone.setExpanded(true)}
           >
             <ConnectionDot state={phone.connectionState} />
-            <strong className="truncate text-xs font-extrabold">{phone.phoneDisplayName}</strong>
+            <strong className="truncate text-xs font-semibold">{phone.phoneDisplayName}</strong>
             <ChevronUp className="size-3.5 shrink-0 text-slate-400" />
           </button>
         ) : (
@@ -144,7 +144,7 @@ export function WebRTCPhoneWidget() {
           >
             <header className="flex h-9 items-center gap-2 border-b border-slate-800 bg-slate-950 px-3 text-white">
               <ConnectionDot state={phone.connectionState} />
-              <strong className="min-w-0 flex-1 truncate text-xs font-extrabold">{phone.phoneDisplayName}</strong>
+              <strong className="min-w-0 flex-1 truncate text-xs font-semibold">{phone.phoneDisplayName}</strong>
               <button
                 type="button"
                 className="grid size-7 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-2 focus-visible:outline-blue-400"
@@ -175,7 +175,7 @@ export function WebRTCPhoneWidget() {
                         value={phone.displayNumber}
                         onChange={(event) => phone.setDialTarget(event.currentTarget.value)}
                         placeholder={labels.enterNumber}
-                        className="min-w-0 flex-1 bg-transparent px-1 font-mono text-sm font-bold text-slate-900 outline-none placeholder:text-xs placeholder:text-slate-400 dark:text-slate-100"
+                        className="min-w-0 flex-1 bg-transparent px-1 font-mono text-sm font-semibold text-slate-900 outline-none placeholder:text-xs placeholder:text-slate-400 dark:text-slate-100"
                       />
                       <button
                         type="button"
@@ -198,19 +198,19 @@ export function WebRTCPhoneWidget() {
                     </div>
                   ) : (
                     <div
-                      className="grid min-h-24 content-center gap-1 rounded-2xl border border-blue-200 bg-blue-50/70 p-3 text-center dark:border-blue-900 dark:bg-blue-950/30"
+                      className="grid min-h-24 content-center gap-1 rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-center dark:border-blue-900 dark:bg-blue-950/30"
                       aria-live="polite"
                     >
-                      <span className="flex items-center justify-center gap-2 text-[11px] font-bold text-blue-700 dark:text-blue-300">
+                      <span className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
                         {phone.incomingCallWaiting ? <PhoneIncoming className="size-4" /> : <PhoneCall className="size-4" />}
                         {phone.callActive ? labels.connected : phone.status}
                       </span>
                       <strong className="truncate text-sm text-slate-900 dark:text-white">{phone.callPeerName || labels.unknown}</strong>
                       <span className="flex items-center justify-center gap-2 font-mono text-xs text-slate-500 dark:text-slate-400">
                         {phone.callPeerNumber}
-                        {phone.timerLabel ? <time className="font-bold text-emerald-600 dark:text-emerald-400">{phone.timerLabel}</time> : null}
+                        {phone.timerLabel ? <time className="font-semibold text-emerald-600 dark:text-emerald-400">{phone.timerLabel}</time> : null}
                       </span>
-                      {phone.mediaNotice ? <small className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">{phone.mediaNotice}</small> : null}
+                      {phone.mediaNotice ? <small className="text-xs font-semibold text-rose-600 dark:text-rose-400">{phone.mediaNotice}</small> : null}
                     </div>
                   )}
 
@@ -230,7 +230,7 @@ export function WebRTCPhoneWidget() {
                         onClick={() => phone.pressDigit(key.value)}
                       >
                         <strong className="font-mono text-sm leading-none">{key.value}</strong>
-                        <small className="mt-1 min-h-2 font-mono text-[8px] leading-none text-slate-400">{key.letters}</small>
+                        <small className="mt-1 min-h-2 font-mono text-xs leading-none text-slate-400">{key.letters}</small>
                       </button>
                     ))}
                   </div>
@@ -239,7 +239,7 @@ export function WebRTCPhoneWidget() {
                     {!phone.callBusy ? (
                       <button
                         type="button"
-                        className="col-span-2 flex min-h-9 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 text-xs font-extrabold text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="col-span-2 flex min-h-9 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
                         disabled={!phone.canCall}
                         onClick={() => void phone.makeCall()}
                       >
@@ -261,7 +261,7 @@ export function WebRTCPhoneWidget() {
                     {phone.callBusy && !phone.callActive && !phone.incomingCallWaiting ? (
                       <button
                         type="button"
-                        className="col-span-2 flex min-h-9 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-xs font-extrabold text-white transition-colors hover:bg-rose-500"
+                        className="col-span-2 flex min-h-9 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-rose-500"
                         onClick={phone.hangupCall}
                       >
                         <PhoneOff className="size-4" />
@@ -314,9 +314,9 @@ export function WebRTCPhoneWidget() {
                           </span>
                           <span className="min-w-0">
                             <strong className="block truncate text-xs text-slate-900 dark:text-slate-100">{log.displayName || labels.unknown}</strong>
-                            <small className="block truncate font-mono text-[10px] text-slate-500 dark:text-slate-400">{log.phoneNumber}</small>
+                            <small className="block truncate font-mono text-xs text-slate-500 dark:text-slate-400">{log.phoneNumber}</small>
                           </span>
-                          <time className="font-mono text-[10px] text-slate-400">{formatWebphoneLogTime(log.createdAt ?? log.startedAt)}</time>
+                          <time className="font-mono text-xs text-slate-400">{formatWebphoneLogTime(log.createdAt ?? log.startedAt)}</time>
                         </article>
                       ))}
                     </div>
@@ -348,7 +348,7 @@ function TabButton({ active, label, icon, onClick }: { active: boolean; label: s
       type="button"
       role="tab"
       aria-selected={active}
-      className={`flex h-7 items-center justify-center gap-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+      className={`flex h-7 items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
         active ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-800 dark:text-blue-400' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
       }`}
       onClick={onClick}
@@ -368,7 +368,7 @@ function ActionButton({ tone, icon, label, onClick }: { tone: 'success' | 'dange
   }[tone];
 
   return (
-    <button type="button" className={`flex min-h-9 items-center justify-center gap-2 rounded-xl px-3 text-xs font-extrabold transition-colors ${toneClass}`} onClick={onClick}>
+    <button type="button" className={`flex min-h-9 items-center justify-center gap-2 rounded-xl px-3 text-xs font-semibold transition-colors ${toneClass}`} onClick={onClick}>
       {icon}
       {label}
     </button>
@@ -406,7 +406,7 @@ function AudioControl({
       >
         {icon}
       </button>
-      <span className="truncate text-[10px] font-bold text-slate-600 dark:text-slate-300">{label}</span>
+      <span className="truncate text-xs font-semibold text-slate-600 dark:text-slate-300">{label}</span>
       <span className="relative grid h-6 items-center">
         <span className="absolute inset-x-0 h-1 rounded-full bg-slate-200 dark:bg-slate-800" />
         <span className="absolute start-0 h-1 rounded-full bg-blue-500/70" style={{ width: `${value}%` }} />
@@ -423,7 +423,7 @@ function AudioControl({
           onChange={(event) => onChange(event.currentTarget.value)}
         />
       </span>
-      <output className="text-end font-mono text-[10px] text-slate-500">{value}%</output>
+      <output className="text-end font-mono text-xs text-slate-500">{value}%</output>
     </div>
   );
 }
@@ -434,7 +434,7 @@ function ModeButton({ active, label, shortLabel, onClick }: { active: boolean; l
       type="button"
       aria-pressed={active}
       title={label}
-      className={`h-7 rounded-lg border px-2 text-[10px] font-extrabold transition-colors ${
+      className={`h-7 rounded-lg border px-2 text-[10px] font-semibold transition-colors ${
         active
           ? 'border-blue-600 bg-blue-600 text-white'
           : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300'
@@ -449,7 +449,7 @@ function ModeButton({ active, label, shortLabel, onClick }: { active: boolean; l
 
 function EmptyLog({ label }: { label: string }) {
   return (
-    <div className="grid min-h-52 place-items-center rounded-2xl border border-dashed border-slate-300 text-center text-xs font-semibold text-slate-500 dark:border-slate-700 dark:text-slate-400">
+    <div className="grid min-h-52 place-items-center rounded-xl border border-dashed border-slate-300 text-center text-xs font-semibold text-slate-500 dark:border-slate-700 dark:text-slate-400">
       <span>
         <History className="mx-auto mb-2 size-5 opacity-60" />
         {label}

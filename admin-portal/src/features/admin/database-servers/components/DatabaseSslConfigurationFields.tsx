@@ -127,11 +127,11 @@ export function DatabaseSslConfigurationFields({
         <div>
           <label
             htmlFor={`${idPrefix}-${field}`}
-            className="block text-xs font-bold text-slate-800 dark:text-slate-200"
+            className="block text-xs font-semibold text-slate-800 dark:text-slate-200"
           >
             {label}{required ? " *" : ""}
           </label>
-          <p className="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs leading-4 text-slate-500 dark:text-slate-400">
             {description}
           </p>
         </div>
@@ -157,10 +157,10 @@ export function DatabaseSslConfigurationFields({
         onChange={(event) =>
           void handleFileChange(field, label, event.target.files?.[0])
         }
-        className="mt-3 block w-full cursor-pointer text-[11px] text-slate-500 file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-bold file:text-blue-700 hover:file:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:file:bg-blue-950/50 dark:file:text-blue-300"
+        className="mt-3 block w-full cursor-pointer text-xs text-slate-500 file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:file:bg-blue-950/50 dark:file:text-blue-300"
       />
       {config[field] && (
-        <p className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
           <ShieldCheck className="h-3.5 w-3.5" /> {copy.readyToSend}
         </p>
       )}
@@ -168,13 +168,13 @@ export function DatabaseSslConfigurationFields({
   );
 
   return (
-    <section dir={dir} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40">
+    <section dir={dir} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40">
       <div className="flex items-start gap-3 border-b border-slate-200 p-4 dark:border-slate-700">
         <div className="rounded-xl bg-blue-100 p-2 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
           <LockKeyhole className="h-4 w-4" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             {copy.title}
           </h3>
           <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
@@ -184,7 +184,7 @@ export function DatabaseSslConfigurationFields({
       </div>
 
       <div className="space-y-4 p-4">
-        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
           {copy.sslMode}
           <select
             value={mode}
@@ -201,7 +201,7 @@ export function DatabaseSslConfigurationFields({
           </select>
         </label>
 
-        <p className="rounded-xl bg-slate-100 px-3 py-2 text-[11px] leading-5 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+        <p className="rounded-xl bg-slate-100 px-3 py-2 text-xs leading-5 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
           {copy.modeHelp[mode]}
         </p>
 
@@ -216,10 +216,10 @@ export function DatabaseSslConfigurationFields({
                 className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
               <span>
-                <span className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                <span className="block text-xs font-semibold text-slate-800 dark:text-slate-200">
                   {copy.rejectUnauthorized}
                 </span>
-                <span className="mt-1 block text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                <span className="mt-1 block text-xs leading-4 text-slate-500 dark:text-slate-400">
                   {copy.rejectUnauthorizedHelp}
                 </span>
               </span>
@@ -230,14 +230,14 @@ export function DatabaseSslConfigurationFields({
                 <div className="flex items-start gap-2">
                   <FileKey2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-emerald-800 dark:text-emerald-200">
+                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
                       {copy.storedBundle}
                     </p>
-                    <p className="mt-1 text-[11px] leading-4 text-emerald-700 dark:text-emerald-300">
+                    <p className="mt-1 text-xs leading-4 text-emerald-700 dark:text-emerald-300">
                       {copy.storedBundleHelp}
                     </p>
                     {onRemoveStoredConfigChange && (
-                      <label className="mt-3 flex cursor-pointer items-center gap-2 text-[11px] font-bold text-rose-700 dark:text-rose-300">
+                      <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-semibold text-rose-700 dark:text-rose-300">
                         <input
                           type="checkbox"
                           checked={removeStoredConfig}
@@ -276,11 +276,11 @@ export function DatabaseSslConfigurationFields({
               <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/70">
                 <label
                   htmlFor={`${idPrefix}-passphrase`}
-                  className="block text-xs font-bold text-slate-800 dark:text-slate-200"
+                  className="block text-xs font-semibold text-slate-800 dark:text-slate-200"
                 >
                   {copy.privateKeyPassphrase}
                 </label>
-                <p className="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-xs leading-4 text-slate-500 dark:text-slate-400">
                   {copy.privateKeyPassphraseHelp}
                 </p>
                 <input

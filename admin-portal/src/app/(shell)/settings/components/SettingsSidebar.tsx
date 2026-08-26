@@ -74,7 +74,7 @@ export function SettingsSidebar() {
   return (
     <aside className="w-full lg:w-64 shrink-0 space-y-1">
       <div className="mb-4 px-3">
-        <h2 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
           <Settings className="w-4.5 h-4.5 text-blue-500" />
           {t.settings.pageTitle}
         </h2>

@@ -45,7 +45,7 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
 
   if (page.isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex flex-col">
+      <div className="min-h-screen bg-slate-50 dark:bg-canvas flex flex-col">
         <Navbar />
         <main className="flex-1 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -56,10 +56,10 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
 
   if (page.error || !page.server) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex flex-col">
+      <div className="min-h-screen bg-slate-50 dark:bg-canvas flex flex-col">
         <Navbar />
         <main className="flex-1 p-6">
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl text-center text-red-500 max-w-md mx-auto shadow-md border border-slate-200 dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-900 p-8 rounded-xl text-center text-red-500 max-w-md mx-auto shadow-md border border-slate-200 dark:border-slate-800">
             {page.error || "Server not found"}
           </div>
         </main>
@@ -70,10 +70,10 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
   const { server } = page;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
+      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
         {/* Modals & Dialogs */}
         <EditDatabaseServerModal
           isOpen={page.isEditModalOpen}
@@ -123,7 +123,7 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
         {page.lifecycleError && (
           <section
             role="alert"
-            className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-950 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
+            className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-950 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
           >
             <div className="flex items-start gap-3">
               <AlertCircle
@@ -131,7 +131,7 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
                 aria-hidden="true"
               />
               <div className="min-w-0">
-                <p className="font-bold">{page.lifecycleError.message}</p>
+                <p className="font-semibold">{page.lifecycleError.message}</p>
                 <p className="mt-1 font-mono text-xs">
                   {page.lifecycleError.errorCode}
                 </p>
@@ -276,20 +276,20 @@ function DatabaseServerDetailBoundary({
   return (
     <div
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="flex min-h-screen flex-col bg-slate-50 dark:bg-[#090d16]"
+      className="flex min-h-screen flex-col bg-slate-50 dark:bg-canvas"
     >
       <Navbar />
       <main className="grid flex-1 place-items-center p-6">
         <section
           role={loading ? "status" : undefined}
-          className="flex max-w-xl flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+          className="flex max-w-xl flex-col items-center rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
         >
           {loading ? (
             <Loader2 className="size-8 animate-spin text-blue-600" />
           ) : (
             <ShieldAlert className="size-8 text-amber-500" />
           )}
-          <h1 className="mt-3 font-black">
+          <h1 className="mt-3 font-semibold">
             {loading
               ? lang === "ar"
                 ? "جارٍ التحقق من الصلاحيات..."

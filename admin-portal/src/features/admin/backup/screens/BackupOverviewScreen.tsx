@@ -36,7 +36,7 @@ export function BackupOverviewScreen() {
         description={view.error.message}
         correlationId={view.error.correlationId}
         action={
-          <button type="button" onClick={() => void view.refresh()} className="min-h-11 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white dark:bg-white dark:text-slate-950">
+          <button type="button" onClick={() => void view.refresh()} className="min-h-11 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white dark:bg-white dark:text-slate-950">
             {isArabic ? "إعادة المحاولة" : "Retry"}
           </button>
         }
@@ -104,7 +104,7 @@ export function BackupOverviewScreen() {
           ? "رؤية تشغيلية للسياسات والنسخ المحفوظة واختبارات الاستعادة، بدون كشف مسارات التخزين أو بيانات الاعتماد."
           : "Operational evidence for policies, retained artifacts, and restore verification without exposing storage paths or credentials."}
         actions={
-          <button type="button" onClick={() => void view.refresh()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+          <button type="button" onClick={() => void view.refresh()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
             <RefreshCw className="size-4" aria-hidden="true" />
             {isArabic ? "تحديث" : "Refresh"}
           </button>
@@ -120,19 +120,19 @@ export function BackupOverviewScreen() {
           { label: isArabic ? "نسخ مكتملة محملة" : "Loaded completed artifacts", value: view.metrics.completedArtifacts, icon: FileCheck2 },
           { label: isArabic ? "استعادات موثقة محملة" : "Loaded verified restores", value: view.metrics.verifiedRestores, icon: ArchiveRestore },
         ].map((metric) => (
-          <div key={metric.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div key={metric.label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{metric.label}</span>
               <metric.icon className="size-5 text-cyan-700 dark:text-cyan-300" aria-hidden="true" />
             </div>
-            <p className="mt-4 font-mono text-3xl font-black text-slate-950 dark:text-white">{metric.value}</p>
+            <p className="mt-4 font-mono text-3xl font-semibold text-slate-950 dark:text-white">{metric.value}</p>
           </div>
         ))}
       </div>
       <p className="text-xs text-slate-500">{isArabic ? "هذه الأرقام تصف لقطة Worker المحدودة التي أعادتها الـ API، وليست إجماليات كاملة للأسطول." : "These counts describe the bounded Worker snapshot returned by the APIs; they are not fleet-wide totals."}</p>
 
       {view.canReadDatabaseAccess ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <BackupServerSelect
               label={isArabic ? "سياق الخادم" : "Server context"}
@@ -142,7 +142,7 @@ export function BackupOverviewScreen() {
               placeholder={isArabic ? "اختر خادم قاعدة بيانات" : "Select a database server"}
             />
             {view.selectedServerId ? (
-              <Link href={`/backup/access?databaseServerId=${encodeURIComponent(view.selectedServerId)}`} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-cyan-700 px-4 text-sm font-bold text-white hover:bg-cyan-800">
+              <Link href={`/backup/access?databaseServerId=${encodeURIComponent(view.selectedServerId)}`} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-cyan-700 px-4 text-sm font-semibold text-white hover:bg-cyan-800">
                 {isArabic ? "فحص الصلاحية" : "Inspect access"}
               </Link>
             ) : null}
@@ -178,15 +178,15 @@ export function BackupOverviewScreen() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-bold">{isArabic ? "آخر عملية نسخ" : "Latest backup run"}</h2>
-            <Link href="/backup/runs" className="text-sm font-bold text-cyan-700 hover:underline dark:text-cyan-300">{isArabic ? "عرض الكل" : "View all"}</Link>
+            <h2 className="text-base font-semibold">{isArabic ? "آخر عملية نسخ" : "Latest backup run"}</h2>
+            <Link href="/backup/runs" className="text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-300">{isArabic ? "عرض الكل" : "View all"}</Link>
           </div>
           {view.selectedData.latestRun ? (
             <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="font-mono text-sm font-bold">{view.selectedData.latestRun.id}</p>
+                <p className="font-mono text-sm font-semibold">{view.selectedData.latestRun.id}</p>
                 <p className="mt-1 text-sm text-slate-500">{formatBackupDate(view.selectedData.latestRun.startedAt, isArabic ? "ar-EG" : "en-US")}</p>
               </div>
               <BackupStatusBadge status={view.selectedData.latestRun.status} />
@@ -194,15 +194,15 @@ export function BackupOverviewScreen() {
           ) : <p className="mt-5 text-sm text-slate-500">{isArabic ? "لا توجد بيانات." : "No evidence available."}</p>}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-bold">{isArabic ? "آخر عملية استعادة" : "Latest restore"}</h2>
-            <Link href="/backup/restores" className="text-sm font-bold text-cyan-700 hover:underline dark:text-cyan-300">{isArabic ? "عرض الكل" : "View all"}</Link>
+            <h2 className="text-base font-semibold">{isArabic ? "آخر عملية استعادة" : "Latest restore"}</h2>
+            <Link href="/backup/restores" className="text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-300">{isArabic ? "عرض الكل" : "View all"}</Link>
           </div>
           {view.selectedData.latestRestore ? (
             <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="font-mono text-sm font-bold">{view.selectedData.latestRestore.id}</p>
+                <p className="font-mono text-sm font-semibold">{view.selectedData.latestRestore.id}</p>
                 <p className="mt-1 text-sm text-slate-500">{formatBackupDate(view.selectedData.latestRestore.startedAt, isArabic ? "ar-EG" : "en-US")}</p>
               </div>
               <BackupStatusBadge status={view.selectedData.latestRestore.status} />

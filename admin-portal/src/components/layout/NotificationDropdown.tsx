@@ -34,7 +34,7 @@ export function NotificationDropdown() {
       >
         <Bell className="h-4 w-4" aria-hidden="true" />
         {view.unreadCount > 0 ? (
-          <span className="absolute end-0 top-0 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white dark:ring-slate-950">
+          <span className="absolute end-0 top-0 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-xs font-semibold leading-none text-white ring-2 ring-white dark:ring-slate-950">
             {view.unreadCount > 99 ? "99+" : view.unreadCount}
           </span>
         ) : null}
@@ -53,18 +53,18 @@ export function NotificationDropdown() {
             role="dialog"
             aria-modal="false"
             aria-labelledby={`${PANEL_ID}-title`}
-            className="absolute end-0 z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl sm:w-96 dark:border-slate-800 dark:bg-slate-900"
+            className="absolute end-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl sm:w-96 dark:border-slate-800 dark:bg-slate-900"
           >
             <header className="flex items-center justify-between gap-3 border-b border-slate-200 p-3.5 dark:border-slate-800">
               <div className="min-w-0">
                 <h2
                   id={`${PANEL_ID}-title`}
-                  className="truncate text-xs font-bold text-slate-900 dark:text-slate-100"
+                  className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100"
                 >
                   {view.copy.title}
                 </h2>
                 {view.unreadCount > 0 ? (
-                  <p className="mt-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                  <p className="mt-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
                     {view.unreadCount} {view.copy.newNotifications}
                   </p>
                 ) : null}
@@ -74,7 +74,7 @@ export function NotificationDropdown() {
                   type="button"
                   onClick={() => void view.markAllRead()}
                   disabled={view.isPending}
-                  className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-400"
+                  className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-blue-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-400"
                 >
                   {view.isPending ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -96,7 +96,7 @@ export function NotificationDropdown() {
                 />
               ) : null}
               {view.actionState === "FORBIDDEN" ? (
-                <p className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                <p className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
                   {view.copy.managePermission}
                 </p>
               ) : null}
@@ -192,12 +192,12 @@ function NotificationPreview({
         <p className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">
           {notification.title}
         </p>
-        <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
           {notification.body}
         </p>
         <time
           dateTime={notification.createdAt}
-          className="mt-1 block text-[10px] text-slate-400"
+          className="mt-1 block text-xs text-slate-400"
         >
           {formatNotificationTime(notification.createdAt)}
         </time>
@@ -208,7 +208,7 @@ function NotificationPreview({
                 type="button"
                 onClick={onMarkRead}
                 disabled={isPending}
-                className="cursor-pointer text-[10px] font-semibold text-blue-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-400"
+                className="cursor-pointer text-xs font-semibold text-blue-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-400"
               >
                 {copy.markRead}
               </button>
@@ -218,7 +218,7 @@ function NotificationPreview({
                 type="button"
                 onClick={onAcknowledge}
                 disabled={isPending}
-                className="cursor-pointer text-[10px] font-semibold text-emerald-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-400"
+                className="cursor-pointer text-xs font-semibold text-emerald-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-400"
               >
                 {copy.acknowledge}
               </button>
@@ -242,7 +242,7 @@ function DropdownError({
   error: { errorCode: string; correlationId?: string };
 }) {
   return (
-    <div className="border-b border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+    <div className="border-b border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
       <p>{message}</p>
       <p className="mt-0.5 font-mono">
         {errorCodeLabel}: {error.errorCode}

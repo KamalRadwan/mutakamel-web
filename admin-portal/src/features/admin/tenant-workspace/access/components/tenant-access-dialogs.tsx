@@ -449,8 +449,8 @@ function DialogFrame({
 }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="tenant-access-dialog-title" dir={locale === "ar" ? "rtl" : "ltr"} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
-        <header className="mb-4 flex items-center justify-between gap-3"><h3 id="tenant-access-dialog-title" className="text-lg font-bold text-slate-950">{title}</h3><button type="button" className="grid size-8 place-items-center rounded-full text-xl text-slate-500 hover:bg-slate-100" aria-label="Close" onClick={onClose}>×</button></header>
+      <section role="dialog" aria-modal="true" aria-labelledby="tenant-access-dialog-title" dir={locale === "ar" ? "rtl" : "ltr"} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
+        <header className="mb-4 flex items-center justify-between gap-3"><h3 id="tenant-access-dialog-title" className="text-lg font-semibold text-slate-950">{title}</h3><button type="button" className="grid size-8 place-items-center rounded-full text-xl text-slate-500 hover:bg-slate-100" aria-label="Close" onClick={onClose}>×</button></header>
         {children}
       </section>
     </div>

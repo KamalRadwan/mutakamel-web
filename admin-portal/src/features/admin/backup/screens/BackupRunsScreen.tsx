@@ -44,32 +44,32 @@ export function BackupRunsScreen() {
           ? "تابع العمليات المجدولة واليدوية. إعادة إرسال نفس الطلب تستخدم هوية أمر ثابتة وتعيد العملية الأصلية."
           : "Track scheduled and manual executions. Retrying the same request keeps one command identity and returns the original run."}
         actions={view.canStart ? (
-          <button type="button" onClick={openStart} disabled={Boolean(view.activeAction)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-700 px-4 text-sm font-bold text-white hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" onClick={openStart} disabled={Boolean(view.activeAction)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-700 px-4 text-sm font-semibold text-white hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50">
             <Play className="size-4" aria-hidden="true" />{isArabic ? "بدء نسخة يدوية" : "Start manual backup"}
           </button>
         ) : undefined}
       />
 
       {view.retryableCommandError || view.pendingCommandAttempt ? (
-        <section role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          <h2 className="font-bold">{isArabic ? "هناك أمر نسخ لم تُحسم نتيجته" : "A backup command still has an unknown outcome"}</h2>
+        <section role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          <h2 className="font-semibold">{isArabic ? "هناك أمر نسخ لم تُحسم نتيجته" : "A backup command still has an unknown outcome"}</h2>
           <p className="mt-2 text-sm leading-6">{isArabic ? "يحتفظ هذا التبويب بالمفتاح وبصمة غير قابلة للقراءة فقط، ولا يخزن سبب التدقيق. افحص سجل العمليات ثم أعد إدخال القيم الأصلية حرفيًا إذا احتجت لإعادة المحاولة؛ لن يُقبل طلب مختلف بنفس المفتاح." : "This tab retains only the key and a non-readable intent digest; it does not store the audit reason. Check the run history, then re-enter the exact original values if a retry is needed. A different request will not be sent with that key."}</p>
           {view.retryableCommandError?.correlationId ? <p className="mt-2 text-xs">Correlation ID: <code>{view.retryableCommandError.correlationId}</code></p> : null}
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_auto] lg:items-end">
           <label className="block"><span className={labelClass}>{isArabic ? "الخادم" : "Server"}</span><select value={view.databaseServerId} onChange={(event) => view.setDatabaseServerId(event.target.value)} className={inputClass}><option value="">{isArabic ? "كل الخوادم" : "All servers"}</option>{view.servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
           <label className="block"><span className={labelClass}>{isArabic ? "الحالة" : "Status"}</span><select value={view.status} onChange={(event) => view.setStatus(event.target.value as BackupRunStatus | "")} className={inputClass}><option value="">{isArabic ? "كل الحالات" : "All statuses"}</option>{Object.values(BackupRunStatus).map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></label>
-          <button type="button" onClick={() => void view.refresh()} disabled={view.isLoading} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 text-sm font-bold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-900"><RefreshCw className={`size-4 ${view.isLoading ? "animate-spin" : ""}`} />{isArabic ? "تحديث" : "Refresh"}</button>
+          <button type="button" onClick={() => void view.refresh()} disabled={view.isLoading} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-900"><RefreshCw className={`size-4 ${view.isLoading ? "animate-spin" : ""}`} />{isArabic ? "تحديث" : "Refresh"}</button>
         </div>
       </section>
 
       {view.error ? <BackupErrorBanner error={view.error} /> : null}
       {view.enrichmentWarning ? (
         <section role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          <p className="font-bold">{isArabic ? "تعذر تحميل أسماء خوادم قواعد البيانات" : "Database server names are unavailable"}</p>
+          <p className="font-semibold">{isArabic ? "تعذر تحميل أسماء خوادم قواعد البيانات" : "Database server names are unavailable"}</p>
           <p className="mt-1 text-xs leading-5">{isArabic ? "تظل بيانات العمليات من Worker متاحة، وتُعرض معرفات الخوادم بدلاً من الأسماء." : "Worker run data remains available; server IDs are shown instead of names."}</p>
           {view.enrichmentWarning.correlationId ? <p className="mt-2 text-xs">Correlation ID: <code className="font-mono">{view.enrichmentWarning.correlationId}</code></p> : null}
         </section>
@@ -80,14 +80,14 @@ export function BackupRunsScreen() {
       ) : view.error ? null : view.runs.length === 0 ? (
         <BackupStatePanel kind="empty" title={isArabic ? "لا توجد عمليات" : "No backup runs"} description={isArabic ? "لا توجد نتائج مطابقة للفلاتر الحالية." : "No run matches the current filters."} />
       ) : (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-sm">
-              <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500 dark:bg-slate-900"><tr><th className="px-5 py-3 text-start">{isArabic ? "العملية" : "Run"}</th><th className="px-5 py-3 text-start">{isArabic ? "الخادم" : "Server"}</th><th className="px-5 py-3 text-start">{isArabic ? "النوع" : "Trigger"}</th><th className="px-5 py-3 text-start">{isArabic ? "النتيجة" : "Progress"}</th><th className="px-5 py-3 text-start">{isArabic ? "بدأت" : "Started"}</th><th className="px-5 py-3 text-start">{isArabic ? "الحالة" : "Status"}</th><th className="px-5 py-3 text-end">{isArabic ? "الإجراءات" : "Actions"}</th></tr></thead>
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-900"><tr><th className="px-5 py-3 text-start">{isArabic ? "العملية" : "Run"}</th><th className="px-5 py-3 text-start">{isArabic ? "الخادم" : "Server"}</th><th className="px-5 py-3 text-start">{isArabic ? "النوع" : "Trigger"}</th><th className="px-5 py-3 text-start">{isArabic ? "النتيجة" : "Progress"}</th><th className="px-5 py-3 text-start">{isArabic ? "بدأت" : "Started"}</th><th className="px-5 py-3 text-start">{isArabic ? "الحالة" : "Status"}</th><th className="px-5 py-3 text-end">{isArabic ? "الإجراءات" : "Actions"}</th></tr></thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{view.runs.map((run) => {
                 const server = view.servers.find((item) => item.id === run.databaseServerId);
                 const terminal = run.status !== BackupRunStatus.PENDING && run.status !== BackupRunStatus.RUNNING;
-                return <tr key={run.id} className="align-top hover:bg-slate-50/70 dark:hover:bg-slate-900/50"><td className="px-5 py-4"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300"><DatabaseBackup className="size-4" /></span><div><p className="font-mono font-bold" title={run.id}>{shortBackupId(run.id)}</p>{run.reason ? <p className="mt-1 max-w-xs truncate text-xs text-slate-500" title={run.reason}>{run.reason}</p> : null}</div></div></td><td className="px-5 py-4"><p className="font-semibold">{server?.name ?? shortBackupId(run.databaseServerId)}</p></td><td className="px-5 py-4 font-semibold uppercase">{run.trigger}</td><td className="px-5 py-4"><p className="font-mono font-bold">{run.succeededTenants}/{run.totalTenants}</p><p className="mt-1 text-xs text-slate-500">{run.failedTenants} failed · {run.skippedTenants} skipped</p></td><td className="px-5 py-4 text-slate-600 dark:text-slate-300">{formatBackupDate(run.startedAt, isArabic ? "ar-EG" : "en-US")}</td><td className="px-5 py-4"><BackupStatusBadge status={run.status} />{run.hasFailure ? <p className="mt-2 max-w-xs text-xs text-rose-600 dark:text-rose-300">{isArabic ? "تم تسجيل تفاصيل الفشل بأمان في Worker." : "Failure details are retained in Worker logs."}</p> : null}</td><td className="px-5 py-4 text-end">{view.canDelete && terminal ? <button type="button" onClick={() => setDeletingRun(run)} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"><Trash2 className="size-4" />{isArabic ? "حذف" : "Delete"}</button> : <span className="text-slate-400">—</span>}</td></tr>;
+                return <tr key={run.id} className="align-top hover:bg-slate-50/70 dark:hover:bg-slate-900/50"><td className="px-5 py-4"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300"><DatabaseBackup className="size-4" /></span><div><p className="font-mono font-semibold" title={run.id}>{shortBackupId(run.id)}</p>{run.reason ? <p className="mt-1 max-w-xs truncate text-xs text-slate-500" title={run.reason}>{run.reason}</p> : null}</div></div></td><td className="px-5 py-4"><p className="font-semibold">{server?.name ?? shortBackupId(run.databaseServerId)}</p></td><td className="px-5 py-4 font-semibold uppercase">{run.trigger}</td><td className="px-5 py-4"><p className="font-mono font-semibold">{run.succeededTenants}/{run.totalTenants}</p><p className="mt-1 text-xs text-slate-500">{run.failedTenants} failed · {run.skippedTenants} skipped</p></td><td className="px-5 py-4 text-slate-600 dark:text-slate-300">{formatBackupDate(run.startedAt, isArabic ? "ar-EG" : "en-US")}</td><td className="px-5 py-4"><BackupStatusBadge status={run.status} />{run.hasFailure ? <p className="mt-2 max-w-xs text-xs text-rose-600 dark:text-rose-300">{isArabic ? "تم تسجيل تفاصيل الفشل بأمان في Worker." : "Failure details are retained in Worker logs."}</p> : null}</td><td className="px-5 py-4 text-end">{view.canDelete && terminal ? <button type="button" onClick={() => setDeletingRun(run)} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"><Trash2 className="size-4" />{isArabic ? "حذف" : "Delete"}</button> : <span className="text-slate-400">—</span>}</td></tr>;
               })}</tbody>
             </table>
           </div>
@@ -106,6 +106,6 @@ export function BackupRunsScreen() {
   );
 }
 
-const labelClass = "mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500";
+const labelClass = "mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500";
 const inputClass = "min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white";
 const uuidV7Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

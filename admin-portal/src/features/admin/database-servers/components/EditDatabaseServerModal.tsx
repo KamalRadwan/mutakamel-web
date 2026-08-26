@@ -115,13 +115,13 @@ function EditDatabaseServerModalContent({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-4">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 rounded-xl">
               <Edit2 className="w-5 h-5" />
             </div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
               Edit Database Server
             </h2>
           </div>
@@ -135,7 +135,7 @@ function EditDatabaseServerModalContent({
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+            <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
               Server Display Name
             </label>
             <input
@@ -149,7 +149,7 @@ function EditDatabaseServerModalContent({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
                 Host / IP Address
               </label>
               <input
@@ -161,7 +161,7 @@ function EditDatabaseServerModalContent({
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
                 Port
               </label>
               <input
@@ -176,7 +176,7 @@ function EditDatabaseServerModalContent({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
                 Max Tenants
               </label>
               <input
@@ -189,7 +189,7 @@ function EditDatabaseServerModalContent({
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 uppercase tracking-wider">
                 Country Location
               </label>
               <input
@@ -236,7 +236,7 @@ function EditDatabaseServerModalContent({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-600/20 transition-all disabled:opacity-50"
+              className="px-5 py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-600/20 transition-all disabled:opacity-50"
             >
               {isSubmitting ? "Saving..." : "Save Changes"}
             </button>

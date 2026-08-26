@@ -13,7 +13,7 @@ export function UsersEmptyState({ hasFilters }: { hasFilters: boolean }) {
         <Users className="w-6 h-6" />
       </div>
       <div className="space-y-1">
-        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
           {hasFilters
             ? lang === "ar"
               ? "لا تتوفر نتائج مطابقة للفلاتر المحددة."
@@ -22,7 +22,7 @@ export function UsersEmptyState({ hasFilters }: { hasFilters: boolean }) {
               ? "لا يوجد أعضاء مشرفين في النظام حالياً."
               : "No admin staff users found."}
         </p>
-        <p className="text-[11px] text-slate-400">
+        <p className="text-xs text-slate-400">
           {hasFilters
             ? lang === "ar"
               ? "جرب تغيير فلاتر البحث أو إلغائها."

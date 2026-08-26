@@ -48,9 +48,9 @@ export function CreateStorageServerScreen() {
 
   if (!canCreate) {
     return (
-      <section className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100 shadow-md">
+      <section className="mx-auto max-w-xl rounded-xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100 shadow-md">
         <ShieldAlert className="mx-auto size-10 text-rose-600 dark:text-rose-400" aria-hidden="true" />
-        <h1 className="mt-3 text-lg font-black">{c.accessDeniedTitle}</h1>
+        <h1 className="mt-3 text-lg font-semibold">{c.accessDeniedTitle}</h1>
         <p className="mt-2 text-sm">{c.accessDeniedDesc}</p>
       </section>
     );
@@ -59,7 +59,7 @@ export function CreateStorageServerScreen() {
   return (
     <div className="w-full space-y-6">
       {/* Glassmorphism Compact Header */}
-      <header className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl border border-indigo-500/20 shadow-md">
+      <header className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-xl border border-indigo-500/20 shadow-md">
         <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/0 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -74,14 +74,14 @@ export function CreateStorageServerScreen() {
 
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                <h1 className="text-base sm:text-lg font-semibold text-white tracking-tight">
                   {c.title}
                 </h1>
-                <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md">
+                <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-2xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">
                   {c.tag}
                 </span>
               </div>
-              <p className="text-[11px] text-indigo-200/80 mt-0.5 max-w-2xl leading-tight">
+              <p className="text-xs text-indigo-200/80 mt-0.5 max-w-2xl leading-tight">
                 {c.subtitle}
               </p>
             </div>
@@ -95,12 +95,12 @@ export function CreateStorageServerScreen() {
           {storageRuntimeSetupRequired && (
             <div
               role="alert"
-              className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+              className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
             >
               <div className="flex items-start gap-3">
                 <KeyRound className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
                 <div className="min-w-0">
-                  <h2 className="text-sm font-black">
+                  <h2 className="text-sm font-semibold">
                     {c.runtimeSetup.title}
                   </h2>
                   <p className="mt-1 text-xs leading-relaxed">
@@ -110,19 +110,19 @@ export function CreateStorageServerScreen() {
                       : c.runtimeSetup.keyUnavailableDescription}
                   </p>
                   {storageRuntimeSetupRequired.correlationId ? (
-                    <p className="mt-2 break-all font-mono text-[11px] opacity-80">
+                    <p className="mt-2 break-all font-mono text-xs opacity-80">
                       {c.runtimeSetup.correlationId}: {storageRuntimeSetupRequired.correlationId}
                     </p>
                   ) : null}
                   {canConfigureStorageRuntime ? (
                     <Link
                       href="/settings/storage"
-                      className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-amber-900 px-4 text-xs font-bold text-white transition hover:bg-amber-800 dark:bg-amber-200 dark:text-amber-950 dark:hover:bg-amber-100"
+                      className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-amber-900 px-4 text-xs font-semibold text-white transition hover:bg-amber-800 dark:bg-amber-200 dark:text-amber-950 dark:hover:bg-amber-100"
                     >
                       {c.runtimeSetup.openSettings}
                     </Link>
                   ) : (
-                    <p className="mt-3 text-xs font-bold">
+                    <p className="mt-3 text-xs font-semibold">
                       {c.runtimeSetup.askAdministrator}
                     </p>
                   )}
@@ -134,7 +134,7 @@ export function CreateStorageServerScreen() {
           {formError && (
             <div
               role="alert"
-              className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-950 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100 shadow-sm whitespace-pre-line"
+              className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-950 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100 shadow-sm whitespace-pre-line"
             >
               {formError}
             </div>
@@ -143,7 +143,7 @@ export function CreateStorageServerScreen() {
           {setupPending && !formError && (
             <div
               role="status"
-              className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100 shadow-sm"
+              className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100 shadow-sm"
             >
               {dir === "rtl"
                 ? "تم حفظ الخادم بالفعل. أعد محاولة التفعيل فقط؛ لن تُرسل بيانات الاعتماد ولن يُنشأ خادم آخر."
@@ -286,7 +286,7 @@ export function CreateStorageServerScreen() {
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end pt-2">
             <Link
               href="/storage-servers"
-              className="inline-flex min-h-11 items-center justify-center rounded-xl px-5 text-xs font-bold text-slate-700 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800 transition"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl px-5 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800 transition"
             >
               {c.actions.cancel}
             </Link>
@@ -295,7 +295,7 @@ export function CreateStorageServerScreen() {
               type="submit"
               formNoValidate={setupPending}
               disabled={isSubmitting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 px-6 text-xs font-bold text-white shadow-lg shadow-indigo-500/25 transition disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 px-6 text-xs font-semibold text-white shadow-lg shadow-indigo-500/25 transition disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
             >
               <Save className="size-4" aria-hidden="true" />
               {isSubmitting
@@ -315,52 +315,52 @@ export function CreateStorageServerScreen() {
 
         {/* Right Column: Live Configuration Preview Card */}
         <div className="lg:col-span-1">
-          <div className="sticky top-6 bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-5">
+          <div className="sticky top-6 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-md space-y-5">
             <div>
-              <h3 className="text-xs font-extrabold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
                 <Globe className="w-4 h-4 text-indigo-500" />
                 {c.sections.preview}
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
                 {c.sections.previewDesc}
               </p>
             </div>
 
             <div className="space-y-3.5 text-xs">
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
+                <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
                   {c.previewCard.targetEndpoint}
                 </span>
-                <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs break-all block">
+                <span className="font-mono font-semibold text-indigo-600 dark:text-indigo-400 text-xs break-all block">
                   {form.endpoint.trim() || "https://..."}
                 </span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
+                <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
                   <Database className="w-3 h-3 text-purple-500" />
                   {c.previewCard.bucketTarget}
                 </span>
-                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-xs block">
+                <span className="font-mono font-semibold text-slate-900 dark:text-slate-100 text-xs block">
                   {form.bucketName.trim() || "bucket-name"} @ {form.region.trim() || "region"}
                 </span>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
+                <span className="text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
                   <Users className="w-3 h-3 text-cyan-500" />
                   {c.previewCard.tenantCap}
                 </span>
-                <span className="font-mono font-bold text-cyan-600 dark:text-cyan-400 text-xs block">
+                <span className="font-mono font-semibold text-cyan-600 dark:text-cyan-400 text-xs block">
                   {maxTenants ? `${maxTenants} tenants` : c.previewCard.unlimited}
                 </span>
               </div>
 
               {/* Security Boundary Highlight */}
-              <div className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/60 flex items-start gap-2.5 text-emerald-900 dark:text-emerald-300">
+              <div className="p-3.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/60 flex items-start gap-2.5 text-emerald-900 dark:text-emerald-300">
                 <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-500 mt-0.5" />
-                <div className="text-[11px] leading-relaxed">
-                  <span className="font-bold block">{c.previewCard.securityMode}</span>
+                <div className="text-xs leading-relaxed">
+                  <span className="font-semibold block">{c.previewCard.securityMode}</span>
                   {c.previewCard.encryptedNotice}
                 </div>
               </div>
@@ -384,13 +384,13 @@ function FormSection({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6 shadow-md">
+    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6 shadow-md">
       <div className="mb-5 flex items-start gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
         <span className="grid size-9 place-items-center rounded-xl bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 shrink-0">
           {icon}
         </span>
         <div>
-          <h2 className="font-black text-sm uppercase tracking-wider text-slate-900 dark:text-slate-100">
+          <h2 className="font-semibold text-sm uppercase tracking-wider text-slate-900 dark:text-slate-100">
             {title}
           </h2>
           {description ? (
@@ -418,12 +418,12 @@ function Field({
 }) {
   return (
     <label className={`block ${wide ? "md:col-span-2" : ""}`}>
-      <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">
         {label}
       </span>
       {children}
       {hint ? (
-        <span className="mt-1.5 block text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="mt-1.5 block text-xs text-slate-500 dark:text-slate-400">
           {hint}
         </span>
       ) : null}

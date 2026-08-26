@@ -93,11 +93,11 @@ export function BackupDialog({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         onKeyDown={handleKeyDown}
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950 sm:p-6"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950 sm:p-6"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id={titleId} className="text-lg font-black text-slate-950 dark:text-white">
+            <h2 id={titleId} className="text-lg font-semibold text-slate-950 dark:text-white">
               {title}
             </h2>
             <p id={descriptionId} className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -122,7 +122,7 @@ export function BackupDialog({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+            className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
           >
             {lang === "ar" ? "إلغاء" : "Cancel"}
           </button>
@@ -130,7 +130,7 @@ export function BackupDialog({
             type="button"
             onClick={onConfirm}
             disabled={isSubmitting || confirmDisabled}
-            className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
               destructive
                 ? "bg-rose-700 hover:bg-rose-800 focus-visible:ring-rose-600"
                 : "bg-cyan-700 hover:bg-cyan-800 focus-visible:ring-cyan-600"

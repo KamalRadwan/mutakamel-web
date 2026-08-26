@@ -67,7 +67,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+      <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
         <Navbar />
         <main className="flex-1 p-4 flex items-center justify-center">
           <div className="flex items-center gap-3 text-slate-500 animate-pulse">
@@ -81,14 +81,14 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
 
   if (roleError && !role) {
     return (
-      <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100">
+      <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100">
         <Navbar />
         <main className="flex flex-1 items-center justify-center p-4">
-          <div role="alert" className="w-full max-w-lg rounded-2xl border border-rose-200 bg-white p-6 text-sm shadow-sm dark:border-rose-900 dark:bg-slate-900">
+          <div role="alert" className="w-full max-w-lg rounded-xl border border-rose-200 bg-white p-6 text-sm shadow-sm dark:border-rose-900 dark:bg-slate-900">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
               <div className="min-w-0">
-                <h1 className="font-bold">
+                <h1 className="font-semibold">
                   {roleError.httpStatus === 403
                     ? lang === "ar" ? "لا تملك صلاحية قراءة هذا الدور." : "You do not have permission to read this role."
                     : roleError.httpStatus === 404
@@ -99,11 +99,11 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                 </h1>
                 {roleError.correlationId ? <p className="mt-2 break-all font-mono text-xs text-slate-500">{roleError.correlationId}</p> : null}
                 <div className="mt-4 flex gap-2">
-                  <button type="button" onClick={reloadRole} className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white">
+                  <button type="button" onClick={reloadRole} className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white">
                     <RefreshCw className="h-3.5 w-3.5" />
                     {lang === "ar" ? "إعادة المحاولة" : "Retry"}
                   </button>
-                  <button type="button" onClick={() => router.push("/roles")} className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold dark:bg-slate-800">
+                  <button type="button" onClick={() => router.push("/roles")} className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold dark:bg-slate-800">
                     {lang === "ar" ? "العودة للأدوار" : "Back to roles"}
                   </button>
                 </div>
@@ -119,12 +119,12 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
   const permissionsReadOnly = !canReplacePermissions || permissionsAmbiguous;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
+      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
         {/* Header Title with Save Status */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/roles")}
@@ -134,21 +134,21 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                   {name || (lang === "ar" ? "دور بدون اسم" : "Unnamed Role")}
                 </h1>
                 {isSuperAdmin ? (
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800 px-2 py-0.5 rounded-full shadow-2xs">
+                  <span className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800 px-2 py-0.5 rounded-full shadow-2xs">
                     <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
                     {lang === "ar" ? "سوبر أدمن (شامل)" : "Super Admin (Full)"}
                   </span>
                 ) : isSystem ? (
-                  <span className="flex items-center gap-1 text-[10px] font-medium text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+                  <span className="flex items-center gap-1 text-xs font-medium text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
                     <Lock className="w-3 h-3" />
                     {lang === "ar" ? "نظام (للقراءة فقط)" : "System (Read-only)"}
                   </span>
                 ) : (
-                  <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-md">
+                  <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-md">
                     {lang === "ar" ? "دور مخصص" : "Custom Role"}
                   </span>
                 )}
@@ -171,13 +171,13 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
 
         {/* Super Admin Full Permissions Banner */}
         {isSuperAdmin && (
-          <div className="bg-gradient-to-r from-amber-500/15 via-indigo-500/10 to-purple-500/15 border border-amber-300 dark:border-amber-700/60 rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 shadow-2xs">
+          <div className="bg-gradient-to-r from-amber-500/15 via-indigo-500/10 to-purple-500/15 border border-amber-300 dark:border-amber-700/60 rounded-xl p-4 sm:p-5 flex items-center justify-between gap-4 shadow-2xs">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/20 shrink-0">
                 <Zap className="w-6 h-6 fill-white" />
               </div>
               <div>
-                <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <span>{lang === "ar" ? "صلاحيات المدير الفائق المطلقة (Super Admin)" : "Full Super Admin Privileges Granted"}</span>
                 </h3>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
@@ -187,7 +187,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                 </p>
               </div>
             </div>
-            <span className="hidden sm:inline-flex px-3 py-1 text-xs font-bold rounded-xl bg-amber-500 text-white shadow-xs shrink-0">
+            <span className="hidden sm:inline-flex px-3 py-1 text-xs font-semibold rounded-xl bg-amber-500 text-white shadow-xs shrink-0">
               {catalogueLength} / {catalogueLength} {lang === "ar" ? "صلاحية ممررة" : "Granted"}
             </span>
           </div>
@@ -195,10 +195,10 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
 
         {/* System Role Info Banner */}
         {isSystem && !isSuperAdmin && (
-          <div className="bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-2xl p-4 flex gap-3 text-blue-900 dark:text-blue-300 shadow-2xs">
+          <div className="bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-xl p-4 flex gap-3 text-blue-900 dark:text-blue-300 shadow-2xs">
             <Info className="w-5 h-5 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
             <div className="text-xs">
-              <h4 className="font-bold mb-1">
+              <h4 className="font-semibold mb-1">
                 {lang === "ar" ? "دور مدمج بالنظام (System Role)" : "Protected System Role"}
               </h4>
               <p className="opacity-80 leading-relaxed">
@@ -211,9 +211,9 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         )}
 
         {/* REQUIREMENT 1: Wide Top Card for General Information */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50 via-indigo-50/30 to-purple-50/20 dark:from-slate-800/40 dark:via-indigo-950/20 dark:to-purple-950/10">
-            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-indigo-500" />
               <span>{lang === "ar" ? "المعلومات الأساسية للدور" : "Role General Information"}</span>
             </h2>
@@ -255,7 +255,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
             </div>
             {metadataError ? (
               <div role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-                <p className="font-bold">
+                <p className="font-semibold">
                   {metadataAmbiguous
                     ? lang === "ar" ? "نتيجة التحديث غير مؤكدة. أعد المحاولة بنفس البيانات والمفتاح." : "Update outcome is unconfirmed. Retry the exact data and command key."
                     : metadataError.message}
@@ -269,7 +269,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                   type="button"
                   onClick={saveMetadata}
                   disabled={isSavingMetadata || !metadataDirty || Boolean(nameError || descriptionError)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-40"
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-40"
                 >
                   {isSavingMetadata ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                   {metadataAmbiguous
@@ -282,10 +282,10 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {/* REQUIREMENT 1 & 3: Full-width Permissions Matrix with Vibrant Colorful Design */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-indigo-500" />
                 <span>{lang === "ar" ? "مصفوفة الصلاحيات المطلقة" : "Permissions Matrix"}</span>
               </h2>
@@ -294,7 +294,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                   ? (lang === "ar" ? "العرض فقط — الصلاحيات المحددة ثابتة لهذا الدور." : "Read-only mode — permissions are fixed for this role.")
                   : (lang === "ar" ? "يتم حفظ تغييرات التحديد تلقائياً." : "Selections are saved automatically.")}
               </p>
-              <p className="mt-0.5 text-[11px] text-slate-500">
+              <p className="mt-0.5 text-xs text-slate-500">
                 {permissionsReadOnly
                   ? lang === "ar" ? "عرض فقط؛ يلزم admin.roles.update وadmin.roles.critical للاستبدال." : "Read-only; replacement requires admin.roles.update and admin.roles.critical."
                   : lang === "ar" ? "راجع التحديد ثم احفظ مجموعة الصلاحيات كاملة." : "Review the selection, then explicitly save the complete permission set."}
@@ -312,7 +312,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                   className="w-full ps-9 pe-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
                 />
               </div>
-              <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800/60 shrink-0">
+              <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800/60 shrink-0">
                 {assignedPermissions.size} {lang === "ar" ? "محددة" : "selected"}
               </div>
             </div>
@@ -328,7 +328,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
           {catalogueError ? (
             <div role="alert" className="m-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
               <div>
-                <p className="font-bold">
+                <p className="font-semibold">
                   {catalogueError.httpStatus === 403
                     ? lang === "ar" ? "لا تملك admin.permissions.read؛ تبقى بيانات الدور متاحة." : "admin.permissions.read is unavailable; role metadata remains available."
                     : lang === "ar" ? "تعذر تحميل دليل الصلاحيات؛ تبقى بيانات الدور متاحة." : "The permission catalogue could not load; role metadata remains available."}
@@ -336,7 +336,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                 <p className="mt-1">{catalogueError.message}</p>
                 {catalogueError.correlationId ? <p className="mt-1 font-mono">{catalogueError.correlationId}</p> : null}
               </div>
-              <button type="button" onClick={reloadCatalogue} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 px-3 py-2 font-bold dark:border-amber-800">
+              <button type="button" onClick={reloadCatalogue} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 px-3 py-2 font-semibold dark:border-amber-800">
                 <RefreshCw className="h-3.5 w-3.5" />
                 {lang === "ar" ? "إعادة المحاولة" : "Retry catalogue"}
               </button>
@@ -345,7 +345,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
 
           {permissionsError ? (
             <div role="alert" className="m-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-              <p className="font-bold">
+              <p className="font-semibold">
                 {permissionsAmbiguous
                   ? lang === "ar" ? "نتيجة الاستبدال غير مؤكدة. أعد العملية نفسها دون تغيير التحديد." : "Replacement outcome is unconfirmed. Retry the unchanged permission set."
                   : permissionsError.message}
@@ -364,10 +364,10 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                   <div className="flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800">
                     <div className="flex items-center gap-2.5">
                       <div className="w-2.5 h-2.5 rounded-full bg-indigo-500"></div>
-                      <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                         {groupName}
                       </h3>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                         {checkedCount} / {perms.length}
                       </span>
                     </div>
@@ -375,7 +375,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                     {!permissionsReadOnly && (
                       <button
                         onClick={() => toggleGroup(groupName, !isAllChecked)}
-                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                        className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                       >
                         {isAllChecked
                           ? (lang === "ar" ? "إلغاء تحديد الكل" : "Deselect All")
@@ -400,11 +400,11 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                           } ${!permissionsReadOnly ? "cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-600" : "opacity-90"}`}
                         >
                           <div className="space-y-1 me-2">
-                            <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                            <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
                               {/* REQUIREMENT 2: Display localized name only, hide p.key */}
                               <span>{getPermissionName(p, lang as "ar" | "en")}</span>
                               {isCritical && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                                <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
                                   {lang === "ar" ? "حرج" : "CRITICAL"}
                                 </span>
                               )}
@@ -448,7 +448,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                 type="button"
                 onClick={savePermissions}
                 disabled={isSavingPermissions || !permissionsDirty}
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-40"
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-40"
               >
                 {isSavingPermissions ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
                 {permissionsAmbiguous

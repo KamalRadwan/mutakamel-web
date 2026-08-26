@@ -53,9 +53,9 @@ export default function PlatformSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
+      <header className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <Server className="size-5 text-blue-600 dark:text-blue-400" />
             {lang === "ar" ? "المنصة والدعم" : "Platform & Support"}
           </h1>
@@ -96,7 +96,7 @@ export default function PlatformSettingsPage() {
               />
             ))
           ) : (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900">
               {allSettings.length
                 ? lang === "ar"
                   ? "لا توجد نتائج مطابقة لبحثك."

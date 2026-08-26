@@ -19,7 +19,7 @@ export function BackupServerSelect({
 }: BackupServerSelectProps) {
   return (
     <label className="block">
-      <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
         {label}
       </span>
       <select

@@ -188,11 +188,11 @@ export function ReportsScreen() {
   return (
     <div
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"
+      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100"
     >
       <Navbar />
       <main className="mx-auto w-full max-w-[1440px] space-y-4 px-4 py-5 sm:px-6">
-        <header className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 px-5 py-4 text-white shadow-md">
+        <header className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 px-5 py-4 text-white shadow-md">
           <div className="absolute end-0 top-0 size-48 -translate-y-1/2 translate-x-1/3 rounded-full bg-cyan-400/15 blur-3xl rtl:-translate-x-1/3" />
           <div className="relative flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -201,10 +201,10 @@ export function ReportsScreen() {
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-black tracking-tight sm:text-2xl">
+                  <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
                     {copy.title}
                   </h1>
-                  <span className="rounded-md border border-cyan-300/30 bg-cyan-400/10 px-2 py-1 text-xs font-bold text-cyan-100">
+                  <span className="rounded-md border border-cyan-300/30 bg-cyan-400/10 px-2 py-1 text-xs font-semibold text-cyan-100">
                     {copy.readOnly}
                   </span>
                 </div>
@@ -231,7 +231,7 @@ export function ReportsScreen() {
             <nav
               role="tablist"
               aria-label={copy.title}
-              className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-5 dark:border-slate-800 dark:bg-slate-900"
+              className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-5 dark:border-slate-800 dark:bg-slate-900"
             >
               {REPORT_KINDS.map((kind) => {
                 const Icon = TAB_ICON[kind];
@@ -245,7 +245,7 @@ export function ReportsScreen() {
                     aria-selected={selected}
                     aria-controls="report-panel"
                     onClick={() => report.setActiveReport(kind)}
-                    className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
+                    className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
                       selected
                         ? "bg-cyan-700 text-white shadow-sm dark:bg-cyan-600"
                         : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -261,10 +261,10 @@ export function ReportsScreen() {
             <form
               aria-label={copy.filters}
               onSubmit={report.submitFilters}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="inline-flex items-center gap-2 text-base font-black">
+                <h2 className="inline-flex items-center gap-2 text-base font-semibold">
                   <Filter className="size-4 text-cyan-600" aria-hidden="true" />
                   {copy.filters}
                 </h2>
@@ -272,7 +272,7 @@ export function ReportsScreen() {
                   type="button"
                   onClick={report.refresh}
                   disabled={report.isRefreshing}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-cyan-300 bg-cyan-50 px-3 text-sm font-bold text-cyan-800 transition-colors hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-wait disabled:opacity-60 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-950/70"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-cyan-300 bg-cyan-50 px-3 text-sm font-semibold text-cyan-800 transition-colors hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-wait disabled:opacity-60 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-950/70"
                 >
                   <RefreshCw
                     className={`size-4 ${report.isRefreshing ? "animate-spin" : ""}`}
@@ -295,14 +295,14 @@ export function ReportsScreen() {
                   <button
                     type="button"
                     onClick={report.clearFilters}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <RotateCcw className="size-4" aria-hidden="true" />
                     {copy.clear}
                   </button>
                   <button
                     type="submit"
-                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-700 px-4 text-sm font-black text-white hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:bg-cyan-600 dark:hover:bg-cyan-500 dark:focus-visible:ring-offset-slate-900"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-700 px-4 text-sm font-semibold text-white hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:bg-cyan-600 dark:hover:bg-cyan-500 dark:focus-visible:ring-offset-slate-900"
                   >
                     <Filter className="size-4" aria-hidden="true" />
                     {copy.apply}
@@ -323,7 +323,7 @@ export function ReportsScreen() {
               {report.isRefreshing ? (
                 <p
                   role="status"
-                  className="absolute end-3 top-3 z-10 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/95 px-3 py-1.5 text-xs font-bold text-cyan-800 shadow-sm dark:border-cyan-900 dark:bg-slate-950/95 dark:text-cyan-200"
+                  className="absolute end-3 top-3 z-10 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-cyan-800 shadow-sm dark:border-cyan-900 dark:bg-slate-950/95 dark:text-cyan-200"
                 >
                   <Loader2
                     className="size-3.5 animate-spin"
@@ -392,7 +392,7 @@ function ReportFilters({
 
       {kind === "TENANTS" ? (
         <>
-          <label className="grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
+          <label className="grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
             <span>{copy.tenantStatus}</span>
             <select
               value={draft.status}
@@ -424,7 +424,7 @@ function ReportFilters({
       ) : null}
 
       {kind === "TENANTS" || kind === "PROVISIONING" ? (
-        <label className="grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
+        <label className="grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
           <span>{copy.limit}</span>
           <select
             value={draft.limit}
@@ -473,7 +473,7 @@ function ReportInput({
   return (
     <label
       htmlFor={id}
-      className="grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300"
+      className="grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300"
     >
       <span>{label}</span>
       <input
@@ -642,7 +642,7 @@ function OverviewView({
                 <dt>
                   <StatusBadge status={status} />
                 </dt>
-                <dd className="font-mono text-lg font-black">
+                <dd className="font-mono text-lg font-semibold">
                   {formatInteger(count, lang)}
                 </dd>
               </div>
@@ -715,7 +715,7 @@ function TenantView({
           <td className="px-4 py-3">
             <Link
               href={`/tenants/${encodeURIComponent(row.id)}`}
-              className="font-bold text-cyan-700 hover:underline dark:text-cyan-300"
+              className="font-semibold text-cyan-700 hover:underline dark:text-cyan-300"
             >
               {row.name}
             </Link>
@@ -730,7 +730,7 @@ function TenantView({
               copy.unknown
             )}
           </td>
-          <td className="px-4 py-3 font-mono font-bold">
+          <td className="px-4 py-3 font-mono font-semibold">
             {row.allowedUsers === null
               ? copy.unknown
               : formatInteger(row.allowedUsers, lang)}
@@ -809,7 +809,7 @@ function ServersView({
           <td className="px-4 py-3">
             <Link
               href={`/database-servers/${encodeURIComponent(row.id)}`}
-              className="font-bold text-cyan-700 hover:underline dark:text-cyan-300"
+              className="font-semibold text-cyan-700 hover:underline dark:text-cyan-300"
             >
               {row.name}
             </Link>
@@ -824,7 +824,7 @@ function ServersView({
               copy.unknown}
           </td>
           <td className="px-4 py-3">{row.databaseEngine}</td>
-          <td className="px-4 py-3 font-mono font-bold">
+          <td className="px-4 py-3 font-mono font-semibold">
             {formatInteger(row.currentTenants, lang)} /{" "}
             {formatInteger(row.maxTenants, lang)}
           </td>
@@ -839,7 +839,7 @@ function ServersView({
                 )}
                 aria-label={`${copy.utilization}: ${formatPercent(row.utilization, lang)}`}
               />
-              <span className="font-mono font-bold">
+              <span className="font-mono font-semibold">
                 {formatPercent(row.utilization, lang)}
               </span>
             </div>
@@ -860,8 +860,8 @@ function BillingView({
   lang: "ar" | "en";
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="text-base font-black">{copy.invoiceBuckets}</h2>
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h2 className="text-base font-semibold">{copy.invoiceBuckets}</h2>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {data.buckets.map((bucket) => (
           <article
@@ -898,8 +898,8 @@ function ProvisioningView({
 }) {
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-        <span className="text-sm font-bold">{copy.stuck}</span>
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+        <span className="text-sm font-semibold">{copy.stuck}</span>
         <strong className="ms-3 font-mono text-2xl">
           {formatInteger(data.stuck, lang)}
         </strong>
@@ -916,7 +916,7 @@ function ProvisioningView({
             <td className="px-4 py-3">
               <Link
                 href={`/tenants/${encodeURIComponent(row.id)}`}
-                className="font-bold text-cyan-700 hover:underline dark:text-cyan-300"
+                className="font-semibold text-cyan-700 hover:underline dark:text-cyan-300"
               >
                 {row.name}
               </Link>
@@ -944,10 +944,10 @@ function DataTable({
   children: ReactNode;
 }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <table className="w-full min-w-[760px] text-start text-sm">
         <caption className="sr-only">{caption}</caption>
-        <thead className="bg-slate-100 text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           <tr>
             {headers.map((header) => (
               <th key={header} scope="col" className="px-4 py-3 text-start">
@@ -972,8 +972,8 @@ function ReportCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="flex items-center gap-2 text-base font-black text-slate-800 dark:text-slate-100">
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h2 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-100">
         <span className="text-cyan-600">{icon}</span>
         {title}
       </h2>
@@ -993,12 +993,12 @@ function Metric({
 }) {
   return (
     <div className="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800/70">
-      <span className="block text-xs font-bold text-slate-500 dark:text-slate-400">
+      <span className="block text-xs font-semibold text-slate-500 dark:text-slate-400">
         {label}
       </span>
       <strong
         dir={mono ? "ltr" : undefined}
-        className={`mt-1 block text-lg font-black ${mono ? "font-mono text-start" : ""}`}
+        className={`mt-1 block text-lg font-semibold ${mono ? "font-mono text-start" : ""}`}
       >
         {value}
       </strong>
@@ -1022,7 +1022,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span
       dir="ltr"
-      className={`inline-flex rounded-full px-2.5 py-1 font-mono text-xs font-bold ${tone}`}
+      className={`inline-flex rounded-full px-2.5 py-1 font-mono text-xs font-semibold ${tone}`}
     >
       {status}
     </span>
@@ -1102,13 +1102,13 @@ function StatePanel({
   return (
     <section
       role={kind === "error" || kind === "forbidden" ? "alert" : "status"}
-      className={`flex min-h-56 flex-col items-center justify-center rounded-2xl border p-6 text-center shadow-sm ${tone}`}
+      className={`flex min-h-56 flex-col items-center justify-center rounded-xl border p-6 text-center shadow-sm ${tone}`}
     >
       <Icon
         className={`mb-3 size-9 opacity-70 ${kind === "loading" ? "animate-spin" : ""}`}
         aria-hidden="true"
       />
-      <h2 className="text-base font-black">{title}</h2>
+      <h2 className="text-base font-semibold">{title}</h2>
       {detail ? (
         <p className="mt-2 max-w-2xl text-sm leading-6 opacity-80">{detail}</p>
       ) : null}
@@ -1136,7 +1136,7 @@ function RetryButton({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:bg-white dark:text-slate-950"
+      className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:bg-white dark:text-slate-950"
     >
       <RefreshCw className="size-4" aria-hidden="true" />
       {label}
@@ -1160,7 +1160,7 @@ function PageButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-300 px-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
+      className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-300 px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
     >
       {icon}
       {label}

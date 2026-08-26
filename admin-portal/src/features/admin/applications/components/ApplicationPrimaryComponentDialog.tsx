@@ -83,16 +83,16 @@ export function ApplicationPrimaryComponentDialog({
         aria-labelledby="primary-component-title"
         aria-describedby="primary-component-description"
         onKeyDown={onKeyDown}
-        className="w-full max-w-xl overflow-hidden rounded-3xl border border-cyan-300/40 bg-white shadow-2xl dark:border-cyan-900 dark:bg-slate-900"
+        className="w-full max-w-xl overflow-hidden rounded-xl border border-cyan-300/40 bg-white shadow-2xl dark:border-cyan-900 dark:bg-slate-900"
       >
         <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-950 px-5 py-4 text-white dark:border-slate-800">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300">
+            <p className="font-mono text-2xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
               {isAdoption
                 ? t.applications.technicalProvisioning.adoptionEyebrow
                 : t.applications.technicalProvisioning.bindingEyebrow}
             </p>
-            <h2 id="primary-component-title" className="mt-1 flex items-center gap-2 text-sm font-black">
+            <h2 id="primary-component-title" className="mt-1 flex items-center gap-2 text-sm font-semibold">
               <Boxes className="h-4 w-4" />
               {isAdoption
                 ? t.applications.technicalProvisioning.adoptionTitle
@@ -120,12 +120,12 @@ export function ApplicationPrimaryComponentDialog({
         </header>
 
         <form onSubmit={submit} className="space-y-5 p-5">
-          <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-900 dark:bg-cyan-950/20">
-            <div className="flex items-center gap-2 text-xs font-black text-cyan-950 dark:text-cyan-100">
+          <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-900 dark:bg-cyan-950/20">
+            <div className="flex items-center gap-2 text-xs font-semibold text-cyan-950 dark:text-cyan-100">
               <ShieldCheck className="h-4 w-4" />
               {t.applications.technicalProvisioning.authoritativeMapping}
             </div>
-            <dl className="mt-3 grid gap-3 text-[11px] sm:grid-cols-2">
+            <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
               <Mapping label={t.applications.technicalProvisioning.applicationKey} value={applicationKey} />
               <Mapping
                 label={t.applications.technicalProvisioning.workerTarget}
@@ -140,13 +140,13 @@ export function ApplicationPrimaryComponentDialog({
                 value={identity.primaryComponentKey}
               />
             </dl>
-            <p className="mt-3 text-[11px] leading-relaxed text-cyan-800 dark:text-cyan-300">
+            <p className="mt-3 text-xs leading-relaxed text-cyan-800 dark:text-cyan-300">
               {t.applications.technicalProvisioning.safeBoundary}
             </p>
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
               {t.applications.technicalProvisioning.changeReason}
               <textarea
                 ref={initialFocusRef}
@@ -161,7 +161,7 @@ export function ApplicationPrimaryComponentDialog({
             </label>
           </div>
 
-          <p className="font-mono text-[10px] text-slate-500">
+          <p className="font-mono text-xs text-slate-500">
             {t.applications.technicalProvisioning.revisionLabel}: {technicalDefinitionRevision}
           </p>
 
@@ -169,7 +169,7 @@ export function ApplicationPrimaryComponentDialog({
             <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
               <p>{validationError || commandMessage}</p>
               {commandError?.correlationId && (
-                <p className="mt-1 font-mono text-[10px] opacity-75">
+                <p className="mt-1 font-mono text-xs opacity-75">
                   {t.applications.technicalProvisioning.correlationId}: {commandError.correlationId}
                 </p>
               )}
@@ -181,7 +181,7 @@ export function ApplicationPrimaryComponentDialog({
               type="button"
               onClick={close}
               disabled={isSubmitting}
-              className="min-h-11 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="min-h-11 rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {t.applications.cancel}
             </button>
@@ -190,7 +190,7 @@ export function ApplicationPrimaryComponentDialog({
                 type="button"
                 onClick={() => void onRetryExactIntent().then((completed) => completed && onClose())}
                 disabled={isSubmitting}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:opacity-50 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:opacity-50 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 {t.applications.technicalProvisioning.retryExactIntent}
@@ -199,7 +199,7 @@ export function ApplicationPrimaryComponentDialog({
             <button
               type="submit"
               disabled={isSubmitting || isRecoverable}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2 text-xs font-bold text-white hover:bg-cyan-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2 text-xs font-semibold text-white hover:bg-cyan-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
             >
               {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {isSubmitting
@@ -220,8 +220,8 @@ export function ApplicationPrimaryComponentDialog({
 function Mapping({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="font-bold text-cyan-700 dark:text-cyan-300">{label}</dt>
-      <dd className="mt-1 break-all font-mono font-black text-slate-900 dark:text-white" dir="ltr">
+      <dt className="font-semibold text-cyan-700 dark:text-cyan-300">{label}</dt>
+      <dd className="mt-1 break-all font-mono font-semibold text-slate-900 dark:text-white" dir="ltr">
         {value}
       </dd>
     </div>

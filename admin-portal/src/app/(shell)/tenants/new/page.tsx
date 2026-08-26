@@ -78,12 +78,12 @@ export default function RegisterTenantWizardPage() {
   const wizardLocked = isSubmitting || pendingCreateRecovery !== null;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
+      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
         {/* Header Title with Back Button */}
-        <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -101,7 +101,7 @@ export default function RegisterTenantWizardPage() {
               )}
             </button>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 <span>{t.tenants.wizardTitle}</span>
               </h1>
@@ -115,9 +115,9 @@ export default function RegisterTenantWizardPage() {
         {pendingCreateRecovery ? (
           <section
             role="status"
-            className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+            className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
           >
-            <h2 className="font-bold">
+            <h2 className="font-semibold">
               {lang === "ar"
                 ? "نتيجة إنشاء سابقة تحتاج فحص الحالة"
                 : "A previous tenant create needs status recovery"}
@@ -131,7 +131,7 @@ export default function RegisterTenantWizardPage() {
               type="button"
               onClick={() => void recoverTenantCreateStatus()}
               disabled={isRecoveringCreate || !canReadTenants}
-              className="mt-4 min-h-11 rounded-xl bg-amber-800 px-4 text-sm font-bold text-white hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-4 min-h-11 rounded-xl bg-amber-800 px-4 text-sm font-semibold text-white hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isRecoveringCreate
                 ? lang === "ar"
@@ -160,8 +160,8 @@ export default function RegisterTenantWizardPage() {
         ) : null}
 
         {/* Wizard Step Navigation Bar */}
-        <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <div className="grid grid-cols-5 gap-1 text-center text-xs font-bold">
+        <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <div className="grid grid-cols-5 gap-1 text-center text-xs font-semibold">
             <button
               type="button"
               onClick={() => goToStep(1)}
@@ -245,9 +245,9 @@ export default function RegisterTenantWizardPage() {
           >
             {/* Step 1: Identity & Geocoding & Address */}
             {currentStep === 1 && (
-              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs relative overflow-hidden">
+              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs relative overflow-hidden">
                 <div className="absolute top-0 end-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 relative z-10">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 relative z-10">
                   <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span>
                     {lang === "ar"
@@ -258,7 +258,7 @@ export default function RegisterTenantWizardPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {lang === "ar"
                         ? "رمز ورابط المستأجر (name) *"
                         : "Tenant Name Code (name) *"}
@@ -288,7 +288,7 @@ export default function RegisterTenantWizardPage() {
                           !formData.name.trim() ||
                           !formData.companyName.trim()
                         }
-                        className="px-3 py-2 text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-100 transition-colors cursor-pointer"
+                        className="px-3 py-2 text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-100 transition-colors cursor-pointer"
                       >
                         {isValidatingIdentity ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -310,7 +310,7 @@ export default function RegisterTenantWizardPage() {
                       {identityValidationEvidence?.result.fields.name.message ??
                         ""}
                     </p>
-                    <p className="text-[11px] text-slate-400 font-mono">
+                    <p className="text-xs text-slate-400 font-mono">
                       {lang === "ar"
                         ? `النطاق المولد: ${formData.name ? `${formData.name}.mutakamel.ai` : "name.mutakamel.ai"}`
                         : `Derived FQDN: ${formData.name ? `${formData.name}.mutakamel.ai` : "name.mutakamel.ai"}`}
@@ -318,7 +318,7 @@ export default function RegisterTenantWizardPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {t.tenants.detailsTab.companyName} *
                     </label>
                     <input
@@ -368,7 +368,7 @@ export default function RegisterTenantWizardPage() {
                   >
                     <p>{identityValidationError.message}</p>
                     {identityValidationError.correlationId ? (
-                      <p className="mt-1 font-mono text-[10px]">
+                      <p className="mt-1 font-mono text-xs">
                         Correlation ID: {identityValidationError.correlationId}
                       </p>
                     ) : null}
@@ -377,7 +377,7 @@ export default function RegisterTenantWizardPage() {
 
                 <div className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {t.tenants.detailsTab.industry}
                     </label>
                     <input
@@ -391,7 +391,7 @@ export default function RegisterTenantWizardPage() {
                   </div>
 
                   <div className="space-y-1 lg:col-span-2">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {lang === "ar" ? "الدولة" : "Country"}
                     </label>
                     <CountrySelect
@@ -413,7 +413,7 @@ export default function RegisterTenantWizardPage() {
                     />
                     {formData.countryName ? (
                       <p
-                        className="font-mono text-[10px] text-slate-500 dark:text-slate-400"
+                        className="font-mono text-xs text-slate-500 dark:text-slate-400"
                         dir="ltr"
                       >
                         {formData.countryName} · {formData.countryIsoCode}
@@ -422,7 +422,7 @@ export default function RegisterTenantWizardPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {t.tenants.detailsTab.timezone}
                     </label>
                     <select
@@ -452,7 +452,7 @@ export default function RegisterTenantWizardPage() {
 
                 {/* Address & Tax Information */}
                 <div className="pt-3 space-y-3">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-rose-500" />
                     <span>{t.tenants.detailsTab.addressSection}</span>
                   </span>
@@ -602,8 +602,8 @@ export default function RegisterTenantWizardPage() {
 
             {/* Step 2: Owner Contact Details */}
             {currentStep === 2 && (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
                   <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>
                     {lang === "ar"
@@ -614,7 +614,7 @@ export default function RegisterTenantWizardPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {lang === "ar"
                         ? "البريد الإلكتروني للمالك *"
                         : "Owner Email *"}
@@ -632,7 +632,7 @@ export default function RegisterTenantWizardPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {lang === "ar" ? "الاسم الأول *" : "First Name *"}
                     </label>
                     <input
@@ -651,7 +651,7 @@ export default function RegisterTenantWizardPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {lang === "ar" ? "الاسم الأخير *" : "Last Name *"}
                     </label>
                     <input
@@ -672,7 +672,7 @@ export default function RegisterTenantWizardPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {lang === "ar" ? "المسمى الوظيفي" : "Job Title"}
                     </label>
                     <input
@@ -689,7 +689,7 @@ export default function RegisterTenantWizardPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       {t.tenants.detailsTab.phone}
                     </label>
                     <input
@@ -704,7 +704,7 @@ export default function RegisterTenantWizardPage() {
                 </div>
 
                 <div className="flex items-center gap-6 pt-3">
-                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700 dark:text-slate-300">
                     <input
                       type="checkbox"
                       checked={formData.sendInvitation}
@@ -781,8 +781,8 @@ export default function RegisterTenantWizardPage() {
 
             {/* Step 5: Final Review & Submit */}
             {currentStep === 5 && (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>
                     {lang === "ar"
@@ -796,7 +796,7 @@ export default function RegisterTenantWizardPage() {
                     <span className="text-slate-500">
                       {t.tenants.tenantName}:
                     </span>
-                    <span className="font-bold font-mono">
+                    <span className="font-semibold font-mono">
                       {formData.name} ({formData.companyName})
                     </span>
                   </div>
@@ -804,7 +804,7 @@ export default function RegisterTenantWizardPage() {
                     <span className="text-slate-500">
                       {t.tenants.primaryFqdn}:
                     </span>
-                    <span className="font-bold font-mono text-blue-600">
+                    <span className="font-semibold font-mono text-blue-600">
                       {formData.name}.mutakamel.ai
                     </span>
                   </div>
@@ -812,7 +812,7 @@ export default function RegisterTenantWizardPage() {
                     <span className="text-slate-500">
                       {lang === "ar" ? "المالك الرئيسي:" : "Primary Owner:"}
                     </span>
-                    <span className="font-bold">
+                    <span className="font-semibold">
                       {formData.ownerFirstName} {formData.ownerLastName} (
                       {formData.ownerEmail})
                     </span>
@@ -821,7 +821,7 @@ export default function RegisterTenantWizardPage() {
                     <span className="text-slate-500">
                       {t.tenants.hostingServer}:
                     </span>
-                    <span className="text-end font-mono font-bold">
+                    <span className="text-end font-mono font-semibold">
                       {selectedDatabasePlacement
                         ? `${selectedDatabasePlacement.name} (${selectedDatabasePlacement.id})`
                         : lang === "ar"
@@ -833,7 +833,7 @@ export default function RegisterTenantWizardPage() {
                     <span className="text-slate-500">
                       {lang === "ar" ? "سيرفر التخزين:" : "Storage Server:"}
                     </span>
-                    <span className="font-bold font-mono text-end">
+                    <span className="font-semibold font-mono text-end">
                       {selectedStoragePlacement
                         ? `${selectedStoragePlacement.name} (${selectedStoragePlacement.id})`
                         : lang === "ar"
@@ -853,10 +853,10 @@ export default function RegisterTenantWizardPage() {
                           key={line.applicationId}
                           className="rounded-lg bg-white px-3 py-2 dark:bg-slate-900"
                         >
-                          <span className="font-bold">
+                          <span className="font-semibold">
                             {line.applicationName}
                           </span>
-                          <span className="ms-2 font-mono text-[10px] text-slate-500">
+                          <span className="ms-2 font-mono text-xs text-slate-500">
                             {line.tierKey} · {line.seats}{" "}
                             {lang === "ar" ? "مقعد" : "seats"}
                           </span>
@@ -869,7 +869,7 @@ export default function RegisterTenantWizardPage() {
                       <span className="text-slate-500">
                         {lang === "ar" ? "خطة التجهيز:" : "Provisioning plan:"}
                       </span>
-                      <span className="text-end font-bold">
+                      <span className="text-end font-semibold">
                         {provisioningPreview.components.length}{" "}
                         {lang === "ar" ? "مكون" : "components"} ·{" "}
                         {provisioningPreview.steps.length}{" "}
@@ -882,12 +882,12 @@ export default function RegisterTenantWizardPage() {
             )}
 
             {/* Wizard Controls Footer */}
-            <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+            <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <button
                 type="button"
                 onClick={prevStep}
                 disabled={currentStep === 1}
-                className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-40"
+                className="px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-40"
               >
                 {lang === "ar" ? "السابق" : "Previous"}
               </button>
@@ -896,7 +896,7 @@ export default function RegisterTenantWizardPage() {
                 <button
                   type="button"
                   onClick={nextStep}
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-600/20 transition-colors cursor-pointer"
+                  className="px-5 py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-600/20 transition-colors cursor-pointer"
                 >
                   {lang === "ar" ? "التالي" : "Next Step"}
                 </button>
@@ -911,7 +911,7 @@ export default function RegisterTenantWizardPage() {
                     !hasValidDatabaseSelection ||
                     !hasValidStorageSelection
                   }
-                  className="px-6 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-600/20 transition-colors cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
+                  className="px-6 py-2.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-600/20 transition-colors cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

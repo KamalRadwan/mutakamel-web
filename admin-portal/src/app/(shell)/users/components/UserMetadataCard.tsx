@@ -38,9 +38,9 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
       <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
-        <h2 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+        <h2 className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-blue-500" />
           <span>{lang === "ar" ? "معلومات النظام والنشاط" : "System & Activity Metadata"}</span>
         </h2>
@@ -72,7 +72,7 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
         {user.sessionVersion !== undefined && (
           <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-800/50">
             <span className="text-slate-500">{t.users.sessionVersion}</span>
-            <span className="font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[11px]">
+            <span className="font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs">
               v{user.sessionVersion}
             </span>
           </div>
@@ -81,7 +81,7 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
         {user.failedLoginAttempts !== undefined && user.failedLoginAttempts > 0 && (
           <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-800/50">
             <span className="text-slate-500">{t.users.failedLoginAttempts}</span>
-            <span className="font-mono px-2 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 font-bold text-[11px] flex items-center gap-1">
+            <span className="font-mono px-2 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 font-semibold text-xs flex items-center gap-1">
               <ShieldAlert className="w-3 h-3" />
               {user.failedLoginAttempts}
             </span>
@@ -91,7 +91,7 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
         {user.lockedUntil && (
           <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-800/50">
             <span className="text-slate-500">{t.users.lockedUntil}</span>
-            <span className="font-mono text-rose-600 dark:text-rose-400 font-bold text-[11px]">
+            <span className="font-mono text-rose-600 dark:text-rose-400 font-semibold text-xs">
               {formatDate(user.lockedUntil)}
             </span>
           </div>
@@ -100,7 +100,7 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
         <div className="flex items-center justify-between pt-1">
           <span className="text-slate-500">ID</span>
           <div className="flex items-center gap-1">
-            <span className="font-mono text-[10px] text-slate-400 truncate max-w-[140px]">
+            <span className="font-mono text-xs text-slate-400 truncate max-w-[140px]">
               {user.id}
             </span>
             <button

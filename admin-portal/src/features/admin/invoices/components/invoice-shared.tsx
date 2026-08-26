@@ -263,7 +263,7 @@ export function InvoicePageFrame({
   dir: "rtl" | "ltr";
 }) {
   return (
-    <div dir={dir} className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100">
+    <div dir={dir} className="min-h-screen bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100">
       <Navbar />
       <main className="mx-auto w-full max-w-[1600px] space-y-4 px-4 py-5 sm:px-6 lg:px-8">
         {children}
@@ -274,7 +274,7 @@ export function InvoicePageFrame({
 
 export function InvoiceHero({ copy, action }: { copy: InvoiceCopy; action?: ReactNode }) {
   return (
-    <header className="overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 px-5 py-5 text-white shadow-md">
+    <header className="overflow-hidden rounded-xl border border-indigo-500/20 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 px-5 py-5 text-white shadow-md">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-indigo-300/30 bg-indigo-400/15 text-indigo-200">
@@ -282,8 +282,8 @@ export function InvoiceHero({ copy, action }: { copy: InvoiceCopy; action?: Reac
           </span>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-black tracking-tight sm:text-2xl">{copy.title}</h1>
-              <span className="rounded-md border border-indigo-300/30 bg-indigo-400/10 px-2 py-1 text-xs font-bold text-indigo-100">
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{copy.title}</h1>
+              <span className="rounded-md border border-indigo-300/30 bg-indigo-400/10 px-2 py-1 text-xs font-semibold text-indigo-100">
                 {copy.readOnly}
               </span>
             </div>
@@ -318,9 +318,9 @@ export function InvoiceStatePanel({
       ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
       : "border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200";
   return (
-    <section role={kind === "error" || kind === "forbidden" ? "alert" : "status"} className={`flex min-h-56 flex-col items-center justify-center rounded-2xl border p-6 text-center shadow-sm ${tone}`}>
+    <section role={kind === "error" || kind === "forbidden" ? "alert" : "status"} className={`flex min-h-56 flex-col items-center justify-center rounded-xl border p-6 text-center shadow-sm ${tone}`}>
       <Icon className={`mb-3 size-9 opacity-70 ${kind === "loading" ? "animate-spin" : ""}`} aria-hidden="true" />
-      <h2 className="text-base font-black">{title}</h2>
+      <h2 className="text-base font-semibold">{title}</h2>
       {detail ? <p className="mt-2 max-w-2xl text-sm leading-6 opacity-85">{detail}</p> : null}
       {correlationId ? (
         <p className="mt-2 max-w-full text-xs">
@@ -346,7 +346,7 @@ export function InvoiceMutationNotice({ mutation, copy }: { mutation: InvoiceMut
   const danger = mutation.phase === "ERROR" || mutation.phase === "FORBIDDEN";
   return (
     <div role={danger ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm ${danger ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100" : mutation.phase === "SUCCEEDED" ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100" : "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"}`}>
-      <p className="font-bold">{message}</p>
+      <p className="font-semibold">{message}</p>
       {mutation.error ? <p className="mt-1 leading-6">{mutation.error.message}</p> : null}
       {mutation.error?.errorCode ? <code dir="ltr" className="mt-1 block break-all text-xs">{mutation.error.errorCode}</code> : null}
       {mutation.correlationId ? <p className="mt-1 text-xs"><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{mutation.correlationId}</code></p> : null}
@@ -373,7 +373,7 @@ export function InvoiceStatusBadge({ status }: { status: Invoice["status"] }) {
         : status === "OVERDUE"
           ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200"
           : "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200";
-  return <span dir="ltr" className={`inline-flex rounded-full px-2.5 py-1 font-mono text-xs font-bold ${tone}`}>{status}</span>;
+  return <span dir="ltr" className={`inline-flex rounded-full px-2.5 py-1 font-mono text-xs font-semibold ${tone}`}>{status}</span>;
 }
 
 export function InvoiceFieldError({ id, code, copy }: { id: string; code?: InvoiceValidationCode; copy: InvoiceCopy }) {
@@ -423,5 +423,5 @@ export function formatInvoiceMoney(value: string, currency: string): string {
 }
 
 export function RetryInvoiceButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-white dark:text-slate-950"><RefreshCw className="size-4" aria-hidden="true" />{label}</button>;
+  return <button type="button" onClick={onClick} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-white dark:text-slate-950"><RefreshCw className="size-4" aria-hidden="true" />{label}</button>;
 }

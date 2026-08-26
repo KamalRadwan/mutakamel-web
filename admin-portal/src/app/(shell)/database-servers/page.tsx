@@ -88,12 +88,12 @@ function DatabaseServersContent() {
   const canDestroy = adminCanAll(user, ADMIN_RBAC_CRITICAL.DB_SERVERS_DESTROY);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
+      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
         {/* Header Title Section with Compact Gradient Accents */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl border border-blue-500/20 shadow-md">
+        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-xl border border-blue-500/20 shadow-md">
           <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-blue-500/20 via-cyan-500/20 to-teal-500/0 rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -103,14 +103,14 @@ function DatabaseServersContent() {
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-base sm:text-lg font-bold tracking-tight text-white">
+                  <h1 className="text-base sm:text-lg font-semibold tracking-tight text-white">
                     Database Servers
                   </h1>
-                  <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-md">
+                  <span className="px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-md">
                     PostgreSQL Nodes
                   </span>
                 </div>
-                <p className="text-[11px] text-blue-200/80 mt-0.5 max-w-xl leading-tight">
+                <p className="text-xs text-blue-200/80 mt-0.5 max-w-xl leading-tight">
                   Physical PostgreSQL database host nodes, application placement
                   targets, and tenant schema allocations.
                 </p>
@@ -120,7 +120,7 @@ function DatabaseServersContent() {
             {canCreate && (
               <Link
                 href="/database-servers/new"
-                className="px-3.5 py-2 text-xs font-bold bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0 border border-white/20"
+                className="px-3.5 py-2 text-xs font-semibold bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0 border border-white/20"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Register Server</span>
@@ -132,88 +132,88 @@ function DatabaseServersContent() {
         {/* Summary Metrics Cards with Distinct Colorful Glows */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total Servers */}
-          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-slate-200/80 dark:border-blue-500/20 shadow-sm hover:shadow-md transition-all">
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-xl border border-slate-200/80 dark:border-blue-500/20 shadow-sm hover:shadow-md transition-all">
             <div className="absolute top-0 end-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Total Hosts
               </span>
               <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-200 dark:border-blue-800/50">
                 <Server className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2 font-mono">
+            <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mt-2 font-mono">
               {summaryMetrics.totalServers}
             </div>
-            <div className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-1">
+            <div className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1">
               Registered Physical Cluster
             </div>
           </div>
 
           {/* Active Servers */}
-          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-slate-200/80 dark:border-emerald-500/20 shadow-sm hover:shadow-md transition-all">
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-xl border border-slate-200/80 dark:border-emerald-500/20 shadow-sm hover:shadow-md transition-all">
             <div className="absolute top-0 end-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Active Nodes
               </span>
               <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
                 <Server className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2 font-mono flex items-center gap-2">
+            <div className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400 mt-2 font-mono flex items-center gap-2">
               {summaryMetrics.activeServers}
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
             </div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
+            <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
               Healthy & Accepting Placements
             </div>
           </div>
 
           {/* Draining Servers */}
-          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-slate-200/80 dark:border-amber-500/20 shadow-sm hover:shadow-md transition-all">
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-xl border border-slate-200/80 dark:border-amber-500/20 shadow-sm hover:shadow-md transition-all">
             <div className="absolute top-0 end-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Draining
               </span>
               <div className="p-2 bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-200 dark:border-amber-800/50">
                 <Server className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-2 font-mono">
+            <div className="text-2xl font-semibold text-amber-600 dark:text-amber-400 mt-2 font-mono">
               {summaryMetrics.drainingServers}
             </div>
-            <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-1">
+            <div className="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-1">
               Migrating & Evacuated
             </div>
           </div>
 
           {/* Offline Servers */}
-          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-slate-200/80 dark:border-rose-500/20 shadow-sm hover:shadow-md transition-all">
+          <div className="relative overflow-hidden bg-white dark:bg-slate-900/90 p-5 rounded-xl border border-slate-200/80 dark:border-rose-500/20 shadow-sm hover:shadow-md transition-all">
             <div className="absolute top-0 end-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Offline Hosts
               </span>
               <div className="p-2 bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-200 dark:border-rose-800/50">
                 <Server className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-2 font-mono">
+            <div className="text-2xl font-semibold text-rose-600 dark:text-rose-400 mt-2 font-mono">
               {summaryMetrics.offlineServers}
             </div>
-            <div className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1">
+            <div className="text-xs text-rose-600 dark:text-rose-400 font-semibold mt-1">
               Disabled / Maintenance
             </div>
           </div>
         </div>
 
         {/* Search & Filter Bar */}
-        <div className="bg-white dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="bg-white dark:bg-slate-900/90 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 text-blue-500 absolute top-3.5 start-3.5" />
             <input
@@ -266,11 +266,11 @@ function DatabaseServersContent() {
         </div>
 
         {/* Dynamic Colorful Table View */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-start">
               <thead>
-                <tr className="bg-slate-100/70 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-extrabold uppercase tracking-wider">
+                <tr className="bg-slate-100/70 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-semibold uppercase tracking-wider">
                   <th className="py-4 px-5 text-start">Server Name</th>
                   <th className="py-4 px-5 text-start">Host & Port</th>
                   <th className="py-4 px-5 text-start">Location</th>
@@ -295,7 +295,7 @@ function DatabaseServersContent() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="py-12 text-center text-rose-500 font-bold"
+                      className="py-12 text-center text-rose-500 font-semibold"
                     >
                       {error}
                     </td>
@@ -317,25 +317,25 @@ function DatabaseServersContent() {
                     >
                       <td className="py-4 px-5">
                         {srv.deletedAt ? (
-                          <span className="inline-block font-bold text-sm text-slate-500 dark:text-slate-400">
+                          <span className="inline-block font-semibold text-sm text-slate-500 dark:text-slate-400">
                             {srv.name}
                           </span>
                         ) : (
                           <Link
                             href={`/database-servers/${srv.id}`}
-                            className="group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors inline-block font-bold text-sm text-slate-900 dark:text-slate-100"
+                            className="group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors inline-block font-semibold text-sm text-slate-900 dark:text-slate-100"
                           >
                             {srv.name}
                           </Link>
                         )}
                       </td>
                       <td className="py-4 px-5 font-mono">
-                        <span className="bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700/60 font-semibold text-[11px] text-slate-700 dark:text-slate-300">
+                        <span className="bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700/60 font-semibold text-xs text-slate-700 dark:text-slate-300">
                           {srv.host}:{srv.port}
                         </span>
                       </td>
                       <td className="py-4 px-5">
-                        <span className="px-2.5 py-1 bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 rounded-lg border border-cyan-200 dark:border-cyan-900/60 font-semibold text-[11px]">
+                        <span className="px-2.5 py-1 bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 rounded-lg border border-cyan-200 dark:border-cyan-900/60 font-semibold text-xs">
                           {srv.countryName || srv.countryIsoCode}
                         </span>
                       </td>
@@ -349,7 +349,7 @@ function DatabaseServersContent() {
                               }}
                             />
                           </div>
-                          <span className="font-bold text-slate-700 dark:text-slate-300 font-mono">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300 font-mono">
                             {srv.currentTenants} / {srv.maxTenants}
                           </span>
                         </div>
@@ -361,7 +361,7 @@ function DatabaseServersContent() {
                             enumType="db-server"
                           />
                           {srv.deletedAt && (
-                            <span className="text-[10px] font-medium text-slate-400">
+                            <span className="text-xs font-medium text-slate-400">
                               {lang === "ar"
                                 ? `الحالة السابقة: ${srv.status}`
                                 : `Previous state: ${srv.status}`}
@@ -375,7 +375,7 @@ function DatabaseServersContent() {
                             type="button"
                             onClick={() => openDestroy(srv)}
                             disabled={destroyingServerId === srv.id}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-700 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-700 dark:bg-rose-800 dark:hover:bg-rose-900 dark:focus-visible:ring-offset-slate-900"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-700 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-700 dark:bg-rose-800 dark:hover:bg-rose-900 dark:focus-visible:ring-offset-slate-900"
                           >
                             <ShieldAlert
                               className="h-3.5 w-3.5"
@@ -388,7 +388,7 @@ function DatabaseServersContent() {
                             type="button"
                             onClick={() => openSoftDelete(srv)}
                             disabled={deletingServerId === srv.id}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/60 dark:focus-visible:ring-offset-slate-900"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/60 dark:focus-visible:ring-offset-slate-900"
                           >
                             <Trash2
                               className="h-3.5 w-3.5"
@@ -397,7 +397,7 @@ function DatabaseServersContent() {
                             {lang === "ar" ? "حذف" : "Delete"}
                           </button>
                         ) : (
-                          <span className="text-[11px] text-slate-400">—</span>
+                          <span className="text-xs text-slate-400">—</span>
                         )}
                       </td>
                     </tr>
@@ -464,20 +464,20 @@ function DatabaseServersBoundary({
   return (
     <div
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100"
+      className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100"
     >
       <Navbar />
       <main className="grid flex-1 place-items-center p-6">
         <section
           role={loading ? "status" : undefined}
-          className="flex max-w-xl flex-col items-center rounded-2xl border border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-950"
+          className="flex max-w-xl flex-col items-center rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-950"
         >
           {loading ? (
             <Server className="size-8 animate-pulse text-blue-500" />
           ) : (
             <ShieldAlert className="size-8 text-amber-500" />
           )}
-          <h1 className="mt-3 font-black">{message}</h1>
+          <h1 className="mt-3 font-semibold">{message}</h1>
         </section>
       </main>
     </div>

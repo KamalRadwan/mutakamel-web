@@ -153,18 +153,18 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
         <>
           <RolloutSummary rollout={rollout} copy={copy} />
           {view.rollout.data ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
               <FleetMeta result={view.rollout.data} copy={copy} />
             </div>
           ) : null}
 
-          <section className="space-y-4 rounded-2xl border border-amber-300 bg-white p-5 shadow-sm dark:border-amber-900 dark:bg-slate-900">
+          <section className="space-y-4 rounded-xl border border-amber-300 bg-white p-5 shadow-sm dark:border-amber-900 dark:bg-slate-900">
             <header>
-              <h2 className="text-xl font-black">{copy.lifecycleControls}</h2>
+              <h2 className="text-xl font-semibold">{copy.lifecycleControls}</h2>
               <p className="mt-1 text-xs text-slate-500">{copy.reasonHint}</p>
             </header>
             {!view.permissions.canManage ? (
-              <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                 {copy.forbiddenManage}
               </p>
             ) : (
@@ -173,12 +173,12 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
                 className="space-y-4"
               >
                 <fieldset disabled={pendingManage} className="grid gap-3 md:grid-cols-2">
-                  <label htmlFor="fleet-manage-revision" className="grid gap-1.5 text-sm font-bold">
+                  <label htmlFor="fleet-manage-revision" className="grid gap-1.5 text-sm font-semibold">
                     <span>{copy.expectedRevision}</span>
                     <input id="fleet-manage-revision" type="number" min={1} step={1} inputMode="numeric" value={manageDraft.expectedRevision || String(rollout.revision)} onChange={(event) => setManageDraft((current) => ({ ...current, expectedRevision: event.target.value }))} aria-invalid={Boolean(manageErrors.expectedRevision)} aria-describedby={manageErrors.expectedRevision ? "fleet-manage-revision-error" : undefined} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950" />
                     <FleetFieldError id="fleet-manage-revision-error" code={manageErrors.expectedRevision} copy={copy} />
                   </label>
-                  <label htmlFor="fleet-manage-reason" className="grid gap-1.5 text-sm font-bold">
+                  <label htmlFor="fleet-manage-reason" className="grid gap-1.5 text-sm font-semibold">
                     <span>{copy.reasonCode}</span>
                     <input id="fleet-manage-reason" dir="ltr" value={manageDraft.reasonCode} onChange={(event) => setManageDraft((current) => ({ ...current, reasonCode: event.target.value }))} aria-invalid={Boolean(manageErrors.reasonCode)} aria-describedby={manageErrors.reasonCode ? "fleet-manage-reason-error" : undefined} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-start font-mono text-xs uppercase dark:border-slate-700 dark:bg-slate-950" />
                     <FleetFieldError id="fleet-manage-reason-error" code={manageErrors.reasonCode} copy={copy} />
@@ -186,7 +186,7 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
                 </fieldset>
                 <div className="flex flex-wrap gap-2">
                   {(["pause", "resume", "cancel"] as FleetManageAction[]).map((action) => (
-                    <button key={action} type="button" disabled={pendingManage || !isFleetActionAllowed(rollout.status, action)} onClick={() => prepareManage(action)} className={`min-h-11 rounded-xl px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-35 ${action === "cancel" ? "bg-rose-700" : action === "pause" ? "bg-amber-700" : "bg-emerald-700"}`}>
+                    <button key={action} type="button" disabled={pendingManage || !isFleetActionAllowed(rollout.status, action)} onClick={() => prepareManage(action)} className={`min-h-11 rounded-xl px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-35 ${action === "cancel" ? "bg-rose-700" : action === "pause" ? "bg-amber-700" : "bg-emerald-700"}`}>
                       {copy[action]}
                     </button>
                   ))}
@@ -205,8 +205,8 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
         </>
       ) : null}
 
-      <section className="space-y-4 rounded-2xl border border-indigo-300 bg-white p-5 shadow-sm dark:border-indigo-900 dark:bg-slate-900">
-            <h2 className="text-xl font-black">{copy.report}</h2>
+      <section className="space-y-4 rounded-xl border border-indigo-300 bg-white p-5 shadow-sm dark:border-indigo-900 dark:bg-slate-900">
+            <h2 className="text-xl font-semibold">{copy.report}</h2>
             <FleetStatePanel
               state={view.authLoading ? "LOADING" : view.report.state}
               error={view.report.error}
@@ -233,27 +233,27 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
 
                 {report.status === "READY_FOR_ATTESTATION" ? (
                   !view.permissions.canAttest ? (
-                    <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                    <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                       {copy.forbiddenAttest}
                     </p>
                   ) : (
-                    <form aria-label={copy.attestation} onSubmit={prepareAttestation} noValidate className="space-y-4 rounded-2xl border border-rose-300 bg-rose-50/50 p-4 dark:border-rose-900 dark:bg-rose-950/10">
+                    <form aria-label={copy.attestation} onSubmit={prepareAttestation} noValidate className="space-y-4 rounded-xl border border-rose-300 bg-rose-50/50 p-4 dark:border-rose-900 dark:bg-rose-950/10">
                       <header>
-                        <h3 className="text-lg font-black">{copy.attestation}</h3>
+                        <h3 className="text-lg font-semibold">{copy.attestation}</h3>
                         <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">{copy.signatureHint}</p>
                       </header>
                       <fieldset disabled={pendingAttest} className="grid gap-3 md:grid-cols-2">
                         <AttestationField id="fleet-attest-revision" label={copy.expectedRevision} value={attestationDraft.expectedRevision || String(report.revision)} error={attestationErrors.expectedRevision} copy={copy} type="number" onChange={(expectedRevision) => setAttestationDraft((current) => ({ ...current, expectedRevision }))} />
                         <AttestationField id="fleet-publisher-key" label={copy.publisherKeyId} value={attestationDraft.publisherKeyId} error={attestationErrors.publisherKeyId} copy={copy} onChange={(publisherKeyId) => setAttestationDraft((current) => ({ ...current, publisherKeyId }))} />
                       </fieldset>
-                      <label htmlFor="fleet-signature" className="grid gap-1.5 text-sm font-bold">
+                      <label htmlFor="fleet-signature" className="grid gap-1.5 text-sm font-semibold">
                         <span>{copy.signatureBase64}</span>
                         <textarea id="fleet-signature" dir="ltr" spellCheck={false} rows={4} value={attestationDraft.signatureBase64} onChange={(event) => setAttestationDraft((current) => ({ ...current, signatureBase64: event.target.value }))} aria-invalid={Boolean(attestationErrors.signatureBase64)} aria-describedby={`fleet-signature-hint${attestationErrors.signatureBase64 ? " fleet-signature-error" : ""}`} className="rounded-xl border border-slate-300 bg-white p-3 text-start font-mono text-xs dark:border-slate-700 dark:bg-slate-950" />
                         <span id="fleet-signature-hint" className="text-xs font-normal text-slate-500">{copy.signatureHint}</span>
                         <FleetFieldError id="fleet-signature-error" code={attestationErrors.signatureBase64} copy={copy} />
                       </label>
                       <FleetCommandNotice view={view.attestCommand} copy={copy} onRetryExact={() => void view.retryAttestExact()} onClear={view.clearAttestCommand} />
-                      <button type="submit" disabled={pendingAttest} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-black text-white disabled:opacity-50">
+                      <button type="submit" disabled={pendingAttest} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-semibold text-white disabled:opacity-50">
                         {pendingAttest ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
                         {pendingAttest ? copy.attesting : copy.attest}
                       </button>
@@ -288,16 +288,16 @@ function RolloutSummary({ rollout, copy }: { rollout: FleetRollout; copy: Return
     ? Math.min(100, Math.round(((rollout.completedCount + rollout.failedCount) / rollout.totalCount) * 100))
     : 0;
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black">{copy.rolloutDetail}</h2>
+          <h2 className="text-xl font-semibold">{copy.rolloutDetail}</h2>
           <code dir="ltr" className="mt-1 block break-all text-start text-xs text-slate-500">{rollout.rolloutId}</code>
         </div>
-        <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-900 dark:bg-cyan-950 dark:text-cyan-100">{copy.rolloutStatus[rollout.status]}</span>
+        <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-900 dark:bg-cyan-950 dark:text-cyan-100">{copy.rolloutStatus[rollout.status]}</span>
       </div>
       <div>
-        <div className="mb-1 flex justify-between text-xs font-bold"><span>{copy.progress}</span><span>{progress}%</span></div>
+        <div className="mb-1 flex justify-between text-xs font-semibold"><span>{copy.progress}</span><span>{progress}%</span></div>
         <div role="progressbar" aria-label={copy.progress} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-full rounded-full bg-cyan-600" style={{ width: `${progress}%` }} /></div>
       </div>
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -322,7 +322,7 @@ function RolloutSummary({ rollout, copy }: { rollout: FleetRollout; copy: Return
         <FleetDatum label={copy.completedAt} value={formatInstant(rollout.completedAt)} />
       </dl>
       <div className="space-y-2">
-        <h3 className="text-sm font-black">{copy.targets}</h3>
+        <h3 className="text-sm font-semibold">{copy.targets}</h3>
         {rollout.targetSelection.length ? rollout.targetSelection.map((target) => (
           <code key={target.componentKey} dir="ltr" className="block break-all rounded-xl bg-slate-100 p-3 text-start text-xs dark:bg-slate-950">{JSON.stringify(target)}</code>
         )) : <p className="text-sm text-slate-500">{copy.none}</p>}
@@ -333,10 +333,10 @@ function RolloutSummary({ rollout, copy }: { rollout: FleetRollout; copy: Return
 
 function RolloutTenants({ view, copy }: { view: ReturnType<typeof useFleetRollout>; copy: ReturnType<typeof getProvisioningFleetCopy> }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-black">{copy.tenantEvidence}</h2>
-        <span className="text-sm font-bold text-slate-500">{copy.total}: {view.tenants.data?.total ?? 0}</span>
+        <h2 className="text-xl font-semibold">{copy.tenantEvidence}</h2>
+        <span className="text-sm font-semibold text-slate-500">{copy.total}: {view.tenants.data?.total ?? 0}</span>
       </header>
       <FleetStatePanel state={view.tenants.state} error={view.tenants.error} copy={copy} invalid={view.routeValid ? copy.contractError : copy.invalidRouteId} onRetry={view.refresh} />
       {view.tenants.state === "EMPTY" ? <p className="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-600 dark:bg-slate-950 dark:text-slate-300">{copy.emptyTenants}</p> : null}
@@ -355,7 +355,7 @@ function RolloutTenants({ view, copy }: { view: ReturnType<typeof useFleetRollou
                   <td dir="ltr" className="px-3 py-3 text-start font-mono text-xs">{tenant.tenantId}</td>
                   <td className="px-3 py-3">{tenant.deterministicRank}</td>
                   <td className="px-3 py-3">{tenant.batchNumber}</td>
-                  <td className="px-3 py-3 font-bold">{copy.tenantStatus[tenant.status]}</td>
+                  <td className="px-3 py-3 font-semibold">{copy.tenantStatus[tenant.status]}</td>
                   <td dir="ltr" className="px-3 py-3 text-start font-mono text-xs">{tenant.operationId ?? copy.none}</td>
                   <td dir="ltr" className="px-3 py-3 text-start font-mono text-xs">{tenant.eligibilityDigest}</td>
                   <td dir="ltr" className="px-3 py-3 text-start font-mono text-xs">{tenant.evidenceDigest ?? copy.none}</td>
@@ -377,7 +377,7 @@ function ReportDetail({ report, copy, copied, onCopy }: { report: FleetReport; c
   const statusLabel = report.status === "NOT_READY" ? copy.reportNotReady : report.status === "READY_FOR_ATTESTATION" ? copy.readyForAttestation : copy.attested;
   return (
     <div className="space-y-4">
-      <div className="rounded-xl bg-indigo-50 p-4 text-sm font-black text-indigo-950 dark:bg-indigo-950/30 dark:text-indigo-100">{statusLabel}</div>
+      <div className="rounded-xl bg-indigo-50 p-4 text-sm font-semibold text-indigo-950 dark:bg-indigo-950/30 dark:text-indigo-100">{statusLabel}</div>
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <FleetDatum label={copy.rolloutId} value={report.rolloutId} mono />
         <FleetDatum label={copy.revision} value={report.revision} />
@@ -392,10 +392,10 @@ function ReportDetail({ report, copy, copied, onCopy }: { report: FleetReport; c
         <FleetDatum label={copy.attestedByActorRef} value={report.attestedByActorRef ?? copy.none} mono />
       </dl>
       {report.payloadBase64 ? (
-        <label htmlFor="fleet-report-payload" className="grid gap-2 text-sm font-bold">
+        <label htmlFor="fleet-report-payload" className="grid gap-2 text-sm font-semibold">
           <span>{copy.payloadBase64}</span>
           <textarea id="fleet-report-payload" dir="ltr" readOnly rows={7} value={report.payloadBase64} className="rounded-xl border border-slate-300 bg-slate-50 p-3 text-start font-mono text-xs dark:border-slate-700 dark:bg-slate-950" />
-          <button type="button" onClick={onCopy} className="w-fit min-h-10 rounded-xl border border-indigo-300 px-4 text-xs font-black text-indigo-800 dark:border-indigo-900 dark:text-indigo-200">{copied ? copy.copied : copy.copyPayload}</button>
+          <button type="button" onClick={onCopy} className="w-fit min-h-10 rounded-xl border border-indigo-300 px-4 text-xs font-semibold text-indigo-800 dark:border-indigo-900 dark:text-indigo-200">{copied ? copy.copied : copy.copyPayload}</button>
         </label>
       ) : null}
     </div>
@@ -405,7 +405,7 @@ function ReportDetail({ report, copy, copied, onCopy }: { report: FleetReport; c
 function AttestationField({ id, label, value, error, copy, type = "text", onChange }: { id: string; label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; type?: "text" | "number"; onChange: (value: string) => void }) {
   const errorId = `${id}-error`;
   return (
-    <label htmlFor={id} className="grid gap-1.5 text-sm font-bold">
+    <label htmlFor={id} className="grid gap-1.5 text-sm font-semibold">
       <span>{label}</span>
       <input id={id} type={type} dir="ltr" min={type === "number" ? 1 : undefined} step={type === "number" ? 1 : undefined} value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-start font-mono text-xs dark:border-slate-700 dark:bg-slate-950" />
       <FleetFieldError id={errorId} code={error} copy={copy} />

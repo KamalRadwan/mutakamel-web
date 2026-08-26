@@ -29,7 +29,7 @@ export function InvoicesListScreen() {
       <InvoiceHero
         copy={copy}
         action={invoices.permissions.canCreate ? (
-          <Link href="/invoices/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-indigo-950 shadow-sm transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300">
+          <Link href="/invoices/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-indigo-950 shadow-sm transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300">
             <Plus className="size-4" aria-hidden="true" />
             {copy.generate}
           </Link>
@@ -57,10 +57,10 @@ function InvoiceFilters({
 }) {
   const inputClass = "min-h-10 min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
   return (
-    <form aria-label={copy.filters} onSubmit={invoices.submitFilters} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <form aria-label={copy.filters} onSubmit={invoices.submitFilters} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="inline-flex items-center gap-2 text-base font-black"><Filter className="size-4 text-indigo-600" aria-hidden="true" />{copy.filters}</h2>
-        <button type="button" onClick={invoices.refresh} disabled={invoices.isRefreshing} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-indigo-300 bg-indigo-50 px-3 text-sm font-bold text-indigo-800 disabled:cursor-wait disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+        <h2 className="inline-flex items-center gap-2 text-base font-semibold"><Filter className="size-4 text-indigo-600" aria-hidden="true" />{copy.filters}</h2>
+        <button type="button" onClick={invoices.refresh} disabled={invoices.isRefreshing} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-indigo-300 bg-indigo-50 px-3 text-sm font-semibold text-indigo-800 disabled:cursor-wait disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
           <RefreshCw className={`size-4 ${invoices.isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />{copy.refresh}
         </button>
       </div>
@@ -82,8 +82,8 @@ function InvoiceFilters({
         </FilterSelect>
       </div>
       <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
-        <button type="button" onClick={invoices.clearFilters} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700 dark:border-slate-700 dark:text-slate-200"><RotateCcw className="size-4" aria-hidden="true" />{copy.reset}</button>
-        <button type="submit" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-indigo-700 px-4 text-sm font-black text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"><Filter className="size-4" aria-hidden="true" />{copy.apply}</button>
+        <button type="button" onClick={invoices.clearFilters} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"><RotateCcw className="size-4" aria-hidden="true" />{copy.reset}</button>
+        <button type="submit" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-indigo-700 px-4 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"><Filter className="size-4" aria-hidden="true" />{copy.apply}</button>
       </div>
     </form>
   );
@@ -92,7 +92,7 @@ function InvoiceFilters({
 function FilterInput({ id, label, value, onChange, error, copy, maxLength, dir }: { id: string; label: string; value: string; onChange: (value: string) => void; error?: Parameters<typeof InvoiceFieldError>[0]["code"]; copy: InvoiceCopy; maxLength?: number; dir?: "ltr" }) {
   const errorId = `${id}-error`;
   return (
-    <label htmlFor={id} className="grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
+    <label htmlFor={id} className="grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
       <span>{label}</span>
       <input id={id} value={value} dir={dir} maxLength={maxLength} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} className={`min-h-10 min-w-0 rounded-xl border bg-white px-3 text-sm font-normal text-slate-950 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-slate-950 dark:text-slate-100 ${error ? "border-rose-500" : "border-slate-300 dark:border-slate-700"}`} />
       <InvoiceFieldError id={errorId} code={error} copy={copy} />
@@ -103,7 +103,7 @@ function FilterInput({ id, label, value, onChange, error, copy, maxLength, dir }
 function FilterSelect({ label, value, onChange, className, children, error, copy }: { label: string; value: string; onChange: (value: string) => void; className: string; children: React.ReactNode; error?: Parameters<typeof InvoiceFieldError>[0]["code"]; copy?: InvoiceCopy }) {
   const errorId = `invoice-select-${label.replaceAll(" ", "-")}-error`;
   return (
-    <label className="grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
+    <label className="grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
       <span>{label}</span>
       <select value={value} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} className={className}>{children}</select>
       {copy ? <InvoiceFieldError id={errorId} code={error} copy={copy} /> : null}
@@ -120,22 +120,22 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
   const data = invoices.snapshot.data;
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <table className="w-full min-w-[1180px] text-start text-sm">
           <caption className="sr-only">{copy.title}</caption>
-          <thead className="bg-slate-100 text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300"><tr>{[copy.number, copy.status, copy.purpose, copy.tenant, copy.total, copy.period, copy.dueAt, copy.updatedAt, copy.actions].map((header) => <th key={header} scope="col" className="px-4 py-3 text-start">{header}</th>)}</tr></thead>
+          <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300"><tr>{[copy.number, copy.status, copy.purpose, copy.tenant, copy.total, copy.period, copy.dueAt, copy.updatedAt, copy.actions].map((header) => <th key={header} scope="col" className="px-4 py-3 text-start">{header}</th>)}</tr></thead>
           <tbody>
             {data.items.map((invoice) => (
               <tr key={invoice.id} className="border-t border-slate-200 hover:bg-indigo-50/50 dark:border-slate-800 dark:hover:bg-indigo-950/20">
-                <td className="px-4 py-3"><Link href={`/invoices/${invoice.id}`} className="font-mono font-black text-indigo-700 hover:underline dark:text-indigo-300">{invoice.number}</Link><code dir="ltr" className="mt-1 block text-xs text-slate-400">{invoice.id}</code></td>
+                <td className="px-4 py-3"><Link href={`/invoices/${invoice.id}`} className="font-mono font-semibold text-indigo-700 hover:underline dark:text-indigo-300">{invoice.number}</Link><code dir="ltr" className="mt-1 block text-xs text-slate-400">{invoice.id}</code></td>
                 <td className="px-4 py-3"><InvoiceStatusBadge status={invoice.status} /></td>
-                <td className="px-4 py-3 font-mono text-xs font-bold">{invoice.purpose}</td>
+                <td className="px-4 py-3 font-mono text-xs font-semibold">{invoice.purpose}</td>
                 <td className="px-4 py-3"><Link href={`/tenants/${invoice.tenantId}`} className="font-mono text-xs text-indigo-700 hover:underline dark:text-indigo-300">{invoice.tenantId}</Link></td>
-                <td dir="ltr" className="px-4 py-3 text-start font-mono font-black">{formatInvoiceMoney(invoice.total, invoice.currencyCode)}</td>
+                <td dir="ltr" className="px-4 py-3 text-start font-mono font-semibold">{formatInvoiceMoney(invoice.total, invoice.currencyCode)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatInvoiceDate(invoice.periodStart, lang)}<span className="mx-1">→</span>{formatInvoiceDate(invoice.periodEnd, lang)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatInvoiceDate(invoice.dueAt, lang)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatInvoiceDate(invoice.updatedAt, lang)}</td>
-                <td className="px-4 py-3"><Link href={`/invoices/${invoice.id}`} className="inline-flex min-h-10 items-center rounded-xl border border-indigo-300 px-3 text-sm font-bold text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">{copy.open}</Link></td>
+                <td className="px-4 py-3"><Link href={`/invoices/${invoice.id}`} className="inline-flex min-h-10 items-center rounded-xl border border-indigo-300 px-3 text-sm font-semibold text-indigo-700 dark:border-indigo-800 dark:text-indigo-300">{copy.open}</Link></td>
               </tr>
             ))}
           </tbody>
@@ -154,5 +154,5 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
 }
 
 function PageButton({ label, disabled, onClick, icon }: { label: string; disabled: boolean; onClick: () => void; icon: React.ReactNode }) {
-  return <button type="button" disabled={disabled} onClick={onClick} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-300 px-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700">{icon}{label}</button>;
+  return <button type="button" disabled={disabled} onClick={onClick} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-300 px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700">{icon}{label}</button>;
 }

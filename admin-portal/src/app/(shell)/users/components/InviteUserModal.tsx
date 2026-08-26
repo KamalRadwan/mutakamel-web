@@ -158,7 +158,7 @@ export function InviteUserModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-md p-4 animate-in fade-in">
-      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl border border-white/20 dark:border-slate-700/50 max-w-lg w-full p-6 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-xl border border-white/20 dark:border-slate-700/50 max-w-lg w-full p-6 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="absolute -top-32 -end-32 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-32 -start-32 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -177,7 +177,7 @@ export function InviteUserModal({
             <UserPlus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
               {t.users.inviteTitle}
             </h2>
             <p className="text-xs text-slate-500">
@@ -257,7 +257,7 @@ export function InviteUserModal({
               />
             </div>
             {fieldErrors.email && (
-              <span className="text-[10px] text-red-500 font-medium block mt-1">
+              <span className="text-xs text-red-500 font-medium block mt-1">
                 {fieldErrors.email}
               </span>
             )}
@@ -297,7 +297,7 @@ export function InviteUserModal({
 
           {user?.isSuperAdmin && (
             <div className="pt-1">
-              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 cursor-pointer">
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={isSuperAdmin}
@@ -307,7 +307,7 @@ export function InviteUserModal({
                 />
                 <div className="flex flex-col gap-0.5">
                   <span>{t.users.superAdminCheckbox}</span>
-                  <span className="text-[10px] text-slate-400 font-normal">
+                  <span className="text-xs text-slate-400 font-normal">
                     {isAr
                       ? "يتجاوز جميع قيود الصلاحيات النظامية."
                       : "Bypasses all permission checks authoritative backend logic."}

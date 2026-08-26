@@ -38,7 +38,7 @@ export function RequirePermission(props: RequirePermissionProps) {
           className="mb-4 size-12 text-slate-300"
           aria-hidden="true"
         />
-        <h2 className="text-lg font-bold text-slate-700 dark:text-slate-200">
+        <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200">
           {lang === "ar" ? "غير مصرح لك" : "Permission required"}
         </h2>
         <p className="mt-1 max-w-2xl break-words text-center text-sm">

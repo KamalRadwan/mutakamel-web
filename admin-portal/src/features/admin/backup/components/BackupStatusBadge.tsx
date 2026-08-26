@@ -20,7 +20,7 @@ export function BackupStatusBadge({ status }: BackupStatusBadgeProps) {
           : "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
 
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${tone}`}>
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}>
       {normalized.replaceAll("_", " ")}
     </span>
   );

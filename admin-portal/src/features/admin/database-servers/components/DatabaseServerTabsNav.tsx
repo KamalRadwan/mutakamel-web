@@ -69,7 +69,7 @@ export function DatabaseServerTabsNav({
     <div
       role="tablist"
       aria-label="Database Server Details Tabs"
-      className="flex items-center gap-1.5 overflow-x-auto p-1.5 bg-slate-200/60 dark:bg-slate-850 dark:bg-slate-900/80 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner no-scrollbar"
+      className="flex items-center gap-1.5 overflow-x-auto p-1.5 bg-slate-200/60 dark:bg-slate-850 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-800 shadow-inner no-scrollbar"
     >
       {tabs.map((tab) => {
         const Icon = tab.icon;
@@ -81,7 +81,7 @@ export function DatabaseServerTabsNav({
             role="tab"
             aria-selected={isActive}
             onClick={() => onTabChange(tab.id)}
-            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
               isActive
                 ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-md border border-slate-200/80 dark:border-slate-700 scale-[1.01]"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/50 dark:hover:bg-slate-800/40"
@@ -91,7 +91,7 @@ export function DatabaseServerTabsNav({
             <span>{tab.label}</span>
             {tab.badge !== undefined && (
               <span
-                className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold ${
+                className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-semibold ${
                   tab.badgeColor || "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
                 }`}
               >

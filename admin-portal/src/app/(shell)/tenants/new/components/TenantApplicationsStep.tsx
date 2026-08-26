@@ -68,10 +68,10 @@ export function TenantApplicationsStep({
   onBillingCycleChange,
 }: TenantApplicationsStepProps) {
   return (
-    <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+    <section className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
       <header className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between dark:border-slate-800">
         <div>
-          <h3 className="flex items-center gap-2 text-sm font-black text-slate-900 dark:text-slate-100">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
             <Package className="size-4 text-amber-600 dark:text-amber-400" />
             {isArabic
               ? "الخطوة 3: التطبيقات والاشتراك"
@@ -83,7 +83,7 @@ export function TenantApplicationsStep({
               : "Select only commercially and technically eligible Applications. Core and Worker foundation components are derived by the server and are never user-selectable."}
           </p>
         </div>
-        <label className="min-w-44 text-xs font-bold text-slate-700 dark:text-slate-300">
+        <label className="min-w-44 text-xs font-semibold text-slate-700 dark:text-slate-300">
           <span className="mb-1.5 block">
             {isArabic ? "دورة الفوترة" : "Billing cycle"}
           </span>
@@ -160,7 +160,7 @@ export function TenantApplicationsStep({
             return (
               <article
                 key={candidate.applicationId}
-                className={`rounded-2xl border p-4 transition-colors ${
+                className={`rounded-xl border p-4 transition-colors ${
                   selection
                     ? "border-blue-400 bg-blue-50/60 dark:border-blue-700 dark:bg-blue-950/30"
                     : "border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/30"
@@ -180,22 +180,22 @@ export function TenantApplicationsStep({
                   <div className="min-w-0 flex-1">
                     <label
                       htmlFor={`tenant-application-${candidate.key}`}
-                      className={`flex min-h-6 items-center justify-between gap-3 font-bold ${
+                      className={`flex min-h-6 items-center justify-between gap-3 font-semibold ${
                         candidate.selectionAllowed
                           ? "cursor-pointer text-slate-900 dark:text-slate-100"
                           : "cursor-not-allowed text-slate-500"
                       }`}
                     >
                       <span className="truncate">{candidate.name}</span>
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 font-mono text-[10px] uppercase text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 font-mono text-2xs uppercase text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         {candidate.key}
                       </span>
                     </label>
-                    <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
                       {candidate.description ??
                         (isArabic ? "لا يوجد وصف منشور." : "No published description.")}
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold uppercase tracking-wide">
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-2xs font-semibold uppercase tracking-wide">
                       <span className="rounded-full bg-white px-2 py-1 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                         {candidate.commercialMode}
                       </span>
@@ -213,7 +213,7 @@ export function TenantApplicationsStep({
                 </div>
 
                 {!candidate.selectionAllowed ? (
-                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
                     {unavailableReasons.length > 0 ? (
                       <ul className="list-inside list-disc space-y-1">
                         {unavailableReasons.map((reason) => (
@@ -228,7 +228,7 @@ export function TenantApplicationsStep({
 
                 {selection ? (
                   <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_9rem]">
-                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       <span className="mb-1.5 block">{isArabic ? "الخطة" : "Tier"}</span>
                       <select
                         value={selection.tierId}
@@ -246,7 +246,7 @@ export function TenantApplicationsStep({
                         ))}
                       </select>
                     </label>
-                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                       <span className="mb-1.5 block">{isArabic ? "المقاعد" : "Seats"}</span>
                       <input
                         type="number"
@@ -271,7 +271,7 @@ export function TenantApplicationsStep({
       ) : null}
 
       {showSelectionError && selectedLines.length === 0 ? (
-        <p className="flex items-center gap-2 text-xs font-bold text-rose-600 dark:text-rose-400" role="alert">
+        <p className="flex items-center gap-2 text-xs font-semibold text-rose-600 dark:text-rose-400" role="alert">
           <AlertCircle className="size-4" />
           {isArabic
             ? "اختر تطبيقاً مؤهلاً واحداً على الأقل وحدد tier ومقاعد صحيحة."
@@ -279,14 +279,14 @@ export function TenantApplicationsStep({
         </p>
       ) : null}
 
-      <section aria-labelledby="provisioning-preview-title" className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+      <section aria-labelledby="provisioning-preview-title" className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
         <header className="flex items-start gap-3 bg-slate-950 px-4 py-3 text-white">
           <Route className="mt-0.5 size-4 text-cyan-300" />
           <div>
-            <h4 id="provisioning-preview-title" className="text-xs font-black">
+            <h4 id="provisioning-preview-title" className="text-xs font-semibold">
               {isArabic ? "معاينة خطة التجهيز" : "Provisioning plan preview"}
             </h4>
-            <p className="mt-1 text-[11px] text-slate-300">
+            <p className="mt-1 text-xs text-slate-300">
               {isArabic
                 ? "الخادم يضيف الـfoundation والاعتماديات ويثبت الإصدارات قبل الإنشاء."
                 : "The server derives foundation components and dependencies, then pins releases before creation."}
@@ -323,26 +323,26 @@ export function TenantApplicationsStep({
           ) : null}
           {previewState === "ready" && preview ? (
             <div className="space-y-4">
-              <dl className="grid gap-3 text-[11px] sm:grid-cols-3">
+              <dl className="grid gap-3 text-xs sm:grid-cols-3">
                 <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
                   <dt className="text-slate-500">{isArabic ? "التطبيقات" : "Selected Applications"}</dt>
-                  <dd className="mt-1 font-mono font-bold">{preview.selectedApplicationKeys.join(", ")}</dd>
+                  <dd className="mt-1 font-mono font-semibold">{preview.selectedApplicationKeys.join(", ")}</dd>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
                   <dt className="text-slate-500">{isArabic ? "المكونات" : "Derived components"}</dt>
-                  <dd className="mt-1 font-bold">{preview.components.length}</dd>
+                  <dd className="mt-1 font-semibold">{preview.components.length}</dd>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
                   <dt className="text-slate-500">{isArabic ? "خطوات التنفيذ" : "Execution steps"}</dt>
-                  <dd className="mt-1 font-bold">{preview.steps.length}</dd>
+                  <dd className="mt-1 font-semibold">{preview.steps.length}</dd>
                 </div>
               </dl>
               <div className="grid gap-2 sm:grid-cols-2">
                 {preview.components.map((component) => (
-                  <div key={component.componentId} className="rounded-xl border border-slate-200 p-3 text-[11px] dark:border-slate-800">
+                  <div key={component.componentId} className="rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-mono font-bold text-slate-900 dark:text-slate-100">{component.componentKey}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-black tracking-wide ${component.selectionSource === "FOUNDATION" ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300" : "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300"}`}>
+                      <p className="font-mono font-semibold text-slate-900 dark:text-slate-100">{component.componentKey}</p>
+                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-wide ${component.selectionSource === "FOUNDATION" ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300" : "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300"}`}>
                         {component.selectionSource}
                       </span>
                     </div>
@@ -350,7 +350,7 @@ export function TenantApplicationsStep({
                   </div>
                 ))}
               </div>
-              <p className="flex items-center gap-2 font-mono text-[10px] text-slate-500" title={preview.selectionDigest}>
+              <p className="flex items-center gap-2 font-mono text-xs text-slate-500" title={preview.selectionDigest}>
                 <Layers3 className="size-3.5" /> {preview.selectionDigest.slice(0, 16)}…
               </p>
             </div>
@@ -377,12 +377,12 @@ function RetryCard({
       <div className="flex items-start gap-2">
         <AlertCircle className="mt-0.5 size-4 shrink-0" />
         <div className="min-w-0">
-          <p className="text-xs font-black">{title}</p>
-          {error?.message ? <p className="mt-1 text-[11px]">{error.message}</p> : null}
-          {error?.correlationId ? <p className="mt-1 break-all font-mono text-[10px]">Correlation ID: {error.correlationId}</p> : null}
+          <p className="text-xs font-semibold">{title}</p>
+          {error?.message ? <p className="mt-1 text-xs">{error.message}</p> : null}
+          {error?.correlationId ? <p className="mt-1 break-all font-mono text-xs">Correlation ID: {error.correlationId}</p> : null}
         </div>
       </div>
-      <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-rose-300 bg-white px-3 text-xs font-bold hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-rose-800 dark:bg-slate-900 dark:hover:bg-rose-950">
+      <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-rose-800 dark:bg-slate-900 dark:hover:bg-rose-950">
         <RefreshCw className="size-3.5" /> {isArabic ? "إعادة المحاولة" : "Retry"}
       </button>
     </div>
@@ -407,8 +407,8 @@ function StateCard({
     <div className={`flex items-start gap-3 rounded-xl border p-4 ${classes}`} role={tone === "blue" ? "status" : "alert"}>
       <span className="mt-0.5 shrink-0">{icon}</span>
       <div>
-        <p className="text-xs font-black">{title}</p>
-        <p className="mt-1 text-[11px] leading-5 opacity-90">{description}</p>
+        <p className="text-xs font-semibold">{title}</p>
+        <p className="mt-1 text-xs leading-5 opacity-90">{description}</p>
       </div>
     </div>
   );

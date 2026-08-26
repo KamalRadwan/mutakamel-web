@@ -99,7 +99,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const [isEditingWebphone, setIsEditingWebphone] = useState(false);
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100">
+      <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100">
         <Navbar />
         <main className="grid flex-1 place-items-center p-6">
           <span className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -113,9 +113,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+      <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
         <Navbar />
-        <main className="flex-1 w-full px-[10px] py-4 sm:py-6">
+        <main className="flex-1 w-full px-4 py-4 sm:py-6">
           <UserNotFoundState />
         </main>
       </div>
@@ -124,9 +124,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
   if (permissionDenied) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+      <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
         <Navbar />
-        <main className="flex-1 w-full px-[10px] py-4 sm:py-6">
+        <main className="flex-1 w-full px-4 py-4 sm:py-6">
           <UserPermissionDenied />
         </main>
       </div>
@@ -134,12 +134,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col">
       <Navbar />
 
-      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
+      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
         {/* Header Title Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/users")}
@@ -147,12 +147,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             >
               {lang === "ar" ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
             </button>
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm">
+            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-700 dark:text-blue-300 font-semibold text-sm">
               {firstName[0] || "?"}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                   {firstName} {lastName}
                 </h1>
                 <span
@@ -165,7 +165,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                   {isSuperAdmin ? "SUPER_ADMIN" : "ADMIN"}
                 </span>
                 {permissions.isSelf && (
-                  <span className="px-2 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 font-mono font-bold">
+                  <span className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 font-mono font-semibold">
                     YOU
                   </span>
                 )}
@@ -224,15 +224,15 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           {/* Left Column: Identity & Metadata & Profile Cards */}
           <div className="space-y-6">
             {/* Identity Profile Card */}
-            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs hover:shadow-xl hover:border-blue-500/30 transition-all duration-300 overflow-hidden relative group">
+            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs hover:shadow-xl hover:border-blue-500/30 transition-all duration-300 overflow-hidden relative group">
               <div className="absolute top-0 start-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-colors duration-500" />
               <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between relative z-10">
-                <h2 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <h2 className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                   <User className="w-4 h-4 text-blue-500" />
                   {t.users.identityProfile}
                 </h2>
                 {identityHasChanges && permissions.canEdit && (
-                  <span className="px-2 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 rounded font-mono">
+                  <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 rounded font-mono">
                     UNSAVED
                   </span>
                 )}
@@ -279,7 +279,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     />
                     <Lock className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 end-3" />
                   </div>
-                  <span className="text-[10px] text-slate-400 mt-1 block">
+                  <span className="text-xs text-slate-400 mt-1 block">
                     {t.users.emailImmutable}
                   </span>
                 </div>
@@ -287,7 +287,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 {permissions.isCurrentSuperAdmin && (
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
                     <label
-                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-xs font-bold transition-colors ${
+                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${
                         isSuperAdmin
                           ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400"
                           : "border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
@@ -306,7 +306,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                             ? "مدير خارق (Super Admin)"
                             : "Super Admin Privileges"}
                         </span>
-                        <span className="text-[10px] font-normal opacity-80">
+                        <span className="text-xs font-normal opacity-80">
                           {lang === "ar"
                             ? "تجاوز كامل للقيود عبر الخادم الموثوق."
                             : "Bypasses system permissions logic."}
@@ -354,15 +354,15 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           {/* Right Column: Roles Assignment & WebPhone Settings */}
           <div className="lg:col-span-2 space-y-6">
             {/* Roles Assignment Card */}
-            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs hover:shadow-xl hover:border-indigo-500/30 transition-all duration-300 overflow-hidden relative group">
+            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs hover:shadow-xl hover:border-indigo-500/30 transition-all duration-300 overflow-hidden relative group">
               <div className="absolute top-0 end-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-indigo-500/10 transition-colors duration-500" />
               <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between relative z-10">
-                <h2 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <h2 className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                   <Shield className="w-4 h-4 text-blue-500" />
                   <span>{lang === "ar" ? "الدور المنسوب (PATCH /roles)" : "Assigned Control Plane Role"}</span>
                 </h2>
                 {roleHasChanges && permissions.canAssignRole && (
-                  <span className="px-2 py-0.5 text-[9px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 rounded font-mono">
+                  <span className="px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 rounded font-mono">
                     UNSAVED ROLE
                   </span>
                 )}
@@ -432,21 +432,21 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 onEditToggle={() => setIsEditingWebphone(true)}
               />
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/30 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h2 className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                    <h2 className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-slate-200">
                       <PhoneCall className="size-4 text-blue-500" />
                       <span>{t.users.webphoneConfig}</span>
                     </h2>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
+                    <p className="mt-0.5 text-xs text-slate-500">
                       {lang === "ar"
                         ? "بيانات تسجيل JsSIP للمشرف. كلمة المرور لا تُعرض بعد الحفظ."
                         : "JsSIP credentials. The current password is never displayed after save."}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 cursor-pointer">
+                    <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={webphoneEnabled}
@@ -482,7 +482,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                       }`}
                     />
                     {extensionError && (
-                      <span className="text-[10px] text-red-500 font-medium block mt-1">
+                      <span className="text-xs text-red-500 font-medium block mt-1">
                         {extensionError}
                       </span>
                     )}
@@ -505,7 +505,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                       }`}
                     />
                     {sipUsernameError && (
-                      <span className="text-[10px] text-red-500 font-medium block mt-1">
+                      <span className="text-xs text-red-500 font-medium block mt-1">
                         {sipUsernameError}
                       </span>
                     )}
@@ -532,7 +532,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                         {showSipPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
                     </div>
-                    <small className="text-[10px] text-slate-400 block mt-1">
+                    <small className="text-xs text-slate-400 block mt-1">
                       {passwordConfigured
                         ? lang === "ar"
                           ? "اتركها فارغة للاحتفاظ بالحالية"
@@ -588,7 +588,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
-                  <span className="text-[11px] text-slate-500">
+                  <span className="text-xs text-slate-500">
                     {passwordConfigured ? t.users.passwordConfigured : t.users.noPasswordConfigured}
                   </span>
                   <div className="flex items-center gap-2">
@@ -599,7 +599,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                         await saveWebphone();
                         setIsEditingWebphone(false);
                       }}
-                      className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-40 cursor-pointer"
+                      className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-40 cursor-pointer"
                     >
                       {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                       <span>{t.users.savePhoneSettings}</span>

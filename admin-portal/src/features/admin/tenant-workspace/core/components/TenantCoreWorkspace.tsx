@@ -68,14 +68,14 @@ export function TenantCoreWorkspace({
       <WorkspaceState locale={locale} role="alert">
         <p>{workspace.loadError?.message ?? "Tenant data is unavailable."}</p>
         {workspace.loadError?.correlationId && (
-          <p className="mt-1 font-mono text-[10px]">
+          <p className="mt-1 font-mono text-xs">
             {text.correlation}: {workspace.loadError.correlationId}
           </p>
         )}
         <button
           type="button"
           onClick={() => void workspace.refresh()}
-          className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white"
+          className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white"
         >
           {text.retry}
         </button>
@@ -90,21 +90,21 @@ export function TenantCoreWorkspace({
       className="space-y-4 text-slate-900 dark:text-slate-100"
       data-testid="tenant-core-workspace"
     >
-      <header className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+      <header className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+          <p className="text-2xs font-semibold uppercase tracking-wide text-slate-500">
             {text.title}
           </p>
-          <h1 className="mt-1 text-lg font-bold">{tenant.companyName}</h1>
-          <p className="font-mono text-[11px] text-slate-500">
+          <h1 className="mt-1 text-lg font-semibold">{tenant.companyName}</h1>
+          <p className="font-mono text-xs text-slate-500">
             {tenant.name} · {tenant.id}
           </p>
         </div>
         <div className="text-end">
-          <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 font-mono text-[10px] font-bold dark:bg-slate-800">
+          <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 font-mono text-xs font-semibold dark:bg-slate-800">
             {tenant.status}
           </span>
-          <p className="mt-1 text-[10px] text-slate-500">
+          <p className="mt-1 text-xs text-slate-500">
             {isTenantDatabaseReady(tenant)
               ? locale === "ar"
                 ? "قاعدة بيانات المستأجر جاهزة"
@@ -123,7 +123,7 @@ export function TenantCoreWorkspace({
         >
           <p>{workspace.mutation.error.message}</p>
           {workspace.mutation.error.correlationId && (
-            <p className="mt-1 font-mono text-[10px]">
+            <p className="mt-1 font-mono text-xs">
               {text.correlation}: {workspace.mutation.error.correlationId}
             </p>
           )}
@@ -161,7 +161,7 @@ function WorkspaceState({
     <div
       dir={locale === "ar" ? "rtl" : "ltr"}
       role={role}
-      className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+      className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
     >
       {children}
     </div>

@@ -50,14 +50,14 @@ export function ApplicationReleaseAuthorityRail({
   return (
     <section
       aria-labelledby="release-authority-title"
-      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
     >
       <header className="flex flex-col justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center dark:border-slate-800">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-violet-600 dark:text-violet-300">
+          <p className="font-mono text-2xs font-semibold uppercase tracking-[0.2em] text-violet-600 dark:text-violet-300">
             {copy.eyebrow}
           </p>
-          <h2 id="release-authority-title" className="mt-1 text-sm font-black">
+          <h2 id="release-authority-title" className="mt-1 text-sm font-semibold">
             {copy.title}
           </h2>
           <p className="mt-1 text-xs text-slate-500">{copy.subtitle}</p>
@@ -67,7 +67,7 @@ export function ApplicationReleaseAuthorityRail({
             type="button"
             onClick={onPublish}
             disabled={isPublishing}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
           >
             {isPublishing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -133,7 +133,7 @@ export function ApplicationReleaseAuthorityRail({
           />
         </ol>
 
-        <div className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 text-[11px] text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between dark:border-slate-800">
+        <div className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between dark:border-slate-800">
           {hasAttributablePublication ? (
             <div className="flex flex-wrap gap-x-5 gap-y-1">
               <span>
@@ -185,14 +185,14 @@ function AuthorityStage({
   return (
     <li className={`rounded-xl border p-3 ${tone}`}>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-wider text-slate-500">
           <Icon className="h-3.5 w-3.5" />
           {label}
         </div>
         <StateIcon className={`h-3.5 w-3.5 ${state === "ready" ? "text-emerald-600" : state === "blocked" ? "text-amber-600" : "text-slate-400"}`} />
       </div>
-      <p className="mt-2 break-words font-mono text-xs font-black" dir="auto">{value}</p>
-      <p className="mt-1 break-words text-[10px] leading-relaxed text-slate-500">{detail}</p>
+      <p className="mt-2 break-words font-mono text-xs font-semibold" dir="auto">{value}</p>
+      <p className="mt-1 break-words text-xs leading-relaxed text-slate-500">{detail}</p>
     </li>
   );
 }

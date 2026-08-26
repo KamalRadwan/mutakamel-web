@@ -9,12 +9,12 @@ export function UserNotFoundState() {
   const { lang, t } = useI18n();
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center shadow-2xs space-y-4 max-w-xl mx-auto my-12">
-      <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-100 dark:border-amber-900/50">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-12 text-center shadow-2xs space-y-4 max-w-xl mx-auto my-12">
+      <div className="w-16 h-16 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-100 dark:border-amber-900/50">
         <UserX className="w-8 h-8" />
       </div>
       <div className="space-y-1.5">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
           {t.users.userNotFoundTitle}
         </h2>
         <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">

@@ -40,11 +40,11 @@ export function PublisherKeysScreen() {
   return (
     <div
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"
+      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100"
     >
       <Navbar />
       <main className="mx-auto w-full max-w-[1500px] space-y-4 px-3 py-5 sm:px-6">
-        <header className="relative overflow-hidden rounded-2xl border border-violet-500/25 bg-gradient-to-r from-slate-950 via-violet-950 to-slate-950 px-5 py-5 text-white shadow-lg">
+        <header className="relative overflow-hidden rounded-xl border border-violet-500/25 bg-gradient-to-r from-slate-950 via-violet-950 to-slate-950 px-5 py-5 text-white shadow-lg">
           <div className="absolute end-0 top-0 size-64 -translate-y-1/2 translate-x-1/3 rounded-full bg-violet-400/15 blur-3xl rtl:-translate-x-1/3" />
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -54,12 +54,12 @@ export function PublisherKeysScreen() {
               <div>
                 <Link
                   href="/provisioning"
-                  className="mb-1 inline-flex items-center gap-1 text-xs font-bold text-violet-200 hover:text-white"
+                  className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-violet-200 hover:text-white"
                 >
                   <ArrowLeft className="size-3.5 rtl:rotate-180" aria-hidden="true" />
                   {copy.back}
                 </Link>
-                <h1 className="text-xl font-black tracking-tight sm:text-2xl">
+                <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
                   {copy.title}
                 </h1>
                 <p className="mt-1 max-w-4xl text-sm leading-6 text-violet-100/80">
@@ -76,13 +76,13 @@ export function PublisherKeysScreen() {
           </div>
         </header>
 
-        <section className="rounded-2xl border border-amber-400/30 bg-amber-50 p-4 text-amber-950 dark:border-amber-400/20 dark:bg-amber-950/25 dark:text-amber-100">
+        <section className="rounded-xl border border-amber-400/30 bg-amber-50 p-4 text-amber-950 dark:border-amber-400/20 dark:bg-amber-950/25 dark:text-amber-100">
           <div className="flex items-start gap-3">
             <ShieldAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <div>
-              <h2 className="font-black">{copy.securityTitle}</h2>
+              <h2 className="font-semibold">{copy.securityTitle}</h2>
               <p className="mt-1 text-sm leading-6">{copy.securityBody}</p>
-              <p className="mt-2 text-xs font-black uppercase tracking-wide">
+              <p className="mt-2 text-xs font-semibold uppercase tracking-wide">
                 {copy.noPrivateKey}
               </p>
             </div>
@@ -110,7 +110,7 @@ export function PublisherKeysScreen() {
 function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="min-w-24 rounded-xl border border-white/15 bg-white/10 px-3 py-2 backdrop-blur">
-      <strong className="block text-lg font-black">{value}</strong>
+      <strong className="block text-lg font-semibold">{value}</strong>
       <span className="text-violet-100/80">{label}</span>
     </div>
   );
@@ -228,7 +228,7 @@ function DirectoryPanel({
                         type="button"
                         onClick={() => view.selectKey(row.publisherKeyId)}
                         aria-pressed={view.selectedId === row.publisherKeyId}
-                        className="rounded-lg border border-violet-300 px-3 py-1.5 text-xs font-black text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-950/30"
+                        className="rounded-lg border border-violet-300 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-950/30"
                       >
                         {copy.select}
                       </button>
@@ -382,7 +382,7 @@ function RevokePanel({
             view.mutation.state === "PENDING" ||
             view.mutation.exactRetryAvailable
           }
-          className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-black text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {copy.reviewRevoke}
         </button>
@@ -458,7 +458,7 @@ function ChallengePanel({
               view.mutation.state === "PENDING" ||
               view.mutation.exactRetryAvailable
             }
-            className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-black text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {copy.createChallenge}
           </button>
@@ -466,7 +466,7 @@ function ChallengePanel({
       )}
       {result ? (
         <div className="mt-4 space-y-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
-          <h3 className="flex items-center gap-2 font-black text-emerald-900 dark:text-emerald-100">
+          <h3 className="flex items-center gap-2 font-semibold text-emerald-900 dark:text-emerald-100">
             <CheckCircle2 className="size-4" aria-hidden="true" />
             {copy.challengeReady}
           </h3>
@@ -543,7 +543,7 @@ function RegistrationPanel({
               view.mutation.state === "PENDING" ||
               view.mutation.exactRetryAvailable
             }
-            className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {copy.reviewRegister}
           </button>
@@ -593,11 +593,11 @@ function MutationFeedback({
   return (
     <section
       aria-live="polite"
-      className={`rounded-2xl border p-4 ${toneClasses(tone)}`}
+      className={`rounded-xl border p-4 ${toneClasses(tone)}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-black">{title}</h2>
+          <h2 className="font-semibold">{title}</h2>
           {mutation.error ? (
             <div className="mt-2 space-y-1 text-xs">
               <p>{copy.errorCode}: <CodeValue>{mutation.error.errorCode}</CodeValue></p>
@@ -694,14 +694,14 @@ function ConfirmationDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="publisher-key-confirm-title"
-        className="w-full max-w-lg rounded-2xl border border-slate-300 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-950"
+        className="w-full max-w-lg rounded-xl border border-slate-300 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-950"
       >
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
             <AlertTriangle className="size-5" aria-hidden="true" />
           </span>
           <div>
-            <h2 id="publisher-key-confirm-title" className="font-black">
+            <h2 id="publisher-key-confirm-title" className="font-semibold">
               {register ? copy.confirmRegisterTitle : copy.confirmRevokeTitle}
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -725,7 +725,7 @@ function ConfirmationDialog({
           <button
             type="button"
             onClick={view.closeConfirmation}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-black hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
           >
             {copy.cancel}
           </button>
@@ -733,7 +733,7 @@ function ConfirmationDialog({
             type="button"
             autoFocus
             onClick={view.confirmMutation}
-            className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-black text-white hover:bg-rose-800"
+            className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800"
           >
             {copy.confirm}
           </button>
@@ -745,7 +745,7 @@ function ConfirmationDialog({
 
 function Panel({ children }: { children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
       {children}
     </section>
   );
@@ -767,7 +767,7 @@ function PanelHeader({
       <div className="flex items-start gap-2.5">
         <span className="mt-0.5 text-violet-600 dark:text-violet-300" aria-hidden="true">{icon}</span>
         <div>
-          <h2 className="font-black">{title}</h2>
+          <h2 className="font-semibold">{title}</h2>
           <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">{subtitle}</p>
         </div>
       </div>
@@ -792,7 +792,7 @@ function ActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-black text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
     >
       {icon}
       {children}
@@ -822,7 +822,7 @@ function StateNotice({
       <div className="flex items-start gap-2">
         {loading ? <Loader2 className="mt-0.5 size-4 animate-spin" aria-hidden="true" /> : <AlertTriangle className="mt-0.5 size-4" aria-hidden="true" />}
         <div className="min-w-0 flex-1">
-          <p className="font-black">{title}</p>
+          <p className="font-semibold">{title}</p>
           {body ? <p className="mt-1 text-xs leading-5">{body}</p> : null}
           {error ? (
             <div className="mt-2 space-y-1 text-xs">
@@ -864,7 +864,7 @@ function Field({
   const errorId = `${id}-error`;
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-black text-slate-700 dark:text-slate-300">{label}</label>
+      <label htmlFor={id} className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">{label}</label>
       <input
         id={id}
         value={value}
@@ -895,7 +895,7 @@ function PermissionNote({ children }: { children: ReactNode }) {
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <p className="text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="text-2xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
       <div className="mt-1 break-words text-sm font-semibold">{children}</div>
     </div>
   );
@@ -909,7 +909,7 @@ function EvidenceLine({
   copy: PublisherKeyCopy;
 }) {
   return resource.correlationId ? (
-    <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
+    <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
       {copy.correlation}: <CodeValue>{resource.correlationId}</CodeValue>
       {resource.timestamp ? ` · ${resource.timestamp}` : ""}
     </p>
@@ -924,7 +924,7 @@ function StatusBadge({
   copy: PublisherKeyCopy;
 }) {
   return (
-    <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-black ${status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>
+    <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${status === "ACTIVE" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>
       {status === "ACTIVE" ? copy.active : copy.revoked}
     </span>
   );
@@ -935,7 +935,7 @@ function CodeValue({ children }: { children: ReactNode }) {
 }
 
 function Th({ children }: { children: ReactNode }) {
-  return <th scope="col" className="px-3 py-2.5 text-start font-black">{children}</th>;
+  return <th scope="col" className="px-3 py-2.5 text-start font-semibold">{children}</th>;
 }
 
 function Td({ children }: { children: ReactNode }) {

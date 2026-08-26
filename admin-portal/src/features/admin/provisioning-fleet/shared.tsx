@@ -36,7 +36,7 @@ export function FleetPageFrame({
   return (
     <div
       dir={dir}
-      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"
+      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100"
     >
       <Navbar />
       <main className="mx-auto w-full max-w-[1500px] space-y-5 px-4 py-5 sm:px-6">
@@ -54,10 +54,10 @@ export function FleetHero({
   action?: ReactNode;
 }) {
   return (
-    <header className="relative overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 p-5 text-white shadow-lg">
+    <header className="relative overflow-hidden rounded-xl border border-cyan-400/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 p-5 text-white shadow-lg">
       <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">{copy.title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{copy.title}</h1>
           <p className="mt-1 max-w-4xl text-sm leading-6 text-cyan-50/80">
             {copy.subtitle}
           </p>
@@ -80,7 +80,7 @@ export function FleetBackLink({
   return (
     <Link
       href={href}
-      className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-slate-600 hover:text-cyan-700 dark:text-slate-300"
+      className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-slate-600 hover:text-cyan-700 dark:text-slate-300"
     >
       {dir === "rtl" ? (
         <ArrowRight className="size-4" aria-hidden="true" />
@@ -106,7 +106,7 @@ export function RefreshButton({
       type="button"
       onClick={onClick}
       disabled={pending}
-      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-black text-white hover:bg-white/20 disabled:opacity-50"
+      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-50"
     >
       <RefreshCw
         className={`size-4 ${pending ? "animate-spin" : ""}`}
@@ -149,20 +149,20 @@ export function FleetStatePanel({
     <section
       role={loading ? "status" : "alert"}
       aria-busy={loading}
-      className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      className="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900"
     >
       {loading ? (
         <Loader2 className="mx-auto size-7 animate-spin text-cyan-600" aria-hidden="true" />
       ) : (
         <AlertTriangle className="mx-auto size-7 text-amber-600" aria-hidden="true" />
       )}
-      <p className="mt-3 text-sm font-bold">{label}</p>
+      <p className="mt-3 text-sm font-semibold">{label}</p>
       {error ? <FleetProblem error={error} copy={copy} /> : null}
       {!loading && onRetry ? (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-4 min-h-10 rounded-xl bg-cyan-700 px-4 text-sm font-black text-white"
+          className="mt-4 min-h-10 rounded-xl bg-cyan-700 px-4 text-sm font-semibold text-white"
         >
           {copy.retry}
         </button>
@@ -240,7 +240,7 @@ export function FleetCommandNotice<T>({
           <ShieldAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
         )}
         <div className="min-w-0 flex-1">
-          <p className="font-bold">{text}</p>
+          <p className="font-semibold">{text}</p>
           {view.error && view.error.errorCode !== "ADMIN_PERMISSION_REQUIRED" ? (
             <FleetProblem error={view.error} copy={copy} />
           ) : null}
@@ -260,7 +260,7 @@ export function FleetCommandNotice<T>({
               <button
                 type="button"
                 onClick={onRetryExact}
-                className="min-h-10 rounded-xl bg-amber-800 px-4 text-xs font-black text-white"
+                className="min-h-10 rounded-xl bg-amber-800 px-4 text-xs font-semibold text-white"
               >
                 {copy.retryExact}
               </button>
@@ -268,7 +268,7 @@ export function FleetCommandNotice<T>({
             <button
               type="button"
               onClick={onClear}
-              className="min-h-10 rounded-xl border border-current/20 px-4 text-xs font-black"
+              className="min-h-10 rounded-xl border border-current/20 px-4 text-xs font-semibold"
             >
               {copy.clearSuccess}
             </button>
@@ -287,7 +287,7 @@ export function FleetMeta({
   copy: ProvisioningFleetCopy;
 }) {
   return (
-    <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-200 pt-3 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
+    <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
       <span dir="ltr" className="break-all font-mono">
         {copy.correlation}: {result.correlationId}
       </span>
@@ -310,7 +310,7 @@ export function FleetFieldError({
   if (!code) return null;
   const message = copy.validation[code as keyof typeof copy.validation] ?? copy.validationFailed;
   return (
-    <span id={id} role="alert" className="text-xs font-bold text-rose-700 dark:text-rose-300">
+    <span id={id} role="alert" className="text-xs font-semibold text-rose-700 dark:text-rose-300">
       {message}
     </span>
   );
@@ -337,18 +337,18 @@ export function FleetPagination({
         type="button"
         disabled={!hasPrev}
         onClick={() => onPage(page - 1)}
-        className="min-h-10 rounded-xl border border-slate-300 px-4 text-sm font-bold disabled:opacity-40 dark:border-slate-700"
+        className="min-h-10 rounded-xl border border-slate-300 px-4 text-sm font-semibold disabled:opacity-40 dark:border-slate-700"
       >
         {copy.previous}
       </button>
-      <span className="text-sm font-bold">
+      <span className="text-sm font-semibold">
         {copy.page} {page} {copy.of} {Math.max(1, totalPages)}
       </span>
       <button
         type="button"
         disabled={!hasNext}
         onClick={() => onPage(page + 1)}
-        className="min-h-10 rounded-xl border border-slate-300 px-4 text-sm font-bold disabled:opacity-40 dark:border-slate-700"
+        className="min-h-10 rounded-xl border border-slate-300 px-4 text-sm font-semibold disabled:opacity-40 dark:border-slate-700"
       >
         {copy.next}
       </button>
@@ -427,11 +427,11 @@ export function FleetConfirmDialog({
             first.focus();
           }
         }}
-        className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id={titleId} className="text-lg font-black">{title}</h2>
+            <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
             <p id={bodyId} className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{body}</p>
           </div>
           <button
@@ -451,7 +451,7 @@ export function FleetConfirmDialog({
             type="button"
             onClick={onClose}
             disabled={pending}
-            className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-black dark:border-slate-700"
+            className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold dark:border-slate-700"
           >
             {copy.close}
           </button>
@@ -459,7 +459,7 @@ export function FleetConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={pending}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-black text-white disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-semibold text-white disabled:opacity-50"
           >
             {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
             {copy.confirm}
@@ -481,10 +481,10 @@ export function FleetDatum({
 }) {
   return (
     <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/50">
-      <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</dt>
+      <dt className="text-2xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</dt>
       <dd
         dir={mono ? "ltr" : undefined}
-        className={`mt-1 break-all text-sm font-bold ${mono ? "text-start font-mono text-xs" : ""}`}
+        className={`mt-1 break-all text-sm font-semibold ${mono ? "text-start font-mono text-xs" : ""}`}
       >
         {value}
       </dd>

@@ -63,11 +63,11 @@ export default function TenantsDirectoryPage() {
   const copy = directoryCopy(lang);
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100">
+    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100">
       <Navbar />
 
-      <main className="w-full flex-1 space-y-4 px-[10px] py-4 sm:py-6">
-        <header className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 px-4 py-3 text-white shadow-md sm:px-5 sm:py-3.5">
+      <main className="w-full flex-1 space-y-4 px-4 py-4 sm:py-6">
+        <header className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 px-4 py-3 text-white shadow-md sm:px-5 sm:py-3.5">
           <div className="pointer-events-none absolute end-0 top-0 -me-10 -mt-10 size-72 rounded-full bg-gradient-to-br from-cyan-500/20 via-blue-500/20 to-indigo-500/0 blur-3xl" />
           <div className="relative z-10 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
@@ -76,14 +76,14 @@ export default function TenantsDirectoryPage() {
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-base font-bold tracking-tight text-white sm:text-lg">
+                  <h1 className="text-base font-semibold tracking-tight text-white sm:text-lg">
                     {t.tenants.pageTitle}
                   </h1>
-                  <span className="rounded-md border border-cyan-500/30 bg-cyan-500/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-cyan-300">
+                  <span className="rounded-md border border-cyan-500/30 bg-cyan-500/20 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider text-cyan-300">
                     {copy.isolation}
                   </span>
                 </div>
-                <p className="mt-0.5 max-w-xl text-[11px] leading-tight text-cyan-100/80">
+                <p className="mt-0.5 max-w-xl text-xs leading-tight text-cyan-100/80">
                   {t.tenants.pageSubtitle}
                 </p>
               </div>
@@ -92,7 +92,7 @@ export default function TenantsDirectoryPage() {
             {permissions.canCreate ? (
               <Link
                 href="/tenants/new"
-                className="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 px-3.5 py-2 text-xs font-bold text-white shadow-md transition-all hover:from-cyan-400 hover:to-indigo-400"
+                className="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 px-3.5 py-2 text-xs font-semibold text-white shadow-md transition-all hover:from-cyan-400 hover:to-indigo-400"
               >
                 <Plus className="size-3.5" />
                 <span>{t.tenants.registerTenant}</span>
@@ -135,7 +135,7 @@ export default function TenantsDirectoryPage() {
           />
         ) : null}
 
-        <section className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900/90 sm:flex-row">
+        <section className="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900/90 sm:flex-row">
           <div className="relative w-full sm:w-96">
             <Search className="absolute start-3.5 top-3 size-4 text-cyan-500" />
             <input
@@ -192,13 +192,13 @@ export default function TenantsDirectoryPage() {
                 ))}
               </select>
               {databaseServerOptionsState === "forbidden" ? (
-                <span className="text-[10px] text-amber-700 dark:text-amber-300">
+                <span className="text-xs text-amber-700 dark:text-amber-300">
                   {copy.databaseServerForbidden}
                 </span>
               ) : databaseServerOptionsState === "error" ? (
                 <span
                   role="alert"
-                  className="text-[10px] text-rose-700 dark:text-rose-300"
+                  className="text-xs text-rose-700 dark:text-rose-300"
                 >
                   {copy.databaseServerUnavailable}
                   {databaseServerOptionsError?.errorCode
@@ -210,7 +210,7 @@ export default function TenantsDirectoryPage() {
                   <button
                     type="button"
                     onClick={() => void retryDatabaseServerOptions()}
-                    className="ms-1 font-bold underline"
+                    className="ms-1 font-semibold underline"
                   >
                     {copy.retry}
                   </button>
@@ -221,13 +221,13 @@ export default function TenantsDirectoryPage() {
         </section>
 
         <section
-          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-900"
+          className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-900"
           aria-busy={isLoading}
         >
           <div className="overflow-x-auto">
             <table className="w-full min-w-[940px] text-start text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-100/70 font-extrabold uppercase tracking-wider text-slate-600 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300">
+                <tr className="border-b border-slate-200 bg-slate-100/70 font-semibold uppercase tracking-wider text-slate-600 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300">
                   <th className="px-5 py-3 text-start">
                     {t.tenants.tenantName}
                   </th>
@@ -367,14 +367,14 @@ function TenantRow({
           className="group inline-flex flex-col"
         >
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-blue-600 group-hover:underline dark:text-blue-400">
+            <span className="text-xs font-semibold text-blue-600 group-hover:underline dark:text-blue-400">
               {tenant.companyName}
             </span>
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 dark:bg-slate-800">
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-500 dark:bg-slate-800">
               {tenant.name}
             </span>
           </div>
-          <span className="font-mono text-[10px] font-normal text-slate-400">
+          <span className="font-mono text-xs font-normal text-slate-400">
             {tenant.ownerEmail ?? "—"}
           </span>
         </Link>
@@ -386,7 +386,7 @@ function TenantRow({
             {tenant.primaryFqdn ?? "—"}
           </span>
           {tenant.secondaryFqdnsCount > 0 ? (
-            <span className="text-[10px] text-slate-400">
+            <span className="text-xs text-slate-400">
               +{tenant.secondaryFqdnsCount}
             </span>
           ) : null}
@@ -405,20 +405,20 @@ function TenantRow({
           </div>
           <div className="flex items-center gap-1.5" title={copy.storageServer}>
             <HardDrive className="size-3.5 shrink-0 text-blue-500" />
-            <span className="font-mono text-[11px] font-semibold">
+            <span className="font-mono text-xs font-semibold">
               {tenant.storageServer?.name ?? tenant.storageServerId}
             </span>
           </div>
         </div>
-        <div className="mt-1 text-[10px] text-slate-400">
+        <div className="mt-1 text-xs text-slate-400">
           {tenant.countryName}
         </div>
       </td>
       <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">
-        <span className="text-xs font-bold">
+        <span className="text-xs font-semibold">
           {tenant.subscriptionStatus ?? "—"}
         </span>
-        <div className="font-mono text-[10px] text-slate-400">
+        <div className="font-mono text-xs text-slate-400">
           {tenant.seats === null ? "—" : copy.seats(tenant.seats)}
         </div>
       </td>
@@ -429,7 +429,7 @@ function TenantRow({
         <div className="flex items-center justify-end gap-1">
           <Link
             href={`/tenants/${tenant.id}`}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/60"
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/60"
           >
             <span>{copy.details}</span>
             <ExternalLink className="size-3" />
@@ -440,7 +440,7 @@ function TenantRow({
               type="button"
               disabled={busy}
               onClick={() => onActivate(tenant)}
-              className="rounded-lg px-2 py-1 text-[11px] font-semibold text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-950/60"
+              className="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-950/60"
             >
               {thisRowBusy ? (
                 <Loader2 className="size-3 animate-spin" />
@@ -454,7 +454,7 @@ function TenantRow({
               type="button"
               disabled={busy}
               onClick={() => onSuspend(tenant)}
-              className="rounded-lg px-2 py-1 text-[11px] font-semibold text-amber-600 hover:bg-amber-50 disabled:opacity-40 dark:text-amber-400 dark:hover:bg-amber-950/60"
+              className="rounded-lg px-2 py-1 text-xs font-semibold text-amber-600 hover:bg-amber-50 disabled:opacity-40 dark:text-amber-400 dark:hover:bg-amber-950/60"
             >
               {thisRowBusy ? (
                 <Loader2 className="size-3 animate-spin" />
@@ -468,7 +468,7 @@ function TenantRow({
               type="button"
               disabled={busy}
               onClick={() => void onReprovision(tenant)}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-40 dark:text-blue-400 dark:hover:bg-blue-950/60"
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-40 dark:text-blue-400 dark:hover:bg-blue-950/60"
             >
               {thisRowBusy ? (
                 <Loader2 className="size-3 animate-spin" />
@@ -582,7 +582,7 @@ function TenantActionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="tenant-action-title"
-        className="relative w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+        className="relative w-full max-w-md space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
       >
         <button
           type="button"
@@ -594,7 +594,7 @@ function TenantActionModal({
           <X className="size-4" />
         </button>
         <div className="pe-8">
-          <h2 id="tenant-action-title" className="text-sm font-bold">
+          <h2 id="tenant-action-title" className="text-sm font-semibold">
             {title}
           </h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
@@ -637,7 +637,7 @@ function TenantActionModal({
             type="button"
             disabled={!confirmed || isSubmitting}
             onClick={onConfirm}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40 ${
+            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 ${
               action === "activate"
                 ? "bg-emerald-600 hover:bg-emerald-700"
                 : action === "suspend"
@@ -683,7 +683,7 @@ function ErrorBanner({
         <p>
           <strong>{errorCode}</strong> · {message}
           {correlationId ? (
-            <span className="ms-2 font-mono text-[10px]">{correlationId}</span>
+            <span className="ms-2 font-mono text-xs">{correlationId}</span>
           ) : null}
         </p>
       </div>
@@ -691,7 +691,7 @@ function ErrorBanner({
         {onRetry && retryLabel ? (
           <button
             type="button"
-            className="font-bold underline"
+            className="font-semibold underline"
             onClick={onRetry}
           >
             {retryLabel}
@@ -700,7 +700,7 @@ function ErrorBanner({
         {onDismiss ? (
           <button
             type="button"
-            className="font-bold underline"
+            className="font-semibold underline"
             onClick={onDismiss}
           >
             {dismissLabel}

@@ -46,11 +46,11 @@ export function ProvisioningGovernanceScreen() {
   return (
     <div
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"
+      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100"
     >
       <Navbar />
       <main className="mx-auto w-full max-w-[1500px] space-y-4 px-4 py-5 sm:px-6">
-        <header className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 px-5 py-4 text-white shadow-md">
+        <header className="relative overflow-hidden rounded-xl border border-indigo-500/20 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 px-5 py-4 text-white shadow-md">
           <div className="absolute end-0 top-0 size-64 -translate-y-1/2 translate-x-1/3 rounded-full bg-indigo-400/15 blur-3xl rtl:-translate-x-1/3" />
           <div className="relative flex items-start gap-3">
             <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-indigo-300/30 bg-indigo-400/15 text-indigo-200">
@@ -58,10 +58,10 @@ export function ProvisioningGovernanceScreen() {
             </span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-black tracking-tight sm:text-2xl">
+                <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
                   {copy.title}
                 </h1>
-                <span className="rounded-md border border-indigo-300/30 bg-indigo-400/10 px-2 py-1 text-xs font-bold text-indigo-100">
+                <span className="rounded-md border border-indigo-300/30 bg-indigo-400/10 px-2 py-1 text-xs font-semibold text-indigo-100">
                   {copy.readOnly}
                 </span>
               </div>
@@ -75,7 +75,7 @@ export function ProvisioningGovernanceScreen() {
         <nav
           role="tablist"
           aria-label={copy.title}
-          className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-950"
+          className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-950"
         >
           <TabButton
             selected={tab === "CATALOGUE"}
@@ -137,13 +137,13 @@ function ProvisioningModuleLinks({
         <Link
           key={module.href}
           href={module.href}
-          className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-indigo-400 hover:text-indigo-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-300"
+          className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-indigo-400 hover:text-indigo-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-300"
         >
           <span className="inline-flex items-center gap-2">
             {module.icon}
             {module.label}
           </span>
-          <span className="text-[10px] font-bold text-slate-400">
+          <span className="text-xs font-semibold text-slate-400">
             {copy.openWorkspace}
           </span>
         </Link>
@@ -356,10 +356,10 @@ function ComponentTable({
   onPage: (value: number) => void;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
-          <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+          <thead className="bg-slate-50 text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-900 dark:text-slate-400">
             <tr>
               {[
                 copy.component,
@@ -379,10 +379,10 @@ function ComponentTable({
             {data.items.map((component) => (
               <tr key={component.id} className="align-top">
                 <td className="px-4 py-4">
-                  <p className="font-mono text-xs font-black text-indigo-700 dark:text-indigo-300">
+                  <p className="font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">
                     {component.key}
                   </p>
-                  <p className="mt-1 text-[10px] text-slate-500">
+                  <p className="mt-1 text-xs text-slate-500">
                     {component.isMandatory ? copy.mandatory : copy.optional} ·{" "}
                     {copy.contract} {component.contractVersion}
                   </p>
@@ -396,7 +396,7 @@ function ComponentTable({
                 <td className="px-4 py-4 text-xs">
                   {component.latestPublishedRelease ? (
                     <>
-                      <p className="font-mono font-bold">
+                      <p className="font-mono font-semibold">
                         {component.latestPublishedRelease.releaseVersion}
                       </p>
                       <p className="mt-1 text-slate-500">
@@ -449,12 +449,12 @@ function ReleaseDialog({
       aria-labelledby="provisioning-release-dialog-title"
       className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
     >
-      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
+      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2
               id="provisioning-release-dialog-title"
-              className="text-lg font-black"
+              className="text-lg font-semibold"
             >
               {copy.releases}: {view.selectedComponent?.key}
             </h2>
@@ -648,7 +648,7 @@ function ReleaseList({
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h3 className="font-mono text-sm font-black">
+                <h3 className="font-mono text-sm font-semibold">
                   {release.releaseVersion}
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
@@ -728,7 +728,7 @@ function DiscoveryWorkspace({
       <section className={cardClass}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-black">{copy.startDiscovery}</h2>
+            <h2 className="font-semibold">{copy.startDiscovery}</h2>
             <p className="mt-1 max-w-3xl text-xs text-slate-500">
               {copy.permissionRun}
             </p>
@@ -803,7 +803,7 @@ function DiscoveryWorkspace({
           </div>
         ) : null}
         {validation ? (
-          <p role="alert" className="mt-3 text-xs font-bold text-rose-600">
+          <p role="alert" className="mt-3 text-xs font-semibold text-rose-600">
             {validation}
           </p>
         ) : null}
@@ -827,7 +827,7 @@ function DiscoveryWorkspace({
         {view.mutation.result ? (
           <p
             role="status"
-            className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+            className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
           >
             {copy.created}{" "}
             <span className="font-mono">{view.mutation.result.runId}</span>
@@ -890,10 +890,10 @@ function DiscoveryTable({
   onInspect: (runId: string) => void;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1050px] text-sm">
-          <thead className="bg-slate-50 text-[11px] font-black uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+          <thead className="bg-slate-50 text-2xs font-semibold uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">
             <tr>
               {[
                 copy.mode,
@@ -915,7 +915,7 @@ function DiscoveryTable({
               <tr key={run.runId}>
                 <td className="px-4 py-4">
                   <Pill>{run.mode}</Pill>
-                  <p className="mt-2 max-w-44 break-all font-mono text-[10px] text-slate-500">
+                  <p className="mt-2 max-w-44 break-all font-mono text-xs text-slate-500">
                     {run.runId}
                   </p>
                 </td>
@@ -936,10 +936,10 @@ function DiscoveryTable({
                     {copy.remaining}: {run.remainingTenantCount}
                   </p>
                 </td>
-                <td className="px-4 py-4 font-mono font-black">
+                <td className="px-4 py-4 font-mono font-semibold">
                   {run.driftedCount}
                 </td>
-                <td className="px-4 py-4 font-mono font-black">
+                <td className="px-4 py-4 font-mono font-semibold">
                   {run.incompatibleCount}
                 </td>
                 <td className="px-4 py-4 text-end">
@@ -956,7 +956,7 @@ function DiscoveryTable({
           </tbody>
         </table>
       </div>
-      <p className="border-t border-slate-200 px-4 py-3 break-all font-mono text-[10px] text-slate-500 dark:border-slate-800">
+      <p className="border-t border-slate-200 px-4 py-3 break-all font-mono text-xs text-slate-500 dark:border-slate-800">
         {copy.correlation}: {correlationId} · {copy.responseAt}:{" "}
         {formatDate(timestamp, lang, true)}
       </p>
@@ -980,10 +980,10 @@ function DiscoveryDetailDialog({
       aria-labelledby="discovery-detail-title"
       className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
     >
-      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl dark:bg-slate-950">
+      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-white p-4 shadow-2xl dark:bg-slate-950">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 id="discovery-detail-title" className="text-lg font-black">
+            <h2 id="discovery-detail-title" className="text-lg font-semibold">
               {copy.results}
             </h2>
             <p className="mt-1 break-all font-mono text-xs text-slate-500">
@@ -1025,7 +1025,7 @@ function DiscoveryResults({
       {detail.resultsTruncated ? (
         <p
           role="status"
-          className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          className="rounded-lg bg-amber-50 p-2 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
         >
           {copy.truncated}
         </p>
@@ -1098,8 +1098,8 @@ function ConfirmationDialog({
       aria-labelledby="discovery-confirm-title"
       className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/75 p-4"
     >
-      <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-950">
-        <h2 id="discovery-confirm-title" className="text-lg font-black">
+      <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl dark:bg-slate-950">
+        <h2 id="discovery-confirm-title" className="text-lg font-semibold">
           {copy.confirmationTitle}
         </h2>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
@@ -1289,7 +1289,7 @@ function ErrorCard({
       className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
     >
       <p>{error.message}</p>
-      <p className="mt-1 break-all font-mono text-[10px]">
+      <p className="mt-1 break-all font-mono text-xs">
         {error.errorCode ? `${copy.errorCode}: ${error.errorCode}` : ""}
         {error.correlationId
           ? ` · ${copy.correlation}: ${error.correlationId}`
@@ -1318,7 +1318,7 @@ function PaginationFooter<T>({
           {copy.page} {data.page} {copy.of} {Math.max(1, data.totalPages)} ·{" "}
           {data.total}
         </p>
-        <p className="mt-1 break-all font-mono text-[10px]">
+        <p className="mt-1 break-all font-mono text-xs">
           {copy.correlation}: {data.correlationId} · {copy.responseAt}:{" "}
           {formatDate(data.timestamp, lang, true)}
         </p>
@@ -1369,10 +1369,10 @@ function StatePanel({
   return (
     <section
       role={tone === "danger" ? "alert" : undefined}
-      className={`flex min-h-48 flex-col items-center justify-center rounded-2xl border p-6 text-center ${colors}`}
+      className={`flex min-h-48 flex-col items-center justify-center rounded-xl border p-6 text-center ${colors}`}
     >
       {icon ? <span className="mb-3">{icon}</span> : null}
-      <h2 className="font-black">{title}</h2>
+      <h2 className="font-semibold">{title}</h2>
       {detail ? (
         <p className="mt-2 max-w-3xl break-all text-xs">{detail}</p>
       ) : null}
@@ -1398,7 +1398,7 @@ function TabButton({
       role="tab"
       aria-selected={selected}
       onClick={onClick}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-black ${selected ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"}`}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold ${selected ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"}`}
     >
       {icon}
       {label}
@@ -1434,7 +1434,7 @@ function TextField({
       {error ? (
         <span
           role="alert"
-          className="text-[11px] font-semibold text-rose-600 dark:text-rose-300"
+          className="text-xs font-semibold text-rose-600 dark:text-rose-300"
         >
           {error}
         </span>
@@ -1514,7 +1514,7 @@ function ActionButton({
 }
 function Pill({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-black text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+    <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
       {children}
     </span>
   );
@@ -1523,7 +1523,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800">
       <dt className="text-slate-500">{label}</dt>
-      <dd className="mt-1 font-bold">{value}</dd>
+      <dd className="mt-1 font-semibold">{value}</dd>
     </div>
   );
 }
@@ -1599,14 +1599,14 @@ function componentFilterErrors(
 }
 
 const cardClass =
-  "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950";
+  "rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950";
 const labelClass =
-  "grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300";
+  "grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300";
 const inputClass =
   "min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-normal text-slate-950 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
 const primaryButtonClass =
-  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-xs font-black text-white hover:bg-indigo-500 disabled:opacity-40";
+  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-40";
 const secondaryButtonClass =
-  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 text-xs font-bold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";
+  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 text-xs font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";
 const dangerButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-xl bg-rose-600 px-4 text-xs font-black text-white hover:bg-rose-500 disabled:opacity-40";
+  "inline-flex min-h-10 items-center justify-center rounded-xl bg-rose-600 px-4 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-40";

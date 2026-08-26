@@ -78,9 +78,9 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-      <section role="dialog" aria-modal="true" aria-labelledby="application-configuration-title" className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+      <section role="dialog" aria-modal="true" aria-labelledby="application-configuration-title" className="w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
         <header className="flex items-start justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-          <div><h2 id="application-configuration-title" className="text-sm font-black">{mode === "metadata" ? copy.metadataTitle : copy.policyTitle}</h2><p className="mt-1 text-xs text-slate-500">{copy.revisionPrefix} {mode === "metadata" ? application.catalogueRevision : application.databasePolicy.policyRevision} {copy.revisionSuffix}</p></div>
+          <div><h2 id="application-configuration-title" className="text-sm font-semibold">{mode === "metadata" ? copy.metadataTitle : copy.policyTitle}</h2><p className="mt-1 text-xs text-slate-500">{copy.revisionPrefix} {mode === "metadata" ? application.catalogueRevision : application.databasePolicy.policyRevision} {copy.revisionSuffix}</p></div>
           <button type="button" onClick={onClose} aria-label={copy.close} className="grid size-11 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
         </header>
         <form onSubmit={submit} className="space-y-4 p-5">
@@ -89,8 +89,8 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
               <div role="note" className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
-                  <p className="text-xs font-black">{copy.publicationInvalidationTitle}</p>
-                  <p className="mt-1 text-[11px] leading-relaxed">{copy.publicationInvalidationDescription}</p>
+                  <p className="text-xs font-semibold">{copy.publicationInvalidationTitle}</p>
+                  <p className="mt-1 text-xs leading-relaxed">{copy.publicationInvalidationDescription}</p>
                 </div>
               </div>
             )}
@@ -113,12 +113,12 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
             <Field label={copy.changeReason}><textarea required maxLength={256} rows={2} value={reason} onChange={(event) => setReason(event.target.value)} className="field resize-none" /></Field>
           </>}
           {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">{error}</p>}
-          <footer className="flex justify-end gap-2 pt-2"><button type="button" onClick={onClose} disabled={isSubmitting} className="min-h-11 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">{t.applications.cancel}</button><button type="submit" disabled={isSubmitting} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-500 disabled:opacity-50">{isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{copy.save}</button></footer>
+          <footer className="flex justify-end gap-2 pt-2"><button type="button" onClick={onClose} disabled={isSubmitting} className="min-h-11 rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">{t.applications.cancel}</button><button type="submit" disabled={isSubmitting} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 disabled:opacity-50">{isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{copy.save}</button></footer>
         </form>
       </section>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">{label}<div className="mt-1.5 [&_.field]:w-full [&_.field]:rounded-xl [&_.field]:border [&_.field]:border-slate-300 [&_.field]:bg-white [&_.field]:px-3 [&_.field]:py-2.5 [&_.field]:text-sm [&_.field]:outline-none [&_.field]:focus:border-violet-500 dark:[&_.field]:border-slate-700 dark:[&_.field]:bg-slate-950">{children}</div></label>; }
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) { return <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-3 text-xs font-bold dark:border-slate-800"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-violet-600" />{label}</label>; }
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">{label}<div className="mt-1.5 [&_.field]:w-full [&_.field]:rounded-xl [&_.field]:border [&_.field]:border-slate-300 [&_.field]:bg-white [&_.field]:px-3 [&_.field]:py-2.5 [&_.field]:text-sm [&_.field]:outline-none [&_.field]:focus:border-violet-500 dark:[&_.field]:border-slate-700 dark:[&_.field]:bg-slate-950">{children}</div></label>; }
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) { return <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-3 text-xs font-semibold dark:border-slate-800"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-violet-600" />{label}</label>; }

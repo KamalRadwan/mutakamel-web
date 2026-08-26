@@ -86,7 +86,7 @@ export function DashboardTabsNav({
 
   return (
     <nav
-      className="sticky top-[61px] z-10 rounded-2xl border border-slate-200 bg-white/95 px-2 shadow-xs backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
+      className="sticky top-[61px] z-10 rounded-xl border border-slate-200 bg-white/95 px-2 shadow-xs backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
       aria-label={lang === "ar" ? "مجموعات تقارير لوحة التحكم" : "Dashboard report groups"}
     >
       <div className="flex items-center gap-1.5 overflow-x-auto py-2 scrollbar-none">
@@ -99,7 +99,7 @@ export function DashboardTabsNav({
               type="button"
               onClick={() => onTabChange(tab.key)}
               aria-current={isActive ? "page" : undefined}
-              className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+              className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
                 isActive
                   ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20"
                   : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80"

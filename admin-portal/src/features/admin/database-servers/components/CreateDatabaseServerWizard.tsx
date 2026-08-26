@@ -521,19 +521,19 @@ export function CreateDatabaseServerWizard({
   return (
     <div
       dir={dir}
-      className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm max-w-3xl mx-auto mt-6"
+      className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm max-w-3xl mx-auto mt-6"
     >
-      <h2 className="text-xl font-bold mb-6">{copy.title}</h2>
+      <h2 className="text-xl font-semibold mb-6">{copy.title}</h2>
 
       {/* Basic Wizard Progress */}
       <div className="flex gap-2 mb-8 text-sm">
         <div
-          className={`flex-1 pb-2 border-b-2 ${step >= 1 ? "border-blue-600 font-bold" : "border-slate-200 text-slate-500"}`}
+          className={`flex-1 pb-2 border-b-2 ${step >= 1 ? "border-blue-600 font-semibold" : "border-slate-200 text-slate-500"}`}
         >
           {copy.connectionStep}
         </div>
         <div
-          className={`flex-1 pb-2 border-b-2 ${step >= 2 ? "border-blue-600 font-bold" : "border-slate-200 text-slate-500"}`}
+          className={`flex-1 pb-2 border-b-2 ${step >= 2 ? "border-blue-600 font-semibold" : "border-slate-200 text-slate-500"}`}
         >
           {copy.accessStep}
         </div>
@@ -546,7 +546,7 @@ export function CreateDatabaseServerWizard({
         >
           <p>{wizardError.message}</p>
           {(wizardError.errorCode || wizardError.correlationId) && (
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px]">
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs">
               {wizardError.errorCode && <span>{wizardError.errorCode}</span>}
               {wizardError.correlationId && (
                 <span>
@@ -567,7 +567,7 @@ export function CreateDatabaseServerWizard({
           <div className="border-b border-red-200 px-4 py-3 dark:border-red-900">
             <h3
               id="database-connectivity-failure-title"
-              className="text-sm font-bold text-red-800 dark:text-red-200"
+              className="text-sm font-semibold text-red-800 dark:text-red-200"
             >
               {copy.connectionChecksFailed}
             </h3>
@@ -582,7 +582,7 @@ export function CreateDatabaseServerWizard({
                 className="flex items-start justify-between gap-4 px-4 py-3 text-xs"
               >
                 <div>
-                  <p className="font-bold text-slate-900 dark:text-slate-100">
+                  <p className="font-semibold text-slate-900 dark:text-slate-100">
                     {copy.securityAdminCheck}
                   </p>
                   <p
@@ -592,7 +592,7 @@ export function CreateDatabaseServerWizard({
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 rounded-full px-2 py-1 font-bold ${check.connected ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"}`}
+                  className={`shrink-0 rounded-full px-2 py-1 font-semibold ${check.connected ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"}`}
                 >
                   {check.connected ? copy.passed : copy.failed}
                 </span>
@@ -874,16 +874,16 @@ export function CreateDatabaseServerWizard({
           </p>
 
           <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
-            <p className="font-bold">{copy.generatedTitle}</p>
+            <p className="font-semibold">{copy.generatedTitle}</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               {DATABASE_SECURITY_ADMIN_POSTURE.generatedPrincipals.map((item) => (
                 <div key={item.principal} className="rounded-lg bg-white/80 px-3 py-2 dark:bg-slate-900/70">
-                  <p className="font-mono font-bold">
+                  <p className="font-mono font-semibold">
                     {item.principal === "Application roles"
                       ? copy.applicationRoles
                       : item.principal}
                   </p>
-                  <p className="mt-1 text-[11px] opacity-75">
+                  <p className="mt-1 text-xs opacity-75">
                     {item.principal === "mutakamel_backup"
                       ? copy.backupAccess
                       : item.principal === "Application roles"

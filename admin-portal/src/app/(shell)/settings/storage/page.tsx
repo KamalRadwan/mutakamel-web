@@ -146,8 +146,8 @@ export default function StorageRuntimeSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
+      <header className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <HardDrive
             className="size-5 text-blue-600 dark:text-blue-400"
             aria-hidden="true"
@@ -186,7 +186,7 @@ export default function StorageRuntimeSettingsPage() {
               </p>
             ) : null}
 
-            <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
               <label className="flex min-h-16 items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 dark:border-slate-700 dark:bg-slate-950">
                 <span>
                   <strong className="block text-sm">{copy.switchLabel}</strong>
@@ -215,20 +215,20 @@ export default function StorageRuntimeSettingsPage() {
               </label>
 
               {!config.configured ? (
-                <p role="note" className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                <p role="note" className="text-xs font-semibold text-amber-700 dark:text-amber-300">
                   {copy.enableBlocked}
                 </p>
               ) : null}
 
               {!config.brokerConfigured ? (
-                <p role="note" className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                <p role="note" className="text-xs font-semibold text-amber-700 dark:text-amber-300">
                   {copy.brokerBlocked}
                 </p>
               ) : null}
 
               <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:flex-row sm:items-center">
                 <div>
-                  <h2 className="flex items-center gap-2 text-sm font-bold">
+                  <h2 className="flex items-center gap-2 text-sm font-semibold">
                     <KeyRound className="size-4 text-amber-600" aria-hidden="true" />
                     {copy.keyTitle}
                   </h2>
@@ -241,7 +241,7 @@ export default function StorageRuntimeSettingsPage() {
                     type="button"
                     onClick={() => setConfirmationOpen(true)}
                     disabled={pending}
-                    className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 text-xs font-bold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 text-xs font-semibold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {keyMutationPending ? (
                       <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -302,7 +302,7 @@ function StorageRuntimeEvidence({
     <section
       role="region"
       aria-label={copy.statusRegion}
-      className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+      className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
     >
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <EvidenceItem
@@ -333,10 +333,10 @@ function StorageRuntimeEvidence({
 function EvidenceItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800">
-      <dt className="text-xs font-bold text-slate-500 dark:text-slate-400">
+      <dt className="text-xs font-semibold text-slate-500 dark:text-slate-400">
         {label}
       </dt>
-      <dd className="mt-1 font-bold">{value}</dd>
+      <dd className="mt-1 font-semibold">{value}</dd>
     </div>
   );
 }
@@ -354,7 +354,7 @@ function MutationNotice({
   return (
     <p
       role={succeeded ? "status" : "alert"}
-      className={`rounded-xl border p-3 text-sm font-bold ${
+      className={`rounded-xl border p-3 text-sm font-semibold ${
         succeeded
           ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
           : "border-rose-300 bg-rose-50 text-rose-950 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"

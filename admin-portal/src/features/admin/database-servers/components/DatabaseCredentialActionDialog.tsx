@@ -72,7 +72,7 @@ export function DatabaseCredentialActionDialog({
       aria-modal="true"
       aria-labelledby="credential-action-title"
     >
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+      <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
           <div className="flex items-start gap-3">
             <div
@@ -85,7 +85,7 @@ export function DatabaseCredentialActionDialog({
               {isCaution ? <KeyRound className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
             </div>
             <div>
-              <h2 id="credential-action-title" className="text-base font-bold text-slate-950 dark:text-white">
+              <h2 id="credential-action-title" className="text-base font-semibold text-slate-950 dark:text-white">
                 {copy.title}
               </h2>
               <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
@@ -136,7 +136,7 @@ export function DatabaseCredentialActionDialog({
               placeholder="Explain why this credential operation is required"
               className="w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
-            <span className="mt-1 block text-[11px] text-slate-400">{reason.trim().length}/500 · minimum 8 characters</span>
+            <span className="mt-1 block text-xs text-slate-400">{reason.trim().length}/500 · minimum 8 characters</span>
           </label>
 
           {error && (

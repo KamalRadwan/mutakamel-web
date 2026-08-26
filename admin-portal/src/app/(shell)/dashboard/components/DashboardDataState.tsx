@@ -24,7 +24,7 @@ export function UnavailableDashboardPanel({
 
   return (
     <section
-      className={`min-h-52 rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-900/60 ${className}`}
+      className={`min-h-52 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-5 dark:border-slate-700 dark:bg-slate-900/60 ${className}`}
       aria-label={title}
     >
       <div className="flex h-full min-h-40 flex-col items-center justify-center gap-3 text-center">
@@ -32,7 +32,7 @@ export function UnavailableDashboardPanel({
           <DatabaseZap className="size-5" aria-hidden="true" />
         </span>
         <div className="max-w-sm space-y-1">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
             {title}
           </h3>
           <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
@@ -42,7 +42,7 @@ export function UnavailableDashboardPanel({
           </p>
         </div>
         {dataset?.reasonCode && (
-          <code className="rounded-md bg-slate-200/80 px-2 py-1 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+          <code className="rounded-md bg-slate-200/80 px-2 py-1 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
             {dataset.reasonCode}
           </code>
         )}
@@ -59,7 +59,7 @@ export function EmptyDashboardPanel({
 
   return (
     <section
-      className={`min-h-52 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 ${className}`}
+      className={`min-h-52 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 ${className}`}
       aria-label={title}
     >
       <div className="flex h-full min-h-40 flex-col items-center justify-center gap-3 text-center">
@@ -68,7 +68,7 @@ export function EmptyDashboardPanel({
           aria-hidden="true"
         />
         <div className="space-y-1">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
             {title}
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">

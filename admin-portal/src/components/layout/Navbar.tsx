@@ -49,8 +49,8 @@ export function Navbar(props: UseNavbarProps) {
   } = useNavbar(props);
 
   return (
-    <header className="sticky top-0 z-30 w-full h-15 bg-[#0f172a] dark:bg-[#0b132b] text-slate-100 border-b border-slate-800/90 shadow-md transition-colors">
-      <div className="h-full px-[10px] flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-30 w-full h-15 bg-sidebar dark:bg-sidebar text-slate-100 border-b border-slate-800/90 shadow-md transition-colors">
+      <div className="h-full px-4 flex items-center justify-between gap-4">
         {/* Left (RTL Start): Brand Logo & Mobile Toggle */}
         <div className="flex items-center gap-3 shrink-0">
           <button
@@ -75,10 +75,10 @@ export function Navbar(props: UseNavbarProps) {
               <ShieldCheck className="w-5.5 h-5.5" />
             </div>
             <div className="flex flex-col">
-              <span className="text-base font-extrabold tracking-tight text-white leading-tight">
+              <span className="text-base font-semibold tracking-tight text-white leading-tight">
                 {lang === "ar" ? "متكامل" : "Mutakamel"}
               </span>
-              <span className="text-[10px] font-medium text-slate-400 leading-none">
+              <span className="text-xs font-medium text-slate-400 leading-none">
                 Control Plane
               </span>
             </div>
@@ -93,7 +93,7 @@ export function Navbar(props: UseNavbarProps) {
               href={navRoutes.dashboard.href}
               className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 isLinkActive(navRoutes.dashboard.href)
-                  ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
+                  ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-semibold"
                   : "text-slate-300 hover:text-white hover:bg-slate-800/70"
               }`}
             >
@@ -109,7 +109,7 @@ export function Navbar(props: UseNavbarProps) {
                 onClick={toggleInfrastructureDropdown}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   isInfrastructureChildActive || isInfrastructureDropdownOpen
-                    ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
+                    ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-semibold"
                     : "text-slate-300 hover:text-white hover:bg-slate-800/70"
                 }`}
               >
@@ -122,7 +122,7 @@ export function Navbar(props: UseNavbarProps) {
 
               {isInfrastructureDropdownOpen && (
                 <div
-                  className="absolute top-full start-0 mt-1 w-48 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl py-1.5 z-40 animate-in fade-in"
+                  className="absolute top-full start-0 mt-1 w-48 bg-slate-900 rounded-xl border border-slate-800 shadow-xl py-1.5 z-40 animate-in fade-in"
                   onMouseLeave={closeInfrastructureDropdown}
                 >
                   {filteredInfrastructureItems.length === 0 ? (
@@ -137,7 +137,7 @@ export function Navbar(props: UseNavbarProps) {
                         onClick={closeInfrastructureDropdown}
                         className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold hover:bg-slate-800 transition-colors ${
                           isLinkActive(item.href)
-                            ? "text-blue-400 font-bold"
+                            ? "text-blue-400 font-semibold"
                             : "text-slate-300"
                         }`}
                       >
@@ -166,7 +166,7 @@ export function Navbar(props: UseNavbarProps) {
               title={navRoutes.backup.label}
               className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 isLinkActive(navRoutes.backup.href)
-                  ? "bg-cyan-600/25 text-cyan-200 border border-cyan-500/40 shadow-xs font-bold"
+                  ? "bg-cyan-600/25 text-cyan-200 border border-cyan-500/40 shadow-xs font-semibold"
                   : "text-slate-300 hover:text-white hover:bg-slate-800/70"
               }`}
             >
@@ -181,7 +181,7 @@ export function Navbar(props: UseNavbarProps) {
               href={navRoutes.tenants.href}
               className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 isLinkActive(navRoutes.tenants.href)
-                  ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
+                  ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-semibold"
                   : "text-slate-300 hover:text-white hover:bg-slate-800/70"
               }`}
             >
@@ -196,7 +196,7 @@ export function Navbar(props: UseNavbarProps) {
               href={navRoutes.applications.href}
               className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 isLinkActive(navRoutes.applications.href)
-                  ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
+                  ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-semibold"
                   : "text-slate-300 hover:text-white hover:bg-slate-800/70"
               }`}
             >
@@ -212,7 +212,7 @@ export function Navbar(props: UseNavbarProps) {
                 onClick={toggleAdminDropdown}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   isAdminChildActive || isAdminDropdownOpen
-                    ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-bold"
+                    ? "bg-blue-600/30 text-blue-300 border border-blue-500/40 shadow-xs font-semibold"
                     : "text-slate-300 hover:text-white hover:bg-slate-800/70"
                 }`}
               >
@@ -225,7 +225,7 @@ export function Navbar(props: UseNavbarProps) {
 
               {isAdminDropdownOpen && (
                 <div
-                  className="absolute top-full start-0 mt-1 w-48 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl py-1.5 z-40 animate-in fade-in"
+                  className="absolute top-full start-0 mt-1 w-48 bg-slate-900 rounded-xl border border-slate-800 shadow-xl py-1.5 z-40 animate-in fade-in"
                   onMouseLeave={closeAdminDropdown}
                 >
                   {filteredAdminItems.length === 0 ? (
@@ -240,7 +240,7 @@ export function Navbar(props: UseNavbarProps) {
                         onClick={closeAdminDropdown}
                         className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold hover:bg-slate-800 transition-colors ${
                           isLinkActive(item.href)
-                            ? "text-blue-400 font-bold"
+                            ? "text-blue-400 font-semibold"
                             : "text-slate-300"
                         }`}
                       >
@@ -287,7 +287,7 @@ export function Navbar(props: UseNavbarProps) {
 
             {filteredInfrastructureItems.length ? (
               <div className="rounded-xl border border-slate-800 p-2">
-                <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <p className="px-2 pb-1 text-2xs font-semibold uppercase tracking-wider text-slate-500">
                   {navRoutes.infrastructureDropdown.label}
                 </p>
                 {filteredInfrastructureItems.map((item) => (
@@ -339,7 +339,7 @@ export function Navbar(props: UseNavbarProps) {
 
             {filteredAdminItems.length ? (
               <div className="rounded-xl border border-slate-800 p-2">
-                <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <p className="px-2 pb-1 text-2xs font-semibold uppercase tracking-wider text-slate-500">
                   {navRoutes.adminDropdown.label}
                 </p>
                 {filteredAdminItems.map((item) => (
@@ -385,7 +385,7 @@ function MobileNavLink({
       href={href}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold ${active ? "bg-cyan-600/20 text-cyan-200" : "text-slate-200 hover:bg-slate-900"}`}
+      className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${active ? "bg-cyan-600/20 text-cyan-200" : "text-slate-200 hover:bg-slate-900"}`}
     >
       {icon}
       <span>{label}</span>

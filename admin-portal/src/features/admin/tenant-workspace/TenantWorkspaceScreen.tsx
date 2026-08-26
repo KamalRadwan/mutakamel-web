@@ -96,11 +96,11 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
           {copy.back}
         </button>
 
-        <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-950">
+        <header className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-950">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-indigo-600">{copy.tenantWorkspace}</p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{tenant.companyName}</h1>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">{copy.tenantWorkspace}</p>
+              <h1 className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{tenant.companyName}</h1>
               <p className="mt-1 font-mono text-xs text-slate-500">{tenant.name} · {tenant.id}</p>
             </div>
             <div className="text-end">
@@ -184,7 +184,7 @@ function PageFrame({ children }: { children: React.ReactNode }) {
 }
 
 function WorkspaceState({ children, alert = false }: { children: React.ReactNode; alert?: boolean }) {
-  return <div role={alert ? "alert" : "status"} className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">{children}</div>;
+  return <div role={alert ? "alert" : "status"} className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">{children}</div>;
 }
 
 function statusClass(status: string): string {
@@ -195,7 +195,7 @@ function statusClass(status: string): string {
       : status === "PROVISIONING"
         ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200"
         : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
-  return `inline-flex rounded-full px-3 py-1 font-mono text-xs font-bold ${tone}`;
+  return `inline-flex rounded-full px-3 py-1 font-mono text-xs font-semibold ${tone}`;
 }
 
 const workspaceCopy = {

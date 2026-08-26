@@ -50,11 +50,11 @@ export function KpiCard({ card, currencyCode = "USD" }: KpiCardProps) {
 
   return (
     <div
-      className={`bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 ${style.topBorder} shadow-2xs space-y-3 flex flex-col justify-between overflow-hidden relative group hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all`}
+      className={`bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-slate-800 ${style.topBorder} shadow-2xs space-y-3 flex flex-col justify-between overflow-hidden relative group hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all`}
     >
       <div className="space-y-2">
         <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-          <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate max-w-[150px]" title={card.label}>
+          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[150px]" title={card.label}>
             {card.label}
           </span>
           <div className={`p-2 rounded-xl ${style.iconBg} ${style.iconColor} shrink-0`}>
@@ -63,12 +63,12 @@ export function KpiCard({ card, currencyCode = "USD" }: KpiCardProps) {
         </div>
 
         <div className="flex items-baseline justify-between pt-1">
-          <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+          <span className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
             {formattedValue}
           </span>
         </div>
 
-        <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-tight">
+        <p className="text-xs sm:text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-tight">
           {card.description}
         </p>
       </div>

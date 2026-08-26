@@ -15,7 +15,7 @@ export function BackupPageHeader({
   actions,
 }: BackupPageHeaderProps) {
   return (
-    <header className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white px-5 py-6 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:px-7">
+    <header className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-5 py-6 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:px-7">
       <div
         className="pointer-events-none absolute inset-y-0 end-0 w-1/3 bg-[radial-gradient(circle_at_center,rgba(14,116,144,0.12),transparent_68%)]"
         aria-hidden="true"
@@ -28,7 +28,7 @@ export function BackupPageHeader({
             </span>
             {eyebrow}
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-3xl">
             {title}
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">

@@ -26,7 +26,7 @@ export function IncomingCallPopup({
 
   return createPortal(
     <aside
-      className="fixed top-4 start-1/2 z-[80] grid w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 gap-3 rounded-2xl border border-slate-700/80 bg-slate-950/95 p-3.5 text-white shadow-2xl backdrop-blur-xl"
+      className="fixed top-4 start-1/2 z-[80] grid w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 gap-3 rounded-xl border border-slate-700/80 bg-slate-950/95 p-3.5 text-white shadow-2xl backdrop-blur-xl"
       aria-label={lang === "ar" ? "مكالمة واردة" : "Incoming call"}
       aria-live="assertive"
     >
@@ -45,10 +45,10 @@ export function IncomingCallPopup({
           <span className="absolute inset-0 animate-ping rounded-xl bg-emerald-400 opacity-30" />
         </span>
         <span className="min-w-0">
-          <small className="block text-[11px] font-bold tracking-wide text-emerald-400">
+          <small className="block text-xs font-semibold tracking-wide text-emerald-400">
             {lang === "ar" ? "مكالمة واردة" : "Incoming call"}
           </small>
-          <strong className="block truncate text-sm font-extrabold">
+          <strong className="block truncate text-sm font-semibold">
             {displayName || phoneNumber || (lang === "ar" ? "متصل غير معروف" : "Unknown caller")}
           </strong>
           {displayName ? (
@@ -62,7 +62,7 @@ export function IncomingCallPopup({
       <div className="grid grid-cols-2 gap-2 border-t border-slate-800 pt-3">
         <button
           type="button"
-          className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+          className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
           onClick={onAnswer}
         >
           <PhoneIncoming className="size-4" />
@@ -70,7 +70,7 @@ export function IncomingCallPopup({
         </button>
         <button
           type="button"
-          className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-xs font-bold text-white transition-colors hover:bg-rose-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+          className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-rose-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
           onClick={onDecline}
         >
           <PhoneOff className="size-4" />

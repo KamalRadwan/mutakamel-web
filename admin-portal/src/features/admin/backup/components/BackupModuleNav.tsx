@@ -35,21 +35,21 @@ export function BackupModuleNav() {
 
   return (
     <section className="border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-      <div className="w-full px-[10px] pt-4 sm:pt-5">
+      <div className="w-full px-4 pt-4 sm:pt-5">
         <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900/70 dark:bg-cyan-950/50 dark:text-cyan-300">
               <DatabaseBackup className="size-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <p className={`text-[11px] font-bold text-cyan-700 dark:text-cyan-300 ${lang === "en" ? "uppercase tracking-[0.16em]" : ""}`}>
+              <p className={`text-[11px] font-semibold text-cyan-700 dark:text-cyan-300 ${lang === "en" ? "uppercase tracking-[0.16em]" : ""}`}>
                 {t.backup.eyebrow}
               </p>
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <p className="text-lg font-black tracking-tight text-slate-950 dark:text-white">
+                <p className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
                   {t.backup.title}
                 </p>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
                   {t.backup.serviceBoundary}
                 </span>
               </div>
@@ -73,7 +73,7 @@ export function BackupModuleNav() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`group relative inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${
+                className={`group relative inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${
                   active
                     ? "bg-cyan-50 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-200"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white"

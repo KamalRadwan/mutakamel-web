@@ -62,9 +62,9 @@ export default function SmtpSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 md:flex-row md:items-center">
+      <header className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 md:flex-row md:items-center">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <Mail className="size-5 text-blue-600 dark:text-blue-400" />
             {lang === "ar" ? "بوابة البريد SMTP" : "SMTP Email Gateway"}
           </h1>
@@ -87,7 +87,7 @@ export default function SmtpSettingsPage() {
                     : "Save changes before testing the persisted configuration."
                   : undefined
               }
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-100 px-3.5 text-xs font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-100 px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               {pending && smtp.mutation.action === "VERIFY" ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -102,7 +102,7 @@ export default function SmtpSettingsPage() {
               type="button"
               onClick={() => void save()}
               disabled={!smtp.hasUnsavedChanges || pending || smtp.configState !== "READY"}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-blue-700 px-3.5 text-xs font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-blue-700 px-3.5 text-xs font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {pending && smtp.mutation.action === "SAVE" ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -126,7 +126,7 @@ export default function SmtpSettingsPage() {
             <SmtpEvidence smtp={smtp} />
             <SmtpMutationNotice smtp={smtp} />
             {smtp.hasUnsavedChanges ? (
-              <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                 {lang === "ar"
                   ? "لديك تغييرات غير محفوظة. اختبار الاتصال معطل حتى يحفظ Core الإعداد ويعيد استجابته الموثوقة."
                   : "Unsaved changes are present. Connection testing stays disabled until Core saves and returns the authoritative configuration."}
@@ -154,9 +154,9 @@ export default function SmtpSettingsPage() {
         ) : null}
       </SettingsResourceBoundary>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-800">
-          <h2 className="flex items-center gap-2 text-sm font-black">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
             <History className="size-4 text-blue-500" />
             {lang === "ar" ? "سجل SMTP الآمن" : "Redacted SMTP audit"}
           </h2>
@@ -188,7 +188,7 @@ export default function SmtpSettingsPage() {
                     {log.changes.length ? (
                       <ul className="flex flex-wrap gap-2">
                         {log.changes.map((change, index) => (
-                          <li key={`${change.field}-${index}`} className="rounded-lg bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                          <li key={`${change.field}-${index}`} className="rounded-lg bg-slate-100 px-2 py-1 font-mono text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                             {change.label}: {String(change.previousValue ?? "—")} → {String(change.newValue ?? "—")}
                           </li>
                         ))}
@@ -214,7 +214,7 @@ function SmtpEvidence({ smtp }: { smtp: ReturnType<typeof useSmtpSettings> }) {
   const config = smtp.snapshot?.data;
   if (!config) return null;
   return (
-    <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-3">
+    <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-3">
       <Evidence label={lang === "ar" ? "الحالة" : "Status"} value={config.configured ? (lang === "ar" ? "مهيأ" : "Configured") : (lang === "ar" ? "غير مهيأ" : "Not configured")} />
       <Evidence label={lang === "ar" ? "المراجعة" : "Revision"} value={config.revision === null ? "—" : String(config.revision)} />
       <Evidence label={lang === "ar" ? "آخر تحديث" : "Updated"} value={config.updatedAt ? new Date(config.updatedAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US") : "—"} />
@@ -223,14 +223,14 @@ function SmtpEvidence({ smtp }: { smtp: ReturnType<typeof useSmtpSettings> }) {
 }
 
 function Evidence({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800"><span className="block text-xs font-bold text-slate-500">{label}</span><strong className="mt-1 block">{value}</strong></div>;
+  return <div className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800"><span className="block text-xs font-semibold text-slate-500">{label}</span><strong className="mt-1 block">{value}</strong></div>;
 }
 
 function SmtpMutationNotice({ smtp }: { smtp: ReturnType<typeof useSmtpSettings> }) {
   if (smtp.mutation.phase === "IDLE" || smtp.mutation.phase === "PENDING") return null;
   const succeeded = smtp.mutation.phase === "SUCCEEDED";
   return (
-    <p role={succeeded ? "status" : "alert"} className={`rounded-xl border p-3 text-sm font-bold ${succeeded ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100" : "border-rose-300 bg-rose-50 text-rose-950 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"}`}>
+    <p role={succeeded ? "status" : "alert"} className={`rounded-xl border p-3 text-sm font-semibold ${succeeded ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100" : "border-rose-300 bg-rose-50 text-rose-950 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"}`}>
       {succeeded
         ? smtp.lang === "ar" ? "اكتملت العملية بنجاح." : "The operation completed successfully."
         : safeMutationMessage(smtp.mutation.localCode ?? smtp.mutation.error?.errorCode, smtp.lang)}
@@ -251,7 +251,7 @@ function SmtpForm({ form, password, errors, lang, disabled, showPassword, onTogg
   onPassword: (value: string) => void;
 }) {
   return (
-    <form aria-label={lang === "ar" ? "إعداد SMTP" : "SMTP configuration"} onSubmit={(event) => event.preventDefault()} className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 lg:grid-cols-2">
+    <form aria-label={lang === "ar" ? "إعداد SMTP" : "SMTP configuration"} onSubmit={(event) => event.preventDefault()} className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 lg:grid-cols-2">
       <TextField id="smtp-from-address" label={lang === "ar" ? "عنوان المرسل" : "From address"} type="email" value={form.fromAddress} maxLength={320} disabled={disabled} error={errors.fromAddress} lang={lang} onChange={(value) => onUpdate("fromAddress", value)} />
       <TextField id="smtp-from-name" label={lang === "ar" ? "اسم المرسل" : "From name"} value={form.fromName} maxLength={200} disabled={disabled} error={errors.fromName} lang={lang} onChange={(value) => onUpdate("fromName", value)} />
       <TextField id="smtp-sender-domain" label={lang === "ar" ? "نطاق المرسل" : "Sender domain"} value={form.senderDomain} maxLength={253} disabled={disabled} error={errors.senderDomain} lang={lang} onChange={(value) => onUpdate("senderDomain", value)} />
@@ -261,7 +261,7 @@ function SmtpForm({ form, password, errors, lang, disabled, showPassword, onTogg
       <SelectField id="smtp-secure" label={lang === "ar" ? "TLS آمن" : "Secure TLS"} value={form.smtpSecure === null ? "" : String(form.smtpSecure)} disabled={disabled} error={errors.smtpSecure} lang={lang} onChange={(value) => onUpdate("smtpSecure", value === "true" ? true : value === "false" ? false : null)} options={[{ value: "true", label: lang === "ar" ? "مفعّل" : "Enabled" }, { value: "false", label: lang === "ar" ? "غير مفعّل" : "Disabled" }]} />
       <TextField id="smtp-username" label={lang === "ar" ? "اسم مستخدم SMTP" : "SMTP username"} value={form.smtpUsername} maxLength={320} disabled={disabled} error={errors.smtpUsername} lang={lang} onChange={(value) => onUpdate("smtpUsername", value)} />
       <div className="grid gap-1.5">
-        <label htmlFor="smtp-password" className="text-xs font-bold">{lang === "ar" ? "كلمة مرور SMTP (للكتابة فقط)" : "SMTP password (write-only)"}</label>
+        <label htmlFor="smtp-password" className="text-xs font-semibold">{lang === "ar" ? "كلمة مرور SMTP (للكتابة فقط)" : "SMTP password (write-only)"}</label>
         <div className="relative">
           <input id="smtp-password" type={showPassword ? "text" : "password"} autoComplete="new-password" value={password} maxLength={1024} disabled={disabled} aria-invalid={Boolean(errors.smtpPassword)} aria-describedby={errors.smtpPassword ? "smtp-password-error" : undefined} onChange={(event) => onPassword(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-300 bg-slate-50 ps-3 pe-11 font-mono text-sm outline-none focus:border-blue-600 dark:border-slate-700 dark:bg-slate-950 disabled:opacity-50" />
           <button type="button" onClick={onTogglePassword} disabled={disabled} aria-label={showPassword ? (lang === "ar" ? "إخفاء كلمة المرور" : "Hide password") : (lang === "ar" ? "إظهار كلمة المرور" : "Show password")} className="absolute end-3 top-3 text-slate-500 disabled:opacity-40">{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button>
@@ -279,17 +279,17 @@ function SmtpForm({ form, password, errors, lang, disabled, showPassword, onTogg
 
 function TextField({ id, label, type = "text", value, maxLength, disabled, error, lang, onChange }: { id: string; label: string; type?: "text" | "email"; value: string; maxLength: number; disabled: boolean; error?: string; lang: "ar" | "en"; onChange: (value: string) => void }) {
   const errorId = `${id}-error`;
-  return <div className="grid gap-1.5"><label htmlFor={id} className="text-xs font-bold">{label}</label><input id={id} type={type} value={value} maxLength={maxLength} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm outline-none focus:border-blue-600 dark:border-slate-700 dark:bg-slate-950 disabled:opacity-50" /><FieldError id={errorId} code={error} lang={lang} /></div>;
+  return <div className="grid gap-1.5"><label htmlFor={id} className="text-xs font-semibold">{label}</label><input id={id} type={type} value={value} maxLength={maxLength} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm outline-none focus:border-blue-600 dark:border-slate-700 dark:bg-slate-950 disabled:opacity-50" /><FieldError id={errorId} code={error} lang={lang} /></div>;
 }
 
 function SelectField({ id, label, value, disabled, error, lang, options, onChange }: { id: string; label: string; value: string; disabled: boolean; error?: string; lang: "ar" | "en"; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
   const errorId = `${id}-error`;
-  return <div className="grid gap-1.5"><label htmlFor={id} className="text-xs font-bold">{label}</label><select id={id} value={value} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm outline-none focus:border-blue-600 dark:border-slate-700 dark:bg-slate-950 disabled:opacity-50"><option value="">{lang === "ar" ? "اختر…" : "Select…"}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><FieldError id={errorId} code={error} lang={lang} /></div>;
+  return <div className="grid gap-1.5"><label htmlFor={id} className="text-xs font-semibold">{label}</label><select id={id} value={value} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => onChange(event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm outline-none focus:border-blue-600 dark:border-slate-700 dark:bg-slate-950 disabled:opacity-50"><option value="">{lang === "ar" ? "اختر…" : "Select…"}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><FieldError id={errorId} code={error} lang={lang} /></div>;
 }
 
 function FieldError({ id, code, lang }: { id: string; code?: string; lang: "ar" | "en" }) {
   if (!code) return null;
-  return <p id={id} role="alert" className="text-xs font-bold text-rose-700 dark:text-rose-300">{fieldErrorCopy(code, lang)}</p>;
+  return <p id={id} role="alert" className="text-xs font-semibold text-rose-700 dark:text-rose-300">{fieldErrorCopy(code, lang)}</p>;
 }
 
 function fieldErrorCopy(code: string, lang: "ar" | "en"): string {

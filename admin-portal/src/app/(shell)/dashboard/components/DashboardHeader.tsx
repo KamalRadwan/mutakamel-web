@@ -32,21 +32,21 @@ export function DashboardHeader({
   const { t, lang } = useI18n();
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white px-4 py-3.5 sm:px-5 sm:py-4 rounded-2xl border border-indigo-500/20 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white px-4 py-3.5 sm:px-5 sm:py-4 rounded-xl border border-indigo-500/20 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       {/* Background glow accents */}
       <div className="absolute top-0 end-0 -mt-10 -me-10 w-72 h-72 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/0 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10">
         <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-base sm:text-lg font-semibold tracking-tight text-white flex items-center gap-2">
             <Sparkles className="w-4.5 h-4.5 text-cyan-400" />
             <span>{t.dashboard.title}</span>
           </h1>
-          <span className="bg-indigo-500/25 text-indigo-300 border border-indigo-400/30 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md">
+          <span className="bg-indigo-500/25 text-indigo-300 border border-indigo-400/30 text-2xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">
             Live Platform Telemetry
           </span>
         </div>
-        <p className="text-[11px] text-indigo-200/80 mt-0.5 leading-tight">
+        <p className="text-xs text-indigo-200/80 mt-0.5 leading-tight">
           {t.dashboard.welcome}
         </p>
       </div>

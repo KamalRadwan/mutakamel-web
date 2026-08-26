@@ -42,11 +42,11 @@ export default function NewDatabaseServerPage() {
   return (
     <div
       dir={dir}
-      className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col"
+      className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col"
     >
       <Navbar />
 
-      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
+      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
         <Link
           href={canReadDetails ? "/database-servers" : "/dashboard"}
           className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
@@ -62,7 +62,7 @@ export default function NewDatabaseServerPage() {
         {isLoading ? (
           <section
             role="status"
-            className="mx-auto grid min-h-72 max-w-3xl place-items-center rounded-2xl border border-slate-200 bg-white p-8 text-sm font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
+            className="mx-auto grid min-h-72 max-w-3xl place-items-center rounded-xl border border-slate-200 bg-white p-8 text-sm font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
           >
             {copy.checkingPermissions}
           </section>
@@ -75,10 +75,10 @@ export default function NewDatabaseServerPage() {
         ) : (
           <section
             role="alert"
-            className="mx-auto flex min-h-72 max-w-3xl flex-col items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+            className="mx-auto flex min-h-72 max-w-3xl flex-col items-center justify-center rounded-xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
           >
             <ShieldAlert className="h-10 w-10" aria-hidden="true" />
-            <h1 className="mt-4 text-lg font-bold">{copy.unavailable}</h1>
+            <h1 className="mt-4 text-lg font-semibold">{copy.unavailable}</h1>
             <p className="mt-2 max-w-md text-sm leading-6">
               {copy.permissionRequired}{" "}
               <code dir="ltr">admin.database_servers.create</code>{" "}

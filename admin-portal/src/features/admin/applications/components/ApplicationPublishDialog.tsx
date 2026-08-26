@@ -65,11 +65,11 @@ export function ApplicationPublishDialog({
         aria-modal="true"
         aria-labelledby="application-publish-title"
         aria-describedby="application-publish-description"
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-violet-300/40 bg-white shadow-2xl dark:border-violet-900 dark:bg-slate-900"
+        className="w-full max-w-lg overflow-hidden rounded-xl border border-violet-300/40 bg-white shadow-2xl dark:border-violet-900 dark:bg-slate-900"
       >
         <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-950 px-5 py-4 text-white dark:border-slate-800">
           <div>
-            <h2 id="application-publish-title" className="flex items-center gap-2 text-sm font-black">
+            <h2 id="application-publish-title" className="flex items-center gap-2 text-sm font-semibold">
               <BookOpenCheck className="h-4 w-4 text-violet-300" />
               {copy.title}
             </h2>
@@ -94,7 +94,7 @@ export function ApplicationPublishDialog({
             <Revision label={copy.publicationRevision} value={application.publicationRevision} />
           </dl>
 
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
             {copy.reason}
             <textarea
               autoFocus
@@ -119,14 +119,14 @@ export function ApplicationPublishDialog({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="min-h-11 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="min-h-11 rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {t.applications.cancel}
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
             >
               {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {copy.confirm}
@@ -141,8 +141,8 @@ export function ApplicationPublishDialog({
 function Revision({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</dt>
-      <dd className="mt-1 font-mono text-sm font-black" dir="ltr">{value}</dd>
+      <dt className="text-2xs font-semibold uppercase tracking-wider text-slate-500">{label}</dt>
+      <dd className="mt-1 font-mono text-sm font-semibold" dir="ltr">{value}</dd>
     </div>
   );
 }

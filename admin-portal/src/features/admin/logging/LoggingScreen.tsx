@@ -44,7 +44,7 @@ export function LoggingScreen() {
 
   return (
     <div className="space-y-4" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <header className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 px-4 py-4 text-white shadow-md sm:px-5">
+      <header className="relative overflow-hidden rounded-xl border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 px-4 py-4 text-white shadow-md sm:px-5">
         <div className="pointer-events-none absolute end-0 top-0 -me-12 -mt-16 size-72 rounded-full bg-cyan-500/20 blur-3xl" />
         <div className="relative flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-cyan-600 shadow-sm">
@@ -52,8 +52,8 @@ export function LoggingScreen() {
           </span>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg font-black tracking-tight">{copy.title}</h1>
-              <span className="rounded-md border border-amber-300/30 bg-amber-300/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-100">
+              <h1 className="text-lg font-semibold tracking-tight">{copy.title}</h1>
+              <span className="rounded-md border border-amber-300/30 bg-amber-300/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider text-amber-100">
                 {copy.critical}
               </span>
             </div>
@@ -109,7 +109,7 @@ function DirectoryPanel({
         help={copy.directoryHelp}
         action={
           rows ? (
-            <div className="flex gap-2 text-[10px] font-black">
+            <div className="flex gap-2 text-xs font-semibold">
               <Metric label={copy.rowsOnPage} value={rows.length} />
               <Metric label={copy.activeOnPage} value={view.activeCount} />
             </div>
@@ -167,7 +167,7 @@ function DirectoryPanel({
             label: String(limit),
           }))}
         />
-        <label className="flex min-h-10 items-center gap-2 self-end rounded-xl border border-slate-300 px-3 text-xs font-bold dark:border-slate-700">
+        <label className="flex min-h-10 items-center gap-2 self-end rounded-xl border border-slate-300 px-3 text-xs font-semibold dark:border-slate-700">
           <input
             type="checkbox"
             checked={view.directoryDraft.includeExpired}
@@ -228,7 +228,7 @@ function DirectoryPanel({
             <InlineEmpty text={copy.emptyDirectory} />
           )}
           <footer className="mt-3 flex items-center justify-between gap-3 text-xs">
-            <span className="font-bold text-slate-500">
+            <span className="font-semibold text-slate-500">
               {copy.page} {view.directoryPage}
             </span>
             <div className="flex gap-2">
@@ -278,10 +278,10 @@ function OverrideRow({
   return (
     <tr className="align-top hover:bg-slate-50 dark:hover:bg-slate-900/60">
       <td className={tdClass}>
-        <p className="font-black">{row.scope}</p>
+        <p className="font-semibold">{row.scope}</p>
         <span
           suppressHydrationWarning
-          className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${
+          className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
             expired
               ? "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
               : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
@@ -291,11 +291,11 @@ function OverrideRow({
         </span>
       </td>
       <td className={tdClass}>
-        <p className="font-bold">{row.appName ?? copy.global}</p>
+        <p className="font-semibold">{row.appName ?? copy.global}</p>
         {row.tenantId ? (
           <Link
             href={`/tenants/${row.tenantId}`}
-            className="mt-1 block max-w-56 break-all font-mono text-[10px] text-cyan-700 hover:underline dark:text-cyan-300"
+            className="mt-1 block max-w-56 break-all font-mono text-xs text-cyan-700 hover:underline dark:text-cyan-300"
           >
             {row.tenantId}
           </Link>
@@ -326,7 +326,7 @@ function OverrideRow({
             </IconButton>
           </div>
         ) : (
-          <span className="text-[10px] text-slate-400">{copy.readOnlyEditor}</span>
+          <span className="text-xs text-slate-400">{copy.readOnlyEditor}</span>
         )}
       </td>
     </tr>
@@ -414,7 +414,7 @@ function OverrideEditor({ view, copy }: { view: ConsoleView; copy: LoggingCopy }
             onChange={(event) => view.setOverrideDraftField("reason", event.target.value)}
             className={inputClass}
           />
-          <span className="flex justify-between text-[10px] text-slate-400">
+          <span className="flex justify-between text-xs text-slate-400">
             <span className="text-rose-600 dark:text-rose-300">
               {view.overrideErrors.reason ? copy.reasonInvalid : ""}
             </span>
@@ -430,7 +430,7 @@ function OverrideEditor({ view, copy }: { view: ConsoleView; copy: LoggingCopy }
           disabled={!view.canUpdate || busy}
         />
         {!view.canUpdate ? (
-          <p className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          <p className="rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
             {copy.readOnlyEditor} {copy.updatePermission}
           </p>
         ) : null}
@@ -492,7 +492,7 @@ function EffectiveInspector({ view, copy }: { view: ConsoleView; copy: LoggingCo
         <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-900 dark:bg-cyan-950/40">
           <div className="flex items-center justify-between gap-3">
             <LevelPill level={view.effective.data.level} />
-            <span className="font-mono text-xs font-black">
+            <span className="font-mono text-xs font-semibold">
               {copy.source}: {view.effective.data.source === "FALLBACK" ? copy.fallback : view.effective.data.source}
             </span>
           </div>
@@ -665,13 +665,13 @@ function HistoryRow({
     <tr className="align-top hover:bg-slate-50 dark:hover:bg-slate-900/60">
       <td className={tdClass}>{formatDate(row.createdAt, lang, true)}</td>
       <td className={tdClass}>
-        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black dark:bg-slate-800">
+        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold dark:bg-slate-800">
           {row.action}
         </span>
       </td>
       <td className={tdClass}>
-        <p className="font-black">{row.scope} · {row.appName ?? copy.global}</p>
-        {row.tenantId ? <p className="mt-1 break-all font-mono text-[10px]">{row.tenantId}</p> : null}
+        <p className="font-semibold">{row.scope} · {row.appName ?? copy.global}</p>
+        {row.tenantId ? <p className="mt-1 break-all font-mono text-xs">{row.tenantId}</p> : null}
       </td>
       <td className={tdClass}>{row.previousLevel ? <LevelPill level={row.previousLevel} /> : copy.notRecorded}</td>
       <td className={tdClass}>{row.level ? <LevelPill level={row.level} /> : copy.notRecorded}</td>
@@ -738,7 +738,7 @@ function LivePanel({
           />
         </div>
       ) : (
-        <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           {copy.forbidden} {copy.livePermission}
         </p>
       )}
@@ -830,7 +830,7 @@ function MutationFeedback({ view, copy }: { view: ConsoleView; copy: LoggingCopy
   return (
     <aside
       role={view.mutationState === "SUCCESS" ? "status" : "alert"}
-      className={`fixed bottom-4 end-4 z-40 w-[min(440px,calc(100vw-2rem))] rounded-2xl border p-4 shadow-2xl ${
+      className={`fixed bottom-4 end-4 z-40 w-[min(440px,calc(100vw-2rem))] rounded-xl border p-4 shadow-2xl ${
         view.mutationState === "SUCCESS"
           ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
           : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100"
@@ -839,14 +839,14 @@ function MutationFeedback({ view, copy }: { view: ConsoleView; copy: LoggingCopy
       <div className="flex items-start gap-3">
         {busy ? <Loader2 className="mt-0.5 size-5 animate-spin" /> : <AlertTriangle className="mt-0.5 size-5" />}
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-black">{titles[view.mutationState]}</p>
+          <p className="text-sm font-semibold">{titles[view.mutationState]}</p>
           {view.mutationError ? (
             <p className="mt-2 break-all text-xs">
               {view.mutationError.message} · {copy.errorCode}: {view.mutationError.errorCode}
             </p>
           ) : null}
           {view.mutationCorrelationId ? (
-            <p className="mt-2 break-all font-mono text-[10px]">
+            <p className="mt-2 break-all font-mono text-xs">
               {copy.correlation}: {view.mutationCorrelationId}
             </p>
           ) : null}
@@ -876,11 +876,11 @@ function MutationConfirmation({ view, copy }: { view: ConsoleView; copy: Logging
     : `${intent.row.scope} · ${intent.row.appName ?? copy.global} · ${intent.row.tenantId ?? copy.noTenant}`;
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm">
-      <section role="dialog" aria-modal="true" aria-labelledby="logging-confirm-title" className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+      <section role="dialog" aria-modal="true" aria-labelledby="logging-confirm-title" className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"><ShieldAlert className="size-5" /></span>
           <div>
-            <h2 id="logging-confirm-title" className="text-base font-black">{upsert ? copy.confirmUpsert : copy.confirmDelete}</h2>
+            <h2 id="logging-confirm-title" className="text-base font-semibold">{upsert ? copy.confirmUpsert : copy.confirmDelete}</h2>
             <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">{upsert ? copy.confirmUpsertDetail : copy.confirmDeleteDetail}</p>
           </div>
         </div>
@@ -914,12 +914,12 @@ function ResourceStatePanel<T>({
 
 function ResourceNotice<T>({ resource, copy }: { resource: ResourceView<T>; copy: LoggingCopy }) {
   if (resource.state !== "STALE" && !(resource.state === "LOADING" && resource.data)) return null;
-  return <p role="status" className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{resource.state === "STALE" ? copy.stale : copy.loading} {errorDetail(resource, copy)}</p>;
+  return <p role="status" className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{resource.state === "STALE" ? copy.stale : copy.loading} {errorDetail(resource, copy)}</p>;
 }
 
 function Correlation<T>({ resource, copy, lang = "en" }: { resource: ResourceView<T>; copy: LoggingCopy; lang?: "ar" | "en" }) {
   if (!resource.correlationId) return null;
-  return <p className="mt-3 break-all font-mono text-[10px] text-slate-400">{copy.correlation}: {resource.correlationId}{resource.timestamp ? ` · ${copy.responseAt}: ${formatDate(resource.timestamp, lang, true)}` : ""}</p>;
+  return <p className="mt-3 break-all font-mono text-xs text-slate-400">{copy.correlation}: {resource.correlationId}{resource.timestamp ? ` · ${copy.responseAt}: ${formatDate(resource.timestamp, lang, true)}` : ""}</p>;
 }
 
 function errorDetail<T>(resource: ResourceView<T>, copy: LoggingCopy): string {
@@ -928,7 +928,7 @@ function errorDetail<T>(resource: ResourceView<T>, copy: LoggingCopy): string {
 
 function LiveStatus({ state, copy }: { state: LiveView["connectionState"]; copy: LoggingCopy }) {
   const live = state === "LIVE";
-  return <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] font-black ${live ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}><span className={`size-2 rounded-full ${live ? "animate-pulse bg-emerald-500" : "bg-slate-400"}`} />{liveStateText(state, copy)}</span>;
+  return <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] font-semibold ${live ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}><span className={`size-2 rounded-full ${live ? "animate-pulse bg-emerald-500" : "bg-slate-400"}`} />{liveStateText(state, copy)}</span>;
 }
 
 function liveStateText(state: LiveView["connectionState"], copy: LoggingCopy): string {
@@ -947,15 +947,15 @@ function liveStateText(state: LiveView["connectionState"], copy: LoggingCopy): s
 
 function LevelPill({ level }: { level: string }) {
   const tone = level === "fatal" || level === "error" ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300" : level === "warn" ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300" : level === "info" ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" : "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300";
-  return <span className={`inline-flex rounded-full px-2 py-1 font-mono text-[10px] font-black ${tone}`}>{level}</span>;
+  return <span className={`inline-flex rounded-full px-2 py-1 font-mono text-[10px] font-semibold ${tone}`}>{level}</span>;
 }
 
 function PanelHeading({ icon, title, help, action }: { icon: ReactNode; title: string; help: string; action?: ReactNode }) {
-  return <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-sm font-black text-slate-900 dark:text-slate-100"><span className="text-cyan-600 dark:text-cyan-400">{icon}</span>{title}</h2><p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400">{help}</p></div>{action}</div>;
+  return <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100"><span className="text-cyan-600 dark:text-cyan-400">{icon}</span>{title}</h2><p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400">{help}</p></div>{action}</div>;
 }
 
 function SelectField({ label, value, options, onChange, error, disabled }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void; error?: string; disabled?: boolean }) {
-  return <label className={labelClass}><span>{label}</span><select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={inputClass}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{error ? <span role="alert" className="text-[10px] text-rose-600 dark:text-rose-300">{error}</span> : null}</label>;
+  return <label className={labelClass}><span>{label}</span><select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={inputClass}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{error ? <span role="alert" className="text-xs text-rose-600 dark:text-rose-300">{error}</span> : null}</label>;
 }
 
 function TextField({ label, value, onChange, error, mono, disabled, type = "text" }: { label: string; value: string; onChange: (value: string) => void; error?: string; mono?: boolean; disabled?: boolean; type?: string }) {
@@ -976,19 +976,19 @@ function InlineEmpty({ text }: { text: string }) {
 
 function StatePanel({ icon, title, detail, tone = "neutral", action }: { icon: ReactNode; title: string; detail?: string; tone?: "neutral" | "warning" | "danger"; action?: ReactNode }) {
   const colors = tone === "danger" ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100" : "border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300";
-  return <section className={`mt-4 flex min-h-36 flex-col items-center justify-center rounded-xl border p-5 text-center ${colors}`}><span className="mb-2 opacity-75">{icon}</span><h3 className="text-sm font-black">{title}</h3>{detail ? <p className="mt-2 max-w-3xl break-all text-xs opacity-85">{detail}</p> : null}{action ? <div className="mt-3">{action}</div> : null}</section>;
+  return <section className={`mt-4 flex min-h-36 flex-col items-center justify-center rounded-xl border p-5 text-center ${colors}`}><span className="mb-2 opacity-75">{icon}</span><h3 className="text-sm font-semibold">{title}</h3>{detail ? <p className="mt-2 max-w-3xl break-all text-xs opacity-85">{detail}</p> : null}{action ? <div className="mt-3">{action}</div> : null}</section>;
 }
 
 function formatDate(value: string, lang: "ar" | "en", time = false): string {
   return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", { year: "numeric", month: "short", day: "2-digit", ...(time ? { hour: "2-digit", minute: "2-digit", second: "2-digit" } : {}), timeZone: "UTC" }).format(new Date(value));
 }
 
-const panelClass = "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950";
-const labelClass = "grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300";
+const panelClass = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950";
+const labelClass = "grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300";
 const inputClass = "min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-normal text-slate-950 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
-const primaryButtonClass = "inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-600 px-3 text-xs font-black text-white hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500";
-const secondaryButtonClass = "inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-slate-300 px-3 text-xs font-bold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";
-const dangerButtonClass = "inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-rose-600 px-3 text-xs font-black text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-40";
-const tableHeadClass = "bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:bg-slate-900 dark:text-slate-400";
+const primaryButtonClass = "inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-600 px-3 text-xs font-semibold text-white hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500";
+const secondaryButtonClass = "inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-slate-300 px-3 text-xs font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";
+const dangerButtonClass = "inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-rose-600 px-3 text-xs font-semibold text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-40";
+const tableHeadClass = "bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-900 dark:text-slate-400";
 const thClass = "px-3 py-2.5 text-start";
 const tdClass = "px-3 py-3";

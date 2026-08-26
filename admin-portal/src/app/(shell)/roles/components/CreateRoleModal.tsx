@@ -140,7 +140,7 @@ export function CreateRoleModal({
         aria-modal="true"
         aria-labelledby="create-role-title"
         aria-busy={isSubmitting}
-        className="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+        className="relative w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900"
       >
         <button
           type="button"
@@ -157,7 +157,7 @@ export function CreateRoleModal({
             <Shield className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
           </div>
           <div>
-            <h2 id="create-role-title" className="text-lg font-bold text-slate-900 dark:text-slate-100">
+            <h2 id="create-role-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {lang === "ar" ? "إنشاء دور مشرف جديد" : "Create Admin Role"}
             </h2>
             <p className="text-xs text-slate-500">
@@ -173,7 +173,7 @@ export function CreateRoleModal({
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
-                <p className="font-bold">
+                <p className="font-semibold">
                   {isAmbiguous
                     ? lang === "ar"
                       ? "نتيجة الإنشاء غير مؤكدة"

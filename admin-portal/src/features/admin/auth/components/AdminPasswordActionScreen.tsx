@@ -49,18 +49,18 @@ export function AdminPasswordActionScreen({
     return (
       <PublicAuthShell>
         <div className="space-y-5 text-center">
-          <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+          <div className="mx-auto grid size-12 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
             <KeyRound className="size-6" />
           </div>
           <div>
-            <h1 className="text-lg font-black text-slate-900 dark:text-slate-100">
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {common.missingTokenTitle}
             </h1>
             <p className="mt-2 text-xs leading-6 text-slate-500 dark:text-slate-400">
               {common.missingTokenDescription}
             </p>
           </div>
-          <Link href="/login" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-5 text-xs font-bold text-white hover:bg-blue-700">
+          <Link href="/login" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-5 text-xs font-semibold text-white hover:bg-blue-700">
             {common.backToSignIn}
           </Link>
         </div>
@@ -81,13 +81,13 @@ export function AdminPasswordActionScreen({
     <PublicAuthShell>
       <div className="space-y-6">
         <div className="text-center">
-          <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-gradient-to-tr from-blue-700 to-blue-500 text-white shadow-lg shadow-blue-500/25">
+          <div className="mx-auto mb-3 grid size-12 place-items-center rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 text-white shadow-lg shadow-blue-500/25">
             <ShieldCheck className="size-6" />
           </div>
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-600 dark:text-blue-400">
+          <p className="text-2xs font-semibold uppercase tracking-[0.22em] text-blue-600 dark:text-blue-400">
             {copy.eyebrow}
           </p>
-          <h1 className="mt-2 text-xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+          <h1 className="mt-2 text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
             {copy.title}
           </h1>
           <p className="mt-2 text-xs leading-6 text-slate-500 dark:text-slate-400">
@@ -141,7 +141,7 @@ export function AdminPasswordActionScreen({
           <button
             type="submit"
             disabled={action.isSubmitting}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-black text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {action.isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
             <span>{action.isSubmitting ? copy.submitting : copy.submit}</span>
@@ -149,7 +149,7 @@ export function AdminPasswordActionScreen({
         </form>
 
         <div className="text-center">
-          <Link href="/login" className="text-xs font-bold text-blue-600 hover:underline dark:text-blue-400">
+          <Link href="/login" className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">
             {common.backToSignIn}
           </Link>
         </div>
@@ -160,14 +160,14 @@ export function AdminPasswordActionScreen({
 
 function PublicAuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 p-4 text-slate-900 dark:bg-[#090d16] dark:text-slate-100 sm:p-6">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 p-4 text-slate-900 dark:bg-canvas dark:text-slate-100 sm:p-6">
       <div className="pointer-events-none absolute -start-40 -top-40 size-96 rounded-full bg-blue-500/10 blur-3xl dark:bg-blue-600/10" />
       <div className="pointer-events-none absolute -bottom-40 -end-40 size-96 rounded-full bg-purple-500/10 blur-3xl dark:bg-purple-600/10" />
       <div className="absolute end-4 top-4 z-20 flex items-center gap-2">
         <LanguageToggle />
         <ThemeToggle />
       </div>
-      <section className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-2xl backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-900/90 sm:p-8">
+      <section className="relative z-10 w-full max-w-md rounded-xl border border-slate-200/80 bg-white/90 p-6 shadow-2xl backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-900/90 sm:p-8">
         {children}
       </section>
     </main>
@@ -197,7 +197,7 @@ function PasswordField({
 }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-start text-xs font-bold text-slate-700 dark:text-slate-300">
+      <label htmlFor={id} className="block text-start text-xs font-semibold text-slate-700 dark:text-slate-300">
         {label}
       </label>
       <div className="relative">

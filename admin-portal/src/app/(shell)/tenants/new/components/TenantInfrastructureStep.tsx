@@ -56,9 +56,9 @@ export function TenantInfrastructureStep({
   onRetryStorage,
 }: TenantInfrastructureStepProps) {
   return (
-    <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+    <section className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
       <header className="border-b border-slate-200 pb-4 dark:border-slate-800">
-        <h3 className="flex items-center gap-2 text-sm font-black text-slate-900 dark:text-slate-100">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
           <Server className="size-4 text-purple-600 dark:text-purple-400" />
           {isArabic
             ? "الخطوة 4: تحديد البنية التحتية"
@@ -117,7 +117,7 @@ export function TenantInfrastructureStep({
           </ValidationMessage>
         ) : null}
         {selectedDatabase ? (
-          <dl className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 text-[11px] sm:grid-cols-4 dark:border-slate-700 dark:bg-slate-900">
+          <dl className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 text-xs sm:grid-cols-4 dark:border-slate-700 dark:bg-slate-900">
             <Metric label={isArabic ? "الاسم" : "Name"} value={selectedDatabase.name} />
             <Metric label={isArabic ? "الحالة" : "Status"} value={selectedDatabase.status} />
             <Metric label={isArabic ? "السعة" : "Capacity"} value={`${selectedDatabase.currentTenants}/${selectedDatabase.maxTenants}`} />
@@ -171,7 +171,7 @@ export function TenantInfrastructureStep({
           </ValidationMessage>
         ) : null}
         {selectedStorage ? (
-          <dl className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 text-[11px] sm:grid-cols-4 dark:border-slate-700 dark:bg-slate-900">
+          <dl className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 text-xs sm:grid-cols-4 dark:border-slate-700 dark:bg-slate-900">
             <Metric label={isArabic ? "الاسم" : "Name"} value={selectedStorage.name} />
             <Metric label={isArabic ? "المنطقة" : "Region"} value={selectedStorage.region} />
             <Metric
@@ -210,12 +210,12 @@ function PlacementSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/30">
+    <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/30">
       <div>
-        <h4 className="flex items-center gap-2 text-xs font-black text-slate-800 dark:text-slate-200">
+        <h4 className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-slate-200">
           <span className="text-purple-600 dark:text-purple-400">{icon}</span> {title}
         </h4>
-        <p className="mt-1 text-[11px] leading-5 text-slate-500">{description}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
       </div>
       {state === "idle" ? <PlacementNotice tone="slate" text={idleText ?? ""} /> : null}
       {state === "loading" ? (
@@ -226,9 +226,9 @@ function PlacementSection({
       ) : null}
       {state === "error" ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300" role="alert">
-          <p className="flex items-start gap-2 text-[11px]"><AlertCircle className="mt-0.5 size-4 shrink-0" /><span>{error?.message ?? (isArabic ? "تعذر تحميل الأهداف." : "Targets could not be loaded.")}</span></p>
-          {error?.correlationId ? <p className="mt-1 break-all font-mono text-[10px]">Correlation ID: {error.correlationId}</p> : null}
-          <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-rose-300 bg-white px-3 text-xs font-bold hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-rose-800 dark:bg-slate-900">
+          <p className="flex items-start gap-2 text-xs"><AlertCircle className="mt-0.5 size-4 shrink-0" /><span>{error?.message ?? (isArabic ? "تعذر تحميل الأهداف." : "Targets could not be loaded.")}</span></p>
+          {error?.correlationId ? <p className="mt-1 break-all font-mono text-xs">Correlation ID: {error.correlationId}</p> : null}
+          <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-rose-800 dark:bg-slate-900">
             <RefreshCw className="size-3.5" /> {isArabic ? "إعادة المحاولة" : "Retry"}
           </button>
         </div>
@@ -254,9 +254,9 @@ function PlacementNotice({ tone, text, loading = false }: { tone: "slate" | "blu
 }
 
 function ValidationMessage({ children }: { children: React.ReactNode }) {
-  return <p className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400" role="alert"><AlertCircle className="size-3.5" />{children}</p>;
+  return <p className="flex items-center gap-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400" role="alert"><AlertCircle className="size-3.5" />{children}</p>;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0"><dt className="text-slate-500">{label}</dt><dd className="mt-1 truncate font-bold text-slate-900 dark:text-slate-100" title={value}>{value}</dd></div>;
+  return <div className="min-w-0"><dt className="text-slate-500">{label}</dt><dd className="mt-1 truncate font-semibold text-slate-900 dark:text-slate-100" title={value}>{value}</dd></div>;
 }

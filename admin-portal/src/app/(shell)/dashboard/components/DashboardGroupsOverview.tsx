@@ -68,10 +68,10 @@ export function DashboardGroupsOverview({
       <section>
         <div className="mb-3 flex items-center justify-between gap-3 px-1">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
               {lang === "ar" ? "مجموعات التقارير" : "Report groups"}
             </h2>
-            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               {data.range.label}
             </p>
           </div>
@@ -79,8 +79,8 @@ export function DashboardGroupsOverview({
         </div>
 
         {groups.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-sm font-bold text-slate-600 dark:text-slate-400">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
               {lang === "ar"
                 ? "لا توجد مجموعات تقارير مصرح بها لحسابك."
                 : "No authorized report groups available."}
@@ -125,21 +125,21 @@ function GroupCard({
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 text-start shadow-xs transition-all hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500 cursor-pointer"
+      className="group relative flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 text-start shadow-xs transition-all hover:border-indigo-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500 cursor-pointer"
     >
       <div>
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
             {label}
           </h3>
           <ChevronRight className="size-4 text-slate-400 group-hover:text-indigo-500 transition-colors rtl:rotate-180" />
         </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2">
+        <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2">
           {description}
         </p>
       </div>
 
-      <div className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide">
+      <div className="mt-4 flex items-center gap-2 text-2xs font-semibold uppercase tracking-wide">
         <span
           className={`rounded-md px-2 py-0.5 border ${
             available
@@ -202,15 +202,15 @@ function ScopeMetric({
 
   return (
     <section
-      className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900 ${current.topBorder}`}
+      className={`rounded-xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900 ${current.topBorder}`}
     >
       <div className={`inline-flex rounded-xl p-2.5 border ${current.bg} ${current.icon}`}>
         <Icon className="size-4" aria-hidden="true" />
       </div>
-      <p className="mt-3 text-xl sm:text-2xl font-black tabular-nums text-slate-900 dark:text-slate-100">
+      <p className="mt-3 text-xl sm:text-2xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">
         {value}
       </p>
-      <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+      <p className="mt-0.5 text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
         {label}
       </p>
     </section>

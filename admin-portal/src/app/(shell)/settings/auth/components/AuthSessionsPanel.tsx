@@ -48,11 +48,11 @@ export function AuthSessionsPanel() {
     <>
       <section
         aria-busy={isLoading || isBusy}
-        className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900"
+        className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900"
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
               <Laptop className="size-4 text-blue-600 dark:text-blue-400" />
               {copy.title}
             </h2>
@@ -65,7 +65,7 @@ export function AuthSessionsPanel() {
               type="button"
               onClick={() => setIsLogoutAllOpen(true)}
               disabled={isLoading || isBusy}
-              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/40"
+              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/40"
             >
               <LogOut className="size-4" />
               {copy.logoutAllButton}
@@ -102,16 +102,16 @@ export function AuthSessionsPanel() {
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                       {session.deviceLabel ?? session.clientId}
                     </span>
                     {session.current && (
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
                         {copy.current}
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {copy.lastUsed}: {formatDate(
                       session.lastUserActivityAt ??
                         session.lastAccessIssuedAt ??
@@ -124,7 +124,7 @@ export function AuthSessionsPanel() {
                     {" · "}
                     {copy.accessIssuances}: {session.accessIssueCount}
                   </p>
-                  <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+                  <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                     {session.clientId} · {session.clientType}
                   </p>
                 </div>
@@ -133,7 +133,7 @@ export function AuthSessionsPanel() {
                     type="button"
                     onClick={() => setPendingSession(session)}
                     disabled={isBusy}
-                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/40"
                   >
                     {revokingId === session.id ? (
                       <Loader2 className="size-4 animate-spin" />

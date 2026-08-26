@@ -10,7 +10,7 @@ export function UsersTableSkeleton() {
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center gap-3"
+            className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center gap-3"
           >
             <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0" />
             <div className="space-y-1.5 flex-1">
@@ -22,7 +22,7 @@ export function UsersTableSkeleton() {
       </div>
 
       {/* Filter Bar Skeleton */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="w-full sm:w-80 h-9 bg-slate-100 dark:bg-slate-800 rounded-xl" />
         <div className="flex gap-2 w-full sm:w-auto">
           <div className="w-28 h-9 bg-slate-100 dark:bg-slate-800 rounded-xl" />
@@ -32,7 +32,7 @@ export function UsersTableSkeleton() {
       </div>
 
       {/* Table Skeleton Rows */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60 h-10" />
         <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (

@@ -45,10 +45,10 @@ function AuthorizedAuthInvalidationReplayPanel() {
     <>
       <section
         aria-busy={isPending}
-        className="space-y-5 rounded-2xl border border-amber-200 bg-white p-5 shadow-2xs dark:border-amber-900/70 dark:bg-slate-900"
+        className="space-y-5 rounded-xl border border-amber-200 bg-white p-5 shadow-2xs dark:border-amber-900/70 dark:bg-slate-900"
       >
         <div>
-          <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
             <ShieldAlert className="size-4 text-amber-600 dark:text-amber-400" />
             {copy.title}
           </h2>
@@ -60,8 +60,8 @@ function AuthorizedAuthInvalidationReplayPanel() {
         <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div>
-            <p className="text-xs font-bold">{copy.warningTitle}</p>
-            <p className="mt-1 text-[11px] leading-5">{copy.warningDescription}</p>
+            <p className="text-xs font-semibold">{copy.warningTitle}</p>
+            <p className="mt-1 text-xs leading-5">{copy.warningDescription}</p>
           </div>
         </div>
 
@@ -76,7 +76,7 @@ function AuthorizedAuthInvalidationReplayPanel() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label
               htmlFor="replay-target"
-              className="space-y-1.5 text-xs font-bold text-slate-700 dark:text-slate-300"
+              className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300"
             >
               <span>{copy.target}</span>
               <span className="relative block">
@@ -168,7 +168,7 @@ function AuthorizedAuthInvalidationReplayPanel() {
                 : "replay-reason-hint"}
               className={`${inputClass} resize-y leading-5`}
             />
-            <span className="block text-end text-[10px] font-medium text-slate-400">
+            <span className="block text-end text-xs font-medium text-slate-400">
               {replay.draft.reason.length}/{AUTH_INVALIDATION_REPLAY_REASON_MAX_LENGTH} {copy.characters}
             </span>
           </Field>
@@ -180,14 +180,14 @@ function AuthorizedAuthInvalidationReplayPanel() {
           ) : null}
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {copy.dryRunRequired}
             </p>
             <div className="flex shrink-0 gap-2">
               <button
                 type="submit"
                 disabled={isPending}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 px-4 text-xs font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 px-4 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
               >
                 {replay.pendingMode === "DRY_RUN" ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -200,7 +200,7 @@ function AuthorizedAuthInvalidationReplayPanel() {
                 type="button"
                 onClick={() => replay.requestConfirmation("APPLY")}
                 disabled={isPending || !replay.canApply}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 text-xs font-semibold text-white shadow-sm hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {replay.pendingMode === "APPLY" ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -219,18 +219,18 @@ function AuthorizedAuthInvalidationReplayPanel() {
             aria-live="polite"
             className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
           >
-            <p className="flex items-center gap-2 text-xs font-bold">
+            <p className="flex items-center gap-2 text-xs font-semibold">
               <CheckCircle2 className="size-4" />
               {replay.receipt.mode === "DRY_RUN"
                 ? copy.success.dryTitle
                 : copy.success.applyTitle}
             </p>
-            <p className="mt-1 text-[11px] leading-5">
+            <p className="mt-1 text-xs leading-5">
               {replay.receipt.mode === "DRY_RUN"
                 ? copy.success.dryDescription
                 : copy.success.applyDescription}
             </p>
-            <dl className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
+            <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
               <Evidence label={copy.success.commandId} value={replay.receipt.commandId} mono />
               <Evidence label={copy.success.eligible} value={String(replay.receipt.eligibleEventCount)} />
               <Evidence label={copy.success.replayed} value={String(replay.receipt.replayedEventCount)} />
@@ -246,11 +246,11 @@ function AuthorizedAuthInvalidationReplayPanel() {
             role="alert"
             className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200"
           >
-            <p className="text-xs font-bold">{copy.failure.title}</p>
-            <p className="mt-1 text-[11px] leading-5">
+            <p className="text-xs font-semibold">{copy.failure.title}</p>
+            <p className="mt-1 text-xs leading-5">
               {copy.apiErrors[apiErrorCopyKey(replay.error)]}
             </p>
-            <dl className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
+            <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
               <Evidence label={copy.failure.code} value={replay.error.errorCode} mono />
               {replay.error.correlationId ? (
                 <Evidence label={copy.failure.correlation} value={replay.error.correlationId} mono />
@@ -258,12 +258,12 @@ function AuthorizedAuthInvalidationReplayPanel() {
             </dl>
             {replay.retryMode ? (
               <div className="mt-3 border-t border-rose-200 pt-3 dark:border-rose-900">
-                <p className="text-[11px] leading-5">{copy.failure.retryNotice}</p>
+                <p className="text-xs leading-5">{copy.failure.retryNotice}</p>
                 <button
                   type="button"
                   onClick={() => replay.requestConfirmation(replay.retryMode as AuthInvalidationReplayMode)}
                   disabled={isPending}
-                  className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-xl border border-rose-300 px-3 text-xs font-bold hover:bg-rose-100 disabled:opacity-50 dark:border-rose-800 dark:hover:bg-rose-950/50"
+                  className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-xl border border-rose-300 px-3 text-xs font-semibold hover:bg-rose-100 disabled:opacity-50 dark:border-rose-800 dark:hover:bg-rose-950/50"
                 >
                   <RotateCcw className="size-4" />
                   {copy.failure.retryExact}
@@ -316,11 +316,11 @@ function Field({
 }) {
   const hintId = errorId.replace(/-error$/, "-hint");
   return (
-    <div className="space-y-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+    <div className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
       <label htmlFor={inputId} className="block">{label}</label>
       {children}
-      {hint ? <span id={hintId} className="block text-[10px] font-medium leading-4 text-slate-500 dark:text-slate-400">{hint}</span> : null}
-      {error ? <span id={errorId} className="block text-[10px] font-semibold text-rose-600 dark:text-rose-400">{error}</span> : null}
+      {hint ? <span id={hintId} className="block text-xs font-medium leading-4 text-slate-500 dark:text-slate-400">{hint}</span> : null}
+      {error ? <span id={errorId} className="block text-xs font-semibold text-rose-600 dark:text-rose-400">{error}</span> : null}
     </div>
   );
 }
@@ -337,7 +337,7 @@ function Evidence({
   return (
     <div>
       <dt className="font-semibold opacity-70">{label}</dt>
-      <dd className={`mt-0.5 break-all ${mono ? "font-mono" : "font-bold"}`}>{value}</dd>
+      <dd className={`mt-0.5 break-all ${mono ? "font-mono" : "font-semibold"}`}>{value}</dd>
     </div>
   );
 }

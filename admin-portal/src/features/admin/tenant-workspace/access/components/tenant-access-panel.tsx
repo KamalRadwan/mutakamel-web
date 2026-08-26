@@ -102,7 +102,7 @@ export function TenantAccessPanel({
     <section dir={locale === "ar" ? "rtl" : "ltr"} className="space-y-4" aria-labelledby="tenant-access-title">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="tenant-access-title" className="text-lg font-bold text-slate-950">{copy.title}</h2>
+          <h2 id="tenant-access-title" className="text-lg font-semibold text-slate-950">{copy.title}</h2>
           <p className="mt-0.5 text-sm text-slate-500">{copy.subtitle}</p>
         </div>
         {controller.permissions.canInvite && controller.ready ? (
@@ -177,9 +177,9 @@ export function TenantAccessPanel({
                   <tbody className="divide-y divide-slate-100">
                     {users.map((tenantUser) => (
                       <tr key={tenantUser.id} className="hover:bg-slate-50/70">
-                        <td className="px-3 py-3"><p className="font-semibold text-slate-900">{tenantUser.firstName} {tenantUser.lastName}{tenantUser.isTenantOwner ? <span className="ms-2 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700">{copy.owner}</span> : null}</p><p className="text-xs text-slate-500">{tenantUser.email}</p></td>
+                        <td className="px-3 py-3"><p className="font-semibold text-slate-900">{tenantUser.firstName} {tenantUser.lastName}{tenantUser.isTenantOwner ? <span className="ms-2 rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">{copy.owner}</span> : null}</p><p className="text-xs text-slate-500">{tenantUser.email}</p></td>
                         <td className="px-3 py-3 text-xs text-slate-600"><p>{tenantUser.organization.company.name ?? "—"} · {tenantUser.organization.branch.name ?? "—"}</p><p>{tenantUser.organization.department.name ?? "—"}{tenantUser.organization.team ? ` · ${tenantUser.organization.team.name ?? "—"}` : ""}</p></td>
-                        <td className="px-3 py-3"><div className="flex max-w-56 flex-wrap gap-1">{tenantUser.roleAssignments.length ? tenantUser.roleAssignments.slice(0, 3).map((assignment) => <span key={assignment.assignmentId} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">{assignment.roleName}</span>) : <span className="text-xs text-slate-400">—</span>}</div></td>
+                        <td className="px-3 py-3"><div className="flex max-w-56 flex-wrap gap-1">{tenantUser.roleAssignments.length ? tenantUser.roleAssignments.slice(0, 3).map((assignment) => <span key={assignment.assignmentId} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{assignment.roleName}</span>) : <span className="text-xs text-slate-400">—</span>}</div></td>
                         <td className="px-3 py-3"><StatusBadge user={tenantUser} locale={locale} /></td>
                         <td className="px-3 py-3 text-end"><button type="button" className={buttonClass} onClick={() => void controller.loadUser(tenantUser.id)}>{copy.details}</button></td>
                       </tr>
@@ -216,7 +216,7 @@ function SummaryCards({ controller, locale }: { controller: ReturnType<typeof us
   const summary = controller.summary.data;
   if (!summary) return controller.summary.status === "loading" ? <div className="h-20 animate-pulse rounded-xl bg-slate-100" /> : null;
   const cards = [[copy.total, summary.total], [copy.active, summary.active], [copy.invited, summary.invited], [copy.suspended, summary.suspended], [copy.deleted, summary.deleted], [copy.webphone, summary.webphoneEnabled], [copy.locked, summary.locked]] as const;
-  return <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">{cards.map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white px-3 py-2"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-0.5 text-xl font-bold text-slate-950">{value}</p></div>)}</div>;
+  return <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">{cards.map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-white px-3 py-2"><p className="text-2xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-0.5 text-xl font-semibold text-slate-950">{value}</p></div>)}</div>;
 }
 
 function UserDetailCard({ controller, locale, openDialog }: { controller: ReturnType<typeof useTenantAccess>; locale: TenantAccessLocale; openDialog: (dialog: DialogState) => void }) {
@@ -230,7 +230,7 @@ function UserDetailCard({ controller, locale, openDialog }: { controller: Return
   const protectedOwner = user.isTenantOwner;
   return (
     <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label={copy.details}>
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold text-slate-950">{user.firstName} {user.lastName}</h3><p className="text-sm text-slate-500">{user.email}</p></div><div className="flex items-center gap-2"><StatusBadge user={user} locale={locale} /><button type="button" className={buttonClass} onClick={controller.closeUser}>{copy.close}</button></div></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-950">{user.firstName} {user.lastName}</h3><p className="text-sm text-slate-500">{user.email}</p></div><div className="flex items-center gap-2"><StatusBadge user={user} locale={locale} /><button type="button" className={buttonClass} onClick={controller.closeUser}>{copy.close}</button></div></div>
       <dl className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-3"><div><dt className="font-semibold text-slate-500">{copy.organization}</dt><dd>{user.organization.company.name} · {user.organization.branch.name} · {user.organization.department.name}{user.organization.team ? ` · ${user.organization.team.name}` : ""}</dd></div><div><dt className="font-semibold text-slate-500">{copy.manager}</dt><dd>{user.manager ? `${user.manager.firstName} ${user.manager.lastName}` : "—"}</dd></div><div><dt className="font-semibold text-slate-500">{copy.lastLogin}</dt><dd>{user.lastLoginAt ? new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(user.lastLoginAt)) : copy.never}</dd></div></dl>
       {protectedOwner ? <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{copy.protectedOwner}</p> : null}
       <div className="mt-4 flex flex-wrap gap-2">

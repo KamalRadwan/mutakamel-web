@@ -30,10 +30,10 @@ export function TenantAddressGeocoding({
           className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400"
         />
         <div>
-          <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+          <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
             {copy.title}
           </h4>
-          <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-400">
+          <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">
             {copy.description}
           </p>
         </div>
@@ -66,7 +66,7 @@ export function TenantAddressGeocoding({
             void state.lookup().catch(() => undefined);
           }}
           disabled={disabled || state.isLoading}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {state.isLoading ? (
             <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
@@ -91,12 +91,12 @@ export function TenantAddressGeocoding({
           role="status"
           className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
         >
-          <p className="font-bold">{copy.suggestion}</p>
+          <p className="font-semibold">{copy.suggestion}</p>
           <p className="mt-1 leading-5">
             {state.suggestion.formattedAddress ??
               formatSuggestion(state.suggestion)}
           </p>
-          <p className="mt-1 font-mono text-[10px]">
+          <p className="mt-1 font-mono text-xs">
             {state.suggestion.countryIsoCode}
             {state.suggestion.stateCode
               ? ` · ${state.suggestion.stateCode}`
@@ -109,11 +109,11 @@ export function TenantAddressGeocoding({
             type="button"
             onClick={() => onApply(state.suggestion!)}
             disabled={disabled}
-            className="mt-3 min-h-10 rounded-xl bg-emerald-700 px-4 text-xs font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-3 min-h-10 rounded-xl bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {copy.apply}
           </button>
-          <p className="mt-2 text-[10px] leading-4 opacity-80">
+          <p className="mt-2 text-xs leading-4 opacity-80">
             {copy.editable}
           </p>
         </div>
@@ -134,7 +134,7 @@ export function TenantReverseGeocodeError({
     >
       <p>{error.message}</p>
       {error.correlationId ? (
-        <p className="mt-1 font-mono text-[10px]">
+        <p className="mt-1 font-mono text-xs">
           Correlation ID: {error.correlationId}
         </p>
       ) : null}
@@ -160,7 +160,7 @@ function CoordinateInput({
   return (
     <label
       htmlFor={id}
-      className="space-y-1 text-xs font-bold text-slate-700 dark:text-slate-300"
+      className="space-y-1 text-xs font-semibold text-slate-700 dark:text-slate-300"
     >
       <span>{label}</span>
       <input

@@ -136,7 +136,7 @@ export function DestructiveActionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !isSubmitting) onClose(); }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={isSubmitting} onKeyDown={handleKeyDown} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={isSubmitting} onKeyDown={handleKeyDown} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4 shadow-2xl relative">
         <button
           type="button"
           onClick={onClose}
@@ -152,8 +152,8 @@ export function DestructiveActionModal({
             {getActionIcon()}
           </div>
           <div>
-            <h3 id={titleId} className="text-sm font-bold text-slate-900 dark:text-slate-100">{title}</h3>
-            <p id={descriptionId} className="text-[11px] text-slate-500">{description}</p>
+            <h3 id={titleId} className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+            <p id={descriptionId} className="text-xs text-slate-500">{description}</p>
           </div>
         </div>
 
@@ -166,7 +166,7 @@ export function DestructiveActionModal({
                     ? `للتأكيد، يرجى كتابة الاسم بالضبط:`
                     : `To confirm, please type the exact name:`}
                 </span>
-                <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm mt-1 select-all">
+                <div className="font-mono font-semibold text-slate-900 dark:text-slate-100 text-sm mt-1 select-all">
                   {targetName}
                 </div>
               </div>
@@ -187,7 +187,7 @@ export function DestructiveActionModal({
           )}
 
           {extraToggle && (
-            <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-rose-700 dark:text-rose-400 pt-1">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-rose-700 dark:text-rose-400 pt-1">
               <input
                 type="checkbox"
                 checked={extraToggle.checked}
@@ -218,7 +218,7 @@ export function DestructiveActionModal({
                 onConfirm();
               }
             }}
-            className={`px-5 py-2 text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${getActionColor()}`}
+            className={`px-5 py-2 text-xs font-semibold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${getActionColor()}`}
           >
             {isSubmitting ? (
               <span className="flex items-center gap-1.5">

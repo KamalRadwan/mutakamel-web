@@ -39,7 +39,7 @@ export function SubscriptionsScreen() {
 
   return (
     <div className="space-y-4">
-      <header className="relative overflow-hidden rounded-2xl border border-violet-500/20 bg-gradient-to-r from-slate-950 via-violet-950 to-slate-950 px-4 py-4 text-white shadow-md sm:px-5">
+      <header className="relative overflow-hidden rounded-xl border border-violet-500/20 bg-gradient-to-r from-slate-950 via-violet-950 to-slate-950 px-4 py-4 text-white shadow-md sm:px-5">
         <div className="pointer-events-none absolute end-0 top-0 -me-12 -mt-16 size-72 rounded-full bg-violet-500/20 blur-3xl" />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -48,10 +48,10 @@ export function SubscriptionsScreen() {
             </span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-black tracking-tight">
+                <h1 className="text-lg font-semibold tracking-tight">
                   {copy.title}
                 </h1>
-                <span className="rounded-md border border-violet-400/30 bg-violet-400/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-violet-200">
+                <span className="rounded-md border border-violet-400/30 bg-violet-400/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider text-violet-200">
                   {copy.readOnly}
                 </span>
               </div>
@@ -62,7 +62,7 @@ export function SubscriptionsScreen() {
           </div>
           {view.isRefreshing ? (
             <span
-              className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold"
+              className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold"
               aria-live="polite"
             >
               <Loader2 className="size-3.5 animate-spin" />
@@ -110,19 +110,19 @@ function SubscriptionFilters({
 }) {
   return (
     <form
-      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
+      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
       onSubmit={(event) => {
         event.preventDefault();
         view.applyFilters();
       }}
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-sm font-black">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
           <Filter className="size-4 text-violet-600 dark:text-violet-400" />
           {copy.filters}
         </h2>
         {view.activeFilterCount ? (
-          <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+          <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
             {view.activeFilterCount} {copy.activeFilters}
           </span>
         ) : null}
@@ -161,7 +161,7 @@ function SubscriptionFilters({
             <span
               id="subscription-tenant-id-error"
               role="alert"
-              className="text-[11px] font-medium text-rose-600 dark:text-rose-300"
+              className="text-xs font-medium text-rose-600 dark:text-rose-300"
             >
               {copy.invalidTenantId}
             </span>
@@ -219,7 +219,7 @@ function SubscriptionFilters({
         </button>
         <button
           type="submit"
-          className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-black text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+          className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-semibold text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
         >
           <Filter className="size-3.5" />
           {copy.apply}
@@ -269,10 +269,10 @@ function SubscriptionResults({
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1120px] text-sm">
-          <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+          <thead className="bg-slate-50 text-2xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-900 dark:text-slate-400">
             <tr>
               {[
                 copy.tenant,
@@ -308,7 +308,7 @@ function SubscriptionResults({
             {Math.max(1, view.data.totalPages)} · {view.data.total}{" "}
             {copy.results}
           </p>
-          <p className="break-all font-mono text-[10px]">
+          <p className="break-all font-mono text-xs">
             {copy.correlation}: {view.data.correlationId} · {copy.responseAt}:{" "}
             {formatDate(view.data.timestamp, lang, true)}
           </p>
@@ -355,22 +355,22 @@ function SubscriptionRow({
           <>
             <Link
               href={`/tenants/${item.tenant.id}`}
-              className="font-black text-violet-700 hover:underline dark:text-violet-300"
+              className="font-semibold text-violet-700 hover:underline dark:text-violet-300"
             >
               {item.tenant.companyName}
             </Link>
             <p className="mt-1 text-xs text-slate-500">{item.tenant.name}</p>
-            <p className="mt-1 text-[10px] text-slate-400">
+            <p className="mt-1 text-xs text-slate-400">
               {copy.tenantStatus}: {item.tenant.status}
             </p>
           </>
         ) : (
-          <p className="font-bold text-amber-700 dark:text-amber-300">
+          <p className="font-semibold text-amber-700 dark:text-amber-300">
             {copy.tenantUnavailable}
           </p>
         )}
         <p
-          className="mt-2 max-w-52 break-all font-mono text-[10px] text-slate-400"
+          className="mt-2 max-w-52 break-all font-mono text-xs text-slate-400"
           title={subscription.id}
         >
           {copy.subscriptionId}: {subscription.id}
@@ -382,7 +382,7 @@ function SubscriptionRow({
           {subscription.billingCycle ?? copy.notConfigured}
         </p>
         {subscription.cancelAt ? (
-          <p className="mt-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+          <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
             {copy.cancels}: {formatDate(subscription.cancelAt, lang)}
           </p>
         ) : null}
@@ -393,7 +393,7 @@ function SubscriptionRow({
             item.enabledModules.map((module) => (
               <span
                 key={module}
-                className="rounded-md bg-violet-50 px-2 py-1 font-mono text-[10px] font-bold text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
+                className="rounded-md bg-violet-50 px-2 py-1 font-mono text-xs font-semibold text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
               >
                 {module.replace(/^module\./u, "")}
               </span>
@@ -403,7 +403,7 @@ function SubscriptionRow({
           )}
         </div>
         <details className="mt-2">
-          <summary className="cursor-pointer text-[11px] font-bold text-violet-700 marker:text-violet-500 dark:text-violet-300">
+          <summary className="cursor-pointer text-xs font-semibold text-violet-700 marker:text-violet-500 dark:text-violet-300">
             {copy.inspectItems} ({item.items.length})
           </summary>
           <div className="mt-2 space-y-2">
@@ -411,9 +411,9 @@ function SubscriptionRow({
               item.items.map((planItem) => (
                 <div
                   key={planItem.id}
-                  className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-[10px] dark:border-slate-800 dark:bg-slate-900"
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-900"
                 >
-                  <p className="font-bold">
+                  <p className="font-semibold">
                     {copy.module}:{" "}
                     {planItem.moduleName ??
                       planItem.moduleKey ??
@@ -437,20 +437,20 @@ function SubscriptionRow({
                 </div>
               ))
             ) : (
-              <p className="text-[11px] text-slate-500">{copy.noItems}</p>
+              <p className="text-xs text-slate-500">{copy.noItems}</p>
             )}
           </div>
         </details>
       </td>
       <td className="px-4 py-4">
-        <p className="font-mono text-base font-black">
+        <p className="font-mono text-base font-semibold">
           {item.effectiveAllowedUsers}
         </p>
-        <p className="mt-1 text-[10px] text-slate-500">
+        <p className="mt-1 text-xs text-slate-500">
           {copy.baseSeats}: {subscription.allowedUsers}
         </p>
       </td>
-      <td className="px-4 py-4 font-mono font-black">
+      <td className="px-4 py-4 font-mono font-semibold">
         {subscription.totalPrice ?? copy.notConfigured}
         {subscription.totalPrice && subscription.currencyCode
           ? ` ${subscription.currencyCode}`
@@ -458,18 +458,18 @@ function SubscriptionRow({
       </td>
       <td className="px-4 py-4 text-xs">
         <p>
-          <span className="font-bold">{copy.ends}:</span>{" "}
+          <span className="font-semibold">{copy.ends}:</span>{" "}
           {formatDate(subscription.currentPeriodEnd, lang)}
         </p>
         <p className="mt-1 text-slate-500">
-          <span className="font-bold">{copy.started}:</span>{" "}
+          <span className="font-semibold">{copy.started}:</span>{" "}
           {formatDate(
             subscription.currentPeriodStart ?? subscription.startedAt,
             lang,
           )}
         </p>
         {!subscription.cancelAt ? (
-          <p className="mt-1 text-[10px] text-slate-400">
+          <p className="mt-1 text-xs text-slate-400">
             {copy.noCancellation}
           </p>
         ) : null}
@@ -500,7 +500,7 @@ function FailurePanel({
         <button
           type="button"
           onClick={view.refresh}
-          className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white hover:bg-rose-500"
+          className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-500"
         >
           {copy.retry}
         </button>
@@ -546,7 +546,7 @@ function StatusPill({
   };
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black ${tones[status]}`}
+      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${tones[status]}`}
     >
       {statusLabel(status, copy)}
     </span>
@@ -630,16 +630,16 @@ function SummaryCard({
       "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300",
   };
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-bold text-slate-500">{label}</p>
+        <p className="text-xs font-semibold text-slate-500">{label}</p>
         <span
           className={`grid size-8 place-items-center rounded-lg ${tones[tone]}`}
         >
           {icon}
         </span>
       </div>
-      <p className="mt-2 font-mono text-2xl font-black">{value}</p>
+      <p className="mt-2 font-mono text-2xl font-semibold">{value}</p>
     </div>
   );
 }
@@ -666,10 +666,10 @@ function StatePanel({
   return (
     <section
       role={tone === "danger" ? "alert" : undefined}
-      className={`flex min-h-56 flex-col items-center justify-center rounded-2xl border p-6 text-center ${colors}`}
+      className={`flex min-h-56 flex-col items-center justify-center rounded-xl border p-6 text-center ${colors}`}
     >
       <span className="mb-3 opacity-75">{icon}</span>
-      <h2 className="text-sm font-black">{title}</h2>
+      <h2 className="text-sm font-semibold">{title}</h2>
       {detail ? (
         <p className="mt-2 max-w-3xl break-all text-xs opacity-85">{detail}</p>
       ) : null}
@@ -679,10 +679,10 @@ function StatePanel({
 }
 
 const labelClass =
-  "grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300";
+  "grid gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300";
 const inputClass =
   "min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-normal text-slate-950 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
 const secondaryButtonClass =
-  "inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 px-3 text-xs font-bold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";
+  "inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 px-3 text-xs font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";
 const pageButtonClass =
-  "inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-slate-300 px-3 font-bold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";
+  "inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-slate-300 px-3 font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";

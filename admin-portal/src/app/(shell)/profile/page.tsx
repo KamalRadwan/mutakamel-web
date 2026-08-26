@@ -39,7 +39,7 @@ export default function MyProfilePage() {
     return (
       <div
         dir={isAr ? "rtl" : "ltr"}
-        className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100"
+        className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100"
       >
         <Navbar />
         <main className="grid flex-1 place-items-center p-6">
@@ -60,20 +60,20 @@ export default function MyProfilePage() {
     return (
       <div
         dir={isAr ? "rtl" : "ltr"}
-        className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100"
+        className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-canvas dark:text-slate-100"
       >
         <Navbar />
         <main className="grid flex-1 place-items-center p-6">
           <section
             role={forbidden ? undefined : "alert"}
-            className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950"
+            className="w-full max-w-xl rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950"
           >
             {forbidden ? (
               <ShieldAlert className="mx-auto size-8 text-amber-500" />
             ) : (
               <AlertTriangle className="mx-auto size-8 text-rose-500" />
             )}
-            <h1 className="mt-3 text-lg font-black">
+            <h1 className="mt-3 text-lg font-semibold">
               {forbidden
                 ? isAr
                   ? "لا يمكنك عرض هذا الملف الشخصي"
@@ -88,14 +88,14 @@ export default function MyProfilePage() {
             </h1>
             <dl className="mt-3 space-y-1 text-xs text-slate-500">
               <div>
-                <dt className="inline font-bold">
+                <dt className="inline font-semibold">
                   {isAr ? "رمز الخطأ" : "Error code"}:{" "}
                 </dt>
                 <dd className="inline font-mono">{loadError.errorCode}</dd>
               </div>
               {loadError.correlationId ? (
                 <div>
-                  <dt className="inline font-bold">
+                  <dt className="inline font-semibold">
                     {isAr ? "معرف الارتباط" : "Correlation ID"}:{" "}
                   </dt>
                   <dd className="inline break-all font-mono">
@@ -108,7 +108,7 @@ export default function MyProfilePage() {
               <button
                 type="button"
                 onClick={() => void reload()}
-                className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-black text-white hover:bg-blue-500"
+                className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-500"
               >
                 <RefreshCw className="size-4" />
                 {isAr ? "إعادة المحاولة" : "Retry"}
@@ -123,19 +123,19 @@ export default function MyProfilePage() {
   return (
     <div
       dir={isAr ? "rtl" : "ltr"}
-      className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col"
+      className="min-h-screen bg-slate-50 dark:bg-canvas text-slate-900 dark:text-slate-100 flex flex-col"
     >
       <Navbar />
 
-      <main className="flex-1 space-y-6 w-full px-[10px] py-4 sm:py-6">
+      <main className="flex-1 space-y-6 w-full px-4 py-4 sm:py-6">
         {/* Header */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/50 shrink-0">
               <Sliders className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 {isAr ? "تفضيلات الحساب الشخصي" : "My Profile Preferences"}
               </h1>
               <p className="text-xs text-slate-500">
@@ -165,7 +165,7 @@ export default function MyProfilePage() {
             role="alert"
             className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
           >
-            <p className="font-bold">
+            <p className="font-semibold">
               {isAr ? "لم تُحفظ التغييرات." : "Changes were not saved."}
             </p>
             <p className="mt-1 font-mono">
@@ -176,10 +176,10 @@ export default function MyProfilePage() {
         ) : null}
 
         {/* Preferences Form */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs p-6 space-y-6">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs p-6 space-y-6">
           {/* Theme Key */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <SunMoon className="w-4 h-4 text-amber-500" />
               <span>
                 {isAr
@@ -222,7 +222,7 @@ export default function MyProfilePage() {
 
           {/* Language Preference */}
           <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Globe className="w-4 h-4 text-emerald-500" />
               <span>{isAr ? "اللغة المفضلة" : "Preferred Language"}</span>
             </label>
@@ -261,7 +261,7 @@ export default function MyProfilePage() {
 
           {/* Table Density */}
           <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <LayoutGrid className="w-4 h-4 text-blue-500" />
               <span>
                 {isAr

@@ -11,8 +11,8 @@ export default function NotificationsSettingsPage() {
   const { lang } = settingsState;
   return (
     <div className="space-y-6">
-      <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
+      <header className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <Bell className="size-5 text-blue-600 dark:text-blue-400" />
           {lang === "ar" ? "قنوات الإشعارات" : "Notifications"}
         </h1>
@@ -56,7 +56,7 @@ export default function NotificationsSettingsPage() {
 
 function EmptyNotifications({ lang }: { lang: "ar" | "en" }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900">
       {lang === "ar"
         ? "لا توجد مفاتيح إشعارات مسجلة."
         : "No notification settings are registered."}

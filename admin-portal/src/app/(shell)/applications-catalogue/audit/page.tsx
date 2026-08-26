@@ -66,11 +66,11 @@ export default function CatalogueAuditPage() {
   return (
     <div
       dir={dir}
-      className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"
+      className="flex min-h-screen flex-col bg-slate-50 text-slate-950 dark:bg-canvas dark:text-slate-100"
     >
       <Navbar />
-      <main className="w-full flex-1 space-y-5 px-[10px] py-4 sm:py-6">
-        <header className="rounded-2xl border border-violet-500/20 bg-slate-950 px-4 py-3 text-white shadow-md sm:px-5 sm:py-3.5">
+      <main className="w-full flex-1 space-y-5 px-4 py-4 sm:py-6">
+        <header className="rounded-xl border border-violet-500/20 bg-slate-950 px-4 py-3 text-white shadow-md sm:px-5 sm:py-3.5">
           <div className="flex items-center gap-3">
             <Link
               href="/applications-catalogue"
@@ -83,12 +83,12 @@ export default function CatalogueAuditPage() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold sm:text-lg">{text.title}</h1>
-                <span className="rounded-md border border-violet-400/30 bg-violet-500/20 px-2 py-0.5 font-mono text-[10px] font-extrabold uppercase tracking-wider text-violet-300">
+                <h1 className="text-base font-semibold sm:text-lg">{text.title}</h1>
+                <span className="rounded-md border border-violet-400/30 bg-violet-500/20 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-violet-300">
                   {text.evidence}
                 </span>
               </div>
-              <p className="mt-0.5 text-[11px] text-slate-300">
+              <p className="mt-0.5 text-xs text-slate-300">
                 {text.description}
               </p>
             </div>
@@ -101,7 +101,7 @@ export default function CatalogueAuditPage() {
           <StateCard>{text.forbidden}</StateCard>
         ) : (
           <>
-            <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row dark:border-slate-800 dark:bg-slate-900">
+            <section className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row dark:border-slate-800 dark:bg-slate-900">
               <select
                 aria-label={text.entityType}
                 value={entityType}
@@ -111,7 +111,7 @@ export default function CatalogueAuditPage() {
                   );
                   setPage(1);
                 }}
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold dark:border-slate-700 dark:bg-slate-950"
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950"
               >
                 <option value="ALL">{text.allEntityTypes}</option>
                 {ENTITY_TYPES.map((value) => (
@@ -134,20 +134,20 @@ export default function CatalogueAuditPage() {
               <button
                 type="button"
                 onClick={() => void load()}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 {text.refresh}
               </button>
             </section>
 
-            <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-                <h2 className="flex items-center gap-2 text-sm font-black">
+                <h2 className="flex items-center gap-2 text-sm font-semibold">
                   <History className="h-4 w-4 text-violet-500" />
                   {text.globalEvents}
                 </h2>
-                <span className="font-mono text-[11px] text-slate-500">
+                <span className="font-mono text-xs text-slate-500">
                   {text.events(data?.total ?? 0)}
                 </span>
               </div>
@@ -163,23 +163,23 @@ export default function CatalogueAuditPage() {
                 ) : error ? (
                   <div
                     role="alert"
-                    className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-center text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"
+                    className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-center text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"
                   >
                     <p>{text.unavailable}</p>
-                    <p className="mt-1 font-mono text-[10px]">
+                    <p className="mt-1 font-mono text-xs">
                       {error.errorCode}
                       {error.correlationId ? ` · ${error.correlationId}` : ""}
                     </p>
                     <button
                       type="button"
                       onClick={() => void load()}
-                      className="mt-3 rounded-xl bg-rose-600 px-3 py-2 font-bold text-white"
+                      className="mt-3 rounded-xl bg-rose-600 px-3 py-2 font-semibold text-white"
                     >
                       {text.retry}
                     </button>
                   </div>
                 ) : !data?.items.length ? (
-                  <div className="rounded-2xl border border-dashed border-slate-300 py-16 text-center text-xs text-slate-500 dark:border-slate-700">
+                  <div className="rounded-xl border border-dashed border-slate-300 py-16 text-center text-xs text-slate-500 dark:border-slate-700">
                     {text.empty}
                   </div>
                 ) : (
@@ -187,18 +187,18 @@ export default function CatalogueAuditPage() {
                     {data.items.map((event) => (
                       <article
                         key={event.id}
-                        className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800"
+                        className="rounded-xl border border-slate-200 p-4 dark:border-slate-800"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <span className="font-mono text-xs font-black text-violet-600 dark:text-violet-400">
+                            <span className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-400">
                               {event.action}
                             </span>
-                            <span className="ms-2 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                            <span className="ms-2 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                               {text.entityNames[event.entityType] ?? event.entityType}
                             </span>
                           </div>
-                          <time className="text-[11px] text-slate-500">
+                          <time className="text-xs text-slate-500">
                             {new Date(event.occurredAt).toLocaleString(
                               lang === "ar" ? "ar-EG" : "en-US",
                             )}
@@ -207,7 +207,7 @@ export default function CatalogueAuditPage() {
                         <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
                           {text.actor}: {event.actorLabel || event.actorAdminId || text.system}
                         </p>
-                        <p className="mt-1 font-mono text-[10px] text-slate-400">
+                        <p className="mt-1 font-mono text-xs text-slate-400">
                           {text.correlation}: {event.correlationId || text.notProvided}
                         </p>
                       </article>
@@ -223,7 +223,7 @@ export default function CatalogueAuditPage() {
                       type="button"
                       disabled={page <= 1}
                       onClick={() => setPage((current) => Math.max(1, current - 1))}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 font-bold disabled:opacity-40 dark:border-slate-700"
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40 dark:border-slate-700"
                     >
                       {text.previous}
                     </button>
@@ -231,7 +231,7 @@ export default function CatalogueAuditPage() {
                       type="button"
                       disabled={page >= data.totalPages}
                       onClick={() => setPage((current) => current + 1)}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 font-bold disabled:opacity-40 dark:border-slate-700"
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40 dark:border-slate-700"
                     >
                       {text.next}
                     </button>
@@ -248,7 +248,7 @@ export default function CatalogueAuditPage() {
 
 function StateCard({ children, loading = false }: { children: React.ReactNode; loading?: boolean }) {
   return (
-    <div role={loading ? "status" : "alert"} className="flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+    <div role={loading ? "status" : "alert"} className="flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
       {children}
     </div>
