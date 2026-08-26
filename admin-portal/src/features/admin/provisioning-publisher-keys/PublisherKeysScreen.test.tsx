@@ -184,8 +184,12 @@ describe("PublisherKeysScreen", () => {
     viewBox.current = view;
     render(<PublisherKeysScreen />);
 
+    // Radix AlertDialogContent renders role="alertdialog", not "dialog" -
+    // the more precise ARIA role for a confirmation that requires an
+    // immediate response, which the hand-rolled dialog this replaced didn't
+    // distinguish.
     expect(
-      screen.getByRole("dialog", { name: "Confirm critical key registration" }),
+      screen.getByRole("alertdialog", { name: "Confirm critical key registration" }),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     expect(view.confirmMutation).toHaveBeenCalledOnce();
