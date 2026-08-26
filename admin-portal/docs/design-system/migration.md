@@ -79,18 +79,50 @@ free" but were not converted to the pattern layer.
 
 **Phase 22 — Dashboard charts.** Recovered the 37 chart components deleted
 in commit `adb263e` (`recharts` had been installed with zero imports since).
-Rather than restoring all 37 unconditionally, each was checked against the
-real `analytics`/`overview`/`panels` data contract in
-`src/types/dashboard.ts`: 9 wired to always-present `overview`/`panels`
-data, 14 more wired to `analytics.subscriptions.*`/`analytics.billing.*`
-(each handling the `DashboardDataset` available/unavailable union so an
-unconfigured backend projection renders `UnavailableDashboardPanel` instead
-of fabricated data), and the remaining 17 — which had no real field to bind
-to — deleted rather than kept as unwired dead code. Also fixed
-`formatDashboardMetric()` (was string-concatenating money values into
-`"USD 1234567.5"`; now real, locale-aware `Intl.NumberFormat`) and collapsed
-`toneToColorStyle()`'s 6-hue switch onto the brand/warn/danger/neutral role
-set.
+The first pass wired 9 to always-present `overview`/`panels` data and 14
+more to `src/types/dashboard.ts`'s `analytics.subscriptions.*`/
+`analytics.billing.*` fields, deleting the remaining 17 that had no field to
+bind to. **That first pass trusted the frontend type contract without
+checking the backend, and was wrong about a large piece of it** — corrected
+in a follow-up once a parallel session grepped the actual Core service:
+
+- `analytics` has **no backend producer at all**. `AdminDashboardResponse`
+  (`core-app/.../admin-dashboard.service.ts`) is `{asOf, authorizedGroups,
+  range, sections, panels, overview} & DashboardGroups` — no `analytics`
+  key, anywhere. `data.analytics` is always `undefined` at runtime, so
+  `{analytics && (...)}` never executed. All 14 of those chart components
+  were unreachable dead code from the moment they were wired, not "gated
+  for when the backend catches up" — there was never a producer to catch
+  up. They and the 8 chart-primitive files they alone depended on
+  (`BaseBarChart` included) were deleted; see
+  `DashboardOverviewCharts.tsx`.
+- `overview.domainHealth.regions` is not intermittently missing, it is
+  **always** stripped: Core's `filterOverview` rebuilds `domainHealth` as a
+  literal object listing only 6 fields, `regions`/`countries` excluded, even
+  though the upstream `domainHealth` object it filters from has both. This
+  is what actually caused the "can't access property 'length',
+  overview.domainHealth.regions is undefined" production crash the first
+  defensive-guard fix (below) patched around. The real per-country data
+  does reach the browser, at a different path — the `tenants` group's
+  `breakdowns.byCountry`, built from the same `countryBreakdown: 
+  DashboardRegionItem[]` source. `RegionalDistributionBarChart` now reads
+  from there instead.
+
+The lesson: `src/types/dashboard.ts` is a frontend-authored guess at the
+response shape, not verified backend evidence — AGENTS.md's source
+precedence (Gateway/Core source outranks frontend types) applies to
+internal type files too, not just docs. A type declaring a field doesn't
+mean a controller sends it.
+
+A follow-up crash fix (separate from this correction) added a `safeArray()`
+guard around every array read in `DashboardOverviewCharts.tsx`, since the
+`regions` finding proved the declared-vs-actual gap is real and not
+limited to that one field.
+
+Also fixed `formatDashboardMetric()` (was string-concatenating money values
+into `"USD 1234567.5"`; now real, locale-aware `Intl.NumberFormat`) and
+collapsed `toneToColorStyle()`'s 6-hue switch onto the brand/warn/danger/
+neutral role set — both still stand.
 
 **Phase 23 — Content/i18n.** Fixed the specific hardcoded-English sites
 called out for this phase (`TablePagination`, `useActionMutation`'s toast

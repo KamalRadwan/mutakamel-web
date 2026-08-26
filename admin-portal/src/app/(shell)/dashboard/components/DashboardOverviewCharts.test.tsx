@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { DashboardResponse } from "@/types/dashboard";
+import { en } from "@/i18n/dictionaries/en";
 
-vi.mock("@/i18n/I18nContext", async () => {
-  const { en } = await import("@/i18n/dictionaries/en");
-  return { useI18n: () => ({ lang: "en", dir: "ltr", t: en }) };
-});
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({ lang: "en", dir: "ltr", t: en }),
+}));
 
 import { DashboardOverviewCharts } from "./DashboardOverviewCharts";
 
@@ -57,42 +57,47 @@ describe("DashboardOverviewCharts", () => {
     expect(() => render(<DashboardOverviewCharts data={buildData()} />)).not.toThrow();
   });
 
-  it("renders without crashing when analytics dataset arrays are undefined despite available: true", () => {
+  it("renders the regional distribution chart from tenants.breakdowns.byCountry when available", () => {
     const data = buildData({
-      analytics: {
-        subscriptions: {
-          arrTarget: { available: true, data: { currencyCode: "USD", actual: 0, target: 0 } },
-          averageCollectedRevenue: { available: true, data: { currencyCode: "USD", points: undefined } },
-          paymentHealth: { available: true, data: undefined },
-          churnAndAcquisition: { available: true, data: { points: undefined } },
-          upcomingRenewals: { available: true, data: { windowDays: 90, points: undefined } },
-          revenueFlow: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
-          lifetimeValue: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
-          promotionImpact: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
-          cohortRetention: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
+      tenants: {
+        key: "tenants",
+        permission: "admin.reports.tenants",
+        available: true,
+        asOf: "2026-08-26T00:00:00.000Z",
+        snapshot: {},
+        period: {},
+        breakdowns: {
+          byCountry: [
+            { key: "eg", countryName: "Egypt", countryIsoCode: "EG", count: 12, ratio: 0.6, tone: "green" },
+            { key: "sa", countryName: "Saudi Arabia", countryIsoCode: "SA", count: 8, ratio: 0.4, tone: "blue" },
+          ],
         },
-        billing: {
-          aging: { available: true, data: { currencyCode: "USD", items: undefined } },
-          daysSalesOutstanding: { available: true, data: { unit: "days", points: undefined } },
-          cashFlow: { available: true, data: { currencyCode: "USD", points: undefined } },
-          revenueByPurpose: { available: true, data: { currencyCode: "USD", items: undefined } },
-          paymentProviders: { available: true, data: undefined },
-          paymentFailureReasons: { available: true, data: undefined },
-          refunds: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
-          taxByCountry: { available: true, data: { currencyCode: "USD", items: undefined } },
-          renewalForecast: { available: true, data: { currencyCode: "USD", windowDays: 90, points: undefined } },
-          usageOverage: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
-          costBreakdown: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
-          discountImpact: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
-          chargebacks: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
-        },
-        servers: {
-          nodes: { available: true, data: [] },
-          regions: { available: true, data: [] },
-          latency: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
-          capacityHistory: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
-        },
-        platformHealth: { available: false, reasonCode: "SOURCE_NOT_CONFIGURED", message: "" },
+        alerts: [],
+        cards: [],
+      },
+    });
+
+    render(<DashboardOverviewCharts data={data} />);
+
+    // recharts renders its labels into an SVG sized by real layout
+    // measurements jsdom doesn't provide, so country names inside the chart
+    // aren't queryable here — assert on the section label that only renders
+    // when domainRegions.length > 0 instead, which is the actual branch
+    // this test exercises.
+    expect(screen.getByText(en.dashboard.tenantsTab.regionalDistributionTitle)).toBeInTheDocument();
+  });
+
+  it("does not crash when the tenants group is unavailable", () => {
+    const data = buildData({
+      tenants: {
+        key: "tenants",
+        permission: "admin.reports.tenants",
+        available: false,
+        asOf: "2026-08-26T00:00:00.000Z",
+        reasonCode: "SOURCE_NOT_CONFIGURED",
+        message: "",
+        alerts: [],
+        cards: [],
       },
     });
 

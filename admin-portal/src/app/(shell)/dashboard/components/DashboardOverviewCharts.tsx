@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useI18n } from "@/i18n/I18nContext";
-import type { DashboardResponse } from "@/types/dashboard";
+import type { DashboardMetricTone, DashboardRegionItem, DashboardResponse } from "@/types/dashboard";
 import { KpiCard } from "./KpiCard";
 import { UnavailableDashboardPanel } from "./DashboardDataState";
 import { TenantGrowthRevenueChart } from "./charts/TenantGrowthRevenueChart";
@@ -12,25 +12,15 @@ import { RegionalDistributionBarChart } from "./charts/RegionalDistributionBarCh
 import { ServerCapacityChart } from "./charts/ServerCapacityChart";
 import { CollectionGaugeChart } from "./charts/CollectionGaugeChart";
 import { MetricDonutChart, type DonutSegment } from "./charts/MetricDonutChart";
-import { BillingCashFlowComposedChart } from "./charts/BillingCashFlowComposedChart";
-import { BillingAgingReportBarChart } from "./charts/BillingAgingReportBarChart";
-import { SubscriptionTargetGauge } from "./charts/SubscriptionTargetGauge";
-import { SubscriptionARPUSplineChart } from "./charts/SubscriptionARPUSplineChart";
-import { SubscriptionChurnComposedChart } from "./charts/SubscriptionChurnComposedChart";
-import { SubscriptionRenewalsBarChart } from "./charts/SubscriptionRenewalsBarChart";
-import { BillingDSOAreaChart } from "./charts/BillingDSOAreaChart";
-import { BillingRevenueByProductRadar } from "./charts/BillingRevenueByProductRadar";
-import { BillingGatewaySplitDonut } from "./charts/BillingGatewaySplitDonut";
-import { BillingFailureReasonsBarChart } from "./charts/BillingFailureReasonsBarChart";
-import { BillingTaxDistributionPie } from "./charts/BillingTaxDistributionPie";
-import { BillingForecastSplineChart } from "./charts/BillingForecastSplineChart";
-import type { DashboardDataset, DashboardMetricTone, DashboardNamedValue } from "@/types/dashboard";
 
-const NAMED_VALUE_PALETTE = ["#10b981", "#3b82f6", "#f59e0b", "#8b5cf6", "#06b6d4", "#ef4444"];
-
-function paletteColor(index: number): string {
-  return NAMED_VALUE_PALETTE[index % NAMED_VALUE_PALETTE.length];
-}
+const TONE_COLOR: Record<DashboardMetricTone, string> = {
+  green: "#10b981",
+  blue: "#3b82f6",
+  amber: "#f59e0b",
+  red: "#ef4444",
+  purple: "#8b5cf6",
+  cyan: "#06b6d4",
+};
 
 // The dashboard response's declared types (src/types/dashboard.ts) mark
 // every array field as always present, but live responses have been
@@ -42,40 +32,30 @@ function safeArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
 }
 
-function namedValuesToDonut(items: DashboardNamedValue[]): DonutSegment[] {
-  return safeArray(items).map((item, index) => ({
-    key: item.key,
-    name: item.label,
-    value: item.value,
-    color: paletteColor(index),
-  }));
-}
-
-const TONE_COLOR: Record<DashboardMetricTone, string> = {
-  green: "#10b981",
-  blue: "#3b82f6",
-  amber: "#f59e0b",
-  red: "#ef4444",
-  purple: "#8b5cf6",
-  cyan: "#06b6d4",
-};
-
 interface DashboardOverviewChartsProps {
   data: DashboardResponse;
 }
 
 export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) {
-  const { t, lang } = useI18n();
-  const { overview, panels, analytics } = data;
+  const { t } = useI18n();
+  const { overview, panels, tenants } = data;
 
   const kpis = safeArray(overview.kpis);
   const tenantLifecycleItems = safeArray(overview.tenantLifecycle.items);
-  const domainRegions = safeArray(overview.domainHealth.regions);
   const databaseCapacityItems = safeArray(panels.databaseCapacity.items);
   const subscriptionStatusItems = safeArray(overview.subscriptionStatus.items);
   const billingSummaryItems = safeArray(overview.billingSummary.items);
   const recentTenants = safeArray(overview.recentTenants.items);
   const tenantGrowthPoints = safeArray(overview.tenantBillingGrowth.points);
+  // overview.domainHealth.regions is never populated — Core's filterOverview
+  // (admin-dashboard.service.ts) always strips it before the response
+  // leaves the server. The same per-country breakdown is real and does
+  // reach the browser, just on the tenants group instead:
+  // tenants.breakdowns.byCountry (built from the same countryBreakdown
+  // source on the backend, typed DashboardRegionItem[] there too).
+  const domainRegions = safeArray(
+    tenants?.available ? (tenants.breakdowns.byCountry as DashboardRegionItem[] | undefined) : undefined,
+  );
 
   return (
     <div className="space-y-5">
@@ -175,136 +155,7 @@ export function DashboardOverviewCharts({ data }: DashboardOverviewChartsProps) 
           <CollectionGaugeChart collectedRatio={overview.billingSummary.collectedRatio} />
         </ChartCard>
       </div>
-
-      {analytics && (
-        <>
-          <SectionHeading title={lang === "ar" ? "تحليلات الاشتراكات" : "Subscription analytics"} />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <AnalyticsChartCard title={lang === "ar" ? "الهدف السنوي للإيرادات" : "ARR target"} dataset={analytics.subscriptions.arrTarget}>
-              {(value) => <SubscriptionTargetGauge actualARR={value.actual} targetARR={value.target} />}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "متوسط الإيراد المحصل" : "Average collected revenue"} dataset={analytics.subscriptions.averageCollectedRevenue}>
-              {(value) => (
-                <SubscriptionARPUSplineChart
-                  data={safeArray(value.points).map((point) => ({ month: point.label, arpu: point.value }))}
-                  metricLabel={lang === "ar" ? "الإيراد المحصل" : "Collected revenue"}
-                />
-              )}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "صحة المدفوعات" : "Payment health"} dataset={analytics.subscriptions.paymentHealth}>
-              {(value) => <MetricDonutChart data={namedValuesToDonut(value)} />}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "الاستحواذ والمغادرة" : "Acquisition vs. churn"} dataset={analytics.subscriptions.churnAndAcquisition} className="lg:col-span-2">
-              {(value) => (
-                <SubscriptionChurnComposedChart
-                  data={safeArray(value.points).map((point) => ({
-                    month: point.label,
-                    newAcquisitions: point.primary,
-                    churned: point.secondary,
-                  }))}
-                />
-              )}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "التجديدات القادمة" : "Upcoming renewals"} dataset={analytics.subscriptions.upcomingRenewals}>
-              {(value) => (
-                <SubscriptionRenewalsBarChart
-                  data={safeArray(value.points).map((point) => ({ month: point.label, renewals: point.value }))}
-                />
-              )}
-            </AnalyticsChartCard>
-          </div>
-
-          <SectionHeading title={lang === "ar" ? "تحليلات الفوترة" : "Billing analytics"} />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <AnalyticsChartCard title={lang === "ar" ? "التدفق النقدي" : "Cash flow"} dataset={analytics.billing.cashFlow}>
-              {(value) => (
-                <BillingCashFlowComposedChart
-                  data={safeArray(value.points).map((point) => ({
-                    month: point.label,
-                    expected: point.primary,
-                    actual: point.secondary,
-                  }))}
-                />
-              )}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "تقادم المستحقات" : "Receivables aging"} dataset={analytics.billing.aging}>
-              {(value) => (
-                <BillingAgingReportBarChart
-                  data={safeArray(value.items).map((item) => ({ bucket: item.label, amount: item.value }))}
-                />
-              )}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "أيام المبيعات غير المحصلة" : "Days sales outstanding"} dataset={analytics.billing.daysSalesOutstanding}>
-              {(value) => (
-                <BillingDSOAreaChart data={safeArray(value.points).map((point) => ({ month: point.label, dso: point.value }))} />
-              )}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "الإيرادات حسب الغرض" : "Revenue by purpose"} dataset={analytics.billing.revenueByPurpose}>
-              {(value) => (
-                <BillingRevenueByProductRadar data={safeArray(value.items).map((item) => ({ product: item.label, revenue: item.value }))} />
-              )}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "توزيع بوابات الدفع" : "Payment gateway split"} dataset={analytics.billing.paymentProviders}>
-              {(value) => (
-                <BillingGatewaySplitDonut
-                  data={safeArray(value).map((item, index) => ({ gateway: item.label, volume: item.value, color: paletteColor(index) }))}
-                />
-              )}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "أسباب فشل الدفع" : "Payment failure reasons"} dataset={analytics.billing.paymentFailureReasons}>
-              {(value) => (
-                <BillingFailureReasonsBarChart data={safeArray(value).map((item) => ({ reason: item.label, count: item.value }))} />
-              )}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "توزيع الضرائب حسب الدولة" : "Tax by country"} dataset={analytics.billing.taxByCountry}>
-              {(value) => (
-                <BillingTaxDistributionPie
-                  data={safeArray(value.items).map((item, index) => ({ region: item.label, amount: item.value, color: paletteColor(index) }))}
-                />
-              )}
-            </AnalyticsChartCard>
-
-            <AnalyticsChartCard title={lang === "ar" ? "توقعات التجديد" : "Renewal forecast"} dataset={analytics.billing.renewalForecast}>
-              {(value) => (
-                <BillingForecastSplineChart data={safeArray(value.points).map((point) => ({ month: point.label, forecast: point.value }))} />
-              )}
-            </AnalyticsChartCard>
-          </div>
-        </>
-      )}
     </div>
-  );
-}
-
-function AnalyticsChartCard<T>({
-  title,
-  dataset,
-  className,
-  children,
-}: {
-  title: string;
-  dataset: DashboardDataset<T>;
-  className?: string;
-  children: (value: T) => React.ReactNode;
-}) {
-  return (
-    <ChartCard title={title} className={className}>
-      {dataset.available ? (
-        children(dataset.data)
-      ) : (
-        <UnavailableDashboardPanel title={title} dataset={dataset} className="min-h-0" />
-      )}
-    </ChartCard>
   );
 }
 
