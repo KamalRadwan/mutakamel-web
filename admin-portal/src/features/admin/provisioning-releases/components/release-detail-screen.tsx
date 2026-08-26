@@ -1,34 +1,181 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Archive, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Archive } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { Button, Card, Checkbox, Field, Input, Textarea } from "@/design-system";
 import { useReleaseDetail } from "../hooks/use-release-detail";
-import { formatDate, JsonEvidence, RELEASE_COPY, RefreshReleaseButton, ReleaseFieldError, ReleaseMutationNotice, ReleasePageFrame, ReleaseSnapshotMeta, ReleaseStatePanel, StatusBadge, type ReleaseCopy } from "./release-shared";
+import {
+  formatDate,
+  JsonEvidence,
+  RELEASE_COPY,
+  RefreshReleaseButton,
+  ReleaseFieldError,
+  ReleaseMutationNotice,
+  ReleasePageFrame,
+  ReleaseSnapshotMeta,
+  ReleaseStatePanel,
+  StatusBadge,
+  type ReleaseCopy,
+} from "./release-shared";
 
 export function ReleaseDetailScreen({ releaseId }: { releaseId: string }) {
   const { lang, dir } = useI18n();
   const copy = RELEASE_COPY[lang];
   const detail = useReleaseDetail(releaseId);
-  return <ReleasePageFrame dir={dir}><Link href="/provisioning/releases" className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-slate-600 hover:text-cyan-700 dark:text-slate-300">{dir === "rtl" ? <ArrowRight className="size-4" /> : <ArrowLeft className="size-4" />}{copy.back}</Link><ReleaseBody detail={detail} copy={copy} lang={lang} /></ReleasePageFrame>;
+  return (
+    <ReleasePageFrame dir={dir}>
+      <Button asChild variant="ghost" className="w-fit">
+        <Link href="/provisioning/releases">
+          {dir === "rtl" ? <ArrowRight className="size-4" aria-hidden="true" /> : <ArrowLeft className="size-4" aria-hidden="true" />}
+          {copy.back}
+        </Link>
+      </Button>
+      <ReleaseBody detail={detail} copy={copy} lang={lang} />
+    </ReleasePageFrame>
+  );
 }
 
 function ReleaseBody({ detail, copy, lang }: { detail: ReturnType<typeof useReleaseDetail>; copy: ReleaseCopy; lang: "ar" | "en" }) {
   if (detail.state === "LOADING") return <ReleaseStatePanel kind="loading" title={copy.loading} copy={copy} />;
   if (detail.state === "FORBIDDEN") return <ReleaseStatePanel kind="forbidden" title={copy.forbidden} detail={copy.readPermission} copy={copy} />;
   if (detail.state === "NOT_FOUND") return <ReleaseStatePanel kind="notFound" title={copy.notFound} detail={detail.error?.message} correlationId={detail.error?.correlationId} copy={copy} />;
-  if (detail.state === "UNAVAILABLE") return <ReleaseStatePanel kind="unavailable" title={copy.unavailable} detail={detail.error?.message} correlationId={detail.error?.correlationId} copy={copy} action={<RefreshReleaseButton label={copy.retry} onClick={detail.refresh} />} />;
-  if (detail.state === "ERROR" || !detail.snapshot) return <ReleaseStatePanel kind="error" title={copy.error} detail={detail.error?.message} correlationId={detail.error?.correlationId} copy={copy} action={<RefreshReleaseButton label={copy.retry} onClick={detail.refresh} />} />;
+  if (detail.state === "UNAVAILABLE") {
+    return (
+      <ReleaseStatePanel kind="unavailable" title={copy.unavailable} detail={detail.error?.message} correlationId={detail.error?.correlationId} copy={copy} action={<RefreshReleaseButton label={copy.retry} onClick={detail.refresh} />} />
+    );
+  }
+  if (detail.state === "ERROR" || !detail.snapshot) {
+    return (
+      <ReleaseStatePanel kind="error" title={copy.error} detail={detail.error?.message} correlationId={detail.error?.correlationId} copy={copy} action={<RefreshReleaseButton label={copy.retry} onClick={detail.refresh} />} />
+    );
+  }
   const release = detail.snapshot.data;
   const pending = detail.mutation.phase === "PENDING";
-  return <div className="space-y-4" aria-busy={pending || detail.isRefreshing}><header className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex items-center gap-3"><h1 dir="ltr" className="font-mono text-xl font-semibold">{release.releaseVersion}</h1><StatusBadge status={release.status} /></div><code dir="ltr" className="mt-2 block break-all text-start text-xs text-slate-500">{release.releaseId}</code></div><RefreshReleaseButton label={copy.refresh} onClick={detail.refresh} pending={detail.isRefreshing} /></div></header><ReleaseMutationNotice mutation={detail.mutation} copy={copy} /><div className="grid gap-4 xl:grid-cols-3"><EvidenceCard title={copy.lifecycleEvidence}><Evidence label={copy.publishedAt} value={formatDate(release.publishedAt, lang)} /><Evidence label={copy.retiredAt} value={formatDate(release.retiredAt, lang)} /><Evidence label={copy.retirementReason} value={release.retirementReasonCode ?? "—"} mono /></EvidenceCard><EvidenceCard title={copy.manifestEvidence}><Evidence label={copy.componentId} value={release.componentId} mono /><Evidence label={copy.manifestVersion} value={String(release.manifestVersion)} mono /><Evidence label={copy.contractVersion} value={String(release.contractVersion)} mono /><Evidence label={copy.manifestChecksumLabel} value={release.manifestChecksum} mono /></EvidenceCard><EvidenceCard title={copy.signatureEvidence}><Evidence label={copy.publicationSource} value={release.publicationSource} mono /><Evidence label={copy.publisherKeyId} value={release.publisherKeyId ?? "—"} mono /><Evidence label={copy.signatureAlgorithm} value={release.signatureAlgorithm ?? "—"} mono /><Evidence label={copy.signedPayloadDigest} value={release.signedPayloadDigest ?? "—"} mono /></EvidenceCard></div><section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><p className="text-sm text-slate-600 dark:text-slate-300">{copy.disclosurePolicy}</p><div className="grid gap-3 xl:grid-cols-2"><JsonEvidence title={copy.manifestPayload} value={release.manifestPayload} /><JsonEvidence title={copy.compatibility} value={release.compatibility} /></div>{release.signatureBase64 ? <label className="grid gap-1.5 text-xs font-semibold"><span>{copy.signatureBase64}</span><textarea readOnly dir="ltr" rows={4} value={release.signatureBase64} className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-start font-mono text-xs text-slate-100" /></label> : null}</section>{release.status === "PUBLISHED" ? <RetireForm detail={detail} copy={copy} /> : null}<ReleaseSnapshotMeta snapshot={detail.snapshot} copy={copy} lang={lang} /></div>;
+  return (
+    <div className="space-y-4" aria-busy={pending || detail.isRefreshing}>
+      <Card className="p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 dir="ltr" className="font-mono text-xl font-semibold text-foreground">{release.releaseVersion}</h1>
+              <StatusBadge status={release.status} />
+            </div>
+            <code dir="ltr" className="mt-2 block break-all text-start text-xs text-muted-foreground">{release.releaseId}</code>
+          </div>
+          <RefreshReleaseButton label={copy.refresh} onClick={detail.refresh} pending={detail.isRefreshing} />
+        </div>
+      </Card>
+
+      <ReleaseMutationNotice mutation={detail.mutation} copy={copy} />
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <EvidenceCard title={copy.lifecycleEvidence}>
+          <Evidence label={copy.publishedAt} value={formatDate(release.publishedAt, lang)} />
+          <Evidence label={copy.retiredAt} value={formatDate(release.retiredAt, lang)} />
+          <Evidence label={copy.retirementReason} value={release.retirementReasonCode ?? "—"} mono />
+        </EvidenceCard>
+        <EvidenceCard title={copy.manifestEvidence}>
+          <Evidence label={copy.componentId} value={release.componentId} mono />
+          <Evidence label={copy.manifestVersion} value={String(release.manifestVersion)} mono />
+          <Evidence label={copy.contractVersion} value={String(release.contractVersion)} mono />
+          <Evidence label={copy.manifestChecksumLabel} value={release.manifestChecksum} mono />
+        </EvidenceCard>
+        <EvidenceCard title={copy.signatureEvidence}>
+          <Evidence label={copy.publicationSource} value={release.publicationSource} mono />
+          <Evidence label={copy.publisherKeyId} value={release.publisherKeyId ?? "—"} mono />
+          <Evidence label={copy.signatureAlgorithm} value={release.signatureAlgorithm ?? "—"} mono />
+          <Evidence label={copy.signedPayloadDigest} value={release.signedPayloadDigest ?? "—"} mono />
+        </EvidenceCard>
+      </div>
+
+      <Card className="space-y-3 p-5">
+        <p className="text-sm text-muted-foreground">{copy.disclosurePolicy}</p>
+        <div className="grid gap-3 xl:grid-cols-2">
+          <JsonEvidence title={copy.manifestPayload} value={release.manifestPayload} />
+          <JsonEvidence title={copy.compatibility} value={release.compatibility} />
+        </div>
+        {release.signatureBase64 ? (
+          <Field label={copy.signatureBase64}>
+            {(fieldProps) => (
+              <Textarea {...fieldProps} readOnly dir="ltr" rows={4} value={release.signatureBase64 ?? ""} className="bg-ink-950 font-mono text-xs text-ink-100" />
+            )}
+          </Field>
+        ) : null}
+      </Card>
+
+      {release.status === "PUBLISHED" ? <RetireForm detail={detail} copy={copy} /> : null}
+      <ReleaseSnapshotMeta snapshot={detail.snapshot} copy={copy} lang={lang} />
+    </div>
+  );
 }
 
 function RetireForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDetail>; copy: ReleaseCopy }) {
   const pending = detail.mutation.phase === "PENDING";
-  if (!detail.permissions.canRetireCritical) return <ReleaseStatePanel kind="forbidden" title={copy.commandForbidden} detail="admin.provisioning.releases.retire + admin.provisioning.critical" copy={copy} />;
-  return <form aria-label={copy.retireTitle} onSubmit={(event) => { event.preventDefault(); void detail.retire(); }} className="space-y-4 rounded-xl border border-rose-300 bg-rose-50 p-5 dark:border-rose-900 dark:bg-rose-950/20"><div><h2 className="text-lg font-semibold">{copy.retireTitle}</h2><p className="mt-1 text-sm">{copy.retireHelp}</p></div><label htmlFor="retirement-reason" className="grid max-w-2xl gap-1.5 text-xs font-semibold"><span>{copy.retirementReason}</span><input id="retirement-reason" dir="ltr" value={detail.retireDraft.reasonCode} maxLength={96} aria-invalid={Boolean(detail.retireErrors.reasonCode)} aria-describedby={detail.retireErrors.reasonCode ? "retirement-reason-error" : undefined} onChange={(event) => detail.updateRetireDraft("reasonCode", event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 font-mono text-sm text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" /><ReleaseFieldError id="retirement-reason-error" code={detail.retireErrors.reasonCode} copy={copy} /></label><label className="flex items-start gap-3 rounded-xl border border-rose-300 bg-white/60 p-3 text-sm font-semibold dark:border-rose-900 dark:bg-slate-950/40"><input type="checkbox" checked={detail.retireDraft.confirmed} aria-invalid={Boolean(detail.retireErrors.confirmed)} aria-describedby={detail.retireErrors.confirmed ? "retirement-confirm-error" : undefined} onChange={(event) => detail.updateRetireDraft("confirmed", event.target.checked)} className="mt-1 size-4 accent-rose-700" /><span>{copy.retireConfirm}</span></label><ReleaseFieldError id="retirement-confirm-error" code={detail.retireErrors.confirmed} copy={copy} /><button type="submit" disabled={!detail.canRetire || pending} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-semibold text-white disabled:opacity-50">{pending ? <Loader2 className="size-4 animate-spin" /> : <Archive className="size-4" />}{pending ? copy.retiring : copy.retire}</button></form>;
+  if (!detail.permissions.canRetireCritical) {
+    return <ReleaseStatePanel kind="forbidden" title={copy.commandForbidden} detail="admin.provisioning.releases.retire + admin.provisioning.critical" copy={copy} />;
+  }
+  return (
+    <Card className="border-danger-300 bg-danger-50 p-5 dark:border-danger-900 dark:bg-danger-950/20">
+      <form
+        aria-label={copy.retireTitle}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void detail.retire();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">{copy.retireTitle}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{copy.retireHelp}</p>
+        </div>
+        <Field label={copy.retirementReason} className="max-w-2xl">
+          {(fieldProps) => (
+            <Input
+              id={fieldProps.id}
+              aria-describedby={detail.retireErrors.reasonCode ? "retirement-reason-error" : undefined}
+              dir="ltr"
+              value={detail.retireDraft.reasonCode}
+              maxLength={96}
+              invalid={Boolean(detail.retireErrors.reasonCode)}
+              onChange={(event) => detail.updateRetireDraft("reasonCode", event.target.value)}
+              className="font-mono"
+            />
+          )}
+        </Field>
+        <ReleaseFieldError id="retirement-reason-error" code={detail.retireErrors.reasonCode} copy={copy} />
+        <label className="flex items-start gap-3 rounded-lg border border-danger-300 bg-card/60 p-3 text-sm font-semibold text-foreground dark:border-danger-900">
+          <Checkbox
+            checked={detail.retireDraft.confirmed}
+            onCheckedChange={(next) => detail.updateRetireDraft("confirmed", next === true)}
+            className="mt-1"
+          />
+          <span>{copy.retireConfirm}</span>
+        </label>
+        <ReleaseFieldError id="retirement-confirm-error" code={detail.retireErrors.confirmed} copy={copy} />
+        <Button type="submit" variant="destructive" disabled={!detail.canRetire || pending} loading={pending}>
+          <Archive className="size-4" aria-hidden="true" />
+          {pending ? copy.retiring : copy.retire}
+        </Button>
+      </form>
+    </Card>
+  );
 }
 
-function EvidenceCard({ title, children }: { title: string; children: React.ReactNode }) { return <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"><h2 className="font-semibold">{title}</h2><dl className="mt-3 grid gap-2">{children}</dl></section>; }
-function Evidence({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) { return <div className="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800/70"><dt className="text-xs font-semibold text-slate-500">{label}</dt><dd dir={mono ? "ltr" : undefined} className={`mt-1 break-all text-sm font-semibold ${mono ? "text-start font-mono" : ""}`}>{value}</dd></div>; }
+function EvidenceCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card className="p-4">
+      <h2 className="font-semibold text-foreground">{title}</h2>
+      <dl className="mt-3 grid gap-2">{children}</dl>
+    </Card>
+  );
+}
+
+function Evidence({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="rounded-lg bg-ink-100 px-3 py-2 dark:bg-ink-900">
+      <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
+      <dd dir={mono ? "ltr" : undefined} className={`mt-1 break-all text-sm font-semibold text-foreground ${mono ? "text-start font-mono" : ""}`}>{value}</dd>
+    </div>
+  );
+}
