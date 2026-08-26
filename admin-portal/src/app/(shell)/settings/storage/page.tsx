@@ -1,17 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { HardDrive, KeyRound, Loader2 } from "lucide-react";
+import { KeyRound, Loader2 } from "lucide-react";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { useToast } from "@/components/ui/ToastContext";
+import { PageHeader } from "@/design-system";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
 import { useStorageRuntimeSettings } from "./hooks/useStorageRuntimeSettings";
 
 const COPY = {
   en: {
     title: "Storage Runtime",
-    subtitle:
-      "Control the platform storage credential runtime. Encryption keys are generated inside Core and are never returned to the browser.",
     statusRegion: "Storage runtime status",
     enabled: "Runtime",
     configured: "Key configuration",
@@ -58,8 +57,6 @@ const COPY = {
   },
   ar: {
     title: "تشغيل التخزين",
-    subtitle:
-      "تحكم في تشغيل بيانات اعتماد التخزين للمنصة. يُنشئ Core مفاتيح التشفير داخلياً ولا يعيدها أبداً إلى المتصفح.",
     statusRegion: "حالة تشغيل التخزين",
     enabled: "التشغيل",
     configured: "تهيئة المفتاح",
@@ -146,18 +143,7 @@ export default function StorageRuntimeSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <HardDrive
-            className="size-5 text-blue-600 dark:text-blue-400"
-            aria-hidden="true"
-          />
-          {copy.title}
-        </h1>
-        <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400">
-          {copy.subtitle}
-        </p>
-      </header>
+      <PageHeader title={copy.title} />
 
       <SettingsResourceBoundary
         state={state.loadState}

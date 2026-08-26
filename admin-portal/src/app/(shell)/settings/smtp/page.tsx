@@ -6,12 +6,12 @@ import {
   EyeOff,
   History,
   Loader2,
-  Mail,
   PlayCircle,
   Save,
   UserCheck,
 } from "lucide-react";
 import { useToast } from "@/components/ui/ToastContext";
+import { PageHeader, Button } from "@/design-system";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
 import { useSmtpSettings } from "./hooks/useSmtpSettings";
 import {
@@ -62,58 +62,50 @@ export default function SmtpSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 md:flex-row md:items-center">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <Mail className="size-5 text-blue-600 dark:text-blue-400" />
-            {lang === "ar" ? "بوابة البريد SMTP" : "SMTP Email Gateway"}
-          </h1>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {lang === "ar"
-              ? "إعداد منفصل عن سجل إعدادات النظام؛ كلمة المرور للكتابة فقط."
-              : "Independent from the generic settings registry; the password is write-only."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {smtp.canVerify ? (
-            <button
-              type="button"
-              onClick={() => void verify()}
-              disabled={!smtp.canTestSavedConfig || pending}
-              title={
-                smtp.hasUnsavedChanges
-                  ? lang === "ar"
-                    ? "احفظ التغييرات قبل اختبار الإعداد المحفوظ."
-                    : "Save changes before testing the persisted configuration."
-                  : undefined
-              }
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-100 px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-            >
-              {pending && smtp.mutation.action === "VERIFY" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <PlayCircle className="size-4" />
-              )}
-              {lang === "ar" ? "اختبار الإعداد المحفوظ" : "Test saved configuration"}
-            </button>
-          ) : null}
-          {smtp.canSaveCritical ? (
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={!smtp.hasUnsavedChanges || pending || smtp.configState !== "READY"}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-blue-700 px-3.5 text-xs font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {pending && smtp.mutation.action === "SAVE" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Save className="size-4" />
-              )}
-              {lang === "ar" ? "حفظ الإعداد" : "Save configuration"}
-            </button>
-          ) : null}
-        </div>
-      </header>
+      <PageHeader
+        title={lang === "ar" ? "بوابة البريد SMTP" : "SMTP Email Gateway"}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            {smtp.canVerify ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void verify()}
+                disabled={!smtp.canTestSavedConfig || pending}
+                title={
+                  smtp.hasUnsavedChanges
+                    ? lang === "ar"
+                      ? "احفظ التغييرات قبل اختبار الإعداد المحفوظ."
+                      : "Save changes before testing the persisted configuration."
+                    : undefined
+                }
+              >
+                {pending && smtp.mutation.action === "VERIFY" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <PlayCircle className="size-4" />
+                )}
+                {lang === "ar" ? "اختبار الإعداد المحفوظ" : "Test saved configuration"}
+              </Button>
+            ) : null}
+            {smtp.canSaveCritical ? (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => void save()}
+                disabled={!smtp.hasUnsavedChanges || pending || smtp.configState !== "READY"}
+              >
+                {pending && smtp.mutation.action === "SAVE" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                {lang === "ar" ? "حفظ الإعداد" : "Save configuration"}
+              </Button>
+            ) : null}
+          </div>
+        }
+      />
 
       <SettingsResourceBoundary
         state={smtp.configState}

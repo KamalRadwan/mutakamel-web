@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone } from "lucide-react";
+import { PageHeader } from "@/design-system";
 import { SettingField } from "../components/SettingField";
 import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
@@ -11,17 +11,7 @@ export default function AsteriskSettingsPage() {
   const { lang } = settingsState;
   return (
     <div className="space-y-6">
-      <header className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <Phone className="size-5 text-blue-600 dark:text-blue-400" />
-          {lang === "ar" ? "بوابة WebRTC (Asterisk)" : "WebRTC (Asterisk)"}
-        </h1>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          {lang === "ar"
-            ? "إعدادات WebSocket وSTUN/TURN وسلوك SIP."
-            : "WebSocket, STUN/TURN, and SIP behavior settings."}
-        </p>
-      </header>
+      <PageHeader title={lang === "ar" ? "بوابة WebRTC (Asterisk)" : "WebRTC (Asterisk)"} />
       <SettingsResourceBoundary
         state={settingsState.loadState}
         error={settingsState.loadError}

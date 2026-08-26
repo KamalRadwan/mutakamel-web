@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Loader2, Save, Siren } from "lucide-react";
+import { Eye, EyeOff, Loader2, Save } from "lucide-react";
 import { useToast } from "@/components/ui/ToastContext";
+import { PageHeader, Button } from "@/design-system";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
 import { useFatalAlertSettings } from "./hooks/useFatalAlertSettings";
 import type {
@@ -39,30 +40,22 @@ export default function FatalAlertSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 md:flex-row md:items-center">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <Siren className="size-5 text-rose-600 dark:text-rose-400" />
-            {lang === "ar" ? "تنبيهات Realtime الحرجة" : "Realtime Fatal Alerts"}
-          </h1>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {lang === "ar"
-              ? "إعداد Core مركزي؛ رمز الوصول مشفّر ومتاح للكتابة فقط."
-              : "Core-owned configuration; the access token is encrypted and write-only."}
-          </p>
-        </div>
-        {state.canSaveCritical ? (
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={!state.hasUnsavedChanges || pending || state.loadState !== "READY"}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-700 px-4 text-xs font-semibold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-            {lang === "ar" ? "حفظ الإعداد" : "Save configuration"}
-          </button>
-        ) : null}
-      </header>
+      <PageHeader
+        title={lang === "ar" ? "تنبيهات Realtime الحرجة" : "Realtime Fatal Alerts"}
+        action={
+          state.canSaveCritical ? (
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void save()}
+              disabled={!state.hasUnsavedChanges || pending || state.loadState !== "READY"}
+            >
+              {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {lang === "ar" ? "حفظ الإعداد" : "Save configuration"}
+            </Button>
+          ) : undefined
+        }
+      />
 
       <SettingsResourceBoundary
         state={state.loadState}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Server } from "lucide-react";
+import { PageHeader } from "@/design-system";
 import { SettingField } from "../components/SettingField";
 import { SettingSearch } from "../components/SettingSearch";
 import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
@@ -53,20 +53,10 @@ export default function PlatformSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <Server className="size-5 text-blue-600 dark:text-blue-400" />
-            {lang === "ar" ? "المنصة والدعم" : "Platform & Support"}
-          </h1>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {lang === "ar"
-              ? "إعدادات سجل المنصة وجهات الاتصال الأساسية."
-              : "Platform registry and support contact settings."}
-          </p>
-        </div>
-        <SettingSearch value={search} onChange={setSearch} />
-      </header>
+      <PageHeader
+        title={lang === "ar" ? "المنصة والدعم" : "Platform & Support"}
+        action={<SettingSearch value={search} onChange={setSearch} />}
+      />
 
       <SettingsResourceBoundary
         state={loadState}
