@@ -337,9 +337,9 @@ export function InvoiceMutationNotice({ mutation, copy }: { mutation: InvoiceMut
 
 export function InvoiceSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSnapshot<unknown>; copy: InvoiceCopy; lang: "ar" | "en" }) {
   return (
-    <footer className="grid gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 sm:grid-cols-2 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-      <p><strong className="text-slate-700 dark:text-slate-200">{copy.responseAt}:</strong> {formatInvoiceDate(snapshot.responseTimestamp, lang)}</p>
-      <p className="min-w-0"><strong className="text-slate-700 dark:text-slate-200">{copy.correlation}:</strong> <code dir="ltr" className="ms-1 select-all break-all">{snapshot.correlationId}</code></p>
+    <footer className="grid gap-2 rounded-xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground sm:grid-cols-2">
+      <p><strong className="text-foreground">{copy.responseAt}:</strong> {formatInvoiceDate(snapshot.responseTimestamp, lang)}</p>
+      <p className="min-w-0"><strong className="text-foreground">{copy.correlation}:</strong> <code dir="ltr" className="ms-1 select-all break-all">{snapshot.correlationId}</code></p>
     </footer>
   );
 }
@@ -362,7 +362,7 @@ export function InvoiceStatusBadge({ status }: { status: Invoice["status"] }) {
 
 export function InvoiceFieldError({ id, code, copy }: { id: string; code?: InvoiceValidationCode; copy: InvoiceCopy }) {
   if (!code) return null;
-  return <span id={id} role="alert" className="text-xs font-medium text-rose-600 dark:text-rose-300">{invoiceValidationMessage(code, copy)}</span>;
+  return <span id={id} role="alert" className="text-xs font-medium text-danger-600 dark:text-danger-300">{invoiceValidationMessage(code, copy)}</span>;
 }
 
 export function invoiceValidationMessage(code: InvoiceValidationCode, copy: InvoiceCopy): string {
