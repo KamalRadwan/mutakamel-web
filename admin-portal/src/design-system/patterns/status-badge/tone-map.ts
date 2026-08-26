@@ -55,6 +55,9 @@ const STATUS_ENTRIES: Record<string, [StatusTone, string, string]> = {
   ACTIVE: ["success", "Active", "نشط"],
   PAID: ["success", "Paid", "مدفوع"],
   SUCCEEDED: ["success", "Succeeded", "نجح"],
+  // Control-plane audit event outcomes — distinct wire values from the
+  // SUCCEEDED/FAILED operation-status pair above, same tones.
+  SUCCESS: ["success", "Success", "نجاح"],
 
   PROVISIONING: ["progress", "Provisioning", "جاري التجهيز"],
   RUNNING: ["progress", "Running", "قيد التشغيل"],
@@ -82,6 +85,7 @@ const STATUS_ENTRIES: Record<string, [StatusTone, string, string]> = {
   ROLLING_BACK: ["warning", "Rolling Back", "جارٍ التراجع"],
 
   FAILED: ["danger", "Failed", "فشل"],
+  FAILURE: ["danger", "Failure", "فشل"],
   PROVISIONING_FAILED: ["danger", "Provisioning Failed", "فشل التجهيز"],
   OVERDUE: ["danger", "Overdue", "متأخر"],
   OFFLINE: ["danger", "Offline", "غير متصل"],
