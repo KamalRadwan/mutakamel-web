@@ -70,12 +70,41 @@ of risk: `/roles`, `/users`, infrastructure (`/database-servers`,
 `LoggingScreen.tsx`, `SubscriptionsScreen.tsx`,
 `control-plane-audit-screen.tsx`, `AdminNotificationsScreen.tsx`, and the
 three invoice screens' internals were explicitly deferred given remaining
-scope). **Phases 20 (`/provisioning`, all 9 routes) and 21 (catalogue,
-settings, tenants, dashboard route shells) were not attempted** — a
-deliberate scope decision given file sizes (`tenants/[id]` alone is 4,189
-lines) and the phase count remaining. These routes still compile and pass
-their existing tests unchanged; they carry the Phase 6/7 token flip "for
-free" but were not converted to the pattern layer.
+scope).
+
+**Phase 20 — `/provisioning` (all 9 routes) is now complete**: the
+governance screen (3 `DataTable`s, `Tabs`, `AmbiguousOutcomePanel` for the
+discovery-run mutation), the fleet module (`FleetDirectoryScreen`,
+`FleetPreviewScreen`, `FleetRolloutScreen`, plus `shared.tsx`'s hero/dialogs),
+`PublisherKeysScreen`, and the releases module (index, detail, draft, and
+draft-detail screens plus `release-shared.tsx`/`release-definition-form.tsx`)
+all render through `PageHeader`/`DataTable`/`Dialog`/`AlertDialog`/`Field`
+now. Every `CommandFeedback`/`MutationFeedback` state machine that carries
+idempotency-key evidence stayed in-body as `AmbiguousOutcomePanel`, per the
+non-negotiable in the original plan.
+
+**Phase 21 is partial.** The dashboard route shell is done: `DashboardHeader`
+(`PageHeader` + range/auto-refresh controls), `DashboardTabsNav` (`Tabs`,
+dropped the 14-hue per-tab icon map), `page.tsx` (`Skeleton`, token-based
+error/forbidden panels), `DashboardGroupsOverview` and `DashboardGroupPanel`
+(`Card`/`Badge`, blue/green/amber/slate tones collapsed onto the
+brand/warn/danger/neutral roles), `KpiCard` (now renders through the shared
+`StatCard` pattern instead of its own markup — see below), and every chart
+component under `components/charts/` (`ChartTooltip`, `CollectionGaugeChart`,
+`DomainHealthGaugeChart`, `MetricDonutChart`, `TenantGrowthRevenueChart`) have
+zero raw-palette-color lint warnings. Catalogue, settings, and tenants remain
+unconverted at the pattern layer — `tenants/[id]` alone is 4,189 lines and
+carries the largest remaining surface in the app. These routes still compile
+and pass their existing tests unchanged; they carry the Phase 6/7 token flip
+"for free" but not the pattern-layer conversion.
+
+`StatCard` (`src/design-system/patterns/kpi/StatCard.tsx`) gained an optional
+`tone` prop (`brand`/`warn`/`danger`/`neutral`) driving an icon badge and a
+top-border accent, so the dashboard's per-metric semantic coloring could move
+onto the same shared primitive every other KPI tile in the app already uses
+(backup, storage-servers, database-servers, users, applications-catalogue,
+roles, subscriptions) instead of staying a one-off. The prop is optional and
+every existing untoned call site is unaffected.
 
 **Phase 22 — Dashboard charts.** Recovered the 37 chart components deleted
 in commit `adb263e` (`recharts` had been installed with zero imports since).
@@ -149,13 +178,16 @@ gradient budget, blur budget, `rounded-2xl`/`3xl`) had ever actually fired
 in a `pnpm lint` run, in any phase of this migration, despite lint being a
 gate on every one of them. Fixed by merging same-scope patterns into one
 array; running lint against the fix surfaced 2,574 real warnings (mostly
-raw-palette-color, concentrated in the Phase 20/21 routes that were never
-converted) that had been invisible the entire time. Flipping the whole rule
+raw-palette-color, concentrated in the Phase 20/21 routes that were unconverted
+at the time) that had been invisible the entire time. Flipping the whole rule
 to "error" as originally planned would have failed the build on all 2,574 —
-not safe given Phases 20/21 remain unconverted. Instead: the two patterns
-with zero real violations (`font-(black|extrabold|bold)`,
+not safe given how much of the app was still unconverted. Instead: the two
+patterns with zero real violations (`font-(black|extrabold|bold)`,
 `rounded-(2xl|3xl)`) are now hard errors; the rest stay warnings until the
-deferred routes convert. Also: verified `.field`/`.primary-button`/
+remaining deferred routes convert. (Phase 20 and the dashboard route have
+since closed out their share of these warnings entirely — see above; the
+remaining count is now concentrated in catalogue/settings/tenants.) Also:
+verified `.field`/`.primary-button`/
 `.secondary-button`/`.danger-button` and `useAccessibleDialog.ts` still have
 real call sites in those same deferred routes and left them in place rather
 than deleting live-dependency code — only `.webphone-user-input` (confirmed
@@ -175,26 +207,31 @@ font-weight sites (280 of them `font-black`) against 101 normal/medium; zero
 loaded fonts; 467 hand-rolled `<button>` elements against 21 using a shared
 class; and a permanently-dark 15-item navbar with per-item hue-coded icons.
 
-The current baseline (`census.baseline.json`, updated through Phase 22):
+The current baseline (`census.baseline.json`, updated through the Phase
+20/dashboard-shell conversion):
 
 | Metric | Current |
 | --- | --- |
-| Color families in use | **13** (was 14 — see below) |
+| Color families in use | **12** (was 14 — see below) |
 | `fontBoldOrHeavier` | **0** |
 | `rounded-2xl`/`rounded-3xl` | **0** / **0** |
 | `physicalRtlViolations` | **0** |
 | `navbarRenderSites` | **0** |
-| `toastCallSites` | **153** |
+| `toastCallSites` | **155** |
 
-**Why "13 families in use", not "4 roles"**: the census counts literal
+**Why "12 families in use", not "4 roles"**: the census counts literal
 Tailwind class names still present in source (`text-slate-500`,
 `bg-emerald-500`, …), not which *token* they resolve to. Every one of those
-13 families is remapped by the theme flip onto one of the four roles at the
-CSS variable level — `slate` (3,804 sites) and `emerald` (413) and `rose`
-(570) all render correctly on the new palette today — but Phase 7's codemod
-to rewrite the class names themselves onto semantic tokens (`bg-slate-900`
-→ `bg-card`) covered roughly the top 120 highest-frequency pairs, not every
+12 families is remapped by the theme flip onto one of the four roles at the
+CSS variable level — `slate` (2,738 sites), `emerald` (288), and `rose` (456)
+all render correctly on the new palette today — but Phase 7's codemod to
+rewrite the class names themselves onto semantic tokens (`bg-slate-900` →
+`bg-card`) covered roughly the top 120 highest-frequency pairs, not every
 site in the app. The remaining literal family names are functionally
 correct, not yet renamed; a future pass that pushes `colorFamiliesInUse`
-toward 4 (rather than "13 families whose CSS variables happen to all point
-at 4 ramps") is renaming work, not a visual bug.
+toward 4 (rather than "12 families whose CSS variables happen to all point
+at 4 ramps") is renaming work, not a visual bug. `gray`/`zinc`/`neutral`/
+`stone`/`orange`/`yellow`/`lime`/`green`/`fuchsia`/`pink` are already at
+zero — the remaining 12 families in use are `slate`, `red`, `amber`,
+`emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`,
+`rose`.
