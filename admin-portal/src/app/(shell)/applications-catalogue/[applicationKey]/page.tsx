@@ -103,11 +103,10 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   return <PageFrame>
     <div className="space-y-6">
       <header className="relative overflow-hidden rounded-xl border border-violet-500/20 bg-slate-950 p-6 text-white shadow-xl">
-        <div className="pointer-events-none absolute end-0 top-0 h-48 w-48 rounded-full bg-violet-500/20 blur-3xl" />
         <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
           <div className="flex min-w-0 items-center gap-4">
             <Link href="/applications-catalogue" aria-label={t.applications.detail.back} className="grid size-11 place-items-center rounded-xl border border-white/15 bg-white/10 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"><ArrowLeft className={`h-5 w-5 ${dir === "rtl" ? "rotate-180" : ""}`} /></Link>
-            <div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><span className="rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 p-2.5"><AppWindow className="h-6 w-6" /></span><h1 className="truncate text-2xl font-semibold">{application.name}</h1><StatusBadge status={application.lifecycleStatus} /></div><p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-300"><code className="me-2 rounded bg-white/10 px-2 py-1 text-violet-200" dir="ltr">{application.key}</code>{application.description || t.applications.detail.noDescription}</p></div>
+            <div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><span className="rounded-xl bg-violet-600 p-2.5"><AppWindow className="h-6 w-6" /></span><h1 className="truncate text-2xl font-semibold">{application.name}</h1><StatusBadge status={application.lifecycleStatus} /></div><p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-300"><code className="me-2 rounded bg-white/10 px-2 py-1 text-violet-200" dir="ltr">{application.key}</code>{application.description || t.applications.detail.noDescription}</p></div>
           </div>
           <div className="flex flex-wrap gap-2">
             {canEditMetadata && <button type="button" onClick={() => setConfigurationMode("metadata")} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15"><Pencil className="h-3.5 w-3.5" />{t.applications.detail.editMetadata}</button>}

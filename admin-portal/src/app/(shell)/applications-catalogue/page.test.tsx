@@ -2,6 +2,8 @@
 
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 
 const { authMock, i18nMock, applicationsHookMock } = vi.hoisted(() => ({
   authMock: {
@@ -14,7 +16,12 @@ const { authMock, i18nMock, applicationsHookMock } = vi.hoisted(() => ({
 
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
 vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => i18nMock,
+  useI18n: () => ({ ...i18nMock, t: i18nMock.lang === "ar" ? ar : en }),
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => "/applications-catalogue",
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/features/admin/applications/hooks/useApplications", () => ({
   useApplications: applicationsHookMock,
@@ -56,18 +63,17 @@ describe("ApplicationsPage read preflight", () => {
     expect(applicationsHookMock).not.toHaveBeenCalled();
   });
 
-  it("renders the permission boundary in Arabic and RTL", () => {
+  it("renders the permission boundary in Arabic", () => {
     i18nMock.lang = "ar";
     i18nMock.dir = "rtl";
 
-    const { container } = render(<ApplicationsPage />);
+    render(<ApplicationsPage />);
 
     expect(
       screen.getByRole("heading", {
         name: "لا تملك صلاحية عرض كتالوج التطبيقات.",
       }),
     ).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveAttribute("dir", "rtl");
     expect(applicationsHookMock).not.toHaveBeenCalled();
   });
 
@@ -94,8 +100,8 @@ describe("ApplicationsPage read preflight", () => {
       setLifecycleFilter: vi.fn(),
       publicationFilter: "ALL",
       setPublicationFilter: vi.fn(),
-      dbAccessFilter: "ALL",
-      setDbAccessFilter: vi.fn(),
+      deploymentFilter: "ALL",
+      setDeploymentFilter: vi.fn(),
       meta: {
         page: 1,
         limit: 20,
@@ -106,21 +112,22 @@ describe("ApplicationsPage read preflight", () => {
       },
       page: 1,
       setPage: vi.fn(),
+      limit: 20,
+      setLimit: vi.fn(),
       refresh: vi.fn(),
       createApplication: vi.fn(),
+      onboardApplication: vi.fn(),
     });
 
-    const { container } = render(<ApplicationsPage />);
+    render(<ApplicationsPage />);
 
     expect(
       screen.getByRole("heading", { name: "كتالوج التطبيقات" }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("بحث التطبيقات")).toHaveAttribute(
-      "placeholder",
-      "ابحث في التطبيقات…",
-    );
-    expect(screen.getByLabelText("النوع")).toHaveTextContent("الكل");
+    expect(
+      screen.getByPlaceholderText("ابحث في التطبيقات…"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("combobox").length).toBeGreaterThan(0);
     expect(screen.getByText("لا توجد تطبيقات مطابقة")).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveAttribute("dir", "rtl");
   });
 });

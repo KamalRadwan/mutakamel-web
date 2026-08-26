@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, History, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { applicationsApi } from "@/features/admin/applications/api/applications.api";
 import type {
   CatalogueAuditEntityType,
+  CatalogueAuditEventView,
   CatalogueAuditPageView,
 } from "@/features/admin/applications/types";
 import { useI18n } from "@/i18n/I18nContext";
@@ -15,6 +16,16 @@ import {
   normalizeApiError,
   type NormalizedApiError,
 } from "@/shared/api/normalized-api-error";
+import {
+  PageHeader,
+  FilterBar,
+  DataTable,
+  Button,
+  Card,
+  CardContent,
+  ErrorState,
+  type ColumnDef,
+} from "@/design-system";
 
 const ENTITY_TYPES = [
   "APPLICATION",
@@ -62,189 +73,118 @@ export default function CatalogueAuditPage() {
     queueMicrotask(() => void load());
   }, [load]);
 
+  const columns: ColumnDef<CatalogueAuditEventView>[] = [
+    {
+      key: "action",
+      headerEn: "Action",
+      headerAr: "الإجراء",
+      cell: (event) => <span className="font-mono text-xs font-semibold text-brand-700 dark:text-brand-400">{event.action}</span>,
+    },
+    {
+      key: "entityType",
+      headerEn: "Entity",
+      headerAr: "الكيان",
+      cell: (event) => (
+        <span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold text-foreground">
+          {text.entityNames[event.entityType] ?? event.entityType}
+        </span>
+      ),
+    },
+    {
+      key: "occurredAt",
+      headerEn: "Occurred At",
+      headerAr: "وقت الحدوث",
+      cell: (event) => new Date(event.occurredAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US"),
+    },
+    {
+      key: "actor",
+      headerEn: "Actor",
+      headerAr: "المنفذ",
+      cell: (event) => event.actorLabel || event.actorAdminId || text.system,
+    },
+    {
+      key: "correlationId",
+      headerEn: "Correlation",
+      headerAr: "معرّف الارتباط",
+      cell: (event) => <span className="font-mono text-xs text-muted-foreground">{event.correlationId || text.notProvided}</span>,
+    },
+  ];
+
   return (
-    <div dir={dir} className="w-full space-y-5">
-        <header className="rounded-xl border border-violet-500/20 bg-slate-950 px-4 py-3 text-white shadow-md sm:px-5 sm:py-3.5">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/applications-catalogue"
-              aria-label={text.back}
-              className="rounded-xl border border-white/15 bg-white/10 p-2 hover:bg-white/15"
-            >
-              <ArrowLeft
-                className={`h-4 w-4 ${dir === "rtl" ? "rotate-180" : ""}`}
-              />
+    <div dir={dir} className="w-full space-y-6">
+      <PageHeader
+        breadcrumb={
+          <Button variant="link" size="sm" asChild className="w-fit px-0">
+            <Link href="/applications-catalogue">
+              <ArrowLeft className={`size-4 ${dir === "rtl" ? "rotate-180" : ""}`} />
+              {text.back}
             </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-semibold sm:text-lg">{text.title}</h1>
-                <span className="rounded-md border border-violet-400/30 bg-violet-500/20 px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-violet-300">
-                  {text.evidence}
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs text-slate-300">
-                {text.description}
-              </p>
-            </div>
-          </div>
-        </header>
+          </Button>
+        }
+        title={text.title}
+        action={
+          canRead && (
+            <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={isLoading}>
+              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
+              {text.refresh}
+            </Button>
+          )
+        }
+      />
 
-        {isAuthLoading ? (
-          <StateCard loading>{text.checking}</StateCard>
-        ) : !canRead ? (
-          <StateCard>{text.forbidden}</StateCard>
-        ) : (
-          <>
-            <section className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row dark:border-slate-800 dark:bg-slate-900">
-              <select
-                aria-label={text.entityType}
-                value={entityType}
-                onChange={(event) => {
-                  setEntityType(
-                    event.target.value as CatalogueAuditEntityType | "ALL",
-                  );
-                  setPage(1);
-                }}
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950"
-              >
-                <option value="ALL">{text.allEntityTypes}</option>
-                {ENTITY_TYPES.map((value) => (
-                  <option key={value} value={value}>
-                    {text.entityNames[value]}
-                  </option>
-                ))}
-              </select>
-              <input
-                aria-label={text.actionFilter}
-                placeholder={text.actionPlaceholder}
-                value={action}
-                maxLength={100}
-                onChange={(event) => {
-                  setAction(event.target.value);
-                  setPage(1);
-                }}
-                className="min-w-64 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950"
-              />
-              <button
-                type="button"
-                onClick={() => void load()}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                {text.refresh}
-              </button>
-            </section>
-
-            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-                <h2 className="flex items-center gap-2 text-sm font-semibold">
-                  <History className="h-4 w-4 text-violet-500" />
-                  {text.globalEvents}
-                </h2>
-                <span className="font-mono text-xs text-slate-500">
-                  {text.events(data?.total ?? 0)}
-                </span>
-              </div>
-              <div className="p-5">
-                {isLoading ? (
-                  <div
-                    role="status"
-                    className="flex items-center justify-center gap-2 py-16 text-xs text-slate-500"
-                  >
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {text.loading}
-                  </div>
-                ) : error ? (
-                  <div
-                    role="alert"
-                    className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-center text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"
-                  >
-                    <p>{text.unavailable}</p>
-                    <p className="mt-1 font-mono text-xs">
-                      {error.errorCode}
-                      {error.correlationId ? ` · ${error.correlationId}` : ""}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void load()}
-                      className="mt-3 rounded-xl bg-rose-600 px-3 py-2 font-semibold text-white"
-                    >
-                      {text.retry}
-                    </button>
-                  </div>
-                ) : !data?.items.length ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 py-16 text-center text-xs text-slate-500 dark:border-slate-700">
-                    {text.empty}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {data.items.map((event) => (
-                      <article
-                        key={event.id}
-                        className="rounded-xl border border-slate-200 p-4 dark:border-slate-800"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <span className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-400">
-                              {event.action}
-                            </span>
-                            <span className="ms-2 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                              {text.entityNames[event.entityType] ?? event.entityType}
-                            </span>
-                          </div>
-                          <time className="text-xs text-slate-500">
-                            {new Date(event.occurredAt).toLocaleString(
-                              lang === "ar" ? "ar-EG" : "en-US",
-                            )}
-                          </time>
-                        </div>
-                        <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                          {text.actor}: {event.actorLabel || event.actorAdminId || text.system}
-                        </p>
-                        <p className="mt-1 font-mono text-xs text-slate-400">
-                          {text.correlation}: {event.correlationId || text.notProvided}
-                        </p>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {data && data.totalPages > 1 ? (
-                <footer className="flex items-center justify-between border-t border-slate-200 px-5 py-4 text-xs dark:border-slate-800">
-                  <span>{text.page(data.page, data.totalPages)}</span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={page <= 1}
-                      onClick={() => setPage((current) => Math.max(1, current - 1))}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40 dark:border-slate-700"
-                    >
-                      {text.previous}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={page >= data.totalPages}
-                      onClick={() => setPage((current) => current + 1)}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40 dark:border-slate-700"
-                    >
-                      {text.next}
-                    </button>
-                  </div>
-                </footer>
-              ) : null}
-            </section>
-          </>
-        )}
+      {isAuthLoading ? (
+        <StateCard loading>{text.checking}</StateCard>
+      ) : !canRead ? (
+        <StateCard>{text.forbidden}</StateCard>
+      ) : (
+        <div className="space-y-0 rounded-lg border border-border bg-card">
+          <FilterBar
+            fields={[
+              {
+                key: "entityType",
+                type: "select",
+                placeholderEn: text.entityType,
+                placeholderAr: text.entityType,
+                options: [
+                  { value: "ALL", labelEn: text.allEntityTypes, labelAr: text.allEntityTypes },
+                  ...ENTITY_TYPES.map((value) => ({ value, labelEn: text.entityNames[value], labelAr: text.entityNames[value] })),
+                ],
+              },
+              { key: "action", type: "search", placeholderEn: text.actionPlaceholder, placeholderAr: text.actionPlaceholder },
+            ]}
+            values={{ entityType: entityType === "ALL" ? "" : entityType, action }}
+            onChange={(next) => {
+              setEntityType(((typeof next.entityType === "string" && next.entityType) || "ALL") as CatalogueAuditEntityType | "ALL");
+              setAction(typeof next.action === "string" ? next.action : "");
+              setPage(1);
+            }}
+          />
+          {error ? (
+            <ErrorState error={error} title={text.unavailable} onRetry={() => void load()} />
+          ) : (
+            <DataTable
+              columns={columns}
+              data={data?.items ?? []}
+              isLoading={isLoading}
+              getRowId={(event) => event.id}
+              pagination={{ page, limit: data?.limit ?? 20, totalItems: data?.total ?? 0, totalPages: data?.totalPages ?? 0, onPageChange: setPage }}
+              emptyState={{ titleEn: text.empty, titleAr: text.empty }}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 function StateCard({ children, loading = false }: { children: React.ReactNode; loading?: boolean }) {
   return (
-    <div role={loading ? "status" : "alert"} className="flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-      {children}
-    </div>
+    <Card>
+      <CardContent role={loading ? "status" : "alert"} className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+        {loading ? <RefreshCw className="size-4 animate-spin" /> : null}
+        {children}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -253,67 +193,49 @@ function auditCopy(lang: "ar" | "en") {
     ? {
         back: "العودة إلى كتالوج التطبيقات",
         title: "تدقيق الكتالوج",
-        evidence: "دليل ثابت لطائرة التحكم",
-        description: "راجع تغييرات التطبيقات والباقات والميزات والاستحقاقات والأسعار.",
         checking: "جارٍ التحقق من صلاحية قراءة الكتالوج…",
         forbidden: "تلزم صلاحية قراءة الكتالوج لعرض سجل التدقيق.",
         entityType: "نوع الكيان",
         allEntityTypes: "كل أنواع الكيانات",
-        actionFilter: "تصفية الإجراء",
-        actionPlaceholder: "صفِّ حسب اسم الإجراء الدقيق",
+        actionPlaceholder: "صفِّ حسب اسم الإجراء الدقيق",
         refresh: "تحديث",
-        globalEvents: "الأحداث العامة",
-        events: (count: number) => `${count} حدث`,
-        loading: "جارٍ تحميل سجل التدقيق…",
         unavailable: "تعذر تحميل سجل تدقيق الكتالوج.",
-        retry: "إعادة المحاولة",
         empty: "لا توجد أحداث تدقيق مطابقة.",
-        actor: "المنفذ",
         system: "النظام",
-        correlation: "معرّف الارتباط",
         notProvided: "غير متوفر",
-        page: (page: number, total: number) => `الصفحة ${page} من ${total}`,
-        previous: "السابق",
-        next: "التالي",
         entityNames: {
+          MODULE: "وحدة",
+          MODULE_ORDER: "ترتيب الوحدات",
           APPLICATION: "تطبيق",
           TIER: "باقة",
           FEATURE: "ميزة",
           TIER_FEATURE_GRANTS: "منح ميزات الباقة",
           PRICE_LADDER: "سلم الأسعار",
+          TIER_STORAGE_ENTITLEMENT: "استحقاق تخزين الباقة",
         } as Record<CatalogueAuditEntityType, string>,
       }
     : {
         back: "Back to Application Catalogue",
         title: "Catalogue audit",
-        evidence: "Immutable control-plane evidence",
-        description: "Review application, tier, feature, entitlement, and pricing mutations.",
         checking: "Checking catalogue-read permission…",
         forbidden: "Catalogue-read permission is required to view audit history.",
         entityType: "Entity type",
         allEntityTypes: "All entity types",
-        actionFilter: "Action filter",
         actionPlaceholder: "Filter by exact action",
         refresh: "Refresh",
-        globalEvents: "Global events",
-        events: (count: number) => `${count} events`,
-        loading: "Loading audit…",
         unavailable: "Catalogue audit is unavailable.",
-        retry: "Retry",
         empty: "No matching catalogue audit events.",
-        actor: "Actor",
         system: "System",
-        correlation: "Correlation",
         notProvided: "not provided",
-        page: (page: number, total: number) => `Page ${page} of ${total}`,
-        previous: "Previous",
-        next: "Next",
         entityNames: {
+          MODULE: "Module",
+          MODULE_ORDER: "Module order",
           APPLICATION: "Application",
           TIER: "Tier",
           FEATURE: "Feature",
           TIER_FEATURE_GRANTS: "Tier feature grants",
           PRICE_LADDER: "Price ladder",
+          TIER_STORAGE_ENTITLEMENT: "Tier storage entitlement",
         } as Record<CatalogueAuditEntityType, string>,
       };
 }
