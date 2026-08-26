@@ -58,6 +58,7 @@ export * from "./patterns/code-ref/CodeRef";
 export * from "./patterns/confirm-action/ConfirmActionModal";
 export * from "./patterns/status-badge/StatusBadge";
 export * from "./patterns/status-badge/tone-map";
+export * from "./patterns/operation-timeline/OperationTimeline";
 
 export * from "./shell/nav-config";
 export * from "./shell/useNavTree";
