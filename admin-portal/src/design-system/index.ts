@@ -38,3 +38,9 @@ export * from "./primitives/Progress";
 export * from "./primitives/AlertDialog";
 export * from "./primitives/Table";
 export * from "./primitives/Breadcrumb";
+
+export * from "./patterns/data-table/types";
+export * from "./patterns/data-table/DataTable";
+export * from "./patterns/pagination/Pagination";
+export * from "./patterns/filter-bar/types";
+export * from "./patterns/filter-bar/FilterBar";
