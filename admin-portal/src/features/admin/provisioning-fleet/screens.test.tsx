@@ -41,9 +41,13 @@ describe("provisioning fleet screens", () => {
     directoryMock.mockReturnValue(view);
     render(<FleetDirectoryScreen />);
 
-    fireEvent.change(screen.getByLabelText("Operation type"), {
-      target: { value: "DECOMMISSION" },
-    });
+    // Radix Select opens on click (its onClick handler runs handleOpen()
+    // whenever the pointer type wasn't tracked as "mouse", which is always
+    // true for a plain fireEvent.click) and its portaled options render
+    // with role="option" - fireEvent.change against a native <select> no
+    // longer applies now that this field is a design-system Select.
+    fireEvent.click(screen.getByRole("combobox", { name: "Operation type" }));
+    fireEvent.click(screen.getByRole("option", { name: "Decommission component" }));
     fireEvent.change(screen.getByLabelText("Component key"), {
       target: { value: "voice.media" },
     });

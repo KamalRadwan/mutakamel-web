@@ -9,15 +9,23 @@ import {
   Loader2,
   RefreshCw,
   ShieldAlert,
-  X,
 } from "lucide-react";
-import {
-  useEffect,
-  useId,
-  useRef,
-  type ReactNode,
-} from "react";
+import { type ReactNode } from "react";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Button,
+  Card,
+  CardContent,
+  CodeRef,
+  PageHeader,
+} from "@/design-system";
 import type { ProvisioningFleetCopy } from "./copy";
 import type {
   FleetCommandView,
@@ -46,19 +54,7 @@ export function FleetHero({
   copy: ProvisioningFleetCopy;
   action?: ReactNode;
 }) {
-  return (
-    <header className="relative overflow-hidden rounded-xl border border-cyan-400/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 p-5 text-white shadow-lg">
-      <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{copy.title}</h1>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-cyan-50/80">
-            {copy.subtitle}
-          </p>
-        </div>
-        {action}
-      </div>
-    </header>
-  );
+  return <PageHeader title={copy.title} description={copy.subtitle} action={action} />;
 }
 
 export function FleetBackLink({
@@ -71,17 +67,16 @@ export function FleetBackLink({
   dir: "ltr" | "rtl";
 }) {
   return (
-    <Link
-      href={href}
-      className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-slate-600 hover:text-cyan-700 dark:text-slate-300"
-    >
-      {dir === "rtl" ? (
-        <ArrowRight className="size-4" aria-hidden="true" />
-      ) : (
-        <ArrowLeft className="size-4" aria-hidden="true" />
-      )}
-      {label}
-    </Link>
+    <Button asChild variant="ghost">
+      <Link href={href}>
+        {dir === "rtl" ? (
+          <ArrowRight className="size-4" aria-hidden="true" />
+        ) : (
+          <ArrowLeft className="size-4" aria-hidden="true" />
+        )}
+        {label}
+      </Link>
+    </Button>
   );
 }
 
@@ -95,18 +90,10 @@ export function RefreshButton({
   pending?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={pending}
-      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-50"
-    >
-      <RefreshCw
-        className={`size-4 ${pending ? "animate-spin" : ""}`}
-        aria-hidden="true"
-      />
+    <Button type="button" variant="outline" onClick={onClick} loading={pending}>
+      <RefreshCw className="size-4" aria-hidden="true" />
       {copy.refresh}
-    </button>
+    </Button>
   );
 }
 
@@ -133,34 +120,32 @@ export function FleetStatePanel({
       ? (forbidden ?? copy.forbiddenRollouts)
       : state === "NOT_FOUND"
         ? copy.notFound
-      : state === "INVALID"
+        : state === "INVALID"
           ? (invalid ?? copy.contractError)
           : state === "UNAVAILABLE"
             ? copy.unavailable
             : copy.genericError;
   return (
-    <section
-      role={loading ? "status" : "alert"}
-      aria-busy={loading}
-      className="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900"
-    >
-      {loading ? (
-        <Loader2 className="mx-auto size-7 animate-spin text-cyan-600" aria-hidden="true" />
-      ) : (
-        <AlertTriangle className="mx-auto size-7 text-amber-600" aria-hidden="true" />
-      )}
-      <p className="mt-3 text-sm font-semibold">{label}</p>
-      {error ? <FleetProblem error={error} copy={copy} /> : null}
-      {!loading && onRetry ? (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-4 min-h-10 rounded-xl bg-cyan-700 px-4 text-sm font-semibold text-white"
-        >
-          {copy.retry}
-        </button>
-      ) : null}
-    </section>
+    <Card>
+      <section
+        role={loading ? "status" : "alert"}
+        aria-busy={loading}
+        className="p-6 text-center"
+      >
+        {loading ? (
+          <Loader2 className="mx-auto size-7 animate-spin text-muted-foreground" aria-hidden="true" />
+        ) : (
+          <AlertTriangle className="mx-auto size-7 text-warn-600 dark:text-warn-400" aria-hidden="true" />
+        )}
+        <p className="mt-3 text-sm font-semibold text-foreground">{label}</p>
+        {error ? <FleetProblem error={error} copy={copy} /> : null}
+        {!loading && onRetry ? (
+          <Button type="button" variant="outline" onClick={onRetry} className="mt-4">
+            {copy.retry}
+          </Button>
+        ) : null}
+      </section>
+    </Card>
   );
 }
 
@@ -172,16 +157,12 @@ export function FleetProblem({
   copy: ProvisioningFleetCopy;
 }) {
   return (
-    <div className="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+    <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
       <p>{error.message}</p>
-      <p dir="ltr" className="break-all font-mono">
-        {copy.errorCode}: {error.errorCode}
-      </p>
-      {error.correlationId ? (
-        <p dir="ltr" className="break-all font-mono">
-          {copy.correlation}: {error.correlationId}
-        </p>
-      ) : null}
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        {error.errorCode && <CodeRef value={error.errorCode} />}
+        {error.correlationId && <CodeRef value={error.correlationId} />}
+      </div>
     </div>
   );
 }
@@ -220,10 +201,10 @@ export function FleetCommandNotice<T>({
   return (
     <div
       role={success ? "status" : "alert"}
-      className={`rounded-xl border p-4 text-sm ${
+      className={`rounded-lg border p-4 text-sm ${
         success
-          ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
-          : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
+          ? "border-brand-300 bg-brand-50 text-brand-950 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-100"
+          : "border-warn-300 bg-warn-50 text-warn-950 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-100"
       }`}
     >
       <div className="flex items-start gap-2">
@@ -238,33 +219,25 @@ export function FleetCommandNotice<T>({
             <FleetProblem error={view.error} copy={copy} />
           ) : null}
           {view.idempotencyKey ? (
-            <p dir="ltr" className="mt-2 break-all font-mono text-xs">
-              {copy.idempotencyKey}: {view.idempotencyKey}
-            </p>
+            <div className="mt-2">
+              <CodeRef value={view.idempotencyKey} />
+            </div>
           ) : null}
           {correlation ? (
-            <p dir="ltr" className="mt-1 break-all font-mono text-xs">
-              {copy.correlation}: {correlation}
-            </p>
+            <div className="mt-1">
+              <CodeRef value={correlation} />
+            </div>
           ) : null}
           {successAction}
           <div className="mt-3 flex flex-wrap gap-2">
             {view.exactRetryAvailable ? (
-              <button
-                type="button"
-                onClick={onRetryExact}
-                className="min-h-10 rounded-xl bg-amber-800 px-4 text-xs font-semibold text-white"
-              >
+              <Button type="button" variant="outline" size="sm" onClick={onRetryExact}>
                 {copy.retryExact}
-              </button>
+              </Button>
             ) : null}
-            <button
-              type="button"
-              onClick={onClear}
-              className="min-h-10 rounded-xl border border-current/20 px-4 text-xs font-semibold"
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={onClear}>
               {copy.clearSuccess}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -280,9 +253,9 @@ export function FleetMeta({
   copy: ProvisioningFleetCopy;
 }) {
   return (
-    <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-      <span dir="ltr" className="break-all font-mono">
-        {copy.correlation}: {result.correlationId}
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5">
+        {copy.correlation}: <CodeRef value={result.correlationId} />
       </span>
       <span>
         {copy.responseAt}: {formatInstant(result.timestamp)}
@@ -303,7 +276,7 @@ export function FleetFieldError({
   if (!code) return null;
   const message = copy.validation[code as keyof typeof copy.validation] ?? copy.validationFailed;
   return (
-    <span id={id} role="alert" className="text-xs font-semibold text-rose-700 dark:text-rose-300">
+    <span id={id} role="alert" className="text-xs font-semibold text-danger-600 dark:text-danger-400">
       {message}
     </span>
   );
@@ -325,26 +298,16 @@ export function FleetPagination({
   copy: ProvisioningFleetCopy;
 }) {
   return (
-    <nav aria-label={copy.page} className="flex items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-      <button
-        type="button"
-        disabled={!hasPrev}
-        onClick={() => onPage(page - 1)}
-        className="min-h-10 rounded-xl border border-slate-300 px-4 text-sm font-semibold disabled:opacity-40 dark:border-slate-700"
-      >
+    <nav aria-label={copy.page} className="flex items-center justify-between gap-3 border-t border-border pt-4">
+      <Button type="button" variant="outline" disabled={!hasPrev} onClick={() => onPage(page - 1)}>
         {copy.previous}
-      </button>
-      <span className="text-sm font-semibold">
+      </Button>
+      <span className="text-sm font-semibold text-foreground">
         {copy.page} {page} {copy.of} {Math.max(1, totalPages)}
       </span>
-      <button
-        type="button"
-        disabled={!hasNext}
-        onClick={() => onPage(page + 1)}
-        className="min-h-10 rounded-xl border border-slate-300 px-4 text-sm font-semibold disabled:opacity-40 dark:border-slate-700"
-      >
+      <Button type="button" variant="outline" disabled={!hasNext} onClick={() => onPage(page + 1)}>
         {copy.next}
-      </button>
+      </Button>
     </nav>
   );
 }
@@ -368,98 +331,32 @@ export function FleetConfirmDialog({
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const titleId = useId();
-  const bodyId = useId();
-  useEffect(() => {
-    if (!open) return;
-    const prior = document.activeElement as HTMLElement | null;
-    const frame = window.requestAnimationFrame(() =>
-      dialogRef.current?.querySelector<HTMLButtonElement>("[data-cancel]")?.focus(),
-    );
-    return () => {
-      window.cancelAnimationFrame(frame);
-      prior?.focus();
-    };
-  }, [open]);
-  if (!open) return null;
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !pending) onClose();
-      }}
-    >
-      <div
-        ref={dialogRef}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={bodyId}
-        aria-busy={pending}
-        onKeyDown={(event) => {
-          if (event.key === "Escape" && !pending) {
-            event.preventDefault();
-            onClose();
-            return;
-          }
-          if (event.key !== "Tab" || !dialogRef.current) return;
-          const focusable = Array.from(
-            dialogRef.current.querySelectorAll<HTMLElement>(
-              "button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex='-1'])",
-            ),
-          );
-          if (!focusable.length) return;
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        }}
-        className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
-            <p id={bodyId} className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{body}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
+    <AlertDialog open={open} onOpenChange={(next) => !next && !pending && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <p className="text-sm leading-6 text-muted-foreground">{body}</p>
+        </AlertDialogHeader>
+        <code dir="ltr" className="mt-4 block max-h-40 overflow-auto break-all rounded-lg bg-ink-100 p-3 text-start text-xs dark:bg-ink-950">
+          {target}
+        </code>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>{copy.close}</AlertDialogCancel>
+          <AlertDialogAction
+            destructive
             disabled={pending}
-            aria-label={copy.close}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </button>
-        </div>
-        <code dir="ltr" className="mt-4 block max-h-40 overflow-auto break-all rounded-xl bg-slate-100 p-3 text-start text-xs dark:bg-slate-950">{target}</code>
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            data-cancel
-            type="button"
-            onClick={onClose}
-            disabled={pending}
-            className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-semibold dark:border-slate-700"
-          >
-            {copy.close}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={pending}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-semibold text-white disabled:opacity-50"
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
           >
             {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
             {copy.confirm}
-          </button>
-        </div>
-      </div>
-    </div>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -473,15 +370,15 @@ export function FleetDatum({
   mono?: boolean;
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/50">
-      <dt className="text-2xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</dt>
+    <Card className="min-w-0 p-3">
+      <dt className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd
         dir={mono ? "ltr" : undefined}
-        className={`mt-1 break-all text-sm font-semibold ${mono ? "text-start font-mono text-xs" : ""}`}
+        className={`mt-1 break-all text-sm font-semibold text-foreground ${mono ? "text-start font-mono text-xs" : ""}`}
       >
         {value}
       </dd>
-    </div>
+    </Card>
   );
 }
 

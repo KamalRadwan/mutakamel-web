@@ -6,6 +6,21 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Checkbox,
+  Field,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+} from "@/design-system";
+import {
   buildPreviewCommand,
   emptyTargetDraft,
   initialPreviewDraft,
@@ -81,9 +96,9 @@ export function FleetDirectoryScreen() {
       />
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.65fr)]">
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <Card className="space-y-4 p-5">
           <header>
-            <h2 className="text-xl font-semibold">{copy.directory}</h2>
+            <h2 className="text-xl font-semibold text-foreground">{copy.directory}</h2>
           </header>
           <FleetStatePanel
             state={view.authLoading ? "LOADING" : view.rollouts.state}
@@ -92,27 +107,22 @@ export function FleetDirectoryScreen() {
             onRetry={view.refresh}
           />
           {view.rollouts.state === "EMPTY" ? (
-            <p className="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+            <p className="rounded-lg bg-ink-100 p-5 text-center text-sm text-muted-foreground dark:bg-ink-900">
               {copy.emptyRollouts}
             </p>
           ) : null}
           {view.rollouts.data?.data.map((rollout) => (
-            <article
-              key={rollout.rolloutId}
-              className="rounded-xl border border-slate-200 p-4 dark:border-slate-800"
-            >
+            <Card key={rollout.rolloutId} className="p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold">
+                  <p className="text-sm font-semibold text-foreground">
                     {copy.operation[rollout.operationType]}
                   </p>
-                  <code dir="ltr" className="mt-1 block break-all text-start text-xs text-slate-500">
+                  <code dir="ltr" className="mt-1 block break-all text-start text-xs text-muted-foreground">
                     {rollout.rolloutId}
                   </code>
                 </div>
-                <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-900 dark:bg-cyan-950 dark:text-cyan-100">
-                  {copy.rolloutStatus[rollout.status]}
-                </span>
+                <Badge tone="neutral">{copy.rolloutStatus[rollout.status]}</Badge>
               </div>
               <dl className="mt-4 grid gap-2 sm:grid-cols-4">
                 <FleetDatum label={copy.total} value={rollout.totalCount} />
@@ -120,83 +130,82 @@ export function FleetDirectoryScreen() {
                 <FleetDatum label={copy.failed} value={rollout.failedCount} />
                 <FleetDatum label={copy.revision} value={rollout.revision} />
               </dl>
-              <div className="mt-4 flex items-center justify-between gap-3 text-xs text-slate-500">
+              <div className="mt-4 flex items-center justify-between gap-3 text-xs text-muted-foreground">
                 <span>{formatInstant(rollout.createdAt)}</span>
-                <Link
-                  href={`/provisioning/fleet/rollouts/${rollout.rolloutId}`}
-                  className="inline-flex min-h-10 items-center rounded-xl bg-cyan-700 px-4 font-semibold text-white"
-                >
-                  {copy.open}
-                </Link>
+                <Button asChild variant="primary" size="sm">
+                  <Link href={`/provisioning/fleet/rollouts/${rollout.rolloutId}`}>
+                    {copy.open}
+                  </Link>
+                </Button>
               </div>
-            </article>
+            </Card>
           ))}
           {view.rollouts.data ? (
             <FleetMeta result={view.rollouts.data} copy={copy} />
           ) : null}
-        </div>
+        </Card>
 
-        <form
-          aria-label={copy.lookupPreview}
-          onSubmit={openLookup}
-          className="h-fit space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-        >
-          <h2 className="text-lg font-semibold">{copy.lookupPreview}</h2>
-          <label htmlFor="fleet-preview-lookup" className="grid gap-1.5 text-sm font-semibold">
-            <span>{copy.previewId}</span>
-            <input
-              id="fleet-preview-lookup"
-              dir="ltr"
-              value={lookupId}
-              onChange={(event) => setLookupId(event.target.value)}
-              aria-invalid={Boolean(lookupError)}
-              aria-describedby={lookupError ? "fleet-preview-lookup-error" : undefined}
-              className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-start font-mono text-xs dark:border-slate-700 dark:bg-slate-950"
-            />
-            <FleetFieldError id="fleet-preview-lookup-error" code={lookupError} copy={copy} />
-          </label>
-          <button type="submit" className="min-h-11 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white dark:bg-cyan-700">
-            {copy.openPreview}
-          </button>
-        </form>
+        <Card className="h-fit">
+          <form aria-label={copy.lookupPreview} onSubmit={openLookup}>
+            <CardContent className="space-y-3">
+              <h2 className="text-lg font-semibold text-foreground">{copy.lookupPreview}</h2>
+              <Field label={copy.previewId} error={lookupError ? FleetFieldErrorText(lookupError, copy) : undefined}>
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    dir="ltr"
+                    value={lookupId}
+                    onChange={(event) => setLookupId(event.target.value)}
+                    className="font-mono text-xs"
+                  />
+                )}
+              </Field>
+              <Button type="submit" variant="primary">
+                {copy.openPreview}
+              </Button>
+            </CardContent>
+          </form>
+        </Card>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <Card className="p-5">
         <header>
-          <h2 className="text-xl font-semibold">{copy.previewBuilder}</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <h2 className="text-xl font-semibold text-foreground">{copy.previewBuilder}</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {copy.previewBuilderHint}
           </p>
         </header>
         {view.authLoading ? (
           <FleetStatePanel state="LOADING" error={null} copy={copy} />
         ) : !view.permissions.canCreatePreview ? (
-          <p role="note" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+          <p role="note" className="mt-4 rounded-lg border border-warn-300 bg-warn-50 p-4 text-sm font-semibold text-warn-900 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-100">
             {copy.forbiddenPreviewCreate}
           </p>
         ) : (
           <form onSubmit={submitPreview} noValidate className="mt-5 space-y-6">
             <fieldset disabled={pending} className="space-y-4">
               <legend className="sr-only">{copy.previewBuilder}</legend>
-              <label htmlFor="fleet-operation" className="grid gap-1.5 text-sm font-semibold">
-                <span>{copy.operationType}</span>
-                <select
-                  id="fleet-operation"
-                  value={draft.operationType}
-                  onChange={(event) =>
-                    changeOperation(
-                      event.target.value as FleetOperationType,
-                      draft,
-                      setDraft,
-                    )
-                  }
-                  className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"
-                >
-                  {Object.entries(copy.operation).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </label>
+              <Field label={copy.operationType}>
+                {(fieldProps) => (
+                  <Select
+                    value={draft.operationType}
+                    onValueChange={(value) =>
+                      changeOperation(value as FleetOperationType, draft, setDraft)
+                    }
+                  >
+                    <SelectTrigger id={fieldProps.id}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(copy.operation).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </Field>
 
               {draft.operationType === "ADD_APPLICATION" ? (
                 <TextField id="fleet-application-key" label={copy.applicationKey} value={draft.applicationKey} error={errors.applicationKey} copy={copy} onChange={(applicationKey) => setDraft((current) => ({ ...current, applicationKey }))} />
@@ -210,8 +219,8 @@ export function FleetDirectoryScreen() {
                 <TargetEditor draft={draft} setDraft={setDraft} errors={errors} copy={copy} />
               )}
 
-              <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-                <legend className="px-2 text-sm font-semibold">{copy.selection}</legend>
+              <fieldset className="space-y-4 rounded-lg border border-border p-4">
+                <legend className="px-2 text-sm font-semibold text-foreground">{copy.selection}</legend>
                 <div className="flex flex-wrap gap-4">
                   <RadioField id="fleet-explicit" label={copy.explicitSelection} checked={!draft.broadSelection} onChange={() => setDraft((current) => ({ ...current, broadSelection: false, allEligibleTenantsAcknowledged: false }))} />
                   <RadioField id="fleet-broad" label={copy.broadSelection} checked={draft.broadSelection} onChange={() => setDraft((current) => ({ ...current, broadSelection: true, tenantIdsText: "" }))} />
@@ -219,15 +228,22 @@ export function FleetDirectoryScreen() {
                 {draft.broadSelection ? (
                   <CheckField id="fleet-broad-ack" label={copy.broadAcknowledge} checked={draft.allEligibleTenantsAcknowledged} error={errors.allEligibleTenantsAcknowledged} copy={copy} onChange={(allEligibleTenantsAcknowledged) => setDraft((current) => ({ ...current, allEligibleTenantsAcknowledged }))} />
                 ) : (
-                  <label htmlFor="fleet-tenant-ids" className="grid gap-1.5 text-sm font-semibold">
-                    <span>{copy.tenantIds}</span>
-                    <textarea id="fleet-tenant-ids" dir="ltr" spellCheck={false} rows={5} value={draft.tenantIdsText} onChange={(event) => setDraft((current) => ({ ...current, tenantIdsText: event.target.value }))} aria-invalid={Boolean(errors.tenantIds)} aria-describedby={`fleet-tenant-hint${errors.tenantIds ? " fleet-tenant-error" : ""}`} className="rounded-xl border border-slate-300 bg-white p-3 text-start font-mono text-xs dark:border-slate-700 dark:bg-slate-950" />
-                    <span id="fleet-tenant-hint" className="text-xs font-normal text-slate-500">{copy.tenantIdsHint}</span>
-                    <FleetFieldError id="fleet-tenant-error" code={errors.tenantIds} copy={copy} />
-                  </label>
+                  <Field label={copy.tenantIds} hint={copy.tenantIdsHint} error={errors.tenantIds ? FleetFieldErrorText(errors.tenantIds, copy) : undefined}>
+                    {(fieldProps) => (
+                      <Textarea
+                        {...fieldProps}
+                        dir="ltr"
+                        spellCheck={false}
+                        rows={5}
+                        value={draft.tenantIdsText}
+                        onChange={(event) => setDraft((current) => ({ ...current, tenantIdsText: event.target.value }))}
+                        className="font-mono text-xs"
+                      />
+                    )}
+                  </Field>
                 )}
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold">{copy.tenantStatuses}</legend>
+                  <legend className="text-sm font-semibold text-foreground">{copy.tenantStatuses}</legend>
                   <div className="flex gap-4">
                     {(["ACTIVE", "SUSPENDED"] as TenantLifecycleStatus[]).map((status) => (
                       <CheckField key={status} id={`fleet-status-${status}`} label={status === "ACTIVE" ? copy.active : copy.suspended} checked={draft.tenantStatuses.includes(status)} copy={copy} onChange={(checked) => setDraft((current) => ({ ...current, tenantStatuses: toggleStatus(current.tenantStatuses, status, checked) }))} />
@@ -246,19 +262,20 @@ export function FleetDirectoryScreen() {
               onClear={view.clearPreviewCommand}
               successAction={
                 view.previewCommand.result ? (
-                  <Link href={`/provisioning/fleet/previews/${view.previewCommand.result.data.previewId}`} className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-emerald-800 px-4 text-xs font-semibold text-white">
-                    {copy.openPreview}
-                  </Link>
+                  <Button asChild variant="primary" size="sm" className="mt-3">
+                    <Link href={`/provisioning/fleet/previews/${view.previewCommand.result.data.previewId}`}>
+                      {copy.openPreview}
+                    </Link>
+                  </Button>
                 ) : null
               }
             />
-            <button type="submit" disabled={pending} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-700 px-5 text-sm font-semibold text-white disabled:opacity-50">
-              {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+            <Button type="submit" variant="primary" disabled={pending} loading={pending}>
               {pending ? copy.creatingPreview : copy.createPreview}
-            </button>
+            </Button>
           </form>
         )}
-      </section>
+      </Card>
 
       <FleetConfirmDialog
         open={pendingCommand !== null}
@@ -300,17 +317,23 @@ function TargetEditor({
     { key: "expectedCurrentManifestChecksum", label: copy.expectedCurrentManifestChecksum },
   ];
   return (
-    <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-      <legend className="px-2 text-sm font-semibold">{copy.targets}</legend>
-      <p className="text-xs text-slate-500">{copy.currentFenceHint}</p>
+    <fieldset className="space-y-4 rounded-lg border border-border p-4">
+      <legend className="px-2 text-sm font-semibold text-foreground">{copy.targets}</legend>
+      <p className="text-xs text-muted-foreground">{copy.currentFenceHint}</p>
       <FleetFieldError id="fleet-targets-error" code={errors.targets} copy={copy} />
       {draft.targets.map((target, index) => (
-        <div key={index} className="space-y-3 rounded-xl bg-slate-50 p-4 dark:bg-slate-950/50">
+        <Card key={index} className="space-y-3 bg-ink-100 p-4 dark:bg-ink-900">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold">{copy.targetNumber} {index + 1}</h3>
-            <button type="button" disabled={draft.targets.length === 1 && draft.operationType === "REPAIR"} onClick={() => setDraft((current) => ({ ...current, targets: current.targets.filter((_, targetIndex) => targetIndex !== index) }))} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-rose-300 px-3 text-xs font-semibold text-rose-700 disabled:opacity-40 dark:border-rose-900 dark:text-rose-300">
+            <h3 className="text-sm font-semibold text-foreground">{copy.targetNumber} {index + 1}</h3>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={draft.targets.length === 1 && draft.operationType === "REPAIR"}
+              onClick={() => setDraft((current) => ({ ...current, targets: current.targets.filter((_, targetIndex) => targetIndex !== index) }))}
+            >
               <Trash2 className="size-4" aria-hidden="true" />{copy.removeTarget}
-            </button>
+            </Button>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {fields.map((field) => {
@@ -319,33 +342,38 @@ function TargetEditor({
             })}
           </div>
           <FleetFieldError id={`fleet-target-${index}-pair-error`} code={errors[`targets.${index}.currentPair`]} copy={copy} />
-        </div>
+        </Card>
       ))}
       {draft.operationType !== "REPAIR" && draft.targets.length < 100 ? (
-        <button type="button" onClick={() => setDraft((current) => ({ ...current, targets: [...current.targets, emptyTargetDraft()] }))} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-cyan-300 px-4 text-sm font-semibold text-cyan-800 dark:border-cyan-900 dark:text-cyan-200">
+        <Button type="button" variant="outline" onClick={() => setDraft((current) => ({ ...current, targets: [...current.targets, emptyTargetDraft()] }))}>
           <Plus className="size-4" aria-hidden="true" />{copy.addTarget}
-        </button>
+        </Button>
       ) : null}
     </fieldset>
   );
 }
 
 function TextField({ id, label, value, error, copy, onChange, mono }: { id: string; label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; onChange: (value: string) => void; mono?: boolean }) {
-  const errorId = `${id}-error`;
   return (
-    <label htmlFor={id} className="grid gap-1.5 text-sm font-semibold">
-      <span>{label}</span>
-      <input id={id} dir={mono ? "ltr" : undefined} value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} className={`min-h-11 rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950 ${mono ? "text-start font-mono text-xs" : ""}`} />
-      <FleetFieldError id={errorId} code={error} copy={copy} />
-    </label>
+    <Field label={label} error={error ? FleetFieldErrorText(error, copy) : undefined}>
+      {(fieldProps) => (
+        <Input
+          {...fieldProps}
+          dir={mono ? "ltr" : undefined}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={mono ? "text-start font-mono text-xs" : undefined}
+        />
+      )}
+    </Field>
   );
 }
 
 function CheckField({ id, label, checked, error, copy, onChange }: { id: string; label: string; checked: boolean; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; onChange: (checked: boolean) => void }) {
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="flex items-start gap-3 text-sm font-semibold">
-        <input id={id} type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} className="mt-1 size-4 accent-cyan-700" />
+      <label htmlFor={id} className="flex items-start gap-3 text-sm font-semibold text-foreground">
+        <Checkbox id={id} checked={checked} onCheckedChange={(next) => onChange(next === true)} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} className="mt-0.5" />
         <span>{label}</span>
       </label>
       <FleetFieldError id={`${id}-error`} code={error} copy={copy} />
@@ -355,11 +383,15 @@ function CheckField({ id, label, checked, error, copy, onChange }: { id: string;
 
 function RadioField({ id, label, checked, onChange }: { id: string; label: string; checked: boolean; onChange: () => void }) {
   return (
-    <label htmlFor={id} className="flex items-center gap-2 text-sm font-semibold">
-      <input id={id} name="fleet-selection-mode" type="radio" checked={checked} onChange={onChange} className="size-4 accent-cyan-700" />
+    <label htmlFor={id} className="flex items-center gap-2 text-sm font-semibold text-foreground">
+      <input id={id} name="fleet-selection-mode" type="radio" checked={checked} onChange={onChange} className="size-4 accent-brand-600" />
       <span>{label}</span>
     </label>
   );
+}
+
+function FleetFieldErrorText(code: string, copy: ReturnType<typeof getProvisioningFleetCopy>): string {
+  return copy.validation[code as keyof typeof copy.validation] ?? copy.validationFailed;
 }
 
 function changeOperation(operationType: FleetOperationType, draft: FleetPreviewDraft, setDraft: React.Dispatch<React.SetStateAction<FleetPreviewDraft>>) {
