@@ -11,10 +11,235 @@
   --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
+/* =========================================================================
+   Design-system tokens (docs/design-system/tokens.md)
+
+   Nothing in the app references any of the names below yet, so adding them
+   is a zero-visual-change commit — see docs/design-system/migration.md
+   Phase 3. Tailwind's own default palette (slate, blue, indigo, …) is left
+   completely untouched here: it already reproduces today's look with zero
+   code from us, and stays that way until the Phase 6 theme flip
+   deliberately overrides those same built-in family variables so every
+   existing bg-slate-900 / text-blue-400 class repaints without a single
+   .tsx edit.
+   ========================================================================= */
+
+@theme {
+  /* Brand — emerald, hue 158->168, anchored at 400 = #34d399 (src/app/icon.svg). */
+  --color-brand-50: oklch(0.976 0.019 158);
+  --color-brand-100: oklch(0.95 0.04 158);
+  --color-brand-200: oklch(0.904 0.076 159);
+  --color-brand-300: oklch(0.848 0.114 160);
+  --color-brand-400: oklch(0.783 0.155 163);
+  --color-brand-500: oklch(0.712 0.15 165);
+  --color-brand-600: oklch(0.616 0.131 166);
+  --color-brand-700: oklch(0.495 0.105 166);
+  --color-brand-800: oklch(0.415 0.086 167);
+  --color-brand-900: oklch(0.352 0.07 168);
+  --color-brand-950: oklch(0.235 0.048 168);
+
+  /* Ink — the neutral ramp. Hue 232->245, half the chroma of Tailwind's
+     slate and rotated ~25deg cooler: machined steel, not denim. 12 steps
+     (an admin table needs a zebra-row step above 50 and a dark-canvas step
+     below 950 that Tailwind's 11-step families don't have). */
+  --color-ink-25: oklch(0.992 0.002 232);
+  --color-ink-50: oklch(0.984 0.003 232);
+  --color-ink-100: oklch(0.966 0.005 232);
+  --color-ink-200: oklch(0.925 0.009 233);
+  --color-ink-300: oklch(0.868 0.014 234);
+  --color-ink-400: oklch(0.715 0.021 235);
+  --color-ink-500: oklch(0.588 0.024 236);
+  --color-ink-600: oklch(0.487 0.024 237);
+  --color-ink-700: oklch(0.404 0.024 238);
+  --color-ink-800: oklch(0.32 0.023 240);
+  --color-ink-900: oklch(0.252 0.021 242);
+  --color-ink-950: oklch(0.176 0.019 244);
+  --color-ink-1000: oklch(0.132 0.017 245);
+
+  /* Danger — warm vermilion, hue 26->30. Deliberately not rose (hue ~15,
+     which reads pink and fights amber); 27 is near-complementary to ink's
+     232, so it has maximum pop against every neutral surface. */
+  --color-danger-50: oklch(0.972 0.014 30);
+  --color-danger-100: oklch(0.94 0.03 30);
+  --color-danger-200: oklch(0.888 0.058 29);
+  --color-danger-300: oklch(0.812 0.098 28);
+  --color-danger-400: oklch(0.716 0.152 28);
+  --color-danger-500: oklch(0.637 0.194 27);
+  --color-danger-600: oklch(0.567 0.203 27);
+  --color-danger-700: oklch(0.487 0.176 27);
+  --color-danger-800: oklch(0.41 0.144 27);
+  --color-danger-900: oklch(0.352 0.118 26);
+  --color-danger-950: oklch(0.232 0.08 26);
+
+  /* Warn — amber, hue 92->44. Large hue torsion is deliberate: amber has to
+     drift toward orange as it darkens or the low steps read as olive. */
+  --color-warn-50: oklch(0.98 0.019 92);
+  --color-warn-100: oklch(0.956 0.045 92);
+  --color-warn-200: oklch(0.912 0.086 88);
+  --color-warn-300: oklch(0.86 0.128 84);
+  --color-warn-400: oklch(0.806 0.152 79);
+  --color-warn-500: oklch(0.752 0.156 74);
+  --color-warn-600: oklch(0.66 0.148 62);
+  --color-warn-700: oklch(0.545 0.13 52);
+  --color-warn-800: oklch(0.455 0.106 48);
+  --color-warn-900: oklch(0.39 0.086 46);
+  --color-warn-950: oklch(0.255 0.058 44);
+}
+
+/* Semantic roles — light values. Named to match shadcn's registry exactly
+   (background/foreground/card/popover/primary/…/sidebar*) so `npx shadcn
+   add <x>` pastes in with zero edits. NOTE: shadcn's own "--accent" means
+   neutral hover fill, not brand — it stays ink here on purpose. Brand as an
+   accent lives only in --primary and --ring. */
+:root {
+  --background: var(--color-ink-50);
+  --foreground: var(--color-ink-900);
+
+  --card: white;
+  --card-foreground: var(--color-ink-900);
+  --popover: white;
+  --popover-foreground: var(--color-ink-900);
+
+  /* Fill role: #34d399 is a dark-mode accent, not a light-mode fill (white
+     text on it is ~1.9:1). A dark label on the bright emerald fill is the
+     accessible choice in both themes and keeps the literal logo color on
+     screen — see docs/design-system/tokens.md contrast table. */
+  --primary: var(--color-brand-500);
+  --primary-foreground: var(--color-ink-950);
+
+  --secondary: var(--color-ink-100);
+  --secondary-foreground: var(--color-ink-900);
+
+  --muted: var(--color-ink-100);
+  --muted-foreground: var(--color-ink-600);
+
+  --accent: var(--color-ink-100);
+  --accent-foreground: var(--color-ink-900);
+
+  /* danger-700, not -600: -600 fails contrast (~3.4:1) with white text. */
+  --destructive: var(--color-danger-700);
+  --destructive-foreground: white;
+
+  --border: var(--color-ink-200);
+  --input: var(--color-ink-200);
+  --ring: var(--color-brand-500);
+
+  /* Chart series placeholders — Phase 22 revisits this with a proper
+     qualitative palette when the dashboard charts are restored. */
+  --chart-1: var(--color-brand-500);
+  --chart-2: var(--color-ink-500);
+  --chart-3: var(--color-warn-500);
+  --chart-4: var(--color-danger-500);
+  --chart-5: var(--color-brand-800);
+
+  /* Sidebar (Phase 14) is bg-sidebar in BOTH themes — unlike the navbar it
+     replaces, which is permanently dark. */
+  --sidebar: white;
+  --sidebar-foreground: var(--color-ink-900);
+  --sidebar-primary: var(--color-brand-500);
+  --sidebar-primary-foreground: var(--color-ink-950);
+  --sidebar-accent: var(--color-ink-100);
+  --sidebar-accent-foreground: var(--color-ink-900);
+  --sidebar-border: var(--color-ink-200);
+  --sidebar-ring: var(--color-brand-500);
+}
+
+/* Semantic roles — dark overrides. Matches the ratio table in
+   docs/design-system/tokens.md: brand-400 fill (9.8:1 with ink-950 text),
+   brand-300 for text/links (11.8:1), ink-600/400 muted-foreground floor. */
+.dark {
+  --background: var(--color-ink-1000);
+  --foreground: var(--color-ink-100);
+
+  --card: var(--color-ink-950);
+  --card-foreground: var(--color-ink-100);
+  --popover: var(--color-ink-900);
+  --popover-foreground: var(--color-ink-100);
+
+  --primary: var(--color-brand-400);
+  --primary-foreground: var(--color-ink-950);
+
+  --secondary: var(--color-ink-800);
+  --secondary-foreground: var(--color-ink-100);
+
+  --muted: var(--color-ink-900);
+  --muted-foreground: var(--color-ink-400);
+
+  --accent: var(--color-ink-800);
+  --accent-foreground: var(--color-ink-100);
+
+  --destructive: var(--color-danger-700);
+  --destructive-foreground: white;
+
+  --border: var(--color-ink-800);
+  --input: var(--color-ink-800);
+  --ring: var(--color-brand-400);
+
+  --chart-1: var(--color-brand-400);
+  --chart-2: var(--color-ink-400);
+  --chart-3: var(--color-warn-400);
+  --chart-4: var(--color-danger-400);
+  --chart-5: var(--color-brand-300);
+
+  --sidebar: var(--color-ink-950);
+  --sidebar-foreground: var(--color-ink-100);
+  --sidebar-primary: var(--color-brand-400);
+  --sidebar-primary-foreground: var(--color-ink-950);
+  --sidebar-accent: var(--color-ink-800);
+  --sidebar-accent-foreground: var(--color-ink-100);
+  --sidebar-border: var(--color-ink-800);
+  --sidebar-ring: var(--color-brand-400);
+}
+
+/* Bridges the semantic :root/.dark custom properties above into Tailwind
+   utility-generating theme keys (bg-background, text-foreground, …). Must
+   be "inline", not plain @theme: a plain @theme's `--color-background:
+   var(--background)` resolves once at :root scope, so .dark's override of
+   --background would never reach the bg-background utility. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* canvas is an explicit alias distinct from --background for the surface
+     ladder in docs/design-system/geometry-and-density.md (canvas / surface
+     / surface-raised / surface-sunken). */
+  --color-canvas: var(--background);
+}
+
 body {
   font-family: var(--font-sans);
   /* Only 400/500/600 are downloaded (src/app/fonts.ts) — this stops a
-     stray font-bold from faking a heavier weight the family doesn't have. */
+     heavier className from faking a weight the family doesn't define. */
   font-synthesis-weight: none;
   background-color: #f1f5f9;
   color: #0f172a;

@@ -17,8 +17,13 @@ const baselinePath = resolve(portalRoot, "docs/design-system/census.baseline.jso
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".css"]);
 const SKIP_DIR_NAMES = new Set(["node_modules", ".next", "coverage"]);
+// src/design-system/ is the target system, not the sprawl being measured —
+// it legitimately defines and uses the tokens/utilities this census counts
+// (the same exemption ESLint's design-system rules apply in eslint.config.mjs).
+const SKIP_ABSOLUTE_DIRS = new Set([resolve(srcRoot, "design-system")]);
 
 function walk(directory) {
+  if (SKIP_ABSOLUTE_DIRS.has(directory)) return [];
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     if (entry.isDirectory()) {
       if (SKIP_DIR_NAMES.has(entry.name)) return [];
