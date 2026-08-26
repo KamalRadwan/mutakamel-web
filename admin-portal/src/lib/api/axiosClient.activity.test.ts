@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { customFetch } from "./axiosClient";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -12,7 +11,114 @@ class MemoryStorage implements Storage {
   setItem(key: string, value: string) { this.values.set(key, value); }
 }
 
+const SESSION_ONE = "019f0000-0000-7000-8000-000000000001";
+const SESSION_TWO = "019f0000-0000-7000-8000-000000000002";
+
+let api: typeof import("./axiosClient");
+
+function seedSession(
+  sessionStorage: Storage,
+  localStorage: Storage,
+  sessionId = SESSION_ONE,
+  eventId = "activity-event",
+  savedAt = Date.now(),
+) {
+  sessionStorage.setItem(
+    "admin_session_meta",
+    JSON.stringify({
+      savedAt,
+      expiresIn: 600,
+      sessionExpiresIn: 1_800,
+      tokenType: "Bearer",
+      sessionId,
+      remember: false,
+      authorizationVersion: 1,
+      profileVersion: 1,
+      authEventId: eventId,
+    }),
+  );
+  localStorage.setItem(
+    "admin_auth_session_event",
+    JSON.stringify({
+      realm: "admin",
+      kind: "session-updated",
+      eventId,
+      sourceId: "activity-test",
+      issuedAt: savedAt,
+      sessionId,
+    }),
+  );
+}
+
+function stubActivityBrowser(
+  pathname: string,
+  sessionStorage: Storage,
+  localStorage: Storage,
+) {
+  const listeners = new Map<string, (event: Event) => void>();
+  const dispatchEvent = vi.fn();
+  const documentState = {
+    cookie: "__Host-mutakamel-admin-csrf=csrf-proof",
+    visibilityState: "visible",
+  };
+  vi.stubGlobal("window", {
+    location: { pathname, href: "" },
+    dispatchEvent,
+    sessionStorage,
+    localStorage,
+    addEventListener: (
+      name: string,
+      listener: EventListenerOrEventListenerObject,
+    ) => {
+      if (typeof listener === "function") {
+        listeners.set(name, listener as (event: Event) => void);
+      }
+    },
+  });
+  vi.stubGlobal("sessionStorage", sessionStorage);
+  vi.stubGlobal("localStorage", localStorage);
+  vi.stubGlobal("document", documentState);
+  vi.stubGlobal("navigator", {});
+  vi.stubGlobal("crypto", {
+    getRandomValues: (bytes: Uint8Array) => bytes.fill(4),
+  });
+  return { dispatchEvent, documentState, listeners };
+}
+
+function refreshedSessionResponse() {
+  return new Response(JSON.stringify({
+    data: {
+      tokenType: "Bearer",
+      expiresIn: 600,
+      sessionExpiresIn: 1_800,
+      session: {
+        id: SESSION_ONE,
+        clientId: "mutakamel-admin-web",
+        clientType: "WEB",
+        createdAt: "2026-08-26T10:00:00.000Z",
+        lastRefreshAt: "2026-08-26T10:10:00.000Z",
+        lastUserActivityAt: "2026-08-26T10:09:00.000Z",
+        idleExpiresAt: "2026-08-26T10:39:00.000Z",
+        absoluteExpiresAt: "2026-08-26T22:00:00.000Z",
+        refreshUseCount: "2",
+        accessIssueCount: "3",
+        credentialVersion: 1,
+        authorizationVersion: 1,
+        profileVersion: 1,
+      },
+    },
+  }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 describe("admin activity checkpoint liveness", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    api = await import("./axiosClient");
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -23,45 +129,12 @@ describe("admin activity checkpoint liveness", () => {
     vi.useFakeTimers();
     const sessionStorage = new MemoryStorage();
     const localStorage = new MemoryStorage();
-    sessionStorage.setItem(
-      "admin_session_meta",
-      JSON.stringify({
-        savedAt: Date.now(),
-        expiresIn: 600,
-        sessionExpiresIn: 1_800,
-        tokenType: "Bearer",
-        sessionId: "019f0000-0000-7000-8000-000000000001",
-        remember: false,
-        authorizationVersion: 1,
-        profileVersion: 1,
-        authEventId: "activity-event",
-      }),
-    );
-    const listeners = new Map<string, (event: Event) => void>();
-    vi.stubGlobal("window", {
-      location: { pathname: "/backup", href: "" },
-      dispatchEvent: vi.fn(),
+    seedSession(sessionStorage, localStorage);
+    const { listeners } = stubActivityBrowser(
+      "/backup",
       sessionStorage,
       localStorage,
-      addEventListener: (
-        name: string,
-        listener: EventListenerOrEventListenerObject,
-      ) => {
-        if (typeof listener === "function") {
-          listeners.set(name, listener as (event: Event) => void);
-        }
-      },
-    });
-    vi.stubGlobal("sessionStorage", sessionStorage);
-    vi.stubGlobal("localStorage", localStorage);
-    vi.stubGlobal("document", {
-      cookie: "__Host-mutakamel-admin-csrf=csrf-proof",
-      visibilityState: "visible",
-    });
-    vi.stubGlobal("navigator", {});
-    vi.stubGlobal("crypto", {
-      getRandomValues: (bytes: Uint8Array) => bytes.fill(4),
-    });
+    );
 
     const urls: string[] = [];
     const activitySignals: AbortSignal[] = [];
@@ -83,12 +156,12 @@ describe("admin activity checkpoint liveness", () => {
       }));
     }));
 
-    await customFetch("/api/admin/worker/v1/backups/runs");
+    await api.customFetch("/api/admin/worker/v1/backups/runs");
     urls.length = 0;
     listeners.get("pointerdown")?.({ isTrusted: true } as Event);
 
     const controller = new AbortController();
-    const abortedRequest = customFetch(
+    const abortedRequest = api.customFetch(
       "/api/admin/worker/v1/backups/runs",
       { signal: controller.signal },
     );
@@ -104,7 +177,7 @@ describe("admin activity checkpoint liveness", () => {
 
     urls.length = 0;
     listeners.get("pointerdown")?.({ isTrusted: true } as Event);
-    const timedRequest = customFetch("/api/admin/worker/v1/backups/runs");
+    const timedRequest = api.customFetch("/api/admin/worker/v1/backups/runs");
     await vi.advanceTimersByTimeAsync(5_000);
     await expect(timedRequest).resolves.toMatchObject({ status: 200 });
     expect(activitySignals[1]?.aborted).toBe(true);
@@ -112,5 +185,219 @@ describe("admin activity checkpoint liveness", () => {
       "/api/admin/core/v1/auth/activity",
       "/api/admin/worker/v1/backups/runs",
     ]);
+  });
+
+  it("checkpoints trusted visible input immediately and coalesces activity for one minute", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(sessionStorage, localStorage);
+    const { documentState, listeners } = stubActivityBrowser(
+      "/dashboard",
+      sessionStorage,
+      localStorage,
+    );
+
+    const activityHeaders: Headers[] = [];
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      urls.push(url);
+      if (url === "/api/admin/core/v1/auth/activity") {
+        activityHeaders.push(new Headers(init.headers));
+        return new Response(null, { status: 204 });
+      }
+      return new Response(JSON.stringify({ data: {} }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }));
+
+    // A protected bootstrap installs the listeners but does not manufacture
+    // human activity.
+    await api.customFetch("/api/admin/core/v1/auth/me");
+    urls.length = 0;
+
+    listeners.get("pointerdown")?.({ isTrusted: false } as Event);
+    documentState.visibilityState = "hidden";
+    listeners.get("keydown")?.({ isTrusted: true } as Event);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(urls).toEqual([]);
+
+    documentState.visibilityState = "visible";
+    listeners.get("pointerdown")?.({ isTrusted: true } as Event);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(urls).toEqual(["/api/admin/core/v1/auth/activity"]);
+    expect(activityHeaders[0]?.get("x-auth-user-activity")).toBe("1");
+    expect(activityHeaders[0]?.get("x-csrf-token")).toBe("csrf-proof");
+    expect(activityHeaders[0]?.has("x-idempotency-key")).toBe(false);
+
+    listeners.get("keydown")?.({ isTrusted: true } as Event);
+    listeners.get("touchstart")?.({ isTrusted: true } as Event);
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(urls).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    listeners.get("keydown")?.({ isTrusted: true } as Event);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(urls).toEqual([
+      "/api/admin/core/v1/auth/activity",
+      "/api/admin/core/v1/auth/activity",
+    ]);
+  });
+
+  it("keeps the session on transient and permission checkpoint failures", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T11:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(sessionStorage, localStorage);
+    const { dispatchEvent, listeners } = stubActivityBrowser(
+      "/dashboard",
+      sessionStorage,
+      localStorage,
+    );
+
+    const activityResponses = [
+      new Response(JSON.stringify({ code: "GW.UPSTREAM.UNAVAILABLE" }), {
+        status: 503,
+        headers: { "Content-Type": "application/problem+json" },
+      }),
+      new Response(JSON.stringify({ errorCode: "AUTH_CSRF_INVALID" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }),
+      new Response(null, { status: 204 }),
+    ];
+    let activityCalls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/admin/core/v1/auth/activity") {
+        activityCalls += 1;
+        return activityResponses.shift() ?? new Response(null, { status: 204 });
+      }
+      return new Response(JSON.stringify({ data: {} }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }));
+
+    await api.customFetch("/api/admin/core/v1/auth/me");
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      listeners.get("pointerdown")?.({ isTrusted: true } as Event);
+      await vi.advanceTimersByTimeAsync(0);
+      if (attempt < 2) await vi.advanceTimersByTimeAsync(5_000);
+    }
+
+    expect(activityCalls).toBe(3);
+    expect(JSON.parse(
+      sessionStorage.getItem("admin_session_meta") ?? "null",
+    )?.sessionId).toBe(SESSION_ONE);
+    expect(dispatchEvent.mock.calls.some(([event]) =>
+      (event as Event).type === "global-toast" ||
+      (event as Event).type === "admin-auth-lifecycle"
+    )).toBe(false);
+    expect(JSON.parse(
+      localStorage.getItem("admin_auth_session_event") ?? "null",
+    )?.kind).toBe("session-updated");
+  });
+
+  it("repairs an expired access cookie before the direct activity checkpoint", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T13:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(sessionStorage, localStorage);
+    const { listeners } = stubActivityBrowser(
+      "/dashboard",
+      sessionStorage,
+      localStorage,
+    );
+
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      urls.push(url);
+      if (url === "/api/admin/core/v1/auth/refresh") {
+        return refreshedSessionResponse();
+      }
+      if (url === "/api/admin/core/v1/auth/activity") {
+        return new Response(null, { status: 204 });
+      }
+      return new Response(JSON.stringify({ data: {} }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }));
+
+    await api.customFetch("/api/admin/core/v1/auth/me");
+    urls.length = 0;
+    await vi.advanceTimersByTimeAsync(601_000);
+
+    listeners.get("pointerdown")?.({ isTrusted: true } as Event);
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(urls).toEqual([
+      "/api/admin/core/v1/auth/refresh",
+      "/api/admin/core/v1/auth/activity",
+    ]);
+    expect(JSON.parse(
+      sessionStorage.getItem("admin_session_meta") ?? "null",
+    )).toMatchObject({ sessionId: SESSION_ONE, expiresIn: 600 });
+  });
+
+  it("ignores a delayed terminal activity response after another session wins", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T12:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(sessionStorage, localStorage);
+    const { dispatchEvent, listeners } = stubActivityBrowser(
+      "/dashboard",
+      sessionStorage,
+      localStorage,
+    );
+
+    let resolveActivity!: (response: Response) => void;
+    const activityResponse = new Promise<Response>((resolve) => {
+      resolveActivity = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url === "/api/admin/core/v1/auth/activity") return activityResponse;
+      return Promise.resolve(new Response(JSON.stringify({ data: {} }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+    }));
+
+    await api.customFetch("/api/admin/core/v1/auth/me");
+    listeners.get("pointerdown")?.({ isTrusted: true } as Event);
+    await vi.advanceTimersByTimeAsync(0);
+
+    seedSession(
+      sessionStorage,
+      localStorage,
+      SESSION_TWO,
+      "new-session-event",
+      Date.now() + 1,
+    );
+    resolveActivity(new Response(JSON.stringify({
+      errorCode: "AUTH_SESSION_IDLE_EXPIRED",
+    }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    }));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(JSON.parse(
+      sessionStorage.getItem("admin_session_meta") ?? "null",
+    )?.sessionId).toBe(SESSION_TWO);
+    expect(JSON.parse(
+      localStorage.getItem("admin_auth_session_event") ?? "null",
+    )).toMatchObject({ kind: "session-updated", sessionId: SESSION_TWO });
+    expect(dispatchEvent.mock.calls.some(([event]) =>
+      (event as CustomEvent).type === "admin-auth-lifecycle" &&
+      (event as CustomEvent).detail === "ENDED"
+    )).toBe(false);
   });
 });

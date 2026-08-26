@@ -44,13 +44,32 @@ export function classifyAuthFailure(
   status: number | undefined,
   code?: string,
 ): AuthFailureDisposition {
+  if (
+    (status === 401 || status === 403) &&
+    isSessionEndingAuthCode(code)
+  ) {
+    return "end";
+  }
   if (status === 403) return "forbidden";
-  if (status === 401 && isSessionEndingAuthCode(code)) return "end";
   if (status === 401) return "refresh";
-  if (status === 429 || status === undefined || (status >= 500 && status <= 599)) {
+  if (
+    status === 404 ||
+    status === 409 ||
+    status === 429 ||
+    status === undefined ||
+    (status >= 500 && status <= 599)
+  ) {
     return "retain";
   }
   return "none";
+}
+
+export function isDefinitiveAuthFailure(error: unknown): boolean {
+  const status = getAuthErrorStatus(error);
+  return (
+    (status === 401 || status === 403) &&
+    isSessionEndingAuthCode(getAuthErrorCode(error))
+  );
 }
 
 export function isSessionEndingAuthCode(code?: string): boolean {

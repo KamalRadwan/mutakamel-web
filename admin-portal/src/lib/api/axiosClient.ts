@@ -983,45 +983,60 @@ async function runAdminActivityTouch(
     }
   }
 
-  const csrfToken = readBrowserCookie(ADMIN_CSRF_COOKIE);
-  if (!csrfToken) return;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const csrfToken = readBrowserCookie(ADMIN_CSRF_COOKIE);
+    if (!csrfToken) return;
 
-  try {
-    epoch = advanceAdminRefreshEpoch(epoch, false);
-    assertFallbackAdminAuthIntentCurrent();
-    const response = await fetch(
-      `${API_BASE_URL}/api/admin/core/v1/auth/activity`,
-      {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "x-auth-user-activity": "1",
-          "x-csrf-token": csrfToken,
+    let response: Response;
+    let payload: unknown;
+    try {
+      epoch = advanceAdminRefreshEpoch(epoch, false);
+      assertFallbackAdminAuthIntentCurrent();
+      response = await fetch(
+        `${API_BASE_URL}/api/admin/core/v1/auth/activity`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "x-auth-user-activity": "1",
+            "x-csrf-token": csrfToken,
+          },
+          credentials: "include",
+          cache: "no-store",
+          signal,
         },
-        credentials: "include",
-        cache: "no-store",
-        signal,
-      },
-    );
-    const payload = await readResponsePayloadWithFallbackAdminAuthFence(
-      response,
-      false,
-    );
-    epoch = advanceAdminRefreshEpoch(epoch, false);
+      );
+      payload = await readResponsePayloadWithFallbackAdminAuthFence(
+        response,
+        false,
+      );
+      epoch = advanceAdminRefreshEpoch(epoch, false);
+    } catch (error) {
+      honorTerminalAdminActivityFailure(error, epoch, sessionId);
+      return;
+    }
 
     if (response.ok) {
       markAdminActivityCheckpointed(sessionId);
       return;
     }
-    honorTerminalAdminActivityFailure(
-      normalizeApiError(response, payload),
-      epoch,
-      sessionId,
-    );
-  } catch (error) {
+
+    const error = normalizeApiError(response, payload);
+    if (
+      attempt === 0 &&
+      classifyAuthFailure(response.status, getAuthErrorCode(error)) === "refresh"
+    ) {
+      try {
+        epoch = await coordinateAdminRefresh(epoch, signal);
+        continue;
+      } catch (refreshError) {
+        honorTerminalAdminActivityFailure(refreshError, epoch, sessionId);
+        return;
+      }
+    }
+
     honorTerminalAdminActivityFailure(error, epoch, sessionId);
-    // Activity is best-effort. Network, timeout, rate-limit, permission, and
-    // stale-response failures never block user work or end a valid session.
+    return;
   }
 }
 

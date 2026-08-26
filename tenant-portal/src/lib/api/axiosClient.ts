@@ -2,7 +2,7 @@ import {
   classifyAuthFailure,
   getAuthErrorCode,
   getAuthErrorStatus,
-  isSessionEndingAuthCode,
+  isDefinitiveAuthFailure,
 } from "../auth/sessionErrors";
 import {
   publishTenantAuthEvent,
@@ -20,9 +20,15 @@ const SESSION_META_KEY = "tenant_session_meta";
 const REMEMBER_PREFERENCE_KEY = "tenant_auth_remember";
 const TENANT_CSRF_COOKIE = "__Host-mutakamel-tenant-csrf";
 const RECENT_USER_ACTIVITY_MS = 60_000;
+const ACTIVITY_RETRY_MS = 15_000;
+const ACTIVITY_DEBOUNCE_MS = 750;
+const ACTIVITY_RESULT_EVENT = "tenant-auth-activity-checkpoint";
 
 let lastUserInteractionAt = 0;
-let activityTrackingInstalled = false;
+let lastActivityAttemptAt = 0;
+let activityTrackingSubscribers = 0;
+let removeActivityTracking: (() => void) | null = null;
+let activityTimer: ReturnType<typeof setTimeout> | null = null;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface ApiEnvelope<T = any> {
@@ -116,10 +122,12 @@ interface PreparedRequest {
   skipAuthRefresh: boolean;
   replayAfterRefresh: boolean;
   publicAuthEndpoint: boolean;
+  sessionId: string | null;
+  hadSessionMetadata: boolean;
   maxResponseBytes?: number;
 }
 
-let refreshInFlight: Promise<void> | null = null;
+let refreshInFlight: Promise<{ sessionId: string }> | null = null;
 let activityTouchInFlight: Promise<void> | null = null;
 let lastActivityTouchAt = 0;
 
@@ -203,11 +211,12 @@ export function storeTenantSessionMetadata(
   response: WebAuthSessionResponse,
   remember: boolean,
   authEventId: string,
+  savedAt = Date.now(),
 ): void {
   if (typeof window === "undefined") return;
   removeLegacyBrowserTokens();
   const metadata: TenantSessionMetadata = {
-    savedAt: Date.now(),
+    savedAt,
     expiresIn: response.expiresIn,
     sessionExpiresIn: response.sessionExpiresIn,
     tokenType: response.tokenType,
@@ -228,8 +237,48 @@ export function clearLocalTenantAuthState(): void {
   removeLegacyBrowserTokens();
 }
 
+export function startTenantActivityTracking(): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  activityTrackingSubscribers += 1;
+  if (removeActivityTracking === null) {
+    const recordInteraction = (event: Event) => {
+      if (!event.isTrusted || document.visibilityState !== "visible") return;
+      lastUserInteractionAt = Date.now();
+      queueActivityCheckpoint();
+    };
+    window.addEventListener("pointerdown", recordInteraction, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener("keydown", recordInteraction, { capture: true });
+    window.addEventListener("touchstart", recordInteraction, {
+      capture: true,
+      passive: true,
+    });
+    removeActivityTracking = () => {
+      window.removeEventListener("pointerdown", recordInteraction, true);
+      window.removeEventListener("keydown", recordInteraction, true);
+      window.removeEventListener("touchstart", recordInteraction, true);
+      if (activityTimer !== null) clearTimeout(activityTimer);
+      activityTimer = null;
+    };
+  }
+
+  let active = true;
+  return () => {
+    if (!active) return;
+    active = false;
+    activityTrackingSubscribers = Math.max(0, activityTrackingSubscribers - 1);
+    if (activityTrackingSubscribers === 0) {
+      removeActivityTracking?.();
+      removeActivityTracking = null;
+    }
+  };
+}
+
 export async function refreshTenantCookieSession(
   rememberOverride?: boolean,
+  expectedSessionId?: string,
 ): Promise<WebAuthSessionResponse> {
   const storedMeta = getStoredTenantSessionMeta();
   const remember =
@@ -255,12 +304,24 @@ export async function refreshTenantCookieSession(
   const auth = readWebAuthSessionResponse(payload);
   if (!auth) throw createLocalApiError(500, "INVALID_REFRESH_RESPONSE");
 
+  const savedAt = Date.now();
   const event = publishTenantAuthEvent(
     "session-updated",
     auth.session.id,
     true,
+    {
+      savedAt,
+      expiresIn: auth.expiresIn,
+      sessionExpiresIn: auth.sessionExpiresIn,
+      authorizationVersion: auth.session.authorizationVersion,
+      profileVersion: auth.session.profileVersion,
+    },
   );
-  storeTenantSessionMetadata(auth, remember, event.eventId);
+  storeTenantSessionMetadata(auth, remember, event.eventId, savedAt);
+  if (expectedSessionId && auth.session.id !== expectedSessionId) {
+    publishTenantAuthLifecycle("STALE");
+    throw createLocalApiError(409, "AUTH_SESSION_CHANGED");
+  }
   publishTenantAuthLifecycle("AUTHENTICATED");
   return auth;
 }
@@ -270,8 +331,8 @@ export async function customTenantFetch<T = any>(
   endpoint: string,
   options: TenantApiRequestConfig = {},
 ): Promise<AxiosResponse<T>> {
-  const prepared = prepareRequest(endpoint, options);
   const eventBeforeRequest = readLatestTenantAuthEvent();
+  const prepared = prepareRequest(endpoint, options, eventBeforeRequest);
   return sendPreparedRequest<T>(prepared, eventBeforeRequest, false);
 }
 
@@ -288,8 +349,8 @@ async function sendPreparedRequest<T>(
     const code = getAuthErrorCode(error);
     const disposition = classifyAuthFailure(response.status, code);
 
-    if (response.status === 401 && disposition === "end") {
-      endTenantBrowserSession();
+    if (disposition === "end") {
+      endTenantBrowserSession(request.sessionId);
       throw error;
     }
     if (
@@ -302,15 +363,11 @@ async function sendPreparedRequest<T>(
       publishTenantAuthLifecycle("STALE");
       try {
         publishTenantAuthLifecycle("REFRESHING");
-        await coordinateTenantRefresh(eventBeforeRequest);
+        await coordinateTenantSessionRefresh(
+          request.sessionId ?? undefined,
+          eventBeforeRequest,
+        );
       } catch (refreshError) {
-        const refreshStatus = getAuthErrorStatus(refreshError);
-        const refreshCode = getAuthErrorCode(refreshError);
-        if (refreshStatus === 401 || isSessionEndingAuthCode(refreshCode)) {
-          endTenantBrowserSession();
-        } else {
-          publishTenantAuthLifecycle("DEGRADED");
-        }
         throw refreshError;
       }
 
@@ -325,8 +382,13 @@ async function sendPreparedRequest<T>(
     if (response.status === 403 && !request.publicAuthEndpoint) {
       dispatchForbiddenToast();
     }
+    if (disposition === "retain" && !request.publicAuthEndpoint) {
+      publishTenantAuthLifecycle("DEGRADED");
+    }
     throw error;
   }
+
+  assertRequestFenceIsCurrent(request, eventBeforeRequest);
 
   return {
     data: payload as T,
@@ -349,11 +411,37 @@ async function touchCoreSessionForCrossAppActivity(
   ) {
     return;
   }
-  if (activityTouchInFlight) return activityTouchInFlight;
+  return runActivityCheckpoint();
+}
 
-  activityTouchInFlight = (async () => {
-    const csrfToken = readBrowserCookie(TENANT_CSRF_COOKIE);
-    if (!csrfToken) return;
+function queueActivityCheckpoint(): void {
+  if (
+    activityTimer !== null ||
+    activityTouchInFlight !== null ||
+    !getStoredTenantSessionMeta() ||
+    document.visibilityState !== "visible" ||
+    (typeof navigator !== "undefined" && navigator.onLine === false) ||
+    Date.now() - lastActivityTouchAt < RECENT_USER_ACTIVITY_MS ||
+    Date.now() - lastActivityAttemptAt < ACTIVITY_RETRY_MS
+  ) {
+    return;
+  }
+  activityTimer = setTimeout(() => {
+    activityTimer = null;
+    void runActivityCheckpoint();
+  }, ACTIVITY_DEBOUNCE_MS);
+}
+
+function runActivityCheckpoint(): Promise<void> {
+  if (activityTouchInFlight) return activityTouchInFlight;
+  const csrfToken = readBrowserCookie(TENANT_CSRF_COOKIE);
+  if (!csrfToken) {
+    dispatchActivityResult(false, undefined, "CSRF_PROOF_MISSING");
+    return Promise.resolve();
+  }
+
+  lastActivityAttemptAt = Date.now();
+  const operation = (async () => {
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/tenant/core/v1/auth/activity`,
@@ -369,16 +457,51 @@ async function touchCoreSessionForCrossAppActivity(
           cache: "no-store",
         },
       );
-      if (response.ok) lastActivityTouchAt = Date.now();
-    } catch {
-      // The actual request remains authoritative. A failed activity checkpoint
-      // never fabricates activity and never turns a transient network issue
-      // into a local logout.
+      if (response.ok) {
+        lastActivityTouchAt = Date.now();
+        dispatchActivityResult(true, response.status);
+        return;
+      }
+      const payload = await readResponsePayload(response, 65_536);
+      const error = normalizeApiError(response, payload);
+      dispatchActivityResult(
+        false,
+        response.status,
+        getAuthErrorCode(error),
+        error.response.data.correlationId,
+      );
+    } catch (error) {
+      dispatchActivityResult(
+        false,
+        getAuthErrorStatus(error),
+        getAuthErrorCode(error) ?? "ACTIVITY_CHECKPOINT_UNAVAILABLE",
+      );
     }
-  })().finally(() => {
-    activityTouchInFlight = null;
+  })();
+  activityTouchInFlight = operation;
+  void operation.finally(() => {
+    if (activityTouchInFlight === operation) activityTouchInFlight = null;
   });
-  return activityTouchInFlight;
+  return operation;
+}
+
+function dispatchActivityResult(
+  ok: boolean,
+  status?: number,
+  errorCode?: string,
+  correlationId?: unknown,
+): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(ACTIVITY_RESULT_EVENT, {
+    detail: {
+      ok,
+      ...(status === undefined ? {} : { status }),
+      ...(errorCode ? { errorCode } : {}),
+      ...(typeof correlationId === "string" && correlationId
+        ? { correlationId }
+        : {}),
+    },
+  }));
 }
 
 function isTenantCoreEndpoint(endpoint: string): boolean {
@@ -392,41 +515,72 @@ function isTenantCoreEndpoint(endpoint: string): boolean {
   }
 }
 
-async function coordinateTenantRefresh(
-  eventBeforeRequest: TenantAuthEvent | null,
+export async function coordinateTenantSessionRefresh(
+  expectedSessionId = getStoredTenantSessionMeta()?.sessionId,
+  observedEvent = readLatestTenantAuthEvent(),
 ): Promise<void> {
-  if (refreshInFlight) return refreshInFlight;
-  refreshInFlight = withTenantAuthLock(async () => {
+  const operation = refreshInFlight ?? startTenantRefresh(
+    expectedSessionId,
+    observedEvent,
+  );
+  try {
+    const result = await operation;
+    if (expectedSessionId && result.sessionId !== expectedSessionId) {
+      publishTenantAuthLifecycle("STALE");
+      throw createLocalApiError(409, "AUTH_SESSION_CHANGED");
+    }
+  } catch (error) {
+    if (isDefinitiveAuthFailure(error)) {
+      endTenantBrowserSession(expectedSessionId ?? null);
+    } else {
+      publishTenantAuthLifecycle("DEGRADED");
+    }
+    throw error;
+  }
+}
+
+function startTenantRefresh(
+  expectedSessionId: string | undefined,
+  observedEvent: TenantAuthEvent | null,
+): Promise<{ sessionId: string }> {
+  const operation = withTenantAuthLock(async () => {
     const latest = readLatestTenantAuthEvent();
-    if (latest?.kind === "session-ended") {
+    if (
+      latest?.kind === "session-ended" &&
+      expectedSessionId &&
+      latest.sessionId === expectedSessionId
+    ) {
       throw createLocalApiError(401, "AUTH_SESSION_ENDED");
     }
-    if (latest && latest.eventId !== eventBeforeRequest?.eventId) {
-      const expectedSessionId =
-        getStoredTenantSessionMeta()?.sessionId ?? eventBeforeRequest?.sessionId;
-      if (
-        !expectedSessionId ||
-        !latest.sessionId ||
-        latest.sessionId !== expectedSessionId
-      ) {
-        synchronizeTenantTabSession(latest.sessionId);
-        publishTenantAuthLifecycle("STALE");
-        throw createLocalApiError(409, "AUTH_SESSION_CHANGED");
+    if (latest && latest.eventId !== observedEvent?.eventId) {
+      if (latest.kind === "session-updated") {
+        synchronizeTenantTabSession(latest);
+        if (!expectedSessionId || latest.sessionId === expectedSessionId) {
+          publishTenantAuthLifecycle("AUTHENTICATED");
+          return { sessionId: latest.sessionId };
+        }
       }
-      adoptExternalAuthEvent(latest.eventId);
-      publishTenantAuthLifecycle("AUTHENTICATED");
-      return;
+      publishTenantAuthLifecycle("STALE");
+      throw createLocalApiError(409, "AUTH_SESSION_CHANGED");
     }
-    await refreshTenantCookieSession();
-  }).finally(() => {
-    refreshInFlight = null;
+
+    const auth = await refreshTenantCookieSession(
+      undefined,
+      expectedSessionId,
+    );
+    return { sessionId: auth.session.id };
   });
-  return refreshInFlight;
+  refreshInFlight = operation;
+  void operation.finally(() => {
+    if (refreshInFlight === operation) refreshInFlight = null;
+  });
+  return operation;
 }
 
 function prepareRequest(
   endpoint: string,
   options: TenantApiRequestConfig,
+  eventBeforeRequest: TenantAuthEvent | null,
 ): PreparedRequest {
   assertRelativeGatewayEndpoint(endpoint);
   const {
@@ -448,6 +602,9 @@ function prepareRequest(
   const headers = new Headers(requestInit.headers ?? {});
   const method = (requestInit.method ?? "GET").toUpperCase();
   const publicAuthEndpoint = isPublicTenantAuthEndpoint(endpoint);
+  const sessionMetadata = publicAuthEndpoint
+    ? null
+    : getStoredTenantSessionMeta();
   const hasCallerIdempotencyKey = headers.has("x-idempotency-key");
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
   if (
@@ -491,6 +648,12 @@ function prepareRequest(
         replayAfterRefreshOverride ||
         hasCallerIdempotencyKey),
     publicAuthEndpoint,
+    sessionId: sessionMetadata?.sessionId ?? (
+      eventBeforeRequest?.kind === "session-updated"
+        ? eventBeforeRequest.sessionId
+        : null
+    ),
+    hadSessionMetadata: sessionMetadata !== null,
     maxResponseBytes,
     init: {
       ...requestInit,

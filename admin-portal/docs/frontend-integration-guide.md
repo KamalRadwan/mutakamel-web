@@ -8,7 +8,7 @@ Application Catalogue integration reverified: **2026-08-25**.
 
 Database and Storage registration workflows reverified: **2026-08-25**.
 
-Authentication/session subsection reverified: **2026-08-12**.
+Authentication/session subsection reverified: **2026-08-26**.
 
 ## Scope
 
@@ -281,10 +281,13 @@ field errors and `correlationId`. See
 - Unsafe calls without a verified caller-owned UUIDv7 (or an explicitly
   documented naturally idempotent contract) repair authentication but are not
   automatically replayed.
-- Emit user-activity evidence only for trusted input in a visible tab. Core
-  requests carry it directly; Worker requests first checkpoint through Core.
-  Polling, refresh, synthetic events, hidden tabs, and WSS do not extend idle
-  auth time; employee WSS-duration accounting is independent.
+- Emit user-activity evidence only for trusted pointer, keyboard, or touch input
+  in a visible tab. Checkpoint Core immediately, coalesce successful touches for
+  one minute, and retry a failed best-effort attempt no faster than five
+  seconds. Core requests also carry recent-input evidence; Worker requests wait
+  for the same five-second-bounded Core checkpoint. Polling, refresh,
+  focus/visibility events, synthetic events, hidden tabs, and WSS never extend
+  idle auth time; employee WSS-duration accounting is independent.
 - Backup start, restore start, and restore promotion participate in the single
   coordinated refresh retry with their original UUIDv7 key and exact body;
   Worker returns the accepted run instead of dispatching a duplicate effect.

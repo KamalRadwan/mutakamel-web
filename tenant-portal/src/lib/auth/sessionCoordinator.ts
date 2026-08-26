@@ -2,13 +2,25 @@ import { safeStorage } from "../safeStorage";
 
 export type TenantAuthEventKind = "session-updated" | "session-ended";
 
+export interface TenantAuthEventTimingSnapshot {
+  expiresIn: number;
+  sessionExpiresIn: number;
+  authorizationVersion: number;
+  profileVersion: number;
+}
+
+export interface TenantAuthEventTiming extends TenantAuthEventTimingSnapshot {
+  savedAt?: number;
+}
+
 export interface TenantAuthEvent {
   realm: "tenant";
   kind: TenantAuthEventKind;
   eventId: string;
   sourceId: string;
   issuedAt: number;
-  sessionId?: string;
+  sessionId: string;
+  timing?: TenantAuthEventTimingSnapshot;
 }
 
 export type TenantAuthLifecycleState =
@@ -30,16 +42,37 @@ export function readLatestTenantAuthEvent(): TenantAuthEvent | null {
 
 export function publishTenantAuthEvent(
   kind: TenantAuthEventKind,
-  sessionId?: string,
+  sessionId: string,
   notifyCurrentTab = true,
+  timing?: TenantAuthEventTiming,
 ): TenantAuthEvent {
+  if (!validSessionId(sessionId)) {
+    throw new TypeError("Tenant auth events require an exact session ID.");
+  }
+  if (kind === "session-ended" && timing !== undefined) {
+    throw new TypeError("Session-ended auth events cannot include timing.");
+  }
+  const normalizedTiming = timing && parsePublishedTiming(timing);
+  if (timing && !normalizedTiming) {
+    throw new TypeError("Tenant auth event timing is invalid.");
+  }
   const event: TenantAuthEvent = {
     realm: "tenant",
     kind,
     eventId: createOpaqueId(),
     sourceId,
-    issuedAt: Date.now(),
-    ...(sessionId ? { sessionId } : {}),
+    issuedAt: normalizedTiming?.savedAt ?? Date.now(),
+    sessionId,
+    ...(normalizedTiming
+      ? {
+          timing: {
+            expiresIn: normalizedTiming.expiresIn,
+            sessionExpiresIn: normalizedTiming.sessionExpiresIn,
+            authorizationVersion: normalizedTiming.authorizationVersion,
+            profileVersion: normalizedTiming.profileVersion,
+          },
+        }
+      : {}),
   };
   safeStorage.setItem(STORAGE_KEY, JSON.stringify(event));
 
@@ -148,13 +181,65 @@ function parseTenantAuthEvent(value: unknown): TenantAuthEvent | null {
     (candidate.kind !== "session-updated" && candidate.kind !== "session-ended") ||
     typeof candidate.eventId !== "string" ||
     typeof candidate.sourceId !== "string" ||
-    typeof candidate.issuedAt !== "number" ||
-    !Number.isFinite(candidate.issuedAt) ||
-    (candidate.sessionId !== undefined && typeof candidate.sessionId !== "string")
+    !positiveInteger(candidate.issuedAt) ||
+    !validSessionId(candidate.sessionId)
   ) {
     return null;
   }
-  return candidate as TenantAuthEvent;
+  if (candidate.kind === "session-ended" && candidate.timing !== undefined) {
+    return null;
+  }
+  const timing = candidate.timing && parseTiming(candidate.timing);
+  if (candidate.timing && !timing) return null;
+  return {
+    realm: "tenant",
+    kind: candidate.kind,
+    eventId: candidate.eventId,
+    sourceId: candidate.sourceId,
+    issuedAt: candidate.issuedAt,
+    sessionId: candidate.sessionId,
+    ...(timing ? { timing } : {}),
+  };
+}
+
+function parsePublishedTiming(
+  value: TenantAuthEventTiming,
+): TenantAuthEventTiming | null {
+  const timing = parseTiming(value);
+  if (!timing || (value.savedAt !== undefined && !positiveInteger(value.savedAt))) {
+    return null;
+  }
+  return {
+    ...timing,
+    ...(value.savedAt !== undefined ? { savedAt: value.savedAt } : {}),
+  };
+}
+
+function parseTiming(value: unknown): TenantAuthEventTimingSnapshot | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Partial<TenantAuthEventTimingSnapshot>;
+  if (
+    !positiveInteger(candidate.expiresIn) ||
+    !positiveInteger(candidate.sessionExpiresIn) ||
+    !positiveInteger(candidate.authorizationVersion) ||
+    !positiveInteger(candidate.profileVersion)
+  ) {
+    return null;
+  }
+  return {
+    expiresIn: candidate.expiresIn,
+    sessionExpiresIn: candidate.sessionExpiresIn,
+    authorizationVersion: candidate.authorizationVersion,
+    profileVersion: candidate.profileVersion,
+  };
+}
+
+function validSessionId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 128;
+}
+
+function positiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
 function createOpaqueId(): string {

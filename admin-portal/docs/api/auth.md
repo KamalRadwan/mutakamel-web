@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-12**
+Last source verification: **2026-08-26**
 
 Verified against the current Core controller, DTOs, cookie helpers, and gateway
 route contracts.
@@ -297,13 +297,20 @@ does not reconstruct, replace, or broadly scan event payloads.
 
 Protected by `AdminGuard`; returns HTTP `204`. The shared client emits the
 exact `x-auth-user-activity: 1` marker only after a trusted, visible-tab
-pointer, keyboard, or touch event. Core owns the bounded idle-deadline touch.
-Before an activity-marked Worker request, the browser first checkpoints through
-this Core route; polling, refresh, timers, hidden tabs, and synthetic DOM events
-never extend idle time. The shared checkpoint has a five-second deadline, and a
-caller's abort stops only that caller from waiting. A hung best-effort checkpoint
-therefore cannot wedge navigation or the subsequent Worker request. WSS
-employee-duration accounting remains independent.
+pointer, keyboard, or touch event. The first eligible input checkpoints this
+Core route immediately; successful checkpoints coalesce further input for one
+minute, while a failed attempt may retry after five seconds. There is no idle
+heartbeat. Polling, refresh, focus/visibility events, hidden tabs, synthetic DOM
+events, and Realtime traffic never extend idle time.
+
+Core owns the bounded idle-deadline touch. Core business requests still carry
+the same recent-input marker, and an activity-marked Worker request waits for
+the shared Core checkpoint before dispatch. The checkpoint has a five-second
+deadline, uses the same session-id/epoch fence as protected work, and never
+blocks UI work or logs out for network, rate-limit, `5xx`, or permission/CSRF
+failure. Only an explicit terminal session/security code for the still-bound
+session may end local authentication. WSS employee-duration accounting remains
+independent.
 
 ## GET `/api/admin/core/v1/auth/me`
 
@@ -390,7 +397,8 @@ Implemented in `src/context/AuthContext.tsx` and
 - explicit terminal, permission-denied, and retained-repair error provenance;
 - bounded single-flight recovery after transient bootstrap/refresh failures;
 - pending-route protection until post-refresh `/auth/me` hydration completes;
-- trusted recent-input idle activity with the Core checkpoint for Worker calls;
+- trusted visible-input idle activity with an immediate, coalesced Core
+  checkpoint and the same bounded checkpoint before Worker calls;
 - public accept-invite and reset-password routes with exact DTO validation,
   one-time fragment handling, bilingual copy, and accessible error states;
 - current-session list and revoke controls under Authentication settings;
