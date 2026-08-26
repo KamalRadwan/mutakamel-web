@@ -107,8 +107,15 @@ export const ADMIN_RBAC_CRITICAL = {
 
   // Storage Servers Critical
   STORAGE_SERVERS_CREATE: ["admin.storage_servers.create", "admin.storage_servers.critical"] as const,
+  // Drain and both credential-rotation writes share this same pair on the
+  // backend controller (@RequirePermissions(UPDATE, CRITICAL) for all
+  // three) rather than a dedicated rotate permission the way database
+  // servers has — verified against storage-servers.controller.ts.
   STORAGE_SERVERS_UPDATE: ["admin.storage_servers.update", "admin.storage_servers.critical"] as const,
   STORAGE_SERVERS_DELETE: ["admin.storage_servers.delete", "admin.storage_servers.critical"] as const,
+
+  // Tenant Storage Migrations Critical
+  STORAGE_MIGRATIONS_EXECUTE: ["admin.storage_migrations.execute", "admin.storage_migrations.critical"] as const,
 
   // Backups Critical
   BACKUPS_POLICY_MANAGE: ["admin.backups.manage", "admin.backups.critical"] as const,

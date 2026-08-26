@@ -60,16 +60,36 @@ const STATUS_ENTRIES: Record<string, [StatusTone, string, string]> = {
   RUNNING: ["progress", "Running", "قيد التشغيل"],
   TRIAL: ["progress", "Trial", "تجريبي"],
   PARTIALLY_PAID: ["progress", "Partially Paid", "مدفوع جزئياً"],
+  // Storage credential rotation (STAGED/ACTIVATED) and tenant storage
+  // migration (ACCEPTED/COPYING/COPIED/PLACEMENT_COMMITTED) — every
+  // non-terminal step of both flows is "progress" until their respective
+  // terminal state (REVOKED, COMPLETED).
+  STAGED: ["progress", "Staged", "مُعد"],
+  ACTIVATED: ["progress", "Activated", "مُفعّل"],
+  ACCEPTED: ["progress", "Accepted", "مقبول"],
+  COPYING: ["progress", "Copying", "جارٍ النسخ"],
+  COPIED: ["progress", "Copied", "تم النسخ"],
+  PLACEMENT_COMMITTED: ["progress", "Placement Committed", "تم اعتماد التوزيع"],
 
   SUSPENDED: ["warning", "Suspended", "معلق"],
   ISSUED: ["warning", "Issued", "صادر"],
   DRAINING: ["warning", "Draining", "قيد الإفراغ"],
   PENDING: ["warning", "Pending", "قيد الانتظار"],
+  // A migration actively unwinding after a failure — not yet the terminal
+  // ROLLED_BACK state, so it reads as an active caution, not a hard danger.
+  ROLLING_BACK: ["warning", "Rolling Back", "جارٍ التراجع"],
 
   FAILED: ["danger", "Failed", "فشل"],
   PROVISIONING_FAILED: ["danger", "Provisioning Failed", "فشل التجهيز"],
   OVERDUE: ["danger", "Overdue", "متأخر"],
   OFFLINE: ["danger", "Offline", "غير متصل"],
+  ROLLED_BACK: ["danger", "Rolled Back", "تم التراجع"],
+
+  COMPLETED: ["success", "Completed", "مكتمل"],
+  // Terminal state of a credential rotation: the previous key is proven
+  // rejected. Distinct from VOID/CANCELLED below — REVOKED is the
+  // successful end of a rotation, not an abandoned one.
+  REVOKED: ["success", "Revoked", "مُبطل"],
 
   DELETED: ["neutral", "Deleted", "محذوف"],
   CANCELLED: ["neutral", "Cancelled", "ملغى"],

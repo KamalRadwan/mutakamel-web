@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  Ban,
   CheckCircle2,
   Clock3,
   Edit3,
@@ -26,7 +27,11 @@ import { useI18n } from "@/i18n/I18nContext";
 import { useStorageServerDetail } from "../hooks/useStorageServerDetail";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import { isSecureStorageEndpoint, probeFreshnessPercent } from "../lib/storage-server-contract";
-import type { StorageServerView, UpdateStorageServerDto } from "../types";
+import type {
+  StorageCredentialRotationView,
+  StorageServerView,
+  UpdateStorageServerDto,
+} from "../types";
 import {
   PageHeader,
   Badge,
@@ -48,8 +53,8 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
   const router = useRouter();
   const toast = useToast();
   const view = useStorageServerDetail(id);
-  const [editor, setEditor] = useState<"configuration" | "credentials" | null>(null);
-  const [confirmation, setConfirmation] = useState<"offline" | "delete" | null>(null);
+  const [editor, setEditor] = useState<"configuration" | "credentials" | "safe-rotation" | null>(null);
+  const [confirmation, setConfirmation] = useState<"offline" | "drain" | "delete" | null>(null);
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
 
   useEffect(() => {
@@ -135,6 +140,12 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
                 </Button>
               )}
               {server.status === "ACTIVE" && !server.isPlatformDefault && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation("drain")} disabled={view.isMutating}>
+                  <Ban className="size-4" />
+                  {isArabic ? "إفراغ" : "Drain"}
+                </Button>
+              )}
+              {server.status === "ACTIVE" && !server.isPlatformDefault && (
                 <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation("offline")} disabled={view.isMutating}>
                   <StopCircle className="size-4" />
                   {isArabic ? "إيقاف" : "Take offline"}
@@ -186,12 +197,18 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
             title={isArabic ? "بيانات الاعتماد" : "Credentials"}
             icon={<KeyRound className="size-4" />}
             action={
-              view.canUpdate && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => setEditor("credentials")} disabled={connectionEditBlocked}>
+              view.canUpdate &&
+              (connectionEditBlocked ? (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditor("safe-rotation")}>
+                  <ShieldCheck className="size-3.5" />
+                  {isArabic ? "تدوير آمن (بدون توقف)" : "Safe rotation (zero downtime)"}
+                </Button>
+              ) : (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditor("credentials")}>
                   <KeyRound className="size-3.5" />
                   {isArabic ? "تدوير" : "Rotate"}
                 </Button>
-              )
+              ))
             }
           >
             <div className="flex items-start gap-3 rounded-md border border-brand-200 bg-brand-500/5 p-4 text-brand-900 dark:border-brand-800/60 dark:text-brand-300">
@@ -201,12 +218,33 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
                   {server.credentialsConfigured ? (isArabic ? "مشفرة ومهيأة" : "Encrypted and configured") : isArabic ? "غير مهيأة" : "Not configured"}
                 </p>
                 <p className="mt-1 text-xs leading-5">
-                  {isArabic
-                    ? "لا يعيد Core المفاتيح الخام إلى المتصفح. التدوير يستبدلها ويجعل حالة الخادم DRAFT حتى إعادة التفعيل."
-                    : "Core never returns raw keys to the browser. Rotation replaces them and moves the server to DRAFT until it is activated again."}
+                  {connectionEditBlocked
+                    ? isArabic
+                      ? "لهذا الخادم مستأجرون معينون. استخدم التدوير الآمن: يبقي المفتاح القديم صالحاً خلال نافذة سماح محددة قبل إبطاله، من دون توقف أو إعادة تفعيل."
+                      : "This server has assigned tenants. Use safe rotation: it keeps the previous key valid through a bounded grace window before revoking it, with no downtime or reactivation."
+                    : isArabic
+                      ? "لا يعيد Core المفاتيح الخام إلى المتصفح. التدوير يستبدلها ويجعل حالة الخادم DRAFT حتى إعادة التفعيل."
+                      : "Core never returns raw keys to the browser. Rotation replaces them and moves the server to DRAFT until it is activated again."}
                 </p>
               </div>
             </div>
+            <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+              <DatumRow label={isArabic ? "آخر تدوير" : "Last rotated"} value={formatDate(server.credentialRotatedAt, isArabic)} />
+              <DatumRow label={isArabic ? "موعد التدوير القادم" : "Rotation due"} value={formatDate(server.credentialRotationDueAt, isArabic)} />
+            </dl>
+            {view.currentRotation && (
+              <RotationStatusCard
+                rotation={view.currentRotation}
+                isArabic={isArabic}
+                isMutating={view.isMutating}
+                onRevoke={() =>
+                  void run(
+                    () => view.revokeCredentialRotation(view.currentRotation!.id),
+                    isArabic ? "تم إثبات رفض المفتاح السابق." : "The previous key was proven rejected.",
+                  )
+                }
+              />
+            )}
           </Panel>
         </div>
 
@@ -248,7 +286,7 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
         </div>
       </div>
 
-      {editor && (
+      {editor && editor !== "safe-rotation" && (
         <StorageServerEditor
           key={`${editor}:${server.configRevision}:${server.updatedAt}`}
           mode={editor}
@@ -265,6 +303,40 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
         />
       )}
 
+      {editor === "safe-rotation" && (
+        <SafeRotationEditor
+          key={`safe-rotation:${server.configRevision}`}
+          isArabic={isArabic}
+          isSubmitting={view.isMutating}
+          onClose={() => setEditor(null)}
+          onSubmit={async (credentials, graceHours) => {
+            await view.rotateCredentials(credentials, graceHours);
+            setEditor(null);
+            toast.success(
+              isArabic ? "بدأ التدوير الآمن" : "Safe rotation started",
+              isArabic
+                ? "المفتاحان صالحان خلال نافذة السماح. أثبت رفض المفتاح القديم بعد انتهائها."
+                : "Both keys work through the grace window. Verify the old key is rejected once it expires.",
+            );
+          }}
+        />
+      )}
+
+      <DestructiveActionModal
+        isOpen={confirmation === "drain"}
+        onClose={() => setConfirmation(null)}
+        onConfirm={() =>
+          void run(view.drain, isArabic ? "الخادم الآن قيد الإفراغ. المستأجرون الحاليون يستمرون، ولا توزيعات جديدة." : "The server is now DRAINING. Existing tenants continue; new placement is blocked.").then((succeeded) => {
+            if (succeeded) setConfirmation(null);
+          })
+        }
+        title={isArabic ? "إفراغ خادم التخزين" : "Drain storage server"}
+        description={isArabic ? "يمنع ذلك التوزيع الجديد فقط. مسارات المستأجرين الحاليين تبقى تعمل." : "This only blocks new placement. Existing tenant routes keep working."}
+        targetName={server.name}
+        actionType="drain"
+        requireNameTyping={false}
+        isSubmitting={view.isMutating}
+      />
       <DestructiveActionModal
         isOpen={confirmation === "offline"}
         onClose={() => setConfirmation(null)}
@@ -472,6 +544,144 @@ function StorageServerEditor({
         )}
       </form>
     </FormDrawer>
+  );
+}
+
+function SafeRotationEditor({
+  isArabic,
+  isSubmitting,
+  onClose,
+  onSubmit,
+}: {
+  isArabic: boolean;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onSubmit: (credentials: { accessKeyId: string; secretAccessKey: string }, graceHours: number) => Promise<void>;
+}) {
+  const [accessKeyId, setAccessKeyId] = useState("");
+  const [secretAccessKey, setSecretAccessKey] = useState("");
+  const [graceHours, setGraceHours] = useState("4");
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    setError(null);
+    try {
+      const hours = Number(graceHours);
+      if (!Number.isInteger(hours) || hours < 1 || hours > 24) {
+        throw new Error(isArabic ? "نافذة السماح يجب أن تكون بين 1 و24 ساعة." : "Grace window must be an integer between 1 and 24 hours.");
+      }
+      await onSubmit({ accessKeyId: accessKeyId.trim(), secretAccessKey }, hours);
+    } catch (caught) {
+      setError(readErrorMessage(caught, isArabic ? "تعذر بدء التدوير." : "Could not start rotation."));
+    }
+  };
+
+  const title = isArabic ? "تدوير آمن لبيانات الاعتماد" : "Safe credential rotation";
+  const description = isArabic
+    ? "يبقي المفتاح الحالي صالحاً طوال نافذة السماح بينما يُفعَّل المفتاح الجديد. لا يمكن استرجاع المفاتيح الحالية."
+    : "Keeps the current key valid for the whole grace window while the new key is activated. Current keys cannot be retrieved.";
+
+  return (
+    <FormDrawer
+      isOpen
+      onClose={onClose}
+      titleEn={title}
+      titleAr={title}
+      subtitleEn={description}
+      subtitleAr={description}
+      isSubmitting={isSubmitting}
+      footerActions={
+        <>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            {isArabic ? "إلغاء" : "Cancel"}
+          </Button>
+          <Button type="submit" form="safe-rotation-form" variant="primary" loading={isSubmitting}>
+            {isArabic ? "بدء التدوير" : "Start rotation"}
+          </Button>
+        </>
+      }
+    >
+      <form id="safe-rotation-form" onSubmit={submit} className="space-y-4 py-1">
+        {error && (
+          <div role="alert" className="rounded-md border border-danger-200 bg-danger-50 p-3 text-sm text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-200">
+            {error}
+          </div>
+        )}
+        <Field label={isArabic ? "معرف مفتاح الوصول الجديد" : "New access key ID"}>
+          {(fp) => <Input {...fp} required minLength={3} maxLength={128} autoComplete="off" value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} className="font-mono" />}
+        </Field>
+        <Field label={isArabic ? "مفتاح الوصول السري الجديد" : "New secret access key"}>
+          {(fp) => <Input {...fp} required type="password" minLength={16} maxLength={256} autoComplete="new-password" value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} className="font-mono" />}
+        </Field>
+        <Field label={isArabic ? "نافذة السماح (ساعات)" : "Grace window (hours)"} hint={isArabic ? "المدة التي يبقى فيها المفتاح القديم صالحاً بالتوازي مع الجديد." : "How long the old key stays valid alongside the new one."}>
+          {(fp) => <Input {...fp} required type="number" min={1} max={24} value={graceHours} onChange={(e) => setGraceHours(e.target.value)} />}
+        </Field>
+      </form>
+    </FormDrawer>
+  );
+}
+
+function RotationStatusCard({
+  rotation,
+  isArabic,
+  isMutating,
+  onRevoke,
+}: {
+  rotation: StorageCredentialRotationView;
+  isArabic: boolean;
+  isMutating: boolean;
+  onRevoke: () => void;
+}) {
+  const [graceExpired, setGraceExpired] = useState(false);
+  useEffect(() => {
+    const expiresAtIso = rotation.graceExpiresAt;
+    const expiresAt = expiresAtIso ? new Date(expiresAtIso).getTime() : null;
+    // Deferred through setTimeout (even at 0ms) rather than called
+    // synchronously in the effect body, so this never fires during the
+    // commit React is currently processing — including the "already
+    // expired" case, which still waits one macrotask.
+    const remaining = expiresAt !== null ? Math.max(0, expiresAt - Date.now()) : 0;
+    const timer = window.setTimeout(() => {
+      setGraceExpired(expiresAt !== null && Date.now() >= expiresAt);
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [rotation.graceExpiresAt]);
+  const canRevoke = rotation.status === "ACTIVATED" && graceExpired;
+  return (
+    <div className="mt-4 rounded-md border border-border bg-muted/40 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {isArabic ? "التدوير الحالي" : "Current rotation"}
+        </span>
+        <StatusBadge status={rotation.status} />
+      </div>
+      <dl className="mt-3 space-y-2 text-xs">
+        <DatumRow label={isArabic ? "انتهاء نافذة السماح" : "Grace expires"} value={formatDate(rotation.graceExpiresAt, isArabic)} />
+        {rotation.revokedAt && <DatumRow label={isArabic ? "تاريخ الإبطال" : "Revoked at"} value={formatDate(rotation.revokedAt, isArabic)} />}
+      </dl>
+      {rotation.status === "ACTIVATED" && (
+        <>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            {isArabic
+              ? "لا يمكن استرجاع معرّف هذا التدوير إذا أُعيد تحميل الصفحة. أثبت رفض المفتاح القديم قبل مغادرة هذه الصفحة."
+              : "This rotation's id cannot be recovered after a page reload. Verify the old key is rejected before leaving this page."}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3 w-full"
+            onClick={onRevoke}
+            disabled={!canRevoke || isMutating}
+            title={!graceExpired ? (isArabic ? "انتظر انتهاء نافذة السماح أولاً." : "Wait for the grace window to expire first.") : undefined}
+          >
+            <ShieldCheck className="size-4" />
+            {isArabic ? "إثبات رفض المفتاح القديم" : "Verify old key is rejected"}
+          </Button>
+        </>
+      )}
+    </div>
   );
 }
 

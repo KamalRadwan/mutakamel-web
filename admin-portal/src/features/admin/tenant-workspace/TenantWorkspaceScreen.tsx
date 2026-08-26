@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Database, ReceiptText, Settings2, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Database, HardDrive, ReceiptText, Settings2, Users } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantAccessPanel } from "./access";
 import { TenantBillingPanel } from "./billing/components/TenantBillingPanel";
@@ -14,8 +14,9 @@ import { useTenantCoreWorkspace } from "./core/hooks/useTenantCoreWorkspace";
 import { useTenantFqdnManagement } from "./core/hooks/useTenantFqdnManagement";
 import { isTenantDatabaseReady } from "./core/model/readers";
 import { TenantProvisioningWorkspace } from "./provisioning";
+import { TenantStorageMigrationPanel } from "./storage";
 
-type WorkspaceTab = "overview" | "provisioning" | "access" | "billing";
+type WorkspaceTab = "overview" | "provisioning" | "access" | "billing" | "storage";
 
 export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
   const router = useRouter();
@@ -85,6 +86,7 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
       hint: !databaseReady ? copy.accessNotReady : undefined,
     },
     { key: "billing", label: copy.billing, icon: ReceiptText },
+    { key: "storage", label: copy.storage, icon: HardDrive },
   ];
 
   return (
@@ -168,6 +170,7 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
           <TenantAccessPanel tenantId={tenantId} tenantStatus={tenant.status} enabled locale={lang} />
         ) : null}
         {activeTab === "billing" ? <TenantBillingPanel workspace={billing} lang={lang} /> : null}
+        {activeTab === "storage" ? <TenantStorageMigrationPanel isArabic={lang === "ar"} /> : null}
       </div>
     </PageFrame>
   );
@@ -210,6 +213,7 @@ const workspaceCopy = {
     provisioning: "Provisioning",
     access: "Users & access",
     billing: "Billing",
+    storage: "Storage",
     accessNotReady: "Users and access become available when the tenant is ACTIVE or SUSPENDED.",
   },
   ar: {
@@ -229,6 +233,7 @@ const workspaceCopy = {
     provisioning: "التجهيز",
     access: "المستخدمون والوصول",
     billing: "الفوترة",
+    storage: "التخزين",
     accessNotReady: "يتاح المستخدمون والوصول عندما تصبح حالة المستأجر ACTIVE أو SUSPENDED.",
   },
 } as const;
