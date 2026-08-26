@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { AlertTriangle, FileText, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
+import { PageHeader, Badge, Button } from "@/design-system";
 import type {
   CoreSnapshot,
   Invoice,
@@ -270,25 +271,12 @@ export function InvoicePageFrame({
 
 export function InvoiceHero({ copy, action }: { copy: InvoiceCopy; action?: ReactNode }) {
   return (
-    <header className="overflow-hidden rounded-xl border border-indigo-500/20 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 px-5 py-5 text-white shadow-md">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-indigo-300/30 bg-indigo-400/15 text-indigo-200">
-            <FileText className="size-5" aria-hidden="true" />
-          </span>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{copy.title}</h1>
-              <span className="rounded-md border border-indigo-300/30 bg-indigo-400/10 px-2 py-1 text-xs font-semibold text-indigo-100">
-                {copy.readOnly}
-              </span>
-            </div>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-indigo-100/80">{copy.subtitle}</p>
-          </div>
-        </div>
-        {action}
-      </div>
-    </header>
+    <PageHeader
+      title={copy.title}
+      description={copy.subtitle}
+      status={<Badge tone="neutral">{copy.readOnly}</Badge>}
+      action={action}
+    />
   );
 }
 
@@ -309,10 +297,10 @@ export function InvoiceStatePanel({
 }) {
   const Icon = kind === "loading" ? Loader2 : kind === "forbidden" ? ShieldAlert : kind === "error" || kind === "unavailable" ? AlertTriangle : FileText;
   const tone = kind === "error"
-    ? "border-rose-200 bg-rose-50 text-rose-950 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"
+    ? "border-danger-200 bg-danger-50 text-danger-950 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-100"
     : kind === "forbidden" || kind === "unavailable"
-      ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
-      : "border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200";
+      ? "border-warn-200 bg-warn-50 text-warn-950 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-100"
+      : "border-border bg-card text-foreground";
   return (
     <section role={kind === "error" || kind === "forbidden" ? "alert" : "status"} className={`flex min-h-56 flex-col items-center justify-center rounded-xl border p-6 text-center shadow-sm ${tone}`}>
       <Icon className={`mb-3 size-9 opacity-70 ${kind === "loading" ? "animate-spin" : ""}`} aria-hidden="true" />
@@ -341,7 +329,7 @@ export function InvoiceMutationNotice({ mutation, copy }: { mutation: InvoiceMut
   }[mutation.phase];
   const danger = mutation.phase === "ERROR" || mutation.phase === "FORBIDDEN";
   return (
-    <div role={danger ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm ${danger ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100" : mutation.phase === "SUCCEEDED" ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100" : "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"}`}>
+    <div role={danger ? "alert" : "status"} className={`rounded-lg border px-4 py-3 text-sm ${danger ? "border-danger-200 bg-danger-50 text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-100" : mutation.phase === "SUCCEEDED" ? "border-brand-200 bg-brand-500/5 text-brand-900 dark:border-brand-800/60 dark:text-brand-100" : "border-warn-200 bg-warn-50 text-warn-950 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-100"}`}>
       <p className="font-semibold">{message}</p>
       {mutation.error ? <p className="mt-1 leading-6">{mutation.error.message}</p> : null}
       {mutation.error?.errorCode ? <code dir="ltr" className="mt-1 block break-all text-xs">{mutation.error.errorCode}</code> : null}
@@ -360,16 +348,19 @@ export function InvoiceSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSn
 }
 
 export function InvoiceStatusBadge({ status }: { status: Invoice["status"] }) {
-  const tone = status === "PAID"
-    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-    : status === "DRAFT"
-      ? "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
-      : status === "ISSUED" || status === "PARTIALLY_PAID"
-        ? "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200"
-        : status === "OVERDUE"
-          ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200"
-          : "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200";
-  return <span dir="ltr" className={`inline-flex rounded-full px-2.5 py-1 font-mono text-xs font-semibold ${tone}`}>{status}</span>;
+  const tone: "brand" | "neutral" | "warn" | "danger" =
+    status === "PAID"
+      ? "brand"
+      : status === "DRAFT" || status === "VOID"
+        ? "neutral"
+        : status === "ISSUED" || status === "PARTIALLY_PAID"
+          ? "warn"
+          : "danger";
+  return (
+    <Badge dir="ltr" tone={tone} className="font-mono">
+      {status}
+    </Badge>
+  );
 }
 
 export function InvoiceFieldError({ id, code, copy }: { id: string; code?: InvoiceValidationCode; copy: InvoiceCopy }) {
@@ -419,5 +410,10 @@ export function formatInvoiceMoney(value: string, currency: string): string {
 }
 
 export function RetryInvoiceButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-white dark:text-slate-950"><RefreshCw className="size-4" aria-hidden="true" />{label}</button>;
+  return (
+    <Button type="button" variant="primary" onClick={onClick}>
+      <RefreshCw className="size-4" aria-hidden="true" />
+      {label}
+    </Button>
+  );
 }
