@@ -1,7 +1,6 @@
 "use client";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { Save, Info, Lock, Loader2, RefreshCw } from "lucide-react";
+import { Save, Info, Lock, RefreshCw } from "lucide-react";
 import { SettingFieldData } from "../hooks/useSettings";
 import { useToast } from "@/components/ui/ToastContext";
 

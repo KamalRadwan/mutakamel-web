@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { AlertTriangle, Boxes, FileJson2, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
+import { AlertTriangle, FileJson2, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { Badge, Button, Card, PageHeader } from "@/design-system";
 import type {
   CoreSnapshot,

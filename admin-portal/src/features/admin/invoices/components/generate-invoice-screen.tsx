@@ -8,7 +8,6 @@ import { INVOICE_PURPOSES, type GenerateInvoiceDraft, type InvoiceValidationCode
 import {
   formatInvoiceMoney,
   INVOICE_COPY,
-  InvoiceFieldError,
   InvoiceMutationNotice,
   InvoicePageFrame,
   InvoiceSnapshotMeta,

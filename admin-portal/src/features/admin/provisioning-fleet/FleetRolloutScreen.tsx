@@ -25,7 +25,6 @@ import {
   FleetCommandNotice,
   FleetConfirmDialog,
   FleetDatum,
-  FleetFieldError,
   FleetHero,
   FleetMeta,
   FleetPageFrame,
@@ -261,8 +260,8 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.signatureHint}</p>
                       </header>
                       <fieldset disabled={pendingAttest} className="grid gap-3 md:grid-cols-2">
-                        <AttestationField id="fleet-attest-revision" label={copy.expectedRevision} value={attestationDraft.expectedRevision || String(report.revision)} error={attestationErrors.expectedRevision} copy={copy} type="number" onChange={(expectedRevision) => setAttestationDraft((current) => ({ ...current, expectedRevision }))} />
-                        <AttestationField id="fleet-publisher-key" label={copy.publisherKeyId} value={attestationDraft.publisherKeyId} error={attestationErrors.publisherKeyId} copy={copy} onChange={(publisherKeyId) => setAttestationDraft((current) => ({ ...current, publisherKeyId }))} />
+                        <AttestationField label={copy.expectedRevision} value={attestationDraft.expectedRevision || String(report.revision)} error={attestationErrors.expectedRevision} copy={copy} type="number" onChange={(expectedRevision) => setAttestationDraft((current) => ({ ...current, expectedRevision }))} />
+                        <AttestationField label={copy.publisherKeyId} value={attestationDraft.publisherKeyId} error={attestationErrors.publisherKeyId} copy={copy} onChange={(publisherKeyId) => setAttestationDraft((current) => ({ ...current, publisherKeyId }))} />
                       </fieldset>
                       <Field label={copy.signatureBase64} hint={copy.signatureHint} error={attestationErrors.signatureBase64 ? (copy.validation[attestationErrors.signatureBase64 as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
                         {(fieldProps) => (
@@ -425,7 +424,7 @@ function ReportDetail({ report, copy, copied, onCopy }: { report: FleetReport; c
   );
 }
 
-function AttestationField({ id, label, value, error, copy, type = "text", onChange }: { id: string; label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; type?: "text" | "number"; onChange: (value: string) => void }) {
+function AttestationField({ label, value, error, copy, type = "text", onChange }: { label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; type?: "text" | "number"; onChange: (value: string) => void }) {
   return (
     <Field label={label} error={error ? (copy.validation[error as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
       {(fieldProps) => (

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -208,11 +208,11 @@ export function FleetDirectoryScreen() {
               </Field>
 
               {draft.operationType === "ADD_APPLICATION" ? (
-                <TextField id="fleet-application-key" label={copy.applicationKey} value={draft.applicationKey} error={errors.applicationKey} copy={copy} onChange={(applicationKey) => setDraft((current) => ({ ...current, applicationKey }))} />
+                <TextField label={copy.applicationKey} value={draft.applicationKey} error={errors.applicationKey} copy={copy} onChange={(applicationKey) => setDraft((current) => ({ ...current, applicationKey }))} />
               ) : null}
               {draft.operationType === "DECOMMISSION" ? (
                 <div className="space-y-3">
-                  <TextField id="fleet-component-key" label={copy.componentKey} value={draft.componentKey} error={errors.componentKey} copy={copy} onChange={(componentKey) => setDraft((current) => ({ ...current, componentKey }))} />
+                  <TextField label={copy.componentKey} value={draft.componentKey} error={errors.componentKey} copy={copy} onChange={(componentKey) => setDraft((current) => ({ ...current, componentKey }))} />
                   <CheckField id="fleet-retention" label={copy.retentionAcknowledged} checked={draft.retentionAcknowledged} error={errors.retentionAcknowledged} copy={copy} onChange={(retentionAcknowledged) => setDraft((current) => ({ ...current, retentionAcknowledged }))} />
                 </div>
               ) : (
@@ -338,7 +338,7 @@ function TargetEditor({
           <div className="grid gap-3 md:grid-cols-2">
             {fields.map((field) => {
               const error = errors[`targets.${index}.${field.key}`];
-              return <TextField key={field.key} id={`fleet-target-${index}-${field.key}`} label={field.label} value={target[field.key]} error={error} copy={copy} mono={field.key !== "targetReleaseVersion" && field.key !== "componentKey"} onChange={(value) => setDraft((current) => ({ ...current, targets: current.targets.map((item, targetIndex) => targetIndex === index ? { ...item, [field.key]: value } : item) }))} />;
+              return <TextField key={field.key} label={field.label} value={target[field.key]} error={error} copy={copy} mono={field.key !== "targetReleaseVersion" && field.key !== "componentKey"} onChange={(value) => setDraft((current) => ({ ...current, targets: current.targets.map((item, targetIndex) => targetIndex === index ? { ...item, [field.key]: value } : item) }))} />;
             })}
           </div>
           <FleetFieldError id={`fleet-target-${index}-pair-error`} code={errors[`targets.${index}.currentPair`]} copy={copy} />
@@ -353,7 +353,7 @@ function TargetEditor({
   );
 }
 
-function TextField({ id, label, value, error, copy, onChange, mono }: { id: string; label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; onChange: (value: string) => void; mono?: boolean }) {
+function TextField({ label, value, error, copy, onChange, mono }: { label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; onChange: (value: string) => void; mono?: boolean }) {
   return (
     <Field label={label} error={error ? FleetFieldErrorText(error, copy) : undefined}>
       {(fieldProps) => (

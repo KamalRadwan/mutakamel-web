@@ -22,7 +22,6 @@ import {
   AlertDialogTitle,
   Button,
   Card,
-  CardContent,
   CodeRef,
   PageHeader,
 } from "@/design-system";
@@ -138,7 +137,7 @@ export function FleetStatePanel({
           <AlertTriangle className="mx-auto size-7 text-warn-600 dark:text-warn-400" aria-hidden="true" />
         )}
         <p className="mt-3 text-sm font-semibold text-foreground">{label}</p>
-        {error ? <FleetProblem error={error} copy={copy} /> : null}
+        {error ? <FleetProblem error={error} /> : null}
         {!loading && onRetry ? (
           <Button type="button" variant="outline" onClick={onRetry} className="mt-4">
             {copy.retry}
@@ -151,10 +150,8 @@ export function FleetStatePanel({
 
 export function FleetProblem({
   error,
-  copy,
 }: {
   error: NormalizedApiError;
-  copy: ProvisioningFleetCopy;
 }) {
   return (
     <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
@@ -216,7 +213,7 @@ export function FleetCommandNotice<T>({
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{text}</p>
           {view.error && view.error.errorCode !== "ADMIN_PERMISSION_REQUIRED" ? (
-            <FleetProblem error={view.error} copy={copy} />
+            <FleetProblem error={view.error} />
           ) : null}
           {view.idempotencyKey ? (
             <div className="mt-2">

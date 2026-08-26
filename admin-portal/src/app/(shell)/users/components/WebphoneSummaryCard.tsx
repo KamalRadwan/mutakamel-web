@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { PhoneCall, Edit2, CheckCircle2, XCircle, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import type { AdminWebphoneConfig } from "../types";

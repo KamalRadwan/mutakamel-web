@@ -35,7 +35,6 @@ import type {
 
 export default function ApplicationsPage() {
   const { user, isLoading } = useAuth();
-  const { t, lang } = useI18n();
   if (isLoading) {
     return <ApplicationsBoundary loading />;
   }
@@ -233,12 +232,12 @@ function ApplicationsCatalogueContent() {
         <FilterBar
           fields={[
             { key: "search", type: "search", placeholderEn: t.applications.searchPlaceholder, placeholderAr: t.applications.searchPlaceholder },
-            { key: "type", type: "select", placeholderEn: t.applications.filterType, placeholderAr: t.applications.filterType, options: selectOptions(["ALL", "SYSTEM", "TENANT"], lang) },
-            { key: "commercial", type: "select", placeholderEn: t.applications.filterCommercial, placeholderAr: t.applications.filterCommercial, options: selectOptions(["ALL", "NON_BILLABLE", "INCLUDED", "SUBSCRIPTION"], lang) },
-            { key: "visibility", type: "select", placeholderEn: t.applications.filterVisibility, placeholderAr: t.applications.filterVisibility, options: selectOptions(["ALL", "PUBLIC", "INTERNAL"], lang) },
-            { key: "lifecycle", type: "select", placeholderEn: t.applications.filterLifecycle, placeholderAr: t.applications.filterLifecycle, options: selectOptions(["ALL", "DRAFT", "ACTIVE", "DEPRECATED", "DISABLED"], lang) },
-            { key: "publication", type: "select", placeholderEn: t.applications.filterPublication, placeholderAr: t.applications.filterPublication, options: selectOptions(["ALL", "UNPUBLISHED", "PUBLISHED"], lang) },
-            { key: "deployment", type: "select", placeholderEn: t.applications.filterDatabaseDeployment, placeholderAr: t.applications.filterDatabaseDeployment, options: selectOptions(["ALL", "NONE", "ON_DEMAND", "PREWARM", "REQUIRED"], lang) },
+            { key: "type", type: "select", placeholderEn: t.applications.filterType, placeholderAr: t.applications.filterType, options: selectOptions(["ALL", "SYSTEM", "TENANT"]) },
+            { key: "commercial", type: "select", placeholderEn: t.applications.filterCommercial, placeholderAr: t.applications.filterCommercial, options: selectOptions(["ALL", "NON_BILLABLE", "INCLUDED", "SUBSCRIPTION"]) },
+            { key: "visibility", type: "select", placeholderEn: t.applications.filterVisibility, placeholderAr: t.applications.filterVisibility, options: selectOptions(["ALL", "PUBLIC", "INTERNAL"]) },
+            { key: "lifecycle", type: "select", placeholderEn: t.applications.filterLifecycle, placeholderAr: t.applications.filterLifecycle, options: selectOptions(["ALL", "DRAFT", "ACTIVE", "DEPRECATED", "DISABLED"]) },
+            { key: "publication", type: "select", placeholderEn: t.applications.filterPublication, placeholderAr: t.applications.filterPublication, options: selectOptions(["ALL", "UNPUBLISHED", "PUBLISHED"]) },
+            { key: "deployment", type: "select", placeholderEn: t.applications.filterDatabaseDeployment, placeholderAr: t.applications.filterDatabaseDeployment, options: selectOptions(["ALL", "NONE", "ON_DEMAND", "PREWARM", "REQUIRED"]) },
           ]}
           values={{
             search,
@@ -299,7 +298,7 @@ function ApplicationsBoundary({ loading = false }: { loading?: boolean }) {
   );
 }
 
-function selectOptions(values: readonly string[], lang: "ar" | "en") {
+function selectOptions(values: readonly string[]) {
   return values.map((value) => ({ value, labelEn: optionLabel(value, "en"), labelAr: optionLabel(value, "ar") }));
 }
 

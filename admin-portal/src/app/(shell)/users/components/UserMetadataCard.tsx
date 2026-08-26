@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { Clock, ShieldAlert, Calendar, Copy } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";

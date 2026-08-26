@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import {
-  AlertTriangle,
   Boxes,
   FlaskConical,
   KeyRound,

@@ -17,8 +17,7 @@ import { useI18n } from "@/i18n/I18nContext";
 
 export function SettingsSidebar() {
   const pathname = usePathname();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
 
   const links = [
     {

@@ -99,18 +99,6 @@ export function WebRTCPhoneWidget() {
 
   if (!phone.shouldRender) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const connectionLabel =
-    phone.connectionState === 'registered'
-      ? labels.registered
-      : phone.connectionState === 'connecting' || phone.connectionState === 'loading'
-        ? labels.connecting
-        : phone.connectionState === 'error'
-          ? labels.error
-          : phone.connectionState === 'offline'
-            ? labels.offline
-            : labels.ready;
-
   return (
     <>
       <IncomingCallPopup

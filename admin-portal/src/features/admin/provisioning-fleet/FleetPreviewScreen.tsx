@@ -172,10 +172,10 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
             ) : (
               <form onSubmit={submit} noValidate className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <NumberField id="fleet-canary" label={copy.canarySize} value={draft.canarySize} error={errors.canarySize} copy={copy} onChange={(canarySize) => setDraft((current) => ({ ...current, canarySize }))} />
-                  <NumberField id="fleet-batch-size" label={copy.batchSize} value={draft.batchSize} error={errors.batchSize} copy={copy} onChange={(batchSize) => setDraft((current) => ({ ...current, batchSize }))} />
-                  <NumberField id="fleet-parallel" label={copy.maxParallel} value={draft.maxParallel} error={errors.maxParallel} copy={copy} onChange={(maxParallel) => setDraft((current) => ({ ...current, maxParallel }))} />
-                  <NumberField id="fleet-failure" label={copy.failureThreshold} value={draft.failureThreshold} error={errors.failureThreshold} copy={copy} onChange={(failureThreshold) => setDraft((current) => ({ ...current, failureThreshold }))} />
+                  <NumberField label={copy.canarySize} value={draft.canarySize} error={errors.canarySize} copy={copy} onChange={(canarySize) => setDraft((current) => ({ ...current, canarySize }))} />
+                  <NumberField label={copy.batchSize} value={draft.batchSize} error={errors.batchSize} copy={copy} onChange={(batchSize) => setDraft((current) => ({ ...current, batchSize }))} />
+                  <NumberField label={copy.maxParallel} value={draft.maxParallel} error={errors.maxParallel} copy={copy} onChange={(maxParallel) => setDraft((current) => ({ ...current, maxParallel }))} />
+                  <NumberField label={copy.failureThreshold} value={draft.failureThreshold} error={errors.failureThreshold} copy={copy} onChange={(failureThreshold) => setDraft((current) => ({ ...current, failureThreshold }))} />
                 </div>
                 <FleetFieldError id="fleet-preview-expired" code={errors.preview} copy={copy} />
                 <FleetCommandNotice
@@ -265,7 +265,7 @@ function PreviewTargets({ preview, copy }: { preview: FleetPreview; copy: Return
   );
 }
 
-function NumberField({ id, label, value, error, copy, onChange }: { id: string; label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; onChange: (value: string) => void }) {
+function NumberField({ label, value, error, copy, onChange }: { label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; onChange: (value: string) => void }) {
   return (
     <Field label={label} error={error ? (copy.validation[error as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
       {(fieldProps) => (
