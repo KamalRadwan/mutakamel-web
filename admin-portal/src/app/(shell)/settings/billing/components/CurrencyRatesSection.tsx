@@ -3,6 +3,21 @@
 import { useState, useEffect } from "react";
 import { useCurrencyRates } from "../hooks/useCurrencyRates";
 import { Coins, Plus, Edit2, Loader2, RefreshCw, CheckCircle2, XCircle, DollarSign } from "lucide-react";
+import {
+  Card,
+  Button,
+  Input,
+  Textarea,
+  Checkbox,
+  Badge,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  type ColumnDef,
+} from "@/design-system";
+import type { CurrencyRateView } from "../hooks/useCurrencyRates";
 
 function formatCurrencyRate(val: string): string {
   const [whole, fraction = ""] = val.split(".");
@@ -80,19 +95,81 @@ export function CurrencyRatesSection() {
     }
   };
 
+  const columns: ColumnDef<CurrencyRateView>[] = [
+    {
+      key: "currency",
+      headerEn: lang === "ar" ? "العملة" : "Currency",
+      headerAr: lang === "ar" ? "العملة" : "Currency",
+      cell: (rate) => <span className="font-mono font-semibold text-foreground">{rate.currencyCode}</span>,
+    },
+    {
+      key: "rate",
+      headerEn: lang === "ar" ? "الوحدات مقابل 1.00 USD" : "Units per 1.00 USD",
+      headerAr: lang === "ar" ? "الوحدات مقابل 1.00 USD" : "Units per 1.00 USD",
+      cell: (rate) => <span className="font-mono text-foreground">{formatCurrencyRate(rate.currencyUnitsPerUsd)}</span>,
+    },
+    {
+      key: "status",
+      headerEn: lang === "ar" ? "الحالة" : "Status",
+      headerAr: lang === "ar" ? "الحالة" : "Status",
+      cell: (rate) =>
+        rate.isActive ? (
+          <Badge tone="brand">
+            <CheckCircle2 className="size-3" aria-hidden="true" />
+            {lang === "ar" ? "نشط" : "Active"}
+          </Badge>
+        ) : (
+          <Badge tone="neutral">
+            <XCircle className="size-3" aria-hidden="true" />
+            {lang === "ar" ? "غير نشط" : "Inactive"}
+          </Badge>
+        ),
+    },
+    ...(canManage
+      ? [
+          {
+            key: "actions",
+            headerEn: lang === "ar" ? "الإجراءات" : "Actions",
+            headerAr: lang === "ar" ? "الإجراءات" : "Actions",
+            align: "end" as const,
+            cell: (rate: CurrencyRateView) => (
+              <div className="flex items-center justify-end gap-2">
+                <Button type="button" variant="ghost" size="sm" onClick={() => toggleRateStatus(rate)}>
+                  {rate.isActive
+                    ? lang === "ar" ? "تعطيل" : "Deactivate"
+                    : lang === "ar" ? "تفعيل" : "Activate"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  title={lang === "ar" ? "تعديل" : "Edit"}
+                  onClick={() => {
+                    setEditingRate(rate);
+                    setIsAddModalOpen(true);
+                  }}
+                >
+                  <Edit2 className="size-3.5" aria-hidden="true" />
+                </Button>
+              </div>
+            ),
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
-      {/* Section Header */}
-      <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+    <Card className="overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border p-5">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
-            <Coins className="w-5 h-5" />
+          <div className="rounded-lg bg-brand-500/10 p-2.5 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+            <Coins className="size-5" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-foreground">
               {lang === "ar" ? "أسعار صرف العملات" : "Currency Exchange Rates"}
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {lang === "ar"
                 ? "إدارة أسعار الصرف بالنسبة للعملة الأساسية (الدولار الأمريكي USD 1.00)."
                 : "Manage foreign exchange conversion units per 1.00 USD."}
@@ -101,210 +178,186 @@ export function CurrencyRatesSection() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={fetchRates}
-            disabled={isLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
-            title={lang === "ar" ? "تحديث" : "Refresh"}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          <Button type="button" variant="ghost" size="sm" onClick={fetchRates} disabled={isLoading} title={lang === "ar" ? "تحديث" : "Refresh"}>
+            <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
             {lang === "ar" ? "تحديث" : "Refresh"}
-          </button>
+          </Button>
 
           {canManage && (
-            <><button type="button" onClick={() => { setBatchText(rates.map((rate) => `${rate.currencyCode},${rate.currencyUnitsPerUsd},${rate.isActive}`).join("\n")); setIsBatchOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950/30">{lang === "ar" ? "تعديل جماعي" : "Batch edit"}</button><button
-              type="button"
-              onClick={() => {
-                setEditingRate(null);
-                setIsAddModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-500 shadow-sm transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              {lang === "ar" ? "إضافة عملة" : "Add Currency Rate"}
-            </button></>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setBatchText(rates.map((rate) => `${rate.currencyCode},${rate.currencyUnitsPerUsd},${rate.isActive}`).join("\n"));
+                  setIsBatchOpen(true);
+                }}
+              >
+                {lang === "ar" ? "تعديل جماعي" : "Batch edit"}
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setEditingRate(null);
+                  setIsAddModalOpen(true);
+                }}
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                {lang === "ar" ? "إضافة عملة" : "Add Currency Rate"}
+              </Button>
+            </>
           )}
         </div>
       </div>
 
-      {/* Base Currency Badge */}
-      <div className="bg-slate-50 dark:bg-slate-950/50 px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-        <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+      <div className="flex items-center gap-2 border-b border-border bg-muted px-5 py-3 text-xs text-muted-foreground">
+        <DollarSign className="size-4 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
         <span>
-          <strong className="font-semibold text-slate-900 dark:text-slate-200">USD (USD 1.00)</strong>{" "}
+          <strong className="font-semibold text-foreground">USD (USD 1.00)</strong>{" "}
           {lang === "ar" ? "هي العملة الأساسية للنظام ولا تتغير." : "is the system base currency (fixed)."}&nbsp;
-          <span className="font-semibold text-slate-500">
+          <span className="font-semibold text-muted-foreground">
             ({lang === "ar" ? "إجمالي العملات المدارة:" : "Total Managed Currencies:"} {rates.length + 1})
           </span>
         </span>
       </div>
 
-      {/* Rates Table / List */}
       <div className="p-5">
-        {error && <div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">{error}</div>}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-10 text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin me-2" />
-            <span className="text-xs">{lang === "ar" ? "جاري تحميل أسعار الصرف..." : "Loading exchange rates..."}</span>
+        {error && (
+          <div role="alert" className="mb-4 rounded-lg border border-danger-200 bg-danger-50 p-3 text-xs text-danger-700 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-300">
+            {error}
           </div>
-        ) : rates.length === 0 ? (
-          <div className="text-center py-8">
-            <Coins className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+        )}
+        {rates.length === 0 && !isLoading ? (
+          <div className="py-8 text-center">
+            <Coins className="mx-auto mb-2 size-8 text-muted-foreground" aria-hidden="true" />
+            <p className="text-xs font-medium text-muted-foreground">
               {lang === "ar" ? "لا توجد عملات إضافية معرفة بعد." : "No foreign exchange rates defined yet."}
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-start">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold">
-                  <th className="py-2.5 px-3 text-start">{lang === "ar" ? "العملة" : "Currency"}</th>
-                  <th className="py-2.5 px-3 text-start">{lang === "ar" ? "الوحدات مقابل 1.00 USD" : "Units per 1.00 USD"}</th>
-                  <th className="py-2.5 px-3 text-start">{lang === "ar" ? "الحالة" : "Status"}</th>
-                  {canManage && <th className="py-2.5 px-3 text-end">{lang === "ar" ? "الإجراءات" : "Actions"}</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {rates.map((rate) => (
-                  <tr key={rate.currencyCode} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-slate-100">
-                      {rate.currencyCode}
-                    </td>
-                    <td className="py-3 px-3 font-mono text-slate-700 dark:text-slate-300">
-                      {formatCurrencyRate(rate.currencyUnitsPerUsd)}
-                    </td>
-                    <td className="py-3 px-3">
-                      {rate.isActive ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                          <CheckCircle2 className="w-3 h-3" />
-                          {lang === "ar" ? "نشط" : "Active"}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                          <XCircle className="w-3 h-3" />
-                          {lang === "ar" ? "غير نشط" : "Inactive"}
-                        </span>
-                      )}
-                    </td>
-                    {canManage && (
-                      <td className="py-3 px-3 text-end">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => toggleRateStatus(rate)}
-                            className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
-                          >
-                            {rate.isActive
-                              ? lang === "ar" ? "تعطيل" : "Deactivate"
-                              : lang === "ar" ? "تفعيل" : "Activate"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingRate(rate);
-                              setIsAddModalOpen(true);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title={lang === "ar" ? "تعديل" : "Edit"}
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            data={rates}
+            isLoading={isLoading}
+            getRowId={(rate) => rate.currencyCode}
+            pagination={{
+              page: 1,
+              limit: Math.max(rates.length, 1),
+              totalItems: rates.length,
+              totalPages: 1,
+              onPageChange: () => {},
+            }}
+          />
         )}
       </div>
 
-      {/* Add / Edit Modal */}
-      {(isAddModalOpen || editingRate) && (
-        <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+      <Dialog open={isAddModalOpen || Boolean(editingRate)} onOpenChange={(open) => { if (!open) { setIsAddModalOpen(false); setEditingRate(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">
               {editingRate
                 ? lang === "ar"
                   ? `تعديل سعر صرف (${editingRate.currencyCode})`
                   : `Edit Exchange Rate (${editingRate.currencyCode})`
                 : lang === "ar"
-                ? "إضافة سعر صرف جديد"
-                : "Add New Exchange Rate"}
-            </h3>
+                  ? "إضافة سعر صرف جديد"
+                  : "Add New Exchange Rate"}
+            </DialogTitle>
+          </DialogHeader>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  {lang === "ar" ? "رمز العملة (3 أحرف ISO)" : "Currency Code (3 ISO Letters)"}
-                </label>
-                <input
-                  type="text"
-                  maxLength={3}
-                  required
-                  disabled={Boolean(editingRate)}
-                  value={formCurrencyCode}
-                  onChange={(e) => setFormCurrencyCode(e.target.value.toUpperCase())}
-                  placeholder="EUR, EGP, SAR..."
-                  className="w-full h-9 px-3 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                />
-              </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted-foreground">
+                {lang === "ar" ? "رمز العملة (3 أحرف ISO)" : "Currency Code (3 ISO Letters)"}
+              </label>
+              <Input
+                type="text"
+                maxLength={3}
+                required
+                disabled={Boolean(editingRate)}
+                value={formCurrencyCode}
+                onChange={(e) => setFormCurrencyCode(e.target.value.toUpperCase())}
+                placeholder="EUR, EGP, SAR..."
+                className="font-mono"
+              />
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  {lang === "ar" ? "الوحدات مقابل 1.00 USD" : "Units per 1.00 USD"}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formUnitsPerUsd}
-                  onChange={(e) => setFormUnitsPerUsd(e.target.value)}
-                  placeholder="e.g. 48.50"
-                  className="w-full h-9 px-3 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted-foreground">
+                {lang === "ar" ? "الوحدات مقابل 1.00 USD" : "Units per 1.00 USD"}
+              </label>
+              <Input
+                type="text"
+                required
+                value={formUnitsPerUsd}
+                onChange={(e) => setFormUnitsPerUsd(e.target.value)}
+                placeholder="e.g. 48.50"
+                className="font-mono"
+              />
+            </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="formIsActive"
-                  checked={formIsActive}
-                  onChange={(e) => setFormIsActive(e.target.checked)}
-                  className="rounded text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor="formIsActive" className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
-                  {lang === "ar" ? "تفعيل هذه العملة" : "Active currency rate"}
-                </label>
-              </div>
+            <label className="flex items-center gap-2 pt-1 text-xs font-semibold text-muted-foreground">
+              <Checkbox checked={formIsActive} onCheckedChange={(checked) => setFormIsActive(checked === true)} />
+              {lang === "ar" ? "تفعيل هذه العملة" : "Active currency rate"}
+            </label>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddModalOpen(false);
-                    setEditingRate(null);
-                  }}
-                  className="h-9 px-4 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                  {lang === "ar" ? "إلغاء" : "Cancel"}
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="h-9 px-4 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {lang === "ar" ? "حفظ" : "Save"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {isBatchOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"><div role="dialog" aria-modal="true" aria-labelledby="batch-rates-title" className="w-full max-w-lg space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900"><div><h3 id="batch-rates-title" className="text-base font-semibold">{lang === "ar" ? "تعديل أسعار الصرف جماعياً" : "Batch edit currency rates"}</h3><p className="mt-1 text-xs text-slate-500">{lang === "ar" ? "سطر لكل عملة: الرمز، السعر، الحالة." : "One line per currency: CODE,RATE,ACTIVE. Omitted currencies stay unchanged."}</p></div><form onSubmit={handleBatchSubmit} className="space-y-4"><textarea value={batchText} onChange={(event) => setBatchText(event.target.value)} rows={10} spellCheck={false} placeholder="EUR,0.9300,true" className="w-full resize-none rounded-xl border border-slate-300 bg-slate-50 p-3 font-mono text-xs outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950" />{batchError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">{batchError}</p>}<div className="flex justify-end gap-2"><button type="button" onClick={() => setIsBatchOpen(false)} className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">{lang === "ar" ? "إلغاء" : "Cancel"}</button><button type="submit" disabled={isSaving} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{lang === "ar" ? "حفظ الكل" : "Save batch"}</button></div></form></div></div>}
-    </div>
+            <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setEditingRate(null);
+                }}
+              >
+                {lang === "ar" ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button type="submit" variant="primary" disabled={isSaving}>
+                {isSaving && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+                {lang === "ar" ? "حفظ" : "Save"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBatchOpen} onOpenChange={(open) => !open && setIsBatchOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base">{lang === "ar" ? "تعديل أسعار الصرف جماعياً" : "Batch edit currency rates"}</DialogTitle>
+            <p className="text-xs text-muted-foreground">
+              {lang === "ar" ? "سطر لكل عملة: الرمز، السعر، الحالة." : "One line per currency: CODE,RATE,ACTIVE. Omitted currencies stay unchanged."}
+            </p>
+          </DialogHeader>
+          <form onSubmit={handleBatchSubmit} className="space-y-4">
+            <Textarea
+              value={batchText}
+              onChange={(event) => setBatchText(event.target.value)}
+              rows={10}
+              spellCheck={false}
+              placeholder="EUR,0.9300,true"
+              className="resize-none font-mono"
+            />
+            {batchError && (
+              <p role="alert" className="rounded-lg border border-danger-200 bg-danger-50 p-3 text-xs text-danger-700 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-300">
+                {batchError}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsBatchOpen(false)}>
+                {lang === "ar" ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button type="submit" variant="primary" disabled={isSaving}>
+                {isSaving && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+                {lang === "ar" ? "حفظ الكل" : "Save batch"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }
