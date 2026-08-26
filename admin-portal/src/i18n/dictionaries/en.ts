@@ -921,6 +921,13 @@ export const en: Dictionary = {
       createdAt: "Created At",
       updatedAt: "Last Updated",
       connectionParameters: "Recommended Connection Parameters",
+      sslStatusDisabled: "TLS disabled",
+      sslStatusBundleConfigured: "Bundle configured",
+      sslStatusStrict: "Encrypted · Strict",
+      sslStatusRelaxed: "Encrypted · Relaxed",
+      driverConfigLabel: "PostgreSQL core driver config",
+      driverConfigNote:
+        "Tenant placements use this host as a physical database server target. Schemas and databases are allocated dynamically under tenant provisioning workflows.",
     },
     readiness: {
       title: "Database Access Readiness",
@@ -966,7 +973,10 @@ export const en: Dictionary = {
         loading: "Loading Application bindings…",
         empty: "No applications bound to this server",
         retry: "Retry",
+        rotationEvery: "Every {{hours}}h",
+        rotationDue: "Due: {{date}}",
       },
+      bindingsCount: "{{count}} binding(s)",
     },
     security: {
       title: "SSL/TLS Security & Encryption Setup",
@@ -979,9 +989,24 @@ export const en: Dictionary = {
       relaxedVerification: "Relaxed Verification",
       tlsDisabled: "TLS is disabled (Not recommended for production)",
       certConfigured: "Certificate bundle configured",
+      noCustomBundle: "No custom bundle attached",
       encryptedBoundaryTitle: "Encrypted Credential Boundary",
       encryptedBoundaryDesc:
         "Core ensures strict security by never revealing database passwords to the browser storage or UI logs. Access is managed via cryptographically secured principles.",
+      passwordBoundaryNote:
+        "Zero plain-text password persistence in browser storage or telemetry logs.",
+      isolatedCredentialsNote:
+        "Isolated service credentials (mutakamel_provisioner, application database keys).",
+      auditLoggingNote:
+        "Audit logging records all password rotation events with cryptographically generated receipts.",
+      sslModeHelp: {
+        allow: "Connects via plain text first; switches to SSL if forced by host.",
+        prefer: "Tries SSL connection first; falls back to unencrypted if unsupported.",
+        require: "Requires encrypted connection without validating host certificate authority.",
+        verifyCa: "Enforces TLS encryption and validates the database server Certificate Authority (CA).",
+        verifyFull: "Enforces TLS encryption, validates Certificate Authority, and verifies hostname match.",
+        fallback: "Standard TLS transport encryption configuration.",
+      },
     },
     history: {
       title: "Database Server Modification History",

@@ -886,6 +886,13 @@ export const ar = {
       createdAt: "تاريخ الإنشاء",
       updatedAt: "آخر تحديث",
       connectionParameters: "معلمات الاتصال الموصى بها",
+      sslStatusDisabled: "TLS معطّل",
+      sslStatusBundleConfigured: "الحزمة مُهيأة",
+      sslStatusStrict: "مشفّر · صارم",
+      sslStatusRelaxed: "مشفّر · مرن",
+      driverConfigLabel: "إعداد برنامج تشغيل PostgreSQL الأساسي",
+      driverConfigNote:
+        "تستخدم مواضع المستأجرين هذا المضيف كخادم قاعدة بيانات فعلي مستهدف. تُخصَّص قواعد البيانات والمخططات ديناميكيًا ضمن مسارات تجهيز المستأجرين.",
     },
     readiness: {
       title: "جاهزية الوصول لخادم قاعدة البيانات",
@@ -931,7 +938,10 @@ export const ar = {
         loading: "جاري تحميل ارتباطات التطبيقات...",
         empty: "لا توجد تطبيقات مرتبطة بهذا السيرفر",
         retry: "إعادة المحاولة",
+        rotationEvery: "كل {{hours}} س",
+        rotationDue: "الاستحقاق: {{date}}",
       },
+      bindingsCount: "{{count}} ربط",
     },
     security: {
       title: "إعدادات الأمان وتشفير SSL/TLS",
@@ -943,10 +953,25 @@ export const ar = {
       relaxedVerification: "التحقق المرن (Relaxed Verification)",
       tlsDisabled: "تشفير TLS معطل (غير مستحسن في الإنتاج)",
       certConfigured: "تم تهيئة حزمة شهادات الأمان (CA Bundle)",
+      noCustomBundle: "لا توجد حزمة شهادات مخصصة مرفقة",
       encryptedBoundaryTitle:
         "حدود الاعتمادات المشفرة (Encrypted Credential Boundary)",
       encryptedBoundaryDesc:
         "يضمن النظام حماية كلمات المرور عبر عدم تخزينها أو كشفها في متصفح المستخدم أو سجلات التشغيل. يتم الوصول فقط عبر مفاتيح مؤمنة تشفيرياً.",
+      passwordBoundaryNote:
+        "لا يوجد أي احتفاظ بكلمات مرور نصية صريحة في تخزين المتصفح أو سجلات التتبع.",
+      isolatedCredentialsNote:
+        "بيانات اعتماد خدمة معزولة (mutakamel_provisioner، مفاتيح قواعد بيانات التطبيقات).",
+      auditLoggingNote:
+        "يسجل سجل التدقيق جميع أحداث تدوير كلمات المرور بإيصالات مُنشأة تشفيريًا.",
+      sslModeHelp: {
+        allow: "يتصل أولاً عبر نص عادي غير مشفر؛ يتحول إلى SSL إذا فرضه المضيف.",
+        prefer: "يحاول الاتصال عبر SSL أولاً؛ يعود إلى اتصال غير مشفر إذا لم يكن مدعومًا.",
+        require: "يتطلب اتصالاً مشفرًا دون التحقق من هيئة إصدار شهادة المضيف.",
+        verifyCa: "يفرض تشفير TLS ويتحقق من هيئة إصدار الشهادات (CA) لخادم قاعدة البيانات.",
+        verifyFull: "يفرض تشفير TLS، ويتحقق من هيئة إصدار الشهادات، ويتأكد من تطابق اسم المضيف.",
+        fallback: "إعداد قياسي لتشفير النقل TLS.",
+      },
     },
     history: {
       title: "سجل تعديلات وأنشطة السيرفر",
