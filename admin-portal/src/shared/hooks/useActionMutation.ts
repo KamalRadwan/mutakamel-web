@@ -3,6 +3,7 @@ import { useIdempotency } from "@/shared/hooks/useIdempotency";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
 import { useToast } from "@/components/ui/ToastContext";
 import { shouldRotateWriteCommandKey } from "@/shared/api/write-command-recovery";
+import { useI18n } from "@/i18n/I18nContext";
 
 export interface ActionMutationOptions<TResult> {
   onSuccessMessage?: string;
@@ -13,6 +14,7 @@ export interface ActionMutationOptions<TResult> {
 
 export function useActionMutation() {
   const toast = useToast();
+  const { lang } = useI18n();
   const { getIdempotencyKey, resetKey } = useIdempotency();
   const [isMutating, setIsMutating] = useState(false);
 
@@ -26,7 +28,7 @@ export function useActionMutation() {
       const key = getIdempotencyKey(idempotencyPayload);
       const result = await action(key);
       if (options?.onSuccessMessage) {
-        toast.success("Success", options.onSuccessMessage);
+        toast.success(lang === "ar" ? "نجاح" : "Success", options.onSuccessMessage);
       }
       resetKey();
       if (options?.onSuccess) {
@@ -41,7 +43,7 @@ export function useActionMutation() {
       if (options?.onErrorReconcile) {
         await options.onErrorReconcile();
       }
-      toast.error("Error", normalized.message);
+      toast.error(lang === "ar" ? "خطأ" : "Error", normalized.message);
       throw normalized;
     } finally {
       setIsMutating(false);
