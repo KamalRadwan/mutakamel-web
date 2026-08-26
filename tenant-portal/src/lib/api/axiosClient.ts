@@ -665,61 +665,44 @@ function prepareRequest(
 }
 
 function hasRecentUserInteraction(): boolean {
-  installActivityTracking();
   return (
     typeof document !== "undefined" &&
-    document.visibilityState !== "hidden" &&
+    document.visibilityState === "visible" &&
     lastUserInteractionAt > 0 &&
     Date.now() - lastUserInteractionAt <= RECENT_USER_ACTIVITY_MS
   );
 }
 
-function installActivityTracking(): void {
-  if (
-    activityTrackingInstalled ||
-    typeof window === "undefined" ||
-    typeof window.addEventListener !== "function"
-  ) {
-    return;
-  }
-  activityTrackingInstalled = true;
-  const recordInteraction = (event: Event) => {
-    if (!event.isTrusted) return;
-    lastUserInteractionAt = Date.now();
-  };
-  window.addEventListener("pointerdown", recordInteraction, {
-    capture: true,
-    passive: true,
-  });
-  window.addEventListener("keydown", recordInteraction, { capture: true });
-  window.addEventListener("touchstart", recordInteraction, {
-    capture: true,
-    passive: true,
-  });
-}
-
-export function synchronizeTenantTabSession(sessionId?: string): void {
-  if (!sessionId || typeof window === "undefined") return;
+export function synchronizeTenantTabSession(event: TenantAuthEvent): void {
+  if (typeof window === "undefined" || event.kind !== "session-updated") return;
   const metadata = getStoredTenantSessionMeta();
-  if (!metadata || metadata.sessionId === sessionId) return;
-  safeSessionStorage.removeItem(SESSION_META_KEY);
-  lastActivityTouchAt = 0;
+  if (metadata && metadata.sessionId !== event.sessionId) {
+    safeSessionStorage.removeItem(SESSION_META_KEY);
+    lastActivityTouchAt = 0;
+  }
+  if (!event.timing) return;
+  safeSessionStorage.setItem(SESSION_META_KEY, JSON.stringify({
+    savedAt: event.issuedAt,
+    expiresIn: event.timing.expiresIn,
+    sessionExpiresIn: event.timing.sessionExpiresIn,
+    tokenType: "Bearer",
+    sessionId: event.sessionId,
+    remember:
+      metadata?.sessionId === event.sessionId
+        ? metadata.remember
+        : safeStorage.getItem(REMEMBER_PREFERENCE_KEY) === "1",
+    authorizationVersion: event.timing.authorizationVersion,
+    profileVersion: event.timing.profileVersion,
+    authEventId: event.eventId,
+  } satisfies TenantSessionMetadata));
 }
 
-function endTenantBrowserSession(): void {
-  const sessionId = getStoredTenantSessionMeta()?.sessionId;
+function endTenantBrowserSession(expectedSessionId: string | null): void {
+  const sessionId = getStoredTenantSessionMeta()?.sessionId ?? null;
+  if (!expectedSessionId || sessionId !== expectedSessionId) return;
   clearLocalTenantAuthState();
   publishTenantAuthEvent("session-ended", sessionId, true);
   publishTenantAuthLifecycle("ENDED");
-}
-
-function adoptExternalAuthEvent(eventId: string): void {
-  const metadata = getStoredTenantSessionMeta();
-  if (!metadata) return;
-  safeSessionStorage.setItem(
-    SESSION_META_KEY,
-    JSON.stringify({ ...metadata, authEventId: eventId }),
-  );
 }
 
 function removeLegacyBrowserTokens(): void {
