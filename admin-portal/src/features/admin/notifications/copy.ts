@@ -2,7 +2,6 @@ export type NotificationLanguage = "ar" | "en";
 
 const en = {
   title: "Notification center",
-  description: "Review your administrative notifications, delivery preferences, and push-device registration.",
   inbox: "Inbox",
   preferences: "Personal preferences",
   devices: "Push device token",
@@ -117,7 +116,6 @@ type CopyShape<T> = {
 
 const ar: CopyShape<typeof en> = {
   title: "مركز الإشعارات",
-  description: "راجع إشعارات الإدارة وتفضيلات التسليم وتسجيل أجهزة الدفع الخاصة بك.",
   inbox: "صندوق الوارد",
   preferences: "التفضيلات الشخصية",
   devices: "رمز جهاز الدفع",

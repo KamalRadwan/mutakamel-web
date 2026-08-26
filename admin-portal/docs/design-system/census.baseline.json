@@ -1,24 +1,24 @@
 {
-  "generatedAt": "2026-08-26T17:08:49.957Z",
+  "generatedAt": "2026-08-26T17:15:53.651Z",
   "fileCount": 568,
   "counts": {
-    "colorUtilityTotal": 5226,
+    "colorUtilityTotal": 5176,
     "arbitraryTypeSize": 24,
-    "textXs": 1058,
+    "textXs": 1049,
     "fontBoldOrHeavier": 0,
-    "fontNormalOrMedium": 76,
-    "roundedXl": 564,
+    "fontNormalOrMedium": 80,
+    "roundedXl": 554,
     "rounded2xl": 0,
     "rounded3xl": 0,
-    "gradients": 16,
-    "backdropBlur": 23,
+    "gradients": 15,
+    "backdropBlur": 22,
     "navbarRenderSites": 0,
     "handRolledTables": 15,
     "physicalRtlViolations": 0,
     "toastCallSites": 155
   },
   "colorFamilyCounts": {
-    "slate": 3022,
+    "slate": 2990,
     "gray": 0,
     "zinc": 0,
     "neutral": 0,
@@ -31,15 +31,15 @@
     "green": 0,
     "emerald": 316,
     "teal": 3,
-    "cyan": 187,
+    "cyan": 185,
     "sky": 10,
-    "blue": 505,
+    "blue": 495,
     "indigo": 89,
     "violet": 121,
     "purple": 42,
     "fuchsia": 0,
     "pink": 1,
-    "rose": 475
+    "rose": 469
   },
   "colorFamiliesInUse": 13
 }
