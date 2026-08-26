@@ -57,6 +57,27 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": ["warn", ...designSystemRestrictedSyntax],
     },
   },
+  {
+    // Correctness guard, not a migration-tracking rule, so it applies
+    // everywhere including src/design-system/ itself. The transport layer
+    // already fires a toast on every non-public 403 (dispatchForbiddenToast
+    // in axiosClient.ts via the "global-toast" window event) — a
+    // toast.error(...) inside a catch block that also references 403 or
+    // AUTHORIZATION double-fires. See docs/design-system/toast-contract.md.
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector:
+            "CatchClause:has(CallExpression[callee.property.name='error'][callee.object.name='toast']):has(Literal[value=403]), " +
+            "CatchClause:has(CallExpression[callee.property.name='error'][callee.object.name='toast']):has(Literal[value=/AUTHORIZATION/])",
+          message:
+            "toast.error(...) here may double-fire with the transport's own 403 toast (dispatchForbiddenToast) — see docs/design-system/toast-contract.md.",
+        },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
