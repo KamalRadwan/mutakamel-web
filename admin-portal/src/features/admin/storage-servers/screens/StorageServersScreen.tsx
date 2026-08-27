@@ -20,8 +20,8 @@ import { useStorageServers } from "../hooks/useStorageServers";
 import type { StorageServerView } from "../types";
 
 export function StorageServersScreen() {
-  const { lang } = useI18n();
-  const isArabic = lang === "ar";
+  const { lang, t } = useI18n();
+  const copy = t.storageServersList;
   const view = useStorageServers();
   const activeOnPage = view.servers.filter((server) => server.status === "ACTIVE").length;
   const freshOnPage = view.servers.filter((server) => server.connectionEvidenceFresh).length;
@@ -31,7 +31,7 @@ export function StorageServersScreen() {
       <div className="grid min-h-80 place-items-center text-sm font-semibold text-muted-foreground">
         <span className="flex items-center gap-2">
           <RefreshCw className="size-5 animate-spin" />
-          {isArabic ? "جارٍ التحقق من الصلاحيات…" : "Checking permissions…"}
+          {copy.checkingPermissions}
         </span>
       </div>
     );
@@ -40,13 +40,13 @@ export function StorageServersScreen() {
     return (
       <div className="mx-auto max-w-xl rounded-lg border border-border bg-card">
         <ErrorState
-          title={isArabic ? "تم رفض الوصول" : "Access denied"}
+          title={copy.accessDeniedTitle}
           error={{
             isNormalized: true,
             httpStatus: 403,
             errorCode: "ADMIN_PERMISSION_DENIED",
             errorCategory: "AUTHORIZATION",
-            message: isArabic ? "لا تملك صلاحية قراءة خوادم التخزين." : "You do not have permission to read Storage Servers.",
+            message: copy.accessDeniedMessage,
           }}
         />
       </div>
@@ -64,7 +64,7 @@ export function StorageServersScreen() {
             {server.name}
           </Link>
           <p className="mt-1 font-mono text-xs text-muted-foreground">{server.code}</p>
-          {server.isPlatformDefault && <Badge tone="brand" className="mt-1.5">{isArabic ? "الافتراضي" : "Platform default"}</Badge>}
+          {server.isPlatformDefault && <Badge tone="brand" className="mt-1.5">{copy.platformDefaultBadge}</Badge>}
         </div>
       ),
     },
@@ -91,8 +91,8 @@ export function StorageServersScreen() {
       headerAr: "دليل الاتصال",
       cell: (server) => (
         <div>
-          <p className={`font-semibold ${evidenceTone(server)}`}>{evidenceLabel(server, isArabic)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{formatDate(server.lastConnectionTestedAt, isArabic)}</p>
+          <p className={`font-semibold ${evidenceTone(server)}`}>{evidenceLabel(server, copy)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{formatDate(server.lastConnectionTestedAt, lang, copy)}</p>
           {server.lastConnectionTestErrorCode && (
             <code className="mt-1 block max-w-xs truncate text-xs" title={server.lastConnectionTestErrorCode}>
               {server.lastConnectionTestErrorCode}
@@ -112,18 +112,14 @@ export function StorageServersScreen() {
   return (
     <div className="w-full space-y-6">
       <PageHeader
-        title={isArabic ? "خوادم التخزين" : "Storage servers"}
-        description={
-          isArabic
-            ? "سجل خوادم S3 وحالة اختبار الاتصال الآمن. يجدول Worker الاختبار كل 12 ساعة."
-            : "S3 registry and safe connection evidence. Worker schedules checks every 12 hours."
-        }
+        title={copy.pageTitle}
+        description={copy.pageDescription}
         action={
           view.canCreate && (
             <Button variant="primary" asChild>
               <Link href="/storage-servers/new">
                 <Plus className="size-4" />
-                {isArabic ? "تسجيل خادم" : "Register server"}
+                {copy.registerServerButton}
               </Link>
             </Button>
           )
@@ -131,17 +127,17 @@ export function StorageServersScreen() {
       />
 
       <StatGrid className="sm:grid-cols-3">
-        <StatCard label={isArabic ? "إجمالي النتائج" : "Total results"} value={view.total} icon={HardDrive} />
-        <StatCard label={isArabic ? "نشط في الصفحة" : "Active on this page"} value={activeOnPage} icon={CheckCircle2} />
-        <StatCard label={isArabic ? "دليل حديث في الصفحة" : "Fresh evidence on this page"} value={freshOnPage} icon={Clock3} />
+        <StatCard label={copy.statTotalResults} value={view.total} icon={HardDrive} />
+        <StatCard label={copy.statActiveOnPage} value={activeOnPage} icon={CheckCircle2} />
+        <StatCard label={copy.statFreshEvidenceOnPage} value={freshOnPage} icon={Clock3} />
       </StatGrid>
 
       {view.error && (
         <DegradedBanner>
-          <p className="font-medium">{isArabic ? "تعذر تحميل خوادم التخزين" : "Storage servers could not be loaded"}</p>
+          <p className="font-medium">{copy.loadErrorTitle}</p>
           <p>{view.error.message}</p>
           <Button type="button" variant="ghost" size="sm" className="mt-1 -ms-2" onClick={() => void view.refresh()}>
-            {isArabic ? "إعادة المحاولة" : "Retry"}
+            {copy.retryButton}
           </Button>
         </DegradedBanner>
       )}
@@ -192,7 +188,7 @@ export function StorageServersScreen() {
           </div>
           <Button type="button" variant="outline" size="sm" onClick={() => void view.refresh()} disabled={view.isLoading}>
             <RefreshCw className={`size-3.5 ${view.isLoading ? "animate-spin" : ""}`} />
-            {isArabic ? "تحديث" : "Refresh"}
+            {copy.refreshButton}
           </Button>
         </div>
         <DataTable
@@ -220,19 +216,21 @@ function evidenceTone(server: StorageServerView): string {
   return "text-warn-700 dark:text-warn-400";
 }
 
-function evidenceLabel(server: StorageServerView, isArabic: boolean) {
-  if (server.lastConnectionTestStatus === "FAILED") return isArabic ? "فشل الاختبار" : "Test failed";
-  if (server.connectionEvidenceFresh) return isArabic ? "حديث وجاهز للتوزيع" : "Fresh for placement";
-  if (server.lastConnectionTestStatus === "PASSED") return isArabic ? "نجح لكنه قديم" : "Passed but stale";
-  return isArabic ? "لم يُختبر" : "Not tested";
+type StorageServersListCopy = typeof import("@/i18n/dictionaries/en").en.storageServersList;
+
+function evidenceLabel(server: StorageServerView, copy: StorageServersListCopy) {
+  if (server.lastConnectionTestStatus === "FAILED") return copy.evidenceTestFailed;
+  if (server.connectionEvidenceFresh) return copy.evidenceFreshForPlacement;
+  if (server.lastConnectionTestStatus === "PASSED") return copy.evidencePassedButStale;
+  return copy.evidenceNotTested;
 }
 
-function formatDate(value: string | null, isArabic: boolean) {
-  if (!value) return isArabic ? "لا يوجد وقت مسجل" : "No timestamp recorded";
+function formatDate(value: string | null, lang: "ar" | "en", copy: StorageServersListCopy) {
+  if (!value) return copy.noTimestampRecorded;
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat(isArabic ? "ar-EG-u-nu-latn" : "en-US", {
+    : new Intl.DateTimeFormat(lang === "ar" ? "ar-EG-u-nu-latn" : "en-US", {
         year: "numeric",
         month: "short",
         day: "2-digit",
