@@ -80,10 +80,10 @@ export default function RolesDirectoryPage() {
         role.isSystem ? (
           <Badge tone="neutral">
             <Lock className="size-3" aria-hidden="true" />
-            {lang === "ar" ? "نظام" : "System"}
+            {t.roles.badgeSystem}
           </Badge>
         ) : (
-          <Badge tone="brand">{lang === "ar" ? "مخصص" : "Custom"}</Badge>
+          <Badge tone="brand">{t.roles.custom}</Badge>
         ),
     },
     {
@@ -106,7 +106,7 @@ export default function RolesDirectoryPage() {
         <div className="flex items-center justify-end gap-1">
           <Link
             href={`/roles/${role.id}`}
-            title={canUpdate ? (lang === "ar" ? "تعديل" : "Edit") : lang === "ar" ? "عرض" : "View"}
+            title={canUpdate ? t.roles.edit : t.roles.view}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-ink-100 hover:text-foreground dark:hover:bg-ink-800"
           >
             {canUpdate ? <Edit2 className="size-3.5" /> : <Eye className="size-3.5" />}
@@ -115,7 +115,7 @@ export default function RolesDirectoryPage() {
             <button
               type="button"
               onClick={() => openDeleteModal(role.id)}
-              title={lang === "ar" ? "حذف" : "Delete"}
+              title={t.roles.delete}
               className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-950/40 dark:hover:text-danger-400"
             >
               <Trash2 className="size-3.5" />
@@ -142,14 +142,14 @@ export default function RolesDirectoryPage() {
       />
 
       <StatGrid className="sm:grid-cols-3">
-        <StatCard label={lang === "ar" ? "إجمالي الأدوار" : "Total roles"} value={totalItems} icon={ShieldCheck} />
+        <StatCard label={t.roles.statTotalRoles} value={totalItems} icon={ShieldCheck} />
         <StatCard
-          label={lang === "ar" ? "أدوار النظام (المعروضة)" : "System roles (visible)"}
+          label={t.roles.statSystemVisible}
           value={roles.filter((r) => r.isSystem).length}
           icon={Lock}
         />
         <StatCard
-          label={lang === "ar" ? "أدوار مخصصة (المعروضة)" : "Custom roles (visible)"}
+          label={t.roles.statCustomVisible}
           value={roles.filter((r) => !r.isSystem).length}
           icon={Edit2}
         />
@@ -158,16 +158,10 @@ export default function RolesDirectoryPage() {
       {listError && rolesOnPage.length > 0 && (
         <DegradedBanner>
           <p className="font-medium">
-            {listError.httpStatus === 403
-              ? lang === "ar"
-                ? "لا تملك صلاحية قراءة الأدوار."
-                : "You do not have permission to read roles."
-              : lang === "ar"
-                ? "تعذر تحديث القائمة. تُعرض آخر صفحة مؤكدة."
-                : "Couldn't refresh the list. The last confirmed page remains visible."}
+            {listError.httpStatus === 403 ? t.roles.forbiddenList : t.roles.refreshFailed}
           </p>
           <Button type="button" variant="ghost" size="sm" className="mt-1 -ms-2" onClick={refreshRoles}>
-            {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+            {t.roles.retry}
           </Button>
         </DegradedBanner>
       )}
@@ -223,9 +217,9 @@ export default function RolesDirectoryPage() {
           onClose={closeDeleteModal}
           onConfirm={confirmDelete}
           isSubmitting={isDeleting}
-          confirmLabel={isDeleteAmbiguous ? (lang === "ar" ? "إعادة الحذف بنفس العملية" : "Retry exact delete") : undefined}
-          title={lang === "ar" ? "حذف الدور" : "Delete Role"}
-          description={lang === "ar" ? "هل أنت متأكد من رغبتك في حذف هذا الدور؟" : "Are you sure you want to delete this role?"}
+          confirmLabel={isDeleteAmbiguous ? t.roles.retryExactDelete : undefined}
+          title={t.roles.deleteRoleTitle}
+          description={t.roles.deleteRoleDescription}
           targetName={activeModalRole.name}
           actionType="delete"
         />

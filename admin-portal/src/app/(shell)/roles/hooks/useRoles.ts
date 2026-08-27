@@ -185,12 +185,7 @@ export function useRoles() {
       setIsDeleteAmbiguous(false);
       setActiveModalRoleId(null);
       setIsDeleteModalOpen(false);
-      toast.success(
-        lang === "ar" ? "تم الحذف" : "Deleted",
-        lang === "ar"
-          ? "تم حذف الدور بنجاح."
-          : "Role deleted successfully.",
-      );
+      toast.success(t.roles.deletedTitle, t.roles.deletedDesc);
       if (rolesOnPage.length === 1 && page > 1) setPage(page - 1);
       else refreshRoles();
     } catch (caught) {
@@ -203,10 +198,7 @@ export function useRoles() {
         setIsDeleteAmbiguous(false);
       }
       setDeleteError(error);
-      toast.error(
-        lang === "ar" ? "فشل الحذف" : "Delete failed",
-        error.message,
-      );
+      toast.error(t.roles.deleteFailedTitle, error.message);
     } finally {
       setIsDeleting(false);
     }
@@ -214,10 +206,10 @@ export function useRoles() {
     activeModalRoleId,
     canDelete,
     isDeleting,
-    lang,
     page,
     refreshRoles,
     rolesOnPage.length,
+    t,
     toast,
   ]);
 

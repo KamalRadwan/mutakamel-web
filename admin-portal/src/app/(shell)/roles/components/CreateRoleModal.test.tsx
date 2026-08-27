@@ -15,7 +15,33 @@ const authMock: { user: { isSuperAdmin: boolean; permissions: string[] } } = {
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: pushMock }) }));
 vi.mock("@/components/ui/ToastContext", () => ({ useToast: () => toastMock }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
-vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ lang: "en" }) }));
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({
+    lang: "en",
+    t: {
+      roles: {
+        nameLengthError: "Name must contain between 2 and 120 characters.",
+        descriptionLengthError: "Description cannot exceed 2,000 characters.",
+        notAuthorized: "Not authorized",
+        createForbidden:
+          "Both admin.roles.create and admin.roles.critical are required.",
+        createdTitle: "Role created",
+        createdDescription: "Role created successfully.",
+        createFailedTitle: "Creation failed",
+        createDrawerTitle: "Create Admin Role",
+        createDrawerSubtitle:
+          "Enter basic information, then assign permissions on the role page.",
+        cancel: "Cancel",
+        retryExactCreate: "Retry exact operation",
+        createAndContinue: "Create & Continue",
+        createAmbiguousMessage:
+          "Retry the unchanged form to reuse the exact command key.",
+        roleNameLabel: "Role Name",
+        descriptionLabel: "Description",
+      },
+    },
+  }),
+}));
 vi.mock("../api", () => ({ rolesApi: { create: vi.fn() } }));
 
 const ROLE_ID = "019f0000-0000-7000-8000-000000000031";

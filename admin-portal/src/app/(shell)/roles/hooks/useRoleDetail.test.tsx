@@ -16,7 +16,22 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: pushMock }) }));
 vi.mock("@/components/ui/ToastContext", () => ({ useToast: () => toastMock }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
 vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => ({ lang: "en", t: { roles: {} } }),
+  useI18n: () => ({
+    lang: "en",
+    t: {
+      roles: {
+        nameRequiredError: "Role name is required.",
+        nameTooShortError: "Name must contain at least 2 characters.",
+        nameTooLongError: "Name cannot exceed 120 characters.",
+        descriptionLengthError: "Description cannot exceed 2,000 characters.",
+        metadataSavedTitle: "Role updated",
+        metadataSavedDesc: "The server-confirmed role metadata is now displayed.",
+        updateFailedTitle: "Update failed",
+        permissionsSavedTitle: "Permissions updated",
+        permissionsSavedDesc: "The server-confirmed permission set is now displayed.",
+      },
+    },
+  }),
 }));
 vi.mock("../api", () => ({
   rolesApi: {

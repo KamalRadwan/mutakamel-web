@@ -26,6 +26,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
 
   const {
     lang,
+    t,
     router,
     role,
     roleError,
@@ -70,7 +71,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
       <div className="grid place-items-center py-16">
         <div className="flex items-center gap-3 text-muted-foreground">
           <Sparkles className="size-5 animate-spin text-brand-500" />
-          <span>{lang === "ar" ? "جاري تحميل تفاصيل الدور..." : "Loading role details..."}</span>
+          <span>{t.roles.loadingDetail}</span>
         </div>
       </div>
     );
@@ -82,9 +83,9 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         <ErrorState
           title={
             roleError.httpStatus === 403
-              ? lang === "ar" ? "لا تملك صلاحية قراءة هذا الدور." : "You do not have permission to read this role."
+              ? t.roles.forbiddenDetail
               : roleError.httpStatus === 404
-                ? lang === "ar" ? "لم يتم العثور على الدور." : "Role not found."
+                ? t.roles.notFoundDetail
                 : undefined
           }
           error={roleError}
@@ -92,7 +93,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         />
         <div className="flex justify-center pb-6">
           <Button type="button" variant="outline" size="sm" onClick={() => router.push("/roles")}>
-            {lang === "ar" ? "العودة للأدوار" : "Back to roles"}
+            {t.roles.backToRoles}
           </Button>
         </div>
       </Card>
@@ -105,27 +106,27 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="w-full space-y-6">
       <PageHeader
-        title={name || (lang === "ar" ? "دور بدون اسم" : "Unnamed Role")}
+        title={name || t.roles.unnamedRole}
         description={`ID: ${id}`}
         status={
           isSuperAdmin ? (
             <Badge tone="warn">
               <Zap className="size-3" aria-hidden="true" />
-              {lang === "ar" ? "سوبر أدمن" : "Super Admin"}
+              {t.roles.superAdminBadge}
             </Badge>
           ) : isSystem ? (
             <Badge tone="neutral">
               <Lock className="size-3" aria-hidden="true" />
-              {lang === "ar" ? "نظام" : "System"}
+              {t.roles.badgeSystem}
             </Badge>
           ) : (
-            <Badge tone="brand">{lang === "ar" ? "دور مخصص" : "Custom Role"}</Badge>
+            <Badge tone="brand">{t.roles.customRoleBadge}</Badge>
           )
         }
         action={
           <Button type="button" variant="outline" size="sm" onClick={() => router.push("/roles")}>
             {lang === "ar" ? <ArrowRight className="size-4" /> : <ArrowLeft className="size-4" />}
-            {lang === "ar" ? "الأدوار" : "Roles"}
+            {t.roles.rolesNavLabel}
           </Button>
         }
       />
@@ -138,17 +139,15 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
             </div>
             <div>
               <h3 className="text-sm font-semibold text-foreground">
-                {lang === "ar" ? "صلاحيات المدير الفائق المطلقة" : "Full Super Admin privileges granted"}
+                {t.roles.superAdminGrantedTitle}
               </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {lang === "ar"
-                  ? "يمتلك دور السوبر أدمن الوصول الكامل لكافة وظائف وصلاحيات النظام تلقائياً دون الحاجة لتحديد الصلاحيات يدوياً."
-                  : "Super Admin roles automatically inherit full unrestricted access to every permission on the platform."}
+                {t.roles.superAdminGrantedDesc}
               </p>
             </div>
           </div>
           <span className="hidden shrink-0 rounded-md bg-warn-500 px-3 py-1 text-xs font-semibold text-ink-950 sm:inline-flex">
-            {catalogueLength} / {catalogueLength} {lang === "ar" ? "ممررة" : "granted"}
+            {catalogueLength} / {catalogueLength} {t.roles.grantedSuffix}
           </span>
         </div>
       )}
@@ -157,11 +156,9 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         <div className="flex gap-3 rounded-lg border border-border bg-ink-50 p-4 text-foreground dark:bg-ink-900/40">
           <Info className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <div className="text-xs">
-            <h4 className="mb-1 font-semibold">{lang === "ar" ? "دور مدمج بالنظام" : "Protected system role"}</h4>
+            <h4 className="mb-1 font-semibold">{t.roles.protectedSystemTitle}</h4>
             <p className="leading-relaxed text-muted-foreground">
-              {lang === "ar"
-                ? "أدوار النظام الأساسية محمية ضد التعديل أو الحذف لضمان استقرار العمليات المركزية."
-                : "System roles are protected baseline roles and cannot be manually modified or deleted."}
+              {t.roles.protectedSystemDesc}
             </p>
           </div>
         </div>
@@ -171,7 +168,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
             <ShieldAlert className="size-4 text-brand-500" aria-hidden="true" />
-            {lang === "ar" ? "المعلومات الأساسية للدور" : "Role general information"}
+            {t.roles.generalInfoTitle}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -179,17 +176,13 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
             <AmbiguousOutcomePanel
               idempotencyKey={metadataIdempotencyKey}
               correlationId={metadataError?.correlationId}
-              message={
-                lang === "ar"
-                  ? "نتيجة التحديث غير مؤكدة. أعد المحاولة بنفس البيانات والمفتاح."
-                  : "Update outcome is unconfirmed. Retry the exact data and command key."
-              }
+              message={t.roles.metadataAmbiguousMessage}
               onRetryExact={() => void saveMetadata()}
               retrying={isSavingMetadata}
             />
           )}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label={lang === "ar" ? "اسم الدور" : "Role Name"} error={nameError ?? undefined}>
+            <Field label={t.roles.roleNameLabel} error={nameError ?? undefined}>
               {(fieldProps) => (
                 <Input
                   {...fieldProps}
@@ -201,7 +194,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                 />
               )}
             </Field>
-            <Field label={lang === "ar" ? "الوصف" : "Description"} error={descriptionError ?? undefined}>
+            <Field label={t.roles.descriptionLabel} error={descriptionError ?? undefined}>
               {(fieldProps) => (
                 <Textarea
                   {...fieldProps}
@@ -226,9 +219,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               loading={isSavingMetadata}
             >
               <Save className="size-3.5" />
-              {metadataAmbiguous
-                ? lang === "ar" ? "إعادة التحديث بنفس العملية" : "Retry exact update"
-                : lang === "ar" ? "حفظ بيانات الدور" : "Save role details"}
+              {metadataAmbiguous ? t.roles.retryExactUpdate : t.roles.saveRoleDetails}
             </Button>
           </CardFooter>
         )}
@@ -239,16 +230,10 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
           <div>
             <CardTitle className="flex items-center gap-2 text-sm">
               <ShieldCheck className="size-4 text-brand-500" aria-hidden="true" />
-              {lang === "ar" ? "مصفوفة الصلاحيات" : "Permissions matrix"}
+              {t.roles.permissionsMatrixTitle}
             </CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {permissionsReadOnly
-                ? lang === "ar"
-                  ? "عرض فقط؛ يلزم admin.roles.update وadmin.roles.critical للاستبدال."
-                  : "Read-only; replacement requires admin.roles.update and admin.roles.critical."
-                : lang === "ar"
-                  ? "راجع التحديد ثم احفظ مجموعة الصلاحيات كاملة."
-                  : "Review the selection, then explicitly save the complete permission set."}
+              {permissionsReadOnly ? t.roles.permissionsReadOnlyHint : t.roles.permissionsEditableHint}
             </p>
           </div>
           <div className="flex w-full items-center gap-3 sm:w-auto">
@@ -256,14 +241,14 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               <Search className="pointer-events-none absolute start-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder={lang === "ar" ? "ابحث عن الصلاحية..." : "Search permissions..."}
+                placeholder={t.roles.searchPermissionsPlaceholder}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="ps-9"
               />
             </div>
             <Badge tone="brand" className="shrink-0 px-3 py-1.5">
-              {assignedPermissions.size} {lang === "ar" ? "محددة" : "selected"}
+              {assignedPermissions.size} {t.roles.selectedSuffix}
             </Badge>
           </div>
         </CardHeader>
@@ -271,18 +256,14 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         {isCatalogueLoading && (
           <div className="flex items-center gap-2 border-b border-border p-4 text-xs text-muted-foreground">
             <Sparkles className="size-3.5 animate-spin" />
-            {lang === "ar" ? "جاري تحميل دليل الصلاحيات..." : "Loading the permission catalogue..."}
+            {t.roles.loadingCatalogue}
           </div>
         )}
 
         {catalogueError && (
           <div className="m-4">
             <ErrorState
-              title={
-                catalogueError.httpStatus === 403
-                  ? lang === "ar" ? "لا تملك admin.permissions.read." : "admin.permissions.read is unavailable."
-                  : undefined
-              }
+              title={catalogueError.httpStatus === 403 ? t.roles.catalogueForbidden : undefined}
               error={catalogueError}
               onRetry={reloadCatalogue}
             />
@@ -295,11 +276,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               idempotencyKey={permissionsAmbiguous ? permissionsIdempotencyKey : undefined}
               correlationId={permissionsAmbiguous ? permissionsError.correlationId : undefined}
               message={
-                permissionsAmbiguous
-                  ? lang === "ar"
-                    ? "نتيجة الاستبدال غير مؤكدة. أعد العملية نفسها دون تغيير التحديد."
-                    : "Replacement outcome is unconfirmed. Retry the unchanged permission set."
-                  : permissionsError.message
+                permissionsAmbiguous ? t.roles.permissionsAmbiguousMessage : permissionsError.message
               }
               onRetryExact={permissionsAmbiguous ? () => void savePermissions() : undefined}
               retrying={isSavingPermissions}
@@ -328,9 +305,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                       onClick={() => toggleGroup(groupName, !isAllChecked)}
                       className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-400"
                     >
-                      {isAllChecked
-                        ? lang === "ar" ? "إلغاء تحديد الكل" : "Deselect all"
-                        : lang === "ar" ? "تحديد الكل" : "Select all"}
+                      {isAllChecked ? t.roles.deselectAll : t.roles.selectAll}
                     </button>
                   )}
                 </div>
@@ -350,7 +325,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                       >
                         <span className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-foreground">
                           {getPermissionName(p, lang as "ar" | "en")}
-                          {isCritical && <Badge tone="danger">{lang === "ar" ? "حرج" : "CRITICAL"}</Badge>}
+                          {isCritical && <Badge tone="danger">{t.roles.criticalBadge}</Badge>}
                         </span>
                         <Checkbox
                           checked={isChecked}
@@ -378,9 +353,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               loading={isSavingPermissions}
             >
               <ShieldCheck className="size-3.5" />
-              {permissionsAmbiguous
-                ? lang === "ar" ? "إعادة الاستبدال بنفس العملية" : "Retry exact replacement"
-                : lang === "ar" ? "حفظ مجموعة الصلاحيات" : "Save permission set"}
+              {permissionsAmbiguous ? t.roles.retryExactReplace : t.roles.savePermissionSet}
             </Button>
           </CardFooter>
         )}

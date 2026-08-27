@@ -14,7 +14,16 @@ const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
 vi.mock("@/components/ui/ToastContext", () => ({ useToast: () => toastMock }));
 vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => ({ lang: "en", t: { roles: {} } }),
+  useI18n: () => ({
+    lang: "en",
+    t: {
+      roles: {
+        deletedTitle: "Deleted",
+        deletedDesc: "Role deleted successfully.",
+        deleteFailedTitle: "Delete failed",
+      },
+    },
+  }),
 }));
 vi.mock("../api", () => ({
   rolesApi: { list: vi.fn(), remove: vi.fn() },

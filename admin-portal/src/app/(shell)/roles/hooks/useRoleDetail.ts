@@ -179,19 +179,13 @@ export function useRoleDetail(id: string) {
 
   const nameError = useMemo(() => {
     const trimmed = name.trim();
-    if (!trimmed) return lang === "ar" ? "اسم الدور مطلوب." : "Role name is required.";
-    if (trimmed.length < 2)
-      return lang === "ar" ? "يجب ألا يقل الاسم عن حرفين." : "Name must contain at least 2 characters.";
-    if (trimmed.length > 120)
-      return lang === "ar" ? "الحد الأقصى للاسم 120 حرفاً." : "Name cannot exceed 120 characters.";
+    if (!trimmed) return t.roles.nameRequiredError;
+    if (trimmed.length < 2) return t.roles.nameTooShortError;
+    if (trimmed.length > 120) return t.roles.nameTooLongError;
     return null;
-  }, [lang, name]);
+  }, [name, t]);
   const descriptionError =
-    description.trim().length > 2_000
-      ? lang === "ar"
-        ? "الحد الأقصى للوصف 2000 حرف."
-        : "Description cannot exceed 2,000 characters."
-      : null;
+    description.trim().length > 2_000 ? t.roles.descriptionLengthError : null;
 
   const metadataDirty =
     name !== originalName || description !== originalDescription;
@@ -251,12 +245,7 @@ export function useRoleDetail(id: string) {
       setMetadataAmbiguous(false);
       setMetadataIdempotencyKey(undefined);
       applyAuthoritativeRole(result.data);
-      toast.success(
-        lang === "ar" ? "تم الحفظ" : "Role updated",
-        lang === "ar"
-          ? "تم تحديث بيانات الدور."
-          : "The server-confirmed role metadata is now displayed.",
-      );
+      toast.success(t.roles.metadataSavedTitle, t.roles.metadataSavedDesc);
     } catch (caught) {
       const error = normalizeApiError(caught);
       const ambiguous = retainWriteIntent(caught, error);
@@ -269,7 +258,7 @@ export function useRoleDetail(id: string) {
       setMetadataAmbiguous(ambiguous);
       setMetadataError(error);
       if (!ambiguous) {
-        toast.error(lang === "ar" ? "فشل الحفظ" : "Update failed", error.message);
+        toast.error(t.roles.updateFailedTitle, error.message);
       }
     } finally {
       setIsSavingMetadata(false);
@@ -281,9 +270,9 @@ export function useRoleDetail(id: string) {
     descriptionError,
     id,
     isSavingMetadata,
-    lang,
     name,
     nameError,
+    t,
     toast,
   ]);
 
@@ -320,12 +309,7 @@ export function useRoleDetail(id: string) {
       setPermissionsAmbiguous(false);
       setPermissionsIdempotencyKey(undefined);
       applyAuthoritativeRole(result.data);
-      toast.success(
-        lang === "ar" ? "تم حفظ الصلاحيات" : "Permissions updated",
-        lang === "ar"
-          ? "تم عرض مجموعة الصلاحيات المؤكدة من الخادم."
-          : "The server-confirmed permission set is now displayed.",
-      );
+      toast.success(t.roles.permissionsSavedTitle, t.roles.permissionsSavedDesc);
     } catch (caught) {
       const error = normalizeApiError(caught);
       const ambiguous = retainWriteIntent(caught, error);
@@ -338,7 +322,7 @@ export function useRoleDetail(id: string) {
       setPermissionsAmbiguous(ambiguous);
       setPermissionsError(error);
       if (!ambiguous) {
-        toast.error(lang === "ar" ? "فشل الحفظ" : "Update failed", error.message);
+        toast.error(t.roles.updateFailedTitle, error.message);
       }
     } finally {
       setIsSavingPermissions(false);
@@ -349,7 +333,7 @@ export function useRoleDetail(id: string) {
     canReplacePermissions,
     id,
     isSavingPermissions,
-    lang,
+    t,
     toast,
   ]);
 

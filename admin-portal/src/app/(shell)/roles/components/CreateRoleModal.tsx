@@ -34,7 +34,7 @@ export function CreateRoleModal({
   onClose: () => void;
   onSuccess?: () => void;
 }) {
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const { user } = useAuth();
   const router = useRouter();
   const toast = useToast();
@@ -51,28 +51,17 @@ export function CreateRoleModal({
   const trimmedName = name.trim();
   const nameError =
     trimmedName.length > 0 && (trimmedName.length < 2 || trimmedName.length > 120)
-      ? lang === "ar"
-        ? "يجب أن يكون الاسم بين حرفين و120 حرفاً."
-        : "Name must contain between 2 and 120 characters."
+      ? t.roles.nameLengthError
       : null;
   const descriptionError =
-    description.trim().length > 2_000
-      ? lang === "ar"
-        ? "الحد الأقصى للوصف 2000 حرف."
-        : "Description cannot exceed 2,000 characters."
-      : null;
+    description.trim().length > 2_000 ? t.roles.descriptionLengthError : null;
 
   const isDirty = name.trim().length > 0 || description.trim().length > 0;
 
   const handleSubmit = async (event?: FormEvent) => {
     event?.preventDefault();
     if (!canCreate) {
-      toast.error(
-        lang === "ar" ? "غير مصرح" : "Not authorized",
-        lang === "ar"
-          ? "يلزم admin.roles.create وadmin.roles.critical."
-          : "Both admin.roles.create and admin.roles.critical are required.",
-      );
+      toast.error(t.roles.notAuthorized, t.roles.createForbidden);
       return;
     }
     if (trimmedName.length < 2 || nameError || descriptionError || isSubmitting) return;
@@ -102,10 +91,7 @@ export function CreateRoleModal({
       intentRef.current = null;
       setIsAmbiguous(false);
       setIdempotencyKey(undefined);
-      toast.success(
-        lang === "ar" ? "تم الإنشاء" : "Role created",
-        lang === "ar" ? "تم إنشاء الدور بنجاح." : "Role created successfully.",
-      );
+      toast.success(t.roles.createdTitle, t.roles.createdDescription);
       onSuccess?.();
       onClose();
       router.push(`/roles/${result.data.id}`);
@@ -124,7 +110,7 @@ export function CreateRoleModal({
       setIsAmbiguous(ambiguous);
       setError(normalized);
       if (!ambiguous) {
-        toast.error(lang === "ar" ? "فشل الإنشاء" : "Creation failed", normalized.message);
+        toast.error(t.roles.createFailedTitle, normalized.message);
       }
     } finally {
       setIsSubmitting(false);
@@ -135,16 +121,16 @@ export function CreateRoleModal({
     <FormDrawer
       isOpen
       onClose={onClose}
-      titleEn="Create Admin Role"
-      titleAr="إنشاء دور مشرف جديد"
-      subtitleEn="Enter basic information, then assign permissions on the role page."
-      subtitleAr="أدخل المعلومات الأساسية ثم عيّن الصلاحيات في صفحة الدور."
+      titleEn={t.roles.createDrawerTitle}
+      titleAr={t.roles.createDrawerTitle}
+      subtitleEn={t.roles.createDrawerSubtitle}
+      subtitleAr={t.roles.createDrawerSubtitle}
       isSubmitting={isSubmitting || isAmbiguous}
       isDirty={isDirty}
       footerActions={
         <>
           <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting || isAmbiguous}>
-            {lang === "ar" ? "إلغاء" : "Cancel"}
+            {t.roles.cancel}
           </Button>
           <Button
             type="submit"
@@ -153,13 +139,7 @@ export function CreateRoleModal({
             loading={isSubmitting}
             disabled={Boolean(nameError || descriptionError) || trimmedName.length < 2}
           >
-            {isAmbiguous
-              ? lang === "ar"
-                ? "إعادة المحاولة بنفس العملية"
-                : "Retry exact operation"
-              : lang === "ar"
-                ? "إنشاء والمتابعة"
-                : "Create & Continue"}
+            {isAmbiguous ? t.roles.retryExactCreate : t.roles.createAndContinue}
           </Button>
         </>
       }
@@ -169,17 +149,13 @@ export function CreateRoleModal({
           <AmbiguousOutcomePanel
             idempotencyKey={idempotencyKey}
             correlationId={error?.correlationId}
-            message={
-              lang === "ar"
-                ? "أعد المحاولة بنفس البيانات لإعادة استخدام مفتاح العملية نفسه."
-                : "Retry the unchanged form to reuse the exact command key."
-            }
+            message={t.roles.createAmbiguousMessage}
             onRetryExact={() => void handleSubmit()}
             retrying={isSubmitting}
           />
         )}
 
-        <Field label={lang === "ar" ? "اسم الدور" : "Role Name"} required error={name && nameError ? nameError : undefined}>
+        <Field label={t.roles.roleNameLabel} required error={name && nameError ? nameError : undefined}>
           {(fieldProps) => (
             <Input
               {...fieldProps}
@@ -192,7 +168,7 @@ export function CreateRoleModal({
           )}
         </Field>
 
-        <Field label={lang === "ar" ? "الوصف" : "Description"} error={descriptionError ?? undefined}>
+        <Field label={t.roles.descriptionLabel} error={descriptionError ?? undefined}>
           {(fieldProps) => (
             <Textarea
               {...fieldProps}
