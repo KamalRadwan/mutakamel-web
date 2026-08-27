@@ -936,6 +936,65 @@ export const en: Dictionary = {
       driverConfigNote:
         "Tenant placements use this host as a physical database server target. Schemas and databases are allocated dynamically under tenant provisioning workflows.",
     },
+    credentialDialog: {
+      retryBootstrap: {
+        title: "Retry server registration setup",
+        description:
+          "Core will resume every incomplete access binding from its exact persisted recovery state. Passwords remain inside the service boundary.",
+        submit: "Retry setup",
+      },
+      regenerate: {
+        title: "Rotate application password",
+        description:
+          "Core will keep the database principal fixed, rotate its password, invalidate affected pools, and advance the credential revision.",
+        submit: "Rotate password",
+      },
+      reconcile: {
+        title: "Reconcile uncertain rotation",
+        description:
+          "Core will verify and promote the already staged encrypted candidate. It will not generate a different password.",
+        submit: "Reconcile rotation",
+      },
+      regenerateSystem: {
+        title: "Rotate provisioning password",
+        description:
+          "Core will preserve the fixed principal, rotate its encrypted password, and advance its fenced credential revision.",
+        submit: "Rotate password",
+      },
+      reconcileSystem: {
+        title: "Reconcile provisioning principal",
+        description:
+          "Core will reapply and verify the exact staged candidate without creating a different password.",
+        submit: "Reconcile rotation",
+      },
+      applicationLabel: "Application",
+      serviceLabel: "Service",
+      principalLabel: "Principal",
+      expectedRevisionLabel: "Expected revision",
+      safetyNotice:
+        "No password will be returned, displayed, copied, downloaded, or stored by this browser. The response contains only safe status and revision evidence.",
+      reasonLabel: "Operator reason",
+      reasonPlaceholder: "Explain why this credential operation is required",
+      reasonHint: "{{count}}/500 · minimum 8 characters",
+      cancel: "Cancel",
+      close: "Close",
+    },
+    editModal: {
+      title: "Edit Database Server",
+      displayName: "Server Display Name",
+      hostAddress: "Host / IP Address",
+      port: "Port",
+      maxTenants: "Max Tenants",
+      countryLocation: "Country Location",
+      countryPlaceholder: "e.g. Egypt, Saudi Arabia",
+      cancel: "Cancel",
+      save: "Save Changes",
+      saving: "Saving...",
+      invalidSslTitle: "Invalid TLS configuration",
+      successTitle: "Success",
+      successDescription: "Database server metadata updated.",
+      failureTitle: "Update Failed",
+    },
     readiness: {
       title: "Database Access Readiness",
       subtitle:
@@ -953,6 +1012,14 @@ export const en: Dictionary = {
       provisioningUnavailableTitle: "Provisioning access is unavailable",
       provisioningUnavailableSub:
         "Retry server registration setup to restore the required provisioning binding.",
+      rotationPolicy: {
+        automaticRotation: "Automatic rotation",
+        intervalHours: "Interval hours",
+        windowStartUtc: "Window start UTC",
+        windowHours: "Window hours",
+        reasonPlaceholder: "Reason for policy change",
+        savePolicy: "Save policy",
+      },
     },
     bindings: {
       title: "Application Database Access Bindings",

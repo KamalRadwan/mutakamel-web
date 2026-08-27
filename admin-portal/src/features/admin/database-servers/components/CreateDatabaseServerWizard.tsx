@@ -521,19 +521,19 @@ export function CreateDatabaseServerWizard({
   return (
     <div
       dir={dir}
-      className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm max-w-3xl mx-auto mt-6"
+      className="bg-card rounded-xl p-6 border border-border shadow-sm max-w-3xl mx-auto mt-6"
     >
       <h2 className="text-xl font-semibold mb-6">{copy.title}</h2>
 
       {/* Basic Wizard Progress */}
       <div className="flex gap-2 mb-8 text-sm">
         <div
-          className={`flex-1 pb-2 border-b-2 ${step >= 1 ? "border-blue-600 font-semibold" : "border-slate-200 text-slate-500"}`}
+          className={`flex-1 pb-2 border-b-2 ${step >= 1 ? "border-brand-500 font-semibold" : "border-border text-muted-foreground"}`}
         >
           {copy.connectionStep}
         </div>
         <div
-          className={`flex-1 pb-2 border-b-2 ${step >= 2 ? "border-blue-600 font-semibold" : "border-slate-200 text-slate-500"}`}
+          className={`flex-1 pb-2 border-b-2 ${step >= 2 ? "border-brand-500 font-semibold" : "border-border text-muted-foreground"}`}
         >
           {copy.accessStep}
         </div>
@@ -542,7 +542,7 @@ export function CreateDatabaseServerWizard({
       {wizardError && (
         <div
           role="alert"
-          className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-200 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+          className="mb-4 p-3 bg-danger-50 text-danger-700 rounded-lg text-sm border border-danger-200 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-300"
         >
           <p>{wizardError.message}</p>
           {(wizardError.errorCode || wizardError.correlationId) && (
@@ -562,37 +562,37 @@ export function CreateDatabaseServerWizard({
         <section
           role="alert"
           aria-labelledby="database-connectivity-failure-title"
-          className="mb-4 overflow-hidden rounded-xl border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30"
+          className="mb-4 overflow-hidden rounded-xl border border-danger-200 bg-danger-50 dark:border-danger-900 dark:bg-danger-950/30"
         >
-          <div className="border-b border-red-200 px-4 py-3 dark:border-red-900">
+          <div className="border-b border-danger-200 px-4 py-3 dark:border-danger-900">
             <h3
               id="database-connectivity-failure-title"
-              className="text-sm font-semibold text-red-800 dark:text-red-200"
+              className="text-sm font-semibold text-danger-800 dark:text-danger-200"
             >
               {copy.connectionChecksFailed}
             </h3>
-            <p className="mt-1 text-xs text-red-700 dark:text-red-300">
+            <p className="mt-1 text-xs text-danger-700 dark:text-danger-300">
               {copy.connectionChecksFailedDescription}
             </p>
           </div>
-          <ul className="divide-y divide-red-200 dark:divide-red-900">
+          <ul className="divide-y divide-danger-200 dark:divide-danger-900">
             {connectivityResult.checks?.map((check) => (
               <li
                 key={check.principal}
                 className="flex items-start justify-between gap-4 px-4 py-3 text-xs"
               >
                 <div>
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  <p className="font-semibold text-foreground">
                     {copy.securityAdminCheck}
                   </p>
                   <p
-                    className={`mt-1 break-words ${check.connected ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}
+                    className={`mt-1 break-words ${check.connected ? "text-brand-700 dark:text-brand-300" : "text-danger-700 dark:text-danger-300"}`}
                   >
                     {check.message}
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 rounded-full px-2 py-1 font-semibold ${check.connected ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"}`}
+                  className={`shrink-0 rounded-full px-2 py-1 font-semibold ${check.connected ? "bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300" : "bg-danger-100 text-danger-700 dark:bg-danger-950 dark:text-danger-300"}`}
                 >
                   {check.connected ? copy.passed : copy.failed}
                 </span>
@@ -618,7 +618,7 @@ export function CreateDatabaseServerWizard({
               required
               minLength={DATABASE_SERVER_CREATE_CONSTRAINTS.name.minLength}
               maxLength={DATABASE_SERVER_CREATE_CONSTRAINTS.name.maxLength}
-              className="w-full border rounded-lg p-2 text-sm dark:bg-slate-800"
+              className="w-full border rounded-lg p-2 text-sm dark:bg-ink-800"
               value={formData.name}
               onChange={(event) =>
                 updateFormData({ ...formData, name: event.target.value })
@@ -640,7 +640,7 @@ export function CreateDatabaseServerWizard({
                 required
                 minLength={DATABASE_SERVER_CREATE_CONSTRAINTS.host.minLength}
                 maxLength={DATABASE_SERVER_CREATE_CONSTRAINTS.host.maxLength}
-                className="w-full border rounded-lg p-2 text-sm dark:bg-slate-800"
+                className="w-full border rounded-lg p-2 text-sm dark:bg-ink-800"
                 value={formData.host}
                 onChange={(event) =>
                   updateFormData({ ...formData, host: event.target.value })
@@ -663,7 +663,7 @@ export function CreateDatabaseServerWizard({
                 min={DATABASE_SERVER_CREATE_CONSTRAINTS.port.min}
                 max={DATABASE_SERVER_CREATE_CONSTRAINTS.port.max}
                 step={1}
-                className="w-full border rounded-lg p-2 text-sm dark:bg-slate-800"
+                className="w-full border rounded-lg p-2 text-sm dark:bg-ink-800"
                 value={formData.port}
                 onChange={(event) =>
                   updateFormData({
@@ -690,7 +690,7 @@ export function CreateDatabaseServerWizard({
               min={DATABASE_SERVER_CREATE_CONSTRAINTS.maxTenants.min}
               max={DATABASE_SERVER_CREATE_CONSTRAINTS.maxTenants.max}
               step={1}
-              className="w-full border rounded-lg p-2 text-sm dark:bg-slate-800"
+              className="w-full border rounded-lg p-2 text-sm dark:bg-ink-800"
               value={formData.maxTenants}
               onChange={(event) =>
                 updateFormData({
@@ -702,7 +702,7 @@ export function CreateDatabaseServerWizard({
           </div>
           <div
             role="note"
-            className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 text-xs leading-5 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200"
+            className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-3 text-xs leading-5 text-brand-900 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-200"
           >
             {copy.supportedEngine}: <strong>{copy.engineRequirement}</strong>.{" "}
             {copy.engineRestriction}
@@ -711,7 +711,7 @@ export function CreateDatabaseServerWizard({
             type="button"
             onClick={() => setStep(2)}
             disabled={!connectionStepIsValid}
-            className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm w-full disabled:opacity-50"
+            className="mt-6 px-4 py-2 bg-brand-500 text-ink-950 rounded-lg text-sm w-full disabled:opacity-50 dark:bg-brand-400"
           >
             {copy.nextCredentials}
           </button>
@@ -721,17 +721,17 @@ export function CreateDatabaseServerWizard({
       {step === 2 && (
         <div className="space-y-6">
           {/* Security Admin Credentials */}
-          <div className="p-4 border rounded-xl dark:border-slate-800">
+          <div className="p-4 border rounded-xl dark:border-border">
             <h3 className="font-semibold mb-3 text-sm">
               {copy.securityAdminCredentials}
             </h3>
-            <p className="mb-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
+            <p className="mb-3 text-xs leading-5 text-muted-foreground">
               {copy.credentialsDescription}
             </p>
             <div
               role="note"
               aria-label={copy.postureAriaLabel}
-              className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-700 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300"
+              className="mb-4 rounded-lg border border-border bg-ink-100 px-3 py-3 text-xs leading-5 text-foreground dark:border-border dark:bg-ink-1000/60 dark:text-muted-foreground"
             >
               <p>
                 {copy.required}:{" "}
@@ -750,7 +750,7 @@ export function CreateDatabaseServerWizard({
               </p>
               <p className="mt-1">{copy.membershipRule}</p>
             </div>
-            <p className="mb-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
+            <p className="mb-3 text-xs leading-5 text-muted-foreground">
               {copy.usernameRule} <code>pg_</code>.
             </p>
             <div className="grid grid-cols-2 gap-4">
@@ -783,7 +783,7 @@ export function CreateDatabaseServerWizard({
                   spellCheck={false}
                   autoComplete="off"
                   placeholder={copy.username}
-                  className="w-full border rounded-lg p-2 text-sm dark:bg-slate-800 disabled:opacity-50"
+                  className="w-full border rounded-lg p-2 text-sm dark:bg-ink-800 disabled:opacity-50"
                   value={formData.securityAdminCredentials.username}
                   onChange={(event) =>
                     updateFormData({
@@ -822,7 +822,7 @@ export function CreateDatabaseServerWizard({
                   autoComplete="new-password"
                   type="password"
                   placeholder={copy.password}
-                  className="w-full border rounded-lg p-2 text-sm dark:bg-slate-800 disabled:opacity-50"
+                  className="w-full border rounded-lg p-2 text-sm dark:bg-ink-800 disabled:opacity-50"
                   value={formData.securityAdminCredentials.password}
                   onChange={(event) =>
                     updateFormData({
@@ -867,17 +867,17 @@ export function CreateDatabaseServerWizard({
             }
           />
 
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="rounded-lg border border-warn-200 bg-warn-50 px-3 py-2 text-xs leading-5 text-warn-900 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-200">
             {copy.localSslNoteStart} <strong>disable</strong>.{" "}
             {copy.localSslNoteEnd} <strong>verify-full</strong>,{" "}
             {copy.localSslNoteTail}
           </p>
 
-          <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+          <div className="rounded-lg border border-brand-200 bg-brand-50/70 p-4 text-xs text-brand-900 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-200">
             <p className="font-semibold">{copy.generatedTitle}</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               {DATABASE_SECURITY_ADMIN_POSTURE.generatedPrincipals.map((item) => (
-                <div key={item.principal} className="rounded-lg bg-white/80 px-3 py-2 dark:bg-slate-900/70">
+                <div key={item.principal} className="rounded-lg bg-card/80 px-3 py-2">
                   <p className="font-mono font-semibold">
                     {item.principal === "Application roles"
                       ? copy.applicationRoles
@@ -898,34 +898,34 @@ export function CreateDatabaseServerWizard({
             </p>
           </div>
 
-          <p role="note" className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-900 dark:border-cyan-900 dark:bg-cyan-950/30 dark:text-cyan-200">
+          <p role="note" className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs leading-5 text-brand-900 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-200">
             {copy.diagnosticNote}
           </p>
 
-          <p role="note" className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+          <p role="note" className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs leading-5 text-brand-900 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-200">
             {copy.emptyCatalogueNote}
           </p>
 
           {activateAfterRegistration && (
-            <p role="note" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+            <p role="note" className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs leading-5 text-brand-900 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-200">
               {copy.setupActionNote}
             </p>
           )}
 
           {pendingActivationId && (
-            <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <p role="status" className="rounded-lg border border-warn-200 bg-warn-50 px-3 py-2 text-xs font-semibold leading-5 text-warn-900 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-200">
               {copy.pendingActivationNote}
             </p>
           )}
 
           {pendingBootstrapId && (
-            <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <p role="status" className="rounded-lg border border-warn-200 bg-warn-50 px-3 py-2 text-xs font-semibold leading-5 text-warn-900 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-200">
               {copy.pendingBootstrapNote}
             </p>
           )}
 
           {connectivityResult?.connected && (
-            <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+            <p role="status" className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-800 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-300">
               {copy.diagnosticPassed}
             </p>
           )}
@@ -952,7 +952,7 @@ export function CreateDatabaseServerWizard({
                 pendingBootstrapId !== null ||
                 !securityAdminStepIsValid
               }
-              className="px-4 py-2 bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 rounded-lg text-sm disabled:opacity-50"
+              className="px-4 py-2 bg-foreground text-background rounded-lg text-sm disabled:opacity-50"
             >
               {pendingAction === "diagnostic"
                 ? copy.testing
@@ -967,7 +967,7 @@ export function CreateDatabaseServerWizard({
                   pendingBootstrapId === null &&
                   !securityAdminStepIsValid)
               }
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
+              className="px-4 py-2 bg-brand-500 text-ink-950 dark:bg-brand-400 rounded-lg text-sm disabled:opacity-50"
             >
               {pendingAction === "activate"
                 ? copy.activating

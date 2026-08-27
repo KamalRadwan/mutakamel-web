@@ -122,16 +122,16 @@ export function DatabaseSslConfigurationFields({
     accept: string,
     required = false,
   ) => (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/70">
+    <div className="rounded-xl border border-border bg-white p-3 dark:border-border dark:bg-ink-900/70">
       <div className="flex items-start justify-between gap-3">
         <div>
           <label
             htmlFor={`${idPrefix}-${field}`}
-            className="block text-xs font-semibold text-slate-800 dark:text-slate-200"
+            className="block text-xs font-semibold text-foreground"
           >
             {label}{required ? " *" : ""}
           </label>
-          <p className="mt-1 text-xs leading-4 text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs leading-4 text-muted-foreground">
             {description}
           </p>
         </div>
@@ -140,7 +140,7 @@ export function DatabaseSslConfigurationFields({
             type="button"
             onClick={() => clearField(field)}
             disabled={disabled}
-            className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50 dark:hover:bg-rose-950/40"
+            className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-danger-50 hover:text-danger-600 disabled:opacity-50 dark:hover:bg-danger-950/40"
             aria-label={copy.clearSelected(label)}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -157,10 +157,10 @@ export function DatabaseSslConfigurationFields({
         onChange={(event) =>
           void handleFileChange(field, label, event.target.files?.[0])
         }
-        className="mt-3 block w-full cursor-pointer text-xs text-slate-500 file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:file:bg-blue-950/50 dark:file:text-blue-300"
+        className="mt-3 block w-full cursor-pointer text-xs text-muted-foreground file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-brand-700 hover:file:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-muted-foreground dark:file:bg-brand-950/50 dark:file:text-brand-300"
       />
       {config[field] && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-700 dark:text-brand-300">
           <ShieldCheck className="h-3.5 w-3.5" /> {copy.readyToSend}
         </p>
       )}
@@ -168,23 +168,23 @@ export function DatabaseSslConfigurationFields({
   );
 
   return (
-    <section dir={dir} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-800/40">
-      <div className="flex items-start gap-3 border-b border-slate-200 p-4 dark:border-slate-700">
-        <div className="rounded-xl bg-blue-100 p-2 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+    <section dir={dir} className="overflow-hidden rounded-lg border border-border bg-ink-100/70 dark:bg-ink-800/40">
+      <div className="flex items-start gap-3 border-b border-border p-4">
+        <div className="rounded-lg bg-brand-100 p-2 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
           <LockKeyhole className="h-4 w-4" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          <h3 className="text-sm font-semibold text-foreground">
             {copy.title}
           </h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
             {copy.description}
           </p>
         </div>
       </div>
 
       <div className="space-y-4 p-4">
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+        <label className="block text-xs font-semibold text-foreground">
           {copy.sslMode}
           <select
             value={mode}
@@ -192,7 +192,7 @@ export function DatabaseSslConfigurationFields({
             onChange={(event) =>
               handleModeChange(event.target.value as DatabaseServerSslMode)
             }
-            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-semibold text-slate-900 outline-none transition-colors focus:border-blue-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="mt-1.5 w-full rounded-lg border border-border bg-card p-2.5 text-sm font-semibold text-foreground outline-none transition-colors focus:border-brand-500 disabled:opacity-50"
           >
             <option value="disable">{copy.disable}</option>
             <option value="require">{copy.require}</option>
@@ -201,49 +201,49 @@ export function DatabaseSslConfigurationFields({
           </select>
         </label>
 
-        <p className="rounded-xl bg-slate-100 px-3 py-2 text-xs leading-5 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+        <p className="rounded-xl bg-ink-100 px-3 py-2 text-xs leading-5 text-muted-foreground dark:bg-ink-900/60 dark:text-muted-foreground">
           {copy.modeHelp[mode]}
         </p>
 
         {mode !== "disable" && (
           <>
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/70">
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-white p-3 dark:border-border dark:bg-ink-900/70">
               <input
                 type="checkbox"
                 checked={rejectUnauthorized}
                 disabled={disabled}
                 onChange={(event) => onRejectUnauthorizedChange(event.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                className="mt-0.5 h-4 w-4 rounded border-border text-brand-600 focus:ring-brand-500"
               />
               <span>
-                <span className="block text-xs font-semibold text-slate-800 dark:text-slate-200">
+                <span className="block text-xs font-semibold text-foreground">
                   {copy.rejectUnauthorized}
                 </span>
-                <span className="mt-1 block text-xs leading-4 text-slate-500 dark:text-slate-400">
+                <span className="mt-1 block text-xs leading-4 text-muted-foreground">
                   {copy.rejectUnauthorizedHelp}
                 </span>
               </span>
             </label>
 
             {hasStoredConfig && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+              <div className="rounded-xl border border-brand-200 bg-brand-50 p-3 dark:border-brand-900 dark:bg-brand-950/30">
                 <div className="flex items-start gap-2">
-                  <FileKey2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
+                  <FileKey2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-700 dark:text-brand-300" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                    <p className="text-xs font-semibold text-brand-800 dark:text-brand-200">
                       {copy.storedBundle}
                     </p>
-                    <p className="mt-1 text-xs leading-4 text-emerald-700 dark:text-emerald-300">
+                    <p className="mt-1 text-xs leading-4 text-brand-700 dark:text-brand-300">
                       {copy.storedBundleHelp}
                     </p>
                     {onRemoveStoredConfigChange && (
-                      <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-semibold text-rose-700 dark:text-rose-300">
+                      <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-semibold text-danger-700 dark:text-danger-300">
                         <input
                           type="checkbox"
                           checked={removeStoredConfig}
                           disabled={disabled}
                           onChange={(event) => handleRemoveStoredConfig(event.target.checked)}
-                          className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                          className="h-4 w-4 rounded border-danger-300 text-danger-600 focus:ring-danger-500"
                         />
                         {copy.removeStoredBundle}
                       </label>
@@ -273,14 +273,14 @@ export function DatabaseSslConfigurationFields({
                 copy.clientPrivateKeyHelp,
                 ".pem,.key,application/x-pem-file,text/plain",
               )}
-              <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/70">
+              <div className="rounded-xl border border-border bg-white p-3 dark:border-border dark:bg-ink-900/70">
                 <label
                   htmlFor={`${idPrefix}-passphrase`}
-                  className="block text-xs font-semibold text-slate-800 dark:text-slate-200"
+                  className="block text-xs font-semibold text-foreground"
                 >
                   {copy.privateKeyPassphrase}
                 </label>
-                <p className="mt-1 text-xs leading-4 text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-xs leading-4 text-muted-foreground">
                   {copy.privateKeyPassphraseHelp}
                 </p>
                 <input
@@ -299,13 +299,13 @@ export function DatabaseSslConfigurationFields({
                     configRef.current = nextConfig;
                     onConfigChange(nextConfig);
                   }}
-                  className="mt-3 w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs outline-none focus:border-blue-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
+                  className="mt-3 w-full rounded-lg border border-border bg-ink-100 p-2 text-xs outline-none focus:border-brand-500 disabled:opacity-50 dark:bg-ink-800"
                 />
               </div>
             </div>
 
             {fileError && (
-              <p role="alert" className="text-xs font-semibold text-rose-700 dark:text-rose-300">
+              <p role="alert" className="text-xs font-semibold text-danger-700 dark:text-danger-300">
                 {fileError}
               </p>
             )}
