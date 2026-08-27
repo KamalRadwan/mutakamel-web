@@ -44,7 +44,7 @@ export function TenantFqdnPanel({
             value={fqdn.candidate}
             disabled={busy}
             placeholder={text.domainPlaceholder}
-            aria-label={locale === "ar" ? "النطاق" : "Domain"}
+            aria-label={text.domainFieldLabel}
             onChange={(event) => fqdn.setCandidate(event.target.value)}
             className="rounded-lg border border-border bg-ink-100 px-3 py-2 text-xs font-mono outline-hidden focus:border-brand-500 disabled:opacity-60 dark:bg-ink-800"
           />
@@ -96,7 +96,7 @@ export function TenantFqdnPanel({
           onClick={() => void fqdn.reloadFqdns()}
           className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold dark:border-border"
         >
-          {locale === "ar" ? "إعادة تحميل النطاقات" : "Reload domains"}
+          {text.reloadDomains}
         </button>
       ) : null}
 
@@ -106,7 +106,7 @@ export function TenantFqdnPanel({
             role="status"
             className="rounded-xl bg-ink-100 p-4 text-center text-xs text-muted-foreground dark:bg-ink-800/50"
           >
-            {locale === "ar" ? "جارٍ تحميل النطاقات…" : "Loading domains…"}
+            {text.loadingDomains}
           </p>
         ) : fqdn.fqdns.length === 0 && !fqdn.listError ? (
           <p className="rounded-xl bg-ink-100 p-4 text-center text-xs text-muted-foreground dark:bg-ink-800/50">
@@ -165,11 +165,7 @@ export function TenantFqdnPanel({
           aria-label={text.remove}
           className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-danger-300 bg-danger-50 p-3 text-xs dark:border-danger-900 dark:bg-danger-950/30"
         >
-          <span>
-            {locale === "ar"
-              ? "تأكيد إزالة هذا النطاق؟"
-              : "Confirm removal of this domain?"}
-          </span>
+          <span>{text.confirmRemoveDomain}</span>
           <div className="flex gap-2">
             <button
               type="button"

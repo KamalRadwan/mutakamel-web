@@ -58,7 +58,7 @@ import type {
 
 export function useRegisterTenant() {
   const router = useRouter();
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const { user, isLoading: isAuthLoading } = useAuth();
   const { getIdempotencyKey, resetKey } = useIdempotency();
@@ -604,15 +604,9 @@ export function useRegisterTenant() {
       }
       setIdentityValidationEvidence({ fingerprint, result });
       if (result.valid) {
-        toast.success(
-          lang === "ar" ? "الهوية متاحة" : "Identity available",
-          result.message,
-        );
+        toast.success(t.tenants.registerFlow.identityAvailableTitle, result.message);
       } else {
-        toast.error(
-          lang === "ar" ? "الهوية غير متاحة" : "Identity unavailable",
-          result.message,
-        );
+        toast.error(t.tenants.registerFlow.identityUnavailableTitle, result.message);
       }
     } catch (caught) {
       if (
@@ -623,10 +617,7 @@ export function useRegisterTenant() {
       }
       const error = normalizeApiError(caught);
       setIdentityValidationError(error);
-      toast.error(
-        lang === "ar" ? "تعذر فحص الهوية" : "Identity check failed",
-        error.message,
-      );
+      toast.error(t.tenants.registerFlow.identityCheckFailedTitle, error.message);
     } finally {
       if (generation === identityRequestGeneration.current) {
         setIsValidatingIdentity(false);
@@ -639,21 +630,15 @@ export function useRegisterTenant() {
     if (submissionLockRef.current || isSubmitting) return;
     if (pendingCreateRecovery) {
       toast.warning(
-        lang === "ar"
-          ? "احسم أمر الإنشاء السابق"
-          : "Resolve the previous create command",
-        lang === "ar"
-          ? "افحص حالة المستأجر المحفوظة قبل إرسال أمر إنشاء جديد."
-          : "Check the retained tenant status before sending another create command.",
+        t.tenants.registerFlow.resolvePreviousCreateTitle,
+        t.tenants.registerFlow.resolvePreviousCreateDesc,
       );
       return;
     }
     if (!hasValidIdentityEvidence) {
       toast.error(
-        lang === "ar" ? "فحص الهوية مطلوب" : "Identity check required",
-        lang === "ar"
-          ? "افحص اسم المستأجر واسم الشركة الحاليين قبل المتابعة."
-          : "Validate the current tenant name and company name before continuing.",
+        t.tenants.registerFlow.identityCheckRequiredTitle,
+        t.tenants.registerFlow.identityCheckRequiredDesc,
       );
       setCurrentStep(1);
       return;
@@ -665,10 +650,8 @@ export function useRegisterTenant() {
       !isCanonicalCountrySelection(formData)
     ) {
       toast.error(
-        lang === "ar" ? "بيانات ناقصة" : "Missing fields",
-        lang === "ar"
-          ? "يرجى استكمال البيانات الأساسية قبل المتابعة."
-          : "Complete the required identity fields before proceeding.",
+        t.tenants.registerFlow.missingFieldsTitle,
+        t.tenants.registerFlow.missingFieldsDesc,
       );
       setCurrentStep(1);
       return;
@@ -682,10 +665,8 @@ export function useRegisterTenant() {
       !formData.ownerJobTitle.trim()
     ) {
       toast.error(
-        lang === "ar" ? "بيانات المالك ناقصة" : "Owner details are incomplete",
-        lang === "ar"
-          ? "أكمل بيانات المالك المطلوبة قبل المتابعة."
-          : "Complete all required owner fields before continuing.",
+        t.tenants.registerFlow.ownerDetailsIncompleteTitle,
+        t.tenants.registerFlow.ownerDetailsIncompleteDesc,
       );
       setCurrentStep(2);
       return;
@@ -815,12 +796,7 @@ export function useRegisterTenant() {
       setPendingCreateRecovery(null);
       setCreateRecoveryError(null);
       resetKey();
-      toast.success(
-        lang === "ar" ? "تم الإنشاء" : "Created",
-        lang === "ar"
-          ? "تم إنشاء بيئة العمل وبدأ التجهيز."
-          : "Tenant created and provisioning has started.",
-      );
+      toast.success(t.tenants.registerFlow.createdTitle, t.tenants.registerFlow.createdDesc);
       router.push(`/tenants/${createdTenant.id}`);
     } catch (caught) {
       if (submissionController.signal.aborted) return;
@@ -830,10 +806,8 @@ export function useRegisterTenant() {
       ) {
         resetKey();
         toast.warning(
-          lang === "ar" ? "تغيرت بيانات الإنشاء" : "Create draft changed",
-          lang === "ar"
-            ? "لم يُرسل أمر الإنشاء. راجع القيم الحالية واطلب عرض سعر جديدًا."
-            : "No create command was sent. Review the current values and request a new quote.",
+          t.tenants.registerFlow.createDraftChangedTitle,
+          t.tenants.registerFlow.createDraftChangedDesc,
         );
         return;
       }
@@ -861,18 +835,12 @@ export function useRegisterTenant() {
       }
       const message =
         adminAuthHandling === "repair-degraded"
-          ? lang === "ar"
-            ? "تعذر استعادة التفويض لهذا الطلب. احتفظنا بالجلسة؛ حاول مرة أخرى."
-            : "We couldn't restore authorization for this request. Your session was kept; try again."
+          ? t.tenants.registerFlow.repairDegradedMessage
           : error.message;
       toast.error(
         commandWasSent
-          ? lang === "ar"
-            ? "فشل إنشاء المستأجر"
-            : "Tenant creation failed"
-          : lang === "ar"
-            ? "تعذر الحصول على عرض السعر"
-            : "Quote request failed",
+          ? t.tenants.registerFlow.tenantCreationFailedTitle
+          : t.tenants.registerFlow.quoteRequestFailedTitle,
         [
           message,
           error.errorCode ? `Code: ${error.errorCode}` : null,
@@ -894,11 +862,7 @@ export function useRegisterTenant() {
     const attempt = pendingCreateRecovery;
     if (!attempt || isRecoveringCreate) return;
     if (!canReadTenants) {
-      setCreateRecoveryError(
-        lang === "ar"
-          ? "يلزم تصريح admin.tenants.read لفحص الحالة. لم تُخزن بيانات الطلب أو بيانات المالك في المتصفح."
-          : "admin.tenants.read is required to check status. No request DTO or owner data was stored in the browser.",
-      );
+      setCreateRecoveryError(t.tenants.registerFlow.recoveryPermissionRequired);
       return;
     }
 
@@ -914,11 +878,7 @@ export function useRegisterTenant() {
       );
       if (controller.signal.aborted) return;
       if (!status) {
-        setCreateRecoveryError(
-          lang === "ar"
-            ? "لا يوجد سجل مستأجر مؤكد حتى الآن. احتفظ بعلامة الاسترداد وافحص الحالة مرة أخرى؛ لا ترسل أمر إنشاء جديدًا."
-            : "No authoritative tenant record is visible yet. Keep the recovery marker and check again; do not send a new create command.",
-        );
+        setCreateRecoveryError(t.tenants.registerFlow.recoveryNoRecordYet);
         return;
       }
 
@@ -926,10 +886,8 @@ export function useRegisterTenant() {
       setPendingCreateRecovery(null);
       resetKey();
       toast.success(
-        lang === "ar" ? "تم استرداد نتيجة الإنشاء" : "Create outcome recovered",
-        lang === "ar"
-          ? `تم العثور على المستأجر بالحالة ${status.status}.`
-          : `The tenant was found with status ${status.status}.`,
+        t.tenants.registerFlow.createOutcomeRecoveredTitle,
+        t.tenants.registerFlow.createOutcomeRecoveredDesc(status.status),
       );
       router.push(`/tenants/${status.id}`);
     } catch (caught) {
@@ -953,22 +911,16 @@ export function useRegisterTenant() {
     const next = Math.max(1, Math.min(5, step));
     if (next > 1 && !hasValidIdentityEvidence) {
       toast.error(
-        lang === "ar" ? "فحص الهوية مطلوب" : "Identity check required",
-        lang === "ar"
-          ? "افحص اسم المستأجر واسم الشركة الحاليين قبل المتابعة."
-          : "Validate the current tenant name and company name before continuing.",
+        t.tenants.registerFlow.identityCheckRequiredTitle,
+        t.tenants.registerFlow.identityCheckRequiredDesc,
       );
       setCurrentStep(1);
       return;
     }
     if (next > 1 && !isCanonicalCountrySelection(formData)) {
       toast.error(
-        lang === "ar"
-          ? "الدولة والمنطقة الزمنية مطلوبتان"
-          : "Country and timezone required",
-        lang === "ar"
-          ? "اختر دولة من السجل المعتمد ثم اختر منطقة زمنية تابعة لها."
-          : "Choose a country from the canonical registry and one of its timezones.",
+        t.tenants.registerFlow.countryTimezoneRequiredTitle,
+        t.tenants.registerFlow.countryTimezoneRequiredDesc,
       );
       setCurrentStep(1);
       return;

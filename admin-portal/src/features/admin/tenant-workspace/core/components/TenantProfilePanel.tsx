@@ -174,7 +174,7 @@ export function TenantProfilePanel({
         <div className="rounded-xl border border-border p-3 dark:border-border">
           <div className="mb-3 flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-foreground">
-              {locale === "ar" ? "العنوان" : "Address"}
+              {text.address}
             </span>
             <button
               type="button"

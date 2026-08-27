@@ -1328,7 +1328,7 @@ function ErrorNotice({
       <p className="mt-1 font-mono text-xs">
         {error.errorCode}
         {error.correlationId
-          ? ` · ${lang === "ar" ? "معرّف الارتباط" : "Correlation"}: ${error.correlationId}`
+          ? ` · ${billingCopy[lang].correlationLabel}: ${error.correlationId}`
           : ""}
       </p>
     </div>
@@ -1418,6 +1418,7 @@ const billingCopy = {
     title: "Subscription, wallet & payments",
     subtitle: "Authoritative billing state and reviewed financial commands.",
     refresh: "Refresh",
+    correlationLabel: "Correlation",
     sections: {
       subscription: "Subscription",
       wallet: "Wallet",
@@ -1546,6 +1547,7 @@ const billingCopy = {
     title: "الاشتراك والمحفظة والمدفوعات",
     subtitle: "حالة فوترة موثوقة وأوامر مالية بعد المراجعة.",
     refresh: "تحديث",
+    correlationLabel: "معرّف الارتباط",
     sections: {
       subscription: "الاشتراك",
       wallet: "المحفظة",

@@ -43,7 +43,49 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => ({ lang: "en", t: {} }),
+  useI18n: () => ({
+    lang: "en",
+    t: {
+      tenants: {
+        registerFlow: {
+          identityAvailableTitle: "Identity available",
+          identityUnavailableTitle: "Identity unavailable",
+          identityCheckFailedTitle: "Identity check failed",
+          resolvePreviousCreateTitle: "Resolve the previous create command",
+          resolvePreviousCreateDesc:
+            "Check the retained tenant status before sending another create command.",
+          identityCheckRequiredTitle: "Identity check required",
+          identityCheckRequiredDesc:
+            "Validate the current tenant name and company name before continuing.",
+          missingFieldsTitle: "Missing fields",
+          missingFieldsDesc:
+            "Complete the required identity fields before proceeding.",
+          ownerDetailsIncompleteTitle: "Owner details are incomplete",
+          ownerDetailsIncompleteDesc:
+            "Complete all required owner fields before continuing.",
+          createdTitle: "Created",
+          createdDesc: "Tenant created and provisioning has started.",
+          createDraftChangedTitle: "Create draft changed",
+          createDraftChangedDesc:
+            "No create command was sent. Review the current values and request a new quote.",
+          repairDegradedMessage:
+            "We couldn't restore authorization for this request. Your session was kept; try again.",
+          tenantCreationFailedTitle: "Tenant creation failed",
+          quoteRequestFailedTitle: "Quote request failed",
+          recoveryPermissionRequired:
+            "admin.tenants.read is required to check status. No request DTO or owner data was stored in the browser.",
+          recoveryNoRecordYet:
+            "No authoritative tenant record is visible yet. Keep the recovery marker and check again; do not send a new create command.",
+          createOutcomeRecoveredTitle: "Create outcome recovered",
+          createOutcomeRecoveredDesc: (status: string) =>
+            `The tenant was found with status ${status}.`,
+          countryTimezoneRequiredTitle: "Country and timezone required",
+          countryTimezoneRequiredDesc:
+            "Choose a country from the canonical registry and one of its timezones.",
+        },
+      },
+    },
+  }),
 }));
 
 vi.mock("@/context/AuthContext", () => ({

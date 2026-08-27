@@ -35,6 +35,12 @@ const copy = {
     clearAddress: "Clear address",
     noDomains: "No domain evidence is available.",
     correlation: "Correlation ID",
+    domainFieldLabel: "Domain",
+    reloadDomains: "Reload domains",
+    loadingDomains: "Loading domains…",
+    confirmRemoveDomain: "Confirm removal of this domain?",
+    address: "Address",
+    confirmAction: (label: string) => `Confirm action: ${label}`,
   },
   ar: {
     title: "إدارة المستأجر",
@@ -70,6 +76,12 @@ const copy = {
     clearAddress: "مسح العنوان",
     noDomains: "لا تتوفر بيانات نطاقات.",
     correlation: "معرّف الارتباط",
+    domainFieldLabel: "النطاق",
+    reloadDomains: "إعادة تحميل النطاقات",
+    loadingDomains: "جارٍ تحميل النطاقات…",
+    confirmRemoveDomain: "تأكيد إزالة هذا النطاق؟",
+    address: "العنوان",
+    confirmAction: (label: string) => `تأكيد الإجراء: ${label}`,
   },
 } as const;
 

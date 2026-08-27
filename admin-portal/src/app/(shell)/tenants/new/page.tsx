@@ -85,9 +85,7 @@ export default function RegisterTenantWizardPage() {
               type="button"
               onClick={onCancel}
               disabled={isSubmitting}
-              aria-label={
-                lang === "ar" ? "العودة إلى المستأجرين" : "Back to tenants"
-              }
+              aria-label={t.tenants.wizard.backToTenants}
               className="p-2 rounded-xl border border-border hover:bg-ink-100 dark:hover:bg-ink-800 transition-colors cursor-pointer text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               {lang === "ar" ? (
@@ -114,14 +112,10 @@ export default function RegisterTenantWizardPage() {
             className="rounded-xl border border-warn-300 bg-warn-50 p-5 text-warn-950 dark:border-warn-900 dark:bg-warn-950/40 dark:text-warn-100"
           >
             <h2 className="font-semibold">
-              {lang === "ar"
-                ? "نتيجة إنشاء سابقة تحتاج فحص الحالة"
-                : "A previous tenant create needs status recovery"}
+              {t.tenants.wizard.recoveryBannerTitle}
             </h2>
             <p className="mt-2 text-sm leading-6">
-              {lang === "ar"
-                ? `يحتفظ هذا التبويب فقط باسم المستأجر العام (${pendingCreateRecovery.tenantName}) ومفتاح الأمر ووقت الإرسال. لا تُخزن بيانات الشركة أو المالك أو العرض أو الخوادم. افحص سجل Core قبل بدء إنشاء جديد.`
-                : `This tab retains only the public tenant name (${pendingCreateRecovery.tenantName}), command key, and send time. Company, owner, quote, and placement data are not stored. Check Core status before starting another create.`}
+              {t.tenants.wizard.recoveryBannerDesc(pendingCreateRecovery.tenantName)}
             </p>
             <button
               type="button"
@@ -129,19 +123,11 @@ export default function RegisterTenantWizardPage() {
               disabled={isRecoveringCreate || !canReadTenants}
               className="mt-4 min-h-11 rounded-xl bg-warn-800 px-4 text-sm font-semibold text-white hover:bg-warn-900 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isRecoveringCreate
-                ? lang === "ar"
-                  ? "جارٍ فحص الحالة…"
-                  : "Checking status…"
-                : lang === "ar"
-                  ? "فحص حالة المستأجر"
-                  : "Check tenant status"}
+              {isRecoveringCreate ? t.tenants.wizard.checkingStatus : t.tenants.wizard.checkTenantStatus}
             </button>
             {!canReadTenants ? (
               <p className="mt-3 text-xs font-semibold">
-                {lang === "ar"
-                  ? "يلزم تصريح admin.tenants.read للفحص؛ لم يتم تفعيل إعادة إرسال تلقائية."
-                  : "admin.tenants.read is required for recovery; automatic replay is not enabled."}
+                {t.tenants.wizard.recoveryPermissionNote}
               </p>
             ) : null}
             {createRecoveryError ? (
@@ -245,18 +231,14 @@ export default function RegisterTenantWizardPage() {
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
                   <Globe className="w-4 h-4 text-brand-600 dark:text-brand-400" />
                   <span>
-                    {lang === "ar"
-                      ? "الخطوة 1: هويّة المستأجر والدومين الأساسي (Tenant Identity & Address)"
-                      : "Step 1: Tenant Identity & FQDN"}
+                    {t.tenants.wizard.step1Heading}
                   </span>
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-foreground">
-                      {lang === "ar"
-                        ? "رمز ورابط المستأجر (name) *"
-                        : "Tenant Name Code (name) *"}
+                      {t.tenants.wizard.tenantNameCodeLabel}
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -287,10 +269,8 @@ export default function RegisterTenantWizardPage() {
                       >
                         {isValidatingIdentity ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : lang === "ar" ? (
-                          "فحص التوفر"
                         ) : (
-                          "Check Availability"
+                          t.tenants.wizard.checkAvailability
                         )}
                       </button>
                     </div>
@@ -306,9 +286,9 @@ export default function RegisterTenantWizardPage() {
                         ""}
                     </p>
                     <p className="text-xs text-muted-foreground font-mono">
-                      {lang === "ar"
-                        ? `النطاق المولد: ${formData.name ? `${formData.name}.mutakamel.ai` : "name.mutakamel.ai"}`
-                        : `Derived FQDN: ${formData.name ? `${formData.name}.mutakamel.ai` : "name.mutakamel.ai"}`}
+                      {t.tenants.wizard.derivedFqdn(
+                        formData.name ? `${formData.name}.mutakamel.ai` : "name.mutakamel.ai",
+                      )}
                     </p>
                   </div>
 
@@ -387,23 +367,15 @@ export default function RegisterTenantWizardPage() {
 
                   <div className="space-y-1 lg:col-span-2">
                     <label className="text-xs font-semibold text-foreground">
-                      {lang === "ar" ? "الدولة" : "Country"}
+                      {t.tenants.wizard.countryLabel}
                     </label>
                     <CountrySelect
                       value={formData.countryIsoCode}
                       onChange={selectCountry}
                       disabled={wizardLocked}
-                      placeholder={
-                        lang === "ar" ? "اختر دولة…" : "Choose a country…"
-                      }
-                      searchPlaceholder={
-                        lang === "ar" ? "ابحث عن دولة…" : "Search countries…"
-                      }
-                      emptyLabel={
-                        lang === "ar"
-                          ? "لا توجد نتائج مطابقة"
-                          : "No matching countries"
-                      }
+                      placeholder={t.tenants.wizard.chooseCountryPlaceholder}
+                      searchPlaceholder={t.tenants.wizard.searchCountriesPlaceholder}
+                      emptyLabel={t.tenants.wizard.noMatchingCountries}
                       className="block w-full"
                     />
                     {formData.countryName ? (
@@ -432,9 +404,7 @@ export default function RegisterTenantWizardPage() {
                       className="w-full px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <option value="">
-                        {lang === "ar"
-                          ? "اختر المنطقة الزمنية"
-                          : "Choose a timezone"}
+                        {t.tenants.wizard.chooseTimezone}
                       </option>
                       {countryTimezoneOptions.map((timezone) => (
                         <option key={timezone} value={timezone}>
@@ -502,9 +472,7 @@ export default function RegisterTenantWizardPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, buildingNo: e.target.value })
                       }
-                      placeholder={
-                        lang === "ar" ? "رقم المبنى" : "Building number"
-                      }
+                      placeholder={t.tenants.wizard.buildingNumberPlaceholder}
                       maxLength={100}
                       className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
@@ -524,11 +492,7 @@ export default function RegisterTenantWizardPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, state: e.target.value })
                       }
-                      placeholder={
-                        lang === "ar"
-                          ? "الولاية / المحافظة"
-                          : "State / province"
-                      }
+                      placeholder={t.tenants.wizard.stateProvincePlaceholder}
                       maxLength={100}
                       className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
@@ -538,7 +502,7 @@ export default function RegisterTenantWizardPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, district: e.target.value })
                       }
-                      placeholder={lang === "ar" ? "الحي" : "District"}
+                      placeholder={t.tenants.wizard.districtPlaceholder}
                       maxLength={100}
                       className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
@@ -548,9 +512,7 @@ export default function RegisterTenantWizardPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, postalCode: e.target.value })
                       }
-                      placeholder={
-                        lang === "ar" ? "الرمز البريدي" : "Postal code"
-                      }
+                      placeholder={t.tenants.wizard.postalCodePlaceholder}
                       maxLength={100}
                       className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
@@ -560,7 +522,7 @@ export default function RegisterTenantWizardPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, landmark: e.target.value })
                       }
-                      placeholder={lang === "ar" ? "علامة مميزة" : "Landmark"}
+                      placeholder={t.tenants.wizard.landmarkPlaceholder}
                       maxLength={100}
                       className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
@@ -582,11 +544,7 @@ export default function RegisterTenantWizardPage() {
                         formattedAddress: e.target.value,
                       })
                     }
-                    placeholder={
-                      lang === "ar"
-                        ? "العنوان المنسق القابل للتعديل"
-                        : "Editable formatted address"
-                    }
+                    placeholder={t.tenants.wizard.formattedAddressPlaceholder}
                     maxLength={500}
                     rows={2}
                     className="w-full resize-y rounded-xl border border-border bg-ink-100 px-3 py-2 text-xs dark:border-border dark:bg-ink-800/60"
@@ -601,18 +559,14 @@ export default function RegisterTenantWizardPage() {
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
                   <User className="w-4 h-4 text-brand-600 dark:text-brand-400" />
                   <span>
-                    {lang === "ar"
-                      ? "الخطوة 2: اعتمادات مالك الشركة والمدير الأول (Owner Contact & Initial Admin)"
-                      : "Step 2: Owner Contact & Admin User"}
+                    {t.tenants.wizard.step2Heading}
                   </span>
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-foreground">
-                      {lang === "ar"
-                        ? "البريد الإلكتروني للمالك *"
-                        : "Owner Email *"}
+                      {t.tenants.wizard.ownerEmailLabel}
                     </label>
                     <input
                       type="email"
@@ -628,7 +582,7 @@ export default function RegisterTenantWizardPage() {
 
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-foreground">
-                      {lang === "ar" ? "الاسم الأول *" : "First Name *"}
+                      {t.tenants.wizard.firstNameRequiredLabel}
                     </label>
                     <input
                       type="text"
@@ -647,7 +601,7 @@ export default function RegisterTenantWizardPage() {
 
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-foreground">
-                      {lang === "ar" ? "الاسم الأخير *" : "Last Name *"}
+                      {t.tenants.wizard.lastNameRequiredLabel}
                     </label>
                     <input
                       type="text"
@@ -668,7 +622,7 @@ export default function RegisterTenantWizardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-foreground">
-                      {lang === "ar" ? "المسمى الوظيفي" : "Job Title"}
+                      {t.tenants.wizard.jobTitleLabel}
                     </label>
                     <input
                       type="text"
@@ -712,9 +666,7 @@ export default function RegisterTenantWizardPage() {
                       className="w-4 h-4 rounded text-brand-600"
                     />
                     <span>
-                      {lang === "ar"
-                        ? "إرسال بريد دعوة رسمي للانضمام للمالك تلقائياً (sendInvitation)"
-                        : "Automatically send email invitation to owner (sendInvitation)"}
+                      {t.tenants.wizard.sendInvitationLabel}
                     </span>
                   </label>
                 </div>
@@ -780,9 +732,7 @@ export default function RegisterTenantWizardPage() {
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
                   <ShieldCheck className="w-4 h-4 text-brand-600 dark:text-brand-400" />
                   <span>
-                    {lang === "ar"
-                      ? "الخطوة 5: مراجعة البيانات وإرسال أمر التجهيز التلقائي"
-                      : "Step 5: Review & Confirm Provisioning Order"}
+                    {t.tenants.wizard.step5Heading}
                   </span>
                 </h3>
 
@@ -805,7 +755,7 @@ export default function RegisterTenantWizardPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
-                      {lang === "ar" ? "المالك الرئيسي:" : "Primary Owner:"}
+                      {t.tenants.wizard.primaryOwnerLabel}
                     </span>
                     <span className="font-semibold">
                       {formData.ownerFirstName} {formData.ownerLastName} (
@@ -819,28 +769,22 @@ export default function RegisterTenantWizardPage() {
                     <span className="text-end font-mono font-semibold">
                       {selectedDatabasePlacement
                         ? `${selectedDatabasePlacement.name} (${selectedDatabasePlacement.id})`
-                        : lang === "ar"
-                          ? "لم يتم الاختيار"
-                          : "Not selected"}
+                        : t.tenants.wizard.notSelected}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
-                      {lang === "ar" ? "سيرفر التخزين:" : "Storage Server:"}
+                      {t.tenants.wizard.storageServerLabel}
                     </span>
                     <span className="font-semibold font-mono text-end">
                       {selectedStoragePlacement
                         ? `${selectedStoragePlacement.name} (${selectedStoragePlacement.id})`
-                        : lang === "ar"
-                          ? "لم يتم الاختيار"
-                          : "Not selected"}
+                        : t.tenants.wizard.notSelected}
                     </span>
                   </div>
                   <div className="border-t border-border pt-3 dark:border-border">
                     <span className="text-muted-foreground">
-                      {lang === "ar"
-                        ? "التطبيقات المختارة:"
-                        : "Selected Applications:"}
+                      {t.tenants.wizard.selectedApplicationsLabel}
                     </span>
                     <ul className="mt-2 grid gap-2 sm:grid-cols-2">
                       {selectedApplicationLines.map((line) => (
@@ -853,7 +797,7 @@ export default function RegisterTenantWizardPage() {
                           </span>
                           <span className="ms-2 font-mono text-xs text-muted-foreground">
                             {line.tierKey} · {line.seats}{" "}
-                            {lang === "ar" ? "مقعد" : "seats"}
+                            {t.tenants.wizard.seatsSuffix}
                           </span>
                         </li>
                       ))}
@@ -862,13 +806,13 @@ export default function RegisterTenantWizardPage() {
                   {provisioningPreview ? (
                     <div className="flex justify-between border-t border-border pt-3 dark:border-border">
                       <span className="text-muted-foreground">
-                        {lang === "ar" ? "خطة التجهيز:" : "Provisioning plan:"}
+                        {t.tenants.wizard.provisioningPlanLabel}
                       </span>
                       <span className="text-end font-semibold">
                         {provisioningPreview.components.length}{" "}
-                        {lang === "ar" ? "مكون" : "components"} ·{" "}
+                        {t.tenants.wizard.componentsSuffix} ·{" "}
                         {provisioningPreview.steps.length}{" "}
-                        {lang === "ar" ? "خطوة" : "steps"}
+                        {t.tenants.wizard.stepsSuffix}
                       </span>
                     </div>
                   ) : null}
@@ -884,7 +828,7 @@ export default function RegisterTenantWizardPage() {
                 disabled={currentStep === 1}
                 className="px-4 py-2.5 text-xs font-semibold text-foreground bg-ink-100 dark:bg-ink-800 hover:bg-ink-200 dark:hover:bg-ink-700 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
               >
-                {lang === "ar" ? "السابق" : "Previous"}
+                {t.tenants.wizard.previousStep}
               </button>
 
               {currentStep < 5 ? (
@@ -893,7 +837,7 @@ export default function RegisterTenantWizardPage() {
                   onClick={nextStep}
                   className="px-5 py-2.5 text-xs font-semibold text-ink-950 bg-brand-500 hover:bg-brand-600 dark:bg-brand-400 dark:hover:bg-brand-500 rounded-lg transition-colors cursor-pointer"
                 >
-                  {lang === "ar" ? "التالي" : "Next Step"}
+                  {t.tenants.wizard.nextStepLabel}
                 </button>
               ) : (
                 <button
@@ -914,7 +858,7 @@ export default function RegisterTenantWizardPage() {
                     <CheckCircle2 className="w-4 h-4" />
                   )}
                   <span>
-                    {lang === "ar" ? "تأكيد الإنشاء" : "Confirm Creation"}
+                    {t.tenants.wizard.confirmCreation}
                   </span>
                 </button>
               )}

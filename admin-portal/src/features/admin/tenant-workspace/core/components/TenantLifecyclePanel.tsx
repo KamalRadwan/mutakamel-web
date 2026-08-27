@@ -143,9 +143,7 @@ export function TenantLifecyclePanel({
           className="space-y-3 rounded-xl border border-danger-300 bg-danger-50 p-3 text-xs text-danger-950 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-100"
         >
           <p className="font-semibold">
-            {locale === "ar"
-              ? `تأكيد الإجراء: ${actionLabel[confirmation]}`
-              : `Confirm action: ${actionLabel[confirmation]}`}
+            {text.confirmAction(actionLabel[confirmation])}
           </p>
           {confirmation === "destroy" && (
             <label className="flex items-center gap-2">
