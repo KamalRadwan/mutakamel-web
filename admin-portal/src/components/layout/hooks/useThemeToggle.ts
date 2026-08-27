@@ -6,7 +6,7 @@ import { useI18n } from "@/i18n/I18nContext";
 
 export function useThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -26,12 +26,6 @@ export function useThemeToggle() {
     isDark,
     mounted,
     toggleTheme,
-    title: isDark
-      ? lang === "ar"
-        ? "التبديل إلى الوضع الفاتح"
-        : "Switch to Light Mode"
-      : lang === "ar"
-        ? "التبديل إلى الوضع الداكن"
-        : "Switch to Dark Mode",
+    title: isDark ? t.common.switchToLightMode : t.common.switchToDarkMode,
   };
 }

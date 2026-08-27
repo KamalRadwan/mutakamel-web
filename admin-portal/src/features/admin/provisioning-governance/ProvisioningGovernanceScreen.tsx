@@ -719,7 +719,6 @@ function DiscoveryWorkspace({
   copy: ProvisioningGovernanceCopy;
   lang: "ar" | "en";
 }) {
-  const { lang: currentLang } = useI18n();
   const toast = useToast();
   const [command, setCommand] = useState<CreateDiscoveryRunCommand>({
     mode: "DRY_RUN",
@@ -744,7 +743,7 @@ function DiscoveryWorkspace({
     const result = await view.runDiscovery(command);
     if (result) {
       toast.success(
-        currentLang === "ar" ? "تم إنشاء عملية الاكتشاف" : "Discovery run created",
+        copy.discoveryRunCreatedTitle,
         `${copy.created} ${result.runId}`,
       );
     }

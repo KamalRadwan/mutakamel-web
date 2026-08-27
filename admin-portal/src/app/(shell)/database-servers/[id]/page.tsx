@@ -221,6 +221,7 @@ function DatabaseServerDetailBoundary({
   lang: "ar" | "en";
   loading?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="grid place-items-center py-16">
       <Card role={loading ? "status" : undefined} className="flex max-w-xl flex-col items-center p-8 text-center text-foreground">
@@ -230,13 +231,7 @@ function DatabaseServerDetailBoundary({
           <ShieldAlert className="size-8 text-warn-600 dark:text-warn-400" aria-hidden="true" />
         )}
         <h1 className="mt-3 font-semibold">
-          {loading
-            ? lang === "ar"
-              ? "جارٍ التحقق من الصلاحيات..."
-              : "Checking database-server access..."
-            : lang === "ar"
-              ? "لا تملك صلاحية عرض هذا الخادم."
-              : "You do not have permission to view this database server."}
+          {loading ? t.databaseServerDetail.checkingAccess : t.databaseServerDetail.forbiddenTitle}
         </h1>
       </Card>
     </div>

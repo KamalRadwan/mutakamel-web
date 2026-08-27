@@ -73,6 +73,7 @@ export interface ProvisioningGovernanceCopy {
   run: string;
   running: string;
   created: string;
+  discoveryRunCreatedTitle: string;
   exactRetry: string;
   validationCutoff: string;
   validationMax: string;
@@ -175,6 +176,7 @@ export const COPY: Record<"ar" | "en", ProvisioningGovernanceCopy> = {
     run: "Start discovery",
     running: "Starting…",
     created: "Discovery run accepted.",
+    discoveryRunCreatedTitle: "Discovery run created",
     exactRetry: "Retry exact command",
     validationCutoff: "Choose a valid UTC time that is not in the future.",
     validationMax: "Enter an integer from 1 through 10,000.",
@@ -278,6 +280,7 @@ export const COPY: Record<"ar" | "en", ProvisioningGovernanceCopy> = {
     run: "بدء الاكتشاف",
     running: "جارٍ البدء…",
     created: "تم قبول عملية الاكتشاف.",
+    discoveryRunCreatedTitle: "تم إنشاء عملية الاكتشاف",
     exactRetry: "إعادة محاولة الأمر نفسه",
     validationCutoff: "اختر وقت UTC صالحًا لا يقع في المستقبل.",
     validationMax: "أدخل عددًا صحيحًا من 1 إلى 10,000.",

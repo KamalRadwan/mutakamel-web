@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from "react";
 import { Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useI18n } from "@/i18n/I18nContext";
 import { adminCan } from "@/lib/auth/rbac";
 import {
   Badge,
@@ -30,7 +31,8 @@ const UUID_V7_PATTERN =
  * id (e.g. from a support ticket). There is intentionally no "start
  * migration" trigger here — see `../api.ts`'s module comment for why.
  */
-export function TenantStorageMigrationPanel({ isArabic }: { isArabic: boolean }) {
+export function TenantStorageMigrationPanel() {
+  const { t } = useI18n();
   const { user } = useAuth();
   const canRead = adminCan(user, "admin.storage_migrations.read");
   const view = useTenantStorageMigration();
@@ -43,7 +45,7 @@ export function TenantStorageMigrationPanel({ isArabic }: { isArabic: boolean })
     event.preventDefault();
     const trimmed = input.trim().toLowerCase();
     if (!UUID_V7_PATTERN.test(trimmed)) {
-      setValidationError(isArabic ? "معرّف التهجير غير صالح." : "That doesn't look like a valid migration id.");
+      setValidationError(t.storageMigration.invalidMigrationId);
       return;
     }
     setValidationError(null);
@@ -54,18 +56,16 @@ export function TenantStorageMigrationPanel({ isArabic }: { isArabic: boolean })
     <Card>
       <CardHeader>
         <CardTitle className="text-sm">
-          {isArabic ? "حالة تهجير التخزين" : "Storage migration status"}
+          {t.storageMigration.panelTitle}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-xs leading-5 text-muted-foreground">
-          {isArabic
-            ? "لا توجد قائمة بعمليات التهجير لهذا المستأجر. أدخل معرّف تهجير معروف لعرض حالته."
-            : "There is no list of migrations for this tenant. Enter a known migration id to view its status."}
+          {t.storageMigration.panelDescription}
         </p>
         <form onSubmit={submit} className="flex items-end gap-2">
           <div className="flex-1">
-            <Field label={isArabic ? "معرّف التهجير" : "Migration id"} error={validationError ?? undefined}>
+            <Field label={t.storageMigration.migrationIdLabel} error={validationError ?? undefined}>
               {(fp) => (
                 <Input
                   {...fp}
@@ -79,14 +79,14 @@ export function TenantStorageMigrationPanel({ isArabic }: { isArabic: boolean })
           </div>
           <Button type="submit" variant="outline" disabled={view.isLoading}>
             <Search className="size-4" />
-            {isArabic ? "بحث" : "Look up"}
+            {t.storageMigration.lookupButton}
           </Button>
         </form>
 
         {view.error && <ErrorState error={view.error} onRetry={() => view.migrationId && view.lookup(view.migrationId)} />}
 
         {view.migration && (
-          <MigrationStatusView migration={view.migration} isArabic={isArabic} isPolling={view.isLoading} />
+          <MigrationStatusView migration={view.migration} isPolling={view.isLoading} />
         )}
       </CardContent>
     </Card>
@@ -95,40 +95,43 @@ export function TenantStorageMigrationPanel({ isArabic }: { isArabic: boolean })
 
 function MigrationStatusView({
   migration,
-  isArabic,
   isPolling,
 }: {
   migration: TenantStorageMigrationView;
-  isArabic: boolean;
   isPolling: boolean;
 }) {
+  const { t, lang } = useI18n();
   return (
     <div className="space-y-4 rounded-md border border-border p-4">
       <div className="flex items-center justify-between gap-3">
         <StatusBadge status={migration.status} />
         {isPolling && (
-          <Badge tone="neutral">{isArabic ? "يُحدَّث تلقائياً…" : "Auto-refreshing…"}</Badge>
+          <Badge tone="neutral">{t.storageMigration.autoRefreshingBadge}</Badge>
         )}
       </div>
-      <OperationTimeline steps={migrationSteps(migration.status, isArabic)} />
+      <OperationTimeline steps={migrationSteps(migration.status, lang, t)} />
       <dl className="grid gap-3 text-xs sm:grid-cols-2">
-        <DatumRow label={isArabic ? "خادم المصدر" : "Source server"} value={migration.sourceStorageServerId} mono />
-        <DatumRow label={isArabic ? "خادم الهدف" : "Target server"} value={migration.targetStorageServerId} mono />
+        <DatumRow label={t.storageMigration.sourceServerLabel} value={migration.sourceStorageServerId} mono />
+        <DatumRow label={t.storageMigration.targetServerLabel} value={migration.targetStorageServerId} mono />
         {migration.copiedObjectCount !== null && (
-          <DatumRow label={isArabic ? "عدد الكائنات المنسوخة" : "Objects copied"} value={String(migration.copiedObjectCount)} />
+          <DatumRow label={t.storageMigration.objectsCopiedLabel} value={String(migration.copiedObjectCount)} />
         )}
         {migration.copiedBytes !== null && (
-          <DatumRow label={isArabic ? "البايتات المنسوخة" : "Bytes copied"} value={migration.copiedBytes} mono />
+          <DatumRow label={t.storageMigration.bytesCopiedLabel} value={migration.copiedBytes} mono />
         )}
         {migration.failureCode && (
-          <DatumRow label={isArabic ? "رمز الفشل" : "Failure code"} value={migration.failureCode} mono />
+          <DatumRow label={t.storageMigration.failureCodeLabel} value={migration.failureCode} mono />
         )}
       </dl>
     </div>
   );
 }
 
-function migrationSteps(status: TenantStorageMigrationStatus, isArabic: boolean): OperationTimelineStep[] {
+function migrationSteps(
+  status: TenantStorageMigrationStatus,
+  lang: "ar" | "en",
+  t: ReturnType<typeof useI18n>["t"],
+): OperationTimelineStep[] {
   const order = ["ACCEPTED", "COPYING", "COPIED", "PLACEMENT_COMMITTED", "COMPLETED"] as const;
   const labels: Record<(typeof order)[number], [string, string]> = {
     ACCEPTED: ["Accepted", "مقبول"],
@@ -137,17 +140,14 @@ function migrationSteps(status: TenantStorageMigrationStatus, isArabic: boolean)
     PLACEMENT_COMMITTED: ["Placement committed", "تم اعتماد التوزيع"],
     COMPLETED: ["Completed", "مكتمل"],
   };
+  const isArabic = lang === "ar";
   if (status === "ROLLING_BACK" || status === "ROLLED_BACK") {
     return [
       {
-        label: isArabic ? "التراجع" : "Rollback",
+        label: t.storageMigration.rollbackLabel,
         detail: status === "ROLLED_BACK"
-          ? isArabic
-            ? "فشل التهجير وتم التراجع عن التغييرات."
-            : "The migration failed and changes were rolled back."
-          : isArabic
-            ? "التهجير فشل والتراجع جارٍ الآن."
-            : "The migration failed and is rolling back now.",
+          ? t.storageMigration.rolledBackDetail
+          : t.storageMigration.rollingBackDetail,
         state: status === "ROLLED_BACK" ? "failed" : "warning",
       },
     ];

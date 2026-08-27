@@ -13,7 +13,16 @@ const { authMock, detailHookMock } = vi.hoisted(() => ({
 
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
 vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => ({ lang: "en", dir: "ltr", t: {} }),
+  useI18n: () => ({
+    lang: "en",
+    dir: "ltr",
+    t: {
+      databaseServerDetail: {
+        checkingAccess: "Checking database-server access...",
+        forbiddenTitle: "You do not have permission to view this database server.",
+      },
+    },
+  }),
 }));
 vi.mock(
   "@/features/admin/database-servers/hooks/useDatabaseServerDetailPage",

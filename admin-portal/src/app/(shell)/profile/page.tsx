@@ -13,6 +13,8 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { Card, Button } from "@/design-system";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { useMyProfile } from "./hooks/useMyProfile";
 
 export default function MyProfilePage() {
@@ -34,13 +36,14 @@ export default function MyProfilePage() {
   } = useMyProfile();
 
   const isAr = lang === "ar";
+  const t = (isAr ? ar : en).profile;
 
   if (isLoading) {
     return (
       <div dir={isAr ? "rtl" : "ltr"} className="grid place-items-center py-16">
         <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
           <Loader2 className="size-5 animate-spin text-brand-600 dark:text-brand-400" aria-hidden="true" />
-          {isAr ? "جارٍ تحميل التفضيلات..." : "Loading profile preferences..."}
+          {t.loadingPreferences}
         </span>
       </div>
     );
@@ -59,25 +62,19 @@ export default function MyProfilePage() {
           )}
           <h1 className="mt-3 text-lg font-semibold text-foreground">
             {forbidden
-              ? isAr
-                ? "لا يمكنك عرض هذا الملف الشخصي"
-                : "Profile access is forbidden"
+              ? t.accessForbiddenTitle
               : unavailable
-                ? isAr
-                  ? "الملف الشخصي غير متاح مؤقتًا"
-                  : "Profile is temporarily unavailable"
-                : isAr
-                  ? "تعذر تحميل الملف الشخصي"
-                  : "Profile could not be loaded"}
+                ? t.temporarilyUnavailableTitle
+                : t.couldNotLoadTitle}
           </h1>
           <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
             <div>
-              <dt className="inline font-semibold">{isAr ? "رمز الخطأ" : "Error code"}: </dt>
+              <dt className="inline font-semibold">{t.errorCodeLabel}: </dt>
               <dd className="inline font-mono">{loadError.errorCode}</dd>
             </div>
             {loadError.correlationId ? (
               <div>
-                <dt className="inline font-semibold">{isAr ? "معرف الارتباط" : "Correlation ID"}: </dt>
+                <dt className="inline font-semibold">{t.correlationIdLabel}: </dt>
                 <dd className="inline break-all font-mono">{loadError.correlationId}</dd>
               </div>
             ) : null}
@@ -85,7 +82,7 @@ export default function MyProfilePage() {
           {!forbidden ? (
             <Button type="button" variant="primary" className="mt-5" onClick={() => void reload()}>
               <RefreshCw className="size-4" aria-hidden="true" />
-              {isAr ? "إعادة المحاولة" : "Retry"}
+              {t.retryButton}
             </Button>
           ) : null}
         </Card>
@@ -102,25 +99,23 @@ export default function MyProfilePage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-foreground">
-              {isAr ? "تفضيلات الحساب الشخصي" : "My Profile Preferences"}
+              {t.pageTitle}
             </h1>
             <p className="text-xs text-muted-foreground">
-              {isAr
-                ? "تخصيص المظهر، اللغة، وكثافة عرض الجداول الخاصة بحسابك."
-                : "Customize theme, interface language, and table density settings."}
+              {t.pageSubtitle}
             </p>
           </div>
         </div>
 
         <Button type="button" variant="primary" disabled={!hasChanges || isSaving} onClick={saveProfile}>
           {isSaving ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Save className="size-4" aria-hidden="true" />}
-          <span>{isAr ? "حفظ التغييرات" : "Save Preferences"}</span>
+          <span>{t.savePreferencesButton}</span>
         </Button>
       </Card>
 
       {saveError ? (
         <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-xs text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-100">
-          <p className="font-semibold">{isAr ? "لم تُحفظ التغييرات." : "Changes were not saved."}</p>
+          <p className="font-semibold">{t.changesNotSavedTitle}</p>
           <p className="mt-1 font-mono">
             {saveError.errorCode}
             {saveError.correlationId ? ` · ${saveError.correlationId}` : ""}
@@ -132,18 +127,18 @@ export default function MyProfilePage() {
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
             <SunMoon className="size-4 text-warn-600 dark:text-warn-400" aria-hidden="true" />
-            <span>{isAr ? "المظهر والشاشات (Theme Key)" : "Color Theme Preference"}</span>
+            <span>{t.colorThemeLabel}</span>
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <OptionButton label={isAr ? "داكن (Dark)" : "Dark Mode"} selected={themeKey === "dark"} onClick={() => setThemeKey("dark")} />
-            <OptionButton label={isAr ? "فاتح (Light)" : "Light Mode"} selected={themeKey === "light"} onClick={() => setThemeKey("light")} />
+            <OptionButton label={t.darkModeOption} selected={themeKey === "dark"} onClick={() => setThemeKey("dark")} />
+            <OptionButton label={t.lightModeOption} selected={themeKey === "light"} onClick={() => setThemeKey("light")} />
           </div>
         </div>
 
         <div className="space-y-2 border-t border-border pt-4">
           <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
             <Globe className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
-            <span>{isAr ? "اللغة المفضلة" : "Preferred Language"}</span>
+            <span>{t.preferredLanguageLabel}</span>
           </label>
           <div className="grid grid-cols-2 gap-3">
             <OptionButton label="English (LTR)" selected={language === "en"} onClick={() => setLanguage("en")} />
@@ -154,7 +149,7 @@ export default function MyProfilePage() {
         <div className="space-y-2 border-t border-border pt-4">
           <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
             <LayoutGrid className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
-            <span>{isAr ? "كثافة الجداول (Table Density)" : "Table Layout Density"}</span>
+            <span>{t.tableDensityLabel}</span>
           </label>
           <div className="grid grid-cols-3 gap-3">
             {["compact", "comfortable", "spacious"].map((density) => (

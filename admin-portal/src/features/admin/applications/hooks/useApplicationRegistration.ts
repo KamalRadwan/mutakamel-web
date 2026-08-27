@@ -9,7 +9,7 @@ import type { CreateApplicationDto, OnboardApplicationDto } from "../types";
 /** Application registration mutations only; this hook never loads the catalogue. */
 export function useApplicationRegistration(onChanged?: () => void) {
   const toast = useToast();
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const createIntent = useIdempotency();
   const onboardingIntent = useIdempotency();
 
@@ -18,18 +18,13 @@ export function useApplicationRegistration(onChanged?: () => void) {
       const key = createIntent.getIdempotencyKey(dto);
       const receipt = await applicationsApi.create(dto, key);
       createIntent.resetKey();
-      toast.success(
-        lang === "ar" ? "تم" : "Success",
-        lang === "ar"
-          ? "تم إنشاء مسودة التطبيق."
-          : "Application drafted successfully.",
-      );
+      toast.success(t.applications.successTitle, t.applications.draftedSuccessDesc);
       onChanged?.();
       return receipt;
     } catch (error) {
       const normalized = normalizeApiError(error);
       if (shouldRotateWriteCommandKey(normalized)) createIntent.resetKey();
-      toast.error(lang === "ar" ? "خطأ" : "Error", normalized.message);
+      toast.error(t.applications.errorTitle, normalized.message);
       throw normalized;
     }
   };
@@ -39,18 +34,13 @@ export function useApplicationRegistration(onChanged?: () => void) {
       const key = onboardingIntent.getIdempotencyKey(dto);
       const receipt = await applicationsApi.onboard(dto, key);
       onboardingIntent.resetKey();
-      toast.success(
-        lang === "ar" ? "تم" : "Success",
-        lang === "ar"
-          ? "تمت تهيئة التطبيق بنجاح."
-          : "Application onboarded successfully.",
-      );
+      toast.success(t.applications.successTitle, t.applications.onboardedSuccessDesc);
       onChanged?.();
       return receipt;
     } catch (error) {
       const normalized = normalizeApiError(error);
       if (shouldRotateWriteCommandKey(normalized)) onboardingIntent.resetKey();
-      toast.error(lang === "ar" ? "خطأ" : "Error", normalized.message);
+      toast.error(t.applications.errorTitle, normalized.message);
       throw normalized;
     }
   };

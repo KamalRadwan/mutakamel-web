@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Route,
 } from "lucide-react";
+import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type {
   TenantApplicationCandidate,
@@ -21,7 +22,6 @@ import type {
 } from "../types";
 
 interface TenantApplicationsStepProps {
-  isArabic: boolean;
   candidates: readonly TenantApplicationCandidate[];
   selections: Readonly<Record<string, TenantApplicationSelection>>;
   state: TenantRegistrationLoadState;
@@ -50,7 +50,6 @@ function evidenceLabel(value: string) {
 }
 
 export function TenantApplicationsStep({
-  isArabic,
   candidates,
   selections,
   state,
@@ -67,25 +66,23 @@ export function TenantApplicationsStep({
   onUpdateSelection,
   onBillingCycleChange,
 }: TenantApplicationsStepProps) {
+  const { t } = useI18n();
+  const copy = t.tenants.wizard.applicationsStep;
   return (
     <section className="space-y-5 rounded-xl border border-border bg-white p-5 shadow-2xs dark:border-border dark:bg-ink-900">
       <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between dark:border-border">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <Package className="size-4 text-warn-600 dark:text-warn-400" />
-            {isArabic
-              ? "الخطوة 3: التطبيقات والاشتراك"
-              : "Step 3: Applications & Subscription"}
+            {copy.stepHeading}
           </h3>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
-            {isArabic
-              ? "اختر فقط التطبيقات التجارية المؤهلة تقنياً. يتم اشتقاق مكونات Core وWorker الأساسية من الخادم ولا يمكن اختيارها يدوياً."
-              : "Select only commercially and technically eligible Applications. Core and Worker foundation components are derived by the server and are never user-selectable."}
+            {copy.stepDescription}
           </p>
         </div>
         <label className="min-w-44 text-xs font-semibold text-foreground">
           <span className="mb-1.5 block">
-            {isArabic ? "دورة الفوترة" : "Billing cycle"}
+            {copy.billingCycleLabel}
           </span>
           <select
             value={billingCycle}
@@ -94,8 +91,8 @@ export function TenantApplicationsStep({
             }
             className="min-h-11 w-full rounded-lg border border-border bg-ink-100 px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-ink-800"
           >
-            <option value="MONTHLY">{isArabic ? "شهري" : "Monthly"}</option>
-            <option value="ANNUAL">{isArabic ? "سنوي" : "Annual"}</option>
+            <option value="MONTHLY">{copy.monthlyOption}</option>
+            <option value="ANNUAL">{copy.annualOption}</option>
           </select>
         </label>
       </header>
@@ -104,12 +101,8 @@ export function TenantApplicationsStep({
         <StateCard
           icon={<Loader2 className="size-4 animate-spin" />}
           tone="neutral"
-          title={isArabic ? "جاري تحميل كتالوج التطبيقات" : "Loading the Application Catalogue"}
-            description={
-              isArabic
-                ? "يتم تحميل لقطة واحدة متسقة من التطبيقات والجاهزية التقنية والـtiers."
-                : "Loading one consistent snapshot of Applications, technical readiness, and active tiers."
-          }
+          title={copy.loadingCatalogueTitle}
+            description={copy.loadingCatalogueDesc}
         />
       ) : null}
 
@@ -117,19 +110,14 @@ export function TenantApplicationsStep({
         <StateCard
           icon={<LockKeyhole className="size-4" />}
           tone="amber"
-          title={isArabic ? "صلاحية إنشاء العميل مطلوبة" : "Tenant-create permission required"}
-          description={
-            isArabic
-              ? "هذه الخطوة تحتاج admin.tenants.create فقط؛ لا تمنح الشاشة صلاحيات قراءة الكتالوج العامة."
-              : "This step requires only admin.tenants.create; it does not require broad catalogue-read permissions."
-          }
+          title={copy.forbiddenTitle}
+          description={copy.forbiddenDesc}
         />
       ) : null}
 
       {state === "error" ? (
         <RetryCard
-          isArabic={isArabic}
-          title={isArabic ? "تعذر تحميل التطبيقات المؤهلة" : "Eligible Applications are unavailable"}
+          title={copy.loadErrorTitle}
           error={error}
           onRetry={onRetryCandidates}
         />
@@ -139,12 +127,8 @@ export function TenantApplicationsStep({
         <StateCard
           icon={<AlertCircle className="size-4" />}
           tone="amber"
-          title={isArabic ? "لا توجد تطبيقات قابلة للاختيار" : "No selectable Applications"}
-          description={
-            isArabic
-              ? "يجب أن يكون التطبيق Tenant وActive وPublished وPublic وله tier نشط وتعريف تقني جاهز."
-              : "An Application must be Tenant, Active, Published, Public, technically ready, and have an active tier."
-          }
+          title={copy.emptyTitle}
+          description={copy.emptyDesc}
         />
       ) : null}
 
@@ -192,8 +176,7 @@ export function TenantApplicationsStep({
                       </span>
                     </label>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {candidate.description ??
-                        (isArabic ? "لا يوجد وصف منشور." : "No published description.")}
+                      {candidate.description ?? copy.noDescriptionFallback}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-2xs font-semibold uppercase tracking-wide">
                       <span className="rounded-full bg-card px-2 py-1 text-muted-foreground">
@@ -201,11 +184,11 @@ export function TenantApplicationsStep({
                       </span>
                       {candidate.selectionAllowed ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-1 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
-                          <CheckCircle2 className="size-3" /> {isArabic ? "جاهز" : "Ready"}
+                          <CheckCircle2 className="size-3" /> {copy.readyBadge}
                         </span>
                       ) : (
                         <span className="rounded-full bg-warn-100 px-2 py-1 text-warn-800 dark:bg-warn-950/60 dark:text-warn-300">
-                          {isArabic ? "غير قابل للاختيار" : "Unavailable"}
+                          {copy.unavailableBadge}
                         </span>
                       )}
                     </div>
@@ -221,7 +204,7 @@ export function TenantApplicationsStep({
                         ))}
                       </ul>
                     ) : (
-                      <p>{isArabic ? "الدليل الحالي لا يسمح بالاختيار." : "Current evidence does not allow selection."}</p>
+                      <p>{copy.noEvidenceReason}</p>
                     )}
                   </div>
                 ) : null}
@@ -229,7 +212,7 @@ export function TenantApplicationsStep({
                 {selection ? (
                   <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_9rem]">
                     <label className="text-xs font-semibold text-foreground">
-                      <span className="mb-1.5 block">{isArabic ? "الخطة" : "Tier"}</span>
+                      <span className="mb-1.5 block">{copy.tierLabel}</span>
                       <select
                         value={selection.tierId}
                         onChange={(event) =>
@@ -247,7 +230,7 @@ export function TenantApplicationsStep({
                       </select>
                     </label>
                     <label className="text-xs font-semibold text-foreground">
-                      <span className="mb-1.5 block">{isArabic ? "المقاعد" : "Seats"}</span>
+                      <span className="mb-1.5 block">{copy.seatsLabel}</span>
                       <input
                         type="number"
                         min={1}
@@ -273,9 +256,7 @@ export function TenantApplicationsStep({
       {showSelectionError && selectedLines.length === 0 ? (
         <p className="flex items-center gap-2 text-xs font-semibold text-danger-600 dark:text-danger-400" role="alert">
           <AlertCircle className="size-4" />
-          {isArabic
-            ? "اختر تطبيقاً مؤهلاً واحداً على الأقل وحدد tier ومقاعد صحيحة."
-            : "Select at least one eligible Application with a valid tier and seat count."}
+          {copy.selectionRequiredError}
         </p>
       ) : null}
 
@@ -284,31 +265,28 @@ export function TenantApplicationsStep({
           <Route className="mt-0.5 size-4 text-brand-400" />
           <div>
             <h4 id="provisioning-preview-title" className="text-xs font-semibold">
-              {isArabic ? "معاينة خطة التجهيز" : "Provisioning plan preview"}
+              {copy.previewTitle}
             </h4>
             <p className="mt-1 text-xs text-muted-foreground">
-              {isArabic
-                ? "الخادم يضيف الـfoundation والاعتماديات ويثبت الإصدارات قبل الإنشاء."
-                : "The server derives foundation components and dependencies, then pins releases before creation."}
+              {copy.previewDesc}
             </p>
           </div>
         </header>
         <div className="p-4">
           {previewState === "idle" ? (
             <p className="text-xs text-muted-foreground">
-              {isArabic ? "اختر التطبيقات لعرض الخطة." : "Select Applications to preview the plan."}
+              {copy.previewIdle}
             </p>
           ) : null}
           {previewState === "loading" ? (
             <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
               <Loader2 className="size-4 animate-spin" />
-              {isArabic ? "جاري بناء المعاينة..." : "Building the preview..."}
+              {copy.previewLoading}
             </p>
           ) : null}
           {previewState === "error" ? (
             <RetryCard
-              isArabic={isArabic}
-              title={isArabic ? "تعذر بناء الخطة" : "The provisioning plan could not be built"}
+              title={copy.previewErrorTitle}
               error={previewError}
               onRetry={onRetryPreview}
             />
@@ -317,23 +295,23 @@ export function TenantApplicationsStep({
             <StateCard
               icon={<AlertCircle className="size-4" />}
               tone="amber"
-              title={isArabic ? "لا توجد خطة صالحة" : "No valid plan available"}
-              description={isArabic ? "أعد المحاولة بعد مراجعة التطبيقات." : "Review the selected Applications and retry."}
+              title={copy.previewEmptyTitle}
+              description={copy.previewEmptyDesc}
             />
           ) : null}
           {previewState === "ready" && preview ? (
             <div className="space-y-4">
               <dl className="grid gap-3 text-xs sm:grid-cols-3">
                 <div className="rounded-xl bg-ink-100 p-3 dark:bg-ink-800/60">
-                  <dt className="text-muted-foreground">{isArabic ? "التطبيقات" : "Selected Applications"}</dt>
+                  <dt className="text-muted-foreground">{copy.selectedApplicationsLabel}</dt>
                   <dd className="mt-1 font-mono font-semibold">{preview.selectedApplicationKeys.join(", ")}</dd>
                 </div>
                 <div className="rounded-xl bg-ink-100 p-3 dark:bg-ink-800/60">
-                  <dt className="text-muted-foreground">{isArabic ? "المكونات" : "Derived components"}</dt>
+                  <dt className="text-muted-foreground">{copy.derivedComponentsLabel}</dt>
                   <dd className="mt-1 font-semibold">{preview.components.length}</dd>
                 </div>
                 <div className="rounded-xl bg-ink-100 p-3 dark:bg-ink-800/60">
-                  <dt className="text-muted-foreground">{isArabic ? "خطوات التنفيذ" : "Execution steps"}</dt>
+                  <dt className="text-muted-foreground">{copy.executionStepsLabel}</dt>
                   <dd className="mt-1 font-semibold">{preview.steps.length}</dd>
                 </div>
               </dl>
@@ -362,16 +340,15 @@ export function TenantApplicationsStep({
 }
 
 function RetryCard({
-  isArabic,
   title,
   error,
   onRetry,
 }: {
-  isArabic: boolean;
   title: string;
   error: NormalizedApiError | null;
   onRetry: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger-800 dark:border-danger-900 dark:bg-danger-950/40 dark:text-danger-300" role="alert">
       <div className="flex items-start gap-2">
@@ -383,7 +360,7 @@ function RetryCard({
         </div>
       </div>
       <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-danger-300 bg-card px-3 text-xs font-semibold hover:bg-danger-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-500 dark:border-danger-800 dark:hover:bg-danger-950">
-        <RefreshCw className="size-3.5" /> {isArabic ? "إعادة المحاولة" : "Retry"}
+        <RefreshCw className="size-3.5" /> {t.tenants.wizard.retryButton}
       </button>
     </div>
   );

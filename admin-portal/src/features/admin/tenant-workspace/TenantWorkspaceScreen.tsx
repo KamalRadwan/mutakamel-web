@@ -170,7 +170,7 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
           <TenantAccessPanel tenantId={tenantId} tenantStatus={tenant.status} enabled locale={lang} />
         ) : null}
         {activeTab === "billing" ? <TenantBillingPanel workspace={billing} lang={lang} /> : null}
-        {activeTab === "storage" ? <TenantStorageMigrationPanel isArabic={lang === "ar"} /> : null}
+        {activeTab === "storage" ? <TenantStorageMigrationPanel /> : null}
       </div>
     </PageFrame>
   );

@@ -676,7 +676,6 @@ export default function RegisterTenantWizardPage() {
             {/* Step 3: Applications and authoritative provisioning preview */}
             {currentStep === 3 && (
               <TenantApplicationsStep
-                isArabic={lang === "ar"}
                 candidates={applicationCandidates}
                 selections={applicationSelections}
                 state={applicationState}
@@ -700,7 +699,6 @@ export default function RegisterTenantWizardPage() {
             {/* Step 4: Application-aware infrastructure placement */}
             {currentStep === 4 && (
               <TenantInfrastructureStep
-                isArabic={lang === "ar"}
                 databaseOptions={databasePlacementOptions}
                 databaseState={databasePlacementState}
                 databaseError={databasePlacementError}
