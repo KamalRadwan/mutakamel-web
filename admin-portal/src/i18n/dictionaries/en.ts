@@ -857,6 +857,23 @@ export const en: Dictionary = {
     activatedTitle: "Activated",
     activatedDesc: "User activated successfully",
     actionFailedTitle: "Action Failed",
+    loadingUserDetails: "Loading user details...",
+    usersNavLabel: "Users",
+    unsavedBadge: "UNSAVED",
+    superAdminPrivilegesLabel: "Super Admin Privileges",
+    superAdminPrivilegesHint: "Bypasses system permissions logic.",
+    assignedRoleTitle: "Assigned Control Plane Role",
+    unsavedRoleBadge: "UNSAVED ROLE",
+    applyRoleAssignment: "Apply Role Assignment",
+    webphoneCredentialsHint:
+      "JsSIP credentials. The current password is never displayed after save.",
+    cancelEdit: "Cancel Edit",
+    sipPasswordLabel: "SIP Password",
+    keepCurrentPasswordHint: "Leave empty to keep current password",
+    passwordRequiredHint: "Required when enabling phone",
+    deleteAccountTitle: "Delete Admin User",
+    deleteAccountDescription:
+      "Are you sure you want to delete this account? Soft-delete will hide this record.",
   },
   roles: {
     pageTitle: "Admin Roles & Permissions",
@@ -1333,6 +1350,59 @@ export const en: Dictionary = {
         title: "Platform & Support",
         emptyFiltered: "No settings match your search.",
         emptyGroup: "No settings are registered in this group.",
+      },
+      asterisk: {
+        title: "WebRTC (Asterisk)",
+        empty: "No Asterisk settings are registered.",
+      },
+    },
+    fatalAlerts: {
+      title: "Realtime Fatal Alerts",
+      saveButton: "Save configuration",
+      readOnlyNote:
+        "Read-only view; saving requires admin.settings.update and admin.settings.critical.",
+      toastSavedTitle: "Fatal-alert settings saved",
+      toastSavedDescription:
+        "Realtime will adopt the new configuration within 30 seconds without a restart.",
+      toastFailedTitle: "Save failed",
+      evidence: {
+        delivery: "Delivery",
+        enabledValue: "Enabled",
+        disabledValue: "Disabled",
+        configuration: "Configuration",
+        completeValue: "Complete",
+        incompleteValue: "Incomplete",
+        revision: "Revision",
+        updated: "Updated",
+      },
+      form: {
+        ariaLabel: "Fatal alert configuration",
+        enableLabel: "Enable fatal-alert delivery",
+        enableHelp: "Realtime applies changes within 30 seconds.",
+        webhookUrlLabel: "Webhook URL",
+        timeoutLabel: "Request timeout (ms)",
+        tokenLabel: "Bearer token (write-only)",
+        tokenPlaceholderConfigured: "Leave blank to retain the current token",
+        tokenPlaceholderRequired: "Required for initial configuration",
+        hideToken: "Hide token",
+        showToken: "Show token",
+        footerNote:
+          "Delivery cannot be enabled until a valid URL and token are saved. Disabling retains the encrypted configuration for later re-enablement.",
+      },
+      fieldErrors: {
+        invalidWebhookUrl:
+          "Enter an HTTP(S) URL without embedded credentials.",
+        tokenRequired: "Initial configuration requires a bearer token.",
+        tokenTooLong: "Token must not exceed 2048 UTF-8 bytes.",
+        invalidTimeout: "Enter an integer from 1 to 120000 milliseconds.",
+        generic: "This value is invalid.",
+      },
+      mutation: {
+        saved: "Configuration saved successfully.",
+        validationFailed: "Review and correct the highlighted fields.",
+        noChanges: "There are no changes to save.",
+        generic: (code: string) =>
+          `The operation could not be completed safely. Error code: ${code}`,
       },
     },
     currencyRates: {

@@ -1,6 +1,8 @@
 "use client";
 
 import { PageHeader } from "@/design-system";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { SettingField } from "../components/SettingField";
 import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
@@ -9,9 +11,10 @@ import { useSettings } from "../hooks/useSettings";
 export default function AsteriskSettingsPage() {
   const settingsState = useSettings("asterisk.");
   const { lang } = settingsState;
+  const copy = (lang === "ar" ? ar : en).settings.pages.asterisk;
   return (
     <div className="space-y-6">
-      <PageHeader title={lang === "ar" ? "بوابة WebRTC (Asterisk)" : "WebRTC (Asterisk)"} />
+      <PageHeader title={copy.title} />
       <SettingsResourceBoundary
         state={settingsState.loadState}
         error={settingsState.loadError}
@@ -37,9 +40,7 @@ export default function AsteriskSettingsPage() {
             ))
           ) : (
             <div className="rounded-lg border border-border bg-card p-8 text-center text-xs text-muted-foreground">
-              {lang === "ar"
-                ? "لا توجد إعدادات Asterisk مسجلة."
-                : "No Asterisk settings are registered."}
+              {copy.empty}
             </div>
           )}
         </div>
