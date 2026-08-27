@@ -95,7 +95,7 @@ export function TenantInfrastructureStep({
           onChange={(event) => onDatabaseChange(event.target.value)}
           aria-invalid={showDatabaseSelectionError && !selectedDatabase}
           required
-          className={`min-h-11 w-full rounded-xl border bg-white px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:bg-ink-900 dark:text-foreground ${
+          className={`min-h-11 w-full rounded-xl border bg-white px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-ink-900 dark:text-foreground ${
             showDatabaseSelectionError && !selectedDatabase
               ? "border-danger-400 dark:border-danger-700"
               : "border-border"
@@ -149,7 +149,7 @@ export function TenantInfrastructureStep({
           onChange={(event) => onStorageChange(event.target.value)}
           aria-invalid={showStorageSelectionError && !selectedStorage}
           required
-          className={`min-h-11 w-full rounded-xl border bg-white px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:bg-ink-900 dark:text-foreground ${
+          className={`min-h-11 w-full rounded-xl border bg-white px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-ink-900 dark:text-foreground ${
             showStorageSelectionError && !selectedStorage
               ? "border-danger-400 dark:border-danger-700"
               : "border-border"

@@ -62,7 +62,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
   }, [catalogue.prices, cycle]);
 
   if (!canRead) {
-    return <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">Commercial catalogue access requires <code>admin.catalog.read</code>.</section>;
+    return <section className="rounded-xl border border-warn-200 bg-warn-50 p-5 text-sm text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-200">Commercial catalogue access requires <code>admin.catalog.read</code>.</section>;
   }
 
   const saveGrants = async () => {
@@ -132,21 +132,21 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
   ];
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <header className="border-b border-slate-200 bg-slate-950 px-5 pt-5 text-white dark:border-slate-800">
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <header className="border-b border-border px-5 pt-5">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
           <div>
-            <p className="font-mono text-2xs font-semibold uppercase tracking-[0.22em] text-violet-300">Commercial control rail</p>
-            <h2 className="mt-1 text-lg font-semibold">Catalogue configuration</h2>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-300">Define what tenants can subscribe to, what each tier unlocks, and how graduated USD pricing behaves.</p>
+            <p className="font-mono text-2xs font-semibold uppercase tracking-[0.22em] text-brand-700 dark:text-brand-400">Commercial control rail</p>
+            <h2 className="mt-1 text-lg font-semibold text-foreground">Catalogue configuration</h2>
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">Define what tenants can subscribe to, what each tier unlocks, and how graduated USD pricing behaves.</p>
           </div>
-          <button type="button" onClick={() => { void catalogue.loadCatalogue(); void catalogue.loadAudit(); }} className="inline-flex items-center gap-2 self-start rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15">
+          <button type="button" onClick={() => { void catalogue.loadCatalogue(); void catalogue.loadAudit(); }} className="inline-flex items-center gap-2 self-start rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted">
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </button>
         </div>
         <nav aria-label="Catalogue sections" className="mt-5 flex gap-1 overflow-x-auto">
           {tabs.map(({ id, label, icon: Icon }) => (
-            <button key={id} type="button" onClick={() => setTab(id)} className={`inline-flex min-w-fit items-center gap-2 border-b-2 px-3 py-3 text-xs font-semibold transition ${tab === id ? "border-violet-400 text-white" : "border-transparent text-slate-400 hover:text-white"}`}>
+            <button key={id} type="button" onClick={() => setTab(id)} className={`inline-flex min-w-fit items-center gap-2 border-b-2 px-3 py-3 text-xs font-semibold transition ${tab === id ? "border-brand-600 text-brand-700 dark:text-brand-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
               <Icon className="h-3.5 w-3.5" /> {label}
             </button>
           ))}
@@ -154,19 +154,19 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
       </header>
 
       {(catalogue.catalogueError || catalogue.tierDetailError || formError) && (
-        <div role="alert" className="m-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+        <div role="alert" className="m-5 rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-xs text-danger-700 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-300">
           {formError || catalogue.catalogueError || catalogue.tierDetailError}
         </div>
       )}
 
       {catalogue.pendingCreateAttempt ? (
-        <div role="status" className="m-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+        <div role="status" className="m-5 rounded-xl border border-warn-200 bg-warn-50 px-4 py-3 text-xs text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/40 dark:text-warn-200">
           <p className="font-semibold">Previous {catalogue.pendingCreateAttempt.kind} create outcome is unknown.</p>
           <p className="mt-1">The portal will only inspect the authoritative catalogue; it will not replay this non-idempotent create automatically.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={() => void catalogue.recoverPendingCreateAttempt()} disabled={Boolean(catalogue.pendingAction)} className="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-900 disabled:opacity-50 dark:border-amber-800 dark:bg-slate-900 dark:text-amber-200">Check catalogue result</button>
+            <button type="button" onClick={() => void catalogue.recoverPendingCreateAttempt()} disabled={Boolean(catalogue.pendingAction)} className="rounded-lg border border-warn-300 bg-card px-3 py-2 font-semibold text-warn-900 disabled:opacity-50 dark:border-warn-800 dark:text-warn-200">Check catalogue result</button>
             {catalogue.pendingCreateAttempt.absenceConfirmed ? (
-              <button type="button" onClick={catalogue.clearAbsentPendingCreateAttempt} disabled={Boolean(catalogue.pendingAction)} className="rounded-lg border border-slate-300 px-3 py-2 font-semibold disabled:opacity-50 dark:border-slate-700">Accept authoritative absence</button>
+              <button type="button" onClick={catalogue.clearAbsentPendingCreateAttempt} disabled={Boolean(catalogue.pendingAction)} className="rounded-lg border border-border px-3 py-2 font-semibold disabled:opacity-50">Accept authoritative absence</button>
             ) : null}
           </div>
         </div>
@@ -174,7 +174,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
 
       <div className="p-5">
         {catalogue.isLoading ? (
-          <div className="flex min-h-44 items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading catalogue…</div>
+          <div className="flex min-h-44 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading catalogue…</div>
         ) : tab === "tiers" ? (
           <ResourceTable title="Subscription tiers" rows={catalogue.tiers} canCreate={canCreate} canMutate={canMutate} onCreate={() => setDialog({ kind: "tier" })} onEdit={(resource) => setDialog({ kind: "tier", resource })} onDelete={(resource) => setDeleteTarget({ kind: "tier", resource })} />
         ) : tab === "features" ? (
@@ -188,56 +188,56 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                   const grant = catalogue.grants.find((item) => item.featureId === feature.id);
                   const isGranted = grantedIds.has(feature.id);
                   return (
-                    <div key={feature.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                    <div key={feature.id} className="rounded-xl border border-border p-4">
                       <label className="flex items-start gap-3">
-                        <input type="checkbox" checked={isGranted} onChange={(event) => toggleGrant(feature, event.target.checked)} disabled={!canMutate} className="mt-1 h-4 w-4 accent-violet-600" />
-                        <span><span className="block text-sm font-semibold">{feature.name}</span><code className="text-xs text-violet-600 dark:text-violet-400">{feature.key}</code></span>
+                        <input type="checkbox" checked={isGranted} onChange={(event) => toggleGrant(feature, event.target.checked)} disabled={!canMutate} className="mt-1 h-4 w-4 accent-brand-600" />
+                        <span><span className="block text-sm font-semibold text-foreground">{feature.name}</span><code className="text-xs text-brand-700 dark:text-brand-400">{feature.key}</code></span>
                       </label>
                       {isGranted && (
-                        <textarea aria-label={`${feature.name} configuration JSON`} placeholder='Optional JSON configuration, for example {"dailyQuota":1000,"rateLimitPerMin":30}' value={grantConfig[feature.id] ?? (grant?.config ? JSON.stringify(grant.config) : "")} onChange={(event) => setGrantConfig((current) => ({ ...current, [feature.id]: event.target.value }))} disabled={!canMutate} rows={2} className="mt-3 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs outline-none focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950" />
+                        <textarea aria-label={`${feature.name} configuration JSON`} placeholder='Optional JSON configuration, for example {"dailyQuota":1000,"rateLimitPerMin":30}' value={grantConfig[feature.id] ?? (grant?.config ? JSON.stringify(grant.config) : "")} onChange={(event) => setGrantConfig((current) => ({ ...current, [feature.id]: event.target.value }))} disabled={!canMutate} rows={2} className="mt-3 w-full resize-none rounded-xl border border-border bg-muted px-3 py-2 font-mono text-xs outline-none focus:border-brand-500" />
                       )}
                     </div>
                   );
                 })}
               </div>
             )}
-            {selectedTier && canMutate && <button type="button" onClick={() => void saveGrants()} disabled={Boolean(catalogue.pendingAction) || !tierContextReady} className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-500 disabled:opacity-50">Replace complete entitlement set</button>}
+            {selectedTier && canMutate && <button type="button" onClick={() => void saveGrants()} disabled={Boolean(catalogue.pendingAction) || !tierContextReady} className="rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-brand-500 disabled:opacity-50">Replace complete entitlement set</button>}
           </div>
         ) : tab === "pricing" ? (
           <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row">
               <TierSelector tiers={catalogue.tiers} selected={catalogue.selectedTierId} onChange={catalogue.setSelectedTierId} />
-              <select value={cycle} onChange={(event) => setCycle(event.target.value as BillingCycle)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950"><option value="MONTHLY">Monthly</option><option value="ANNUAL">Annual</option></select>
+              <select value={cycle} onChange={(event) => setCycle(event.target.value as BillingCycle)} className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground"><option value="MONTHLY">Monthly</option><option value="ANNUAL">Annual</option></select>
             </div>
             {!selectedTier ? <EmptyState text="Create a tier before defining pricing." /> : !tierContextReady ? <Loading /> : (
               <div className="space-y-3">
                 {brackets.map((row, index) => (
-                  <div key={index} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_auto] dark:border-slate-800">
+                  <div key={index} className="grid grid-cols-1 gap-3 rounded-xl border border-border p-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
                     <NumberField label="Minimum users" value={row.minUsers} disabled={!canMutate} onChange={(value) => setBrackets((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, minUsers: value } : item))} />
-                    <label className="text-xs font-semibold text-slate-500">Maximum users<input value={row.maxUsers ?? ""} disabled={!canMutate || index === brackets.length - 1} placeholder="Open ended" onChange={(event) => setBrackets((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, maxUsers: event.target.value ? Number(event.target.value) : null } : item))} type="number" min={1} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-950" /></label>
-                    <label className="text-xs font-semibold text-slate-500">USD per user<input value={row.unitPrice} disabled={!canMutate} inputMode="decimal" onChange={(event) => setBrackets((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, unitPrice: event.target.value } : item))} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-950" /></label>
-                    {canMutate && brackets.length > 1 && <button type="button" aria-label="Remove bracket" onClick={() => setBrackets((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="self-end rounded-lg p-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"><Trash2 className="h-4 w-4" /></button>}
+                    <label className="text-xs font-semibold text-muted-foreground">Maximum users<input value={row.maxUsers ?? ""} disabled={!canMutate || index === brackets.length - 1} placeholder="Open ended" onChange={(event) => setBrackets((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, maxUsers: event.target.value ? Number(event.target.value) : null } : item))} type="number" min={1} className="mt-1 block w-full rounded-lg border border-border bg-card px-2.5 py-2 font-mono text-xs text-foreground" /></label>
+                    <label className="text-xs font-semibold text-muted-foreground">USD per user<input value={row.unitPrice} disabled={!canMutate} inputMode="decimal" onChange={(event) => setBrackets((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, unitPrice: event.target.value } : item))} className="mt-1 block w-full rounded-lg border border-border bg-card px-2.5 py-2 font-mono text-xs text-foreground" /></label>
+                    {canMutate && brackets.length > 1 && <button type="button" aria-label="Remove bracket" onClick={() => setBrackets((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="self-end rounded-lg p-2 text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950/30"><Trash2 className="h-4 w-4" /></button>}
                   </div>
                 ))}
-                {canMutate && <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setBrackets((current) => { const previous = current[current.length - 1]; const previousMax = previous.maxUsers ?? previous.minUsers; return [...current.map((item, index) => index === current.length - 1 ? { ...item, maxUsers: previousMax } : item), { minUsers: previousMax + 1, maxUsers: null, unitPrice: previous.unitPrice }]; })} className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><Plus className="me-1 inline h-3.5 w-3.5" />Add bracket</button><button type="button" onClick={() => void validateAndSavePrices()} disabled={Boolean(catalogue.pendingAction) || !tierContextReady} className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 disabled:opacity-50">Replace {cycle.toLowerCase()} ladder</button></div>}
+                {canMutate && <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setBrackets((current) => { const previous = current[current.length - 1]; const previousMax = previous.maxUsers ?? previous.minUsers; return [...current.map((item, index) => index === current.length - 1 ? { ...item, maxUsers: previousMax } : item), { minUsers: previousMax + 1, maxUsers: null, unitPrice: previous.unitPrice }]; })} className="rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted"><Plus className="me-1 inline h-3.5 w-3.5" />Add bracket</button><button type="button" onClick={() => void validateAndSavePrices()} disabled={Boolean(catalogue.pendingAction) || !tierContextReady} className="rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-500 disabled:opacity-50">Replace {cycle.toLowerCase()} ladder</button></div>}
               </div>
             )}
           </div>
         ) : (
           <div className="space-y-3">
             {catalogue.auditError ? <EmptyState text={catalogue.auditError} /> : !catalogue.audit?.items.length ? <EmptyState text="No application-scoped audit events." /> : catalogue.audit.items.map((event) => (
-              <article key={event.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-                <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs font-semibold text-violet-600 dark:text-violet-400">{event.action}</span><time className="text-xs text-slate-500">{new Date(event.occurredAt).toLocaleString()}</time></div>
-                <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{event.actorLabel || event.actorAdminId || "System"} · {event.entityType}</p>
-                <p className="mt-1 font-mono text-xs text-slate-400">Correlation: {event.correlationId || "not provided"}</p>
+              <article key={event.id} className="rounded-xl border border-border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs font-semibold text-brand-700 dark:text-brand-400">{event.action}</span><time className="text-xs text-muted-foreground">{new Date(event.occurredAt).toLocaleString()}</time></div>
+                <p className="mt-2 text-xs text-foreground">{event.actorLabel || event.actorAdminId || "System"} · {event.entityType}</p>
+                <p className="mt-1 font-mono text-xs text-muted-foreground">Correlation: {event.correlationId || "not provided"}</p>
               </article>
             ))}
             {catalogue.audit && catalogue.audit.totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800">
+              <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
                 <span>Page {catalogue.audit.page} of {catalogue.audit.totalPages}</span>
                 <div className="flex gap-2">
-                  <button type="button" disabled={catalogue.audit.page <= 1} onClick={() => void catalogue.loadAudit(catalogue.audit!.page - 1)} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40 dark:border-slate-700">Previous</button>
-                  <button type="button" disabled={catalogue.audit.page >= catalogue.audit.totalPages} onClick={() => void catalogue.loadAudit(catalogue.audit!.page + 1)} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40 dark:border-slate-700">Next</button>
+                  <button type="button" disabled={catalogue.audit.page <= 1} onClick={() => void catalogue.loadAudit(catalogue.audit!.page - 1)} className="rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40">Previous</button>
+                  <button type="button" disabled={catalogue.audit.page >= catalogue.audit.totalPages} onClick={() => void catalogue.loadAudit(catalogue.audit!.page + 1)} className="rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40">Next</button>
                 </div>
               </div>
             )}
@@ -257,16 +257,16 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
 }
 
 function ResourceTable<T extends TierView | FeatureView>({ title, rows, canCreate, canMutate, onCreate, onEdit, onDelete }: { title: string; rows: T[]; canCreate: boolean; canMutate: boolean; onCreate: () => void; onEdit: (row: T) => void; onDelete: (row: T) => void }) {
-  return <div className="space-y-4"><div className="flex items-center justify-between"><div><h3 className="text-sm font-semibold">{title}</h3><p className="text-xs text-slate-500">{rows.length} configured</p></div>{canCreate && <button type="button" onClick={onCreate} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-violet-500"><Plus className="h-3.5 w-3.5" />Add</button>}</div>{!rows.length ? <EmptyState text={`No ${title.toLowerCase()} configured.`} /> : <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">{rows.map((row) => <div key={row.id} className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center"><div className="min-w-0"><div className="flex items-center gap-2"><span className="truncate text-sm font-semibold">{row.name}</span><span className={`h-2 w-2 rounded-full ${row.isActive ? "bg-emerald-500" : "bg-slate-400"}`} /></div><code className="text-xs text-violet-600 dark:text-violet-400">{row.key}</code><p className="mt-1 text-xs text-slate-500">Rank {row.rank}{"color" in row ? ` · ${row.color}` : ""}</p></div>{canMutate && <div className="flex gap-1"><button type="button" onClick={() => onEdit(row)} aria-label={`Edit ${row.name}`} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-violet-600 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" /></button><button type="button" onClick={() => onDelete(row)} aria-label={`Delete ${row.name}`} className="rounded-lg p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30"><Trash2 className="h-4 w-4" /></button></div>}</div>)}</div>}</div>;
+  return <div className="space-y-4"><div className="flex items-center justify-between"><div><h3 className="text-sm font-semibold text-foreground">{title}</h3><p className="text-xs text-muted-foreground">{rows.length} configured</p></div>{canCreate && <button type="button" onClick={onCreate} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-brand-500"><Plus className="h-3.5 w-3.5" />Add</button>}</div>{!rows.length ? <EmptyState text={`No ${title.toLowerCase()} configured.`} /> : <div className="divide-y divide-border rounded-xl border border-border">{rows.map((row) => <div key={row.id} className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center"><div className="min-w-0"><div className="flex items-center gap-2"><span className="truncate text-sm font-semibold text-foreground">{row.name}</span><span className={`h-2 w-2 rounded-full ${row.isActive ? "bg-brand-500" : "bg-muted-foreground"}`} /></div><code className="text-xs text-brand-700 dark:text-brand-400">{row.key}</code><p className="mt-1 text-xs text-muted-foreground">Rank {row.rank}{"color" in row ? ` · ${row.color}` : ""}</p></div>{canMutate && <div className="flex gap-1"><button type="button" onClick={() => onEdit(row)} aria-label={`Edit ${row.name}`} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-brand-600"><Pencil className="h-4 w-4" /></button><button type="button" onClick={() => onDelete(row)} aria-label={`Delete ${row.name}`} className="rounded-lg p-2 text-muted-foreground hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-950/30"><Trash2 className="h-4 w-4" /></button></div>}</div>)}</div>}</div>;
 }
 
 function TierSelector({ tiers, selected, onChange }: { tiers: TierView[]; selected: string | null; onChange: (value: string) => void }) {
-  return <select aria-label="Tier" value={selected ?? ""} onChange={(event) => onChange(event.target.value)} className="min-w-56 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950"><option value="" disabled>Select tier</option>{tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}</select>;
+  return <select aria-label="Tier" value={selected ?? ""} onChange={(event) => onChange(event.target.value)} className="min-w-56 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground"><option value="" disabled>Select tier</option>{tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}</select>;
 }
 
 function NumberField({ label, value, disabled, onChange }: { label: string; value: number; disabled: boolean; onChange: (value: number) => void }) {
-  return <label className="text-xs font-semibold text-slate-500">{label}<input value={value} disabled={disabled} onChange={(event) => onChange(Number(event.target.value))} type="number" min={1} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-950" /></label>;
+  return <label className="text-xs font-semibold text-muted-foreground">{label}<input value={value} disabled={disabled} onChange={(event) => onChange(Number(event.target.value))} type="number" min={1} className="mt-1 block w-full rounded-lg border border-border bg-card px-2.5 py-2 font-mono text-xs text-foreground" /></label>;
 }
 
-function EmptyState({ text }: { text: string }) { return <div className="rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center text-xs text-slate-500 dark:border-slate-700">{text}</div>; }
-function Loading() { return <div className="flex items-center justify-center gap-2 py-10 text-xs text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Loading tier configuration…</div>; }
+function EmptyState({ text }: { text: string }) { return <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-xs text-muted-foreground">{text}</div>; }
+function Loading() { return <div className="flex items-center justify-center gap-2 py-10 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading tier configuration…</div>; }

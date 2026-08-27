@@ -153,7 +153,7 @@ export function AdminNotificationsScreen() {
   return shell(
     <>
       {!view.canManage ? (
-        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+        <div role="status" className="rounded-xl border border-warn-200 bg-warn-50 px-4 py-3 text-xs font-semibold text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-200">
           {copy.managePermission}
         </div>
       ) : null}
@@ -165,18 +165,18 @@ export function AdminNotificationsScreen() {
         onRetry={() => void view.retryLastAction()}
       />
 
-      <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <section className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="flex items-center gap-2 text-sm font-semibold"><Inbox className="size-4 text-blue-600" aria-hidden="true" />{copy.inbox}</h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{view.page?.items.length ?? 0} {copy.all}</p>
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Inbox className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />{copy.inbox}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{view.page?.items.length ?? 0} {copy.all}</p>
           </div>
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold dark:border-slate-700">
+            <label className="flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 text-xs font-semibold text-foreground">
               <input type="checkbox" checked={view.unreadOnly} onChange={(event) => view.setUnreadOnly(event.target.checked)} />
               {copy.unreadOnly}
             </label>
-            <label className="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <label className="grid gap-1 text-xs font-semibold text-foreground">
               {copy.pageSize}
               <select value={view.limit} onChange={(event) => view.setLimit(Number(event.target.value))} className={inputClass}>
                 {NOTIFICATION_LIST_LIMITS.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -187,7 +187,7 @@ export function AdminNotificationsScreen() {
         </div>
 
         {view.canManage ? (
-          <div className="flex flex-wrap gap-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3 dark:border-blue-950 dark:bg-blue-950/20">
+          <div className="flex flex-wrap gap-2 rounded-xl border border-brand-200 bg-brand-50/60 p-3 dark:border-brand-800/60 dark:bg-brand-950/20">
             <button disabled={pending || view.unreadCount === 0} type="button" onClick={() => void view.performBulkAction("read-all")} className={primaryButton}><CheckCheck className="size-4" aria-hidden="true" />{copy.readAll}</button>
             <button disabled={pending || view.unreadCount === 0} type="button" onClick={() => void view.performBulkAction("mark-all-read-compatibility")} className={secondaryButton}>{copy.markAllReadLegacy}</button>
           </div>
@@ -220,8 +220,8 @@ export function AdminNotificationsScreen() {
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="flex items-center gap-2 text-sm font-semibold"><Settings2 className="size-4 text-violet-600" aria-hidden="true" />{copy.preferences}</h2>
+        <section className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Settings2 className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />{copy.preferences}</h2>
           {view.preferences.length ? (
             <div className="grid gap-2">
               {view.preferences.map((preference) => (
@@ -237,10 +237,10 @@ export function AdminNotificationsScreen() {
                 }} />
               ))}
             </div>
-          ) : <p className="text-xs text-slate-500 dark:text-slate-400">{copy.noPreferences}</p>}
+          ) : <p className="text-xs text-muted-foreground">{copy.noPreferences}</p>}
           {view.canManage ? (
-            <form noValidate onSubmit={(event) => void submitPreference(event)} className="grid gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
-              <h3 className="text-xs font-semibold">{copy.configurePreference}</h3>
+            <form noValidate onSubmit={(event) => void submitPreference(event)} className="grid gap-3 border-t border-border pt-4">
+              <h3 className="text-xs font-semibold text-foreground">{copy.configurePreference}</h3>
               <Field label={copy.notificationType} error={preferenceError(preferenceErrors.notificationType, copy)} id="notification-preference-type">
                 <input id="notification-preference-type" value={preferenceDraft.notificationType} onChange={(event) => setPreferenceDraft((current) => ({ ...current, notificationType: event.target.value }))} maxLength={128} placeholder={copy.notificationTypePlaceholder} aria-invalid={Boolean(preferenceErrors.notificationType)} className={inputClass} />
               </Field>
@@ -257,8 +257,8 @@ export function AdminNotificationsScreen() {
           ) : null}
         </section>
 
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="flex items-center gap-2 text-sm font-semibold"><Smartphone className="size-4 text-emerald-600" aria-hidden="true" />{copy.devices}</h2>
+        <section className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Smartphone className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />{copy.devices}</h2>
           {view.canManage ? (
             <form noValidate onSubmit={(event) => void submitDevice(event)} className="grid gap-3">
               <Field label={copy.provider} id="notification-device-provider">
@@ -278,13 +278,13 @@ export function AdminNotificationsScreen() {
             </form>
           ) : null}
           {view.deviceReceipt ? (
-            <dl className="grid gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs dark:border-emerald-900 dark:bg-emerald-950/20">
+            <dl className="grid gap-2 rounded-xl border border-brand-200 bg-brand-50 p-3 text-xs dark:border-brand-800/60 dark:bg-brand-950/20">
               <Evidence label={copy.receipt} value={view.deviceReceipt.id} mono />
               <Evidence label={copy.tokenHash} value={view.deviceReceipt.tokenHash} mono />
             </dl>
           ) : null}
           {view.canManage ? (
-            <div className="grid gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <div className="grid gap-2 border-t border-border pt-4">
               <Field label={copy.tokenId} error={revokeIdError ? copy.validation.uuid : undefined} id="notification-revoke-id">
                 <input id="notification-revoke-id" value={revokeId} onChange={(event) => { setRevokeId(event.target.value); setRevokeIdError(false); }} autoComplete="off" spellCheck={false} aria-invalid={revokeIdError} className={`${inputClass} font-mono`} />
               </Field>
@@ -324,29 +324,29 @@ function NotificationCard({ notification, copy, lang, canManage, pending, onActi
 }) {
   const url = safeNotificationActionUrl(notification.actionUrl);
   return (
-    <article className={`rounded-xl border p-4 ${notification.readAt ? "border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-950/30" : "border-blue-200 bg-blue-50/40 dark:border-blue-900 dark:bg-blue-950/20"}`}>
+    <article className={`rounded-xl border p-4 ${notification.readAt ? "border-border bg-muted/60" : "border-brand-200 bg-brand-50/40 dark:border-brand-800/60 dark:bg-brand-950/20"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            {!notification.readAt ? <span className="size-2 rounded-full bg-blue-600" aria-label={copy.unread} /> : null}
-            <h3 className="text-sm font-semibold text-slate-950 dark:text-slate-100">{notification.title}</h3>
-            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold dark:bg-slate-800">{notification.priority}</span>
+            {!notification.readAt ? <span className="size-2 rounded-full bg-brand-600" aria-label={copy.unread} /> : null}
+            <h3 className="text-sm font-semibold text-foreground">{notification.title}</h3>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">{notification.priority}</span>
           </div>
-          <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600 dark:text-slate-300">{notification.body}</p>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-foreground">{notification.body}</p>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>{copy.source}: {notification.sourceApp}</span><span>{copy.type}: {notification.notificationType}</span><span>{formatDate(notification.createdAt, lang)}</span>
           </div>
         </div>
         {url ? <Link href={url} className={iconButton} aria-label={copy.open}><ExternalLink className="size-4" /></Link> : null}
       </div>
       {canManage ? (
-        <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
           <button disabled={pending || Boolean(notification.readAt)} type="button" onClick={() => onAction("read")} className={smallButton}><Check className="size-3.5" />{copy.markRead}</button>
           <button disabled={pending || Boolean(notification.acknowledgedAt)} type="button" onClick={() => onAction("acknowledge")} className={smallButton}><CheckCheck className="size-3.5" />{copy.acknowledge}</button>
           <button disabled={pending} type="button" onClick={() => onDismiss(false)} className={smallDangerButton}><Trash2 className="size-3.5" />{copy.dismiss}</button>
           <details className="relative">
             <summary className={`${smallButton} cursor-pointer list-none`}>{copy.compatibility}</summary>
-            <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2 dark:border-amber-900 dark:bg-amber-950/20">
+            <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-warn-200 bg-warn-50 p-2 dark:border-warn-800/60 dark:bg-warn-950/20">
               <button disabled={pending || Boolean(notification.acknowledgedAt)} type="button" onClick={() => onAction("ack-compatibility")} className={smallButton}>{copy.acknowledgeLegacy}</button>
               <button disabled={pending} type="button" onClick={() => onDismiss(true)} className={smallDangerButton}>{copy.dismissLegacy}</button>
             </div>
@@ -358,7 +358,7 @@ function NotificationCard({ notification, copy, lang, canManage, pending, onActi
 }
 
 function PreferenceRow({ preference, copy, onEdit }: { preference: NotificationPreference; copy: NotificationsCopy; onEdit: () => void }) {
-  return <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800"><div><p className="font-mono font-semibold">{preference.notificationType}</p><p className="mt-1 text-xs text-slate-500">{copy.inApp}: {yesNo(preference.inAppEnabled)} · {copy.push}: {yesNo(preference.pushEnabled)} · {copy.email}: {yesNo(preference.emailEnabled)}</p></div><button type="button" onClick={onEdit} className={smallButton}>{copy.edit}</button></div>;
+  return <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3 text-xs"><div><p className="font-mono font-semibold text-foreground">{preference.notificationType}</p><p className="mt-1 text-xs text-muted-foreground">{copy.inApp}: {yesNo(preference.inAppEnabled)} · {copy.push}: {yesNo(preference.pushEnabled)} · {copy.email}: {yesNo(preference.emailEnabled)}</p></div><button type="button" onClick={onEdit} className={smallButton}>{copy.edit}</button></div>;
 }
 
 function RuntimePanel({ config, copy }: { config: ReturnType<typeof useAdminNotifications>["config"]; copy: NotificationsCopy }) {
@@ -366,7 +366,7 @@ function RuntimePanel({ config, copy }: { config: ReturnType<typeof useAdminNoti
   const metrics = [
     [copy.runtimeEnabled, config.enabled], [copy.inAppEnabled, config.inAppEnabled], [copy.realtimeEnabled, config.realtimeEnabled], [copy.pushEnabled, config.pushEnabled], [copy.emailEnabled, config.emailEnabled],
   ] as const;
-  return <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"><h2 className="flex items-center gap-2 text-sm font-semibold"><MessageSquare className="size-4 text-cyan-600" />{copy.runtime}</h2><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">{metrics.map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 p-3 dark:border-slate-800"><p className="text-xs font-semibold text-slate-500">{label}</p><p className={`mt-1 text-xs font-semibold ${value ? "text-emerald-600" : "text-slate-400"}`}>{yesNo(value)}</p></div>)}</div><dl className="grid gap-2 text-xs sm:grid-cols-3"><Evidence label={copy.runtimeProvider} value={config.provider} /><Evidence label={copy.polling} value={`${config.pollIntervalMs} ms`} /><Evidence label={copy.previewLimit} value={String(config.previewLimit)} /></dl>{!config.pushEnabled ? <p className="text-xs text-amber-700 dark:text-amber-300">{copy.firebaseUnavailable}</p> : null}</section>;
+  return <section className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><MessageSquare className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />{copy.runtime}</h2><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">{metrics.map(([label, value]) => <div key={label} className="rounded-xl border border-border p-3"><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className={`mt-1 text-xs font-semibold ${value ? "text-brand-600 dark:text-brand-400" : "text-muted-foreground"}`}>{yesNo(value)}</p></div>)}</div><dl className="grid gap-2 text-xs sm:grid-cols-3"><Evidence label={copy.runtimeProvider} value={config.provider} /><Evidence label={copy.polling} value={`${config.pollIntervalMs} ms`} /><Evidence label={copy.previewLimit} value={String(config.previewLimit)} /></dl>{!config.pushEnabled ? <p className="text-xs text-warn-700 dark:text-warn-400">{copy.firebaseUnavailable}</p> : null}</section>;
 }
 
 function ActionBanner({ status, copy, updated, onClose, onRetry }: { status: NotificationActionStatus; copy: NotificationsCopy; updated: number | null; onClose: () => void; onRetry: () => void }) {
@@ -374,7 +374,7 @@ function ActionBanner({ status, copy, updated, onClose, onRetry }: { status: Not
   const success = status.state === "SUCCESS";
   const pending = status.state === "PENDING";
   const title = actionTitle(status, copy);
-  return <section role={success || pending ? "status" : "alert"} aria-live="polite" className={`rounded-xl border p-3 text-xs ${success ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200" : pending ? "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950/20 dark:text-blue-200" : "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200"}`}><div className="flex items-start justify-between gap-3"><div><p className="flex items-center gap-2 font-semibold">{pending ? <Loader2 className="size-4 animate-spin" /> : success ? <Check className="size-4" /> : <AlertTriangle className="size-4" />}{title}</p>{updated !== null ? <p className="mt-1">{copy.updated}: {updated}</p> : null}{status.error ? <dl className="mt-2 grid gap-1"><Evidence label={copy.errorCode} value={status.error.errorCode} mono />{status.error.correlationId ? <Evidence label={copy.correlation} value={status.error.correlationId} mono /> : null}</dl> : null}</div>{!pending ? <button type="button" onClick={onClose} className={smallButton}>{copy.close}</button> : null}</div>{status.state === "UNAVAILABLE" || status.state === "CONFLICT" ? <button type="button" onClick={onRetry} className={`${smallButton} mt-2`}><RefreshCw className="size-3.5" />{copy.retry}</button> : null}</section>;
+  return <section role={success || pending ? "status" : "alert"} aria-live="polite" className={`rounded-xl border p-3 text-xs ${success ? "border-brand-200 bg-brand-50 text-brand-900 dark:border-brand-800/60 dark:bg-brand-950/20 dark:text-brand-200" : pending ? "border-border bg-muted text-foreground" : "border-danger-200 bg-danger-50 text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/20 dark:text-danger-200"}`}><div className="flex items-start justify-between gap-3"><div><p className="flex items-center gap-2 font-semibold">{pending ? <Loader2 className="size-4 animate-spin" /> : success ? <Check className="size-4" /> : <AlertTriangle className="size-4" />}{title}</p>{updated !== null ? <p className="mt-1">{copy.updated}: {updated}</p> : null}{status.error ? <dl className="mt-2 grid gap-1"><Evidence label={copy.errorCode} value={status.error.errorCode} mono />{status.error.correlationId ? <Evidence label={copy.correlation} value={status.error.correlationId} mono /> : null}</dl> : null}</div>{!pending ? <button type="button" onClick={onClose} className={smallButton}>{copy.close}</button> : null}</div>{status.state === "UNAVAILABLE" || status.state === "CONFLICT" ? <button type="button" onClick={onRetry} className={`${smallButton} mt-2`}><RefreshCw className="size-3.5" />{copy.retry}</button> : null}</section>;
 }
 
 function actionTitle(status: NotificationActionStatus, copy: NotificationsCopy): string {
@@ -395,15 +395,15 @@ function actionTitle(status: NotificationActionStatus, copy: NotificationsCopy):
 }
 
 function Field({ id, label, hint, error, children }: { id: string; label: string; hint?: string; error?: string; children: ReactNode }) {
-  return <div className="grid gap-1"><label htmlFor={id} className="text-xs font-semibold text-slate-600 dark:text-slate-300">{label}</label>{children}{hint ? <p className="text-xs leading-4 text-slate-500">{hint}</p> : null}{error ? <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-300">{error}</p> : null}</div>;
+  return <div className="grid gap-1"><label htmlFor={id} className="text-xs font-semibold text-foreground">{label}</label>{children}{hint ? <p className="text-xs leading-4 text-muted-foreground">{hint}</p> : null}{error ? <p role="alert" className="text-xs font-semibold text-danger-600 dark:text-danger-400">{error}</p> : null}</div>;
 }
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return <label className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold dark:border-slate-700"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />{label}</label>;
+  return <label className="flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 text-xs font-semibold text-foreground"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />{label}</label>;
 }
 
 function Evidence({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) { return <div><dt className="text-xs font-semibold opacity-70">{label}</dt><dd className={`mt-0.5 break-all ${mono ? "font-mono" : "font-semibold"}`}>{value}</dd></div>; }
-function StatePanel({ icon, title, detail, action, tone = "neutral", compact = false }: { icon: ReactNode; title: string; detail?: string; action?: ReactNode; tone?: "neutral" | "danger"; compact?: boolean }) { return <section role={tone === "danger" ? "alert" : "status"} className={`flex ${compact ? "min-h-32" : "min-h-64"} flex-col items-center justify-center rounded-xl border p-6 text-center ${tone === "danger" ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200" : "border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"}`}><span className="mb-3 opacity-70">{icon}</span><h2 className="text-sm font-semibold">{title}</h2>{detail ? <p className="mt-2 max-w-3xl break-all text-xs leading-5 opacity-80">{detail}</p> : null}{action ? <div className="mt-4">{action}</div> : null}</section>; }
+function StatePanel({ icon, title, detail, action, tone = "neutral", compact = false }: { icon: ReactNode; title: string; detail?: string; action?: ReactNode; tone?: "neutral" | "danger"; compact?: boolean }) { return <section role={tone === "danger" ? "alert" : "status"} className={`flex ${compact ? "min-h-32" : "min-h-64"} flex-col items-center justify-center rounded-xl border p-6 text-center ${tone === "danger" ? "border-danger-200 bg-danger-50 text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/20 dark:text-danger-200" : "border-border bg-card text-muted-foreground"}`}><span className="mb-3 opacity-70">{icon}</span><h2 className="text-sm font-semibold">{title}</h2>{detail ? <p className="mt-2 max-w-3xl break-all text-xs leading-5 opacity-80">{detail}</p> : null}{action ? <div className="mt-4">{action}</div> : null}</section>; }
 function RetryButton({ label, onClick }: { label: string; onClick: () => void }) { return <button type="button" onClick={onClick} className={primaryButton}><RefreshCw className="size-4" />{label}</button>; }
 function formatDate(value: string, lang: "ar" | "en"): string { try { return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); } catch { return value; } }
 function yesNo(value: boolean): string { return value ? "✓" : "—"; }
@@ -412,10 +412,10 @@ function preferenceError(value: PreferenceValidationErrors["notificationType"], 
 function quietHoursError(value: PreferenceValidationErrors["quietHours"], copy: NotificationsCopy) { return value === "invalidJson" ? copy.validation.invalidJson : value === "objectRequired" ? copy.validation.objectRequired : undefined; }
 function deviceTokenError(value: DeviceTokenValidationErrors["token"], copy: NotificationsCopy) { return value === "required" ? copy.validation.required : value === "tooLong" ? copy.validation.tokenTooLong : undefined; }
 
-const inputClass = "min-h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
-const primaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40";
-const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800";
-const dangerButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40";
-const smallButton = "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800";
-const smallDangerButton = "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40 dark:border-rose-900 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950/30";
-const iconButton = "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-blue-600 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-300 dark:hover:bg-blue-950/30";
+const inputClass = "min-h-10 w-full rounded-xl border border-border bg-muted px-3 py-2 text-xs font-medium text-foreground outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+const primaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 text-xs font-semibold text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-40";
+const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40";
+const dangerButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-danger-600 px-4 text-xs font-semibold text-white hover:bg-danger-500 disabled:cursor-not-allowed disabled:opacity-40";
+const smallButton = "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-2xs font-semibold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40";
+const smallDangerButton = "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-danger-200 bg-card px-2.5 text-2xs font-semibold text-danger-700 hover:bg-danger-50 disabled:opacity-40 dark:border-danger-800/60 dark:text-danger-300 dark:hover:bg-danger-950/30";
+const iconButton = "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-brand-600 hover:bg-brand-500/10 dark:text-brand-400";
