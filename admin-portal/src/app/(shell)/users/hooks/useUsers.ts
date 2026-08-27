@@ -1,5 +1,5 @@
 "use client";
- 
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   listAdminUsers,
   getAdminUser,
+  isForbiddenError,
   listRoles,
   suspendAdminUser,
   activateAdminUser,
@@ -156,7 +157,7 @@ export function useUsers() {
       const code = normalizeErrorCode(err);
       setErrorCode(code);
 
-      if (err?.response?.status === 403) {
+      if (isForbiddenError(err)) {
         setPermissionDenied(true);
       } else {
         const details = getErrorMessageAndDetails(err, lang);

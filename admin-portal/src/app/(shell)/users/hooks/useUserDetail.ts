@@ -1,5 +1,5 @@
 "use client";
- 
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/ToastContext";
 import {
   getAdminUser,
   getUserWebphone,
+  isForbiddenError,
   listRoles,
   updateAdminUser,
   assignUserRole,
@@ -155,7 +156,7 @@ export function useUserDetail(id: string) {
 
       if (requestError?.response?.status === 404 || code === "ADMIN_USER_NOT_FOUND") {
         setNotFound(true);
-      } else if (requestError?.response?.status === 403 || code === "MISSING_REQUIRED_PERMISSIONS") {
+      } else if (isForbiddenError(requestError) || code === "MISSING_REQUIRED_PERMISSIONS") {
         setPermissionDenied(true);
       } else {
         const details = getErrorMessageAndDetails(requestError, lang);

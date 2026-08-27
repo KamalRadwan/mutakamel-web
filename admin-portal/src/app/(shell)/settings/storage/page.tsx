@@ -166,19 +166,19 @@ export default function StorageRuntimeSettingsPage() {
             {!state.canUpdateCritical ? (
               <p
                 role="note"
-                className="rounded-xl border border-slate-300 bg-slate-100 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="rounded-xl border border-border bg-ink-100 p-3 text-sm text-foreground dark:border-border dark:bg-ink-800 dark:text-foreground"
               >
                 {copy.readOnly}
               </p>
             ) : null}
 
-            <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-              <label className="flex min-h-16 items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 dark:border-slate-700 dark:bg-slate-950">
+            <section className="grid gap-4 rounded-xl border border-border bg-white p-5 dark:border-border dark:bg-ink-900">
+              <label className="flex min-h-16 items-center justify-between gap-4 rounded-xl border border-border bg-ink-100 px-4 dark:border-border dark:bg-ink-1000">
                 <span>
                   <strong className="block text-sm">{copy.switchLabel}</strong>
                   <span
                     id="storage-runtime-enable-help"
-                    className="mt-1 block text-xs text-slate-500 dark:text-slate-400"
+                    className="mt-1 block text-xs text-muted-foreground"
                   >
                     {copy.switchHelp}
                   </span>
@@ -196,29 +196,29 @@ export default function StorageRuntimeSettingsPage() {
                       (!config.configured || !config.brokerConfigured))
                   }
                   onChange={(event) => void changeEnabled(event.target.checked)}
-                  className="size-5 shrink-0 accent-blue-600 disabled:cursor-not-allowed"
+                  className="size-5 shrink-0 accent-brand-600 disabled:cursor-not-allowed"
                 />
               </label>
 
               {!config.configured ? (
-                <p role="note" className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                <p role="note" className="text-xs font-semibold text-warn-700 dark:text-warn-300">
                   {copy.enableBlocked}
                 </p>
               ) : null}
 
               {!config.brokerConfigured ? (
-                <p role="note" className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                <p role="note" className="text-xs font-semibold text-warn-700 dark:text-warn-300">
                   {copy.brokerBlocked}
                 </p>
               ) : null}
 
-              <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:flex-row sm:items-center">
+              <div className="flex flex-col justify-between gap-4 rounded-xl border border-border p-4 dark:border-border sm:flex-row sm:items-center">
                 <div>
                   <h2 className="flex items-center gap-2 text-sm font-semibold">
-                    <KeyRound className="size-4 text-amber-600" aria-hidden="true" />
+                    <KeyRound className="size-4 text-warn-600" aria-hidden="true" />
                     {copy.keyTitle}
                   </h2>
-                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
                     {copy.keyHelp}
                   </p>
                 </div>
@@ -227,7 +227,7 @@ export default function StorageRuntimeSettingsPage() {
                     type="button"
                     onClick={() => setConfirmationOpen(true)}
                     disabled={pending}
-                    className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 text-xs font-semibold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-warn-600 px-4 text-xs font-semibold text-white hover:bg-warn-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {keyMutationPending ? (
                       <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -288,7 +288,7 @@ function StorageRuntimeEvidence({
     <section
       role="region"
       aria-label={copy.statusRegion}
-      className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+      className="rounded-xl border border-border bg-white p-4 dark:border-border dark:bg-ink-900"
     >
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <EvidenceItem
@@ -318,8 +318,8 @@ function StorageRuntimeEvidence({
 
 function EvidenceItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-slate-100 p-3 dark:bg-slate-800">
-      <dt className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+    <div className="rounded-xl bg-ink-100 p-3 dark:bg-ink-800">
+      <dt className="text-xs font-semibold text-muted-foreground">
         {label}
       </dt>
       <dd className="mt-1 font-semibold">{value}</dd>
@@ -342,8 +342,8 @@ function MutationNotice({
       role={succeeded ? "status" : "alert"}
       className={`rounded-xl border p-3 text-sm font-semibold ${
         succeeded
-          ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
-          : "border-rose-300 bg-rose-50 text-rose-950 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"
+          ? "border-brand-300 bg-brand-50 text-brand-950 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-100"
+          : "border-danger-300 bg-danger-50 text-danger-950 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-100"
       }`}
     >
       {succeeded

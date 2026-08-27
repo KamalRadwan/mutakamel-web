@@ -20,6 +20,7 @@ import {
 } from "@/design-system";
 import {
   inviteAdminUser,
+  isForbiddenError,
   listAdminUsers,
   listRoles,
 } from "../api/adminUsersApi";
@@ -75,7 +76,7 @@ export function InviteUserModal({
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
-        if (err?.response?.status === 403) {
+        if (isForbiddenError(err)) {
           setRolesForbidden(true);
         } else {
           toast.error(lang === "ar" ? "تعذر تحميل الأدوار" : "Failed to load roles");

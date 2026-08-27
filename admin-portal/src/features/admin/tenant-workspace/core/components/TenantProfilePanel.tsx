@@ -80,12 +80,12 @@ export function TenantProfilePanel({
   };
 
   return (
-    <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+    <section className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-xs dark:border-border dark:bg-ink-900">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3 dark:border-border">
+        <h2 className="text-sm font-semibold text-foreground">
           {text.profile}
         </h2>
-        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+        <span className="rounded-full bg-ink-100 px-2 py-1 text-xs font-semibold text-muted-foreground dark:bg-ink-800 dark:text-muted-foreground">
           {labels.placement}: {tenant.databaseServer?.name ?? "—"} ·{" "}
           {tenant.storageServer?.name ?? "—"}
         </span>
@@ -94,13 +94,13 @@ export function TenantProfilePanel({
       {workspace.profileStale && (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warn-300 bg-warn-50 p-3 text-xs text-warn-900 dark:border-warn-800 dark:bg-warn-950/40 dark:text-warn-200"
         >
           <span>{text.stale}</span>
           <button
             type="button"
             onClick={() => void workspace.reloadStaleProfile()}
-            className="rounded-lg bg-amber-700 px-3 py-1.5 font-semibold text-white"
+            className="rounded-lg bg-warn-700 px-3 py-1.5 font-semibold text-white"
           >
             {text.reload}
           </button>
@@ -171,16 +171,16 @@ export function TenantProfilePanel({
           />
         </div>
 
-        <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+        <div className="rounded-xl border border-border p-3 dark:border-border">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            <span className="text-xs font-semibold text-foreground">
               {locale === "ar" ? "العنوان" : "Address"}
             </span>
             <button
               type="button"
               disabled={disabled || draft.address === null}
               onClick={workspace.clearAddress}
-              className="rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 disabled:opacity-40"
+              className="rounded-lg px-2 py-1 text-xs font-semibold text-danger-600 disabled:opacity-40"
             >
               {text.clearAddress}
             </button>
@@ -214,7 +214,7 @@ export function TenantProfilePanel({
           <button
             type="submit"
             disabled={disabled || !workspace.profileDirty}
-            className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-brand-500 px-4 py-2 text-xs font-semibold text-ink-950 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-400"
           >
             {workspace.mutation.name === "profile" ? "…" : text.save}
           </button>
@@ -242,7 +242,7 @@ function Field({
   onChange,
 }: FieldProps) {
   return (
-    <label className="space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-400">
+    <label className="space-y-1 text-xs font-semibold text-muted-foreground">
       <span>{label}</span>
       <input
         value={value}
@@ -250,7 +250,7 @@ function Field({
         maxLength={maxLength}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-normal text-slate-900 outline-hidden focus:border-blue-500 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+        className="w-full rounded-lg border border-border bg-ink-100 px-3 py-2 text-xs font-normal text-foreground outline-hidden focus:border-brand-500 disabled:opacity-60 dark:bg-ink-800"
       />
     </label>
   );

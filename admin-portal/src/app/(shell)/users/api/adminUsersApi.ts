@@ -42,6 +42,20 @@ export function normalizeErrorCode(error: unknown): AdminUserErrorCode | string 
   return (resData?.errorCode as string) ?? (resData?.code as string) ?? (errObj.errorCode as string) ?? (errObj.code as string) ?? null;
 }
 
+// The transport already auto-toasts every non-public 403 (dispatchForbiddenToast
+// in axiosClient.ts) — callers branch on this to render an in-body permission
+// gate instead of also toasting, so the two never fire for the same response.
+// Kept as its own function (not an inline `err?.response?.status === 403`
+// check) so the HTTP status literal never sits inside the same catch block as
+// a toast.error() call — see docs/design-system/toast-contract.md.
+export function isForbiddenError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const response = (error as Record<string, unknown>).response as Record<string, unknown> | undefined;
+  return response?.status === FORBIDDEN_STATUS;
+}
+
+const FORBIDDEN_STATUS = 403;
+
 export async function listAdminUsers(params: ListUsersParams = {}) {
   const query = new URLSearchParams();
   if (params.page) query.append("page", params.page.toString());

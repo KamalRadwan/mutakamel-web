@@ -45,19 +45,19 @@ function AuthorizedAuthInvalidationReplayPanel() {
     <>
       <section
         aria-busy={isPending}
-        className="space-y-5 rounded-xl border border-amber-200 bg-white p-5 shadow-2xs dark:border-amber-900/70 dark:bg-slate-900"
+        className="space-y-5 rounded-xl border border-warn-200 bg-white p-5 shadow-2xs dark:border-warn-900/70 dark:bg-ink-900"
       >
         <div>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-            <ShieldAlert className="size-4 text-amber-600 dark:text-amber-400" />
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <ShieldAlert className="size-4 text-warn-600 dark:text-warn-400" />
             {copy.title}
           </h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
             {copy.description}
           </p>
         </div>
 
-        <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+        <div className="flex gap-3 rounded-xl border border-warn-200 bg-warn-50 p-3 text-warn-900 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-200">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div>
             <p className="text-xs font-semibold">{copy.warningTitle}</p>
@@ -76,14 +76,14 @@ function AuthorizedAuthInvalidationReplayPanel() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label
               htmlFor="replay-target"
-              className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300"
+              className="space-y-1.5 text-xs font-semibold text-foreground"
             >
               <span>{copy.target}</span>
               <span className="relative block">
                 {replay.draft.target === "CONTROL_PLANE" ? (
-                  <ServerCog className="pointer-events-none absolute start-3 top-3 size-4 text-slate-400" />
+                  <ServerCog className="pointer-events-none absolute start-3 top-3 size-4 text-muted-foreground" />
                 ) : (
-                  <Database className="pointer-events-none absolute start-3 top-3 size-4 text-slate-400" />
+                  <Database className="pointer-events-none absolute start-3 top-3 size-4 text-muted-foreground" />
                 )}
                 <select
                   id="replay-target"
@@ -168,26 +168,26 @@ function AuthorizedAuthInvalidationReplayPanel() {
                 : "replay-reason-hint"}
               className={`${inputClass} resize-y leading-5`}
             />
-            <span className="block text-end text-xs font-medium text-slate-400">
+            <span className="block text-end text-xs font-medium text-muted-foreground">
               {replay.draft.reason.length}/{AUTH_INVALIDATION_REPLAY_REASON_MAX_LENGTH} {copy.characters}
             </span>
           </Field>
 
           {replay.validationErrors.workflow ? (
-            <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <p role="alert" className="rounded-xl border border-warn-200 bg-warn-50 p-3 text-xs font-semibold text-warn-800 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-200">
               {copy.validation[replay.validationErrors.workflow]}
             </p>
           ) : null}
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-muted-foreground">
               {copy.dryRunRequired}
             </p>
             <div className="flex shrink-0 gap-2">
               <button
                 type="submit"
                 disabled={isPending}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 px-4 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-brand-200 px-4 text-xs font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-900 dark:text-brand-300 dark:hover:bg-brand-950/30"
               >
                 {replay.pendingMode === "DRY_RUN" ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -200,7 +200,7 @@ function AuthorizedAuthInvalidationReplayPanel() {
                 type="button"
                 onClick={() => replay.requestConfirmation("APPLY")}
                 disabled={isPending || !replay.canApply}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 text-xs font-semibold text-white shadow-sm hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-danger-600 px-4 text-xs font-semibold text-white shadow-sm hover:bg-danger-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {replay.pendingMode === "APPLY" ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -217,7 +217,7 @@ function AuthorizedAuthInvalidationReplayPanel() {
           <div
             role="status"
             aria-live="polite"
-            className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
+            className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-brand-900 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-200"
           >
             <p className="flex items-center gap-2 text-xs font-semibold">
               <CheckCircle2 className="size-4" />
@@ -244,7 +244,7 @@ function AuthorizedAuthInvalidationReplayPanel() {
         {replay.error ? (
           <div
             role="alert"
-            className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200"
+            className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger-900 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-200"
           >
             <p className="text-xs font-semibold">{copy.failure.title}</p>
             <p className="mt-1 text-xs leading-5">
@@ -257,13 +257,13 @@ function AuthorizedAuthInvalidationReplayPanel() {
               ) : null}
             </dl>
             {replay.retryMode ? (
-              <div className="mt-3 border-t border-rose-200 pt-3 dark:border-rose-900">
+              <div className="mt-3 border-t border-danger-200 pt-3 dark:border-danger-900">
                 <p className="text-xs leading-5">{copy.failure.retryNotice}</p>
                 <button
                   type="button"
                   onClick={() => replay.requestConfirmation(replay.retryMode as AuthInvalidationReplayMode)}
                   disabled={isPending}
-                  className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-xl border border-rose-300 px-3 text-xs font-semibold hover:bg-rose-100 disabled:opacity-50 dark:border-rose-800 dark:hover:bg-rose-950/50"
+                  className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-xl border border-danger-300 px-3 text-xs font-semibold hover:bg-danger-100 disabled:opacity-50 dark:border-danger-800 dark:hover:bg-danger-950/50"
                 >
                   <RotateCcw className="size-4" />
                   {copy.failure.retryExact}
@@ -316,11 +316,11 @@ function Field({
 }) {
   const hintId = errorId.replace(/-error$/, "-hint");
   return (
-    <div className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+    <div className="space-y-1.5 text-xs font-semibold text-foreground">
       <label htmlFor={inputId} className="block">{label}</label>
       {children}
-      {hint ? <span id={hintId} className="block text-xs font-medium leading-4 text-slate-500 dark:text-slate-400">{hint}</span> : null}
-      {error ? <span id={errorId} className="block text-xs font-semibold text-rose-600 dark:text-rose-400">{error}</span> : null}
+      {hint ? <span id={hintId} className="block text-xs font-medium leading-4 text-muted-foreground">{hint}</span> : null}
+      {error ? <span id={errorId} className="block text-xs font-semibold text-danger-600 dark:text-danger-400">{error}</span> : null}
     </div>
   );
 }
@@ -395,4 +395,4 @@ function apiErrorCopyKey(error: NormalizedApiError): ReplayApiErrorCopyKey {
 }
 
 const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-medium text-slate-900 outline-none transition-colors focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100";
+  "w-full rounded-lg border border-border bg-ink-100 px-3 py-2.5 text-xs font-medium text-foreground outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-ink-800/60";

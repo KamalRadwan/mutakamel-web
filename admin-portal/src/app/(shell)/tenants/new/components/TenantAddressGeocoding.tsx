@@ -23,17 +23,17 @@ export function TenantAddressGeocoding({
   const copy = lang === "ar" ? AR : EN;
 
   return (
-    <section className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+    <section className="rounded-lg border border-brand-200 bg-brand-50/60 p-4 dark:border-brand-900 dark:bg-brand-950/20">
       <div className="flex items-start gap-2">
         <MapPinned
           aria-hidden="true"
-          className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400"
+          className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400"
         />
         <div>
-          <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+          <h4 className="text-xs font-semibold text-foreground">
             {copy.title}
           </h4>
-          <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
             {copy.description}
           </p>
         </div>
@@ -66,7 +66,7 @@ export function TenantAddressGeocoding({
             void state.lookup().catch(() => undefined);
           }}
           disabled={disabled || state.isLoading}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 text-xs font-semibold text-ink-950 hover:bg-brand-600 dark:bg-brand-400 dark:hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {state.isLoading ? (
             <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
@@ -78,7 +78,7 @@ export function TenantAddressGeocoding({
       {state.validationCode ? (
         <p
           role="alert"
-          className="mt-2 text-xs font-semibold text-rose-700 dark:text-rose-300"
+          className="mt-2 text-xs font-semibold text-danger-700 dark:text-danger-300"
         >
           {coordinateMessage(copy, state.validationCode)}
         </p>
@@ -89,7 +89,7 @@ export function TenantAddressGeocoding({
       {state.suggestion ? (
         <div
           role="status"
-          className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
+          className="mt-3 rounded-xl border border-brand-200 bg-brand-50 p-3 text-xs text-brand-950 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-100"
         >
           <p className="font-semibold">{copy.suggestion}</p>
           <p className="mt-1 leading-5">
@@ -109,7 +109,7 @@ export function TenantAddressGeocoding({
             type="button"
             onClick={() => onApply(state.suggestion!)}
             disabled={disabled}
-            className="mt-3 min-h-10 rounded-xl bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-3 min-h-10 rounded-xl bg-brand-700 px-4 text-xs font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {copy.apply}
           </button>
@@ -130,7 +130,7 @@ export function TenantReverseGeocodeError({
   return (
     <div
       role="alert"
-      className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200"
+      className="mt-3 rounded-xl border border-danger-200 bg-danger-50 p-3 text-xs text-danger-900 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-200"
     >
       <p>{error.message}</p>
       {error.correlationId ? (
@@ -160,7 +160,7 @@ function CoordinateInput({
   return (
     <label
       htmlFor={id}
-      className="space-y-1 text-xs font-semibold text-slate-700 dark:text-slate-300"
+      className="space-y-1 text-xs font-semibold text-foreground"
     >
       <span>{label}</span>
       <input
@@ -173,7 +173,7 @@ function CoordinateInput({
         disabled={disabled}
         aria-invalid={invalid}
         placeholder="30.0444000"
-        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        className="w-full rounded-xl border border-border bg-white px-3 py-2 font-mono text-xs text-foreground dark:border-border dark:bg-ink-900 dark:text-foreground"
       />
     </label>
   );

@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-08-27T14:43:21.426Z",
+  "generatedAt": "2026-08-27T14:46:48.987Z",
   "fileCount": 563,
   "counts": {
-    "colorUtilityTotal": 1362,
+    "colorUtilityTotal": 1221,
     "arbitraryTypeSize": 5,
     "textXs": 897,
     "fontBoldOrHeavier": 0,
     "fontNormalOrMedium": 65,
-    "roundedXl": 260,
+    "roundedXl": 256,
     "rounded2xl": 0,
     "rounded3xl": 0,
     "gradients": 1,
@@ -18,28 +18,28 @@
     "toastCallSites": 158
   },
   "colorFamilyCounts": {
-    "slate": 760,
+    "slate": 677,
     "gray": 0,
     "zinc": 0,
     "neutral": 0,
     "stone": 0,
-    "red": 36,
+    "red": 30,
     "orange": 0,
-    "amber": 113,
+    "amber": 105,
     "yellow": 0,
     "lime": 0,
     "green": 0,
-    "emerald": 91,
+    "emerald": 80,
     "teal": 0,
     "cyan": 58,
     "sky": 0,
-    "blue": 151,
+    "blue": 125,
     "indigo": 0,
     "violet": 58,
     "purple": 4,
     "fuchsia": 0,
     "pink": 0,
-    "rose": 109
+    "rose": 102
   },
   "colorFamiliesInUse": 9
 }

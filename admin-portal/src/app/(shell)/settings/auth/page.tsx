@@ -39,7 +39,7 @@ export default function AuthSettingsPage() {
               />
             ))
           ) : (
-            <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-lg border border-border bg-card p-8 text-center text-xs text-muted-foreground">
               {lang === "ar"
                 ? "لا توجد إعدادات مصادقة مسجلة."
                 : "No authentication registry settings are configured."}

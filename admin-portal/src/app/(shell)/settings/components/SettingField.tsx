@@ -32,7 +32,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
 
   if (!uiMeta) {
     return (
-      <div className="p-4 border border-red-200 bg-red-50 text-red-600 rounded-xl text-xs">
+      <div className="p-4 border border-danger-200 bg-danger-50 text-danger-600 rounded-lg text-xs">
         Missing UI Metadata for {key}
       </div>
     );
@@ -61,25 +61,25 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
   };
 
   return (
-    <div className={`p-5 rounded-xl border transition-colors ${readOnly ? "bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-800/50"} shadow-2xs group`}>
+    <div className={`p-5 rounded-lg border transition-colors ${readOnly ? "bg-ink-100 dark:bg-ink-800/30 border-border" : "bg-card border-border hover:border-brand-200 dark:hover:border-brand-800/50"} group`}>
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
 
         {/* Left Side: Label and Description */}
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               {title}
-              {readOnly && <Lock className="w-3.5 h-3.5 text-slate-400" />}
+              {readOnly && <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
             </h3>
           </div>
 
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl flex items-start gap-1.5 mt-1.5">
-            <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl flex items-start gap-1.5 mt-1.5">
+            <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
             {lang === "ar" ? descriptionI18n.ar : descriptionI18n.en}
           </p>
 
           {readOnly && (
-            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-2 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded w-fit">
+            <p className="text-xs text-warn-700 dark:text-warn-400 font-medium mt-2 bg-warn-50 dark:bg-warn-950/20 px-2 py-1 rounded w-fit">
               {permissionLocked
                 ? lang === "ar"
                   ? "يتطلب التعديل صلاحيتَي admin.settings.update و admin.settings.critical معاً."
@@ -102,7 +102,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
                     type="button"
                     onClick={handleToggle}
                     disabled={readOnly}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${localValue ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700"} ${readOnly ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${localValue ? "bg-brand-500" : "bg-ink-200 dark:bg-ink-700"} ${readOnly ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localValue ? "translate-x-6" : "translate-x-1"}`} />
                   </button>
@@ -120,7 +120,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
                   onChange={(e) => handleChange(e.target.value)}
                   disabled={readOnly}
                   placeholder={uiMeta.placeholder}
-                  className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed font-mono"
+                  className="w-full px-3 py-2 text-sm bg-ink-100 dark:bg-ink-800/60 border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed font-mono"
                 />
               )}
 
@@ -134,7 +134,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
                   disabled={readOnly}
                   min={uiMeta.min}
                   max={uiMeta.max}
-                  className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed font-mono"
+                  className="w-full px-3 py-2 text-sm bg-ink-100 dark:bg-ink-800/60 border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed font-mono"
                 />
               )}
 
@@ -147,7 +147,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
                   }
                   onChange={handleSelectChange}
                   disabled={readOnly}
-                  className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+                  className="w-full px-3 py-2 text-sm bg-ink-100 dark:bg-ink-800/60 border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {uiMeta.options?.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -162,7 +162,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
           {/* Feedback States */}
           <div className="h-5 flex items-center justify-end text-xs font-medium transition-opacity w-full">
             {isSaving ? (
-              <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 animate-pulse">
+              <span className="flex items-center gap-1.5 text-brand-600 dark:text-brand-400 animate-pulse">
                 <Save className="w-3.5 h-3.5" />
                 {lang === "ar" ? "جاري الحفظ..." : "Saving..."}
               </span>
@@ -182,7 +182,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
                       ? "إعادة تحميل هذا الإعداد من Core"
                       : "Reload this setting from Core"
                 }
-                className="inline-flex items-center gap-1.5 text-slate-500 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:text-blue-300"
+                className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-brand-300"
               >
                 <RefreshCw
                   className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`}
@@ -193,7 +193,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
             )}
           </div>
           {setting.error ? (
-            <p role="alert" className="w-full text-start text-xs text-rose-700 dark:text-rose-300">
+            <p role="alert" className="w-full text-start text-xs text-danger-700 dark:text-danger-300">
               {setting.error}
             </p>
           ) : null}
