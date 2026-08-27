@@ -8,7 +8,7 @@ import { adminCan } from "@/lib/auth/rbac";
 
 export function useUserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const { user, logout } = useAuth();
   const toast = useToast();
 
@@ -28,12 +28,7 @@ export function useUserDropdown() {
     try {
       await logout();
     } catch {
-      toast.error(
-        lang === "ar" ? "تعذر تسجيل الخروج" : "Sign-out failed",
-        lang === "ar"
-          ? "لم تُنهَ الجلسة على الخادم. ما زلت مسجلاً للدخول ويمكنك المحاولة مرة أخرى."
-          : "The server session was not ended. You remain signed in and can try again.",
-      );
+      toast.error(t.common.signOutFailedTitle, t.common.signOutFailedDescription);
     }
   };
   const canViewRoles = adminCan(user, "admin.roles.read");

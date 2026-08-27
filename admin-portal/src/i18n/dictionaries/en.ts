@@ -15,7 +15,11 @@ export const en: Dictionary = {
     permissionsAndRoles: "Permissions & Roles",
     systemSettings: "System Settings",
     signOut: "Sign Out",
+    signOutFailedTitle: "Sign-out failed",
+    signOutFailedDescription:
+      "The server session was not ended. You remain signed in and can try again.",
     langSwitch: "العربية",
+    langSwitchTitle: "التحويل للغة العربية",
   },
   login: {
     title: "Admin Portal Sign-In",
@@ -32,6 +36,37 @@ export const en: Dictionary = {
     forgotModalDescription: "A password reset link will be sent to your email address.",
     cancel: "Cancel",
     sendResetLink: "Send reset link",
+    missingCredentialsError: "Please enter email and password",
+    loginFailedTitle: "Login Failed",
+    loginSuccessTitle: "Login Successful",
+    loginSuccessDescription: "Welcome to Mutakamel Control Plane.",
+    credentialsInvalidFallback: "Invalid email or password",
+    authenticationErrorTitle: "Authentication Error",
+    errorTitle: "Error",
+    emailRequiredMessage: "Please enter your email",
+    resetLinkSentTitle: "Reset Link Sent",
+    resetLinkSentDescription:
+      "If the email is registered, password reset instructions will be sent.",
+    sendFailedTitle: "Failed to Send",
+    sendFailedDescription: "Could not communicate with the server.",
+  },
+  profile: {
+    loadFailedTitle: "Profile Load Failed",
+    loadFailedDescription:
+      "Profile preferences could not be loaded. You can retry safely.",
+    savedTitle: "Preferences Saved",
+    savedDescription: "Your profile preferences have been updated.",
+    saveErrorTitle: "Save Error",
+    saveErrorDescription:
+      "Preferences could not be saved. The changes are not treated as persisted.",
+  },
+  incomingCall: {
+    ariaLabel: "Incoming call",
+    dismiss: "Dismiss alert",
+    label: "Incoming call",
+    unknownCaller: "Unknown caller",
+    answer: "Answer",
+    decline: "Decline",
   },
   authActions: {
     common: {

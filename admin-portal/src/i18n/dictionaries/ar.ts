@@ -13,7 +13,11 @@ export const ar = {
     permissionsAndRoles: "الصلاحيات والأدوار",
     systemSettings: "إعدادات النظام",
     signOut: "تسجيل الخروج",
+    signOutFailedTitle: "تعذر تسجيل الخروج",
+    signOutFailedDescription:
+      "لم تُنهَ الجلسة على الخادم. ما زلت مسجلاً للدخول ويمكنك المحاولة مرة أخرى.",
     langSwitch: "English",
+    langSwitchTitle: "Switch to English",
   },
   login: {
     title: "تسجيل الدخول إلى لوحة التحكم",
@@ -29,6 +33,35 @@ export const ar = {
     forgotModalDescription: "سيتم إرسال رابط إعادة التعيين للبريد الإلكتروني",
     cancel: "إلغاء",
     sendResetLink: "إرسال رابط التعيين",
+    missingCredentialsError: "يرجى أدخال البريد الإلكتروني وكلمة المرور",
+    loginFailedTitle: "فشل تسجيل الدخول",
+    loginSuccessTitle: "تم تسجيل الدخول بنجاح",
+    loginSuccessDescription: "أهلاً بك في منصة التحكم متكامل.",
+    credentialsInvalidFallback: "بيانات الاعتماد غير صالحة",
+    authenticationErrorTitle: "خطأ في الدخول",
+    errorTitle: "خطأ",
+    emailRequiredMessage: "يرجى إدخال البريد الإلكتروني",
+    resetLinkSentTitle: "تم إرسال رابط التعيين",
+    resetLinkSentDescription:
+      "إذا كان البريد مسجلاً، ستصل إليه تعليمات إعادة تعيين كلمة المرور.",
+    sendFailedTitle: "تعذر الإرسال",
+    sendFailedDescription: "حدث خطأ أثناء الاتصال بالخادم.",
+  },
+  profile: {
+    loadFailedTitle: "فشل تحميل الملف الشخصي",
+    loadFailedDescription: "تعذر تحميل تفضيلات الملف الشخصي. يمكنك إعادة المحاولة بأمان.",
+    savedTitle: "تم الحفظ",
+    savedDescription: "تم تحديث تفضيلات الحساب الشخصي بنجاح.",
+    saveErrorTitle: "خطأ في الحفظ",
+    saveErrorDescription: "تعذر حفظ التفضيلات. لم تُعتبر التغييرات محفوظة.",
+  },
+  incomingCall: {
+    ariaLabel: "مكالمة واردة",
+    dismiss: "إخفاء التنبيه",
+    label: "مكالمة واردة",
+    unknownCaller: "متصل غير معروف",
+    answer: "رد",
+    decline: "رفض",
   },
   authActions: {
     common: {

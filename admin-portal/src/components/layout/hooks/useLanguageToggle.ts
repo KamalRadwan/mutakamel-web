@@ -3,12 +3,12 @@
 import { useI18n } from "@/i18n/I18nContext";
 
 export function useLanguageToggle() {
-  const { lang, toggleLang } = useI18n();
+  const { lang, toggleLang, t } = useI18n();
 
   return {
     lang,
     toggleLanguage: toggleLang,
-    title: lang === "ar" ? "Switch to English" : "التحويل للغة العربية",
-    buttonLabel: lang === "ar" ? "English" : "العربية",
+    title: t.common.langSwitchTitle,
+    buttonLabel: t.common.langSwitch,
   };
 }

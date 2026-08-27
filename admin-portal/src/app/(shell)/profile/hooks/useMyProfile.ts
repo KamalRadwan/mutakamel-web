@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { axiosClient, getApiRequestOutcome } from "@/lib/api/axiosClient";
 import { generateUUIDv7 } from "@/lib/utils/uuid";
 import { useI18n } from "@/i18n/I18nContext";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { useToast } from "@/components/ui/ToastContext";
 import type { SuccessResponse } from "@/types/common";
 import type { AdminUserProfile } from "@/app/(shell)/users/types";
@@ -29,6 +31,7 @@ interface ProfileWriteIntent {
 
 export function useMyProfile() {
   const { lang, setLang } = useI18n();
+  const copy = (lang === "ar" ? ar : en).profile;
   const toast = useToast();
 
   const [profile, setProfile] = useState<AdminUserProfile | null>(null);
@@ -59,16 +62,11 @@ export function useMyProfile() {
     } catch (caught: unknown) {
       const normalized = normalizeApiError(caught);
       setLoadError(normalized);
-      toast.error(
-        lang === "ar" ? "فشل تحميل الملف الشخصي" : "Profile Load Failed",
-        lang === "ar"
-          ? "تعذر تحميل تفضيلات الملف الشخصي. يمكنك إعادة المحاولة بأمان."
-          : "Profile preferences could not be loaded. You can retry safely.",
-      );
+      toast.error(copy.loadFailedTitle, copy.loadFailedDescription);
     } finally {
       setIsLoading(false);
     }
-  }, [lang, toast]);
+  }, [copy.loadFailedTitle, copy.loadFailedDescription, toast]);
 
   useEffect(() => {
     queueMicrotask(() => loadMyProfile());
@@ -132,12 +130,7 @@ export function useMyProfile() {
         setLang(language);
       }
 
-      toast.success(
-        lang === "ar" ? "تم الحفظ" : "Preferences Saved",
-        lang === "ar"
-          ? "تم تحديث تفضيلات الحساب الشخصي بنجاح."
-          : "Your profile preferences have been updated.",
-      );
+      toast.success(copy.savedTitle, copy.savedDescription);
     } catch (caught: unknown) {
       const normalized = normalizeApiError(caught);
       const current = profileIntentRef.current;
@@ -161,12 +154,7 @@ export function useMyProfile() {
         profileIntentRef.current = null;
       }
       setSaveError(normalized);
-      toast.error(
-        lang === "ar" ? "خطأ في الحفظ" : "Save Error",
-        lang === "ar"
-          ? "تعذر حفظ التفضيلات. لم تُعتبر التغييرات محفوظة."
-          : "Preferences could not be saved. The changes are not treated as persisted.",
-      );
+      toast.error(copy.saveErrorTitle, copy.saveErrorDescription);
     } finally {
       setIsSaving(false);
     }

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastContext";
 import { axiosClient } from "@/lib/api/axiosClient";
@@ -17,6 +19,7 @@ export function useLogin() {
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   const { t, lang } = useI18n();
+  const copy = (lang === "ar" ? ar : en).login;
   const { login } = useAuth();
   const toast = useToast();
 
@@ -28,9 +31,9 @@ export function useLogin() {
     setError(null);
 
     if (!email || !password) {
-      const errMsg = lang === "ar" ? "يرجى أدخال البريد الإلكتروني وكلمة المرور" : "Please enter email and password";
+      const errMsg = copy.missingCredentialsError;
       setError(errMsg);
-      toast.error(lang === "ar" ? "فشل تسجيل الدخول" : "Login Failed", errMsg);
+      toast.error(copy.loginFailedTitle, errMsg);
       return;
     }
 
@@ -38,19 +41,16 @@ export function useLogin() {
 
     try {
       await login({ email, password, rememberMe });
-      toast.success(
-        lang === "ar" ? "تم تسجيل الدخول بنجاح" : "Login Successful",
-        lang === "ar" ? "أهلاً بك في منصة التحكم متكامل." : "Welcome to Mutakamel Control Plane."
-      );
+      toast.success(copy.loginSuccessTitle, copy.loginSuccessDescription);
     } catch (err: unknown) {
       // A newer login in another tab owns the shared cookie session. AuthContext
       // adopts it through the session event/bootstrap path without presenting
       // the superseded local submission as a credential failure.
       if (getAuthErrorCode(err) === "AUTH_SESSION_CHANGED") return;
       const errorPayload = err as { response?: { data?: { message?: string } }; message?: string };
-      const errMsg = errorPayload?.response?.data?.message || errorPayload?.message || (lang === "ar" ? "بيانات الاعتماد غير صالحة" : "Invalid email or password");
+      const errMsg = errorPayload?.response?.data?.message || errorPayload?.message || copy.credentialsInvalidFallback;
       setError(errMsg);
-      toast.error(lang === "ar" ? "خطأ في الدخول" : "Authentication Error", errMsg);
+      toast.error(copy.authenticationErrorTitle, errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -59,10 +59,10 @@ export function useLogin() {
   const handleForgotPassword = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!email) {
-      toast.error(lang === "ar" ? "خطأ" : "Error", lang === "ar" ? "يرجى إدخال البريد الإلكتروني" : "Please enter your email");
+      toast.error(copy.errorTitle, copy.emailRequiredMessage);
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       await axiosClient.post(
@@ -75,18 +75,10 @@ export function useLogin() {
           nonReplayable: true,
         },
       );
-      toast.info(
-        lang === "ar" ? "تم إرسال رابط التعيين" : "Reset Link Sent",
-        lang === "ar"
-          ? "إذا كان البريد مسجلاً، ستصل إليه تعليمات إعادة تعيين كلمة المرور."
-          : "If the email is registered, password reset instructions will be sent."
-      );
+      toast.info(copy.resetLinkSentTitle, copy.resetLinkSentDescription);
       setIsForgotModalOpen(false);
     } catch {
-      toast.error(
-        lang === "ar" ? "تعذر الإرسال" : "Failed to Send",
-        lang === "ar" ? "حدث خطأ أثناء الاتصال بالخادم." : "Could not communicate with the server."
-      );
+      toast.error(copy.sendFailedTitle, copy.sendFailedDescription);
     } finally {
       setIsSubmitting(false);
     }
