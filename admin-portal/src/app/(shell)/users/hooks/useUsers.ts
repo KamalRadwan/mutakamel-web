@@ -162,15 +162,12 @@ export function useUsers() {
       } else {
         const details = getErrorMessageAndDetails(err, lang);
         setError(details.message);
-        toast.error(
-          lang === "ar" ? "خطأ في التحميل" : "Load Error",
-          details.message
-        );
+        toast.error(t.users.fetchLoadErrorTitle, details.message);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, debouncedSearch, statusFilter, roleFilter, isSuperAdminFilter, sortBy, sortDir, lang, toast]);
+  }, [page, limit, debouncedSearch, statusFilter, roleFilter, isSuperAdminFilter, sortBy, sortDir, lang, t, toast]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -182,10 +179,7 @@ export function useUsers() {
 
   const openModal = (userId: string, action: "suspend" | "activate" | "delete") => {
     if (currentUser?.id === userId) {
-      toast.error(
-        lang === "ar" ? "إجراء غير مسموح" : "Forbidden Action",
-        lang === "ar" ? "لا يمكنك إجاء هذه العملية على حسابك الخاص." : "You cannot perform this action on your own account."
-      );
+      toast.error(t.users.forbiddenActionTitle, t.users.forbiddenActionDesc);
       return;
     }
     setActiveModalUserId(userId);
@@ -221,22 +215,13 @@ export function useUsers() {
     try {
       if (modalActionType === "delete") {
         await deleteAdminUser(activeModalUserId, intent.idempotencyKey);
-        toast.success(
-          lang === "ar" ? "تم الحذف" : "Deleted",
-          lang === "ar" ? "تم حذف المستخدم بنجاح" : "User deleted successfully"
-        );
+        toast.success(t.users.deletedTitle, t.users.deletedFromListDesc);
       } else if (modalActionType === "suspend") {
         await suspendAdminUser(activeModalUserId, intent.idempotencyKey);
-        toast.success(
-          lang === "ar" ? "تم التعليق" : "Suspended",
-          lang === "ar" ? "تم تعليق حساب المستخدم بنجاح" : "User suspended successfully"
-        );
+        toast.success(t.users.suspendedTitle, t.users.suspendedDesc);
       } else if (modalActionType === "activate") {
         await activateAdminUser(activeModalUserId, intent.idempotencyKey);
-        toast.success(
-          lang === "ar" ? "تم التنشيط" : "Activated",
-          lang === "ar" ? "تم تنشيط حساب المستخدم بنجاح" : "User activated successfully"
-        );
+        toast.success(t.users.activatedTitle, t.users.activatedDesc);
       }
 
       actionIntentRef.current = null;
@@ -272,10 +257,7 @@ export function useUsers() {
         }
       }
       const details = getErrorMessageAndDetails(err, lang);
-      toast.error(
-        lang === "ar" ? "فشل الإجراء" : "Action Failed",
-        details.message
-      );
+      toast.error(t.users.actionFailedTitle, details.message);
     } finally {
       setIsActionLoading(false);
     }

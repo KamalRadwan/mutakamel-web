@@ -86,7 +86,7 @@ export default function UsersDirectoryPage() {
                 <span>
                   {usr.firstName} {usr.lastName}
                 </span>
-                {rowPermissions.isSelf && <Badge tone="brand">{lang === "ar" ? "أنت" : "YOU"}</Badge>}
+                {rowPermissions.isSelf && <Badge tone="brand">{t.users.youBadge}</Badge>}
               </div>
               <div className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
                 <Mail className="size-3" />
@@ -103,7 +103,7 @@ export default function UsersDirectoryPage() {
       headerAr: t.users.role,
       cell: (usr) => (
         <Badge tone={usr.isSuperAdmin ? "danger" : "neutral"} className="font-mono">
-          {usr.isSuperAdmin ? "Super Admin" : usr.role?.nameI18n?.[lang] || usr.role?.name || "No Role"}
+          {usr.isSuperAdmin ? "Super Admin" : usr.role?.nameI18n?.[lang] || usr.role?.name || t.users.noRole}
         </Badge>
       ),
     },
@@ -216,16 +216,13 @@ export default function UsersDirectoryPage() {
       {permissionDenied ? (
         <div className="rounded-lg border border-border bg-card">
           <ErrorState
-            title={lang === "ar" ? "وصول غير مصرح به" : "Access denied"}
+            title={t.users.listAccessDeniedTitle}
             error={{
               isNormalized: true,
               httpStatus: 403,
               errorCode: "ADMIN_PERMISSION_DENIED",
               errorCategory: "AUTHORIZATION",
-              message:
-                lang === "ar"
-                  ? "لا تملك صلاحية (admin.users.read) المطلوبة لعرض حسابات أعضاء الفريق."
-                  : "You do not have the required permission (admin.users.read) to view the staff directory.",
+              message: t.users.listAccessDeniedMessage,
             }}
           />
         </div>
@@ -363,29 +360,17 @@ export default function UsersDirectoryPage() {
           onConfirm={confirmModalAction}
           title={
             modalActionType === "suspend"
-              ? lang === "ar"
-                ? "تعليق حساب المشرف"
-                : "Suspend Admin User"
+              ? t.users.suspendActionTitle
               : modalActionType === "activate"
-                ? lang === "ar"
-                  ? "تنشيط حساب المشرف"
-                  : "Activate Admin User"
-                : lang === "ar"
-                  ? "حذف حساب المشرف"
-                  : "Delete Admin User"
+                ? t.users.activateActionTitle
+                : t.users.deleteActionTitle
           }
           description={
             modalActionType === "suspend"
-              ? lang === "ar"
-                ? `هل أنت متأكد من تعليق حساب ${activeModalUser.firstName} ${activeModalUser.lastName}؟ سيتم إلغاء الجلسات الفعالة.`
-                : `Are you sure you want to suspend ${activeModalUser.firstName} ${activeModalUser.lastName}? Active sessions will be terminated.`
+              ? t.users.suspendActionDescription(`${activeModalUser.firstName} ${activeModalUser.lastName}`)
               : modalActionType === "activate"
-                ? lang === "ar"
-                  ? `هل أنت متأكد من إعادة تنشيط حساب ${activeModalUser.firstName} ${activeModalUser.lastName}؟`
-                  : `Are you sure you want to reactivate ${activeModalUser.firstName} ${activeModalUser.lastName}?`
-                : lang === "ar"
-                  ? `هل أنت متأكد من حذف حساب ${activeModalUser.firstName} ${activeModalUser.lastName} نهائياً؟`
-                  : `Are you sure you want to delete ${activeModalUser.firstName} ${activeModalUser.lastName}?`
+                ? t.users.activateActionDescription(`${activeModalUser.firstName} ${activeModalUser.lastName}`)
+                : t.users.deleteActionDescription(`${activeModalUser.firstName} ${activeModalUser.lastName}`)
           }
           targetName={`${activeModalUser.firstName} ${activeModalUser.lastName}`}
           actionType={modalActionType}

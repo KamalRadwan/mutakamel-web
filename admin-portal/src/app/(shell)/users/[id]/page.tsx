@@ -110,7 +110,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
       <div className="grid place-items-center py-16">
         <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
           <RefreshCw className="size-5 animate-spin text-brand-500" />
-          {lang === "ar" ? "جارٍ تحميل بيانات المستخدم..." : "Loading user details..."}
+          {t.users.loadingUserDetails}
         </span>
       </div>
     );
@@ -142,14 +142,14 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             <Badge tone={isSuperAdmin ? "danger" : "neutral"} className="font-mono">
               {isSuperAdmin ? "SUPER_ADMIN" : "ADMIN"}
             </Badge>
-            {permissions.isSelf && <Badge tone="brand">{lang === "ar" ? "أنت" : "YOU"}</Badge>}
+            {permissions.isSelf && <Badge tone="brand">{t.users.youBadge}</Badge>}
           </>
         }
         action={
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => router.push("/users")}>
               {lang === "ar" ? <ArrowRight className="size-4" /> : <ArrowLeft className="size-4" />}
-              {lang === "ar" ? "الأعضاء" : "Users"}
+              {t.users.usersNavLabel}
             </Button>
             {permissions.canSuspend && (
               <Button type="button" variant="outline" size="sm" disabled={isSaving} onClick={() => handleStatusChange("SUSPENDED")}>
@@ -181,7 +181,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 <User className="size-4 text-brand-500" />
                 {t.users.identityProfile}
               </CardTitle>
-              {identityHasChanges && permissions.canEdit && <Badge tone="warn">{lang === "ar" ? "غير محفوظ" : "UNSAVED"}</Badge>}
+              {identityHasChanges && permissions.canEdit && <Badge tone="warn">{t.users.unsavedBadge}</Badge>}
             </CardHeader>
             <CardContent className="space-y-4">
               <Field label={t.users.firstNameLabel}>
@@ -227,9 +227,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     disabled={!permissions.canEdit || isSaving}
                   />
                   <span className="flex flex-col gap-0.5">
-                    <span>{lang === "ar" ? "مدير خارق (Super Admin)" : "Super Admin Privileges"}</span>
+                    <span>{t.users.superAdminPrivilegesLabel}</span>
                     <span className="text-xs font-normal opacity-80">
-                      {lang === "ar" ? "تجاوز كامل للقيود عبر الخادم الموثوق." : "Bypasses system permissions logic."}
+                      {t.users.superAdminPrivilegesHint}
                     </span>
                   </span>
                 </label>
@@ -269,9 +269,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Shield className="size-4 text-brand-500" />
-                {lang === "ar" ? "الدور المنسوب" : "Assigned Control Plane Role"}
+                {t.users.assignedRoleTitle}
               </CardTitle>
-              {roleHasChanges && permissions.canAssignRole && <Badge tone="warn">{lang === "ar" ? "دور غير محفوظ" : "UNSAVED ROLE"}</Badge>}
+              {roleHasChanges && permissions.canAssignRole && <Badge tone="warn">{t.users.unsavedRoleBadge}</Badge>}
             </CardHeader>
             <CardContent className="space-y-4">
               <Field label={t.users.roleLabel}>
@@ -282,7 +282,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     disabled={!permissions.canAssignRole || permissions.isSelf || isSaving}
                   >
                     <SelectTrigger {...fieldProps}>
-                      <SelectValue placeholder={lang === "ar" ? "اختر الدور" : "Select a role"} />
+                      <SelectValue placeholder={t.users.selectRolePlaceholder} />
                     </SelectTrigger>
                     <SelectContent>
                       {availableRoles.map((role) => (
@@ -309,7 +309,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               <CardFooter>
                 <Button type="button" variant="primary" size="sm" onClick={saveRole} disabled={isSaving} loading={isSaving}>
                   <Save className="size-3.5" />
-                  {lang === "ar" ? "تأكيد وتحديث الدور" : "Apply Role Assignment"}
+                  {t.users.applyRoleAssignment}
                 </Button>
                 <Button
                   type="button"
@@ -339,9 +339,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     {t.users.webphoneConfig}
                   </CardTitle>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {lang === "ar"
-                      ? "بيانات تسجيل JsSIP للمشرف. كلمة المرور لا تُعرض بعد الحفظ."
-                      : "JsSIP credentials. The current password is never displayed after save."}
+                    {t.users.webphoneCredentialsHint}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -350,7 +348,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     {t.users.enablePhone}
                   </label>
                   <Button type="button" variant="outline" size="sm" onClick={() => setIsEditingWebphone(false)}>
-                    {lang === "ar" ? "إلغاء التعديل" : "Cancel Edit"}
+                    {t.users.cancelEdit}
                   </Button>
                 </div>
               </CardHeader>
@@ -367,7 +365,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     />
                   )}
                 </Field>
-                <Field label="SIP Username" error={sipUsernameError ?? undefined}>
+                <Field label={t.users.sipUsernameLabel} error={sipUsernameError ?? undefined}>
                   {(fieldProps) => (
                     <Input
                       {...fieldProps}
@@ -380,12 +378,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                   )}
                 </Field>
                 <Field
-                  label="SIP Password"
-                  hint={
-                    passwordConfigured
-                      ? lang === "ar" ? "اتركها فارغة للاحتفاظ بالحالية" : "Leave empty to keep current password"
-                      : lang === "ar" ? "مطلوبة عند تفعيل الهاتف" : "Required when enabling phone"
-                  }
+                  label={t.users.sipPasswordLabel}
+                  hint={passwordConfigured ? t.users.keepCurrentPasswordHint : t.users.passwordRequiredHint}
                 >
                   {(fieldProps) => (
                     <div className="relative">
@@ -408,12 +402,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     </div>
                   )}
                 </Field>
-                <Field label="Display Name">
+                <Field label={t.users.displayNameLabel}>
                   {(fieldProps) => (
                     <Input {...fieldProps} maxLength={120} value={webphoneDisplayName} onChange={(e) => setWebphoneDisplayName(e.target.value)} />
                   )}
                 </Field>
-                <Field label="Outbound Caller ID">
+                <Field label={t.users.outboundCallerIdLabel}>
                   {(fieldProps) => (
                     <Input
                       {...fieldProps}
@@ -425,7 +419,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     />
                   )}
                 </Field>
-                <Field label="SIP Transport">
+                <Field label={t.users.sipTransportLabel}>
                   {(fieldProps) => (
                     <Select value={webphoneTransport} onValueChange={(v) => setWebphoneTransport(v === "ws" ? "ws" : "wss")}>
                       <SelectTrigger {...fieldProps}>
@@ -470,14 +464,10 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           setIsDeleteModalOpen(false);
           void handleDelete();
         }}
-        title={lang === "ar" ? "حذف الحساب نهائياً" : "Delete Admin User"}
+        title={t.users.deleteAccountTitle}
         targetName={`${firstName} ${lastName}`.trim() || email}
         actionType="delete"
-        description={
-          lang === "ar"
-            ? "هل أنت متأكد من رغبتك في حذف هذا الحساب؟ لا يمكن التراجع عن هذا الإجراء."
-            : "Are you sure you want to delete this account? Soft-delete will hide this record."
-        }
+        description={t.users.deleteAccountDescription}
         isSubmitting={isSaving}
       />
     </div>

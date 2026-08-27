@@ -13,7 +13,7 @@ export function WebphoneSummaryCard({
   canEdit: boolean;
   onEditToggle: () => void;
 }) {
-  const { lang, t } = useI18n();
+  const { t } = useI18n();
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-2xs overflow-hidden">
@@ -39,12 +39,12 @@ export function WebphoneSummaryCard({
           {webphone?.enabled ? (
             <span className="inline-flex items-center gap-1 text-xs text-brand-700 bg-brand-50 border border-brand-200 dark:bg-brand-900/30 dark:border-brand-800 dark:text-brand-400 px-2 py-0.5 rounded-md font-medium">
               <CheckCircle2 className="w-3 h-3" />
-              {lang === "ar" ? "مفعل" : "Enabled"}
+              {t.users.enabledBadge}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-ink-100 border border-border dark:bg-ink-800 dark:border-border px-2 py-0.5 rounded-md font-medium">
               <XCircle className="w-3 h-3" />
-              {lang === "ar" ? "معطل" : "Disabled"}
+              {t.users.disabledBadge}
             </span>
           )}
         </div>
@@ -57,28 +57,28 @@ export function WebphoneSummaryCard({
         </div>
 
         <div>
-          <span className="block text-xs text-muted-foreground mb-1">SIP Username</span>
+          <span className="block text-xs text-muted-foreground mb-1">{t.users.sipUsernameLabel}</span>
           <span className="font-mono font-semibold text-foreground">
             {webphone?.sipUsername || t.users.notConfigured}
           </span>
         </div>
 
         <div>
-          <span className="block text-xs text-muted-foreground mb-1">Display Name</span>
+          <span className="block text-xs text-muted-foreground mb-1">{t.users.displayNameLabel}</span>
           <span className="font-semibold text-foreground">
             {webphone?.displayName || t.users.notConfigured}
           </span>
         </div>
 
         <div>
-          <span className="block text-xs text-muted-foreground mb-1">Outbound Caller ID</span>
+          <span className="block text-xs text-muted-foreground mb-1">{t.users.outboundCallerIdLabel}</span>
           <span className="font-mono font-semibold text-foreground">
             {webphone?.outboundCallerId || t.users.notConfigured}
           </span>
         </div>
 
         <div>
-          <span className="block text-xs text-muted-foreground mb-1">SIP Transport</span>
+          <span className="block text-xs text-muted-foreground mb-1">{t.users.sipTransportLabel}</span>
           <span className="font-mono font-semibold uppercase text-foreground">
             {webphone?.transport || "wss"}
           </span>

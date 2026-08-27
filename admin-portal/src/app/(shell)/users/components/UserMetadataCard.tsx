@@ -24,15 +24,9 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
   const copyId = async () => {
     try {
       await navigator.clipboard.writeText(user.id);
-      toast.success(
-        lang === "ar" ? "تم النسخ" : "Copied",
-        lang === "ar" ? "تم نسخ معرف المستخدم." : "The user ID was copied.",
-      );
+      toast.success(t.users.copiedTitle, t.users.copiedDesc);
     } catch {
-      toast.error(
-        lang === "ar" ? "فشل النسخ" : "Copy Failed",
-        lang === "ar" ? "تعذر نسخ معرف المستخدم." : "The user ID could not be copied.",
-      );
+      toast.error(t.users.copyFailedTitle, t.users.copyFailedDesc);
     }
   };
 
@@ -41,7 +35,7 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
       <div className="p-4 border-b border-border bg-ink-100/50 dark:bg-ink-800/30 flex items-center justify-between">
         <h2 className="text-xs font-semibold text-foreground flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
-          <span>{lang === "ar" ? "معلومات النظام والنشاط" : "System & Activity Metadata"}</span>
+          <span>{t.users.metadataCardTitle}</span>
         </h2>
       </div>
 
@@ -97,7 +91,7 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
         )}
 
         <div className="flex items-center justify-between pt-1">
-          <span className="text-muted-foreground">ID</span>
+          <span className="text-muted-foreground">{t.users.idLabel}</span>
           <div className="flex items-center gap-1">
             <span className="font-mono text-xs text-muted-foreground truncate max-w-[140px]">
               {user.id}
@@ -105,7 +99,7 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
             <button
               onClick={copyId}
               className="p-1 text-muted-foreground hover:text-muted-foreground dark:hover:text-foreground rounded transition-colors cursor-pointer"
-              title="Copy ID"
+              title={t.users.copyIdTitle}
             >
               <Copy className="w-3.5 h-3.5" />
             </button>

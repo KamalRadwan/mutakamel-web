@@ -79,14 +79,14 @@ export function InviteUserModal({
         if (isForbiddenError(err)) {
           setRolesForbidden(true);
         } else {
-          toast.error(lang === "ar" ? "تعذر تحميل الأدوار" : "Failed to load roles");
+          toast.error(t.users.rolesLoadFailed);
         }
       } finally {
         setIsLoadingRoles(false);
       }
     }
     loadRolesData();
-  }, [lang, toast]);
+  }, [t, toast]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -108,12 +108,7 @@ export function InviteUserModal({
         command,
       );
     } catch {
-      toast.error(
-        lang === "ar" ? "الطلب غير مطابق" : "Request changed",
-        lang === "ar"
-          ? "أعد القيم الأصلية لإعادة المحاولة."
-          : "Restore the original values before retrying the unresolved invitation.",
-      );
+      toast.error(t.users.requestChangedTitle, t.users.requestChangedDesc);
       return;
     }
     inviteIntentRef.current = intent;
@@ -128,12 +123,7 @@ export function InviteUserModal({
       setIsAmbiguous(false);
       setIdempotencyKey(undefined);
 
-      toast.success(
-        lang === "ar" ? "تمت الدعوة بنجاح" : "Invitation Sent",
-        lang === "ar"
-          ? "تم إرسال دعوة الانضمام للمشرف الجديد بنجاح."
-          : "The invitation email has been sent successfully.",
-      );
+      toast.success(t.users.invitationSentTitle, t.users.invitationSentDesc);
 
       onSuccess();
       onClose();
@@ -149,12 +139,7 @@ export function InviteUserModal({
         inviteIntentRef.current = null;
         setIsAmbiguous(false);
         setIdempotencyKey(undefined);
-        toast.success(
-          lang === "ar" ? "تم تأكيد الدعوة" : "Invitation confirmed",
-          lang === "ar"
-            ? "أكدت قراءة المستخدم أن الدعوة حفظت بنجاح."
-            : "An authoritative user read confirmed the invitation was saved.",
-        );
+        toast.success(t.users.invitationConfirmedTitle, t.users.invitationConfirmedDesc);
         onSuccess();
         onClose();
         return;
@@ -165,14 +150,13 @@ export function InviteUserModal({
         setFieldErrors(details.fieldErrors);
       }
       if (!ambiguous && (!details.fieldErrors || Object.keys(details.fieldErrors).length === 0)) {
-        toast.error(lang === "ar" ? "فشل إرسال الدعوة" : "Invitation Failed", details.message);
+        toast.error(t.users.invitationFailedTitle, details.message);
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isAr = lang === "ar";
   const isDirty = Boolean(email.trim() || firstName.trim() || lastName.trim() || roleId);
 
   return (
@@ -188,7 +172,7 @@ export function InviteUserModal({
       footerActions={
         <>
           <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting || isAmbiguous}>
-            {isAr ? "إلغاء" : "Cancel"}
+            {t.users.cancel}
           </Button>
           <Button
             type="submit"
@@ -212,11 +196,7 @@ export function InviteUserModal({
         {isAmbiguous && (
           <AmbiguousOutcomePanel
             idempotencyKey={idempotencyKey}
-            message={
-              isAr
-                ? "نتيجة الدعوة غير مؤكدة. أعد محاولة نفس الطلب."
-                : "The invitation outcome is unconfirmed. Retry the exact unchanged request."
-            }
+            message={t.users.ambiguousInviteMessage}
             onRetryExact={() => void handleSubmit()}
             retrying={isSubmitting}
           />
@@ -231,7 +211,7 @@ export function InviteUserModal({
                 value={firstName}
                 disabled={isAmbiguous}
                 onChange={(e) => setFirstName(e.target.value)}
-                placeholder={isAr ? "عمر" : "Omar"}
+                placeholder={t.users.firstNamePlaceholder}
               />
             )}
           </Field>
@@ -243,7 +223,7 @@ export function InviteUserModal({
                 value={lastName}
                 disabled={isAmbiguous}
                 onChange={(e) => setLastName(e.target.value)}
-                placeholder={isAr ? "حسين" : "Hassan"}
+                placeholder={t.users.lastNamePlaceholder}
               />
             )}
           </Field>
@@ -277,7 +257,7 @@ export function InviteUserModal({
             ) : (
               <Select value={roleId} onValueChange={setRoleId} disabled={isLoadingRoles || isAmbiguous}>
                 <SelectTrigger {...fieldProps}>
-                  <SelectValue placeholder={isAr ? "اختر الدور" : "Select a role"} />
+                  <SelectValue placeholder={t.users.selectRolePlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
                   {roles.map((r) => (
@@ -302,9 +282,7 @@ export function InviteUserModal({
             <span className="flex flex-col gap-0.5">
               <span>{t.users.superAdminCheckbox}</span>
               <span className="text-xs font-normal text-muted-foreground">
-                {isAr
-                  ? "يتجاوز جميع قيود الصلاحيات النظامية."
-                  : "Bypasses all permission checks authoritative backend logic."}
+                {t.users.superAdminHint}
               </span>
             </span>
           </label>

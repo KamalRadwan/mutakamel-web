@@ -160,12 +160,12 @@ export function useUserDetail(id: string) {
         setPermissionDenied(true);
       } else {
         const details = getErrorMessageAndDetails(requestError, lang);
-        toast.error(lang === "ar" ? "فشل التحميل" : "Load Error", toastErrorMessage(details));
+        toast.error(t.users.loadFailedTitle, toastErrorMessage(details));
       }
     } finally {
       setIsLoading(false);
     }
-  }, [id, lang, toast]);
+  }, [id, lang, t, toast]);
 
   useEffect(() => {
     queueMicrotask(() => loadUser());
@@ -193,8 +193,7 @@ export function useUserDetail(id: string) {
   const saveIdentity = async () => {
     if (!user || !identityHasChanges || isSaving) return;
     if (!firstName.trim() || !lastName.trim()) {
-      const msg = lang === "ar" ? "الاسم الأول واسم العائلة مطلوبان." : "First name and last name are required.";
-      toast.error(lang === "ar" ? "حقل مطلوب" : "Required Field", msg);
+      toast.error(t.users.requiredFieldTitle, t.users.identityRequiredFieldMsg);
       return;
     }
 
@@ -229,13 +228,10 @@ export function useUserDetail(id: string) {
       setFirstName(updated.firstName);
       setLastName(updated.lastName);
       setIsSuperAdmin(updated.isSuperAdmin);
-      toast.success(
-        lang === "ar" ? "تم الحفظ" : "Saved",
-        lang === "ar" ? "تم تحديث البيانات الشخصية بنجاح." : "Identity profile updated successfully."
-      );
+      toast.success(t.users.identitySavedTitle, t.users.identitySavedDesc);
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
-      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", toastErrorMessage(details));
+      toast.error(t.users.saveErrorTitle, toastErrorMessage(details));
 
       if (!writeIntentsRef.current.get("identity")?.ambiguous) {
         setFirstName(user.firstName);
@@ -269,15 +265,10 @@ export function useUserDetail(id: string) {
 
       setUser(freshUser);
       setAssignedRoleId(freshUser.roleId ?? freshUser.role?.id ?? undefined);
-      toast.success(
-        lang === "ar" ? "تم تعيين الدور" : "Role Assigned",
-        lang === "ar"
-          ? "تم تحديث دور المشرف بنجاح وتم إبطال الجلسات السابقة."
-          : "Role updated successfully. Active sessions have been invalidated."
-      );
+      toast.success(t.users.roleAssignedTitle, t.users.roleAssignedDesc);
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
-      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", toastErrorMessage(details));
+      toast.error(t.users.saveErrorTitle, toastErrorMessage(details));
 
       if (!writeIntentsRef.current.get("role")?.ambiguous) {
         setAssignedRoleId(user.roleId ?? user.role?.id ?? undefined);
@@ -290,9 +281,9 @@ export function useUserDetail(id: string) {
   const saveWebphone = async () => {
     if (!user || !webphoneHasChanges || isSaving) return;
 
-    const validationError = validateWebphoneForm(webphoneForm, webphone, lang);
+    const validationError = validateWebphoneForm(webphoneForm, webphone, t);
     if (validationError) {
-      toast.error(lang === "ar" ? "خطأ في التحقق" : "Validation Error", validationError);
+      toast.error(t.users.validationErrorTitle, validationError);
       return;
     }
 
@@ -320,16 +311,13 @@ export function useUserDetail(id: string) {
 
       setWebphone(updated);
       setWebphoneForm(webphoneFormFromConfig(updated));
-      toast.success(
-        lang === "ar" ? "تم حفظ إعدادات الهاتف" : "Phone Settings Saved",
-        lang === "ar" ? "تم تحديث إعدادات WebPhone بنجاح." : "WebPhone configuration updated successfully."
-      );
+      toast.success(t.users.webphoneSavedTitle, t.users.webphoneSavedDesc);
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
       if (details.fieldErrors?.extension) setExtensionError(details.fieldErrors.extension);
       if (details.fieldErrors?.sipUsername) setSipUsernameError(details.fieldErrors.sipUsername);
 
-      toast.error(lang === "ar" ? "خطأ في الحفظ" : "Save Error", toastErrorMessage(details));
+      toast.error(t.users.saveErrorTitle, toastErrorMessage(details));
     } finally {
       setIsSaving(false);
     }
@@ -361,13 +349,10 @@ export function useUserDetail(id: string) {
 
       setUser(updated);
       setStatus(updated.status);
-      toast.success(
-        lang === "ar" ? "نجاح" : "Success",
-        lang === "ar" ? "تم تحديث حالة المستخدم بنجاح." : "User status updated successfully."
-      );
+      toast.success(t.users.statusUpdatedTitle, t.users.statusUpdatedDesc);
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
-      toast.error(lang === "ar" ? "خطأ في التحديث" : "Update Error", toastErrorMessage(details));
+      toast.error(t.users.updateErrorTitle, toastErrorMessage(details));
     } finally {
       setIsSaving(false);
     }
@@ -395,14 +380,11 @@ export function useUserDetail(id: string) {
           }
         },
       );
-      toast.success(
-        lang === "ar" ? "تم الحذف" : "Deleted",
-        lang === "ar" ? "تم حذف حساب المشرف بنجاح." : "Admin user deleted successfully."
-      );
+      toast.success(t.users.deletedTitle, t.users.deletedFromDetailDesc);
       router.push("/users");
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
-      toast.error(lang === "ar" ? "خطأ في الحذف" : "Delete Error", toastErrorMessage(details));
+      toast.error(t.users.deleteErrorTitle, toastErrorMessage(details));
     } finally {
       setIsSaving(false);
     }
@@ -514,18 +496,14 @@ function webphoneFormChanged(form: WebphoneForm, config?: AdminWebphoneConfig | 
 function validateWebphoneForm(
   form: WebphoneForm,
   config: AdminWebphoneConfig | undefined,
-  lang: "ar" | "en"
+  t: ReturnType<typeof useI18n>["t"],
 ) {
   if (!form.enabled) return undefined;
   if (!form.extension.trim() || !form.sipUsername.trim()) {
-    return lang === "ar"
-      ? "تفعيل WebPhone يتطلب رقم الامتداد واسم مستخدم SIP."
-      : "Enabled WebPhone settings require an extension and SIP username.";
+    return t.users.webphoneRequiresExtensionMsg;
   }
   if (!form.sipPassword.trim() && !config?.passwordConfigured) {
-    return lang === "ar"
-      ? "تفعيل WebPhone يتطلب كلمة مرور SIP."
-      : "Enabled WebPhone settings require a SIP password.";
+    return t.users.webphoneRequiresPasswordMsg;
   }
   return undefined;
 }
