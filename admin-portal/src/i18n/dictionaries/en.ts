@@ -317,6 +317,17 @@ export const en: Dictionary = {
     alertsSuffix: "alerts",
     groupsAriaLabel: "Dashboard report groups",
     noRecentTenants: "No recently provisioned tenants.",
+    unavailableGeneric: "This data source is not available.",
+    unavailableReasons: {
+      targetNotConfigured:
+        "The target value has not been configured on the dashboard yet.",
+      historicalDataNotStored:
+        "The system does not currently retain the historical record required for this metric.",
+      projectionNotActive:
+        "The authoritative data projection for this report is not currently active.",
+      default:
+        "The requested data source is not currently connected to the dashboard interface.",
+    },
     tabs: {
       overview: "Overview",
       tenants: "Tenant Lifecycle",
@@ -1179,6 +1190,64 @@ export const en: Dictionary = {
       commandAcceptedTitle: "Command accepted",
       commandAcceptedDescription: "Secret-free credential evidence was refreshed.",
       commandFailedTitle: "Command failed",
+    },
+    artifactsScreen: {
+      runLabel: "Run",
+      failureRetainedNote: "Failure details are retained in Worker logs.",
+      restoreAction: "Restore",
+      deleteAriaLabel: "Delete artifact",
+      eyebrow: "Recoverable evidence",
+      title: "Backup artifacts",
+      description:
+        "Inspect retained copies, sizes, and safe checksum evidence. Storage keys and paths are intentionally never rendered.",
+      runIdLabel: "Run ID",
+      serverLabel: "Server",
+      allServersPlaceholder: "All servers",
+      tenantIdLabel: "Tenant ID",
+      applyButton: "Apply",
+      refreshButton: "Refresh",
+      invalidUuidError: "Entered ID filters must be valid UUIDs.",
+      degradedTitle: "Database server names are unavailable",
+      degradedDescription:
+        "Worker artifact data remains available; server-name filter options are temporarily unavailable.",
+      noSensitiveDataNote:
+        "This page never renders storageKey, raw metadata, or credential references.",
+      deleteModalTitle: "Permanently delete backup artifact",
+      deleteModalDescription:
+        "Worker deletes this backup object and row. If it is the run's last artifact, Worker also deletes the parent run and manifest; this recovery point will no longer be available.",
+    },
+    runsScreen: {
+      deleteAction: "Delete",
+      eyebrow: "Worker execution",
+      title: "Backup runs",
+      description:
+        "Track scheduled and manual executions. Retrying the same request keeps one command identity and returns the original run.",
+      startManualBackupAction: "Start manual backup",
+      startManualBackupDialogTitle: "Start manual backup",
+      ambiguousMessage:
+        "This tab retains only the key and a non-readable intent digest; it does not store the audit reason. Check the run history, then re-enter the exact original values if a retry is needed. A different request will not be sent with that key.",
+      serverFilterLabel: "Server",
+      allServersPlaceholder: "All servers",
+      statusFilterLabel: "Status",
+      allStatusesPlaceholder: "All statuses",
+      refreshButton: "Refresh",
+      degradedDescription:
+        "Worker run data remains available; server IDs are shown instead of names.",
+      boundedHistoryNote:
+        "Worker returns a bounded history; the UI does not invent totals or pagination metadata.",
+      dialogDescription:
+        "The command identity and request digest stay in this tab until the outcome is known; the audit reason is not stored.",
+      confirmStart: "Start run",
+      databaseServerFieldLabel: "Database server",
+      selectServerPlaceholder: "Select a database server",
+      databaseServerIdLabel: "Database server ID",
+      databaseServerIdHint:
+        "The command can be authorized by ID without exposing the server registry.",
+      concurrencyLabel: "Tenant concurrency",
+      auditReasonLabel: "Audit reason",
+      deleteModalTitle: "Delete backup run and all recovery data",
+      deleteModalDescription:
+        "Permanently deletes the run record, every artifact object and row in the run, and its manifest. Those recovery points cannot be restored afterward.",
     },
   },
   createStorageServer: {
