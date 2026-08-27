@@ -139,12 +139,7 @@ export function useCreateStorageServerScreen() {
       await storageServersApi.activate(storageServerId, key);
       activationIntent.resetKey();
       setPendingActivationId(null);
-      toast.success(
-        lang === "ar" ? "اكتمل إعداد خادم التخزين" : "Storage server setup complete",
-        lang === "ar"
-          ? "تم الحفظ وفحص الاتصال والتفعيل في إجراء واحد."
-          : "The server was saved, authoritatively checked, and activated in one action.",
-      );
+      toast.success(c.activation.setupCompleteTitle, c.activation.setupCompleteDescription);
       router.push(canRead ? `/storage-servers/${storageServerId}` : "/dashboard");
     } catch (caught) {
       const normalized = normalizeApiError(caught);
@@ -164,17 +159,10 @@ export function useCreateStorageServerScreen() {
         const recoveryMessage = readErrorMessage(
           normalized,
           canRead
-            ? lang === "ar"
-              ? "الخادم محفوظ؛ راجع حالته الحالية وأعد التفعيل من صفحة التفاصيل."
-              : "The server is saved; inspect its current lifecycle state and retry from the detail page."
-            : lang === "ar"
-              ? "الخادم محفوظ. أصلح سبب الرفض ثم أعد محاولة التفعيل فقط؛ لن يُنشأ خادم آخر."
-              : "The server is saved. Resolve the rejection and retry activation only; no second server will be created.",
+            ? c.activation.recoveryMessageWithAccess
+            : c.activation.recoveryMessageNoAccess,
         );
-        toast.warning(
-          lang === "ar" ? "تم الحفظ ويحتاج التفعيل للمراجعة" : "Saved; activation needs attention",
-          recoveryMessage,
-        );
+        toast.warning(c.activation.needsAttentionTitle, recoveryMessage);
         if (canRead) {
           setPendingActivationId(null);
           router.push(`/storage-servers/${storageServerId}`);
@@ -184,12 +172,7 @@ export function useCreateStorageServerScreen() {
         return;
       }
       setFormError(
-        readErrorMessage(
-          normalized,
-          lang === "ar"
-            ? "تم حفظ الخادم، لكن نتيجة التفعيل غير مؤكدة. أعد المحاولة بنفس عملية الإعداد."
-            : "The server was saved, but activation is still unknown. Retry the same setup intent.",
-        ),
+        readErrorMessage(normalized, c.activation.ambiguousOutcomeMessage),
       );
     } finally {
       setIsSubmitting(false);

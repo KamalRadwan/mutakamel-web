@@ -20,6 +20,7 @@ export const en: Dictionary = {
       "The server session was not ended. You remain signed in and can try again.",
     langSwitch: "العربية",
     langSwitchTitle: "التحويل للغة العربية",
+    cancel: "Cancel",
   },
   login: {
     title: "Admin Portal Sign-In",
@@ -278,6 +279,43 @@ export const en: Dictionary = {
     autoRefresh60s: "Every 60s",
     autoRefresh5m: "Every 5m",
     printPdfReport: "Export Executive PDF Report",
+    liveBadge: "Live",
+    customRangeLabel: "Custom",
+    fromDateLabel: "From date",
+    toDateLabel: "To date",
+    accessDeniedTitle: "Dashboard access denied",
+    accessDeniedDesc:
+      "The admin.reports.read permission is required to open this dashboard.",
+    staleRefreshTitle: "Refresh failed — showing the last successful response",
+    loadFailedTitle: "Dashboard could not be loaded",
+    rateLimitedMessage: "The request limit was reached. Try again later.",
+    retryButton: "Retry",
+    collectedLabel: "Collected",
+    remainingLabel: "Remaining",
+    domainVerifiedActive: "Verified Active",
+    domainPendingInvalid: "Pending / Invalid",
+    tenantCountLabel: "Tenant count",
+    currentSnapshotTitle: "Current snapshot",
+    currentStateSubtitle: "Current state",
+    selectedPeriodTitle: "Selected period",
+    breakdownsTitle: "Breakdowns",
+    breakdownsSubtitle: "Grouped detail from the authoritative source",
+    reportAlertsAriaLabel: "Report alerts",
+    needAttentionSuffix: "need attention",
+    noAdditionalValues: "No additional values for this period.",
+    unavailableLabel: "Unavailable",
+    yesLabel: "Yes",
+    noLabel: "No",
+    authorizedGroups: "Authorized groups",
+    availableSources: "Available sources",
+    unavailableSources: "Unavailable sources",
+    openAlertSignals: "Open alert signals",
+    reportGroupsTitle: "Report groups",
+    noAuthorizedGroups: "No authorized report groups available.",
+    availableBadge: "Available",
+    metricsSuffix: "metrics",
+    alertsSuffix: "alerts",
+    groupsAriaLabel: "Dashboard report groups",
     tabs: {
       overview: "Overview",
       tenants: "Tenant Lifecycle",
@@ -1105,6 +1143,10 @@ export const en: Dictionary = {
       artifacts: "Artifacts",
       restores: "Restore Runs",
     },
+    artifacts: {
+      deletedTitle: "Backup artifact deleted",
+      deleteFailedTitle: "Artifact delete failed",
+    },
   },
   createStorageServer: {
     backToList: "Back to Storage Servers",
@@ -1173,6 +1215,18 @@ export const en: Dictionary = {
       title: "Storage Server Registered",
       message:
         "Credentials were stored encrypted. Run a connection test before activation.",
+    },
+    activation: {
+      setupCompleteTitle: "Storage server setup complete",
+      setupCompleteDescription:
+        "The server was saved, authoritatively checked, and activated in one action.",
+      recoveryMessageWithAccess:
+        "The server is saved; inspect its current lifecycle state and retry from the detail page.",
+      recoveryMessageNoAccess:
+        "The server is saved. Resolve the rejection and retry activation only; no second server will be created.",
+      needsAttentionTitle: "Saved; activation needs attention",
+      ambiguousOutcomeMessage:
+        "The server was saved, but activation is still unknown. Retry the same setup intent.",
     },
   },
   databaseServersList: {

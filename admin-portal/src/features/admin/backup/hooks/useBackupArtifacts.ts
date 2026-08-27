@@ -13,7 +13,7 @@ import { useI18n } from "@/i18n/I18nContext";
 
 export function useBackupArtifacts() {
   const { user } = useAuth();
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const searchParams = useSearchParams();
   const canReadServers = adminCan(user, "admin.database_servers.read");
@@ -80,11 +80,11 @@ export function useBackupArtifacts() {
       await backupApi.deleteArtifact(artifactId, key);
       resetKey();
       await refresh();
-      toast.success(lang === "ar" ? "تم حذف النسخة المحفوظة" : "Backup artifact deleted");
+      toast.success(t.backup.artifacts.deletedTitle);
     } catch (caught) {
       const normalized = normalizeApiError(caught);
       setError(normalized);
-      toast.error(lang === "ar" ? "فشل حذف النسخة" : "Artifact delete failed", normalized.message);
+      toast.error(t.backup.artifacts.deleteFailedTitle, normalized.message);
       throw normalized;
     } finally {
       setActiveAction(null);

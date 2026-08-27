@@ -30,7 +30,7 @@ export function BackupDialog({
   confirmDisabled = false,
   destructive = false,
 }: BackupDialogProps) {
-  const { lang } = useI18n();
+  const { t } = useI18n();
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && !isSubmitting && onClose()}>
@@ -44,7 +44,7 @@ export function BackupDialog({
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-            {lang === "ar" ? "إلغاء" : "Cancel"}
+            {t.common.cancel}
           </Button>
           <Button type="button" variant={destructive ? "destructive" : "primary"} onClick={onConfirm} disabled={isSubmitting || confirmDisabled} loading={isSubmitting}>
             {confirmLabel}
