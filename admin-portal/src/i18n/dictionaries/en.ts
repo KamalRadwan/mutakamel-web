@@ -316,6 +316,7 @@ export const en: Dictionary = {
     metricsSuffix: "metrics",
     alertsSuffix: "alerts",
     groupsAriaLabel: "Dashboard report groups",
+    noRecentTenants: "No recently provisioned tenants.",
     tabs: {
       overview: "Overview",
       tenants: "Tenant Lifecycle",
@@ -1146,6 +1147,38 @@ export const en: Dictionary = {
     artifacts: {
       deletedTitle: "Backup artifact deleted",
       deleteFailedTitle: "Artifact delete failed",
+    },
+    runs: {
+      startedTitle: "Backup run started",
+      retryableTitle: "The same command can be retried safely",
+      retryableDescription:
+        "The browser keeps the same command key so Worker returns the original run.",
+      startFailedTitle: "Backup start failed",
+      deletedTitle: "Backup run deleted",
+      deleteFailedTitle: "Run delete failed",
+    },
+    policies: {
+      policySavedTitle: "Backup policy saved",
+      policySaveFailedTitle: "Policy save failed",
+      overrideSavedTitle: "Database override saved",
+      overrideSaveFailedTitle: "Override save failed",
+      overrideResetTitle: "Policy defaults restored",
+      overrideResetFailedTitle: "Override reset failed",
+    },
+    restores: {
+      retryableTitle: "The same restore command can be retried safely",
+      retryableDescription:
+        "The command key remains stable so Worker returns the same restore run.",
+      commandFailedTitle: "Restore command failed",
+      startedTitle: "Restore test started",
+      promotedTitle: "Restore promoted",
+    },
+    access: {
+      policyUpdatedTitle: "Rotation policy updated",
+      policyUpdateFailedTitle: "Policy update failed",
+      commandAcceptedTitle: "Command accepted",
+      commandAcceptedDescription: "Secret-free credential evidence was refreshed.",
+      commandFailedTitle: "Command failed",
     },
   },
   createStorageServer: {

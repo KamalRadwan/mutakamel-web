@@ -23,7 +23,7 @@ import { shouldRetainBackupCommandKey } from "../lib/backup-format";
 
 export function useBackupRuns() {
   const { user } = useAuth();
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const searchParams = useSearchParams();
   const canReadServers = adminCan(user, "admin.database_servers.read");
@@ -116,28 +116,17 @@ export function useBackupRuns() {
       const run = await backupApi.startRun(data, idempotencyKey);
       startCommand.clear();
       await refresh();
-      toast.success(
-        lang === "ar" ? "بدأت عملية النسخ" : "Backup run started",
-        run.id,
-      );
+      toast.success(t.backup.runs.startedTitle, run.id);
       return run;
     } catch (caught) {
       const normalized = normalizeApiError(caught);
       if (shouldRetainBackupCommandKey(normalized)) {
         setRetryableCommandError(normalized);
-        toast.warning(
-          lang === "ar" ? "يمكن إعادة محاولة نفس الأمر بأمان" : "The same command can be retried safely",
-          lang === "ar"
-            ? "سيستخدم المتصفح نفس مفتاح الأمر حتى يرد Worker بالعملية الأصلية."
-            : "The browser keeps the same command key so Worker returns the original run.",
-        );
+        toast.warning(t.backup.runs.retryableTitle, t.backup.runs.retryableDescription);
       } else {
         startCommand.clear();
         setError(normalized);
-        toast.error(
-          lang === "ar" ? "فشل بدء النسخ" : "Backup start failed",
-          normalized.message,
-        );
+        toast.error(t.backup.runs.startFailedTitle, normalized.message);
       }
       throw normalized;
     } finally {
@@ -157,16 +146,11 @@ export function useBackupRuns() {
       await backupApi.deleteRun(runId, key);
       deleteCommand.resetKey();
       await refresh();
-      toast.success(
-        lang === "ar" ? "تم حذف سجل العملية" : "Backup run deleted",
-      );
+      toast.success(t.backup.runs.deletedTitle);
     } catch (caught) {
       const normalized = normalizeApiError(caught);
       setError(normalized);
-      toast.error(
-        lang === "ar" ? "فشل حذف العملية" : "Run delete failed",
-        normalized.message,
-      );
+      toast.error(t.backup.runs.deleteFailedTitle, normalized.message);
       throw normalized;
     } finally {
       setActiveAction(null);

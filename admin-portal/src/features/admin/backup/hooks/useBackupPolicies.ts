@@ -22,7 +22,7 @@ import {
 
 export function useBackupPolicies() {
   const { user } = useAuth();
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const canReadServers = adminCan(user, "admin.database_servers.read");
   const canManage = adminCanAll(user, ADMIN_RBAC_CRITICAL.BACKUPS_POLICY_MANAGE);
@@ -110,14 +110,14 @@ export function useBackupPolicies() {
       if (selectedServerIdRef.current === serverId) {
         setPolicy(saved);
         await refresh();
-        toast.success(lang === "ar" ? "تم حفظ سياسة النسخ" : "Backup policy saved");
+        toast.success(t.backup.policies.policySavedTitle);
       }
       return saved;
     } catch (caught) {
       const normalized = normalizeApiError(caught);
       if (selectedServerIdRef.current === serverId) {
         setError(normalized);
-        toast.error(lang === "ar" ? "فشل حفظ السياسة" : "Policy save failed", normalized.message);
+        toast.error(t.backup.policies.policySaveFailedTitle, normalized.message);
       }
       throw normalized;
     } finally {
@@ -136,13 +136,13 @@ export function useBackupPolicies() {
       resetKey();
       if (selectedServerIdRef.current === serverId) {
         await refresh();
-        toast.success(lang === "ar" ? "تم حفظ استثناء قاعدة البيانات" : "Database override saved");
+        toast.success(t.backup.policies.overrideSavedTitle);
       }
     } catch (caught) {
       const normalized = normalizeApiError(caught);
       if (selectedServerIdRef.current === serverId) {
         setError(normalized);
-        toast.error(lang === "ar" ? "فشل حفظ الاستثناء" : "Override save failed", normalized.message);
+        toast.error(t.backup.policies.overrideSaveFailedTitle, normalized.message);
       }
       throw normalized;
     } finally {
@@ -161,13 +161,13 @@ export function useBackupPolicies() {
       resetKey();
       if (selectedServerIdRef.current === serverId) {
         await refresh();
-        toast.success(lang === "ar" ? "تمت استعادة القيم الافتراضية" : "Policy defaults restored");
+        toast.success(t.backup.policies.overrideResetTitle);
       }
     } catch (caught) {
       const normalized = normalizeApiError(caught);
       if (selectedServerIdRef.current === serverId) {
         setError(normalized);
-        toast.error(lang === "ar" ? "فشل حذف الاستثناء" : "Override reset failed", normalized.message);
+        toast.error(t.backup.policies.overrideResetFailedTitle, normalized.message);
       }
       throw normalized;
     } finally {

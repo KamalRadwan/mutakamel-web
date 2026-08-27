@@ -300,6 +300,7 @@ export const ar = {
     metricsSuffix: "مؤشرات",
     alertsSuffix: "تنبيهات",
     groupsAriaLabel: "مجموعات تقارير لوحة التحكم",
+    noRecentTenants: "لا يوجد مستأجرون حديثون.",
     tabs: {
       overview: "نظرة عامة",
       tenants: "دورة حياة المستأجرين",
@@ -1087,6 +1088,37 @@ export const ar = {
     artifacts: {
       deletedTitle: "تم حذف النسخة المحفوظة",
       deleteFailedTitle: "فشل حذف النسخة",
+    },
+    runs: {
+      startedTitle: "بدأت عملية النسخ",
+      retryableTitle: "يمكن إعادة محاولة نفس الأمر بأمان",
+      retryableDescription:
+        "سيستخدم المتصفح نفس مفتاح الأمر حتى يرد Worker بالعملية الأصلية.",
+      startFailedTitle: "فشل بدء النسخ",
+      deletedTitle: "تم حذف سجل العملية",
+      deleteFailedTitle: "فشل حذف العملية",
+    },
+    policies: {
+      policySavedTitle: "تم حفظ سياسة النسخ",
+      policySaveFailedTitle: "فشل حفظ السياسة",
+      overrideSavedTitle: "تم حفظ استثناء قاعدة البيانات",
+      overrideSaveFailedTitle: "فشل حفظ الاستثناء",
+      overrideResetTitle: "تمت استعادة القيم الافتراضية",
+      overrideResetFailedTitle: "فشل حذف الاستثناء",
+    },
+    restores: {
+      retryableTitle: "يمكن إعادة محاولة نفس أمر الاستعادة بأمان",
+      retryableDescription: "يظل مفتاح الأمر ثابتًا حتى يعيد Worker نفس عملية الاستعادة.",
+      commandFailedTitle: "فشل أمر الاستعادة",
+      startedTitle: "بدأ اختبار الاستعادة",
+      promotedTitle: "تمت ترقية الاستعادة",
+    },
+    access: {
+      policyUpdatedTitle: "تم تحديث سياسة التدوير",
+      policyUpdateFailedTitle: "فشل تحديث السياسة",
+      commandAcceptedTitle: "تم قبول الأمر",
+      commandAcceptedDescription: "تم تحديث دليل الاعتماد الآمن.",
+      commandFailedTitle: "فشل الأمر",
     },
   },
   createStorageServer: {
