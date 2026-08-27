@@ -32,8 +32,8 @@ import {
 } from "@/design-system";
 
 export function BackupPoliciesScreen() {
-  const { lang } = useI18n();
-  const isArabic = lang === "ar";
+  const { t } = useI18n();
+  const copy = t.backup.policiesScreen;
   const view = useBackupPolicies();
   const [enabled, setEnabled] = useState(true);
   const [cronExpression, setCronExpression] = useState("0 2 * * *");
@@ -76,8 +76,8 @@ export function BackupPoliciesScreen() {
     return (
       <BackupStatePanel
         kind="forbidden"
-        title={isArabic ? "اختيار الخادم غير متاح" : "Server selection is restricted"}
-        description={isArabic ? "تحتاج إلى admin.database_servers.read لإعداد سياسة لخادم جديد." : "admin.database_servers.read is required to configure a policy for a registered server."}
+        title={copy.restrictedTitle}
+        description={copy.restrictedDescription}
       />
     );
   }
@@ -112,7 +112,7 @@ export function BackupPoliciesScreen() {
       headerAr: "النسخ",
       cell: (database) => (
         <div className="flex items-center gap-2">
-          {database.backupEnabled ? (isArabic ? "مفعّل" : "Enabled") : isArabic ? "متوقف" : "Disabled"}
+          {database.backupEnabled ? copy.enabledValue : copy.disabledValue}
           {database.override && <Badge tone="warn">Override</Badge>}
         </div>
       ),
@@ -127,7 +127,7 @@ export function BackupPoliciesScreen() {
         <div className="flex items-center justify-end gap-2">
           {view.canManage && (
             <Button type="button" variant="outline" size="sm" onClick={() => openOverride(database)}>
-              {isArabic ? "تعديل" : "Edit"}
+              {copy.editAction}
             </Button>
           )}
           {view.canManage && database.override && (
@@ -135,7 +135,7 @@ export function BackupPoliciesScreen() {
               type="button"
               onClick={() => void view.resetOverride(database.tenantId).catch(() => undefined)}
               disabled={view.activeAction === `reset:${database.tenantId}`}
-              aria-label={isArabic ? "إعادة الافتراضي" : "Reset override"}
+              aria-label={copy.resetOverrideAriaLabel}
               className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-ink-100 disabled:opacity-50 dark:hover:bg-ink-800"
             >
               <Undo2 className="size-4" />
@@ -149,28 +149,24 @@ export function BackupPoliciesScreen() {
   return (
     <div className="w-full space-y-6">
       <BackupPageHeader
-        eyebrow={isArabic ? "جدولة Worker" : "Worker scheduling"}
-        title={isArabic ? "سياسات النسخ الاحتياطي" : "Backup policies"}
-        description={
-          isArabic
-            ? "سياسة مستقلة لكل خادم مع إعدادات افتراضية واستثناءات محددة لكل قاعدة بيانات."
-            : "One policy per database server, with inherited defaults and explicit per-database overrides."
-        }
+        eyebrow={copy.eyebrow}
+        title={copy.title}
+        description={copy.description}
       />
 
       <Card>
         <CardContent className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <BackupServerSelect
-            label={isArabic ? "خادم قاعدة البيانات" : "Database server"}
+            label={copy.databaseServerLabel}
             value={view.selectedServerId}
             servers={view.servers}
             onChange={view.setSelectedServerId}
             disabled={view.isLoading || Boolean(view.activeAction)}
-            placeholder={isArabic ? "اختر خادم قاعدة بيانات" : "Select a database server"}
+            placeholder={copy.selectServerPlaceholder}
           />
           <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={!view.selectedServerId || view.isLoadingData}>
             <RefreshCw className={`size-4 ${view.isLoadingData ? "animate-spin" : ""}`} />
-            {isArabic ? "تحديث" : "Refresh"}
+            {copy.refreshButton}
           </Button>
         </CardContent>
       </Card>
@@ -178,9 +174,9 @@ export function BackupPoliciesScreen() {
       {view.error && <BackupErrorBanner error={view.error} />}
 
       {view.isLoading || view.isLoadingData ? (
-        <BackupStatePanel kind="loading" title={isArabic ? "جارٍ تحميل السياسة" : "Loading policy"} description={isArabic ? "قراءة الإعدادات وقواعد البيانات التابعة." : "Reading policy and tenant database configuration."} />
+        <BackupStatePanel kind="loading" title={copy.loadingTitle} description={copy.loadingDescription} />
       ) : view.error ? null : !view.selectedServerId || !view.policy ? (
-        <BackupStatePanel kind="empty" title={isArabic ? "اختر خادمًا" : "Select a server"} description={isArabic ? "لا توجد سياسة قابلة للعرض بدون سياق خادم." : "A server context is required before a policy can be displayed."} />
+        <BackupStatePanel kind="empty" title={copy.selectServerTitle} description={copy.selectServerDescription} />
       ) : (
         <>
           <Card>
@@ -188,41 +184,41 @@ export function BackupPoliciesScreen() {
               <div>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Settings2 className="size-5 text-brand-600 dark:text-brand-400" />
-                  {isArabic ? "الإعدادات الافتراضية" : "Policy defaults"}
+                  {copy.policyDefaultsTitle}
                 </CardTitle>
-                <CardDescription>{isArabic ? "تطبق على قواعد البيانات التي لا تملك استثناءً." : "Applied to databases without an explicit override."}</CardDescription>
+                <CardDescription>{copy.policyDefaultsDescription}</CardDescription>
               </div>
-              <Badge tone={enabled ? "brand" : "neutral"}>{enabled ? (isArabic ? "مفعلة" : "Enabled") : isArabic ? "متوقفة" : "Disabled"}</Badge>
+              <Badge tone={enabled ? "brand" : "neutral"}>{enabled ? copy.policyEnabledBadge : copy.policyDisabledBadge}</Badge>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <label className="flex h-(--size-control-lg) items-center gap-3 rounded-md border border-border px-3 text-sm font-semibold">
                 <Checkbox checked={enabled} onCheckedChange={(c) => setEnabled(c === true)} disabled={!view.canManage} />
-                {isArabic ? "تفعيل السياسة" : "Policy enabled"}
+                {copy.policyEnabledLabel}
               </label>
-              <Field label={isArabic ? "تعبير Cron" : "Cron expression"}>
+              <Field label={copy.cronLabel}>
                 {(fp) => <Input {...fp} value={cronExpression} onChange={(e) => setCronExpression(e.target.value)} disabled={!view.canManage} maxLength={120} />}
               </Field>
-              <Field label={isArabic ? "المنطقة الزمنية" : "Timezone"}>
+              <Field label={copy.timezoneLabel}>
                 {(fp) => <Input {...fp} value={timezone} onChange={(e) => setTimezone(e.target.value)} disabled={!view.canManage} maxLength={80} />}
               </Field>
-              <Field label={isArabic ? "الاحتفاظ بالأيام" : "Retention days"}>
+              <Field label={copy.retentionDaysLabel}>
                 {(fp) => <Input {...fp} type="number" min={1} max={3650} value={retentionDays} onChange={(e) => setRetentionDays(e.target.value)} disabled={!view.canManage} placeholder="30" />}
               </Field>
-              <Field label={isArabic ? "تزامن الخادم" : "Server concurrency"}>
+              <Field label={copy.serverConcurrencyLabel}>
                 {(fp) => <Input {...fp} type="number" min={1} max={10} value={serverConcurrency} onChange={(e) => setServerConcurrency(Number(e.target.value))} disabled={!view.canManage} />}
               </Field>
-              <Field label={isArabic ? "تزامن العملاء" : "Tenant concurrency"}>
+              <Field label={copy.tenantConcurrencyLabel}>
                 {(fp) => <Input {...fp} type="number" min={1} max={10} value={tenantConcurrency} onChange={(e) => setTenantConcurrency(Number(e.target.value))} disabled={!view.canManage} />}
               </Field>
               <label className="flex h-(--size-control-lg) items-center gap-3 rounded-md border border-border px-3 text-sm font-semibold">
                 <Checkbox checked={defaultBackupEnabled} onCheckedChange={(c) => setDefaultBackupEnabled(c === true)} disabled={!view.canManage} />
-                {isArabic ? "النسخ افتراضيًا" : "Backup by default"}
+                {copy.backupByDefaultLabel}
               </label>
               <label className="flex h-(--size-control-lg) items-center gap-3 rounded-md border border-border px-3 text-sm font-semibold">
                 <Checkbox checked={defaultCompressionEnabled} onCheckedChange={(c) => setDefaultCompressionEnabled(c === true)} disabled={!view.canManage} />
-                {isArabic ? "الضغط افتراضيًا" : "Compress by default"}
+                {copy.compressByDefaultLabel}
               </label>
-              <Field label={isArabic ? "خوارزمية الضغط" : "Compression algorithm"}>
+              <Field label={copy.defaultCompressionAlgorithmLabel}>
                 {(fp) => (
                   <Select value={defaultAlgorithm} onValueChange={(v) => setDefaultAlgorithm(v as BackupCompressionAlgorithm)} disabled={!view.canManage}>
                     <SelectTrigger {...fp}>
@@ -259,7 +255,7 @@ export function BackupPoliciesScreen() {
                   }
                 >
                   <Settings2 className="size-4" />
-                  {isArabic ? "حفظ السياسة" : "Save policy"}
+                  {copy.savePolicyButton}
                 </Button>
               </CardFooter>
             )}
@@ -270,9 +266,9 @@ export function BackupPoliciesScreen() {
               <div>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <SlidersHorizontal className="size-5 text-brand-600 dark:text-brand-400" />
-                  {isArabic ? "إعدادات قواعد البيانات" : "Database configuration"}
+                  {copy.databaseConfigTitle}
                 </CardTitle>
-                <CardDescription>{isArabic ? "الاستثناءات ظاهرة بوضوح ويمكن إعادتها للقيم الافتراضية." : "Overrides are explicit and can be reset to policy defaults."}</CardDescription>
+                <CardDescription>{copy.databaseConfigDescription}</CardDescription>
               </div>
               <Badge tone="neutral">{view.databases.length}</Badge>
             </CardHeader>
@@ -289,9 +285,9 @@ export function BackupPoliciesScreen() {
 
       <BackupDialog
         open={editingDatabase !== null}
-        title={isArabic ? "تعديل استثناء قاعدة البيانات" : "Edit database override"}
+        title={copy.editOverrideDialogTitle}
         description={editingDatabase ? editingDatabase.databaseName : ""}
-        confirmLabel={isArabic ? "حفظ الاستثناء" : "Save override"}
+        confirmLabel={copy.saveOverrideButton}
         onClose={() => setEditingDatabase(null)}
         onConfirm={() => {
           if (!editingDatabase) return;
@@ -307,42 +303,42 @@ export function BackupPoliciesScreen() {
         isSubmitting={editingDatabase ? view.activeAction === `override:${editingDatabase.tenantId}` : false}
         confirmDisabled={!view.ownsSelectedServerState}
       >
-        <Field label={isArabic ? "النسخ الاحتياطي" : "Backup enabled"}>
+        <Field label={copy.backupEnabledFieldLabel}>
           {(fp) => (
             <Select value={overrideBackup} onValueChange={setOverrideBackup}>
               <SelectTrigger {...fp}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="inherit">{isArabic ? "يرث السياسة" : "Inherit policy"}</SelectItem>
-                <SelectItem value="enabled">{isArabic ? "مفعّل" : "Enabled"}</SelectItem>
-                <SelectItem value="disabled">{isArabic ? "متوقف" : "Disabled"}</SelectItem>
+                <SelectItem value="inherit">{copy.inheritPolicyOption}</SelectItem>
+                <SelectItem value="enabled">{copy.enabledValue}</SelectItem>
+                <SelectItem value="disabled">{copy.disabledValue}</SelectItem>
               </SelectContent>
             </Select>
           )}
         </Field>
-        <Field label={isArabic ? "الضغط" : "Compression enabled"}>
+        <Field label={copy.compressionEnabledFieldLabel}>
           {(fp) => (
             <Select value={overrideCompression} onValueChange={setOverrideCompression}>
               <SelectTrigger {...fp}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="inherit">{isArabic ? "يرث السياسة" : "Inherit policy"}</SelectItem>
-                <SelectItem value="enabled">{isArabic ? "مفعّل" : "Enabled"}</SelectItem>
-                <SelectItem value="disabled">{isArabic ? "متوقف" : "Disabled"}</SelectItem>
+                <SelectItem value="inherit">{copy.inheritPolicyOption}</SelectItem>
+                <SelectItem value="enabled">{copy.enabledValue}</SelectItem>
+                <SelectItem value="disabled">{copy.disabledValue}</SelectItem>
               </SelectContent>
             </Select>
           )}
         </Field>
-        <Field label={isArabic ? "الخوارزمية" : "Compression algorithm"}>
+        <Field label={copy.overrideAlgorithmFieldLabel}>
           {(fp) => (
             <Select value={overrideAlgorithm} onValueChange={setOverrideAlgorithm}>
               <SelectTrigger {...fp}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="inherit">{isArabic ? "يرث السياسة" : "Inherit policy"}</SelectItem>
+                <SelectItem value="inherit">{copy.inheritPolicyOption}</SelectItem>
                 <SelectItem value={BackupCompressionAlgorithm.GZIP}>gzip</SelectItem>
                 <SelectItem value={BackupCompressionAlgorithm.NONE}>none</SelectItem>
               </SelectContent>
