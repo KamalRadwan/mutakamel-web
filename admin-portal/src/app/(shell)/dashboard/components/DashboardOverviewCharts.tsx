@@ -182,11 +182,11 @@ function RecentTenantsList({
 }: {
   items: Array<{ id: string; name: string; status: string; plan: string; createdAt: string }>;
 }) {
-  const { lang } = useI18n();
+  const { t } = useI18n();
   if (items.length === 0) {
     return (
       <p className="rounded-md bg-ink-100 p-4 text-xs text-muted-foreground dark:bg-ink-800/50">
-        {lang === "ar" ? "لا يوجد مستأجرون حديثون." : "No recently provisioned tenants."}
+        {t.dashboard.noRecentTenants}
       </p>
     );
   }

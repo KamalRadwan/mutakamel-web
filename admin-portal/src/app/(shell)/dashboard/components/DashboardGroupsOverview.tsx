@@ -28,7 +28,7 @@ export function DashboardGroupsOverview({
   data,
   onOpenGroup,
 }: DashboardGroupsOverviewProps) {
-  const { lang } = useI18n();
+  const { t, lang } = useI18n();
   const groups = getAuthorizedDashboardGroups(data);
   const available = groups.filter(([, group]) => group.available).length;
   const unavailable = groups.length - available;
@@ -41,25 +41,25 @@ export function DashboardGroupsOverview({
     <div className="space-y-5 animate-in fade-in duration-150">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <ScopeMetric
-          label={lang === "ar" ? "المجموعات المصرح بها" : "Authorized groups"}
+          label={t.dashboard.authorizedGroups}
           value={groups.length}
           icon={ShieldCheck}
           tone="neutral"
         />
         <ScopeMetric
-          label={lang === "ar" ? "مصادر متاحة" : "Available sources"}
+          label={t.dashboard.availableSources}
           value={available}
           icon={CheckCircle2}
           tone="brand"
         />
         <ScopeMetric
-          label={lang === "ar" ? "مصادر غير متاحة" : "Unavailable sources"}
+          label={t.dashboard.unavailableSources}
           value={unavailable}
           icon={Unplug}
           tone="neutral"
         />
         <ScopeMetric
-          label={lang === "ar" ? "تنبيهات مفتوحة" : "Open alert signals"}
+          label={t.dashboard.openAlertSignals}
           value={alerts}
           icon={AlertTriangle}
           tone={alerts > 0 ? "warn" : "brand"}
@@ -72,7 +72,7 @@ export function DashboardGroupsOverview({
         <div className="mb-3 flex items-center justify-between gap-3 px-1">
           <div>
             <h2 className="text-sm font-semibold text-foreground">
-              {lang === "ar" ? "مجموعات التقارير" : "Report groups"}
+              {t.dashboard.reportGroupsTitle}
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {data.range.label}
@@ -84,9 +84,7 @@ export function DashboardGroupsOverview({
         {groups.length === 0 ? (
           <Card className="border-dashed p-8 text-center">
             <p className="text-sm font-semibold text-muted-foreground">
-              {lang === "ar"
-                ? "لا توجد مجموعات تقارير مصرح بها لحسابك."
-                : "No authorized report groups available."}
+              {t.dashboard.noAuthorizedGroups}
             </p>
           </Card>
         ) : (
@@ -118,6 +116,7 @@ function GroupCard({
   lang: "ar" | "en";
   onClick: () => void;
 }) {
+  const { t } = useI18n();
   const label = getDashboardGroupLabel(groupKey, lang);
   const description = getDashboardGroupDescription(groupKey, lang);
   const available = group.available;
@@ -145,16 +144,16 @@ function GroupCard({
 
         <div className="mt-4 flex items-center gap-2 text-2xs font-semibold uppercase tracking-wide">
           <Badge tone={available ? "brand" : "neutral"}>
-            {available ? (lang === "ar" ? "متاح" : "Available") : lang === "ar" ? "غير متاح" : "Unavailable"}
+            {available ? t.dashboard.availableBadge : t.dashboard.unavailableLabel}
           </Badge>
           {available && (
             <span className="font-mono text-muted-foreground">
-              {cardCount} {lang === "ar" ? "مؤشرات" : "metrics"}
+              {cardCount} {t.dashboard.metricsSuffix}
             </span>
           )}
           {alertCount > 0 && (
             <span className="font-mono text-warn-700 dark:text-warn-400">
-              {alertCount} {lang === "ar" ? "تنبيهات" : "alerts"}
+              {alertCount} {t.dashboard.alertsSuffix}
             </span>
           )}
         </div>

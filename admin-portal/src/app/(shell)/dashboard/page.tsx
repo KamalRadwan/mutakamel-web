@@ -11,7 +11,7 @@ import { useDashboardData } from "./hooks/useDashboardData";
 import { getAuthorizedDashboardGroups } from "./utils/dashboard-groups";
 
 export default function DashboardPage() {
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const {
     activeTab,
     setActiveTab,
@@ -38,12 +38,10 @@ export default function DashboardPage() {
             <Lock className="size-7" aria-hidden="true" />
           </div>
           <h1 className="mt-4 text-xl font-semibold text-foreground">
-            {lang === "ar" ? "لا يمكنك فتح لوحة التحكم" : "Dashboard access denied"}
+            {t.dashboard.accessDeniedTitle}
           </h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {lang === "ar"
-              ? "تحتاج إلى صلاحية admin.reports.read لفتح لوحة التحكم."
-              : "The admin.reports.read permission is required to open this dashboard."}
+            {t.dashboard.accessDeniedDesc}
           </p>
         </section>
       </PageShell>
@@ -123,7 +121,7 @@ function ErrorBanner({
   correlationId?: string;
   onRetry: () => void;
 }) {
-  const { lang } = useI18n();
+  const { t } = useI18n();
   return (
     <section
       role="alert"
@@ -133,20 +131,10 @@ function ErrorBanner({
         <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
         <div>
           <h2 className="text-sm font-semibold">
-            {stale
-              ? lang === "ar"
-                ? "تعذر تحديث البيانات — المعروض هو آخر رد ناجح"
-                : "Refresh failed — showing the last successful response"
-              : lang === "ar"
-                ? "تعذر تحميل لوحة التحكم"
-                : "Dashboard could not be loaded"}
+            {stale ? t.dashboard.staleRefreshTitle : t.dashboard.loadFailedTitle}
           </h2>
           <p className="mt-1 text-xs leading-5 opacity-90">
-            {rateLimited
-              ? lang === "ar"
-                ? "تم تجاوز حد الطلبات. حاول مرة أخرى لاحقًا."
-                : "The request limit was reached. Try again later."
-              : message}
+            {rateLimited ? t.dashboard.rateLimitedMessage : message}
           </p>
           {(code || correlationId) && (
             <p className="mt-2 font-mono text-xs opacity-70">
@@ -157,7 +145,7 @@ function ErrorBanner({
       </div>
       <Button type="button" variant="outline" size="sm" onClick={onRetry} className="shrink-0 border-danger-300 dark:border-danger-800">
         <RotateCw className="size-3.5" aria-hidden="true" />
-        {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+        {t.dashboard.retryButton}
       </Button>
     </section>
   );

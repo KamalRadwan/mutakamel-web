@@ -12,12 +12,12 @@ export function CollectionGaugeChart({
   collectedRatio,
   height = 180,
 }: CollectionGaugeChartProps) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const percentage = Math.min(100, Math.max(0, collectedRatio * 100));
 
   const data = [
-    { name: lang === "ar" ? "المحصل" : "Collected", value: percentage, color: "#10b981" },
-    { name: lang === "ar" ? "المتبقي" : "Remaining", value: 100 - percentage, color: "var(--border)" },
+    { name: t.dashboard.collectedLabel, value: percentage, color: "#10b981" },
+    { name: t.dashboard.remainingLabel, value: 100 - percentage, color: "var(--border)" },
   ];
 
   return (

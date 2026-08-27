@@ -40,10 +40,10 @@ export function RegionalDistributionBarChart({
   regions,
   height = 220,
 }: RegionalDistributionBarChartProps) {
-  const { lang } = useI18n();
+  const { t } = useI18n();
   if (!regions || regions.length === 0) return null;
 
-  const countLabel = lang === "ar" ? "عدد الشركات" : "Tenant count";
+  const countLabel = t.dashboard.tenantCountLabel;
 
   return (
     <div style={{ width: "100%", height }}>

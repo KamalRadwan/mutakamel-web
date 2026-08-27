@@ -32,7 +32,7 @@ export function DashboardGroupPanel({
   group,
   rangeLabel,
 }: DashboardGroupPanelProps) {
-  const { lang } = useI18n();
+  const { t, lang } = useI18n();
   const title = getDashboardGroupLabel(groupKey, lang);
 
   if (!group.available) {
@@ -58,24 +58,20 @@ export function DashboardGroupPanel({
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ReportObject
-          title={lang === "ar" ? "اللقطة الحالية" : "Current snapshot"}
-          subtitle={lang === "ar" ? "الحالة الحالية" : "Current state"}
+          title={t.dashboard.currentSnapshotTitle}
+          subtitle={t.dashboard.currentStateSubtitle}
           value={group.snapshot}
         />
         <ReportObject
-          title={lang === "ar" ? "الفترة المحددة" : "Selected period"}
+          title={t.dashboard.selectedPeriodTitle}
           subtitle={rangeLabel}
           value={group.period}
         />
       </div>
 
       <ReportObject
-        title={lang === "ar" ? "التوزيعات" : "Breakdowns"}
-        subtitle={
-          lang === "ar"
-            ? "تفاصيل مجمعة من المصدر الموثوق"
-            : "Grouped detail from the authoritative source"
-        }
+        title={t.dashboard.breakdownsTitle}
+        subtitle={t.dashboard.breakdownsSubtitle}
         value={group.breakdowns}
         wide
       />
@@ -84,9 +80,9 @@ export function DashboardGroupPanel({
 }
 
 function ReportAlerts({ alerts }: { alerts: DashboardGroupAlert[] }) {
-  const { lang } = useI18n();
+  const { t } = useI18n();
   return (
-    <section aria-label={lang === "ar" ? "تنبيهات التقرير" : "Report alerts"}>
+    <section aria-label={t.dashboard.reportAlertsAriaLabel}>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {alerts.map((alert) => {
           const style = alertStyle(alert.severity);
@@ -99,7 +95,7 @@ function ReportAlerts({ alerts }: { alerts: DashboardGroupAlert[] }) {
               <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <p className="text-xs font-semibold">
-                  {alert.count.toLocaleString()} {lang === "ar" ? "تحتاج متابعة" : "need attention"}
+                  {alert.count.toLocaleString()} {t.dashboard.needAttentionSuffix}
                 </p>
                 <p className="mt-0.5 text-xs leading-5 opacity-85">{alert.message}</p>
               </div>
@@ -123,7 +119,7 @@ function ReportObject({
   wide?: boolean;
 }) {
   const entries = Object.entries(value);
-  const { lang } = useI18n();
+  const { t } = useI18n();
   return (
     <Card className={wide ? "xl:col-span-2" : ""}>
       <CardHeader>
@@ -133,7 +129,7 @@ function ReportObject({
       <CardContent>
         {entries.length === 0 ? (
           <p className="rounded-md bg-ink-100 p-4 text-xs text-muted-foreground dark:bg-ink-800/50">
-            {lang === "ar" ? "لا توجد قيم إضافية لهذه الفترة." : "No additional values for this period."}
+            {t.dashboard.noAdditionalValues}
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -148,7 +144,7 @@ function ReportObject({
 }
 
 function ReportValue({ fieldKey, value }: { fieldKey: string; value: unknown }) {
-  const { lang } = useI18n();
+  const { t, lang } = useI18n();
   const label = humanizeDashboardField(fieldKey);
 
   if (isUnavailableProjection(value)) {
@@ -156,7 +152,7 @@ function ReportValue({ fieldKey, value }: { fieldKey: string; value: unknown }) 
       <div className="rounded-md border border-dashed border-border bg-ink-100 p-3 dark:bg-ink-800/40">
         <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
         <p className="mt-1 text-xs font-semibold text-foreground">
-          {lang === "ar" ? "غير متاح" : "Unavailable"}
+          {t.dashboard.unavailableLabel}
         </p>
         {value.message && <p className="mt-1 text-xs leading-5 text-muted-foreground">{value.message}</p>}
         {value.reasonCode && <code className="mt-2 inline-block text-xs text-muted-foreground">{value.reasonCode}</code>}
@@ -174,7 +170,7 @@ function ReportValue({ fieldKey, value }: { fieldKey: string; value: unknown }) 
           <div className="space-y-2">
             {value.map((item, index) => (
               <div key={`${fieldKey}-${index}`} className="rounded-md border border-border bg-card p-2 text-xs">
-                {renderScalarOrObject(item, lang)}
+                {renderScalarOrObject(item, lang, t)}
               </div>
             ))}
           </div>
@@ -192,7 +188,7 @@ function ReportValue({ fieldKey, value }: { fieldKey: string; value: unknown }) 
             <div key={nestedKey} className="flex items-start justify-between gap-3 rounded-md border border-border bg-card px-3 py-2">
               <span className="text-xs text-muted-foreground">{humanizeDashboardField(nestedKey)}</span>
               <span className="max-w-[60%] text-end text-xs font-semibold tabular-nums text-foreground">
-                {renderScalarOrObject(nestedValue, lang)}
+                {renderScalarOrObject(nestedValue, lang, t)}
               </span>
             </div>
           ))}
@@ -205,13 +201,17 @@ function ReportValue({ fieldKey, value }: { fieldKey: string; value: unknown }) 
     <div className="rounded-md bg-ink-100 p-3 dark:bg-ink-800/40">
       <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
-        {formatValue(fieldKey, value, lang)}
+        {formatValue(fieldKey, value, lang, t)}
       </p>
     </div>
   );
 }
 
-function renderScalarOrObject(value: unknown, lang: "ar" | "en"): ReactNode {
+function renderScalarOrObject(
+  value: unknown,
+  lang: "ar" | "en",
+  t: ReturnType<typeof useI18n>["t"],
+): ReactNode {
   if (isRecord(value)) {
     return (
       <span className="space-y-1">
@@ -219,20 +219,25 @@ function renderScalarOrObject(value: unknown, lang: "ar" | "en"): ReactNode {
           <span key={key} className="flex justify-between gap-3">
             <span className="text-muted-foreground">{humanizeDashboardField(key)}</span>
             <span className="font-semibold tabular-nums text-foreground">
-              {formatValue(key, item, lang)}
+              {formatValue(key, item, lang, t)}
             </span>
           </span>
         ))}
       </span>
     );
   }
-  return formatValue("value", value, lang);
+  return formatValue("value", value, lang, t);
 }
 
-function formatValue(fieldKey: string, value: unknown, lang: "ar" | "en"): string {
+function formatValue(
+  fieldKey: string,
+  value: unknown,
+  lang: "ar" | "en",
+  t: ReturnType<typeof useI18n>["t"],
+): string {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") {
-    return value ? (lang === "ar" ? "نعم" : "Yes") : lang === "ar" ? "لا" : "No";
+    return value ? t.dashboard.yesLabel : t.dashboard.noLabel;
   }
   if (typeof value === "number") {
     const normalizedKey = fieldKey.toLowerCase();

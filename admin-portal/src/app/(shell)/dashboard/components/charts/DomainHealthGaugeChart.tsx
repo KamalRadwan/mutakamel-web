@@ -18,7 +18,7 @@ export function DomainHealthGaugeChart({
   total,
   height = 40,
 }: DomainHealthGaugeChartProps) {
-  const { lang } = useI18n();
+  const { t } = useI18n();
 
   if (total <= 0) return null;
 
@@ -31,8 +31,8 @@ export function DomainHealthGaugeChart({
   ];
 
   const names = {
-    verified: lang === "ar" ? "مفعل ومثبت" : "Verified Active",
-    invalid: lang === "ar" ? "ينتظر التفعيل / غير صالح" : "Pending / Invalid",
+    verified: t.dashboard.domainVerifiedActive,
+    invalid: t.dashboard.domainPendingInvalid,
   };
 
   return (

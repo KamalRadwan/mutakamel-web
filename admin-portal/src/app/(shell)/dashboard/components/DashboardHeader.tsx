@@ -40,13 +40,13 @@ export function DashboardHeader({
   onAutoRefreshChange,
   onPrintReport,
 }: DashboardHeaderProps) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
 
   return (
     <PageHeader
       title={t.dashboard.title}
       description={t.dashboard.welcome}
-      status={<Badge tone="neutral">{lang === "ar" ? "بيانات مباشرة" : "Live"}</Badge>}
+      status={<Badge tone="neutral">{t.dashboard.liveBadge}</Badge>}
       action={
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-ink-100 p-1 text-xs dark:bg-ink-900">
@@ -58,7 +58,7 @@ export function DashboardHeader({
               {t.dashboard.lastMonth}
             </Button>
             <Button type="button" variant={rangePreset === "custom" ? "primary" : "ghost"} size="sm" onClick={() => onRangeChange("custom")}>
-              {lang === "ar" ? "مخصص" : "Custom"}
+              {t.dashboard.customRangeLabel}
             </Button>
           </div>
 
@@ -70,7 +70,7 @@ export function DashboardHeader({
                 onChange={(event) =>
                   onCustomRangeChange({ ...customRange, from: event.target.value || undefined })
                 }
-                aria-label={lang === "ar" ? "من تاريخ" : "From date"}
+                aria-label={t.dashboard.fromDateLabel}
                 className="h-7 w-auto px-2 text-xs"
               />
               <span className="text-muted-foreground" aria-hidden="true">–</span>
@@ -81,7 +81,7 @@ export function DashboardHeader({
                 onChange={(event) =>
                   onCustomRangeChange({ ...customRange, to: event.target.value || undefined })
                 }
-                aria-label={lang === "ar" ? "إلى تاريخ" : "To date"}
+                aria-label={t.dashboard.toDateLabel}
                 className="h-7 w-auto px-2 text-xs"
               />
             </div>

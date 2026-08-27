@@ -20,7 +20,7 @@ export function UnavailableDashboardPanel({
   dataset,
   className = "",
 }: DashboardDataStateProps) {
-  const { lang } = useI18n();
+  const { t, lang } = useI18n();
 
   return (
     <section
@@ -37,8 +37,8 @@ export function UnavailableDashboardPanel({
           </h3>
           <p className="text-xs leading-5 text-muted-foreground">
             {lang === "ar"
-              ? unavailableMessage(dataset?.reasonCode)
-              : dataset?.message ?? "This data source is not available."}
+              ? unavailableMessage(dataset?.reasonCode, t)
+              : dataset?.message ?? t.dashboard.unavailableGeneric}
           </p>
         </div>
         {dataset?.reasonCode && (
@@ -53,15 +53,16 @@ export function UnavailableDashboardPanel({
 
 function unavailableMessage(
   reasonCode: DashboardUnavailableState["reasonCode"],
+  t: ReturnType<typeof useI18n>["t"],
 ) {
   switch (reasonCode) {
     case "TARGET_NOT_CONFIGURED":
-      return "لم يتم إعداد القيمة المستهدفة في لوحة التحكم بعد.";
+      return t.dashboard.unavailableReasons.targetNotConfigured;
     case "HISTORICAL_DATA_NOT_STORED":
-      return "لا يحتفظ النظام حاليًا بالسجل التاريخي اللازم لهذا المؤشر.";
+      return t.dashboard.unavailableReasons.historicalDataNotStored;
     case "PROJECTION_NOT_ACTIVE":
-      return "عرض البيانات الموثوق لهذا التقرير غير مفعل حاليًا.";
+      return t.dashboard.unavailableReasons.projectionNotActive;
     default:
-      return "مصدر البيانات المطلوب غير متصل بواجهة لوحة التحكم حاليًا.";
+      return t.dashboard.unavailableReasons.default;
   }
 }

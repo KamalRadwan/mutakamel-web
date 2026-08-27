@@ -73,7 +73,7 @@ export function DashboardTabsNav({
     >
       <TabsList
         className="h-auto w-full justify-start gap-1.5 overflow-x-auto border-b-0 py-2 scrollbar-none"
-        aria-label={lang === "ar" ? "مجموعات تقارير لوحة التحكم" : "Dashboard report groups"}
+        aria-label={t.dashboard.groupsAriaLabel}
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
