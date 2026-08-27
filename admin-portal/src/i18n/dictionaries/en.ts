@@ -396,6 +396,86 @@ export const en: Dictionary = {
     },
     emptyState: "No tenants match the selected filters.",
     detailsLink: "Details",
+    registerFlow: {
+      identityAvailableTitle: "Identity available",
+      identityUnavailableTitle: "Identity unavailable",
+      identityCheckFailedTitle: "Identity check failed",
+      resolvePreviousCreateTitle: "Resolve the previous create command",
+      resolvePreviousCreateDesc:
+        "Check the retained tenant status before sending another create command.",
+      identityCheckRequiredTitle: "Identity check required",
+      identityCheckRequiredDesc:
+        "Validate the current tenant name and company name before continuing.",
+      missingFieldsTitle: "Missing fields",
+      missingFieldsDesc:
+        "Complete the required identity fields before proceeding.",
+      ownerDetailsIncompleteTitle: "Owner details are incomplete",
+      ownerDetailsIncompleteDesc:
+        "Complete all required owner fields before continuing.",
+      createdTitle: "Created",
+      createdDesc: "Tenant created and provisioning has started.",
+      createDraftChangedTitle: "Create draft changed",
+      createDraftChangedDesc:
+        "No create command was sent. Review the current values and request a new quote.",
+      repairDegradedMessage:
+        "We couldn't restore authorization for this request. Your session was kept; try again.",
+      tenantCreationFailedTitle: "Tenant creation failed",
+      quoteRequestFailedTitle: "Quote request failed",
+      recoveryPermissionRequired:
+        "admin.tenants.read is required to check status. No request DTO or owner data was stored in the browser.",
+      recoveryNoRecordYet:
+        "No authoritative tenant record is visible yet. Keep the recovery marker and check again; do not send a new create command.",
+      createOutcomeRecoveredTitle: "Create outcome recovered",
+      createOutcomeRecoveredDesc: (status: string) =>
+        `The tenant was found with status ${status}.`,
+      countryTimezoneRequiredTitle: "Country and timezone required",
+      countryTimezoneRequiredDesc:
+        "Choose a country from the canonical registry and one of its timezones.",
+    },
+    wizard: {
+      backToTenants: "Back to tenants",
+      recoveryBannerTitle: "A previous tenant create needs status recovery",
+      recoveryBannerDesc: (tenantName: string) =>
+        `This tab retains only the public tenant name (${tenantName}), command key, and send time. Company, owner, quote, and placement data are not stored. Check Core status before starting another create.`,
+      checkingStatus: "Checking status…",
+      checkTenantStatus: "Check tenant status",
+      recoveryPermissionNote:
+        "admin.tenants.read is required for recovery; automatic replay is not enabled.",
+      step1Heading: "Step 1: Tenant Identity & FQDN",
+      tenantNameCodeLabel: "Tenant Name Code (name) *",
+      checkAvailability: "Check Availability",
+      derivedFqdn: (domain: string) => `Derived FQDN: ${domain}`,
+      countryLabel: "Country",
+      chooseCountryPlaceholder: "Choose a country…",
+      searchCountriesPlaceholder: "Search countries…",
+      noMatchingCountries: "No matching countries",
+      chooseTimezone: "Choose a timezone",
+      buildingNumberPlaceholder: "Building number",
+      stateProvincePlaceholder: "State / province",
+      districtPlaceholder: "District",
+      postalCodePlaceholder: "Postal code",
+      landmarkPlaceholder: "Landmark",
+      formattedAddressPlaceholder: "Editable formatted address",
+      step2Heading: "Step 2: Owner Contact & Admin User",
+      ownerEmailLabel: "Owner Email *",
+      firstNameRequiredLabel: "First Name *",
+      lastNameRequiredLabel: "Last Name *",
+      jobTitleLabel: "Job Title",
+      sendInvitationLabel:
+        "Automatically send email invitation to owner (sendInvitation)",
+      step5Heading: "Step 5: Review & Confirm Provisioning Order",
+      primaryOwnerLabel: "Primary Owner:",
+      notSelected: "Not selected",
+      storageServerLabel: "Storage Server:",
+      selectedApplicationsLabel: "Selected Applications:",
+      seatsSuffix: "seats",
+      provisioningPlanLabel: "Provisioning plan:",
+      componentsSuffix: "components",
+      stepsSuffix: "steps",
+      previousStep: "Previous",
+      nextStepLabel: "Next Step",
+      confirmCreation: "Confirm Creation",
+    },
   },
   applications: {
     pageTitle: "Application Catalogue",
@@ -1059,6 +1139,37 @@ export const en: Dictionary = {
       message:
         "Credentials were stored encrypted. Run a connection test before activation.",
     },
+  },
+  databaseServersList: {
+    boundaryCheckingAccess: "Checking database-server access...",
+    boundaryNoPermission: "You do not have permission to view database servers.",
+    actions: "Actions",
+    previousState: (status: string) => `Previous state: ${status}`,
+    destroy: "Destroy",
+    deleteButton: "Delete",
+    pageTitle: "Database Servers",
+    pageDescription:
+      "Physical PostgreSQL database host nodes, application placement targets, and tenant schema allocations.",
+    registerServer: "Register Server",
+    statTotalHosts: "Total Hosts",
+    statActiveNodes: "Active Nodes",
+    statDraining: "Draining",
+    statOfflineHosts: "Offline Hosts",
+    allCountries: "All Countries",
+    deleteModalTitle: "Delete database server",
+    deleteModalDescription:
+      "Soft delete this empty drained or offline server. It will no longer be available for placement.",
+    destroyModalTitle: "Permanently destroy database server",
+    destroyModalDescription:
+      "This permanently removes the soft-deleted server record and its eligible dependent data. This action cannot be undone.",
+    serverDeletedTitle: "Server deleted",
+    serverDeletedDescription: (name: string) => `${name} was soft deleted.`,
+    deleteFailedTitle: "Delete failed",
+    serverDestroyedTitle: "Server destroyed",
+    serverDestroyedDescription: (name: string) =>
+      `${name} and its eligible dependent records were permanently removed.`,
+    destroyFailedTitle: "Destroy failed",
+    genericErrorTitle: "Error",
   },
   databaseServerDetail: {
     backToList: "Back to Database Servers",

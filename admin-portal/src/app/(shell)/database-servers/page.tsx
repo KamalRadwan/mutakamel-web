@@ -12,6 +12,8 @@ import {
   canSoftDeleteDatabaseServer,
 } from "@/features/admin/database-servers/lib/database-server-deletion";
 import { useI18n } from "@/i18n/I18nContext";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import {
   PageHeader,
   StatGrid,
@@ -24,9 +26,14 @@ import {
 } from "@/design-system";
 import type { DatabaseServerView } from "@/features/admin/database-servers/types";
 
+function dict(lang: "ar" | "en") {
+  return (lang === "ar" ? ar : en).databaseServersList;
+}
+
 export default function DatabaseServersPage() {
   const { user, isLoading } = useAuth();
   const { lang } = useI18n();
+  const copy = dict(lang);
   const canRead = adminCan(user, "admin.database_servers.read");
 
   if (isLoading) {
@@ -34,7 +41,7 @@ export default function DatabaseServersPage() {
       <DatabaseServersBoundary
         lang={lang}
         loading
-        message={lang === "ar" ? "جارٍ التحقق من الصلاحيات..." : "Checking database-server access..."}
+        message={copy.boundaryCheckingAccess}
       />
     );
   }
@@ -42,7 +49,7 @@ export default function DatabaseServersPage() {
     return (
       <DatabaseServersBoundary
         lang={lang}
-        message={lang === "ar" ? "لا تملك صلاحية عرض خوادم قواعد البيانات." : "You do not have permission to view database servers."}
+        message={copy.boundaryNoPermission}
       />
     );
   }
@@ -80,6 +87,7 @@ function DatabaseServersContent() {
 
   const { user } = useAuth();
   const { lang } = useI18n();
+  const copy = dict(lang);
   const canCreate = adminCanAll(user, ["admin.database_servers.create"]);
   const canDelete = adminCanAll(user, ["admin.database_servers.delete", "admin.database_servers.critical"]);
   const canDestroy = adminCanAll(user, ADMIN_RBAC_CRITICAL.DB_SERVERS_DESTROY);
@@ -145,7 +153,7 @@ function DatabaseServersContent() {
           <StatusBadge status={srv.deletedAt ? "DELETED" : srv.status} enumType="db-server" />
           {srv.deletedAt && (
             <span className="text-xs text-muted-foreground">
-              {lang === "ar" ? `الحالة السابقة: ${srv.status}` : `Previous state: ${srv.status}`}
+              {copy.previousState(srv.status)}
             </span>
           )}
         </div>
@@ -153,19 +161,19 @@ function DatabaseServersContent() {
     },
     {
       key: "actions",
-      headerEn: lang === "ar" ? "الإجراءات" : "Actions",
+      headerEn: "Actions",
       headerAr: "الإجراءات",
       align: "end",
       cell: (srv) =>
         canDestroy && canDestroyDatabaseServer(srv) ? (
           <Button type="button" variant="destructive" size="sm" onClick={() => openDestroy(srv)} disabled={destroyingServerId === srv.id}>
             <ShieldAlert className="size-3.5" />
-            {lang === "ar" ? "إتلاف نهائي" : "Destroy"}
+            {copy.destroy}
           </Button>
         ) : canDelete && canSoftDeleteDatabaseServer(srv) ? (
           <Button type="button" variant="outline" size="sm" onClick={() => openSoftDelete(srv)} disabled={deletingServerId === srv.id}>
             <Trash2 className="size-3.5" />
-            {lang === "ar" ? "حذف" : "Delete"}
+            {copy.deleteButton}
           </Button>
         ) : (
           <span className="text-xs text-muted-foreground">—</span>
@@ -176,26 +184,22 @@ function DatabaseServersContent() {
   return (
     <div className="w-full space-y-6">
       <PageHeader
-        title={lang === "ar" ? "خوادم قواعد البيانات" : "Database Servers"}
-        description={
-          lang === "ar"
-            ? "عُقد استضافة PostgreSQL الفعلية، وجهات توزيع التطبيقات، وتخصيصات مخطط المستأجرين."
-            : "Physical PostgreSQL database host nodes, application placement targets, and tenant schema allocations."
-        }
+        title={copy.pageTitle}
+        description={copy.pageDescription}
         action={
           canCreate && (
             <Button variant="primary" asChild>
-              <Link href="/database-servers/new">{lang === "ar" ? "تسجيل خادم" : "Register Server"}</Link>
+              <Link href="/database-servers/new">{copy.registerServer}</Link>
             </Button>
           )
         }
       />
 
       <StatGrid>
-        <StatCard label={lang === "ar" ? "إجمالي المضيفين" : "Total Hosts"} value={summaryMetrics.totalServers} icon={Server} />
-        <StatCard label={lang === "ar" ? "عُقد نشطة" : "Active Nodes"} value={summaryMetrics.activeServers} icon={Server} />
-        <StatCard label={lang === "ar" ? "قيد التفريغ" : "Draining"} value={summaryMetrics.drainingServers} icon={Server} />
-        <StatCard label={lang === "ar" ? "مضيفون غير متصلين" : "Offline Hosts"} value={summaryMetrics.offlineServers} icon={Server} />
+        <StatCard label={copy.statTotalHosts} value={summaryMetrics.totalServers} icon={Server} />
+        <StatCard label={copy.statActiveNodes} value={summaryMetrics.activeServers} icon={Server} />
+        <StatCard label={copy.statDraining} value={summaryMetrics.drainingServers} icon={Server} />
+        <StatCard label={copy.statOfflineHosts} value={summaryMetrics.offlineServers} icon={Server} />
       </StatGrid>
 
       <div className="rounded-lg border border-border bg-card">
@@ -236,7 +240,7 @@ function DatabaseServersContent() {
               }}
             />
           </div>
-          <CountrySelect value={countryFilter} onChange={(isoCode) => setCountryFilter(isoCode)} allowAll allLabel={lang === "ar" ? "كل الدول" : "All Countries"} />
+          <CountrySelect value={countryFilter} onChange={(isoCode) => setCountryFilter(isoCode)} allowAll allLabel={copy.allCountries} />
         </div>
         <DataTable
           columns={columns}
@@ -255,12 +259,8 @@ function DatabaseServersContent() {
         isOpen={serverPendingDelete !== null}
         onClose={closeSoftDelete}
         onConfirm={() => void confirmSoftDelete()}
-        title={lang === "ar" ? "حذف خادم قاعدة البيانات" : "Delete database server"}
-        description={
-          lang === "ar"
-            ? "حذف منطقي لخادم فارغ في حالة التفريغ أو عدم الاتصال. لن يعود متاحًا للتوزيع."
-            : "Soft delete this empty drained or offline server. It will no longer be available for placement."
-        }
+        title={copy.deleteModalTitle}
+        description={copy.deleteModalDescription}
         targetName={serverPendingDelete?.name ?? ""}
         actionType="delete"
         requireNameTyping
@@ -271,12 +271,8 @@ function DatabaseServersContent() {
         isOpen={serverPendingDestroy !== null}
         onClose={closeDestroy}
         onConfirm={() => void confirmDestroy()}
-        title={lang === "ar" ? "إتلاف خادم قاعدة البيانات نهائيًا" : "Permanently destroy database server"}
-        description={
-          lang === "ar"
-            ? "سيتم حذف سجل الخادم المحذوف منطقيًا والبيانات التابعة المؤهلة نهائيًا. لا يمكن التراجع عن هذا الإجراء."
-            : "This permanently removes the soft-deleted server record and its eligible dependent data. This action cannot be undone."
-        }
+        title={copy.destroyModalTitle}
+        description={copy.destroyModalDescription}
         targetName={serverPendingDestroy?.name ?? ""}
         actionType="destroy"
         requireNameTyping
