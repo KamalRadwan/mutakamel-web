@@ -16,8 +16,8 @@ import { Card, CardContent, Field, Input, Textarea, Checkbox, Button } from "@/d
 type DialogName = "policy" | "regenerate" | "reconcile" | null;
 
 export function BackupAccessScreen() {
-  const { lang } = useI18n();
-  const isArabic = lang === "ar";
+  const { lang, t } = useI18n();
+  const copy = t.backup.accessScreen;
   const view = useBackupDatabaseAccess();
   const [dialog, setDialog] = useState<DialogName>(null);
   const [reason, setReason] = useState("");
@@ -49,12 +49,8 @@ export function BackupAccessScreen() {
     return (
       <BackupStatePanel
         kind="forbidden"
-        title={isArabic ? "دليل صلاحية قاعدة البيانات غير متاح" : "Database access evidence is restricted"}
-        description={
-          isArabic
-            ? "تحتاج إلى admin.database_servers.read. صلاحيات النسخ الاحتياطي وحدها لا تكشف حالة بيانات اعتماد Core."
-            : "This view requires admin.database_servers.read. Backup permissions alone do not expose Core credential state."
-        }
+        title={copy.restrictedTitle}
+        description={copy.restrictedDescription}
       />
     );
   }
@@ -62,28 +58,24 @@ export function BackupAccessScreen() {
   return (
     <div className="w-full space-y-6">
       <BackupPageHeader
-        eyebrow={isArabic ? "حد أمان Core" : "Core security boundary"}
-        title={isArabic ? "صلاحية قاعدة بيانات النسخ الاحتياطي" : "Backup database access"}
-        description={
-          isArabic
-            ? "إدارة الحساب الثابت وسياسة تدوير كلمة المرور. كلمات المرور لا تظهر ولا تنتقل إلى المتصفح."
-            : "Manage the fixed Backup principal and its password-rotation policy. Passwords are never returned to the browser."
-        }
+        eyebrow={copy.eyebrow}
+        title={copy.title}
+        description={copy.description}
       />
 
       <Card>
         <CardContent className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <BackupServerSelect
-            label={isArabic ? "خادم قاعدة البيانات" : "Database server"}
+            label={t.backup.policiesScreen.databaseServerLabel}
             value={view.selectedServerId}
             servers={view.servers}
             onChange={view.setSelectedServerId}
             disabled={view.isLoading || Boolean(view.activeAction)}
-            placeholder={isArabic ? "اختر خادم قاعدة بيانات" : "Select a database server"}
+            placeholder={t.backup.policiesScreen.selectServerPlaceholder}
           />
           <Button type="button" variant="outline" onClick={() => void view.refreshBinding()} disabled={!view.selectedServerId || view.isLoadingBinding}>
             <RefreshCw className={`size-4 ${view.isLoadingBinding ? "animate-spin" : ""}`} />
-            {isArabic ? "تحديث الدليل" : "Refresh evidence"}
+            {copy.refreshEvidenceButton}
           </Button>
         </CardContent>
       </Card>
@@ -91,11 +83,11 @@ export function BackupAccessScreen() {
       {view.error && <BackupErrorBanner error={view.error} />}
 
       {view.isLoading || view.isLoadingBinding ? (
-        <BackupStatePanel kind="loading" title={isArabic ? "جارٍ تحميل الحساب" : "Loading database access"} description={isArabic ? "قراءة دليل آمن بدون أسرار من Core." : "Reading secret-free evidence from Core."} />
+        <BackupStatePanel kind="loading" title={copy.loadingTitle} description={copy.loadingDescription} />
       ) : view.error ? null : !view.selectedServerId ? (
-        <BackupStatePanel kind="empty" title={isArabic ? "لا يوجد خادم محدد" : "No server selected"} description={isArabic ? "اختر خادمًا لعرض حساب النسخ الاحتياطي." : "Choose a server to inspect its Backup principal."} />
+        <BackupStatePanel kind="empty" title={copy.noServerTitle} description={copy.noServerDescription} />
       ) : !view.binding ? (
-        <BackupStatePanel kind="empty" title={isArabic ? "حساب النسخ الاحتياطي غير موجود" : "Backup principal is not provisioned"} description={isArabic ? "لا يمكن تفعيل الحماية حتى ينشئ Core الحساب المخصص ويتحقق منه." : "Protection remains fail-closed until Core creates and verifies the dedicated principal."} />
+        <BackupStatePanel kind="empty" title={copy.notProvisionedTitle} description={copy.notProvisionedDescription} />
       ) : (
         <>
           <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -107,7 +99,7 @@ export function BackupAccessScreen() {
                       <KeyRound className="size-5" />
                     </span>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isArabic ? "الحساب الثابت" : "Fixed principal"}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{copy.fixedPrincipalLabel}</p>
                       <p className="mt-1 font-mono text-base font-semibold">{view.binding.databasePrincipal}</p>
                     </div>
                   </div>
@@ -116,10 +108,10 @@ export function BackupAccessScreen() {
 
                 <dl className="mt-6 grid gap-4 sm:grid-cols-2">
                   {[
-                    [isArabic ? "مراجعة الاعتماد" : "Credential revision", view.binding.credentialRevision],
-                    [isArabic ? "موعد التدوير" : "Rotation due", formatBackupDate(view.binding.rotationDueAt, isArabic ? "ar-EG" : "en-US")],
-                    [isArabic ? "آخر تدوير ناجح" : "Last successful rotation", formatBackupDate(view.binding.lastRotationSucceededAt, isArabic ? "ar-EG" : "en-US")],
-                    [isArabic ? "إعادة المحاولة" : "Retry at", formatBackupDate(view.binding.retryAt, isArabic ? "ar-EG" : "en-US")],
+                    [copy.credentialRevisionLabel, view.binding.credentialRevision],
+                    [copy.rotationDueLabel, formatBackupDate(view.binding.rotationDueAt, lang === "ar" ? "ar-EG" : "en-US")],
+                    [copy.lastRotationLabel, formatBackupDate(view.binding.lastRotationSucceededAt, lang === "ar" ? "ar-EG" : "en-US")],
+                    [copy.retryAtLabel, formatBackupDate(view.binding.retryAt, lang === "ar" ? "ar-EG" : "en-US")],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md bg-ink-100 p-4 dark:bg-ink-900/40">
                       <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
@@ -129,7 +121,7 @@ export function BackupAccessScreen() {
                 </dl>
                 {view.binding.safeFailureCode && (
                   <div className="mt-4 rounded-md border border-warn-200 bg-warn-50 p-4 text-sm text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-200">
-                    {isArabic ? "رمز الفشل الآمن" : "Safe failure code"}: <code>{view.binding.safeFailureCode}</code>
+                    {copy.safeFailureCodeLabel}: <code>{view.binding.safeFailureCode}</code>
                   </div>
                 )}
               </CardContent>
@@ -139,19 +131,19 @@ export function BackupAccessScreen() {
               <CardContent className="p-5">
                 <div className="flex items-center gap-3">
                   <ShieldCheck className="size-5 text-brand-600 dark:text-brand-400" />
-                  <h2 className="text-base font-semibold">{isArabic ? "سياسة التدوير" : "Rotation policy"}</h2>
+                  <h2 className="text-base font-semibold">{copy.rotationPolicyTitle}</h2>
                 </div>
                 <dl className="mt-5 space-y-3 text-sm">
                   <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">{isArabic ? "الحالة" : "Status"}</dt>
-                    <dd className="font-semibold">{view.binding.rotationEnabled ? (isArabic ? "مفعلة" : "Enabled") : isArabic ? "متوقفة" : "Disabled"}</dd>
+                    <dt className="text-muted-foreground">{copy.statusLabel}</dt>
+                    <dd className="font-semibold">{view.binding.rotationEnabled ? t.backup.policiesScreen.policyEnabledBadge : t.backup.policiesScreen.policyDisabledBadge}</dd>
                   </div>
                   <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">{isArabic ? "الفترة" : "Interval"}</dt>
+                    <dt className="text-muted-foreground">{copy.intervalLabel}</dt>
                     <dd className="font-semibold">{view.binding.rotationIntervalHours}h</dd>
                   </div>
                   <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">{isArabic ? "نافذة الصيانة" : "Maintenance window"}</dt>
+                    <dt className="text-muted-foreground">{copy.maintenanceWindowLabel}</dt>
                     <dd className="font-semibold">UTC {view.binding.maintenanceWindowStartUtc}:00 +{view.binding.maintenanceWindowHours}h</dd>
                   </div>
                 </dl>
@@ -164,7 +156,7 @@ export function BackupAccessScreen() {
                     disabled={!view.ownsSelectedServerState || Boolean(view.activeAction)}
                   >
                     <Settings2 className="size-4" />
-                    {isArabic ? "تعديل السياسة" : "Edit policy"}
+                    {copy.editPolicyButton}
                   </Button>
                 )}
               </CardContent>
@@ -173,8 +165,8 @@ export function BackupAccessScreen() {
 
           <Card>
             <CardContent className="p-5">
-              <h2 className="text-base font-semibold">{isArabic ? "أوامر الاعتماد" : "Credential commands"}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{isArabic ? "كل أمر مرتبط بمراجعة متوقعة ويعيد إيصالًا بدون سر." : "Every command is revision-bound and returns a secret-free receipt."}</p>
+              <h2 className="text-base font-semibold">{copy.credentialCommandsTitle}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{copy.credentialCommandsDescription}</p>
               <div className="mt-5 flex flex-wrap gap-3">
                 {view.canRegenerate && (
                   <Button
@@ -184,13 +176,13 @@ export function BackupAccessScreen() {
                     disabled={!view.ownsSelectedServerState || view.binding.status !== "READY" || view.binding.hasStagedCandidate || Boolean(view.activeAction)}
                   >
                     <RotateCcw className="size-4" />
-                    {isArabic ? "تدوير كلمة المرور" : "Rotate password"}
+                    {copy.rotatePasswordButton}
                   </Button>
                 )}
                 {view.canReconcile && (
                   <Button type="button" variant="outline" onClick={() => setDialog("reconcile")} disabled={!view.ownsSelectedServerState || Boolean(view.activeAction)}>
                     <RefreshCw className="size-4" />
-                    {isArabic ? "مطابقة الاعتماد" : "Reconcile credential"}
+                    {copy.reconcileCredentialButton}
                   </Button>
                 )}
               </div>
@@ -201,9 +193,9 @@ export function BackupAccessScreen() {
 
       <BackupDialog
         open={dialog === "policy"}
-        title={isArabic ? "تعديل سياسة التدوير" : "Edit rotation policy"}
-        description={isArabic ? "القيم بالساعات وتطبق على حساب النسخ الاحتياطي فقط." : "Hour-based values apply only to the Backup principal."}
-        confirmLabel={isArabic ? "حفظ السياسة" : "Save policy"}
+        title={copy.editPolicyDialogTitle}
+        description={copy.editPolicyDialogDescription}
+        confirmLabel={t.backup.policiesScreen.savePolicyButton}
         onClose={closeDialog}
         onConfirm={() =>
           void view
@@ -216,54 +208,54 @@ export function BackupAccessScreen() {
       >
         <label className="flex items-center gap-3 text-sm font-semibold">
           <Checkbox checked={rotationEnabled} onCheckedChange={(c) => setRotationEnabled(c === true)} />
-          {isArabic ? "تفعيل التدوير التلقائي" : "Enable automatic rotation"}
+          {copy.enableAutoRotationLabel}
         </label>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={isArabic ? "الفترة بالساعات" : "Interval hours"}>
+          <Field label={copy.intervalHoursLabel}>
             {(fp) => <Input {...fp} type="number" value={intervalHours} min={24} max={8760} onChange={(e) => setIntervalHours(Number(e.target.value))} />}
           </Field>
-          <Field label={isArabic ? "بداية UTC" : "UTC start"}>
+          <Field label={copy.utcStartLabel}>
             {(fp) => <Input {...fp} type="number" value={windowStart} min={0} max={23} onChange={(e) => setWindowStart(Number(e.target.value))} />}
           </Field>
-          <Field label={isArabic ? "مدة النافذة" : "Window hours"}>
+          <Field label={copy.windowHoursLabel}>
             {(fp) => <Input {...fp} type="number" value={windowHours} min={1} max={24} onChange={(e) => setWindowHours(Number(e.target.value))} />}
           </Field>
         </div>
-        <Field label={isArabic ? "سبب موثق (8 أحرف على الأقل)" : "Audit reason (at least 8 characters)"}>
+        <Field label={copy.auditReasonMin8Label}>
           {(fp) => <Textarea {...fp} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} />}
         </Field>
       </BackupDialog>
 
       <BackupDialog
         open={dialog === "regenerate"}
-        title={isArabic ? "تدوير كلمة مرور النسخ الاحتياطي" : "Rotate Backup password"}
-        description={isArabic ? "ينشئ Core كلمة مرور جديدة دون عرضها. اكتب ROTATE للتأكيد." : "Core generates and adopts a new password without revealing it. Type ROTATE to confirm."}
-        confirmLabel={isArabic ? "بدء التدوير" : "Start rotation"}
+        title={copy.rotateDialogTitle}
+        description={copy.rotateDialogDescription}
+        confirmLabel={copy.startRotationButton}
         onClose={closeDialog}
         onConfirm={() => void view.regenerate(reason).then(closeDialog).catch(() => undefined)}
         isSubmitting={view.activeAction === "regenerate"}
         confirmDisabled={!view.ownsSelectedServerState || reason.trim().length < 8 || confirmation !== "ROTATE"}
         destructive
       >
-        <Field label={isArabic ? "سبب موثق (8 أحرف على الأقل)" : "Audit reason (at least 8 characters)"}>
+        <Field label={copy.auditReasonMin8Label}>
           {(fp) => <Textarea {...fp} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} />}
         </Field>
-        <Field label={isArabic ? "نص التأكيد" : "Confirmation text"}>
+        <Field label={copy.confirmationTextLabel}>
           {(fp) => <Input {...fp} value={confirmation} onChange={(e) => setConfirmation(e.target.value)} placeholder="ROTATE" />}
         </Field>
       </BackupDialog>
 
       <BackupDialog
         open={dialog === "reconcile"}
-        title={isArabic ? "مطابقة اعتماد النسخ الاحتياطي" : "Reconcile Backup credential"}
-        description={isArabic ? "يتحقق Core من المرشح الحالي ويعيد بناء الحالة الآمنة عند الحاجة." : "Core verifies the exact candidate and repairs safe state when possible."}
-        confirmLabel={isArabic ? "بدء المطابقة" : "Start reconciliation"}
+        title={copy.reconcileDialogTitle}
+        description={copy.reconcileDialogDescription}
+        confirmLabel={copy.startReconciliationButton}
         onClose={closeDialog}
         onConfirm={() => void view.reconcile(reason).then(closeDialog).catch(() => undefined)}
         isSubmitting={view.activeAction === "reconcile"}
         confirmDisabled={!view.ownsSelectedServerState || reason.trim().length < 8}
       >
-        <Field label={isArabic ? "سبب موثق (8 أحرف على الأقل)" : "Audit reason (at least 8 characters)"}>
+        <Field label={copy.auditReasonMin8Label}>
           {(fp) => <Textarea {...fp} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} />}
         </Field>
       </BackupDialog>
