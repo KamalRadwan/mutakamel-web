@@ -9,10 +9,10 @@ export function LanguageToggle() {
   return (
     <button
       onClick={toggleLanguage}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-700/80 bg-slate-800/60 text-slate-200 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+      className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-ink-100 hover:text-foreground dark:hover:bg-ink-800"
       title={title}
     >
-      <Globe className="w-3.5 h-3.5 text-blue-400" />
+      <Globe className="size-3.5" aria-hidden="true" />
       <span>{buttonLabel}</span>
     </button>
   );

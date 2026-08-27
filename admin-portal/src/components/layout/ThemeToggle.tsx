@@ -9,13 +9,13 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer border border-slate-700/50 bg-slate-800/40"
+      className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-ink-100 hover:text-foreground dark:hover:bg-ink-800"
       title={title}
     >
       {isDark ? (
-        <Sun className="w-4 h-4 text-amber-400" />
+        <Sun className="size-4" aria-hidden="true" />
       ) : (
-        <Moon className="w-4 h-4 text-slate-300" />
+        <Moon className="size-4" aria-hidden="true" />
       )}
     </button>
   );
