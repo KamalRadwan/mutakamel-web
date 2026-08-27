@@ -1,6 +1,8 @@
 "use client";
 
 import { PageHeader } from "@/design-system";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { SettingField } from "../components/SettingField";
 import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
@@ -41,7 +43,7 @@ export default function BillingSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={lang === "ar" ? "الفوترة والاشتراكات" : "Billing & Trials"} />
+      <PageHeader title={(lang === "ar" ? ar : en).settings.pages.billing.title} />
 
       <SettingsResourceBoundary
         state={loadState}
@@ -84,9 +86,7 @@ export default function BillingSettingsPage() {
 function EmptySettings({ lang }: { lang: "ar" | "en" }) {
   return (
     <div className="rounded-lg border border-border bg-card p-8 text-center text-xs text-muted-foreground">
-      {lang === "ar"
-        ? "لا توجد إعدادات فوترة أو تجربة مسجلة."
-        : "No billing or trial settings are registered."}
+      {(lang === "ar" ? ar : en).settings.pages.billing.empty}
     </div>
   );
 }

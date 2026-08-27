@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { AlertTriangle, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type { SettingsLoadState } from "../hooks/useSettings";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 
 interface SettingsResourceBoundaryProps {
   state: SettingsLoadState;
@@ -20,6 +22,8 @@ export function SettingsResourceBoundary({
   onRetry,
   children,
 }: SettingsResourceBoundaryProps) {
+  const copy = (lang === "ar" ? ar : en).settings.boundary;
+
   if (state === "READY") return <>{children}</>;
   if (state === "LOADING") {
     return (
@@ -28,7 +32,7 @@ export function SettingsResourceBoundary({
         className="flex min-h-40 items-center justify-center gap-2 rounded-lg border border-border bg-card p-8 text-sm text-muted-foreground"
       >
         <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-        {lang === "ar" ? "جارٍ تحميل الإعدادات…" : "Loading settings…"}
+        {copy.loading}
       </div>
     );
   }
@@ -37,21 +41,11 @@ export function SettingsResourceBoundary({
   const unavailable = state === "UNAVAILABLE";
   const Icon = forbidden ? ShieldAlert : AlertTriangle;
   const title = forbidden
-    ? lang === "ar"
-      ? "لا تملك صلاحية قراءة هذه الإعدادات"
-      : "Settings read permission required"
+    ? copy.forbiddenTitle
     : unavailable
-      ? lang === "ar"
-        ? "خدمة الإعدادات غير متاحة حالياً"
-        : "Settings service is unavailable"
-      : lang === "ar"
-        ? "تعذر تحميل الإعدادات"
-        : "Settings could not be loaded";
-  const detail = forbidden
-    ? "admin.settings.read"
-    : lang === "ar"
-      ? "لم نعرض بيانات فارغة بدلاً من فشل التحميل. يمكنك إعادة المحاولة."
-      : "The load failure is not being shown as empty data. You can retry safely.";
+      ? copy.unavailableTitle
+      : copy.errorTitle;
+  const detail = forbidden ? "admin.settings.read" : copy.errorDetail;
 
   return (
     <section
@@ -78,7 +72,7 @@ export function SettingsResourceBoundary({
           className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-danger-700 px-4 text-sm font-semibold text-white hover:bg-danger-600"
         >
           <RefreshCw className="size-4" aria-hidden="true" />
-          {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+          {copy.retry}
         </button>
       ) : null}
     </section>

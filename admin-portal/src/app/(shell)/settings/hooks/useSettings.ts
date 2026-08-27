@@ -12,6 +12,8 @@ import {
 } from "@/shared/api/normalized-api-error";
 import { useToast } from "@/components/ui/ToastContext";
 import { isAmbiguousWriteOutcome } from "@/shared/api/write-command-recovery";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { SETTINGS_UI_REGISTRY, type SettingUIMetadata } from "./useSettingsRegistry";
 
 export type SystemSettingValue = string | number | boolean;
@@ -300,19 +302,12 @@ export function useSettings(prefix: string) {
     }
 
     setIsSaving(false);
+    const saveCopy = (lang === "ar" ? ar : en).settings.save;
     if (failures.length) {
-      toast.error(
-        lang === "ar" ? "فشل الحفظ" : "Save failed",
-        failures.join("\n"),
-      );
+      toast.error(saveCopy.failedTitle, failures.join("\n"));
       throw new Error("SETTINGS_SAVE_FAILED");
     }
-    toast.success(
-      lang === "ar" ? "تم الحفظ بنجاح" : "Settings saved",
-      lang === "ar"
-        ? "تم تحديث إعدادات النظام بنجاح."
-        : "System configuration updated successfully.",
-    );
+    toast.success(saveCopy.successTitle, saveCopy.successDescription);
   }, [canUpdateCritical, lang, toast]);
 
   const reloadSetting = useCallback(
@@ -415,22 +410,15 @@ export function validateTopUpRange(
   values: Readonly<Record<string, SystemSettingValue>>,
   lang: "ar" | "en",
 ): void {
+  const copy = (lang === "ar" ? ar : en).settings.validation;
   const minimum = values[MIN_TOP_UP_KEY];
   const maximum = values[MAX_TOP_UP_KEY];
   if (minimum === undefined || maximum === undefined) return;
   if (typeof minimum !== "number" || typeof maximum !== "number") {
-    throw new Error(
-      lang === "ar"
-        ? "يجب أن تكون حدود الشحن أعداداً صحيحة."
-        : "Wallet top-up limits must be integers.",
-    );
+    throw new Error(copy.topUpMustBeIntegers);
   }
   if (minimum > maximum) {
-    throw new Error(
-      lang === "ar"
-        ? `الحد الأدنى لا يمكن أن يكون أكبر من الحد الأقصى (${maximum}).`
-        : `Minimum cannot be greater than the maximum (${maximum}).`,
-    );
+    throw new Error(copy.topUpMinGreaterThanMax(maximum));
   }
 }
 
@@ -472,89 +460,69 @@ function validateSettingValue(
   value: SystemSettingValue,
   lang: "ar" | "en",
 ): void {
+  const copy = (lang === "ar" ? ar : en).settings.validation;
   const metadata = SETTINGS_UI_REGISTRY[key];
   if (metadata?.inputType === "number") {
     if (typeof value !== "number" || !Number.isInteger(value)) {
-      throw new Error(
-        lang === "ar" ? "يجب إدخال عدد صحيح." : "Enter a whole number.",
-      );
+      throw new Error(copy.wholeNumber);
     }
     if (metadata.min !== undefined && value < metadata.min) {
-      throw new Error(
-        lang === "ar"
-          ? `يجب أن تكون القيمة على الأقل ${metadata.min}.`
-          : `Value must be at least ${metadata.min}.`,
-      );
+      throw new Error(copy.minValue(metadata.min));
     }
     if (metadata.max !== undefined && value > metadata.max) {
-      throw new Error(
-        lang === "ar"
-          ? `يجب أن تكون القيمة على الأكثر ${metadata.max}.`
-          : `Value must be at most ${metadata.max}.`,
-      );
+      throw new Error(copy.maxValue(metadata.max));
     }
   }
   if (metadata?.inputType === "boolean" && typeof value !== "boolean") {
-    throw new Error(lang === "ar" ? "قيمة منطقية غير صالحة." : "Invalid boolean value.");
+    throw new Error(copy.invalidBoolean);
   }
   if (
     (metadata?.inputType === "string" || metadata?.inputType === "enum") &&
     typeof value !== "string"
   ) {
-    throw new Error(lang === "ar" ? "قيمة نصية غير صالحة." : "Invalid text value.");
+    throw new Error(copy.invalidText);
   }
   if (
     metadata?.inputType === "enum" &&
     metadata.options &&
     !metadata.options.some((option) => option.value === value)
   ) {
-    throw new Error(lang === "ar" ? "قيمة غير صالحة." : "Invalid option selected.");
+    throw new Error(copy.invalidOption);
   }
-
-  const invalidJsonArray =
-    lang === "ar"
-      ? "يجب إدخال مصفوفة JSON صحيحة من إعدادات RTCIceServer."
-      : "Enter a valid JSON array of RTCIceServer objects.";
-  const invalidJsonObject =
-    lang === "ar" ? "يجب إدخال كائن JSON صحيح." : "Enter a valid JSON object.";
 
   if (key === "asterisk.turn_servers_json" || key === "asterisk.ice_servers_json") {
     if (typeof value !== "string" || value.length > 10_000) {
-      throw new Error(invalidJsonArray);
+      throw new Error(copy.invalidIceServerArray);
     }
     let parsed: unknown;
     try {
       parsed = JSON.parse(value);
     } catch {
-      throw new Error(invalidJsonArray);
+      throw new Error(copy.invalidIceServerArray);
     }
     if (!Array.isArray(parsed) || !parsed.every(isValidIceServerObject)) {
-      throw new Error(invalidJsonArray);
+      throw new Error(copy.invalidIceServerArray);
     }
   }
 
   if (key === "asterisk.extra_json") {
     if (typeof value !== "string" || value.length > 10_000) {
-      throw new Error(invalidJsonObject);
+      throw new Error(copy.invalidJsonObject);
     }
     let parsed: unknown;
     try {
       parsed = JSON.parse(value);
     } catch {
-      throw new Error(invalidJsonObject);
+      throw new Error(copy.invalidJsonObject);
     }
-    if (!plainRecord(parsed)) throw new Error(invalidJsonObject);
+    if (!plainRecord(parsed)) throw new Error(copy.invalidJsonObject);
   }
 
   if (
     key === "asterisk.websocket_url" &&
     (typeof value !== "string" || (value !== "" && !/^wss?:\/\/\S+$/iu.test(value)))
   ) {
-    throw new Error(
-      lang === "ar"
-        ? "رابط WebSocket يجب أن يبدأ بـ ws:// أو wss:// بدون مسافات."
-        : "WebSocket URL must start with ws:// or wss:// and contain no spaces.",
-    );
+    throw new Error(copy.invalidWebsocketUrl);
   }
 }
 
@@ -700,17 +668,12 @@ function settingWriteFingerprint(
 }
 
 function localSettingsError(lang: "ar" | "en", code: string): string {
+  const copy = (lang === "ar" ? ar : en).settings.validation;
   if (code === "PENDING_SETTING_WRITE_MUST_BE_RECONCILED") {
-    return lang === "ar"
-      ? "يوجد حفظ سابق لم تُحسم نتيجته. أعد إرسال القيمة الأصلية نفسها قبل تعديلها."
-      : "A previous save has an unresolved outcome. Retry the exact original value before changing it.";
+    return copy.unresolvedWrite;
   }
   if (code === "DEPENDENT_TOP_UP_WRITE_SKIPPED") {
-    return lang === "ar"
-      ? "لم تُرسل القيمة التابعة لأن كتابة حد الشحن الأول لم تنجح."
-      : "The dependent value was not sent because the first top-up limit write failed.";
+    return copy.dependentTopUpSkipped;
   }
-  return lang === "ar"
-    ? `تعذر حفظ هذا الإعداد بأمان. رمز الخطأ: ${code}`
-    : `This setting could not be saved safely. Error code: ${code}`;
+  return copy.saveFailedGeneric(code);
 }

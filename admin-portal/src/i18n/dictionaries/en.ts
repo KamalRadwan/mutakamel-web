@@ -782,6 +782,81 @@ export const en: Dictionary = {
     rolesUnavailable: "Roles list is unavailable due to missing permissions.",
     invitedInfoBanner:
       "The account will remain in INVITED status until the recipient accepts the email invitation.",
+    youBadge: "YOU",
+    noRole: "No Role",
+    listAccessDeniedTitle: "Access denied",
+    listAccessDeniedMessage:
+      "You do not have the required permission (admin.users.read) to view the staff directory.",
+    suspendActionTitle: "Suspend Admin User",
+    activateActionTitle: "Activate Admin User",
+    deleteActionTitle: "Delete Admin User",
+    suspendActionDescription: (name: string) =>
+      `Are you sure you want to suspend ${name}? Active sessions will be terminated.`,
+    activateActionDescription: (name: string) =>
+      `Are you sure you want to reactivate ${name}?`,
+    deleteActionDescription: (name: string) =>
+      `Are you sure you want to delete ${name}?`,
+    rolesLoadFailed: "Failed to load roles",
+    requestChangedTitle: "Request changed",
+    requestChangedDesc:
+      "Restore the original values before retrying the unresolved invitation.",
+    invitationSentTitle: "Invitation Sent",
+    invitationSentDesc: "The invitation email has been sent successfully.",
+    invitationConfirmedTitle: "Invitation confirmed",
+    invitationConfirmedDesc:
+      "An authoritative user read confirmed the invitation was saved.",
+    invitationFailedTitle: "Invitation Failed",
+    cancel: "Cancel",
+    ambiguousInviteMessage:
+      "The invitation outcome is unconfirmed. Retry the exact unchanged request.",
+    firstNamePlaceholder: "Omar",
+    lastNamePlaceholder: "Hassan",
+    selectRolePlaceholder: "Select a role",
+    superAdminHint: "Bypasses all permission checks authoritative backend logic.",
+    copiedTitle: "Copied",
+    copiedDesc: "The user ID was copied.",
+    copyFailedTitle: "Copy Failed",
+    copyFailedDesc: "The user ID could not be copied.",
+    metadataCardTitle: "System & Activity Metadata",
+    copyIdTitle: "Copy ID",
+    idLabel: "ID",
+    enabledBadge: "Enabled",
+    disabledBadge: "Disabled",
+    sipUsernameLabel: "SIP Username",
+    displayNameLabel: "Display Name",
+    outboundCallerIdLabel: "Outbound Caller ID",
+    sipTransportLabel: "SIP Transport",
+    loadFailedTitle: "Load Error",
+    identityRequiredFieldMsg: "First name and last name are required.",
+    requiredFieldTitle: "Required Field",
+    identitySavedTitle: "Saved",
+    identitySavedDesc: "Identity profile updated successfully.",
+    saveErrorTitle: "Save Error",
+    roleAssignedTitle: "Role Assigned",
+    roleAssignedDesc:
+      "Role updated successfully. Active sessions have been invalidated.",
+    validationErrorTitle: "Validation Error",
+    webphoneSavedTitle: "Phone Settings Saved",
+    webphoneSavedDesc: "WebPhone configuration updated successfully.",
+    statusUpdatedTitle: "Success",
+    statusUpdatedDesc: "User status updated successfully.",
+    updateErrorTitle: "Update Error",
+    deletedTitle: "Deleted",
+    deletedFromDetailDesc: "Admin user deleted successfully.",
+    deleteErrorTitle: "Delete Error",
+    webphoneRequiresExtensionMsg:
+      "Enabled WebPhone settings require an extension and SIP username.",
+    webphoneRequiresPasswordMsg:
+      "Enabled WebPhone settings require a SIP password.",
+    fetchLoadErrorTitle: "Load Error",
+    forbiddenActionTitle: "Forbidden Action",
+    forbiddenActionDesc: "You cannot perform this action on your own account.",
+    deletedFromListDesc: "User deleted successfully",
+    suspendedTitle: "Suspended",
+    suspendedDesc: "User suspended successfully",
+    activatedTitle: "Activated",
+    activatedDesc: "User activated successfully",
+    actionFailedTitle: "Action Failed",
   },
   roles: {
     pageTitle: "Admin Roles & Permissions",
@@ -1185,5 +1260,131 @@ export const en: Dictionary = {
     saveChanges: "Save Configuration Settings",
     saving: "Saving configuration...",
     saveSuccess: "System settings saved successfully!",
+    field: {
+      invalidValueTitle: "Invalid Value",
+      valueSaveFailed: "The value could not be saved.",
+      permissionLockedNote:
+        "Editing requires both admin.settings.update and admin.settings.critical.",
+      environmentLockedNote:
+        "Managed by environment configuration and is read-only.",
+      saving: "Saving...",
+      reloadDisabledHint:
+        "Save the edit before reloading the authoritative value.",
+      reloadHint: "Reload this setting from Core",
+      reload: "Reload",
+    },
+    banner: {
+      unsavedChanges: "You have unsaved changes.",
+      saveChanges: "Save Changes",
+    },
+    search: {
+      placeholder: "Search settings...",
+    },
+    boundary: {
+      loading: "Loading settings…",
+      forbiddenTitle: "Settings read permission required",
+      unavailableTitle: "Settings service is unavailable",
+      errorTitle: "Settings could not be loaded",
+      errorDetail:
+        "The load failure is not being shown as empty data. You can retry safely.",
+      retry: "Retry",
+    },
+    validation: {
+      wholeNumber: "Enter a whole number.",
+      minValue: (min: number) => `Value must be at least ${min}.`,
+      maxValue: (max: number) => `Value must be at most ${max}.`,
+      invalidBoolean: "Invalid boolean value.",
+      invalidText: "Invalid text value.",
+      invalidOption: "Invalid option selected.",
+      invalidIceServerArray:
+        "Enter a valid JSON array of RTCIceServer objects.",
+      invalidJsonObject: "Enter a valid JSON object.",
+      invalidWebsocketUrl:
+        "WebSocket URL must start with ws:// or wss:// and contain no spaces.",
+      topUpMustBeIntegers: "Wallet top-up limits must be integers.",
+      topUpMinGreaterThanMax: (maximum: number) =>
+        `Minimum cannot be greater than the maximum (${maximum}).`,
+      unresolvedWrite:
+        "A previous save has an unresolved outcome. Retry the exact original value before changing it.",
+      dependentTopUpSkipped:
+        "The dependent value was not sent because the first top-up limit write failed.",
+      saveFailedGeneric: (code: string) =>
+        `This setting could not be saved safely. Error code: ${code}`,
+    },
+    save: {
+      failedTitle: "Save failed",
+      successTitle: "Settings saved",
+      successDescription: "System configuration updated successfully.",
+    },
+    pages: {
+      auth: {
+        title: "Authentication",
+        empty: "No authentication registry settings are configured.",
+      },
+      billing: {
+        title: "Billing & Trials",
+        empty: "No billing or trial settings are registered.",
+      },
+      notifications: {
+        title: "Notifications",
+        empty: "No notification settings are registered.",
+      },
+      platform: {
+        title: "Platform & Support",
+        emptyFiltered: "No settings match your search.",
+        emptyGroup: "No settings are registered in this group.",
+      },
+    },
+    currencyRates: {
+      title: "Currency Exchange Rates",
+      subtitle: "Manage foreign exchange conversion units per 1.00 USD.",
+      refresh: "Refresh",
+      batchEdit: "Batch edit",
+      addCurrency: "Add Currency Rate",
+      baseCurrencyLabel: "USD (USD 1.00)",
+      baseCurrencyNote: "is the system base currency (fixed).",
+      totalManaged: "Total Managed Currencies:",
+      empty: "No foreign exchange rates defined yet.",
+      table: {
+        currency: "Currency",
+        rate: "Units per 1.00 USD",
+        status: "Status",
+        actions: "Actions",
+      },
+      statusActive: "Active",
+      statusInactive: "Inactive",
+      deactivate: "Deactivate",
+      activate: "Activate",
+      edit: "Edit",
+      editRateTitle: (code: string) => `Edit Exchange Rate (${code})`,
+      addRateTitle: "Add New Exchange Rate",
+      currencyCodeLabel: "Currency Code (3 ISO Letters)",
+      unitsLabel: "Units per 1.00 USD",
+      activeLabel: "Active currency rate",
+      cancel: "Cancel",
+      save: "Save",
+      batchDialogTitle: "Batch edit currency rates",
+      batchDialogDescription:
+        "One line per currency: CODE,RATE,ACTIVE. Omitted currencies stay unchanged.",
+      saveBatch: "Save batch",
+      validation: {
+        actionFailedTitle: "Action failed",
+        loadFailed: "Failed to load exchange rates.",
+        insufficientPermissions:
+          "Missing currency-manage and catalogue-critical permissions.",
+        saveFailed: "Failed to save currency rate.",
+        rateSavedTitle: "Currency rate saved",
+        batchSaveFailed: "Failed to save currency rates.",
+        batchSavedTitle: "Currency rates saved",
+        currencyCodeInvalid: "Currency code must be exactly three ISO letters.",
+        usdImmutable: "USD is the fixed base currency and cannot be managed.",
+        rateFormatInvalid:
+          "Rate must be a positive decimal string with at most 12 whole and 12 fractional digits.",
+        batchCodesUnique: "Batch currency codes must be unique.",
+        lineFormatInvalid: "Each line must be CODE,RATE[,ACTIVE].",
+        atLeastOneRate: "Add at least one currency rate.",
+        batchInvalid: "Batch rates are invalid.",
+      },
+    },
   },
 };

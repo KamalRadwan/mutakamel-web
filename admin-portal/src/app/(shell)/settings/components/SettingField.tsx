@@ -3,6 +3,8 @@
 import { Save, Info, Lock, RefreshCw } from "lucide-react";
 import { SettingFieldData } from "../hooks/useSettings";
 import { useToast } from "@/components/ui/ToastContext";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 
 interface SettingFieldProps {
   setting: SettingFieldData;
@@ -16,6 +18,7 @@ interface SettingFieldProps {
 
 export function SettingField({ setting, lang, onUpdate, onReload }: SettingFieldProps) {
   const toast = useToast();
+  const copy = (lang === "ar" ? ar : en).settings.field;
   const {
     key,
     value: initialValue,
@@ -46,8 +49,8 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
       await onUpdate(key, newVal);
     } catch (err: unknown) {
       toast.error(
-        lang === "ar" ? "قيمة غير صالحة" : "Invalid Value",
-        errorText(err) || (lang === "ar" ? "تعذر حفظ القيمة." : "The value could not be saved."),
+        copy.invalidValueTitle,
+        errorText(err) || copy.valueSaveFailed,
       );
     }
   };
@@ -80,13 +83,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
 
           {readOnly && (
             <p className="text-xs text-warn-700 dark:text-warn-400 font-medium mt-2 bg-warn-50 dark:bg-warn-950/20 px-2 py-1 rounded w-fit">
-              {permissionLocked
-                ? lang === "ar"
-                  ? "يتطلب التعديل صلاحيتَي admin.settings.update و admin.settings.critical معاً."
-                  : "Editing requires both admin.settings.update and admin.settings.critical."
-                : lang === "ar"
-                  ? "هذا الإعداد يُدار عبر بيئة التشغيل ومقفل للتعديل."
-                  : "Managed by environment configuration and is read-only."}
+              {permissionLocked ? copy.permissionLockedNote : copy.environmentLockedNote}
             </p>
           )}
 
@@ -164,7 +161,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
             {isSaving ? (
               <span className="flex items-center gap-1.5 text-brand-600 dark:text-brand-400 animate-pulse">
                 <Save className="w-3.5 h-3.5" />
-                {lang === "ar" ? "جاري الحفظ..." : "Saving..."}
+                {copy.saving}
               </span>
             ) : (
               <button
@@ -173,22 +170,14 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
                   void Promise.resolve(onReload(key)).catch(() => undefined);
                 }}
                 disabled={isRefreshing || hasPendingChange}
-                title={
-                  hasPendingChange
-                    ? lang === "ar"
-                      ? "احفظ التغيير قبل إعادة تحميل القيمة الموثوقة."
-                      : "Save the edit before reloading the authoritative value."
-                    : lang === "ar"
-                      ? "إعادة تحميل هذا الإعداد من Core"
-                      : "Reload this setting from Core"
-                }
+                title={hasPendingChange ? copy.reloadDisabledHint : copy.reloadHint}
                 className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-brand-300"
               >
                 <RefreshCw
                   className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`}
                   aria-hidden="true"
                 />
-                {lang === "ar" ? "إعادة تحميل" : "Reload"}
+                {copy.reload}
               </button>
             )}
           </div>

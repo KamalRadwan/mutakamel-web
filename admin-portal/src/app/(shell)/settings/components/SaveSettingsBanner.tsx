@@ -2,6 +2,8 @@
 
 import { Save, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/ToastContext";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 
 interface SaveSettingsBannerProps {
   hasUnsavedChanges: boolean;
@@ -12,6 +14,7 @@ interface SaveSettingsBannerProps {
 
 export function SaveSettingsBanner({ hasUnsavedChanges, isSaving, onSave, lang }: SaveSettingsBannerProps) {
   useToast();
+  const copy = (lang === "ar" ? ar : en).settings.banner;
 
   const handleSave = async () => {
     try {
@@ -28,7 +31,7 @@ export function SaveSettingsBanner({ hasUnsavedChanges, isSaving, onSave, lang }
       <div className="flex items-center gap-3 text-warn-800 dark:text-warn-300">
         <AlertCircle className="w-5 h-5 shrink-0" />
         <p className="text-sm font-semibold">
-          {lang === "ar" ? "لديك تغييرات غير محفوظة." : "You have unsaved changes."}
+          {copy.unsavedChanges}
         </p>
       </div>
       <button
@@ -38,7 +41,7 @@ export function SaveSettingsBanner({ hasUnsavedChanges, isSaving, onSave, lang }
         className="w-full sm:w-auto px-4 py-2 text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-ink-950 dark:bg-brand-400 dark:hover:bg-brand-500 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
       >
         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-        {lang === "ar" ? "حفظ التغييرات" : "Save Changes"}
+        {copy.saveChanges}
       </button>
     </div>
   );

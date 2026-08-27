@@ -54,6 +54,8 @@ const COPY = {
     rotatedToast: "Storage encryption key rotated",
     actionFailed: "The storage runtime action failed",
     successNotice: "The storage runtime configuration was updated.",
+    unknownErrorCode: (code: string) =>
+      `The operation could not be completed safely. Error code: ${code}`,
   },
   ar: {
     title: "تشغيل التخزين",
@@ -100,6 +102,8 @@ const COPY = {
     rotatedToast: "تم تدوير مفتاح تشفير التخزين",
     actionFailed: "تعذر تنفيذ عملية تشغيل التخزين",
     successNotice: "تم تحديث إعداد تشغيل التخزين.",
+    unknownErrorCode: (code: string) =>
+      `تعذر إكمال العملية بأمان. رمز الخطأ: ${code}`,
   },
 } as const;
 
@@ -370,9 +374,7 @@ function mutationMessage(
     return brokerNotConfiguredMessage;
   }
   const safeCode = code ?? "UNKNOWN_ERROR";
-  return state.lang === "ar"
-    ? `تعذر إكمال العملية بأمان. رمز الخطأ: ${safeCode}`
-    : `The operation could not be completed safely. Error code: ${safeCode}`;
+  return COPY[state.lang].unknownErrorCode(safeCode);
 }
 
 function formatUpdatedAt(value: string, lang: "ar" | "en"): string {

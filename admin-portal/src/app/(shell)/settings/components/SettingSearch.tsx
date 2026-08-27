@@ -9,7 +9,7 @@ interface SettingSearchProps {
 }
 
 export function SettingSearch({ value, onChange }: SettingSearchProps) {
-  const { lang } = useI18n();
+  const { t } = useI18n();
 
   return (
     <div className="relative w-full sm:w-72">
@@ -18,7 +18,7 @@ export function SettingSearch({ value, onChange }: SettingSearchProps) {
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={lang === "ar" ? "تصفية الإعدادات..." : "Search settings..."}
+        placeholder={t.settings.search.placeholder}
         className="w-full ps-9 pe-8 py-2 text-xs bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand-500 transition-colors"
       />
       {value && (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useCurrencyRates } from "../hooks/useCurrencyRates";
+import { useI18n } from "@/i18n/I18nContext";
 import { Coins, Plus, Edit2, Loader2, RefreshCw, CheckCircle2, XCircle, DollarSign } from "lucide-react";
 import {
   Card,
@@ -27,7 +28,6 @@ function formatCurrencyRate(val: string): string {
 
 export function CurrencyRatesSection() {
   const {
-    lang,
     rates,
     isLoading,
     isSaving,
@@ -43,6 +43,8 @@ export function CurrencyRatesSection() {
     toggleRateStatus,
     batchUpsertRates,
   } = useCurrencyRates();
+  const { t } = useI18n();
+  const copy = t.settings.currencyRates;
 
   const [formCurrencyCode, setFormCurrencyCode] = useState("");
   const [formUnitsPerUsd, setFormUnitsPerUsd] = useState("");
@@ -82,46 +84,46 @@ export function CurrencyRatesSection() {
     try {
       const rates = batchText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
         const [currencyCode, currencyUnitsPerUsd, active = "true"] = line.split(",").map((part) => part.trim());
-        if (!currencyCode || !currencyUnitsPerUsd) throw new Error("Each line must be CODE,RATE[,ACTIVE].");
+        if (!currencyCode || !currencyUnitsPerUsd) throw new Error(copy.validation.lineFormatInvalid);
         return { currencyCode, currencyUnitsPerUsd, isActive: active.toLowerCase() !== "false" };
       });
-      if (!rates.length) throw new Error("Add at least one currency rate.");
+      if (!rates.length) throw new Error(copy.validation.atLeastOneRate);
       if (await batchUpsertRates(rates)) {
         setIsBatchOpen(false);
         setBatchText("");
       }
     } catch (submissionError) {
-      setBatchError(submissionError instanceof Error ? submissionError.message : "Batch rates are invalid.");
+      setBatchError(submissionError instanceof Error ? submissionError.message : copy.validation.batchInvalid);
     }
   };
 
   const columns: ColumnDef<CurrencyRateView>[] = [
     {
       key: "currency",
-      headerEn: lang === "ar" ? "العملة" : "Currency",
-      headerAr: lang === "ar" ? "العملة" : "Currency",
+      headerEn: copy.table.currency,
+      headerAr: copy.table.currency,
       cell: (rate) => <span className="font-mono font-semibold text-foreground">{rate.currencyCode}</span>,
     },
     {
       key: "rate",
-      headerEn: lang === "ar" ? "الوحدات مقابل 1.00 USD" : "Units per 1.00 USD",
-      headerAr: lang === "ar" ? "الوحدات مقابل 1.00 USD" : "Units per 1.00 USD",
+      headerEn: copy.table.rate,
+      headerAr: copy.table.rate,
       cell: (rate) => <span className="font-mono text-foreground">{formatCurrencyRate(rate.currencyUnitsPerUsd)}</span>,
     },
     {
       key: "status",
-      headerEn: lang === "ar" ? "الحالة" : "Status",
-      headerAr: lang === "ar" ? "الحالة" : "Status",
+      headerEn: copy.table.status,
+      headerAr: copy.table.status,
       cell: (rate) =>
         rate.isActive ? (
           <Badge tone="brand">
             <CheckCircle2 className="size-3" aria-hidden="true" />
-            {lang === "ar" ? "نشط" : "Active"}
+            {copy.statusActive}
           </Badge>
         ) : (
           <Badge tone="neutral">
             <XCircle className="size-3" aria-hidden="true" />
-            {lang === "ar" ? "غير نشط" : "Inactive"}
+            {copy.statusInactive}
           </Badge>
         ),
     },
@@ -129,21 +131,19 @@ export function CurrencyRatesSection() {
       ? [
           {
             key: "actions",
-            headerEn: lang === "ar" ? "الإجراءات" : "Actions",
-            headerAr: lang === "ar" ? "الإجراءات" : "Actions",
+            headerEn: copy.table.actions,
+            headerAr: copy.table.actions,
             align: "end" as const,
             cell: (rate: CurrencyRateView) => (
               <div className="flex items-center justify-end gap-2">
                 <Button type="button" variant="ghost" size="sm" onClick={() => toggleRateStatus(rate)}>
-                  {rate.isActive
-                    ? lang === "ar" ? "تعطيل" : "Deactivate"
-                    : lang === "ar" ? "تفعيل" : "Activate"}
+                  {rate.isActive ? copy.deactivate : copy.activate}
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  title={lang === "ar" ? "تعديل" : "Edit"}
+                  title={copy.edit}
                   onClick={() => {
                     setEditingRate(rate);
                     setIsAddModalOpen(true);
@@ -167,20 +167,18 @@ export function CurrencyRatesSection() {
           </div>
           <div>
             <h2 className="text-base font-semibold text-foreground">
-              {lang === "ar" ? "أسعار صرف العملات" : "Currency Exchange Rates"}
+              {copy.title}
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {lang === "ar"
-                ? "إدارة أسعار الصرف بالنسبة للعملة الأساسية (الدولار الأمريكي USD 1.00)."
-                : "Manage foreign exchange conversion units per 1.00 USD."}
+              {copy.subtitle}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={fetchRates} disabled={isLoading} title={lang === "ar" ? "تحديث" : "Refresh"}>
+          <Button type="button" variant="ghost" size="sm" onClick={fetchRates} disabled={isLoading} title={copy.refresh}>
             <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
-            {lang === "ar" ? "تحديث" : "Refresh"}
+            {copy.refresh}
           </Button>
 
           {canManage && (
@@ -194,7 +192,7 @@ export function CurrencyRatesSection() {
                   setIsBatchOpen(true);
                 }}
               >
-                {lang === "ar" ? "تعديل جماعي" : "Batch edit"}
+                {copy.batchEdit}
               </Button>
               <Button
                 type="button"
@@ -206,7 +204,7 @@ export function CurrencyRatesSection() {
                 }}
               >
                 <Plus className="size-4" aria-hidden="true" />
-                {lang === "ar" ? "إضافة عملة" : "Add Currency Rate"}
+                {copy.addCurrency}
               </Button>
             </>
           )}
@@ -216,10 +214,10 @@ export function CurrencyRatesSection() {
       <div className="flex items-center gap-2 border-b border-border bg-muted px-5 py-3 text-xs text-muted-foreground">
         <DollarSign className="size-4 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
         <span>
-          <strong className="font-semibold text-foreground">USD (USD 1.00)</strong>{" "}
-          {lang === "ar" ? "هي العملة الأساسية للنظام ولا تتغير." : "is the system base currency (fixed)."}&nbsp;
+          <strong className="font-semibold text-foreground">{copy.baseCurrencyLabel}</strong>{" "}
+          {copy.baseCurrencyNote}&nbsp;
           <span className="font-semibold text-muted-foreground">
-            ({lang === "ar" ? "إجمالي العملات المدارة:" : "Total Managed Currencies:"} {rates.length + 1})
+            ({copy.totalManaged} {rates.length + 1})
           </span>
         </span>
       </div>
@@ -234,7 +232,7 @@ export function CurrencyRatesSection() {
           <div className="py-8 text-center">
             <Coins className="mx-auto mb-2 size-8 text-muted-foreground" aria-hidden="true" />
             <p className="text-xs font-medium text-muted-foreground">
-              {lang === "ar" ? "لا توجد عملات إضافية معرفة بعد." : "No foreign exchange rates defined yet."}
+              {copy.empty}
             </p>
           </div>
         ) : (
@@ -258,20 +256,14 @@ export function CurrencyRatesSection() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base">
-              {editingRate
-                ? lang === "ar"
-                  ? `تعديل سعر صرف (${editingRate.currencyCode})`
-                  : `Edit Exchange Rate (${editingRate.currencyCode})`
-                : lang === "ar"
-                  ? "إضافة سعر صرف جديد"
-                  : "Add New Exchange Rate"}
+              {editingRate ? copy.editRateTitle(editingRate.currencyCode) : copy.addRateTitle}
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-1 block text-xs font-semibold text-muted-foreground">
-                {lang === "ar" ? "رمز العملة (3 أحرف ISO)" : "Currency Code (3 ISO Letters)"}
+                {copy.currencyCodeLabel}
               </label>
               <Input
                 type="text"
@@ -287,7 +279,7 @@ export function CurrencyRatesSection() {
 
             <div>
               <label className="mb-1 block text-xs font-semibold text-muted-foreground">
-                {lang === "ar" ? "الوحدات مقابل 1.00 USD" : "Units per 1.00 USD"}
+                {copy.unitsLabel}
               </label>
               <Input
                 type="text"
@@ -301,7 +293,7 @@ export function CurrencyRatesSection() {
 
             <label className="flex items-center gap-2 pt-1 text-xs font-semibold text-muted-foreground">
               <Checkbox checked={formIsActive} onCheckedChange={(checked) => setFormIsActive(checked === true)} />
-              {lang === "ar" ? "تفعيل هذه العملة" : "Active currency rate"}
+              {copy.activeLabel}
             </label>
 
             <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
@@ -313,11 +305,11 @@ export function CurrencyRatesSection() {
                   setEditingRate(null);
                 }}
               >
-                {lang === "ar" ? "إلغاء" : "Cancel"}
+                {copy.cancel}
               </Button>
               <Button type="submit" variant="primary" disabled={isSaving}>
                 {isSaving && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
-                {lang === "ar" ? "حفظ" : "Save"}
+                {copy.save}
               </Button>
             </div>
           </form>
@@ -327,9 +319,9 @@ export function CurrencyRatesSection() {
       <Dialog open={isBatchOpen} onOpenChange={(open) => !open && setIsBatchOpen(false)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-base">{lang === "ar" ? "تعديل أسعار الصرف جماعياً" : "Batch edit currency rates"}</DialogTitle>
+            <DialogTitle className="text-base">{copy.batchDialogTitle}</DialogTitle>
             <p className="text-xs text-muted-foreground">
-              {lang === "ar" ? "سطر لكل عملة: الرمز، السعر، الحالة." : "One line per currency: CODE,RATE,ACTIVE. Omitted currencies stay unchanged."}
+              {copy.batchDialogDescription}
             </p>
           </DialogHeader>
           <form onSubmit={handleBatchSubmit} className="space-y-4">
@@ -348,11 +340,11 @@ export function CurrencyRatesSection() {
             )}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setIsBatchOpen(false)}>
-                {lang === "ar" ? "إلغاء" : "Cancel"}
+                {copy.cancel}
               </Button>
               <Button type="submit" variant="primary" disabled={isSaving}>
                 {isSaving && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
-                {lang === "ar" ? "حفظ الكل" : "Save batch"}
+                {copy.saveBatch}
               </Button>
             </div>
           </form>

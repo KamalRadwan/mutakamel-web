@@ -1,6 +1,8 @@
 "use client";
 
 import { PageHeader } from "@/design-system";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { SettingField } from "../components/SettingField";
 import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
@@ -11,9 +13,10 @@ import { AuthSessionsPanel } from "./components/AuthSessionsPanel";
 export default function AuthSettingsPage() {
   const settingsState = useSettings("auth.");
   const { lang } = settingsState;
+  const copy = (lang === "ar" ? ar : en).settings.pages.auth;
   return (
     <div className="space-y-6">
-      <PageHeader title={lang === "ar" ? "المصادقة والأمان" : "Authentication"} />
+      <PageHeader title={copy.title} />
 
       <SettingsResourceBoundary
         state={settingsState.loadState}
@@ -40,9 +43,7 @@ export default function AuthSettingsPage() {
             ))
           ) : (
             <div className="rounded-lg border border-border bg-card p-8 text-center text-xs text-muted-foreground">
-              {lang === "ar"
-                ? "لا توجد إعدادات مصادقة مسجلة."
-                : "No authentication registry settings are configured."}
+              {copy.empty}
             </div>
           )}
         </div>

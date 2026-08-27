@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { PageHeader } from "@/design-system";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { SettingField } from "../components/SettingField";
 import { SettingSearch } from "../components/SettingSearch";
 import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
@@ -17,6 +19,7 @@ export default function PlatformSettingsPage() {
   const platform = useSettings("platform.");
   const support = useSettings("support.");
   const lang = platform.lang;
+  const copy = (lang === "ar" ? ar : en).settings.pages.platform;
   const allSettings = [...platform.settings, ...support.settings];
   const loadState = combineSettingsLoadStates([
     platform.loadState,
@@ -54,7 +57,7 @@ export default function PlatformSettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={lang === "ar" ? "المنصة والدعم" : "Platform & Support"}
+        title={copy.title}
         action={<SettingSearch value={search} onChange={setSearch} />}
       />
 
@@ -87,13 +90,7 @@ export default function PlatformSettingsPage() {
             ))
           ) : (
             <div className="rounded-lg border border-border bg-card p-8 text-center text-xs text-muted-foreground">
-              {allSettings.length
-                ? lang === "ar"
-                  ? "لا توجد نتائج مطابقة لبحثك."
-                  : "No settings match your search."
-                : lang === "ar"
-                  ? "لا توجد إعدادات مسجلة في هذه المجموعة."
-                  : "No settings are registered in this group."}
+              {allSettings.length ? copy.emptyFiltered : copy.emptyGroup}
             </div>
           )}
         </div>
