@@ -38,19 +38,25 @@ const toastDoubleFireSyntax = {
     "toast.error(...) here may double-fire with the transport's own 403 toast (dispatchForbiddenToast) — see docs/design-system/toast-contract.md.",
 };
 
-// Every pattern below has a real, live call site today in the routes
-// Phases 20-21 deliberately left unconverted (provisioning,
-// applications-catalogue, tenant-workspace — see
-// docs/design-system/migration.md), plus font-weight/radius sites that are
-// already clean. ESLint's `no-restricted-syntax` takes one severity for
-// its whole pattern list, and flat config can't give two different
-// severities to the same rule id on the same files (see the note above) —
-// so this stays one list at "warn" rather than error on real,
-// intentionally-deferred violations. `font-(black|extrabold|bold)` and
-// `rounded-(2xl|3xl)` have zero known violations as of the Phase 25 census
-// baseline and are the first candidates to promote to "error" once the
-// remaining patterns' violations are cleared (which requires converting
-// Phases 20-21, not a config change).
+// Every pattern below is at zero known violations as of the current census
+// baseline (docs/design-system/census.baseline.json) — the routes that used
+// to carry real, live call sites for these patterns (provisioning,
+// applications-catalogue, tenant-workspace, settings) have since converted.
+// Promoted from "warn" to "error": ESLint's `no-restricted-syntax` takes one
+// severity for its whole pattern list, and flat config can't give two
+// different severities to the same rule id on the same files (see the note
+// above), so `toastDoubleFireSyntax` — a correctness guard, not a migration
+// pattern — rides along at the same "error" severity here. That check's AST
+// selector matches "does this catch block contain both a toast.error(...)
+// call and a 403/AUTHORIZATION literal anywhere", not whether they're in
+// mutually-exclusive branches — a correctly-guarded if/else (403 branch
+// never calls toast, because the transport already toasts it) can still
+// trip it. Every real site of that shape in this app has already been
+// resolved by extracting a shared `isForbiddenError(err)` helper so the
+// literal `403` no longer textually co-occurs with the toast.error(...)
+// call in the same block (see e.g. src/app/(shell)/users/api/adminUsersApi.ts).
+// If this rule ever fires on genuinely correct code, that's the fix —
+// not disabling the line.
 const designSystemSyntax = [
   {
     selector: `Literal[value=/\\bfont-(black|extrabold|bold)\\b/]`,
@@ -98,7 +104,7 @@ const eslintConfig = defineConfig([
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/design-system/**"],
     rules: {
-      "no-restricted-syntax": ["warn", ...designSystemSyntax],
+      "no-restricted-syntax": ["error", ...designSystemSyntax],
     },
   },
   {
@@ -107,7 +113,7 @@ const eslintConfig = defineConfig([
     // migration patterns above forbid everywhere else.
     files: ["src/design-system/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-syntax": ["warn", toastDoubleFireSyntax],
+      "no-restricted-syntax": ["error", toastDoubleFireSyntax],
     },
   },
   // Override default ignores of eslint-config-next.

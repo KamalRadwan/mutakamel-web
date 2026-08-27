@@ -647,34 +647,3 @@ body {
   color: var(--foreground);
 }
 
-/* 3 of the original 4 legacy shim classes remain: .field/.primary-button/
-   .secondary-button/.danger-button still have real call sites in the
-   provisioning, applications-catalogue, and tenant-workspace screens that
-   Phases 20-21 of the design-system migration deliberately did not convert
-   (docs/design-system/migration.md) — deleting these now would silently
-   drop styling on those still-live screens with no build error to catch it.
-   .webphone-user-input had zero call sites and was removed in Phase 25.
-   Two of the remaining three are edited here (not left to the blanket
-   family remap): a "primary" action and a focus ring are both roles the
-   design system keeps brand-colored on purpose even during the
-   monochrome-first migration (docs/design-system/tokens.md) — letting
-   indigo/blue silently flatten to neutral ink here would make the primary
-   CTA and the focus indicator both disappear into the background for as
-   long as these shims are still in use. */
-@layer components {
-  .primary-button {
-    @apply inline-flex items-center justify-center rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-ink-950 transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-400 dark:hover:bg-brand-500;
-  }
-
-  .secondary-button {
-    @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900;
-  }
-
-  .danger-button {
-    @apply inline-flex items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50;
-  }
-
-  .field {
-    @apply min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100;
-  }
-}

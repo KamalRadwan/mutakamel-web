@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-27**
 
 Owner: **Admin Portal**
 
@@ -83,20 +83,29 @@ now. Every `CommandFeedback`/`MutationFeedback` state machine that carries
 idempotency-key evidence stayed in-body as `AmbiguousOutcomePanel`, per the
 non-negotiable in the original plan.
 
-**Phase 21 is partial.** The dashboard route shell is done: `DashboardHeader`
-(`PageHeader` + range/auto-refresh controls), `DashboardTabsNav` (`Tabs`,
-dropped the 14-hue per-tab icon map), `page.tsx` (`Skeleton`, token-based
-error/forbidden panels), `DashboardGroupsOverview` and `DashboardGroupPanel`
-(`Card`/`Badge`, blue/green/amber/slate tones collapsed onto the
-brand/warn/danger/neutral roles), `KpiCard` (now renders through the shared
-`StatCard` pattern instead of its own markup — see below), and every chart
-component under `components/charts/` (`ChartTooltip`, `CollectionGaugeChart`,
-`DomainHealthGaugeChart`, `MetricDonutChart`, `TenantGrowthRevenueChart`) have
-zero raw-palette-color lint warnings. Catalogue, settings, and tenants remain
-unconverted at the pattern layer — `tenants/[id]` alone is 4,189 lines and
-carries the largest remaining surface in the app. These routes still compile
-and pass their existing tests unchanged; they carry the Phase 6/7 token flip
-"for free" but not the pattern-layer conversion.
+**Phase 21 is effectively complete.** The dashboard route shell is done:
+`DashboardHeader` (`PageHeader` + range/auto-refresh controls),
+`DashboardTabsNav` (`Tabs`, dropped the 14-hue per-tab icon map), `page.tsx`
+(`Skeleton`, token-based error/forbidden panels), `DashboardGroupsOverview`
+and `DashboardGroupPanel` (`Card`/`Badge`, blue/green/amber/slate tones
+collapsed onto the brand/warn/danger/neutral roles), `KpiCard` (renders
+through the shared `StatCard` pattern), and every chart component under
+`components/charts/` have zero raw-palette-color lint warnings.
+Applications-catalogue is fully converted. `tenants/[id]` was refactored
+into `src/features/admin/tenant-workspace/` (access/billing/core/
+provisioning/storage sub-modules) — no longer a single 4,189-line file;
+every panel in that module (`TenantFqdnPanel`, `TenantProfilePanel`,
+`TenantLifecyclePanel`, `TenantBillingPanel`, `TenantWorkspaceScreen`, the
+access panel/dialogs) renders through `Card`/`CardHeader`/`Badge`/`Button`.
+**Remaining pattern-layer gap:** the tenant-creation wizard
+(`tenants/new/*`, 4 files) and most of Settings (9 files, including
+`SettingField.tsx` — the field renderer every settings page shares) are
+still hand-rolling forms/buttons/selects with correct tokens but no shared
+components. Settings additionally has a real pre-existing gap worth closing
+alongside that conversion: `useSettings.ts` already tracks per-setting
+idempotency-key/ambiguous-write-outcome evidence, but it never reaches the
+UI today — the only place it surfaces is a toast, which disappears, the
+exact failure mode AGENTS.md's non-negotiable rule exists to prevent.
 
 `StatCard` (`src/design-system/patterns/kpi/StatCard.tsx`) gained an optional
 `tone` prop (`brand`/`warn`/`danger`/`neutral`) driving an icon badge and a
@@ -156,12 +165,26 @@ neutral role set — both still stand.
 **Phase 23 — Content/i18n.** Fixed the specific hardcoded-English sites
 called out for this phase (`TablePagination`, `useActionMutation`'s toast
 titles; `useThemeToggle`/`useLanguageToggle` were already correct from an
-earlier phase). Added a dictionary parity test. **Explicitly not
-attempted:** the full 428-inline-ternary-across-80-files inventory, and
+earlier phase). Added a dictionary parity test.
+
+The full inline-ternary inventory this phase originally deferred (`lang ===
+"ar" ? … : …` scattered outside `src/i18n/dictionaries/{en,ar}.ts`, instead
+of living in the shared dictionary) was picked back up in a later session
+and closed out completely: the real count once boolean-derived variants
+(`const isArabic = lang === "ar"`, then `isArabic ? … : …` at dozens of call
+sites per file) were included was 487 sites across 99 files, not the
+originally-estimated 428/80 — that estimate came from a grep pattern that
+only matched the literal `lang === "ar" ?` shape and missed the
+boolean-derived one entirely. Every genuinely scattered site is now
+converted; a large minority of the original count turned out to already be
+acceptable local bilingual patterns that don't belong in the central
+dictionary (a per-file `const copy = lang === "ar" ? AR : EN` object, a
+`Record<Key, [en, ar]>` translation-lookup table, or a design-system
+primitive branching on its own `lang` prop for a few words of built-in
+micro-copy) — see the dictionary/i18n docs for how to tell the two apart.
 `dispatchForbiddenToast`'s hardcoded `"Access Denied"` string in
-`axiosClient.ts` — that file is this migration's non-negotiable, untouchable
-data-layer boundary and had unrelated in-progress changes from a concurrent
-process at the time.
+`axiosClient.ts` remains untouched — that file is this migration's
+non-negotiable, untouchable data-layer boundary.
 
 **Phase 24 — Docs.** This file and its siblings.
 
@@ -178,23 +201,45 @@ gradient budget, blur budget, `rounded-2xl`/`3xl`) had ever actually fired
 in a `pnpm lint` run, in any phase of this migration, despite lint being a
 gate on every one of them. Fixed by merging same-scope patterns into one
 array; running lint against the fix surfaced 2,574 real warnings (mostly
-raw-palette-color, concentrated in the Phase 20/21 routes that were unconverted
-at the time) that had been invisible the entire time. Flipping the whole rule
-to "error" as originally planned would have failed the build on all 2,574 —
-not safe given how much of the app was still unconverted. Instead: the two
-patterns with zero real violations (`font-(black|extrabold|bold)`,
-`rounded-(2xl|3xl)`) are now hard errors; the rest stay warnings until the
-remaining deferred routes convert. (Phase 20 and the dashboard route have
-since closed out their share of these warnings entirely — see above; the
-remaining count is now concentrated in catalogue/settings/tenants.) Also:
-verified `.field`/`.primary-button`/
-`.secondary-button`/`.danger-button` and `useAccessibleDialog.ts` still have
-real call sites in those same deferred routes and left them in place rather
-than deleting live-dependency code — only `.webphone-user-input` (confirmed
-zero call sites) was removed. `Navbar.tsx` and the 3 passthrough layouts
-were already gone (Phase 14). Confirmed `recharts` and the Phase 22 chart
-components are imported only from `(shell)/dashboard/`, so their ~500KB
-chunk is route-split and not part of every page's shared bundle.
+raw-palette-color, concentrated in the Phase 20/21 routes that were
+unconverted at the time) that had been invisible the entire time. Flipping
+the whole rule to "error" as originally planned would have failed the build
+on all 2,574 — not safe given how much of the app was still unconverted, so
+this phase originally promoted only the two patterns with zero real
+violations (`font-(black|extrabold|bold)`, `rounded-(2xl|3xl)`) to hard
+errors and left the rest as warnings.
+
+**That blocking condition is now gone.** Every one of the 7 migration
+patterns is confirmed at zero real violations app-wide (see the numbers
+table below); the whole `no-restricted-syntax` rule — all 7 migration
+patterns plus the toast double-fire check — is now `"error"`, in both
+`eslint.config.mjs` blocks (app code and `src/design-system/` itself). The
+toast double-fire check's AST selector has a known false-positive shape
+(matches "catch block contains both a toast.error(...) call and a
+403/AUTHORIZATION literal", not whether they're in mutually-exclusive
+branches) — every real site of that shape in this app has already been
+resolved by extracting a shared `isForbiddenError(err)` helper (see e.g.
+`src/app/(shell)/users/api/adminUsersApi.ts`) so the literal no longer
+co-occurs with the toast call; if this ever fires on genuinely correct new
+code, that extraction is the fix, not disabling the line — see the comment
+above the rule definition in `eslint.config.mjs`.
+
+Also from the original Phase 25 pass: `.field`/`.primary-button`/
+`.secondary-button`/`.danger-button` and `useAccessibleDialog.ts` still had
+real call sites in the then-deferred routes and were left in place rather
+than deleting live-dependency code; only `.webphone-user-input` (confirmed
+zero call sites) was removed at the time. `Navbar.tsx` and the 3 passthrough
+layouts were already gone (Phase 14). Confirmed `recharts` and the Phase 22
+chart components are imported only from `(shell)/dashboard/`, so their
+~500KB chunk is route-split and not part of every page's shared bundle.
+
+**Follow-up closure:** once every route finally converted, `.field`,
+`.secondary-button`, and `.danger-button` had zero remaining call sites and
+were deleted from `globals.css`; `.primary-button`'s one remaining call site
+(`TenantWorkspaceScreen.tsx`) was swapped to the `Button` primitive, then
+that class was deleted too. `useAccessibleDialog.ts` had already been
+deleted once its last consumer converted to the design-system `Dialog`.
+Phase 25.2/25.3 are now fully closed, not just partially.
 
 ## Current state vs. the numbers this migration started from
 
@@ -207,31 +252,41 @@ font-weight sites (280 of them `font-black`) against 101 normal/medium; zero
 loaded fonts; 467 hand-rolled `<button>` elements against 21 using a shared
 class; and a permanently-dark 15-item navbar with per-item hue-coded icons.
 
-The current baseline (`census.baseline.json`, updated through the Phase
-20/dashboard-shell conversion):
+The current baseline (`census.baseline.json`, regenerated 2026-08-27, after
+every route converted and the dead CSS shims removed):
 
 | Metric | Current |
 | --- | --- |
-| Color families in use | **12** (was 14 — see below) |
+| `colorUtilityTotal` | **0** |
+| Color families in use | **2** — both false positives, see below |
+| `arbitraryTypeSize` | **0** |
 | `fontBoldOrHeavier` | **0** |
 | `rounded-2xl`/`rounded-3xl` | **0** / **0** |
+| `gradients` | **0** |
+| `backdropBlur` | **0** |
 | `physicalRtlViolations` | **0** |
 | `navbarRenderSites` | **0** |
-| `toastCallSites` | **155** |
+| `handRolledTables` | **3** |
+| `toastCallSites` | **158** |
 
-**Why "12 families in use", not "4 roles"**: the census counts literal
-Tailwind class names still present in source (`text-slate-500`,
-`bg-emerald-500`, …), not which *token* they resolve to. Every one of those
-12 families is remapped by the theme flip onto one of the four roles at the
-CSS variable level — `slate` (2,738 sites), `emerald` (288), and `rose` (456)
-all render correctly on the new palette today — but Phase 7's codemod to
-rewrite the class names themselves onto semantic tokens (`bg-slate-900` →
-`bg-card`) covered roughly the top 120 highest-frequency pairs, not every
-site in the app. The remaining literal family names are functionally
-correct, not yet renamed; a future pass that pushes `colorFamiliesInUse`
-toward 4 (rather than "12 families whose CSS variables happen to all point
-at 4 ramps") is renaming work, not a visual bug. `gray`/`zinc`/`neutral`/
-`stone`/`orange`/`yellow`/`lime`/`green`/`fuchsia`/`pink` are already at
-zero — the remaining 12 families in use are `slate`, `red`, `amber`,
-`emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`,
-`rose`.
+**Every literal Tailwind color-family usage in live component code is gone
+— the "12 families → 4 roles" renaming work this doc used to describe as
+outstanding is done.** The census's `colorFamiliesInUse: 2` (2 `slate`, 2
+`blue`) is a measurement artifact, not a real remainder: the script's
+per-family counter scans `.css` files without filtering by file kind the
+way its `colorUtilityTotal` check does, and the only two matches left are
+`globals.css` **comments** — prose text describing the theme flip
+("`bg-slate-900` / `text-blue-400`") — not live `@apply`/utility classes. A
+manual grep for the actual utility-class regex
+(`\b(bg|text|border|...)-(slate|blue|...)-[0-9]{2,3}\b`) across every `.ts`,
+`.tsx`, and `.css` file in `src/` returns zero matches. Not worth editing
+those two comments just to force the number to literal 0 — they're
+historical narration, not code.
+
+`handRolledTables: 3` is the last real, honest signal of unconverted
+surface: `LoggingScreen.tsx`'s `LiveRowsTable` (a continuously-appending
+live-tail panel with no stable page/total-pages concept — `DataTable`'s
+`pagination` prop is required, not optional, so this is a genuine fit
+mismatch, not an oversight) and `TenantProvisioningWorkspaceView.tsx`
+(converted for i18n in a later session; its table was not in scope for
+that pass).

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Database, HardDrive, ReceiptText, Settings2, Users } from "lucide-react";
+import { Button } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantAccessPanel } from "./access";
 import { TenantBillingPanel } from "./billing/components/TenantBillingPanel";
@@ -69,7 +70,7 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
         <WorkspaceState alert>
           <p>{core.loadError?.message ?? copy.unavailable}</p>
           {core.loadError?.correlationId ? <p className="mt-2 font-mono text-xs">{copy.correlation}: {core.loadError.correlationId}</p> : null}
-          <button type="button" className="primary-button mt-4" onClick={() => void core.refresh()}>{copy.retry}</button>
+          <Button type="button" variant="primary" className="mt-4" onClick={() => void core.refresh()}>{copy.retry}</Button>
         </WorkspaceState>
       </PageFrame>
     );
