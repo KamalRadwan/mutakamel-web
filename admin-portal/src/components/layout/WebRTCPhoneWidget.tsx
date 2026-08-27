@@ -99,7 +99,6 @@ export function WebRTCPhoneWidget() {
 
   if (!phone.shouldRender) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const connectionLabel =
     phone.connectionState === 'registered'
       ? labels.registered
@@ -133,7 +132,7 @@ export function WebRTCPhoneWidget() {
             aria-label={labels.showPhone}
             onClick={() => phone.setExpanded(true)}
           >
-            <ConnectionDot state={phone.connectionState} />
+            <ConnectionDot state={phone.connectionState} label={connectionLabel} />
             <strong className="truncate text-xs font-extrabold">{phone.phoneDisplayName}</strong>
             <ChevronUp className="size-3.5 shrink-0 text-slate-400" />
           </button>
@@ -143,7 +142,7 @@ export function WebRTCPhoneWidget() {
             aria-label={lang === 'ar' ? 'هاتف WebRTC' : 'WebRTC phone'}
           >
             <header className="flex h-9 items-center gap-2 border-b border-slate-800 bg-slate-950 px-3 text-white">
-              <ConnectionDot state={phone.connectionState} />
+              <ConnectionDot state={phone.connectionState} label={connectionLabel} />
               <strong className="min-w-0 flex-1 truncate text-xs font-extrabold">{phone.phoneDisplayName}</strong>
               <button
                 type="button"
@@ -331,13 +330,14 @@ export function WebRTCPhoneWidget() {
   );
 }
 
-function ConnectionDot({ state }: { state: WebphoneConnectionState }) {
+function ConnectionDot({ state, label }: { state: WebphoneConnectionState; label: string }) {
   const tone = state === 'registered' || state === 'ready' ? 'bg-emerald-500' : state === 'connecting' || state === 'loading' ? 'bg-amber-400' : 'bg-rose-500';
 
   return (
-    <span className="relative flex size-2.5 shrink-0">
+    <span className="relative flex size-2.5 shrink-0" role="status">
       {state === 'registered' ? <span className={`absolute inline-flex size-full animate-ping rounded-full opacity-60 ${tone}`} /> : null}
       <span className={`relative inline-flex size-2.5 rounded-full ${tone}`} />
+      <span className="sr-only">{label}</span>
     </span>
   );
 }
