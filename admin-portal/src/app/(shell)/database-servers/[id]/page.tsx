@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import { Loader2, ShieldAlert } from "lucide-react";
-import { ErrorState } from "@/design-system";
+import { ErrorState, Card } from "@/design-system";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { EditDatabaseServerModal } from "@/features/admin/database-servers/components/EditDatabaseServerModal";
 import { DatabaseCredentialActionDialog } from "@/features/admin/database-servers/components/DatabaseCredentialActionDialog";
@@ -42,11 +42,13 @@ export default function DatabaseServerDetailPage({
 
 function DatabaseServerDetailContent({ id }: { id: string }) {
   const page = useDatabaseServerDetailPage(id);
+  const { t } = useI18n();
+  const d = t.databaseServerDetail;
 
   if (page.isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="size-8 animate-spin text-brand-600 dark:text-brand-400" aria-hidden="true" />
       </div>
     );
   }
@@ -74,8 +76,8 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
           isOpen={page.isDeleteModalOpen}
           onClose={() => page.setIsDeleteModalOpen(false)}
           onConfirm={page.handleDeleteConfirm}
-          title="Delete Database Server"
-          description="Deletion is available only when the server is empty and draining or offline."
+          title={d.deleteHost}
+          description={d.deleteHostDescription}
           targetName={server.name}
           actionType="delete"
           requireNameTyping={true}
@@ -90,17 +92,17 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
           onConfirm={() => void page.handleLifecycleConfirm()}
           title={
             page.lifecycleAction === "activate"
-              ? "Activate Database Server"
+              ? d.activateServer
               : page.lifecycleAction === "drain"
-                ? "Drain Database Server"
-                : "Take Database Server Offline"
+                ? d.drainConnections
+                : d.takeOffline
           }
           description={
             page.lifecycleAction === "activate"
-              ? "This server becomes eligible for new tenant placement."
+              ? d.activateServerDescription
               : page.lifecycleAction === "drain"
-                ? "New tenant placement stops while existing tenants remain assigned."
-                : "The server becomes unavailable for placement and connection operations."
+                ? d.drainConnectionsDescription
+                : d.takeOfflineDescription
           }
           targetName={server.name}
           actionType={page.lifecycleAction ?? "offline"}
@@ -221,25 +223,22 @@ function DatabaseServerDetailBoundary({
 }) {
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="grid place-items-center py-16">
-        <section
-          role={loading ? "status" : undefined}
-          className="flex max-w-xl flex-col items-center rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
-        >
-          {loading ? (
-            <Loader2 className="size-8 animate-spin text-blue-600" />
-          ) : (
-            <ShieldAlert className="size-8 text-amber-500" />
-          )}
-          <h1 className="mt-3 font-semibold">
-            {loading
-              ? lang === "ar"
-                ? "جارٍ التحقق من الصلاحيات..."
-                : "Checking database-server access..."
-              : lang === "ar"
-                ? "لا تملك صلاحية عرض هذا الخادم."
-                : "You do not have permission to view this database server."}
-          </h1>
-        </section>
+      <Card role={loading ? "status" : undefined} className="flex max-w-xl flex-col items-center p-8 text-center text-foreground">
+        {loading ? (
+          <Loader2 className="size-8 animate-spin text-brand-600 dark:text-brand-400" aria-hidden="true" />
+        ) : (
+          <ShieldAlert className="size-8 text-warn-600 dark:text-warn-400" aria-hidden="true" />
+        )}
+        <h1 className="mt-3 font-semibold">
+          {loading
+            ? lang === "ar"
+              ? "جارٍ التحقق من الصلاحيات..."
+              : "Checking database-server access..."
+            : lang === "ar"
+              ? "لا تملك صلاحية عرض هذا الخادم."
+              : "You do not have permission to view this database server."}
+        </h1>
+      </Card>
     </div>
   );
 }

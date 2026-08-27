@@ -26,6 +26,9 @@ export const ar = {
     submitting: "جاري التحقق والتسجيل...",
     footerNote: "نظام تحكم آمن ومشفّر لبيانات المنصة",
     invalidCredentials: "بريد إلكتروني أو كلمة مرور غير صحيحة",
+    forgotModalDescription: "سيتم إرسال رابط إعادة التعيين للبريد الإلكتروني",
+    cancel: "إلغاء",
+    sendResetLink: "إرسال رابط التعيين",
   },
   authActions: {
     common: {
@@ -858,9 +861,13 @@ export const ar = {
     backToList: "العودة لسيرفرات قواعد البيانات",
     editMetadata: "تعديل البيانات الأساسية",
     activateServer: "تفعيل السيرفر",
+    activateServerDescription: "يصبح هذا السيرفر مؤهلاً لاستقبال تسكين مستأجرين جدد.",
     drainConnections: "تفريغ الاتصالات",
+    drainConnectionsDescription: "يتوقف تسكين المستأجرين الجدد بينما يبقى المستأجرون الحاليون مُسندين.",
     takeOffline: "إيقاف السيرفر مؤقتاً",
+    takeOfflineDescription: "يصبح السيرفر غير متاح لعمليات التسكين والاتصال.",
     deleteHost: "حذف السيرفر",
+    deleteHostDescription: "الحذف متاح فقط عندما يكون السيرفر فارغاً وفي وضع التفريغ أو غير متصل.",
     tabs: {
       overview: "نظرة عامة والمقاييس",
       readiness: "جاهزية الوصول وحسابات النظام",

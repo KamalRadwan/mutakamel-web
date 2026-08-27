@@ -29,6 +29,9 @@ export const en: Dictionary = {
     submitting: "Authenticating session...",
     footerNote: "Secure & Encrypted Control Plane Infrastructure",
     invalidCredentials: "Invalid administrative email or password",
+    forgotModalDescription: "A password reset link will be sent to your email address.",
+    cancel: "Cancel",
+    sendResetLink: "Send reset link",
   },
   authActions: {
     common: {
@@ -893,9 +896,13 @@ export const en: Dictionary = {
     backToList: "Back to Database Servers",
     editMetadata: "Edit Metadata",
     activateServer: "Activate Server",
+    activateServerDescription: "This server becomes eligible for new tenant placement.",
     drainConnections: "Drain Connections",
+    drainConnectionsDescription: "New tenant placement stops while existing tenants remain assigned.",
     takeOffline: "Take Offline",
+    takeOfflineDescription: "The server becomes unavailable for placement and connection operations.",
     deleteHost: "Delete Host",
+    deleteHostDescription: "Deletion is available only when the server is empty and draining or offline.",
     tabs: {
       overview: "Overview & Metrics",
       readiness: "Access Readiness & System Principals",
