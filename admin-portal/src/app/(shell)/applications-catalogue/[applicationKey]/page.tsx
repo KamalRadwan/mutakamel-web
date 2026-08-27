@@ -150,7 +150,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Fact label={t.applications.detail.facts.applicationType} value={application.applicationType} />
         <Fact label={t.applications.detail.facts.commercialMode} value={application.commercialMode} />
-        <Fact label={lang === "ar" ? "نشر قاعدة البيانات" : "Database deployment"} value={application.databaseDeployment} />
+        <Fact label={t.applications.detail.facts.databaseDeployment} value={application.databaseDeployment} />
         <Fact label={t.applications.detail.facts.databasePrincipal} value={application.databasePrincipal || t.applications.detail.facts.none} mono />
       </section>
 

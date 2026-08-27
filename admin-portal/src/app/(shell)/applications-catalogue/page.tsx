@@ -276,7 +276,7 @@ function ApplicationsCatalogueContent() {
 }
 
 function ApplicationsBoundary({ loading = false }: { loading?: boolean }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   return (
     <div className="grid place-items-center py-16">
       <Card className="w-full max-w-xl">
@@ -284,7 +284,7 @@ function ApplicationsBoundary({ loading = false }: { loading?: boolean }) {
           {loading ? (
             <>
               <AppWindow className="mx-auto size-8 animate-pulse text-brand-500" />
-              <h1 className="mt-3 font-semibold">{lang === "ar" ? "جارٍ التحقق من الصلاحيات..." : "Checking Application Catalogue access..."}</h1>
+              <h1 className="mt-3 font-semibold">{t.applications.checkingAccess}</h1>
             </>
           ) : (
             <>
