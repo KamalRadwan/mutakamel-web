@@ -21,6 +21,8 @@ export const ar = {
     cancel: "إلغاء",
     switchToLightMode: "التبديل إلى الوضع الفاتح",
     switchToDarkMode: "التبديل إلى الوضع الداكن",
+    successTitle: "نجاح",
+    errorTitle: "خطأ",
   },
   login: {
     title: "تسجيل الدخول إلى لوحة التحكم",
@@ -1085,6 +1087,29 @@ export const ar = {
     deleteAccountTitle: "حذف الحساب نهائياً",
     deleteAccountDescription:
       "هل أنت متأكد من رغبتك في حذف هذا الحساب؟ لا يمكن التراجع عن هذا الإجراء.",
+    errors: {
+      unexpected: "حدث خطأ غير متوقع.",
+      missingPermissions: (perms?: string) =>
+        `عفواً، لا تملك الصلاحيات المطلوبة لهذا الإجراء${perms ? `: (${perms})` : ""}.`,
+      adminUserNotFound: "لم يتم العثور على حساب المشرف المطلوبة، ربما تم حذفه.",
+      adminEmailTaken: "البريد الإلكتروني مستخدم بالفعل لحساب مشرف آخر.",
+      roleNotFound: "الدور المحدد غير موجود، يرجى إعادة تحميل القائمة.",
+      adminSelfForbidden: "لا يمكنك تنفيذ هذا الإجراء على حسابك الخاص.",
+      adminSelfRoleChangeForbidden: "لا يمكنك تعديل دور حسابك الخاص بنفسك.",
+      adminLastSuperAdmin: "لا يمكن تعديل أو حذف آخر مدير خارق (Super Admin) في النظام.",
+      adminLastRoleManager: "لا يمكن سحب الدور من آخر مشرف يمتلك صلاحية إدارة الأدوار.",
+      adminInvitePending:
+        "المشرف ما زال في حالة (معلق الدعوة)، يجب قبول الدعوة أولاً لاستكمال الإجراء.",
+      adminSuperAdminRequired: "يتطلب هذا الإجراء صلاحية مدير خارق (Super Admin).",
+      rolePermissionEscalation: "الدور المحدد يحتوي على صلاحيات تتجاوز صلاحياتك الحالية.",
+      webphoneConfigIncomplete:
+        "يرجى إكمال رقم الامتداد، اسم مستخدم SIP، وكلمة المرور عند تفعيل الهاتف.",
+      webphoneExtensionTaken: "رقم الامتداد هذا مستخدم بالفعل.",
+      webphoneSipUsernameTaken: "اسم مستخدم SIP هذا مستخدم بالفعل.",
+      gatewayIdempotencyIssue: (code: string) =>
+        `خطأ في الاتصال بالبوابة (مفتاح التكرار ${code}). يرجى المحاولة مرة أخرى.`,
+      systemError: (code: string) => `خطأ النظام (${code})`,
+    },
   },
   roles: {
     pageTitle: "أدوار النظام والصلاحيات",

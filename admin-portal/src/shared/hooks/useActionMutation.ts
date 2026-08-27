@@ -4,8 +4,10 @@ import { normalizeApiError } from "@/shared/api/normalized-api-error";
 import { useToast } from "@/components/ui/ToastContext";
 import { shouldRotateWriteCommandKey } from "@/shared/api/write-command-recovery";
 import { useI18n } from "@/i18n/I18nContext";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 
-export interface ActionMutationOptions<TResult> {
+interface ActionMutationOptions<TResult> {
   onSuccessMessage?: string;
   onSuccess?: (result: TResult) => void | Promise<void>;
   /** Refetch authoritative state after a rejected or ambiguous command. */
@@ -28,7 +30,7 @@ export function useActionMutation() {
       const key = getIdempotencyKey(idempotencyPayload);
       const result = await action(key);
       if (options?.onSuccessMessage) {
-        toast.success(lang === "ar" ? "نجاح" : "Success", options.onSuccessMessage);
+        toast.success(lang === "ar" ? ar.common.successTitle : en.common.successTitle, options.onSuccessMessage);
       }
       resetKey();
       if (options?.onSuccess) {
@@ -43,7 +45,7 @@ export function useActionMutation() {
       if (options?.onErrorReconcile) {
         await options.onErrorReconcile();
       }
-      toast.error(lang === "ar" ? "خطأ" : "Error", normalized.message);
+      toast.error(lang === "ar" ? ar.common.errorTitle : en.common.errorTitle, normalized.message);
       throw normalized;
     } finally {
       setIsMutating(false);

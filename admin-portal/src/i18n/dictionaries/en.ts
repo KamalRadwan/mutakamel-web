@@ -23,6 +23,8 @@ export const en: Dictionary = {
     cancel: "Cancel",
     switchToLightMode: "Switch to Light Mode",
     switchToDarkMode: "Switch to Dark Mode",
+    successTitle: "Success",
+    errorTitle: "Error",
   },
   login: {
     title: "Admin Portal Sign-In",
@@ -1150,6 +1152,32 @@ export const en: Dictionary = {
     deleteAccountTitle: "Delete Admin User",
     deleteAccountDescription:
       "Are you sure you want to delete this account? Soft-delete will hide this record.",
+    errors: {
+      unexpected: "An unexpected error occurred.",
+      missingPermissions: (perms?: string) =>
+        `Missing required permissions${perms ? `: (${perms})` : "."}`,
+      adminUserNotFound:
+        "The specified admin user could not be found or has been deleted.",
+      adminEmailTaken: "This email address is already registered to another admin.",
+      roleNotFound: "The selected role was not found. Please refresh and select again.",
+      adminSelfForbidden: "You cannot perform this action on your own admin account.",
+      adminSelfRoleChangeForbidden: "An administrator cannot modify their own role.",
+      adminLastSuperAdmin:
+        "Cannot suspend or delete the last remaining active Super Admin.",
+      adminLastRoleManager: "Cannot change the role of the last active role manager.",
+      adminInvitePending:
+        "This account is still INVITED. The invitation must be accepted first.",
+      adminSuperAdminRequired: "Only a database-backed Super Admin can perform this action.",
+      rolePermissionEscalation:
+        "The selected role contains permissions exceeding your current scope.",
+      webphoneConfigIncomplete:
+        "Extension, SIP username, and SIP password are required when phone is enabled.",
+      webphoneExtensionTaken: "This SIP extension is already in use.",
+      webphoneSipUsernameTaken: "This SIP username is already in use.",
+      gatewayIdempotencyIssue: (code: string) =>
+        `Gateway Idempotency issue (${code}). Please retry the action.`,
+      systemError: (code: string) => `System Error (${code})`,
+    },
   },
   roles: {
     pageTitle: "Admin Roles & Permissions",

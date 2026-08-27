@@ -1,4 +1,6 @@
 import { normalizeErrorCode } from "../api/adminUsersApi";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 
 export interface MappedErrorDetails {
   code: string | null;
@@ -21,13 +23,13 @@ export function getErrorMessageAndDetails(
   const correlationId = (data?.correlationId as string) || (errorObj?.correlationId as string) || "";
   const serverMsg = (data?.message as string) || (data?.detail as string) || (data?.title as string);
 
-  const isAr = lang === "ar";
+  const copy = (lang === "ar" ? ar : en).users.errors;
   const fieldErrors: Record<string, string> = {};
 
   if (!code) {
     return {
       code: null,
-      message: serverMsg || (isAr ? "حدث خطأ غير متوقع." : "An unexpected error occurred."),
+      message: serverMsg || copy.unexpected,
       correlationId,
     };
   }
@@ -38,9 +40,7 @@ export function getErrorMessageAndDetails(
       const requiredPerms = (details?.permissions as string[] | undefined)?.join(", ");
       return {
         code,
-        message: isAr
-          ? `عفواً، لا تملك الصلاحيات المطلوبة لهذا الإجراء${requiredPerms ? `: (${requiredPerms})` : ""}.`
-          : `Missing required permissions${requiredPerms ? `: (${requiredPerms})` : "."}`,
+        message: copy.missingPermissions(requiredPerms),
         correlationId,
         isPermissionError: true,
       };
@@ -49,17 +49,13 @@ export function getErrorMessageAndDetails(
     case "ADMIN_USER_NOT_FOUND":
       return {
         code,
-        message: isAr
-          ? "لم يتم العثور على حساب المشرف المطلوبة، ربما تم حذفه."
-          : "The specified admin user could not be found or has been deleted.",
+        message: copy.adminUserNotFound,
         correlationId,
         isNotFound: true,
       };
 
     case "ADMIN_EMAIL_TAKEN": {
-      const msg = isAr
-        ? "البريد الإلكتروني مستخدم بالفعل لحساب مشرف آخر."
-        : "This email address is already registered to another admin.";
+      const msg = copy.adminEmailTaken;
       fieldErrors.email = msg;
       return {
         code,
@@ -70,9 +66,7 @@ export function getErrorMessageAndDetails(
     }
 
     case "ROLE_NOT_FOUND": {
-      const msg = isAr
-        ? "الدور المحدد غير موجود، يرجى إعادة تحميل القائمة."
-        : "The selected role was not found. Please refresh and select again.";
+      const msg = copy.roleNotFound;
       fieldErrors.roleId = msg;
       return {
         code,
@@ -85,9 +79,7 @@ export function getErrorMessageAndDetails(
     case "ADMIN_SELF_FORBIDDEN":
       return {
         code,
-        message: isAr
-          ? "لا يمكنك تنفيذ هذا الإجراء على حسابك الخاص."
-          : "You cannot perform this action on your own admin account.",
+        message: copy.adminSelfForbidden,
         correlationId,
         isSelfForbidden: true,
       };
@@ -95,9 +87,7 @@ export function getErrorMessageAndDetails(
     case "ADMIN_SELF_ROLE_CHANGE_FORBIDDEN":
       return {
         code,
-        message: isAr
-          ? "لا يمكنك تعديل دور حسابك الخاص بنفسك."
-          : "An administrator cannot modify their own role.",
+        message: copy.adminSelfRoleChangeForbidden,
         correlationId,
         isSelfForbidden: true,
       };
@@ -105,61 +95,47 @@ export function getErrorMessageAndDetails(
     case "ADMIN_LAST_SUPER_ADMIN":
       return {
         code,
-        message: isAr
-          ? "لا يمكن تعديل أو حذف آخر مدير خارق (Super Admin) في النظام."
-          : "Cannot suspend or delete the last remaining active Super Admin.",
+        message: copy.adminLastSuperAdmin,
         correlationId,
       };
 
     case "ADMIN_LAST_ROLE_MANAGER":
       return {
         code,
-        message: isAr
-          ? "لا يمكن سحب الدور من آخر مشرف يمتلك صلاحية إدارة الأدوار."
-          : "Cannot change the role of the last active role manager.",
+        message: copy.adminLastRoleManager,
         correlationId,
       };
 
     case "ADMIN_INVITE_PENDING":
       return {
         code,
-        message: isAr
-          ? "المشرف ما زال في حالة (معلق الدعوة)، يجب قبول الدعوة أولاً لاستكمال الإجراء."
-          : "This account is still INVITED. The invitation must be accepted first.",
+        message: copy.adminInvitePending,
         correlationId,
       };
 
     case "ADMIN_SUPER_ADMIN_REQUIRED":
       return {
         code,
-        message: isAr
-          ? "يتطلب هذا الإجراء صلاحية مدير خارق (Super Admin)."
-          : "Only a database-backed Super Admin can perform this action.",
+        message: copy.adminSuperAdminRequired,
         correlationId,
       };
 
     case "ROLE_PERMISSION_ESCALATION":
       return {
         code,
-        message: isAr
-          ? "الدور المحدد يحتوي على صلاحيات تتجاوز صلاحياتك الحالية."
-          : "The selected role contains permissions exceeding your current scope.",
+        message: copy.rolePermissionEscalation,
         correlationId,
       };
 
     case "WEBPHONE_CONFIG_INCOMPLETE":
       return {
         code,
-        message: isAr
-          ? "يرجى إكمال رقم الامتداد، اسم مستخدم SIP، وكلمة المرور عند تفعيل الهاتف."
-          : "Extension, SIP username, and SIP password are required when phone is enabled.",
+        message: copy.webphoneConfigIncomplete,
         correlationId,
       };
 
     case "WEBPHONE_EXTENSION_TAKEN": {
-      const msg = isAr
-        ? "رقم الامتداد هذا مستخدم بالفعل."
-        : "This SIP extension is already in use.";
+      const msg = copy.webphoneExtensionTaken;
       fieldErrors.extension = msg;
       return {
         code,
@@ -170,9 +146,7 @@ export function getErrorMessageAndDetails(
     }
 
     case "WEBPHONE_SIP_USERNAME_TAKEN": {
-      const msg = isAr
-        ? "اسم مستخدم SIP هذا مستخدم بالفعل."
-        : "This SIP username is already in use.";
+      const msg = copy.webphoneSipUsernameTaken;
       fieldErrors.sipUsername = msg;
       return {
         code,
@@ -188,16 +162,14 @@ export function getErrorMessageAndDetails(
     case "GW.IDEM.MISMATCH":
       return {
         code,
-        message: isAr
-          ? "خطأ في الاتصال بالبوابة (مفتاح التكرار). يرجى المحاولة مرة أخرى."
-          : `Gateway Idempotency issue (${code}). Please retry the action.`,
+        message: copy.gatewayIdempotencyIssue(code),
         correlationId,
       };
 
     default:
       return {
         code,
-        message: serverMsg || (isAr ? `خطأ النظام (${code})` : `System Error (${code})`),
+        message: serverMsg || copy.systemError(code),
         correlationId,
       };
   }
