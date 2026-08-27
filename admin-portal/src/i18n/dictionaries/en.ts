@@ -1249,6 +1249,48 @@ export const en: Dictionary = {
       deleteModalDescription:
         "Permanently deletes the run record, every artifact object and row in the run, and its manifest. Those recovery points cannot be restored afterward.",
     },
+    restoresScreen: {
+      evidenceRecorded: "Evidence recorded",
+      notAvailable: "Not available",
+      resolvePreviousPromotionTitle: "Resolve the previous promotion command first",
+      promoteAction: "Promote",
+      eyebrow: "Critical recovery boundary",
+      title: "Restore tests and promotion",
+      description:
+        "Restores begin as isolated verification runs. Promotion is a separate critical command requiring the exact target database name.",
+      startRestoreTestAction: "Start restore test",
+      ambiguousMessage:
+        "This tab retains only the key, a non-readable digest, and the resource ID. Check restore history before retrying, then re-enter the exact original values. Audit reasons and confirmation text are never stored.",
+      tenantIdLabel: "Tenant ID",
+      tenantIdError: "Tenant ID must be a valid UUID.",
+      statusLabel: "Status",
+      allStatusesPlaceholder: "All statuses",
+      applyButton: "Apply",
+      refreshButton: "Refresh",
+      degradedDescription:
+        "Worker restore data remains available; server IDs are shown instead of names.",
+      emptyTitle: "No restore runs",
+      emptyNoArtifacts: "No completed artifact is available for a restore test.",
+      emptyStartHint: "Start an isolated restore test to prove recoverability.",
+      verificationNote:
+        "Only verification presence is shown; the raw verification payload is not rendered.",
+      startDialogDescription:
+        "Only the command identity, request digest, and artifact ID stay in this tab; the audit reason and target database name are not stored.",
+      confirmStartTest: "Start test",
+      completedArtifactLabel: "Completed artifact",
+      selectArtifactPlaceholder: "Select an artifact",
+      targetDbNameLabel: "Target database name (optional)",
+      targetDbNameError:
+        "Use letters, numbers, and underscores; start with a letter or underscore.",
+      auditReasonLabel: "Audit reason",
+      promoteDialogTitle: "Promote verified restore",
+      promoteDialogDescription:
+        "This tab retains only the command identity, digest, and restore-run ID. Type the exact target database name; confirmation text and reason are not stored.",
+      confirmPromote: "Promote restore",
+      verifiedOnlyNote: "Promotion is allowed only from VERIFIED state.",
+      promotionReasonLabel: "Promotion reason",
+      targetConfirmationLabel: "Target database confirmation",
+    },
   },
   createStorageServer: {
     backToList: "Back to Storage Servers",

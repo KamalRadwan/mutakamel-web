@@ -30,8 +30,8 @@ import {
 } from "@/design-system";
 
 export function BackupRestoresScreen() {
-  const { lang } = useI18n();
-  const isArabic = lang === "ar";
+  const { lang, t } = useI18n();
+  const copy = t.backup.restoresScreen;
   const view = useBackupRestores();
   const [handledArtifactRequest, setHandledArtifactRequest] = useState<string | undefined>();
   const [tenantId, setTenantId] = useState("");
@@ -100,13 +100,13 @@ export function BackupRestoresScreen() {
         restore.hasVerification ? (
           <span className="inline-flex items-center gap-2 text-brand-700 dark:text-brand-400">
             <CheckCircle2 className="size-4" />
-            {isArabic ? "دليل مسجل" : "Evidence recorded"}
+            {copy.evidenceRecorded}
           </span>
         ) : (
-          <span className="text-muted-foreground">{isArabic ? "غير متاح" : "Not available"}</span>
+          <span className="text-muted-foreground">{copy.notAvailable}</span>
         ),
     },
-    { key: "started", headerEn: "Started", headerAr: "بدأت", cell: (restore) => <span className="text-muted-foreground">{formatBackupDate(restore.startedAt, isArabic ? "ar-EG" : "en-US")}</span> },
+    { key: "started", headerEn: "Started", headerAr: "بدأت", cell: (restore) => <span className="text-muted-foreground">{formatBackupDate(restore.startedAt, lang === "ar" ? "ar-EG" : "en-US")}</span> },
     {
       key: "status",
       headerEn: "Status",
@@ -114,7 +114,7 @@ export function BackupRestoresScreen() {
       cell: (restore) => (
         <div>
           <BackupStatusBadge status={restore.status} />
-          {restore.hasFailure && <p className="mt-2 max-w-xs text-xs text-danger-600 dark:text-danger-400">{isArabic ? "تم تسجيل تفاصيل الفشل بأمان في Worker." : "Failure details are retained in Worker logs."}</p>}
+          {restore.hasFailure && <p className="mt-2 max-w-xs text-xs text-danger-600 dark:text-danger-400">{t.backup.artifactsScreen.failureRetainedNote}</p>}
         </div>
       ),
     },
@@ -136,9 +136,9 @@ export function BackupRestoresScreen() {
               setConfirmationText("");
             }}
             disabled={Boolean(view.activeAction) || anotherPromotionIsPending}
-            title={anotherPromotionIsPending ? (isArabic ? "احسم أمر الترقية السابق أولًا" : "Resolve the previous promotion command first") : undefined}
+            title={anotherPromotionIsPending ? copy.resolvePreviousPromotionTitle : undefined}
           >
-            {isArabic ? "ترقية" : "Promote"}
+            {copy.promoteAction}
           </Button>
         ) : (
           <span className="text-muted-foreground">—</span>
@@ -150,18 +150,14 @@ export function BackupRestoresScreen() {
   return (
     <div className="w-full space-y-6">
       <BackupPageHeader
-        eyebrow={isArabic ? "حد الاستعادة الحرج" : "Critical recovery boundary"}
-        title={isArabic ? "اختبارات الاستعادة والترقية" : "Restore tests and promotion"}
-        description={
-          isArabic
-            ? "تبدأ الاستعادة في قاعدة معزولة للتحقق. الترقية أمر حرج منفصل ويتطلب اسم قاعدة الهدف حرفيًا."
-            : "Restores begin as isolated verification runs. Promotion is a separate critical command requiring the exact target database name."
-        }
+        eyebrow={copy.eyebrow}
+        title={copy.title}
+        description={copy.description}
         actions={
           view.canRestore && (
             <Button type="button" variant="primary" onClick={openStart} disabled={view.artifacts.length === 0 || Boolean(view.activeAction)}>
               <Play className="size-4" />
-              {isArabic ? "بدء اختبار استعادة" : "Start restore test"}
+              {copy.startRestoreTestAction}
             </Button>
           )
         }
@@ -171,24 +167,20 @@ export function BackupRestoresScreen() {
         <AmbiguousOutcomePanel
           idempotencyKey={view.pendingStartAttempt?.idempotencyKey ?? view.pendingPromotionAttempt?.idempotencyKey}
           correlationId={view.retryableCommandError?.correlationId}
-          message={
-            isArabic
-              ? "يحتفظ هذا التبويب بالمفتاح وبصمة غير قابلة للقراءة ومعرف المورد فقط. افحص سجل الاستعادات ثم أعد إدخال القيم الأصلية حرفيًا عند الحاجة؛ أسباب التدقيق ونصوص التأكيد لا تُخزن."
-              : "This tab retains only the key, a non-readable digest, and the resource ID. Check restore history before retrying, then re-enter the exact original values. Audit reasons and confirmation text are never stored."
-          }
+          message={copy.ambiguousMessage}
         />
       )}
 
       <Card>
         <CardContent className="grid gap-4 p-5 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
-          <Field label={isArabic ? "معرف المستأجر" : "Tenant ID"} error={!tenantValid ? (isArabic ? "معرف المستأجر غير صحيح." : "Tenant ID must be a valid UUID.") : undefined}>
+          <Field label={copy.tenantIdLabel} error={!tenantValid ? copy.tenantIdError : undefined}>
             {(fp) => <Input {...fp} value={tenantId} onChange={(e) => setTenantId(e.target.value.trim())} placeholder="UUIDv7" />}
           </Field>
-          <Field label={isArabic ? "الحالة" : "Status"}>
+          <Field label={copy.statusLabel}>
             {(fp) => (
               <Select value={status} onValueChange={(v) => setStatus(v as RestoreRunStatus | "")}>
                 <SelectTrigger {...fp}>
-                  <SelectValue placeholder={isArabic ? "كل الحالات" : "All statuses"} />
+                  <SelectValue placeholder={copy.allStatusesPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
                   {Object.values(RestoreRunStatus).map((item) => (
@@ -199,11 +191,11 @@ export function BackupRestoresScreen() {
             )}
           </Field>
           <Button type="button" variant="primary" disabled={!tenantValid} onClick={() => view.setQuery(tenantId, status)}>
-            {isArabic ? "تطبيق" : "Apply"}
+            {copy.applyButton}
           </Button>
           <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={view.isLoading}>
             <RefreshCw className={`size-4 ${view.isLoading ? "animate-spin" : ""}`} />
-            {isArabic ? "تحديث" : "Refresh"}
+            {copy.refreshButton}
           </Button>
         </CardContent>
       </Card>
@@ -211,20 +203,16 @@ export function BackupRestoresScreen() {
       {view.error && <BackupErrorBanner error={view.error} />}
       {view.enrichmentWarning && (
         <DegradedBanner>
-          <p className="font-medium">{isArabic ? "تعذر تحميل أسماء خوادم قواعد البيانات" : "Database server names are unavailable"}</p>
-          <p className="text-xs leading-5">{isArabic ? "تظل بيانات الاستعادة من Worker متاحة، وتُعرض معرفات الخوادم بدلاً من الأسماء." : "Worker restore data remains available; server IDs are shown instead of names."}</p>
+          <p className="font-medium">{t.backup.artifactsScreen.degradedTitle}</p>
+          <p className="text-xs leading-5">{copy.degradedDescription}</p>
         </DegradedBanner>
       )}
 
       {view.error ? null : view.restores.length === 0 && !view.isLoading ? (
         <BackupStatePanel
           kind="empty"
-          title={isArabic ? "لا توجد عمليات استعادة" : "No restore runs"}
-          description={
-            view.artifacts.length === 0
-              ? isArabic ? "لا توجد نسخة مكتملة متاحة لبدء الاختبار." : "No completed artifact is available for a restore test."
-              : isArabic ? "ابدأ اختبار استعادة لإثبات قابلية الاسترجاع." : "Start an isolated restore test to prove recoverability."
-          }
+          title={copy.emptyTitle}
+          description={view.artifacts.length === 0 ? copy.emptyNoArtifacts : copy.emptyStartHint}
         />
       ) : (
         <div className="rounded-lg border border-border bg-card">
@@ -236,20 +224,16 @@ export function BackupRestoresScreen() {
             pagination={{ page: 1, limit: view.restores.length || 1, totalItems: view.restores.length, totalPages: 1, onPageChange: () => {} }}
           />
           <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
-            {isArabic ? "يُعرض وجود دليل التحقق فقط؛ لا تُعرض حمولة verification الخام." : "Only verification presence is shown; the raw verification payload is not rendered."}
+            {copy.verificationNote}
           </p>
         </div>
       )}
 
       <BackupDialog
         open={startOpen}
-        title={isArabic ? "بدء اختبار استعادة" : "Start restore test"}
-        description={
-          isArabic
-            ? "تُحفظ هوية الأمر وبصمة الطلب ومعرف النسخة فقط داخل هذا التبويب؛ لا يُحفظ سبب التدقيق أو اسم قاعدة الهدف."
-            : "Only the command identity, request digest, and artifact ID stay in this tab; the audit reason and target database name are not stored."
-        }
-        confirmLabel={isArabic ? "بدء الاختبار" : "Start test"}
+        title={copy.startRestoreTestAction}
+        description={copy.startDialogDescription}
+        confirmLabel={copy.confirmStartTest}
         onClose={() => {
           if (!view.activeAction) setStartOpen(false);
         }}
@@ -264,11 +248,11 @@ export function BackupRestoresScreen() {
         isSubmitting={view.activeAction === "start"}
         confirmDisabled={!artifactId || !reason.trim() || reason.length > 500 || !targetValid}
       >
-        <Field label={isArabic ? "النسخة المكتملة" : "Completed artifact"}>
+        <Field label={copy.completedArtifactLabel}>
           {(fp) => (
             <Select value={artifactId} onValueChange={setArtifactId}>
               <SelectTrigger {...fp}>
-                <SelectValue placeholder={isArabic ? "اختر نسخة" : "Select an artifact"} />
+                <SelectValue placeholder={copy.selectArtifactPlaceholder} />
               </SelectTrigger>
               <SelectContent>
                 {view.artifacts.map((artifact) => (
@@ -279,25 +263,21 @@ export function BackupRestoresScreen() {
           )}
         </Field>
         <Field
-          label={isArabic ? "اسم قاعدة الهدف (اختياري)" : "Target database name (optional)"}
-          error={!targetValid ? (isArabic ? "استخدم حروفًا وأرقامًا وشرطة سفلية، وابدأ بحرف أو شرطة سفلية." : "Use letters, numbers, and underscores; start with a letter or underscore.") : undefined}
+          label={copy.targetDbNameLabel}
+          error={!targetValid ? copy.targetDbNameError : undefined}
         >
           {(fp) => <Input {...fp} value={targetDatabaseName} onChange={(e) => setTargetDatabaseName(e.target.value)} maxLength={63} placeholder="restore_tenant_..." />}
         </Field>
-        <Field label={isArabic ? "سبب موثق" : "Audit reason"}>
+        <Field label={copy.auditReasonLabel}>
           {(fp) => <Textarea {...fp} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={4} />}
         </Field>
       </BackupDialog>
 
       <BackupDialog
         open={promotingRun !== null}
-        title={isArabic ? "ترقية الاستعادة" : "Promote verified restore"}
-        description={
-          isArabic
-            ? "يحتفظ هذا التبويب بهوية الأمر وبصمته ومعرف عملية الاستعادة فقط. اكتب اسم قاعدة الهدف حرفيًا؛ لا يُخزن نص التأكيد أو السبب."
-            : "This tab retains only the command identity, digest, and restore-run ID. Type the exact target database name; confirmation text and reason are not stored."
-        }
-        confirmLabel={isArabic ? "ترقية الاستعادة" : "Promote restore"}
+        title={copy.promoteDialogTitle}
+        description={copy.promoteDialogDescription}
+        confirmLabel={copy.confirmPromote}
         onClose={() => {
           if (!view.activeAction) setPromotingRun(null);
         }}
@@ -316,12 +296,12 @@ export function BackupRestoresScreen() {
       >
         <div className="rounded-md border border-danger-200 bg-danger-50 p-4 text-sm text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-200">
           <p className="font-semibold">{promotingRun?.targetDatabaseName}</p>
-          <p className="mt-1 text-xs">{isArabic ? "الترقية مسموحة فقط لحالة VERIFIED." : "Promotion is allowed only from VERIFIED state."}</p>
+          <p className="mt-1 text-xs">{copy.verifiedOnlyNote}</p>
         </div>
-        <Field label={isArabic ? "سبب الترقية" : "Promotion reason"}>
+        <Field label={copy.promotionReasonLabel}>
           {(fp) => <Textarea {...fp} value={promotionReason} onChange={(e) => setPromotionReason(e.target.value)} maxLength={500} rows={3} />}
         </Field>
-        <Field label={isArabic ? "اسم قاعدة الهدف للتأكيد" : "Target database confirmation"}>
+        <Field label={copy.targetConfirmationLabel}>
           {(fp) => <Input {...fp} value={confirmationText} onChange={(e) => setConfirmationText(e.target.value)} maxLength={63} />}
         </Field>
       </BackupDialog>
