@@ -17,7 +17,6 @@ export interface LeadStage {
   id: string;
   nameAr: string;
   nameEn: string;
-  color: string;
   flag: LeadStageFlag;
 }
 
@@ -85,15 +84,6 @@ export function buildCreateLeadRequest(
     ...(form.stageId ? { stageId: form.stageId } : {}),
   };
 }
-
-const STAGE_COLORS = [
-  "border-slate-200",
-  "border-sky-200",
-  "border-blue-200",
-  "border-purple-200",
-  "border-amber-200",
-  "border-emerald-200",
-] as const;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -277,11 +267,10 @@ export function parseLeadResponse(
 export function parseLeadStagesResponse(payload: unknown): LeadStage[] {
   return parseLeadStageCatalogueResponse(payload)
     .filter(({ isActive }) => isActive)
-    .map((stage, index) => ({
+    .map((stage) => ({
       id: stage.id,
       nameAr: stage.nameAr,
       nameEn: stage.nameEn,
-      color: STAGE_COLORS[index % STAGE_COLORS.length],
       flag: stage.flag,
     }));
 }
