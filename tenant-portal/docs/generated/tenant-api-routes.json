@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generatedAt": "2026-08-27T19:11:03.981Z",
+    "generatedAt": "2026-08-28T03:11:36.705Z",
     "generator": "scripts/docs/generate-route-inventory.mjs",
-    "frontendRevision": "67034e343dff+dirty",
-    "backendRevision": "3cbfe3e8ddd7+dirty",
+    "frontendRevision": "dbd18ccbee94+dirty",
+    "backendRevision": "4308162fb249",
     "sourcePolicy": "Gateway master ownership and canonicalization rules for master=tenant",
     "canonicalNamespaces": [
       "/api/tenant/core/v1/*",
@@ -34,10 +34,10 @@
     }
   },
   "sourceHashes": {
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "c6be913b7892dd919771a31a0a0c3f77952a95e940b2ef5f8aa798aa7c1bd66a",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts": "2c89b910a7fbb4b21e597305b86fd456f996ccf8f88791fc18f4cd9f86380202",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts": "adbfa5117542dd5acfec99de413aaa14e14b744ef663dac458b7b12e7ad06541",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "2669f7b959da1f8f8294e407f9fb4a1449a086b2efdd9de8ecf73f87df4cffe0",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "9854b533e118923843dac81c081a28a4ba6d4f2dbe7f9687b18786172ad9c6f9",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts": "6506da8aa1b48f54b4506a89e13a9b722c64161110a3634190bfa76a3b2f0111",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts": "75e277fa597ab6af4b09a1cdfe96a391c8d139543d60cf38f0abd016edba836c",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "d2b37c7d40a975d710be5ad32249b40cc313b183c099bd7dcf52805b010ecd25",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/upstream-app.registry.ts": "ad6fb200dfb68c54e9f5c3f9f4e144d80eb47531e97522fe48cbc9a43755bd6c"
   },
   "routes": [
