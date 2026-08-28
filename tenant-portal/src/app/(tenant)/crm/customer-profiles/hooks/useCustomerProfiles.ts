@@ -15,7 +15,7 @@ export const CUSTOMER_PROFILES_PATH = "/api/tenant/crm/v1/customer-profiles";
 export const CUSTOMER_PROFILES_PAGE_SIZE = 25;
 
 export const CUSTOMER_PROFILE_TYPES = ["INDIVIDUAL", "CORPORATE"] as const;
-export const CUSTOMER_PROFILE_STATUSES = [
+const CUSTOMER_PROFILE_STATUSES = [
   "PROSPECT",
   "ACTIVE_CUSTOMER",
   "INACTIVE",
@@ -292,20 +292,12 @@ export function useCustomerProfiles() {
       setResult(null);
 
       if (!userId) {
-        setError(
-          lang === "ar"
-            ? "تعذر تحديد جلسة مستخدم موثقة لتحميل ملفات العملاء."
-            : "An authenticated user session is required to load customer profiles.",
-        );
+        setError(t.crmCustomerProfiles.sessionRequired);
         setIsLoading(false);
         return;
       }
       if (!branchId) {
-        setError(
-          lang === "ar"
-            ? "تعذر تحديد فرع واحد موثوق. عيّن فرعًا أساسيًا أو اختر حسابًا له فرع واحد متاح."
-            : "No single trusted branch is available. Set a primary branch or use an account with one accessible branch.",
-        );
+        setError(t.crmCustomerProfiles.singleBranchRequired);
         setIsLoading(false);
         return;
       }
@@ -337,7 +329,7 @@ export function useCustomerProfiles() {
         if (!signal.aborted) setIsLoading(false);
       }
     },
-    [branchId, lang, page, serverSearch, userId],
+    [branchId, page, serverSearch, t, userId],
   );
 
   useEffect(() => {

@@ -276,6 +276,8 @@ export const en: Dictionary = {
   crmCustomerProfiles: {
     subtitle: "Current CRM customer profiles for the trusted session branch.",
     search: "Search by name or contact details…",
+    sessionRequired: "An authenticated user session is required to load customer profiles.",
+    singleBranchRequired: "No single trusted branch is available. Set a primary branch or use an account with one accessible branch.",
     name: "Customer name",
     type: "Type",
     contact: "Contact",
