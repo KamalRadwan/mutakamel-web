@@ -1,6 +1,6 @@
-import { UnavailableCapability } from "@/components/layout/UnavailableCapability";
+import { UnavailableState } from "@/design-system";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 
 export default function TradeIndexPage() {
-  return <UnavailableCapability backHref={TENANT_ROUTES.home} />;
+  return <UnavailableState backHref={TENANT_ROUTES.home} />;
 }

@@ -51,6 +51,7 @@ export * from "./patterns/page-header/PageHeader";
 export * from "./patterns/pagination/Pagination";
 export * from "./patterns/permission-gate/hasPermission";
 export * from "./patterns/permission-gate/PermissionGate";
+export * from "./patterns/unavailable-state/UnavailableState";
 export * from "./patterns/status-badge/StatusBadge";
 export * from "./patterns/status-badge/tone-map";
 

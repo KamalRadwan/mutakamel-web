@@ -329,6 +329,11 @@ export const en: Dictionary = {
     title: "Access restricted",
     description: "You don't have permission to view this section. Contact your workspace admin if you believe this is a mistake."
   },
+  unavailable: {
+    title: "This capability is not available yet",
+    description: "The demo scaffold was disabled because it was not connected to a server contract. The portal will not show fabricated data or success states.",
+    back: "Return to an available capability"
+  },
   nav: {
     workspaceCenter: "Workspace center",
     dashboard: "Dashboard",

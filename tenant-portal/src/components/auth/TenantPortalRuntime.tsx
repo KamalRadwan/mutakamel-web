@@ -1,4 +1,4 @@
-import { ToastProvider } from "@/components/ui/ToastContext";
+import { ToastProvider } from "@/design-system";
 import { TenantAuthProvider } from "@/context/AuthContext";
 import { TenantRealtimeProvider } from "@/context/TenantRealtimeProvider";
 import { I18nProvider } from "@/i18n/I18nContext";
