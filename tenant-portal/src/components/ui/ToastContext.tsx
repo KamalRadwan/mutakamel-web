@@ -3,5 +3,4 @@
 // unchanged, including inside Tier 1's TenantPortalRuntime.tsx, which this
 // rebuild does not edit. Delete this file at the end of phase 4 once every
 // consumer imports from @/design-system directly.
-export { ToastProvider } from "@/design-system/feedback/ToastProvider";
-export { useToast } from "@/design-system/feedback/useToast";
+export { ToastProvider, useToast } from "@/design-system";

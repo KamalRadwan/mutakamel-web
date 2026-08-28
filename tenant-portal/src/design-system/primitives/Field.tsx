@@ -1,3 +1,5 @@
+"use client";
+
 import { cloneElement, isValidElement, useId } from "react";
 import { cn } from "../lib/cn";
 import { Label } from "./Label";

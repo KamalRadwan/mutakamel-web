@@ -1,3 +1,5 @@
+"use client";
+
 import { ShieldAlert } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useTenantAuth } from "@/context/AuthContext";

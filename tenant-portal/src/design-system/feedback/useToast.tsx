@@ -1,3 +1,5 @@
+"use client";
+
 import { toast as sonnerToast } from "sonner";
 import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/lib/api/errors";

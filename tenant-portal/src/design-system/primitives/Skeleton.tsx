@@ -1,3 +1,5 @@
+"use client";
+
 import { useDirection } from "@/i18n/useLanguage";
 import { cn } from "../lib/cn";
 

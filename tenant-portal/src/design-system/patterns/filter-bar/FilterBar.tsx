@@ -1,3 +1,5 @@
+"use client";
+
 import { useRef, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Badge } from "../../primitives/Badge";

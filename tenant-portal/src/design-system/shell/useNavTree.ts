@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { NAV_SECTIONS, type NavSection } from "./nav-config";

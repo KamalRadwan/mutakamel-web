@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import type { NormalizedApiError } from "@/lib/api/errors";

@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { Skeleton } from "../../primitives/Skeleton";

@@ -1,3 +1,5 @@
+"use client";
+
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../../primitives/Button";
 import type { PageInfo } from "../data-table/types";

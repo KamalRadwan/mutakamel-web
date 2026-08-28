@@ -1,3 +1,5 @@
+"use client";
+
 import { Inbox, type LucideIcon } from "lucide-react";
 import { Button } from "../../primitives/Button";
 

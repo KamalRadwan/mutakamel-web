@@ -1,3 +1,5 @@
+"use client";
+
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { cn } from "../lib/cn";

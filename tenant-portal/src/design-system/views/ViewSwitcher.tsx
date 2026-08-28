@@ -1,3 +1,5 @@
+"use client";
+
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { Columns3, LayoutGrid, Rows3 } from "lucide-react";
 import { cn } from "../lib/cn";

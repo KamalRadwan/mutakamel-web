@@ -1,3 +1,5 @@
+"use client";
+
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { Checkbox } from "../../primitives/Checkbox";

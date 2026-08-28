@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { TenantPortalRuntime } from "@/components/auth/TenantPortalRuntime";
-import { AppShell } from "@/design-system/shell/AppShell";
-import type { SidebarState } from "@/design-system/shell/useSidebar";
+import { AppShell, type SidebarState } from "@/design-system";
 
 export default async function TenantLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
