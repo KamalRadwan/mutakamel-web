@@ -1,20 +1,32 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/PageHeader";
-import { TableToolbar } from "@/components/ui/TableToolbar";
-import { Table } from "@/components/ui/Table";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { RefreshCw, Trash2, Megaphone } from "lucide-react";
+import { Megaphone, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Badge,
+  Button,
+  DataTable,
+  FilterBar,
+  PageHeader,
+  SubNav,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  NAV_SECTIONS,
+  type ColumnDef,
+} from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
+import { formatTemplate } from "@/lib/format/template";
 import type { AcquisitionSource } from "./acquisition-source-contract";
-import { useAcquisitionSources } from "./hooks/useAcquisitionSources";
 import { CreateAcquisitionSourcesModal } from "./components/CreateAcquisitionSourcesModal";
 import { DeleteAcquisitionSourcesConfirmModal } from "./components/DeleteAcquisitionSourcesConfirmModal";
+import { useAcquisitionSources } from "./hooks/useAcquisitionSources";
+
+const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup")?.items ?? [];
 
 export default function AcquisitionSourcesPage() {
+  const { lang } = useI18n();
   const {
     t,
-    lang,
     items,
     hasLoadedItems,
     searchQuery,
@@ -35,92 +47,58 @@ export default function AcquisitionSourcesPage() {
     handleDelete,
     reload,
   } = useAcquisitionSources();
-  const copy =
-    lang === "ar"
-      ? {
-          subtitle: "إدارة قائمة مصادر الاستقطاب الثنائية اللغة المعتمدة من CRM.",
-          add: "إضافة مصدر",
-          reload: "إعادة التحميل",
-          search: "ابحث بالاسم العربي أو الإنجليزي...",
-          source: "المصدر",
-          order: "الترتيب",
-          status: "الحالة",
-          actions: "الإجراءات",
-          active: "نشط",
-          inactive: "غير نشط",
-          loading: "جارٍ تحميل مصادر الاستقطاب...",
-          empty: "لا توجد مصادر استقطاب مطابقة.",
-          delete: "حذف",
-        }
-      : {
-          subtitle: "Manage the bilingual acquisition-source catalogue owned by CRM.",
-          add: "Add source",
-          reload: "Reload",
-          search: "Search Arabic or English names...",
-          source: "Source",
-          order: "Order",
-          status: "Status",
-          actions: "Actions",
-          active: "Active",
-          inactive: "Inactive",
-          loading: "Loading acquisition sources...",
-          empty: "No matching acquisition sources.",
-          delete: "Delete",
-        };
 
-  const columns = [
+  const columns: ColumnDef<AcquisitionSource>[] = [
     {
-      header: copy.source,
-      cell: (item: AcquisitionSource) => (
+      id: "source",
+      header: t.crmAcquisitionSources.source,
+      cell: (item) => (
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
-            <Megaphone className="w-4 h-4" aria-hidden="true" />
-          </div>
+          <span className="flex size-7 items-center justify-center rounded-sm bg-muted">
+            <Megaphone className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+          </span>
           <div>
-            <p className="font-bold text-slate-900 dark:text-slate-100">
-              {lang === "ar" ? item.nameAr : item.nameEn}
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {lang === "ar" ? item.nameEn : item.nameAr}
-            </p>
+            <p className="font-medium text-foreground">{lang === "ar" ? item.nameAr : item.nameEn}</p>
+            <p className="text-2xs text-muted-foreground">{lang === "ar" ? item.nameEn : item.nameAr}</p>
           </div>
         </div>
       ),
     },
     {
-      header: copy.order,
-      cell: (item: AcquisitionSource) => (
-        <span className="font-bold text-slate-900 dark:text-slate-100">
-          {item.sortOrder}
-        </span>
-      ),
+      id: "order",
+      header: t.crmAcquisitionSources.order,
+      numeric: true,
+      cell: (item) => item.sortOrder,
     },
     {
-      header: copy.status,
-      cell: (item: AcquisitionSource) => (
-        <Badge variant={item.isActive ? "success" : "neutral"}>
-          {item.isActive ? copy.active : copy.inactive}
-        </Badge>
+      id: "status",
+      header: t.common.status,
+      cell: (item) => (
+        <Badge tone={item.isActive ? "positive" : "neutral"}>{item.isActive ? t.common.active : t.common.inactive}</Badge>
       ),
     },
     ...(canManage
       ? [
           {
-            header: copy.actions,
+            id: "actions",
+            header: t.common.actions,
+            align: "end" as const,
+            sticky: "end" as const,
             cell: (item: AcquisitionSource) => (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => selectForDelete(item)}
-                disabled={isDeleting}
-                aria-label={`${copy.delete}: ${lang === "ar" ? item.nameAr : item.nameEn}`}
-              >
-                <Trash2
-                  className="w-4 h-4 text-red-500"
-                  aria-hidden="true"
-                />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => selectForDelete(item)}
+                    disabled={isDeleting}
+                    aria-label={`${t.common.delete}: ${lang === "ar" ? item.nameAr : item.nameEn}`}
+                  >
+                    <Trash2 className="size-4 text-destructive" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t.common.delete}</TooltipContent>
+              </Tooltip>
             ),
           },
         ]
@@ -128,61 +106,67 @@ export default function AcquisitionSourcesPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title={t.crm.acquisitionSourcesAndMarket}
-        subtitle={copy.subtitle}
-        actionLabel={canManage ? copy.add : undefined}
-        onAction={canManage ? openCreate : undefined}
-      >
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => void reload()}
-          disabled={isLoading}
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-            aria-hidden="true"
-          />
-          {copy.reload}
-        </Button>
-      </PageHeader>
+        description={t.crmAcquisitionSources.subtitle}
+        primaryAction={canManage ? { label: t.crmAcquisitionSources.add, onClick: openCreate } : undefined}
+        secondaryActions={
+          <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+            <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+            {t.crmAcquisitionSources.reload}
+          </Button>
+        }
+      />
 
-      <TableToolbar
-        searchQuery={searchQuery}
+      <SubNav items={CRM_SETUP_ITEMS} />
+
+      <FilterBar
+        filters={[]}
+        values={{}}
+        onChange={() => undefined}
+        onReset={() => undefined}
+        searchValue={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder={copy.search}
+        searchPlaceholder={t.crmAcquisitionSources.search}
       />
 
       {queryError && (
-        <div
-          role="alert"
-          className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
-        >
+        <div role="alert" className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
           {queryError}
         </div>
       )}
 
       {mutationError && !selectedForDelete && !isCreateOpen ? (
-        <p
-          role="alert"
-          className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-        >
+        <p role="alert" className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
           {mutationError}
         </p>
       ) : null}
 
-      {isLoading && !hasLoadedItems ? (
-        <div
-          role="status"
-          className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
-        >
-          {copy.loading}
-        </div>
-      ) : (
-        <Table columns={columns} data={items} emptyText={copy.empty} />
-      )}
+      <DataTable
+        columns={columns}
+        rows={items}
+        isLoading={isLoading && !hasLoadedItems}
+        error={null}
+        page={{ page: 1, limit: Math.max(items.length, 1), total: items.length }}
+        onPageChange={() => undefined}
+        rowKey={(item) => item.id}
+        labels={{
+          retry: t.common.retry,
+          errorTitle: "",
+          emptyTitle: t.crmAcquisitionSources.empty,
+          selectAll: t.common.actions,
+          selectRow: t.common.actions,
+          sortAscending: t.common.actions,
+          sortDescending: t.common.actions,
+          notSorted: t.common.actions,
+          pagination: {
+            previous: t.common.previousPage,
+            next: t.common.nextPage,
+            summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+          },
+        }}
+      />
 
       <CreateAcquisitionSourcesModal
         key={isCreateOpen ? "open" : "closed"}

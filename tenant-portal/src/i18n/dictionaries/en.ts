@@ -112,6 +112,21 @@ export const en: Dictionary = {
     deleting: "Deleting…",
     empty: "No matching lead stages"
   },
+  crmAcquisitionSources: {
+    subtitle: "Manage the bilingual acquisition-source catalogue owned by CRM.",
+    add: "Add source",
+    reload: "Reload",
+    search: "Search Arabic or English names…",
+    source: "Source",
+    order: "Order",
+    empty: "No matching acquisition sources.",
+    addTitle: "Add acquisition source",
+    save: "Save source",
+    saving: "Saving…",
+    deleteTitle: "Delete acquisition source",
+    deleteMessage: (name: string) => `Delete "${name}"? CRM will reject deletion when the source is in use.`,
+    deleting: "Deleting…"
+  },
   statusValues: {
     "LeadStageFlag.NEW": "New",
     "LeadStageFlag.CONTACTED": "Contacted",

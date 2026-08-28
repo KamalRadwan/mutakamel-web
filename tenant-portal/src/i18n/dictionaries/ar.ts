@@ -110,6 +110,21 @@ export const ar = {
     deleting: "جارٍ الحذف...",
     empty: "لا توجد مراحل عملاء مطابقة"
   },
+  crmAcquisitionSources: {
+    subtitle: "إدارة قائمة مصادر الاستقطاب الثنائية اللغة المعتمدة من CRM.",
+    add: "إضافة مصدر",
+    reload: "إعادة التحميل",
+    search: "ابحث بالاسم العربي أو الإنجليزي...",
+    source: "المصدر",
+    order: "الترتيب",
+    empty: "لا توجد مصادر استقطاب مطابقة.",
+    addTitle: "إضافة مصدر استقطاب",
+    save: "حفظ المصدر",
+    saving: "جارٍ الحفظ...",
+    deleteTitle: "حذف مصدر الاستقطاب",
+    deleteMessage: (name: string) => `هل تريد حذف مصدر الاستقطاب «${name}»؟ قد يرفض CRM الحذف إذا كان المصدر مستخدمًا.`,
+    deleting: "جارٍ الحذف..."
+  },
   // Enum wire value -> translated label, keyed "<StatusKind>.<VALUE>" (e.g.
   // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts
   // in phase 4 — see src/design-system/patterns/status-badge. An unmapped

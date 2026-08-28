@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { ConfirmActionModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { AcquisitionSource } from "../acquisition-source-contract";
 
@@ -21,35 +21,22 @@ export function DeleteAcquisitionSourcesConfirmModal({
   isSubmitting,
   error,
 }: DeleteModalProps) {
-  const { lang } = useI18n();
-  const name = lang === "ar" ? item?.nameAr : item?.nameEn;
-  const copy =
-    lang === "ar"
-      ? {
-          title: "حذف مصدر الاستقطاب",
-          message: `هل تريد حذف مصدر الاستقطاب «${name ?? ""}»؟ قد يرفض CRM الحذف إذا كان المصدر مستخدمًا.`,
-          confirm: "حذف المصدر",
-          loading: "جارٍ الحذف...",
-        }
-      : {
-          title: "Delete acquisition source",
-          message: `Delete “${name ?? ""}”? CRM will reject deletion when the source is in use.`,
-          confirm: "Delete source",
-          loading: "Deleting...",
-        };
+  const { t, lang } = useI18n();
+  const name = (lang === "ar" ? item?.nameAr : item?.nameEn) ?? "";
+  const message = t.crmAcquisitionSources.deleteMessage(name);
 
   return (
-    <ConfirmModal
-      isOpen={isOpen}
-      onClose={onClose}
+    <ConfirmActionModal
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title={t.crmAcquisitionSources.deleteTitle}
+      description={error ? `${message} ${error}` : message}
+      confirmLabel={isSubmitting ? t.crmAcquisitionSources.deleting : t.common.delete}
+      cancelLabel={t.common.cancel}
       onConfirm={onConfirm}
-      title={copy.title}
-      message={error ? `${copy.message} ${error}` : copy.message}
-      confirmText={copy.confirm}
-      loadingText={copy.loading}
-      isSubmitting={isSubmitting}
-      closeOnConfirm={false}
-      isDanger
+      loading={isSubmitting}
     />
   );
 }
