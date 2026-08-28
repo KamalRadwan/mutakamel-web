@@ -13,7 +13,7 @@ describe("Tenant Portal server route boundary", () => {
     "/crm",
     "/crm/leads",
     "/crm/customer-profiles/customer-id",
-    "/crm/pipeline",
+    "/crm/opportunities",
   ])("passes the supported route %s to its page", (pathname) => {
     const response = proxy(request(pathname));
 

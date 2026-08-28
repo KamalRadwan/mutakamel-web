@@ -38,7 +38,7 @@ describe("Tenant Portal production route surface", () => {
     expect(
       canAccessCrmRoute(
         ["crm.opportunities.read", "crm.pipelines.read"],
-        TENANT_ROUTES.crmPipeline,
+        TENANT_ROUTES.crmOpportunities,
       ),
     ).toBe(true);
     expect(
@@ -50,7 +50,7 @@ describe("Tenant Portal production route surface", () => {
     expect(
       canAccessCrmRoute(
         ["crm.opportunities.read.all", "crm.pipelines.read"],
-        TENANT_ROUTES.crmPipeline,
+        TENANT_ROUTES.crmOpportunities,
       ),
     ).toBe(true);
   });
@@ -68,11 +68,11 @@ describe("Tenant Portal production route surface", () => {
     expect(
       canAccessCrmRoute(
         ["crm.opportunities.read.team"],
-        TENANT_ROUTES.crmPipeline,
+        TENANT_ROUTES.crmOpportunities,
       ),
     ).toBe(false);
     expect(
-      canAccessCrmRoute(["crm.pipelines.read"], TENANT_ROUTES.crmPipeline),
+      canAccessCrmRoute(["crm.pipelines.read"], TENANT_ROUTES.crmOpportunities),
     ).toBe(false);
   });
 

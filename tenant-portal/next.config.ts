@@ -15,6 +15,13 @@ const nextConfig: NextConfig = {
       destination: `${devApiTarget}/api/:path*`,
     }];
   },
+  async redirects() {
+    return [{
+      source: "/crm/pipeline",
+      destination: "/crm/opportunities",
+      permanent: false,
+    }];
+  },
   webpack: (config) => {
     config.watchOptions = {
       ...config.watchOptions,

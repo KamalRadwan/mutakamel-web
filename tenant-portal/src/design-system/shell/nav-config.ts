@@ -33,12 +33,6 @@ export interface NavSection {
 // Single source of truth — useNavTree.ts filters this against the
 // authenticated permission set. Only server-backed routes appear; the 45
 // sealed routes are deleted, not hidden. See docs/design/shell.md#navigation-map.
-//
-// Pipeline still points at /crm/pipeline, not the target /crm/opportunities
-// rename shell.md calls for — the physical route, its feature hook, and
-// tenant-routes.ts all still say "pipeline" today. Renaming only the nav
-// entry would point at a route that 404s. Do the rename as one atomic
-// change in phase 4 when that screen converts.
 export const NAV_SECTIONS: NavSection[] = [
   {
     id: "workspace",
@@ -72,11 +66,11 @@ export const NAV_SECTIONS: NavSection[] = [
         hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmCustomerProfiles),
       },
       {
-        id: "pipeline",
-        labelKey: "salesPipelineWorkspace",
-        href: TENANT_ROUTES.crmPipeline,
+        id: "opportunities",
+        labelKey: "opportunities",
+        href: TENANT_ROUTES.crmOpportunities,
         icon: TrendingUp,
-        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmPipeline),
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmOpportunities),
       },
     ],
   },

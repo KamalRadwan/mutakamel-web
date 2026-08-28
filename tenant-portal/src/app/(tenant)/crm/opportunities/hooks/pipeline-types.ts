@@ -53,7 +53,6 @@ export interface OpportunityStage {
   rank: number;
   isActive: boolean;
   isSystem: boolean;
-  colorTheme?: string;
 }
 
 export interface OpportunityPipeline {
@@ -103,4 +102,15 @@ export function formatCurrencyAmount(
   const grouped = new Intl.NumberFormat("en-US").format(BigInt(whole));
   const decimal = fraction ? `.${fraction.padEnd(2, "0")}` : "";
   return `${currencyCode ? `${currencyCode} ` : ""}${negative ? "-" : ""}${grouped}${decimal}`;
+}
+
+export interface OpportunityActionCapability {
+  scope: "own" | "team" | "all";
+  ownerUserIds: string[] | null;
+}
+
+export interface OpportunityCapabilities {
+  create: OpportunityActionCapability | null;
+  update: OpportunityActionCapability | null;
+  delete: OpportunityActionCapability | null;
 }

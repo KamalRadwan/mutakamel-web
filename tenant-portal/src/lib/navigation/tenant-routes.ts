@@ -6,7 +6,7 @@ export const TENANT_ROUTES = {
   crmHome: "/crm",
   crmLeads: "/crm/leads",
   crmCustomerProfiles: "/crm/customer-profiles",
-  crmPipeline: "/crm/pipeline",
+  crmOpportunities: "/crm/opportunities",
   crmStaticCatalogue: "/crm/static-data-catalogue",
   crmLeadStages: "/crm/lead-stages",
   crmAcquisitionSources: "/crm/acquisition-sources",
@@ -19,7 +19,7 @@ const CRM_EXACT_PATHS = new Set<string>([
   TENANT_ROUTES.crm,
   TENANT_ROUTES.crmLeads,
   TENANT_ROUTES.crmCustomerProfiles,
-  TENANT_ROUTES.crmPipeline,
+  TENANT_ROUTES.crmOpportunities,
   TENANT_ROUTES.crmStaticCatalogue,
   TENANT_ROUTES.crmLeadStages,
   TENANT_ROUTES.crmAcquisitionSources,
@@ -48,7 +48,7 @@ const CRM_ENTRY_ROUTES = [
     ],
   },
   {
-    href: TENANT_ROUTES.crmPipeline,
+    href: TENANT_ROUTES.crmOpportunities,
     requirements: [
       {
         permission: "crm.opportunities.read",

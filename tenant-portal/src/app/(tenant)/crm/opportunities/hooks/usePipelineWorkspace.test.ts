@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCurrencyAmount } from "../models/pipeline-types";
+import { formatCurrencyAmount } from "./pipeline-types";
 import {
   buildStageMoveRequest,
   opportunityCapabilityAllowsOwner,

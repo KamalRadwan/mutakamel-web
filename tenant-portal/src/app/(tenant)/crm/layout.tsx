@@ -2,12 +2,13 @@
 
 import { usePathname } from "next/navigation";
 
-// The pipeline screen's old markup manages its own full-height layout and
-// needs this wrapper until phase 4 converts it. AppShell's <main> now owns
-// the shell chrome and page padding; this layout no longer duplicates either.
+// The opportunities board scrolls horizontally within its own full-height
+// column rather than the page scrolling vertically, so it needs the shell's
+// <main> to hand it the full remaining height instead of the page padding
+// every other CRM screen gets.
 export default function CrmLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isPipeline = pathname === "/crm/pipeline" || pathname.startsWith("/crm/pipeline/");
+  const isOpportunities = pathname === "/crm/opportunities" || pathname.startsWith("/crm/opportunities/");
 
-  return <div className={isPipeline ? "flex h-full flex-col overflow-hidden" : undefined}>{children}</div>;
+  return <div className={isOpportunities ? "flex h-full flex-col overflow-hidden" : undefined}>{children}</div>;
 }
