@@ -4,6 +4,7 @@ import { dmMono, readex } from "./fonts";
 import "./globals.css";
 import { DirectionBridge } from "@/i18n/DirectionBridge";
 import { ThemeProvider } from "@/design-system/theme/ThemeProvider";
+import { TooltipProvider } from "@/design-system/primitives/Tooltip";
 
 export const metadata: Metadata = {
   title: "Tenant Portal - Mutakamel Crowd Capital",
@@ -40,7 +41,9 @@ export default function RootLayout({
         className={`${readex.variable} ${dmMono.variable} h-full antialiased`}
       >
         <ThemeProvider>
-          <DirectionBridge>{children}</DirectionBridge>
+          <DirectionBridge>
+            <TooltipProvider>{children}</TooltipProvider>
+          </DirectionBridge>
         </ThemeProvider>
       </body>
     </html>

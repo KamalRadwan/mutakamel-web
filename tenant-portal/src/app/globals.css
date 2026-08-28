@@ -572,6 +572,16 @@ body {
   }
 }
 
+/* translateX has no logical equivalent, so RTL gets its own keyframe rather
+   than sweeping backwards against Arabic reading direction — see
+   docs/design/theming.md#layout-mirroring. Skeleton picks between the two
+   from useDirection(). */
+@keyframes shimmer-rtl {
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
 @keyframes pulse-dot {
   0%,
   100% {
@@ -622,6 +632,16 @@ body {
   transform-origin: top center;
 }
 
+/* The pending dot — docs/design/motion.md#the-pending-dot. Its own class
+   rather than an inline animate-[...] utility so the reduced-motion carve-out
+   below can target it specifically: the dot is one of two animations that
+   must survive prefers-reduced-motion by falling back to a static state
+   (information, not decoration) instead of being neutered like everything
+   else in that media block. */
+.dot-pending {
+  animation: pulse-dot 1.8s var(--ease-out-quart) infinite;
+}
+
 /* ---------- 8. Reduced motion ----------
    Non-negotiable — docs/design/motion.md#reduced-motion. The pending dot and
    spinner survive this by falling back to a static state elsewhere in their
@@ -635,5 +655,16 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Two exceptions survive the reset above by falling back to a static
+     state instead of being neutered — removing them would remove
+     information, not decoration. Without this override, the generic reset
+     would still play pulse-dot once and settle on its 100% keyframe
+     (opacity: 1, a solid dot), which is indistinguishable from the
+     positive/negative/caution roles' plain badges. */
+  .dot-pending {
+    animation: none !important;
+    opacity: 0.45;
   }
 }
