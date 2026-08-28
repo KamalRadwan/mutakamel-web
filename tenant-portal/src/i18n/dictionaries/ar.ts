@@ -35,7 +35,9 @@ export const ar = {
   },
   errors: {
     reference: "المرجع",
-    notificationUpdateFailed: "تعذر تحديث حالة الإشعارات. حاول مرة أخرى."
+    notificationUpdateFailed: "تعذر تحديث حالة الإشعارات. حاول مرة أخرى.",
+    accessDenied: "تم رفض الوصول",
+    accessDeniedMessage: "ليست لديك الصلاحية لتنفيذ هذا الإجراء."
   },
   // Enum wire value -> translated label, keyed "<StatusKind>.<VALUE>" (e.g.
   // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts

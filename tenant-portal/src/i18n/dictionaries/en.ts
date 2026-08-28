@@ -37,7 +37,9 @@ export const en: Dictionary = {
   },
   errors: {
     reference: "Ref",
-    notificationUpdateFailed: "Could not update notifications. Try again."
+    notificationUpdateFailed: "Could not update notifications. Try again.",
+    accessDenied: "Access denied",
+    accessDeniedMessage: "You do not have permission to perform this action."
   },
   statusValues: {} as Record<string, string>,
   permissionGate: {
