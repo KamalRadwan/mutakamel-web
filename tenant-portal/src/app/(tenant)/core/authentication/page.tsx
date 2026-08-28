@@ -1,21 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { Laptop, Loader2, RefreshCw, ShieldOff } from "lucide-react";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { RefreshCw, ShieldOff } from "lucide-react";
+import {
+  Badge,
+  Button,
+  ConfirmActionModal,
+  DataTable,
+  PageHeader,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  type ColumnDef,
+} from "@/design-system";
+import { formatDateTime } from "@/lib/format/date";
+import { formatTemplate } from "@/lib/format/template";
 import {
   useAuthenticationManagement,
   type AuthSessionItem,
 } from "./hooks/useAuthenticationManagement";
 
+const CLIENT_TYPE_KEY = {
+  WEB: "clientTypeWeb",
+  IOS: "clientTypeIos",
+  ANDROID: "clientTypeAndroid",
+  DESKTOP: "clientTypeDesktop",
+} as const;
+
 export default function AuthenticationManagementPage() {
-  const { lang, items, isLoading, error, revokingId, reload, revoke } =
+  const { t, lang, items, isLoading, error, revokingId, reload, revoke } =
     useAuthenticationManagement();
   const [pendingSession, setPendingSession] = useState<AuthSessionItem | null>(null);
-  const locale = lang === "ar" ? "ar-EG" : "en-US";
   const isConfirming = pendingSession?.id === revokingId;
 
   const closeConfirmation = () => {
@@ -27,157 +42,117 @@ export default function AuthenticationManagementPage() {
     if (await revoke(pendingSession)) setPendingSession(null);
   };
 
+  const columns: ColumnDef<AuthSessionItem>[] = [
+    {
+      id: "device",
+      header: t.authSessions.columnDevice,
+      cell: (session) => (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="font-medium text-foreground">{session.deviceLabel ?? session.clientId}</span>
+          {session.current && <Badge tone="positive">{t.authSessions.thisDevice}</Badge>}
+          {session.endedAt && <Badge tone="negative">{t.authSessions.ended}</Badge>}
+        </span>
+      ),
+    },
+    {
+      id: "clientType",
+      header: t.authSessions.columnClientType,
+      cell: (session) => t.authSessions[CLIENT_TYPE_KEY[session.clientType]],
+    },
+    {
+      id: "lastActivity",
+      header: t.authSessions.columnLastActivity,
+      cell: (session) =>
+        formatDateTime(
+          session.lastUserActivityAt ?? session.lastAccessIssuedAt ?? session.lastRefreshAt ?? session.createdAt,
+          lang,
+        ),
+    },
+    {
+      id: "created",
+      header: t.authSessions.columnCreated,
+      cell: (session) => formatDateTime(session.createdAt, lang),
+    },
+    {
+      id: "actions",
+      header: t.authSessions.columnActions,
+      align: "end",
+      sticky: "end",
+      cell: (session) => {
+        if (session.endedAt) return null;
+        const label = session.current ? t.authSessions.endThisSession : t.authSessions.revokeSession;
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={label}
+                disabled={revokingId !== null}
+                loading={revokingId === session.id}
+                onClick={() => setPendingSession(session)}
+              >
+                <ShieldOff className="size-4" aria-hidden="true" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{label}</TooltipContent>
+          </Tooltip>
+        );
+      },
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4">
       <PageHeader
-        title={lang === "ar" ? "جلسات تسجيل الدخول" : "Sign-in sessions"}
-        subtitle={
-          lang === "ar"
-            ? "راجع المتصفحات والأجهزة المرتبطة بحسابك وألغِ أي جلسة لا تعرفها."
-            : "Review the browsers and devices signed in to your account and revoke any you do not recognize."
+        title={t.authSessions.title}
+        description={t.authSessions.subtitle}
+        secondaryActions={
+          <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+            <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+            {t.authSessions.refresh}
+          </Button>
         }
-      >
-        <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
-          <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
-          {lang === "ar" ? "تحديث" : "Refresh"}
-        </Button>
-      </PageHeader>
+      />
 
-      {error && (
-        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
-          {lang === "ar"
-            ? "تعذر تحميل الجلسات أو إلغاؤها. حاول مرة أخرى."
-            : "The sessions could not be loaded or revoked. Try again."}
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={items}
+        isLoading={isLoading}
+        error={error ? { status: 0, code: error } : null}
+        onRetry={() => void reload()}
+        page={{ page: 1, limit: Math.max(items.length, 1), total: items.length }}
+        onPageChange={() => undefined}
+        rowKey={(session) => session.id}
+        labels={{
+          retry: t.common.retry,
+          errorTitle: t.authSessions.loadFailed,
+          emptyTitle: t.authSessions.empty,
+          selectAll: t.common.actions,
+          selectRow: t.common.actions,
+          sortAscending: t.common.actions,
+          sortDescending: t.common.actions,
+          notSorted: t.common.actions,
+          pagination: {
+            previous: t.common.previousPage,
+            next: t.common.nextPage,
+            summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+          },
+        }}
+      />
 
-      {isLoading ? (
-        <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-12 text-slate-400 dark:border-slate-800 dark:bg-slate-900">
-          <Loader2 className="size-6 animate-spin" />
-        </div>
-      ) : (
-        <div className="grid gap-3">
-          {items.map((session) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              lang={lang}
-              locale={locale}
-              isRevoking={revokingId === session.id}
-              disabled={revokingId !== null}
-              onRevoke={() => setPendingSession(session)}
-            />
-          ))}
-          {items.length === 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900">
-              {lang === "ar" ? "لا توجد جلسات متاحة." : "No sessions available."}
-            </div>
-          )}
-        </div>
-      )}
-      <ConfirmModal
-        isOpen={pendingSession !== null}
-        onClose={closeConfirmation}
+      <ConfirmActionModal
+        open={pendingSession !== null}
+        onOpenChange={(open) => {
+          if (!open) closeConfirmation();
+        }}
+        title={pendingSession?.current ? t.authSessions.confirmEndTitle : t.authSessions.confirmRevokeTitle}
+        description={pendingSession?.current ? t.authSessions.confirmEndMessage : t.authSessions.confirmRevokeMessage}
+        confirmLabel={pendingSession?.current ? t.authSessions.endThisSession : t.authSessions.revokeSession}
+        cancelLabel={t.common.cancel}
         onConfirm={() => void confirmRevocation()}
-        title={pendingSession?.current
-          ? lang === "ar" ? "إنهاء الجلسة الحالية؟" : "End the current session?"
-          : lang === "ar" ? "إلغاء جلسة تسجيل الدخول؟" : "Revoke this sign-in session?"}
-        message={pendingSession?.current
-          ? lang === "ar"
-            ? "سيتم تسجيل خروج هذا المتصفح فورًا مع بقاء الجلسات الأخرى دون تغيير."
-            : "This browser will be signed out immediately. Other sessions remain active."
-          : lang === "ar"
-            ? "سيفقد هذا المتصفح أو الجهاز إمكانية الوصول فورًا."
-            : "That browser or device will lose access immediately."}
-        confirmText={pendingSession?.current
-          ? lang === "ar" ? "إنهاء هذه الجلسة" : "End this session"
-          : lang === "ar" ? "إلغاء الجلسة" : "Revoke session"}
-        cancelText={lang === "ar" ? "إلغاء" : "Cancel"}
-        loadingText={lang === "ar" ? "جارٍ الإلغاء..." : "Revoking..."}
-        isSubmitting={isConfirming}
-        closeOnConfirm={false}
+        loading={isConfirming}
       />
     </div>
   );
-}
-
-function SessionCard({
-  session,
-  lang,
-  locale,
-  isRevoking,
-  disabled,
-  onRevoke,
-}: {
-  session: AuthSessionItem;
-  lang: "ar" | "en";
-  locale: string;
-  isRevoking: boolean;
-  disabled: boolean;
-  onRevoke: () => void;
-}) {
-  const lastUsed =
-    session.lastUserActivityAt ??
-    session.lastAccessIssuedAt ??
-    session.lastRefreshAt ??
-    session.createdAt;
-  return (
-    <article className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-start gap-3">
-        <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-          <Laptop className="size-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              {session.deviceLabel ?? session.clientId}
-            </h2>
-            {session.current && (
-              <Badge variant="success">
-                {lang === "ar" ? "الجلسة الحالية" : "Current"}
-              </Badge>
-            )}
-            {session.endedAt && (
-              <Badge variant="danger">
-                {lang === "ar" ? "منتهية" : "Ended"}
-              </Badge>
-            )}
-          </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {lang === "ar" ? "آخر استخدام" : "Last used"}: {formatDate(lastUsed, locale)}
-          </p>
-          <p className="mt-1 text-[11px] text-slate-400">
-            {lang === "ar" ? "مرات التحديث" : "Refreshes"}: {session.refreshUseCount}
-            {" · "}
-            {lang === "ar" ? "إصدارات الوصول" : "Access issuances"}: {session.accessIssueCount}
-          </p>
-          <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
-            {session.clientId} · {session.clientType}
-          </p>
-        </div>
-      </div>
-      {!session.endedAt && (
-        <Button variant="danger" onClick={onRevoke} disabled={disabled}>
-          {isRevoking ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <ShieldOff className="size-4" />
-          )}
-          {session.current
-            ? lang === "ar" ? "إنهاء هذه الجلسة" : "End this session"
-            : lang === "ar" ? "إلغاء الجلسة" : "Revoke session"}
-        </Button>
-      )}
-    </article>
-  );
-}
-
-function formatDate(value: string, locale: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat(locale, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(date);
 }

@@ -31,7 +31,10 @@ export const ar = {
     markAllRead: "تحديد الكل كمقروء",
     switchToLight: "التبديل إلى المظهر الفاتح",
     switchToDark: "التبديل إلى المظهر الداكن",
-    switchToSystem: "التبديل إلى مظهر النظام"
+    switchToSystem: "التبديل إلى مظهر النظام",
+    previousPage: "الصفحة السابقة",
+    nextPage: "الصفحة التالية",
+    showingOf: "عرض {from}–{to} من {total}"
   },
   errors: {
     reference: "المرجع",
@@ -61,6 +64,31 @@ export const ar = {
     resetFailed: "تعذر الإرسال",
     resetFailedMessage: "حاول مرة أخرى لاحقًا.",
     footer: "© 2026 متكامل كراود كابيتال. جميع الحقوق محفوظة."
+  },
+  authSessions: {
+    title: "جلسات تسجيل الدخول",
+    subtitle: "راجع المتصفحات والأجهزة المرتبطة بحسابك وألغِ أي جلسة لا تعرفها.",
+    refresh: "تحديث",
+    loadFailed: "تعذر تحميل الجلسات أو إلغاؤها. حاول مرة أخرى.",
+    empty: "لا توجد جلسات متاحة.",
+    thisDevice: "الجلسة الحالية",
+    ended: "منتهية",
+    columnDevice: "الجهاز",
+    columnClientType: "نوع العميل",
+    columnLastActivity: "آخر نشاط",
+    columnCreated: "تاريخ الإنشاء",
+    columnActions: "الإجراءات",
+    endThisSession: "إنهاء هذه الجلسة",
+    revokeSession: "إلغاء الجلسة",
+    confirmEndTitle: "إنهاء الجلسة الحالية؟",
+    confirmEndMessage: "سيتم تسجيل خروج هذا المتصفح فورًا مع بقاء الجلسات الأخرى دون تغيير.",
+    confirmRevokeTitle: "إلغاء جلسة تسجيل الدخول؟",
+    confirmRevokeMessage: "سيفقد هذا المتصفح أو الجهاز إمكانية الوصول فورًا.",
+    confirmLoading: "جارٍ الإلغاء...",
+    clientTypeWeb: "الويب",
+    clientTypeIos: "iOS",
+    clientTypeAndroid: "Android",
+    clientTypeDesktop: "سطح المكتب"
   },
   // Enum wire value -> translated label, keyed "<StatusKind>.<VALUE>" (e.g.
   // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts

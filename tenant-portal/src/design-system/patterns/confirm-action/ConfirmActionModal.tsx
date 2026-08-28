@@ -35,8 +35,8 @@ export function ConfirmActionModal({
   loading,
 }: ConfirmActionModalProps) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+    <AlertDialog open={open} onOpenChange={(next) => (loading ? undefined : onOpenChange(next))}>
+      <AlertDialogContent aria-busy={loading || undefined}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

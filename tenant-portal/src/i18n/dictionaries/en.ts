@@ -33,7 +33,10 @@ export const en: Dictionary = {
     markAllRead: "Mark all read",
     switchToLight: "Switch to light theme",
     switchToDark: "Switch to dark theme",
-    switchToSystem: "Switch to system theme"
+    switchToSystem: "Switch to system theme",
+    previousPage: "Previous page",
+    nextPage: "Next page",
+    showingOf: "Showing {from}–{to} of {total}"
   },
   errors: {
     reference: "Ref",
@@ -63,6 +66,31 @@ export const en: Dictionary = {
     resetFailed: "Request failed",
     resetFailedMessage: "Please try again later.",
     footer: "© 2026 Mutakamel Crowd Capital. All rights reserved."
+  },
+  authSessions: {
+    title: "Sign-in sessions",
+    subtitle: "Review the browsers and devices signed in to your account and revoke any you do not recognize.",
+    refresh: "Refresh",
+    loadFailed: "The sessions could not be loaded or revoked. Try again.",
+    empty: "No sessions available.",
+    thisDevice: "This device",
+    ended: "Ended",
+    columnDevice: "Device",
+    columnClientType: "Client",
+    columnLastActivity: "Last activity",
+    columnCreated: "Created",
+    columnActions: "Actions",
+    endThisSession: "End this session",
+    revokeSession: "Revoke session",
+    confirmEndTitle: "End the current session?",
+    confirmEndMessage: "This browser will be signed out immediately. Other sessions remain active.",
+    confirmRevokeTitle: "Revoke this sign-in session?",
+    confirmRevokeMessage: "That browser or device will lose access immediately.",
+    confirmLoading: "Revoking…",
+    clientTypeWeb: "Web",
+    clientTypeIos: "iOS",
+    clientTypeAndroid: "Android",
+    clientTypeDesktop: "Desktop"
   },
   statusValues: {} as Record<string, string>,
   permissionGate: {
