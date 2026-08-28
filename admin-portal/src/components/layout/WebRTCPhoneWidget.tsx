@@ -15,13 +15,19 @@ import {
   PhoneCall,
   PhoneIncoming,
   PhoneOff,
+  RotateCw,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nContext';
 import { formatWebphoneLogTime, useWebRTCPhone } from './hooks/useWebRTCPhone';
 import { IncomingCallPopup } from './IncomingCallPopup';
-import type { WebphoneCallLogType, WebphoneConnectionState } from '@mutakamel/webphone';
+import type {
+  WebphoneCallLogType,
+  WebphoneConnectionState,
+  WebphoneMediaNoticeCode,
+  WebphoneStatus,
+} from '@mutakamel/webphone';
 
 const copy = {
   ar: {
@@ -56,6 +62,38 @@ const copy = {
     unknown: 'غير معروف',
     showPhone: 'فتح هاتف WebRTC',
     foldPhone: 'تصغير هاتف WebRTC',
+    retryConnection: 'إعادة محاولة الاتصال',
+    status: {
+      idle: 'خامل',
+      loadingPhone: 'جارٍ تحميل الهاتف',
+      disabled: 'معطل',
+      ready: 'جاهز',
+      notConfigured: 'غير مُهيأ',
+      unavailable: 'غير متاح',
+      connecting: 'جارٍ الاتصال',
+      socketConnected: 'تم الاتصال بالخادم',
+      registering: 'جارٍ التسجيل',
+      registered: 'تم التسجيل',
+      registrationFailed: 'فشل التسجيل',
+      disconnected: 'انقطع الاتصال',
+      connectFailed: 'فشل الاتصال',
+      incomingCall: 'مكالمة واردة',
+      calling: 'جارٍ الاتصال بالرقم',
+      ringing: 'يرن الآن',
+      startingCall: 'جارٍ بدء المكالمة',
+      callEnded: 'انتهت المكالمة',
+      declined: 'تم الرفض',
+      callFailed: 'فشلت المكالمة',
+      inCall: 'في مكالمة',
+    },
+    mediaNoticeText: {
+      requiresHttps: 'يتطلب الميكروفون اتصال HTTPS آمن',
+      unavailable: 'الميكروفون غير متاح',
+      stopped: 'توقف الميكروفون',
+      muted: 'تم كتم الميكروفون',
+      clickToAllow: 'انقر للسماح بالصوت',
+      permissionDenied: 'تم رفض إذن الميكروفون',
+    },
   },
   en: {
     phone: 'Phone',
@@ -89,8 +127,49 @@ const copy = {
     unknown: 'Unknown',
     showPhone: 'Open WebRTC phone',
     foldPhone: 'Collapse WebRTC phone',
+    retryConnection: 'Retry connection',
+    status: {
+      idle: 'Idle',
+      loadingPhone: 'Loading phone',
+      disabled: 'Disabled',
+      ready: 'Ready',
+      notConfigured: 'Not configured',
+      unavailable: 'Unavailable',
+      connecting: 'Connecting',
+      socketConnected: 'Socket connected',
+      registering: 'Registering',
+      registered: 'Registered',
+      registrationFailed: 'Registration failed',
+      disconnected: 'Disconnected',
+      connectFailed: 'Connect failed',
+      incomingCall: 'Incoming call',
+      calling: 'Calling',
+      ringing: 'Ringing',
+      startingCall: 'Starting call',
+      callEnded: 'Call ended',
+      declined: 'Declined',
+      callFailed: 'Call failed',
+      inCall: 'In call',
+    },
+    mediaNoticeText: {
+      requiresHttps: 'Microphone requires HTTPS',
+      unavailable: 'Microphone unavailable',
+      stopped: 'Microphone stopped',
+      muted: 'Microphone muted',
+      clickToAllow: 'Click to allow audio',
+      permissionDenied: 'Microphone permission denied',
+    },
   },
 } as const;
+
+function statusText(labels: (typeof copy)[keyof typeof copy], status: WebphoneStatus) {
+  const base = labels.status[status.code];
+  return status.detail ? `${base} (${status.detail})` : base;
+}
+
+function mediaNoticeLabel(labels: (typeof copy)[keyof typeof copy], code?: WebphoneMediaNoticeCode) {
+  return code ? labels.mediaNoticeText[code] : undefined;
+}
 
 export function WebRTCPhoneWidget() {
   const { lang } = useI18n();
@@ -144,6 +223,17 @@ export function WebRTCPhoneWidget() {
             <header className="flex h-9 items-center gap-2 border-b border-slate-800 bg-slate-950 px-3 text-white">
               <ConnectionDot state={phone.connectionState} label={connectionLabel} />
               <strong className="min-w-0 flex-1 truncate text-xs font-extrabold">{phone.phoneDisplayName}</strong>
+              {phone.connectionState === 'error' ? (
+                <button
+                  type="button"
+                  className="grid size-7 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-2 focus-visible:outline-blue-400"
+                  aria-label={labels.retryConnection}
+                  title={labels.retryConnection}
+                  onClick={phone.retryConnection}
+                >
+                  <RotateCw className="size-3.5" />
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="grid size-7 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-2 focus-visible:outline-blue-400"
@@ -202,14 +292,16 @@ export function WebRTCPhoneWidget() {
                     >
                       <span className="flex items-center justify-center gap-2 text-[11px] font-bold text-blue-700 dark:text-blue-300">
                         {phone.incomingCallWaiting ? <PhoneIncoming className="size-4" /> : <PhoneCall className="size-4" />}
-                        {phone.callActive ? labels.connected : phone.status}
+                        {phone.callActive ? labels.connected : statusText(labels, phone.status)}
                       </span>
                       <strong className="truncate text-sm text-slate-900 dark:text-white">{phone.callPeerName || labels.unknown}</strong>
                       <span className="flex items-center justify-center gap-2 font-mono text-xs text-slate-500 dark:text-slate-400">
                         {phone.callPeerNumber}
                         {phone.timerLabel ? <time className="font-bold text-emerald-600 dark:text-emerald-400">{phone.timerLabel}</time> : null}
                       </span>
-                      {phone.mediaNotice ? <small className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">{phone.mediaNotice}</small> : null}
+                      {phone.mediaNotice ? (
+                        <small className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">{mediaNoticeLabel(labels, phone.mediaNotice)}</small>
+                      ) : null}
                     </div>
                   )}
 

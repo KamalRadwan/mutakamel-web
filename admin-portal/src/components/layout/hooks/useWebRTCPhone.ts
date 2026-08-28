@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import type { RTCSession } from 'jssip/lib/RTCSession';
 import type { UA } from 'jssip';
 import { useAuth } from '@/context/AuthContext';
-import { playDtmfTone, iceServersFromSettings, isWebphoneReady, normalizeCallTarget, sipUri } from '@mutakamel/webphone';
+import { playDtmfTone, pcConfigFromSettings, isWebphoneReady, normalizeCallTarget, sipUri } from '@mutakamel/webphone';
 import { createMyWebphoneCallLog, loadAsteriskSettings, loadMyWebphoneCallLogs, loadMyWebphoneConfig } from '../webphone/api';
 import { safeStorage } from "@/lib/safeStorage";
 import type {
@@ -16,6 +16,9 @@ import type {
   WebphoneCallLog,
   WebphoneCallState,
   WebphoneConnectionState,
+  WebphoneMediaNoticeCode,
+  WebphoneStatus,
+  WebphoneStatusCode,
   WebphoneTab,
 } from '@mutakamel/webphone';
 
@@ -40,6 +43,9 @@ const WEBPHONE_STORAGE_KEYS = {
   micVolume: 'mutakamel.webphone.micVolume',
   speakerVolume: 'mutakamel.webphone.speakerVolume',
 } as const;
+
+/** Re-fetch minted TURN credentials this far ahead of their expiry. */
+const TURN_CREDENTIAL_REFRESH_MARGIN_MS = 60_000;
 
 const idlePhoneLifecycle: PhoneLifecycle = {
   connectPhone: async () => undefined,
@@ -94,7 +100,7 @@ export function useWebRTCPhone() {
   const [webphone, setWebphone] = useState<AdminWebphoneConfig>();
   const [connectionState, setConnectionState] = useState<WebphoneConnectionState>('idle');
   const [callState, setCallState] = useState<WebphoneCallState>('idle');
-  const [status, setStatus] = useState('WebPhone');
+  const [status, setStatus] = useState<WebphoneStatus>({ code: 'idle' });
   const [dialTarget, setDialTarget] = useState('');
   const [remoteParty, setRemoteParty] = useState('');
   const [muted, setMuted] = useState(false);
@@ -108,7 +114,7 @@ export function useWebRTCPhone() {
   const [speakerVolume, setSpeakerVolume] = useState(() => readVolumePreference(WEBPHONE_STORAGE_KEYS.speakerVolume, 60));
   const [callDurationSeconds, setCallDurationSeconds] = useState(0);
   const [lastCallDuration, setLastCallDuration] = useState<string>();
-  const [mediaNotice, setMediaNotice] = useState<string>();
+  const [mediaNotice, setMediaNotice] = useState<WebphoneMediaNoticeCode>();
   const [activeCallContext, setActiveCallContext] = useState<ActiveCallContext | null>(null);
   const [callLogs, setCallLogs] = useState<WebphoneCallLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -137,7 +143,7 @@ export function useWebRTCPhone() {
 
     async function loadPhone() {
       setConnectionState('loading');
-      setStatus('Loading phone');
+      setStatus({ code: 'loadingPhone' });
 
       try {
         const loadedWebphone = await loadMyWebphoneConfig();
@@ -148,7 +154,7 @@ export function useWebRTCPhone() {
 
         if (!loadedWebphone.enabled) {
           setConnectionState('offline');
-          setStatus('Disabled');
+          setStatus({ code: 'disabled' });
           return;
         }
 
@@ -158,11 +164,11 @@ export function useWebRTCPhone() {
         setSettings(loadedSettings);
         const ready = isWebphoneReady(loadedSettings, loadedWebphone);
         setConnectionState(ready ? 'ready' : 'offline');
-        setStatus(ready ? 'Ready' : 'Not configured');
+        setStatus({ code: ready ? 'ready' : 'notConfigured' });
       } catch (error) {
         if (cancelled) return;
         setConnectionState('error');
-        setStatus(readPhoneError(error, 'Unavailable'));
+        setStatus(readPhoneError(error, 'unavailable'));
       }
     }
 
@@ -246,11 +252,11 @@ export function useWebRTCPhone() {
     void Promise.resolve().then(() => {
       if (cancelled || typeof window === 'undefined') return;
       if (!window.isSecureContext) {
-        setMediaNotice('Microphone requires HTTPS');
+        setMediaNotice('requiresHttps');
         return;
       }
       if (!navigator.mediaDevices?.getUserMedia) {
-        setMediaNotice('Microphone unavailable');
+        setMediaNotice('unavailable');
         return;
       }
       setMediaNotice(undefined);
@@ -260,6 +266,22 @@ export function useWebRTCPhone() {
       cancelled = true;
     };
   }, [shouldActivate]);
+
+  useEffect(() => {
+    const expiresAt = webphone?.turnCredentials?.expiresAt;
+    if (!webphone?.turnCredentials?.enabled || !expiresAt) return;
+
+    const msUntilRefresh = new Date(expiresAt).getTime() - Date.now() - TURN_CREDENTIAL_REFRESH_MARGIN_MS;
+    if (msUntilRefresh <= 0) return;
+
+    const timer = window.setTimeout(() => {
+      void loadMyWebphoneConfig()
+        .then(setWebphone)
+        .catch(() => undefined);
+    }, msUntilRefresh);
+
+    return () => window.clearTimeout(timer);
+  }, [webphone?.turnCredentials?.expiresAt, webphone?.turnCredentials?.enabled]);
 
   async function connectPhone() {
     if (!isWebphoneReady(settings, webphone) || !settings || !webphone) {
@@ -272,14 +294,17 @@ export function useWebRTCPhone() {
     }
 
     setConnectionState('connecting');
-    setStatus('Connecting');
+    setStatus({ code: 'connecting' });
 
     try {
       const JsSIP = await import('jssip');
-      const socket = new JsSIP.WebSocketInterface(settings.websocketUrl!);
+      const sockets = [{ socket: new JsSIP.WebSocketInterface(settings.websocketUrl!), weight: 10 }];
+      if (settings.secondaryWebsocketUrl) {
+        sockets.push({ socket: new JsSIP.WebSocketInterface(settings.secondaryWebsocketUrl), weight: 0 });
+      }
       const extraHeaders = settings.outboundProxy ? [`Route: <${settings.outboundProxy}>`] : undefined;
       const ua = new JsSIP.UA({
-        sockets: [socket],
+        sockets,
         uri: sipUri(webphone.sipUsername!, settings.sipDomain!),
         authorization_user: webphone.sipUsername ?? undefined,
         password: webphone.sipPassword ?? undefined,
@@ -293,22 +318,23 @@ export function useWebRTCPhone() {
         extra_headers: extraHeaders,
       });
 
-      ua.on('connected', () => {
+      ua.on('connected', (event) => {
         setConnectionState('connecting');
-        setStatus('Socket connected');
+        setStatus({ code: 'socketConnected' });
+        tracePhone(settings, 'ua.connected', { url: event.socket?.url });
       });
       ua.on('registered', () => {
         setConnectionState('registered');
-        setStatus('Registered');
+        setStatus({ code: 'registered' });
       });
       ua.on('registrationFailed', (event) => {
         setConnectionState('error');
-        setStatus(event.cause ? `Registration failed: ${event.cause}` : 'Registration failed');
+        setStatus({ code: 'registrationFailed', detail: event.cause || undefined });
       });
       ua.on('disconnected', () => {
         uaRef.current = null;
         setConnectionState('offline');
-        setStatus('Disconnected');
+        setStatus({ code: 'disconnected' });
       });
       ua.on('newRTCSession', (event: { session: RTCSession; originator: 'local' | 'remote' }) => {
         if (sessionRef.current && sessionRef.current !== event.session && !sessionRef.current.isEnded()) {
@@ -332,8 +358,15 @@ export function useWebRTCPhone() {
       ua.start();
     } catch (error) {
       setConnectionState('error');
-      setStatus(readPhoneError(error, 'Connect failed'));
+      setStatus(readPhoneError(error, 'connectFailed'));
     }
+  }
+
+  function retryConnection() {
+    stopPhone(uaRef.current, sessionRef.current);
+    uaRef.current = null;
+    sessionRef.current = null;
+    void connectPhone();
   }
 
   function bindSession(session: RTCSession, incoming: boolean) {
@@ -349,7 +382,7 @@ export function useWebRTCPhone() {
     setDialTarget(partyNumber || party);
     setCallState(incoming ? 'incoming' : 'calling');
     setIncomingPopupDismissed(!incoming);
-    setStatus(incoming ? 'Incoming call' : 'Calling');
+    setStatus({ code: incoming ? 'incomingCall' : 'calling' });
 
     if (!activeCallContextRef.current) {
       setCurrentActiveCallContext({
@@ -367,16 +400,16 @@ export function useWebRTCPhone() {
     session.on('peerconnection', ({ peerconnection }) => bindPeerConnection(peerconnection));
     session.on('progress', () => {
       if (activeCallContextRef.current?.direction === 'incoming') {
-        setStatus('Incoming call');
+        setStatus({ code: 'incomingCall' });
         return;
       }
       setCallState('ringing');
-      setStatus('Ringing');
+      setStatus({ code: 'ringing' });
     });
     session.on('accepted', markCallAnswered);
     session.on('confirmed', markCallAnswered);
-    session.on('ended', () => finishCall('ended', 'Call ended'));
-    session.on('failed', (event) => finishCall('failed', event.cause ? `Failed: ${event.cause}` : 'Call failed'));
+    session.on('ended', () => finishCall('ended', { code: 'callEnded' }));
+    session.on('failed', (event) => finishCall('failed', { code: 'callFailed', detail: event.cause || undefined }));
     session.on('hold', () => setHeld(true));
     session.on('unhold', () => setHeld(false));
     session.on('muted', () => setMuted(true));
@@ -392,7 +425,7 @@ export function useWebRTCPhone() {
 
     if (!uaRef.current.isRegistered()) {
       setConnectionState('connecting');
-      setStatus('Registering');
+      setStatus({ code: 'registering' });
       uaRef.current.register();
       return;
     }
@@ -405,7 +438,7 @@ export function useWebRTCPhone() {
       startedAt: nowIso(),
     });
     setCallState('calling');
-    setStatus('Starting call');
+    setStatus({ code: 'startingCall' });
 
     try {
       tracePhone(settings, 'call.start', { target });
@@ -417,7 +450,7 @@ export function useWebRTCPhone() {
         },
         mediaConstraints: { audio: true, video: false },
         mediaStream: localStream,
-        pcConfig: { iceServers: iceServersFromSettings(settings) },
+        pcConfig: pcConfigFromSettings(settings, webphone?.turnCredentials?.iceServers),
         rtcOfferConstraints: {
           offerToReceiveAudio: true,
           offerToReceiveVideo: false,
@@ -431,9 +464,9 @@ export function useWebRTCPhone() {
         target,
         error: safeErrorDetails(error),
       });
-      const message = callStartErrorMessage(error);
-      setMediaNotice(mediaFailureNotice(message));
-      finishCall('failed', message);
+      const failure = classifyCallStartError(error);
+      setMediaNotice(failure.mediaNoticeCode);
+      finishCall('failed', failure.status);
     }
   }
 
@@ -452,7 +485,7 @@ export function useWebRTCPhone() {
       session.answer({
         mediaConstraints: { audio: true, video: false },
         mediaStream: localStream,
-        pcConfig: { iceServers: iceServersFromSettings(settings) },
+        pcConfig: pcConfigFromSettings(settings, webphone?.turnCredentials?.iceServers),
         rtcOfferConstraints: {
           offerToReceiveAudio: true,
           offerToReceiveVideo: false,
@@ -460,9 +493,9 @@ export function useWebRTCPhone() {
       });
       markCallAnswered();
     } catch (error) {
-      const message = callStartErrorMessage(error);
-      setMediaNotice(mediaFailureNotice(message));
-      finishCall('failed', message);
+      const failure = classifyCallStartError(error);
+      setMediaNotice(failure.mediaNoticeCode);
+      finishCall('failed', failure.status);
     }
   }
 
@@ -472,7 +505,7 @@ export function useWebRTCPhone() {
     session.terminate({ status_code: 603, reason_phrase: 'Decline' });
     setIncomingPopupDismissed(true);
     stopIncomingRingTone();
-    finishCall('ended', 'Declined');
+    finishCall('ended', { code: 'declined' });
   }
 
   function hangupCall() {
@@ -481,7 +514,7 @@ export function useWebRTCPhone() {
     session.terminate();
     setIncomingPopupDismissed(true);
     stopIncomingRingTone();
-    finishCall('ended', 'Call ended');
+    finishCall('ended', { code: 'callEnded' });
   }
 
   function dismissIncomingPopup() {
@@ -555,17 +588,18 @@ export function useWebRTCPhone() {
     void navigator.clipboard?.writeText(value);
   }
 
-  function finishCall(nextState: WebphoneCallState, nextStatus: string) {
+  function finishCall(nextState: WebphoneCallState, nextStatus: WebphoneStatus) {
     const context = activeCallContextRef.current;
     const durationSeconds = callStartedAtRef.current ? Math.min(86_400, elapsedSecondsSince(callStartedAtRef.current)) : 0;
     const finalDuration = callStartedAtRef.current ? formatDuration(durationSeconds) : undefined;
 
     if (context) {
+      const cause = nextStatus.detail ? `${nextStatus.code}: ${nextStatus.detail}` : nextStatus.code;
       const completedContext = {
         ...context,
         endedAt: nowIso(),
         durationSeconds,
-        cause: nextStatus.slice(0, 120),
+        cause: cause.slice(0, 120),
       };
       setCurrentActiveCallContext(null);
       void saveCallLog(completedContext);
@@ -578,7 +612,7 @@ export function useWebRTCPhone() {
     stopIncomingRingTone();
     setIncomingPopupDismissed(true);
     setCallState(nextState);
-    setStatus(finalDuration ? `${nextStatus} · ${finalDuration}` : nextStatus);
+    setStatus(nextStatus);
     setLastCallDuration(finalDuration);
     setCallDurationSeconds(0);
     setMuted(false);
@@ -613,7 +647,7 @@ export function useWebRTCPhone() {
       answeredAt: context.answeredAt ?? nowIso(),
     });
     setCallState('active');
-    setStatus('In call');
+    setStatus({ code: 'inCall' });
   }
 
   function setCurrentActiveCallContext(context: ActiveCallContext | null) {
@@ -669,10 +703,10 @@ export function useWebRTCPhone() {
       track.enabled = !muted;
       track.addEventListener('ended', () => {
         if (!stoppingLocalStreamRef.current) {
-          setMediaNotice('Microphone stopped');
+          setMediaNotice('stopped');
         }
       });
-      track.addEventListener('mute', () => setMediaNotice('Microphone muted'));
+      track.addEventListener('mute', () => setMediaNotice('muted'));
       track.addEventListener('unmute', () => setMediaNotice(undefined));
     });
     setMediaNotice(undefined);
@@ -773,7 +807,7 @@ export function useWebRTCPhone() {
     void remoteAudioRef.current
       .play()
       .then(() => setMediaNotice(undefined))
-      .catch(() => setMediaNotice('Click to allow audio'));
+      .catch(() => setMediaNotice('clickToAllow'));
   }
 
   function resetRemoteAudio() {
@@ -824,7 +858,7 @@ export function useWebRTCPhone() {
   const displayNumber = remoteParty || dialTarget;
   const timerLabel = callActive ? formatDuration(callDurationSeconds) : lastCallDuration;
   const phoneDisplayName = webphoneDisplayName(webphone, 'Admin Phone');
-  const phoneIdentity = webphone?.outboundCallerId?.trim() || webphone?.extension?.trim() || status;
+  const phoneIdentity = webphone?.outboundCallerId?.trim() || webphone?.extension?.trim() || '';
   const callContext = activeCallContext;
   const incomingCallWaiting = callContext?.direction === 'incoming' && callBusy && !callActive;
   const callPeerNumber = callContext?.number || displayNumber || phoneIdentity;
@@ -851,7 +885,6 @@ export function useWebRTCPhone() {
       activeTab,
       setActiveTab,
       connectionState,
-      connectionLabel: connectionBadgeLabel(connectionState),
       callState,
       status,
       dialTarget,
@@ -869,6 +902,7 @@ export function useWebRTCPhone() {
       canCall: canConnect && registered && Boolean(dialTarget.trim()) && !callBusy,
       keypad,
       makeCall,
+      retryConnection,
       answerCall,
       declineCall,
       hangupCall,
@@ -919,14 +953,6 @@ function webphoneDisplayName(webphone: AdminWebphoneConfig | undefined, fallback
   return fullName || fallback;
 }
 
-function connectionBadgeLabel(state: WebphoneConnectionState) {
-  if (state === 'registered') return 'Registered';
-  if (state === 'connecting' || state === 'loading') return 'Connecting';
-  if (state === 'error') return 'Error';
-  if (state === 'offline') return 'Offline';
-  return 'Ready';
-}
-
 function assertMediaEnvironment() {
   if (typeof window !== 'undefined' && !window.isSecureContext) {
     throw new Error('Microphone requires HTTPS or localhost.');
@@ -945,27 +971,28 @@ function safeErrorDetails(error: unknown) {
   return error instanceof Error ? { name: error.name, message: error.message } : { message: 'Unknown error' };
 }
 
-function readPhoneError(error: unknown, fallback: string) {
-  if (!(error instanceof Error) || !error.message.trim()) return fallback;
-  return error.message.slice(0, 120);
+function readPhoneError(error: unknown, fallbackCode: WebphoneStatusCode): WebphoneStatus {
+  if (!(error instanceof Error) || !error.message.trim()) return { code: fallbackCode };
+  return { code: fallbackCode, detail: error.message.slice(0, 120) };
 }
 
-function callStartErrorMessage(error: unknown) {
+type CallStartFailure = {
+  status: WebphoneStatus;
+  mediaNoticeCode?: WebphoneMediaNoticeCode;
+};
+
+function classifyCallStartError(error: unknown): CallStartFailure {
   const name = error instanceof Error ? error.name : '';
   const message = error instanceof Error ? error.message : '';
   const combined = `${name} ${message}`;
 
   if (/permission|denied|notallowed/i.test(combined)) {
-    return 'Microphone permission denied';
+    return { status: { code: 'callFailed' }, mediaNoticeCode: 'permissionDenied' };
   }
   if (/secure|https|getUserMedia|microphone is not available/i.test(combined)) {
-    return 'Microphone requires HTTPS';
+    return { status: { code: 'callFailed' }, mediaNoticeCode: 'requiresHttps' };
   }
-  return message ? `Call failed: ${message}`.slice(0, 120) : 'Call failed before invite';
-}
-
-function mediaFailureNotice(message: string) {
-  return /microphone/i.test(message) ? message : undefined;
+  return { status: { code: 'callFailed', detail: message ? message.slice(0, 120) : undefined } };
 }
 
 function clampVolume(value: number) {

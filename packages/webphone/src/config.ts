@@ -14,6 +14,9 @@ export function asteriskSettingsFromSystemSettings(
   return {
     enabled: booleanValue(values.get("asterisk.enabled")),
     websocketUrl: stringValue(values.get("asterisk.websocket_url")),
+    secondaryWebsocketUrl: optionalString(
+      values.get("asterisk.websocket_url_secondary"),
+    ),
     sipDomain: stringValue(values.get("asterisk.sip_domain")),
     realm: stringValue(values.get("asterisk.realm")),
     outboundProxy: stringValue(values.get("asterisk.outbound_proxy")),
@@ -34,6 +37,9 @@ export function asteriskSettingsFromSystemSettings(
       values.get("asterisk.turn_servers_json"),
     ),
     iceServers: jsonObjectArray(values.get("asterisk.ice_servers_json")),
+    iceTransportPolicy: iceTransportPolicyValue(
+      values.get("asterisk.ice_transport_policy"),
+    ),
     extra: jsonObject(values.get("asterisk.extra_json")),
   };
 }
@@ -77,6 +83,26 @@ export function iceServersFromSettings(
   return [...explicit, ...stun, ...turn];
 }
 
+/**
+ * Builds the RTCPeerConnection config for a call. `ephemeralIceServers`
+ * (from minted TURN REST credentials, see `AdminWebphoneConfig.turnCredentials`)
+ * are appended after the static settings-derived ones. Only sets
+ * `iceTransportPolicy` when it's 'relay' — omitting it otherwise matches
+ * the browser default ('all') rather than asserting it explicitly.
+ */
+export function pcConfigFromSettings(
+  settings?: AsteriskIntegrationSettings,
+  ephemeralIceServers?: RTCIceServer[],
+): RTCConfiguration {
+  const iceServers = [
+    ...iceServersFromSettings(settings),
+    ...(ephemeralIceServers ?? []),
+  ];
+  return settings?.iceTransportPolicy === "relay"
+    ? { iceServers, iceTransportPolicy: "relay" }
+    : { iceServers };
+}
+
 function toIceServer(server: Record<string, unknown>): RTCIceServer | null {
   const urls = server.urls;
   if (typeof urls !== "string" && !Array.isArray(urls)) return null;
@@ -105,6 +131,14 @@ function stringValue(value: unknown) {
   if (typeof value === "string") return value;
   if (value === undefined || value === null) return "";
   return String(value);
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function iceTransportPolicyValue(value: unknown): "all" | "relay" | undefined {
+  return value === "relay" ? "relay" : value === "all" ? "all" : undefined;
 }
 
 function numberValue(value: unknown) {

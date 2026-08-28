@@ -16,6 +16,18 @@ export type AsteriskIntegrationSettings = {
   turnServers?: Array<Record<string, unknown>>;
   iceServers?: Array<Record<string, unknown>>;
   extra?: Record<string, unknown>;
+  /**
+   * Backup WebSocket transport for SIP failover, from
+   * `asterisk.websocket_url_secondary`. JsSIP tries the primary socket
+   * first and only falls back to this one on connection loss.
+   */
+  secondaryWebsocketUrl?: string;
+  /**
+   * WebRTC ICE transport policy from `asterisk.ice_transport_policy`.
+   * 'relay' forces all media through a configured TURN server instead of
+   * attempting a direct/STUN path.
+   */
+  iceTransportPolicy?: 'all' | 'relay';
 };
 
 export type AdminWebphoneConfig = {
@@ -29,6 +41,16 @@ export type AdminWebphoneConfig = {
   outboundCallerId?: string | null;
   transport?: "ws" | "wss";
   passwordConfigured?: boolean;
+  /**
+   * Ephemeral TURN credentials minted server-side (coturn REST
+   * convention), present only on the self-service webphone config
+   * response and only when `asterisk.turn_rest_enabled` is configured.
+   */
+  turnCredentials?: {
+    enabled: boolean;
+    iceServers: Array<{ urls: string[]; username: string; credential: string }>;
+    expiresAt: string | null;
+  };
 };
 
 export type WebphoneCallLogType = "IN_ANS" | "IN_NOANS" | "OUT";
@@ -59,6 +81,43 @@ export type WebphoneConnectionState =
   | "registered"
   | "offline"
   | "error";
+
+export type WebphoneStatusCode =
+  | "idle"
+  | "loadingPhone"
+  | "disabled"
+  | "ready"
+  | "notConfigured"
+  | "unavailable"
+  | "connecting"
+  | "socketConnected"
+  | "registering"
+  | "registered"
+  | "registrationFailed"
+  | "disconnected"
+  | "connectFailed"
+  | "incomingCall"
+  | "calling"
+  | "ringing"
+  | "startingCall"
+  | "callEnded"
+  | "declined"
+  | "callFailed"
+  | "inCall";
+
+export type WebphoneStatus = {
+  code: WebphoneStatusCode;
+  /** Raw technical detail (SIP cause, error message) — not localized. */
+  detail?: string;
+};
+
+export type WebphoneMediaNoticeCode =
+  | "requiresHttps"
+  | "unavailable"
+  | "stopped"
+  | "muted"
+  | "clickToAllow"
+  | "permissionDenied";
 
 export type WebphoneCallState =
   | "idle"
