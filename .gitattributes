@@ -1,0 +1,24 @@
+# Generated documentation and Node scripts are written with LF by their
+# generators. Without this, core.autocrlf=true rewrites them to CRLF on a
+# Windows checkout and every drift check compares LF output against a CRLF
+# working tree — so `docs:check` can never pass. See
+# tenant-portal/docs/build/DEFECTS.md D8.
+
+*.mjs               text eol=lf
+*.md                text eol=lf
+*.json              text eol=lf
+
+*/docs/generated/** text eol=lf
+
+# Binary — never normalize.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary
+*.pdf  binary

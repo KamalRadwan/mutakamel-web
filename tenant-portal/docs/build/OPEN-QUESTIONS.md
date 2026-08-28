@@ -1,0 +1,98 @@
+# Open Questions
+
+Last review: **2026-08-28**
+
+Questions the documentation cannot answer. **Add to this file rather than
+guessing or asking a human mid-build.** An entry here is a bug in the docs.
+
+Format: the question, why it cannot be answered from source, what was done
+instead, and who can settle it.
+
+## Status
+
+**All nine questions opened during the 2026-08-27 rebuild are resolved.**
+The list is kept as a record of how each was settled, because the reasoning
+matters more than the answer.
+
+| # | Question | Resolution |
+| --- | --- | --- |
+| Q1 | Who owns security headers? | **Nginx Proxy Manager** for transport headers; the app owns CSP (nonce) — [security-headers.md](../architecture/security-headers.md) |
+| Q2 | Detail routes for leads and customers? | **Build both** — [detail-screens.md](../design/detail-screens.md) |
+| Q3 | Lead conversion flow? | **Three-step drawer** with a persistent success panel — [detail-screens.md](../design/detail-screens.md#lead-conversion) |
+| Q4 | Font validation | Availability + Arabic subset **verified**; visual density check deferred to phase 2 — see below |
+| Q5 | Request-body field shapes | **Generated** — [dto-fields.md](../reference/dto-fields.md), 46 classes, 293 fields |
+| Q6 | Test strategy | **Written** — [testing.md](../architecture/testing.md) |
+| Q7 | Accessibility checklist | **Written** — [accessibility.md](../design/accessibility.md) |
+| Q8 | Palette never rendered | **Computed and fixed** — `pnpm design:contrast`; see below |
+| Q9 | Core / Trade enums and permissions | Core **extracted** (64 permissions); Trade deliberately deferred |
+
+---
+
+## Q4 — Font validation · partially closed
+
+**Verified 2026-08-28** by fetching the Google Fonts CSS directly:
+
+- **Readex Pro** — available, three weights, and a genuine Arabic subset
+  (`U+0600-06FF`, `U+0750-077F`, `U+FB50-FDFF`, `U+FE70-FEFC`) alongside latin
+  and latin-ext.
+- **DM Mono** — available at 400 and 500.
+- **Zain** — available, confirmed as a viable fallback.
+
+**Still open:** whether Readex Pro's Arabic is too wide for a 40px table row at
+`text-xs`. That needs a rendered look, which this environment could not
+reliably produce.
+
+**Action in phase 2:** load the fonts, open a populated table in Arabic, and
+look. If rows overflow, switch to **Zain** and record the change in
+[typography.md](../design/typography.md).
+
+---
+
+## Q8 — Palette · closed, and it caught three real defects
+
+`node scripts/design/contrast.mjs` now computes every ratio from the OKLCH
+values rather than estimating them. Running it the first time found:
+
+1. **Five brand steps were outside the sRGB gamut** (500–900, chroma 6–15% too
+   high). The browser would have silently clipped them to a different color
+   than specified. Chroma reduced to 96% of the in-gamut maximum; all steps now
+   resolve cleanly.
+2. **"`negative-600` fails contrast" was false** — it measures 5.09 and would
+   have been acceptable. `negative-700` is kept as a *margin* choice, and the
+   documented reason is corrected.
+3. **"No amber step clears AA against both labels" was false** —
+   `caution-500` with an `ink-950` label measures 8.42. The rule *"amber is
+   never a filled button"* stands, but on **semantic** grounds, not contrast.
+
+All twelve required pairings now pass. The tightest is `brand-500` as the light
+focus ring at **3.19** against a 3.0 bar — noted in
+[tokens.md](../design/tokens.md#contrast-resolution) so nobody erodes it.
+
+---
+
+## Q9 — Trade permissions · deliberately deferred
+
+Core's 64 tenant permissions are extracted into
+[permissions.md](../reference/permissions.md#core-tenant-permissions), from the
+controllers — there is no packaged catalogue for them.
+
+Trade has 231 Gateway routes and **no portal screen**. Enumerating its
+permissions now would produce documentation that rots before it is read.
+Extract from `trade-app/src/**/*.controller.ts` when a Trade screen is first
+built, and add the section in the same change.
+
+---
+
+## How to add one
+
+Do not delete a resolved entry — the reasoning is the value. Append new
+questions below with the same shape:
+
+```markdown
+## Q10 — <the question>
+
+<why it cannot be answered from source>
+
+**Assumed:** <what you did instead>
+**Settle with:** <who or what closes it>
+```

@@ -1,0 +1,42 @@
+{
+  "generatedAt": "2026-08-28T01:32:28.918Z",
+  "fileCount": 310,
+  "counts": {
+    "colorUtilityTotal": 1992,
+    "arbitraryTypeSize": 83,
+    "fontBoldOrHeavier": 157,
+    "fontNormalOrMedium": 30,
+    "roundedXlOrAbove": 151,
+    "gradients": 19,
+    "backdropBlur": 14,
+    "handRolledButtons": 46,
+    "handRolledTables": 3,
+    "physicalRtlViolations": 16,
+    "languageTernaries": 189,
+    "colorFamiliesInUse": 17
+  },
+  "colorFamilyCounts": {
+    "slate": 1075,
+    "gray": 120,
+    "zinc": 0,
+    "neutral": 0,
+    "stone": 0,
+    "red": 150,
+    "orange": 29,
+    "amber": 100,
+    "yellow": 2,
+    "lime": 0,
+    "green": 2,
+    "emerald": 82,
+    "teal": 6,
+    "cyan": 4,
+    "sky": 5,
+    "blue": 266,
+    "indigo": 22,
+    "violet": 12,
+    "purple": 59,
+    "fuchsia": 0,
+    "pink": 2,
+    "rose": 56
+  }
+}

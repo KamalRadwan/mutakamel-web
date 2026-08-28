@@ -3,9 +3,9 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-08-26T00:28:19.553Z**
+Generated at: **2026-08-27T19:11:03.981Z**
 
-Frontend revision: `6f465221c373+dirty`
+Frontend revision: `67034e343dff+dirty`
 
 Backend revision: `3cbfe3e8ddd7+dirty`
 
