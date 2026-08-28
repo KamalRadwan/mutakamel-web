@@ -1,6 +1,6 @@
 import { isUUIDv7 } from "@/lib/uuid";
 
-export const LEAD_STAGE_FLAGS = [
+const LEAD_STAGE_FLAGS = [
   "NEW",
   "CONTACTED",
   "QUALIFYING",

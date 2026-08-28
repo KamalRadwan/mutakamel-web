@@ -78,6 +78,9 @@ export default function LoginPage() {
                     className="pe-9"
                     required
                   />
+                  {/* Button's chrome doesn't fit a borderless icon overlaid
+                      on the input itself. */}
+                  {/* eslint-disable-next-line no-restricted-syntax */}
                   <button
                     type="button"
                     onClick={toggleShowPassword}

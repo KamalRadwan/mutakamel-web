@@ -101,10 +101,12 @@ had to ask a human is a bug in the documentation.
 ## Verification
 
 ```bash
-pnpm verify        # typecheck + lint + test + docs:check + design:rtl
-pnpm build
-pnpm design:census -- --check
+pnpm verify   # typecheck, lint, rtl, census --check, contrast, test, docs:check, build, knip — in that order
 ```
+
+Order matters: cheap and specific gates run first, so a failure names itself
+immediately rather than surfacing after a multi-minute build — see
+`docs/design/enforcement.md#ci-ordering`.
 
 A green run proves *type-validated, lint-validated, unit-tested*. It does not
 prove the app works against a real authenticated session — report that

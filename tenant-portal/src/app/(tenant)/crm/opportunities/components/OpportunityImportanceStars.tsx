@@ -16,6 +16,10 @@ export function OpportunityImportanceStars({ importance, onChange, label, classN
   return (
     <div className={cn("flex items-center gap-0.5", className)} title={label}>
       {[1, 2, 3].map((star) => (
+        // Button's chrome (padding, border, rounded-sm background) doesn't
+        // fit a bare star toggle in a tight row — same precedent as the
+        // password-visibility toggle in app/login/page.tsx.
+        // eslint-disable-next-line no-restricted-syntax
         <button
           key={star}
           type="button"

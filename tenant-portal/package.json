@@ -17,7 +17,7 @@
     "docs:api-reference:check": "node scripts/docs/generate-api-reference.mjs --check",
     "design:census": "node scripts/design/census.mjs",
     "design:rtl": "node scripts/design/rtl-guard.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run docs:check && npm run design:contrast && npm run design:rtl",
+    "verify": "npm run typecheck && npm run lint && npm run design:rtl && npm run design:census -- --check && npm run design:contrast && npm run test && npm run docs:check && npm run build && npm run knip",
     "docs:verify-claims": "node scripts/docs/verify-route-claims.mjs",
     "docs:audit-api": "node scripts/docs/audit-api-coverage.mjs",
     "docs:dto": "node scripts/docs/generate-dto-reference.mjs",
@@ -25,7 +25,8 @@
     "design:contrast": "node scripts/design/contrast.mjs",
     "docs:errors": "node scripts/docs/generate-error-reference.mjs",
     "docs:errors:check": "node scripts/docs/generate-error-reference.mjs --check",
-    "docs:verify-called-routes": "node scripts/docs/verify-called-routes.mjs"
+    "docs:verify-called-routes": "node scripts/docs/verify-called-routes.mjs",
+    "knip": "knip"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -68,8 +69,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.11",
     "jsdom": "^29.1.1",
+    "knip": "^6.32.3",
     "tailwindcss": "^4",
-    "ts-morph": "^28.0.0",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

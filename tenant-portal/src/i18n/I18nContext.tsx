@@ -19,10 +19,14 @@ const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const lang = useLanguage();
+  // dir/lang-value computation, not UI copy — docs/design/i18n.md's
+  // zero-ternary rule explicitly allows this.
+  // eslint-disable-next-line no-restricted-syntax
   const dir = lang === "ar" ? "rtl" : "ltr";
   const dictionary = lang === "ar" ? ar : en;
 
   const toggleLang = () => {
+    // eslint-disable-next-line no-restricted-syntax -- toggling the lang value, not picking display text
     setLanguage(lang === "ar" ? "en" : "ar");
   };
 

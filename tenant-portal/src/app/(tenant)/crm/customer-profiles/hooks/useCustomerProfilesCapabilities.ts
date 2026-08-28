@@ -5,7 +5,7 @@ import { axiosClient } from "@/lib/api/axiosClient";
 import { isUUIDv7 } from "@/lib/uuid";
 import { CUSTOMER_PROFILES_PATH } from "./useCustomerProfiles";
 
-export interface ActionCapability {
+interface ActionCapability {
   scope: "own" | "team" | "all";
   ownerUserIds: string[] | null;
 }

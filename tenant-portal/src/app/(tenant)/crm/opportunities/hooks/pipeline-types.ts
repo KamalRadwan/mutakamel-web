@@ -12,7 +12,7 @@ export type StageFlag =
   | "WON"
   | "LOST";
 
-export interface OpportunityRecord {
+interface OpportunityRecord {
   id: string;
   branchId: string;
   customerProfileId: string;

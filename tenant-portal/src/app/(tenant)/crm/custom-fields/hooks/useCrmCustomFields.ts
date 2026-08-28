@@ -15,7 +15,7 @@ export const CRM_CUSTOM_FIELD_OWNER_TYPES = [
   "OPPORTUNITY",
 ] as const;
 
-export const CRM_CUSTOM_FIELD_TYPES = [
+const CRM_CUSTOM_FIELD_TYPES = [
   "TEXT",
   "TEXTAREA",
   "NUMBER",
@@ -47,11 +47,11 @@ const CRM_CUSTOM_FIELD_RESPONSE_OWNER_TYPES = [
 ] as const;
 const CRM_CUSTOM_FIELD_KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
 
-export type CrmCustomFieldOwnerType =
+type CrmCustomFieldOwnerType =
   (typeof CRM_CUSTOM_FIELD_RESPONSE_OWNER_TYPES)[number];
 export type CrmCustomFieldCreateOwnerType =
   (typeof CRM_CUSTOM_FIELD_OWNER_TYPES)[number];
-export type CrmCustomFieldType = (typeof CRM_CUSTOM_FIELD_TYPES)[number];
+type CrmCustomFieldType = (typeof CRM_CUSTOM_FIELD_TYPES)[number];
 export type CrmCustomFieldSimpleCreateType =
   (typeof CRM_CUSTOM_FIELD_SIMPLE_CREATE_TYPES)[number];
 

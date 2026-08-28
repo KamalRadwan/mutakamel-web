@@ -27,7 +27,7 @@ export interface CrmStaticData {
   };
 }
 
-export type StaticCatalogueGroupKind =
+type StaticCatalogueGroupKind =
   | "enum"
   | "permission"
   | "owner"

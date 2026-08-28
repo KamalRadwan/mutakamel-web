@@ -41,5 +41,8 @@ export function useLanguage(): Language {
 }
 
 export function useDirection(): "rtl" | "ltr" {
+  // dir computation, not UI copy — docs/design/i18n.md's zero-ternary rule
+  // explicitly allows this.
+  // eslint-disable-next-line no-restricted-syntax
   return useLanguage() === "ar" ? "rtl" : "ltr";
 }

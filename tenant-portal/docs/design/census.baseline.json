@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-28T08:24:05.256Z",
-  "fileCount": 109,
+  "generatedAt": "2026-08-28T08:38:49.900Z",
+  "fileCount": 108,
   "counts": {
     "colorUtilityTotal": 19,
     "arbitraryTypeSize": 0,
@@ -12,7 +12,7 @@
     "handRolledButtons": 5,
     "handRolledTables": 0,
     "physicalRtlViolations": 0,
-    "languageTernaries": 21,
+    "languageTernaries": 19,
     "colorFamiliesInUse": 3
   },
   "colorFamilyCounts": {

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/app/**/{page,layout,not-found,error,loading,route,proxy}.{ts,tsx}",
+    "src/design-system/index.ts",
+    "scripts/**/*.mjs"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.mjs"],
+  "ignore": ["src/lib/api/**", "src/lib/auth/**", "src/context/**"],
+  "ignoreDependencies": ["tailwindcss", "tw-animate-css"]
+}
