@@ -45,6 +45,10 @@ export function useNavbar(props: UseNavbarProps = {}) {
     auth?.user,
     ADMIN_RBAC_CRITICAL.STORAGE_SERVERS_CREATE,
   );
+  const canViewDatabaseMigrations = adminCan(
+    auth?.user,
+    "admin.migrations.read",
+  );
 
   const handleMobileMenuToggle = () => {
     setIsMobileMenuOpen((prev) => !prev);
@@ -96,7 +100,8 @@ export function useNavbar(props: UseNavbarProps = {}) {
     pathname.startsWith("/provisioning");
   const isInfrastructureChildActive =
     pathname.startsWith("/database-servers") ||
-    pathname.startsWith("/storage-servers");
+    pathname.startsWith("/storage-servers") ||
+    pathname.startsWith("/database-migrations");
 
   // Define full routes
   const rawAdminItems = [
@@ -163,6 +168,12 @@ export function useNavbar(props: UseNavbarProps = {}) {
       href: canViewStorageServers ? "/storage-servers" : "/storage-servers/new",
     }]
       : []),
+    ...(canViewDatabaseMigrations
+      ? [{
+      label: lang === "ar" ? "ترحيلات قواعد البيانات" : "Database migrations",
+      href: "/database-migrations",
+    }]
+      : []),
   ];
   const homeHref = canViewDashboard
     ? "/dashboard"
@@ -197,6 +208,7 @@ export function useNavbar(props: UseNavbarProps = {}) {
     canViewApplications,
     canViewDatabaseServers,
     canViewStorageServers,
+    canViewDatabaseMigrations,
     canViewBackup: adminCan(auth?.user, "admin.backups.read"),
     brand: {
       title: t.common.appName,

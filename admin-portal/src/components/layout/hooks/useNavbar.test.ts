@@ -167,6 +167,33 @@ describe("useNavbar audit destination", () => {
     expect(noRoutes.result.current.homeHref).toBe("/profile");
   });
 
+  it("discloses the database-migrations destination only with its read permission", () => {
+    authMock.user = {
+      isSuperAdmin: false,
+      permissions: ["admin.migrations.read"],
+    };
+    const { result } = renderHook(() => useNavbar());
+
+    expect(result.current.canViewDatabaseMigrations).toBe(true);
+    expect(result.current.filteredInfrastructureItems).toContainEqual({
+      label: "Database migrations",
+      href: "/database-migrations",
+    });
+
+    authMock.user = {
+      isSuperAdmin: false,
+      // Holding the mutating permissions alone must not reveal the surface.
+      permissions: ["admin.migrations.manage", "admin.migrations.critical"],
+    };
+    const unauthorized = renderHook(() => useNavbar());
+    expect(unauthorized.result.current.canViewDatabaseMigrations).toBe(false);
+    expect(
+      unauthorized.result.current.filteredInfrastructureItems,
+    ).not.toContainEqual(
+      expect.objectContaining({ href: "/database-migrations" }),
+    );
+  });
+
   it("links create-only infrastructure actors directly to registration screens", () => {
     authMock.user = {
       isSuperAdmin: false,
