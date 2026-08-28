@@ -2,24 +2,12 @@
 
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AdminWebphoneConfig, AsteriskIntegrationSettings } from "@mutakamel/webphone";
-
-vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard" }));
-vi.mock("@/context/AuthContext", () => ({
-  useAuth: () => ({ isAuthenticated: true }),
-}));
-
-const { loadMyWebphoneConfigMock, loadAsteriskSettingsMock } = vi.hoisted(() => ({
-  loadMyWebphoneConfigMock: vi.fn(),
-  loadAsteriskSettingsMock: vi.fn(),
-}));
-
-vi.mock("../webphone/api", () => ({
-  loadMyWebphoneConfig: loadMyWebphoneConfigMock,
-  loadAsteriskSettings: loadAsteriskSettingsMock,
-  loadMyWebphoneCallLogs: vi.fn().mockResolvedValue([]),
-  createMyWebphoneCallLog: vi.fn().mockResolvedValue(undefined),
-}));
+import type { ReactNode } from "react";
+import { endpointSocketWeight } from "../config";
+import { WebphoneProvider } from "../context/WebphoneContext";
+import { webphoneCopy } from "../copy";
+import type { WebphoneHttpClient } from "../http";
+import type { WebphoneMe } from "../types";
 
 class MockWebSocketInterface {
   url: string;
@@ -62,63 +50,102 @@ vi.mock("jssip", () => ({
   WebSocketInterface: MockWebSocketInterface,
 }));
 
-const webphoneConfig: AdminWebphoneConfig = {
+const BASE_PATH = "/api/admin/webphone/v1";
+
+const getMock = vi.fn();
+const httpClient = {
+  get: getMock,
+  post: vi.fn().mockResolvedValue({ data: { data: null } }),
+} as unknown as WebphoneHttpClient;
+
+const webphoneMe: WebphoneMe = {
   enabled: true,
   extension: "100",
   sipUsername: "100",
   sipPassword: "secret",
-  displayName: "Admin",
+  displayName: "Operator",
+  outboundCallerId: null,
+  transport: "wss",
+  passwordConfigured: true,
+  config: {
+    enabled: true,
+    sipDomain: "example.com",
+    realm: null,
+    outboundProxy: null,
+    fromDomain: null,
+    registrarServer: null,
+    contactUri: null,
+    registerExpires: 600,
+    sessionTimers: false,
+    traceSip: false,
+    iceTransportPolicy: "all",
+    endpoints: [{ websocketUrl: "wss://primary.example.com:8089/ws", priority: 0 }],
+    iceServers: [],
+  },
+  turnCredentials: { enabled: false, iceServers: [], expiresAt: null },
 };
 
-const asteriskSettings: AsteriskIntegrationSettings = {
-  enabled: true,
-  websocketUrl: "wss://primary.example.com:8089/ws",
-  sipDomain: "example.com",
-};
+function serveMe(me: WebphoneMe) {
+  getMock.mockImplementation((url: string) =>
+    url.endsWith("/call-logs")
+      ? Promise.resolve({ data: { data: [] } })
+      : Promise.resolve({ data: { data: me } }),
+  );
+}
 
-async function loadUseWebRTCPhone() {
-  const mod = await import("./useWebRTCPhone");
-  return mod.useWebRTCPhone;
+function wrapper({ children }: { children: ReactNode }) {
+  return (
+    <WebphoneProvider basePath={BASE_PATH} http={httpClient} active copy={webphoneCopy.en}>
+      {children}
+    </WebphoneProvider>
+  );
+}
+
+async function renderPhone() {
+  const { useWebRTCPhone } = await import("./useWebRTCPhone");
+  return renderHook(() => useWebRTCPhone(), { wrapper });
 }
 
 describe("useWebRTCPhone connection lifecycle", () => {
   beforeEach(() => {
     MockUA.instances = [];
-    loadMyWebphoneConfigMock.mockReset().mockResolvedValue(webphoneConfig);
-    loadAsteriskSettingsMock.mockReset().mockResolvedValue(asteriskSettings);
+    getMock.mockReset();
+    serveMe(webphoneMe);
   });
 
-  it("registers with a single primary socket when no secondary is configured", async () => {
-    const useWebRTCPhone = await loadUseWebRTCPhone();
-    renderHook(() => useWebRTCPhone());
+  it("builds one socket per endpoint returned by the runtime config", async () => {
+    await renderPhone();
 
     await waitFor(() => expect(MockUA.instances).toHaveLength(1));
     const sockets = MockUA.instances[0].config.sockets as Array<{ socket: MockWebSocketInterface; weight: number }>;
     expect(sockets).toHaveLength(1);
     expect(sockets[0].socket.url).toBe("wss://primary.example.com:8089/ws");
-    expect(sockets[0].weight).toBe(10);
+    expect(sockets[0].weight).toBe(endpointSocketWeight(0));
   });
 
-  it("adds a lower-weight backup socket when a secondary websocket URL is configured", async () => {
-    loadAsteriskSettingsMock.mockResolvedValue({
-      ...asteriskSettings,
-      secondaryWebsocketUrl: "wss://backup.example.com:8089/ws",
+  it("keeps the server's endpoint order while inverting priority into a JsSIP weight", async () => {
+    serveMe({
+      ...webphoneMe,
+      config: {
+        ...webphoneMe.config,
+        endpoints: [
+          { websocketUrl: "wss://primary.example.com:8089/ws", priority: 0 },
+          { websocketUrl: "wss://backup.example.com:8089/ws", priority: 5 },
+        ],
+      },
     });
-    const useWebRTCPhone = await loadUseWebRTCPhone();
-    renderHook(() => useWebRTCPhone());
+    await renderPhone();
 
     await waitFor(() => expect(MockUA.instances).toHaveLength(1));
     const sockets = MockUA.instances[0].config.sockets as Array<{ socket: MockWebSocketInterface; weight: number }>;
     expect(sockets).toHaveLength(2);
     expect(sockets[0].socket.url).toBe("wss://primary.example.com:8089/ws");
-    expect(sockets[0].weight).toBe(10);
     expect(sockets[1].socket.url).toBe("wss://backup.example.com:8089/ws");
-    expect(sockets[1].weight).toBe(0);
+    expect(sockets[0].weight).toBeGreaterThan(sockets[1].weight);
   });
 
   it("moves to the registered state with a matching status code once JsSIP registers", async () => {
-    const useWebRTCPhone = await loadUseWebRTCPhone();
-    const { result } = renderHook(() => useWebRTCPhone());
+    const { result } = await renderPhone();
 
     await waitFor(() => expect(MockUA.instances).toHaveLength(1));
     act(() => {
@@ -132,8 +159,7 @@ describe("useWebRTCPhone connection lifecycle", () => {
   });
 
   it("surfaces registrationFailed as an error status carrying the SIP cause as detail", async () => {
-    const useWebRTCPhone = await loadUseWebRTCPhone();
-    const { result } = renderHook(() => useWebRTCPhone());
+    const { result } = await renderPhone();
 
     await waitFor(() => expect(MockUA.instances).toHaveLength(1));
     act(() => {
@@ -147,8 +173,7 @@ describe("useWebRTCPhone connection lifecycle", () => {
   });
 
   it("does not auto-retry after a registration failure, but retryConnection reconnects manually", async () => {
-    const useWebRTCPhone = await loadUseWebRTCPhone();
-    const { result } = renderHook(() => useWebRTCPhone());
+    const { result } = await renderPhone();
 
     await waitFor(() => expect(MockUA.instances).toHaveLength(1));
     act(() => {
@@ -169,20 +194,19 @@ describe("useWebRTCPhone connection lifecycle", () => {
 describe("TURN REST credential refresh", () => {
   beforeEach(() => {
     MockUA.instances = [];
-    loadMyWebphoneConfigMock.mockReset().mockResolvedValue(webphoneConfig);
-    loadAsteriskSettingsMock.mockReset().mockResolvedValue(asteriskSettings);
+    getMock.mockReset();
+    serveMe(webphoneMe);
   });
 
   it("schedules a refetch ahead of a minted TURN credential's expiry", async () => {
     const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
-    loadMyWebphoneConfigMock.mockResolvedValue({
-      ...webphoneConfig,
+    serveMe({
+      ...webphoneMe,
       turnCredentials: { enabled: true, iceServers: [], expiresAt },
     });
     const setTimeoutSpy = vi.spyOn(window, "setTimeout");
 
-    const useWebRTCPhone = await loadUseWebRTCPhone();
-    renderHook(() => useWebRTCPhone());
+    await renderPhone();
 
     await waitFor(() => {
       const scheduledNearExpiry = setTimeoutSpy.mock.calls.some(
@@ -195,14 +219,9 @@ describe("TURN REST credential refresh", () => {
   });
 
   it("does not schedule a refetch when TURN REST credentials are disabled", async () => {
-    loadMyWebphoneConfigMock.mockResolvedValue({
-      ...webphoneConfig,
-      turnCredentials: { enabled: false, iceServers: [], expiresAt: null },
-    });
     const setTimeoutSpy = vi.spyOn(window, "setTimeout");
 
-    const useWebRTCPhone = await loadUseWebRTCPhone();
-    renderHook(() => useWebRTCPhone());
+    await renderPhone();
 
     await waitFor(() => expect(MockUA.instances).toHaveLength(1));
     const scheduledNearExpiry = setTimeoutSpy.mock.calls.some(

@@ -19,161 +19,29 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { useI18n } from '@/i18n/I18nContext';
-import { formatWebphoneLogTime, useWebRTCPhone } from './hooks/useWebRTCPhone';
+import type { ReactNode } from 'react';
+import type { WebphoneCopy } from '../copy';
+import { useWebphoneContext } from '../context/WebphoneContext';
+import { formatWebphoneLogTime, useWebRTCPhone } from '../hooks/useWebRTCPhone';
 import { IncomingCallPopup } from './IncomingCallPopup';
 import type {
   WebphoneCallLogType,
   WebphoneConnectionState,
   WebphoneMediaNoticeCode,
   WebphoneStatus,
-} from '@mutakamel/webphone';
+} from '../types';
 
-const copy = {
-  ar: {
-    phone: 'الهاتف',
-    calls: 'السجل',
-    registered: 'مسجل',
-    connecting: 'جارٍ الاتصال',
-    error: 'خطأ',
-    offline: 'غير متصل',
-    ready: 'جاهز',
-    enterNumber: 'أدخل الرقم...',
-    copyNumber: 'نسخ الرقم',
-    deleteDigit: 'حذف آخر رقم',
-    incoming: 'مكالمة واردة',
-    connected: 'متصل',
-    answer: 'رد',
-    decline: 'رفض',
-    call: 'اتصال',
-    hangup: 'إنهاء',
-    hold: 'تعليق',
-    resume: 'استئناف',
-    mic: 'الميكروفون',
-    speaker: 'السماعة',
-    muteMic: 'كتم الميكروفون',
-    unmuteMic: 'تشغيل الميكروفون',
-    muteSpeaker: 'كتم السماعة',
-    unmuteSpeaker: 'تشغيل السماعة',
-    autoAnswer: 'رد تلقائي',
-    dnd: 'عدم الإزعاج',
-    loading: 'جارٍ تحميل سجل المكالمات',
-    noCalls: 'لا توجد مكالمات مسجلة',
-    unknown: 'غير معروف',
-    showPhone: 'فتح هاتف WebRTC',
-    foldPhone: 'تصغير هاتف WebRTC',
-    retryConnection: 'إعادة محاولة الاتصال',
-    status: {
-      idle: 'خامل',
-      loadingPhone: 'جارٍ تحميل الهاتف',
-      disabled: 'معطل',
-      ready: 'جاهز',
-      notConfigured: 'غير مُهيأ',
-      unavailable: 'غير متاح',
-      connecting: 'جارٍ الاتصال',
-      socketConnected: 'تم الاتصال بالخادم',
-      registering: 'جارٍ التسجيل',
-      registered: 'تم التسجيل',
-      registrationFailed: 'فشل التسجيل',
-      disconnected: 'انقطع الاتصال',
-      connectFailed: 'فشل الاتصال',
-      incomingCall: 'مكالمة واردة',
-      calling: 'جارٍ الاتصال بالرقم',
-      ringing: 'يرن الآن',
-      startingCall: 'جارٍ بدء المكالمة',
-      callEnded: 'انتهت المكالمة',
-      declined: 'تم الرفض',
-      callFailed: 'فشلت المكالمة',
-      inCall: 'في مكالمة',
-    },
-    mediaNoticeText: {
-      requiresHttps: 'يتطلب الميكروفون اتصال HTTPS آمن',
-      unavailable: 'الميكروفون غير متاح',
-      stopped: 'توقف الميكروفون',
-      muted: 'تم كتم الميكروفون',
-      clickToAllow: 'انقر للسماح بالصوت',
-      permissionDenied: 'تم رفض إذن الميكروفون',
-    },
-  },
-  en: {
-    phone: 'Phone',
-    calls: 'Call log',
-    registered: 'Registered',
-    connecting: 'Connecting',
-    error: 'Error',
-    offline: 'Offline',
-    ready: 'Ready',
-    enterNumber: 'Enter number...',
-    copyNumber: 'Copy number',
-    deleteDigit: 'Delete last digit',
-    incoming: 'Incoming call',
-    connected: 'Connected',
-    answer: 'Answer',
-    decline: 'Decline',
-    call: 'Call',
-    hangup: 'Hang up',
-    hold: 'Hold',
-    resume: 'Resume',
-    mic: 'Microphone',
-    speaker: 'Speaker',
-    muteMic: 'Mute microphone',
-    unmuteMic: 'Unmute microphone',
-    muteSpeaker: 'Mute speaker',
-    unmuteSpeaker: 'Unmute speaker',
-    autoAnswer: 'Auto answer',
-    dnd: 'Do not disturb',
-    loading: 'Loading call history',
-    noCalls: 'No calls recorded',
-    unknown: 'Unknown',
-    showPhone: 'Open WebRTC phone',
-    foldPhone: 'Collapse WebRTC phone',
-    retryConnection: 'Retry connection',
-    status: {
-      idle: 'Idle',
-      loadingPhone: 'Loading phone',
-      disabled: 'Disabled',
-      ready: 'Ready',
-      notConfigured: 'Not configured',
-      unavailable: 'Unavailable',
-      connecting: 'Connecting',
-      socketConnected: 'Socket connected',
-      registering: 'Registering',
-      registered: 'Registered',
-      registrationFailed: 'Registration failed',
-      disconnected: 'Disconnected',
-      connectFailed: 'Connect failed',
-      incomingCall: 'Incoming call',
-      calling: 'Calling',
-      ringing: 'Ringing',
-      startingCall: 'Starting call',
-      callEnded: 'Call ended',
-      declined: 'Declined',
-      callFailed: 'Call failed',
-      inCall: 'In call',
-    },
-    mediaNoticeText: {
-      requiresHttps: 'Microphone requires HTTPS',
-      unavailable: 'Microphone unavailable',
-      stopped: 'Microphone stopped',
-      muted: 'Microphone muted',
-      clickToAllow: 'Click to allow audio',
-      permissionDenied: 'Microphone permission denied',
-    },
-  },
-} as const;
-
-function statusText(labels: (typeof copy)[keyof typeof copy], status: WebphoneStatus) {
+function statusText(labels: WebphoneCopy, status: WebphoneStatus) {
   const base = labels.status[status.code];
   return status.detail ? `${base} (${status.detail})` : base;
 }
 
-function mediaNoticeLabel(labels: (typeof copy)[keyof typeof copy], code?: WebphoneMediaNoticeCode) {
+function mediaNoticeLabel(labels: WebphoneCopy, code?: WebphoneMediaNoticeCode) {
   return code ? labels.mediaNoticeText[code] : undefined;
 }
 
 export function WebRTCPhoneWidget() {
-  const { lang } = useI18n();
-  const labels = copy[lang];
+  const { copy: labels } = useWebphoneContext();
   const [phone, remoteAudioRef] = useWebRTCPhone();
 
   if (!phone.shouldRender) return null;
@@ -195,7 +63,6 @@ export function WebRTCPhoneWidget() {
         open={phone.showIncomingPopup}
         phoneNumber={phone.callPeerNumber || labels.unknown}
         displayName={phone.callPeerName !== phone.callPeerNumber ? phone.callPeerName : undefined}
-        lang={lang}
         onAnswer={phone.answerCall}
         onDecline={phone.declineCall}
         onClose={phone.dismissIncomingPopup}
@@ -218,7 +85,7 @@ export function WebRTCPhoneWidget() {
         ) : (
           <section
             className="flex max-h-[calc(100svh-1rem)] w-[min(17.5rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-t-3xl border border-b-0 border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950"
-            aria-label={lang === 'ar' ? 'هاتف WebRTC' : 'WebRTC phone'}
+            aria-label={labels.phoneRegion}
           >
             <header className="flex h-9 items-center gap-2 border-b border-slate-800 bg-slate-950 px-3 text-white">
               <ConnectionDot state={phone.connectionState} label={connectionLabel} />
@@ -247,7 +114,7 @@ export function WebRTCPhoneWidget() {
             <div
               className="grid grid-cols-2 border-b border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900"
               role="tablist"
-              aria-label={lang === 'ar' ? 'أقسام الهاتف' : 'Phone sections'}
+              aria-label={labels.phoneSections}
             >
               <TabButton active={phone.activeTab === 'phone'} label={labels.phone} icon={<Phone className="size-3.5" />} onClick={() => phone.setActiveTab('phone')} />
               <TabButton active={phone.activeTab === 'log'} label={labels.calls} icon={<History className="size-3.5" />} onClick={() => phone.setActiveTab('log')} />
@@ -434,7 +301,7 @@ function ConnectionDot({ state, label }: { state: WebphoneConnectionState; label
   );
 }
 
-function TabButton({ active, label, icon, onClick }: { active: boolean; label: string; icon: React.ReactNode; onClick: () => void }) {
+function TabButton({ active, label, icon, onClick }: { active: boolean; label: string; icon: ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -451,7 +318,7 @@ function TabButton({ active, label, icon, onClick }: { active: boolean; label: s
   );
 }
 
-function ActionButton({ tone, icon, label, onClick }: { tone: 'success' | 'danger' | 'warning' | 'neutral'; icon: React.ReactNode; label: string; onClick: () => void }) {
+function ActionButton({ tone, icon, label, onClick }: { tone: 'success' | 'danger' | 'warning' | 'neutral'; icon: ReactNode; label: string; onClick: () => void }) {
   const toneClass = {
     success: 'bg-emerald-600 hover:bg-emerald-500 text-white',
     danger: 'bg-rose-600 hover:bg-rose-500 text-white',
@@ -481,7 +348,7 @@ function AudioControl({
   value: number;
   level: number;
   muted: boolean;
-  icon: React.ReactNode;
+  icon: ReactNode;
   toggleLabel: string;
   onToggle: () => void;
   onChange: (value: string) => void;

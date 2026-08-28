@@ -1,56 +1,65 @@
-export type AsteriskIntegrationSettings = {
-  enabled?: boolean;
-  websocketUrl?: string | null;
-  sipDomain?: string | null;
-  realm?: string | null;
-  outboundProxy?: string | null;
-  defaultCallerId?: string | null;
-  fromDomain?: string | null;
-  registrarServer?: string | null;
-  contactUri?: string | null;
-  registerExpires?: number | null;
-  sessionTimers?: boolean;
-  traceSip?: boolean;
-  allowInvalidTlsCertificate?: boolean;
-  stunServers?: string[];
-  turnServers?: Array<Record<string, unknown>>;
-  iceServers?: Array<Record<string, unknown>>;
-  extra?: Record<string, unknown>;
-  /**
-   * Backup WebSocket transport for SIP failover, from
-   * `asterisk.websocket_url_secondary`. JsSIP tries the primary socket
-   * first and only falls back to this one on connection loss.
-   */
-  secondaryWebsocketUrl?: string;
-  /**
-   * WebRTC ICE transport policy from `asterisk.ice_transport_policy`.
-   * 'relay' forces all media through a configured TURN server instead of
-   * attempting a direct/STUN path.
-   */
-  iceTransportPolicy?: 'all' | 'relay';
+export type WebphoneIceServer = {
+  urls: string[];
+  username?: string;
+  credential?: string;
 };
 
-export type AdminWebphoneConfig = {
+/**
+ * One SIP WebSocket transport. The API returns enabled endpoints only,
+ * ordered by `priority` ascending (lowest first).
+ */
+export type WebphoneEndpoint = {
+  websocketUrl: string;
+  priority: number;
+};
+
+/**
+ * The resolved runtime configuration served with the caller's own extension.
+ * The client never parses raw settings — it maps this straight to JsSIP.
+ */
+export type WebphoneRuntimeConfig = {
   enabled: boolean;
-  extension?: string | null;
-  sipUsername?: string | null;
-  sipPassword?: string | null;
-  displayName?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  outboundCallerId?: string | null;
-  transport?: "ws" | "wss";
-  passwordConfigured?: boolean;
+  sipDomain: string;
+  realm: string | null;
+  outboundProxy: string | null;
+  fromDomain: string | null;
+  registrarServer: string | null;
+  contactUri: string | null;
+  registerExpires: number;
+  sessionTimers: boolean;
+  traceSip: boolean;
   /**
-   * Ephemeral TURN credentials minted server-side (coturn REST
-   * convention), present only on the self-service webphone config
-   * response and only when `asterisk.turn_rest_enabled` is configured.
+   * WebRTC ICE transport policy. 'relay' forces all media through a
+   * configured TURN server instead of attempting a direct/STUN path.
    */
-  turnCredentials?: {
-    enabled: boolean;
-    iceServers: Array<{ urls: string[]; username: string; credential: string }>;
-    expiresAt: string | null;
-  };
+  iceTransportPolicy: "all" | "relay";
+  endpoints: WebphoneEndpoint[];
+  iceServers: WebphoneIceServer[];
+};
+
+/**
+ * Ephemeral TURN credentials minted server-side (coturn REST convention).
+ * They are appended to the static ICE servers, never a replacement.
+ */
+export type WebphoneTurnCredentials = {
+  enabled: boolean;
+  iceServers: Array<{ urls: string[]; username: string; credential: string }>;
+  expiresAt: string | null;
+};
+
+/** The full `GET {base}/me` payload: everything the widget needs to run. */
+export type WebphoneMe = {
+  enabled: boolean;
+  extension: string | null;
+  sipUsername: string | null;
+  /** Decrypted for this session only — never persisted by the client. */
+  sipPassword: string | null;
+  displayName: string | null;
+  outboundCallerId: string | null;
+  transport: "ws" | "wss";
+  passwordConfigured: boolean;
+  config: WebphoneRuntimeConfig;
+  turnCredentials: WebphoneTurnCredentials;
 };
 
 export type WebphoneCallLogType = "IN_ANS" | "IN_NOANS" | "OUT";
@@ -139,9 +148,4 @@ export type ActiveCallContext = {
   endedAt?: string | null;
   durationSeconds?: number | null;
   cause?: string | null;
-};
-
-export type ApiSystemSetting = {
-  key: string;
-  value: unknown;
 };

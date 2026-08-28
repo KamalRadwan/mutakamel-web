@@ -1,26 +1,25 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RTCSession } from 'jssip/lib/RTCSession';
 import type { UA } from 'jssip';
-import { useAuth } from '@/context/AuthContext';
-import { playDtmfTone, pcConfigFromSettings, isWebphoneReady, normalizeCallTarget, sipUri } from '@mutakamel/webphone';
-import { createMyWebphoneCallLog, loadAsteriskSettings, loadMyWebphoneCallLogs, loadMyWebphoneConfig } from '../webphone/api';
-import { safeStorage } from "@/lib/safeStorage";
+import { createWebphoneApi } from '../api';
+import { endpointSocketWeight, isWebphoneReady, normalizeCallTarget, pcConfigFromSettings, sipUri } from '../config';
+import { useWebphoneContext } from '../context/WebphoneContext';
+import { playDtmfTone } from '../utils/dtmfAudio';
 import type {
   ActiveCallContext,
-  AdminWebphoneConfig,
-  AsteriskIntegrationSettings,
   CreateWebphoneCallLogPayload,
   WebphoneCallLog,
   WebphoneCallState,
   WebphoneConnectionState,
+  WebphoneMe,
   WebphoneMediaNoticeCode,
+  WebphoneRuntimeConfig,
   WebphoneStatus,
   WebphoneStatusCode,
   WebphoneTab,
-} from '@mutakamel/webphone';
+} from '../types';
 
 type PhoneLifecycle = {
   connectPhone: () => Promise<void>;
@@ -70,9 +69,8 @@ const keypad = [
 ] as const;
 
 export function useWebRTCPhone() {
-  const { isAuthenticated } = useAuth();
-  const pathname = usePathname();
-  const shouldActivate = isAuthenticated && pathname !== '/login';
+  const { basePath, http, active, copy } = useWebphoneContext();
+  const api = useMemo(() => createWebphoneApi(basePath, http), [basePath, http]);
 
   const uaRef = useRef<UA | null>(null);
   const sessionRef = useRef<RTCSession | null>(null);
@@ -96,8 +94,7 @@ export function useWebRTCPhone() {
   const [expanded, setExpanded] = useState(() => readBooleanPreference(WEBPHONE_STORAGE_KEYS.expanded, false));
   const [incomingPopupDismissed, setIncomingPopupDismissed] = useState(false);
   const [activeTab, setActiveTab] = useState<WebphoneTab>('phone');
-  const [settings, setSettings] = useState<AsteriskIntegrationSettings>();
-  const [webphone, setWebphone] = useState<AdminWebphoneConfig>();
+  const [me, setMe] = useState<WebphoneMe>();
   const [connectionState, setConnectionState] = useState<WebphoneConnectionState>('idle');
   const [callState, setCallState] = useState<WebphoneCallState>('idle');
   const [status, setStatus] = useState<WebphoneStatus>({ code: 'idle' });
@@ -119,6 +116,8 @@ export function useWebRTCPhone() {
   const [callLogs, setCallLogs] = useState<WebphoneCallLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
 
+  const config = me?.config;
+
   useEffect(() => {
     phoneLifecycleRef.current = {
       connectPhone,
@@ -137,7 +136,7 @@ export function useWebRTCPhone() {
   }, [doNotDisturb]);
 
   useEffect(() => {
-    if (!shouldActivate) return;
+    if (!active) return;
 
     let cancelled = false;
 
@@ -146,23 +145,19 @@ export function useWebRTCPhone() {
       setStatus({ code: 'loadingPhone' });
 
       try {
-        const loadedWebphone = await loadMyWebphoneConfig();
+        const loadedMe = await api.loadMe();
         if (cancelled) return;
 
-        setWebphone(loadedWebphone);
-        setShouldRender(Boolean(loadedWebphone.enabled));
+        setMe(loadedMe);
+        setShouldRender(Boolean(loadedMe.enabled));
 
-        if (!loadedWebphone.enabled) {
+        if (!loadedMe.enabled) {
           setConnectionState('offline');
           setStatus({ code: 'disabled' });
           return;
         }
 
-        const loadedSettings = await loadAsteriskSettings();
-        if (cancelled) return;
-
-        setSettings(loadedSettings);
-        const ready = isWebphoneReady(loadedSettings, loadedWebphone);
+        const ready = isWebphoneReady(loadedMe);
         setConnectionState(ready ? 'ready' : 'offline');
         setStatus({ code: ready ? 'ready' : 'notConfigured' });
       } catch (error) {
@@ -183,15 +178,15 @@ export function useWebRTCPhone() {
       uaRef.current = null;
       sessionRef.current = null;
     };
-  }, [shouldActivate]);
+  }, [active, api]);
 
   useEffect(() => {
-    if (!isWebphoneReady(settings, webphone)) return;
+    if (!isWebphoneReady(me)) return;
     if (uaRef.current || connectionState === 'connecting' || connectionState === 'registered') {
       return;
     }
     void phoneLifecycleRef.current.connectPhone();
-  }, [connectionState, settings, webphone]);
+  }, [connectionState, me]);
 
   useEffect(() => {
     if (callState !== 'active' || !callStartedAtRef.current) return;
@@ -230,7 +225,7 @@ export function useWebRTCPhone() {
     async function loadLogs() {
       setLogsLoading(true);
       try {
-        const logs = await loadMyWebphoneCallLogs();
+        const logs = await api.loadCallLogs();
         if (!cancelled) setCallLogs(logs);
       } catch {
         if (!cancelled) setCallLogs([]);
@@ -243,10 +238,10 @@ export function useWebRTCPhone() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, shouldRender]);
+  }, [activeTab, api, shouldRender]);
 
   useEffect(() => {
-    if (!shouldActivate) return;
+    if (!active) return;
 
     let cancelled = false;
     void Promise.resolve().then(() => {
@@ -265,63 +260,64 @@ export function useWebRTCPhone() {
     return () => {
       cancelled = true;
     };
-  }, [shouldActivate]);
+  }, [active]);
 
   useEffect(() => {
-    const expiresAt = webphone?.turnCredentials?.expiresAt;
-    if (!webphone?.turnCredentials?.enabled || !expiresAt) return;
+    const expiresAt = me?.turnCredentials?.expiresAt;
+    if (!me?.turnCredentials?.enabled || !expiresAt) return;
 
     const msUntilRefresh = new Date(expiresAt).getTime() - Date.now() - TURN_CREDENTIAL_REFRESH_MARGIN_MS;
     if (msUntilRefresh <= 0) return;
 
     const timer = window.setTimeout(() => {
-      void loadMyWebphoneConfig()
-        .then(setWebphone)
+      void api
+        .loadMe()
+        .then(setMe)
         .catch(() => undefined);
     }, msUntilRefresh);
 
     return () => window.clearTimeout(timer);
-  }, [webphone?.turnCredentials?.expiresAt, webphone?.turnCredentials?.enabled]);
+  }, [api, me?.turnCredentials?.expiresAt, me?.turnCredentials?.enabled]);
 
   async function connectPhone() {
-    if (!isWebphoneReady(settings, webphone) || !settings || !webphone) {
-      return;
-    }
+    if (!isWebphoneReady(me) || !me) return;
 
     if (uaRef.current) {
       uaRef.current.register();
       return;
     }
 
+    const phoneConfig = me.config;
     setConnectionState('connecting');
     setStatus({ code: 'connecting' });
 
     try {
       const JsSIP = await import('jssip');
-      const sockets = [{ socket: new JsSIP.WebSocketInterface(settings.websocketUrl!), weight: 10 }];
-      if (settings.secondaryWebsocketUrl) {
-        sockets.push({ socket: new JsSIP.WebSocketInterface(settings.secondaryWebsocketUrl), weight: 0 });
-      }
-      const extraHeaders = settings.outboundProxy ? [`Route: <${settings.outboundProxy}>`] : undefined;
+      // Endpoints arrive lowest-priority-first; JsSIP prefers the highest weight.
+      const sockets = phoneConfig.endpoints.map((endpoint) => ({
+        socket: new JsSIP.WebSocketInterface(endpoint.websocketUrl),
+        weight: endpointSocketWeight(endpoint.priority),
+      }));
+      const extraHeaders = phoneConfig.outboundProxy ? [`Route: <${phoneConfig.outboundProxy}>`] : undefined;
       const ua = new JsSIP.UA({
         sockets,
-        uri: sipUri(webphone.sipUsername!, settings.sipDomain!),
-        authorization_user: webphone.sipUsername ?? undefined,
-        password: webphone.sipPassword ?? undefined,
-        display_name: webphone.displayName ?? webphone.extension ?? undefined,
-        realm: settings.realm ?? undefined,
+        uri: sipUri(me.sipUsername!, phoneConfig.sipDomain),
+        authorization_user: me.sipUsername ?? undefined,
+        password: me.sipPassword ?? undefined,
+        display_name: me.displayName ?? me.extension ?? undefined,
+        realm: phoneConfig.realm ?? undefined,
         register: true,
-        register_expires: settings.registerExpires ?? 600,
-        registrar_server: settings.registrarServer ?? undefined,
-        contact_uri: settings.contactUri ?? undefined,
-        session_timers: settings.sessionTimers ?? false,
+        register_expires: phoneConfig.registerExpires,
+        registrar_server: phoneConfig.registrarServer ?? undefined,
+        contact_uri: phoneConfig.contactUri ?? undefined,
+        session_timers: phoneConfig.sessionTimers,
         extra_headers: extraHeaders,
       });
 
       ua.on('connected', (event) => {
         setConnectionState('connecting');
         setStatus({ code: 'socketConnected' });
-        tracePhone(settings, 'ua.connected', { url: event.socket?.url });
+        tracePhone(phoneConfig, 'ua.connected', { url: event.socket?.url });
       });
       ua.on('registered', () => {
         setConnectionState('registered');
@@ -421,7 +417,7 @@ export function useWebRTCPhone() {
   }
 
   async function makeCall() {
-    if (!uaRef.current || !settings?.sipDomain || !dialTarget.trim()) return;
+    if (!uaRef.current || !config?.sipDomain || !dialTarget.trim()) return;
 
     if (!uaRef.current.isRegistered()) {
       setConnectionState('connecting');
@@ -430,7 +426,7 @@ export function useWebRTCPhone() {
       return;
     }
 
-    const target = normalizeCallTarget(dialTarget, settings.sipDomain);
+    const target = normalizeCallTarget(dialTarget, config.sipDomain);
     setCurrentActiveCallContext({
       direction: 'outgoing',
       number: dialTarget.trim(),
@@ -441,7 +437,7 @@ export function useWebRTCPhone() {
     setStatus({ code: 'startingCall' });
 
     try {
-      tracePhone(settings, 'call.start', { target });
+      tracePhone(config, 'call.start', { target });
       const localStream = await getLocalAudioStream();
       const session = uaRef.current.call(target, {
         eventHandlers: {
@@ -450,17 +446,17 @@ export function useWebRTCPhone() {
         },
         mediaConstraints: { audio: true, video: false },
         mediaStream: localStream,
-        pcConfig: pcConfigFromSettings(settings, webphone?.turnCredentials?.iceServers),
+        pcConfig: pcConfigFromSettings(config, me?.turnCredentials?.iceServers),
         rtcOfferConstraints: {
           offerToReceiveAudio: true,
           offerToReceiveVideo: false,
         },
-        fromDisplayName: webphone?.displayName ?? undefined,
-        fromUserName: webphone?.outboundCallerId ?? settings.defaultCallerId ?? webphone?.extension ?? undefined,
+        fromDisplayName: me?.displayName ?? undefined,
+        fromUserName: me?.outboundCallerId ?? me?.extension ?? undefined,
       });
       bindSession(session, false);
     } catch (error) {
-      tracePhone(settings, 'call.failed_before_invite', {
+      tracePhone(config, 'call.failed_before_invite', {
         target,
         error: safeErrorDetails(error),
       });
@@ -485,7 +481,7 @@ export function useWebRTCPhone() {
       session.answer({
         mediaConstraints: { audio: true, video: false },
         mediaStream: localStream,
-        pcConfig: pcConfigFromSettings(settings, webphone?.turnCredentials?.iceServers),
+        pcConfig: pcConfigFromSettings(config, me?.turnCredentials?.iceServers),
         rtcOfferConstraints: {
           offerToReceiveAudio: true,
           offerToReceiveVideo: false,
@@ -671,7 +667,7 @@ export function useWebRTCPhone() {
     setCallLogs((current) => [{ ...payload, id: temporaryId, createdAt: nowIso() }, ...current].slice(0, 50));
 
     try {
-      const saved = await createMyWebphoneCallLog(payload);
+      const saved = await api.createCallLog(payload);
       if (saved) {
         setCallLogs((current) => [saved, ...current.filter((log) => log.id !== temporaryId)].slice(0, 50));
       }
@@ -758,7 +754,7 @@ export function useWebRTCPhone() {
       const candidateType = candidate.match(/ typ ([a-z0-9]+)/i)?.[1] ?? 'unknown';
       const hasPublicMediaCandidate = candidateType === 'srflx' || candidateType === 'relay';
 
-      tracePhone(settings, 'ice.candidate', {
+      tracePhone(config, 'ice.candidate', {
         candidateType,
         ready: hasPublicMediaCandidate,
       });
@@ -776,7 +772,7 @@ export function useWebRTCPhone() {
       }
 
       iceReadyTimer ??= window.setTimeout(() => {
-        tracePhone(settings, 'ice.ready_timeout', { candidateType });
+        tracePhone(config, 'ice.ready_timeout', { candidateType });
         markReady();
       }, 1200);
     };
@@ -851,14 +847,14 @@ export function useWebRTCPhone() {
     ringToneStopRef.current = null;
   }
 
-  const canConnect = isWebphoneReady(settings, webphone);
+  const canConnect = isWebphoneReady(me);
   const registered = connectionState === 'registered';
   const callActive = callState === 'active';
   const callBusy = callState !== 'idle' && callState !== 'ended' && callState !== 'failed';
   const displayNumber = remoteParty || dialTarget;
   const timerLabel = callActive ? formatDuration(callDurationSeconds) : lastCallDuration;
-  const phoneDisplayName = webphoneDisplayName(webphone, 'Admin Phone');
-  const phoneIdentity = webphone?.outboundCallerId?.trim() || webphone?.extension?.trim() || '';
+  const phoneDisplayName = me?.displayName?.trim() || copy.phoneName;
+  const phoneIdentity = me?.outboundCallerId?.trim() || me?.extension?.trim() || '';
   const callContext = activeCallContext;
   const incomingCallWaiting = callContext?.direction === 'incoming' && callBusy && !callActive;
   const callPeerNumber = callContext?.number || displayNumber || phoneIdentity;
@@ -879,7 +875,7 @@ export function useWebRTCPhone() {
 
   return [
     {
-      shouldRender: shouldActivate && shouldRender,
+      shouldRender: active && shouldRender,
       expanded,
       setExpanded,
       activeTab,
@@ -942,17 +938,6 @@ function elapsedSecondsSince(startedAt: number) {
   return Math.floor((Date.now() - startedAt) / 1000);
 }
 
-function webphoneDisplayName(webphone: AdminWebphoneConfig | undefined, fallback: string) {
-  const configuredName = webphone?.displayName?.trim();
-  if (configuredName) return configuredName;
-
-  const fullName = [webphone?.firstName, webphone?.lastName]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(' ');
-  return fullName || fallback;
-}
-
 function assertMediaEnvironment() {
   if (typeof window !== 'undefined' && !window.isSecureContext) {
     throw new Error('Microphone requires HTTPS or localhost.');
@@ -962,8 +947,8 @@ function assertMediaEnvironment() {
   }
 }
 
-function tracePhone(settings: AsteriskIntegrationSettings | undefined, event: string, payload: Record<string, unknown>) {
-  if (!settings?.traceSip) return;
+function tracePhone(config: WebphoneRuntimeConfig | undefined, event: string, payload: Record<string, unknown>) {
+  if (!config?.traceSip) return;
   console.info(`[WebPhone] ${event}`, payload);
 }
 
@@ -1004,7 +989,7 @@ function readBooleanPreference(key: string, fallback: boolean) {
   if (typeof window === 'undefined') return fallback;
 
   try {
-    const value = safeStorage.getItem(key);
+    const value = window.localStorage.getItem(key);
     if (value === '1') return true;
     if (value === '0') return false;
   } catch {
@@ -1017,9 +1002,9 @@ function writeBooleanPreference(key: string, value: boolean) {
   if (typeof window === 'undefined') return;
 
   try {
-    safeStorage.setItem(key, value ? '1' : '0');
+    window.localStorage.setItem(key, value ? '1' : '0');
   } catch {
-    // Browser privacy modes can block safeStorage.
+    // Browser privacy modes can block localStorage.
   }
 }
 
@@ -1027,7 +1012,7 @@ function readVolumePreference(key: string, fallback: number) {
   if (typeof window === 'undefined') return fallback;
 
   try {
-    const storedValue = safeStorage.getItem(key);
+    const storedValue = window.localStorage.getItem(key);
     if (storedValue == null) return fallback;
     const value = Number(storedValue);
     if (Number.isFinite(value)) return clampVolume(value);
@@ -1041,9 +1026,9 @@ function writeVolumePreference(key: string, value: number) {
   if (typeof window === 'undefined') return;
 
   try {
-    safeStorage.setItem(key, String(clampVolume(value)));
+    window.localStorage.setItem(key, String(clampVolume(value)));
   } catch {
-    // Browser privacy modes can block safeStorage.
+    // Browser privacy modes can block localStorage.
   }
 }
 

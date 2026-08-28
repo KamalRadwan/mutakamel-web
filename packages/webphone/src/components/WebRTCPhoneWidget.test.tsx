@@ -2,12 +2,10 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { WebphoneConnectionState, WebphoneStatus } from "@mutakamel/webphone";
-
-const { langMock } = vi.hoisted(() => ({ langMock: { lang: "en" as "en" | "ar" } }));
-vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => langMock,
-}));
+import { WebphoneProvider } from "../context/WebphoneContext";
+import { webphoneCopy, type WebphoneLanguage } from "../copy";
+import type { WebphoneHttpClient } from "../http";
+import type { WebphoneConnectionState, WebphoneStatus } from "../types";
 
 const { phoneMock } = vi.hoisted(() => ({
   phoneMock: {
@@ -62,8 +60,8 @@ const { phoneMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("./hooks/useWebRTCPhone", async () => {
-  const actual = await vi.importActual<typeof import("./hooks/useWebRTCPhone")>("./hooks/useWebRTCPhone");
+vi.mock("../hooks/useWebRTCPhone", async () => {
+  const actual = await vi.importActual<typeof import("../hooks/useWebRTCPhone")>("../hooks/useWebRTCPhone");
   return {
     formatWebphoneLogTime: actual.formatWebphoneLogTime,
     useWebRTCPhone: () => [phoneMock, { current: null }] as const,
@@ -72,9 +70,23 @@ vi.mock("./hooks/useWebRTCPhone", async () => {
 
 import { WebRTCPhoneWidget } from "./WebRTCPhoneWidget";
 
+const httpStub = { get: vi.fn(), post: vi.fn() } as unknown as WebphoneHttpClient;
+
+function widget(lang: WebphoneLanguage = "en") {
+  return (
+    <WebphoneProvider
+      basePath="/api/admin/webphone/v1"
+      http={httpStub}
+      active
+      copy={webphoneCopy[lang]}
+    >
+      <WebRTCPhoneWidget />
+    </WebphoneProvider>
+  );
+}
+
 describe("WebRTCPhoneWidget", () => {
   beforeEach(() => {
-    langMock.lang = "en";
     Object.assign(phoneMock, {
       shouldRender: true,
       expanded: false,
@@ -88,31 +100,30 @@ describe("WebRTCPhoneWidget", () => {
 
   it("renders nothing when the phone should not render", () => {
     phoneMock.shouldRender = false;
-    const { container } = render(<WebRTCPhoneWidget />);
+    const { container } = render(widget());
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("gives the connection dot an accessible status label matching the current language", () => {
+  it("gives the connection dot an accessible status label from the injected copy", () => {
     phoneMock.connectionState = "registered";
-    render(<WebRTCPhoneWidget />);
+    render(widget());
     expect(screen.getByRole("status")).toHaveTextContent("Registered");
   });
 
   it("localizes the connection status label into Arabic", () => {
-    langMock.lang = "ar";
     phoneMock.connectionState = "connecting";
-    render(<WebRTCPhoneWidget />);
+    render(widget("ar"));
     expect(screen.getByRole("status")).toHaveTextContent("جارٍ الاتصال");
   });
 
   it("shows a retry control only once the connection has errored, and wires it to retryConnection", () => {
     phoneMock.expanded = true;
     phoneMock.connectionState = "ready";
-    const { rerender } = render(<WebRTCPhoneWidget />);
+    const { rerender } = render(widget());
     expect(screen.queryByLabelText("Retry connection")).not.toBeInTheDocument();
 
     phoneMock.connectionState = "error";
-    rerender(<WebRTCPhoneWidget />);
+    rerender(widget());
     const retryButton = screen.getByLabelText("Retry connection");
     fireEvent.click(retryButton);
     expect(phoneMock.retryConnection).toHaveBeenCalledTimes(1);
@@ -122,7 +133,7 @@ describe("WebRTCPhoneWidget", () => {
     phoneMock.expanded = true;
     phoneMock.callBusy = true;
     phoneMock.status = { code: "ringing" };
-    render(<WebRTCPhoneWidget />);
+    render(widget());
     expect(screen.getByText("Ringing")).toBeInTheDocument();
   });
 
@@ -130,7 +141,7 @@ describe("WebRTCPhoneWidget", () => {
     phoneMock.expanded = true;
     phoneMock.callBusy = true;
     phoneMock.status = { code: "callFailed", detail: "Timeout" };
-    render(<WebRTCPhoneWidget />);
+    render(widget());
     expect(screen.getByText("Call failed (Timeout)")).toBeInTheDocument();
   });
 });

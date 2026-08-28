@@ -2,12 +2,12 @@
 
 import { createPortal } from "react-dom";
 import { PhoneIncoming, PhoneOff, X } from "lucide-react";
+import { useWebphoneContext } from "../context/WebphoneContext";
 
 type IncomingCallPopupProps = {
   open: boolean;
   phoneNumber: string;
   displayName?: string;
-  lang: "ar" | "en";
   onAnswer: () => void;
   onDecline: () => void;
   onClose: () => void;
@@ -17,23 +17,24 @@ export function IncomingCallPopup({
   open,
   phoneNumber,
   displayName,
-  lang,
   onAnswer,
   onDecline,
   onClose,
 }: IncomingCallPopupProps) {
+  const { copy } = useWebphoneContext();
+
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
     <aside
       className="fixed top-4 start-1/2 z-[80] grid w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 gap-3 rounded-2xl border border-slate-700/80 bg-slate-950/95 p-3.5 text-white shadow-2xl backdrop-blur-xl"
-      aria-label={lang === "ar" ? "مكالمة واردة" : "Incoming call"}
+      aria-label={copy.incoming}
       aria-live="assertive"
     >
       <button
         className="absolute top-2 end-2 grid size-8 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
         type="button"
-        aria-label={lang === "ar" ? "إخفاء التنبيه" : "Dismiss alert"}
+        aria-label={copy.dismissAlert}
         onClick={onClose}
       >
         <X className="size-4" />
@@ -46,10 +47,10 @@ export function IncomingCallPopup({
         </span>
         <span className="min-w-0">
           <small className="block text-[11px] font-bold tracking-wide text-emerald-400">
-            {lang === "ar" ? "مكالمة واردة" : "Incoming call"}
+            {copy.incoming}
           </small>
           <strong className="block truncate text-sm font-extrabold">
-            {displayName || phoneNumber || (lang === "ar" ? "متصل غير معروف" : "Unknown caller")}
+            {displayName || phoneNumber || copy.unknownCaller}
           </strong>
           {displayName ? (
             <span className="block truncate font-mono text-xs text-slate-300">
@@ -66,7 +67,7 @@ export function IncomingCallPopup({
           onClick={onAnswer}
         >
           <PhoneIncoming className="size-4" />
-          {lang === "ar" ? "رد" : "Answer"}
+          {copy.answer}
         </button>
         <button
           type="button"
@@ -74,7 +75,7 @@ export function IncomingCallPopup({
           onClick={onDecline}
         >
           <PhoneOff className="size-4" />
-          {lang === "ar" ? "رفض" : "Decline"}
+          {copy.decline}
         </button>
       </div>
     </aside>,

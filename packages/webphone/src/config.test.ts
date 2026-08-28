@@ -1,87 +1,85 @@
 import { describe, expect, it } from "vitest";
 import {
-  asteriskSettingsFromSystemSettings,
+  endpointSocketWeight,
   iceServersFromSettings,
   isWebphoneReady,
   normalizeCallTarget,
   pcConfigFromSettings,
   sipUri,
 } from "./config";
-import type { ApiSystemSetting } from "./types";
+import type { WebphoneIceServer, WebphoneMe, WebphoneRuntimeConfig } from "./types";
 
-function settingsFixture(overrides: Record<string, unknown> = {}): ApiSystemSetting[] {
-  const base: Record<string, unknown> = {
-    "asterisk.enabled": true,
-    "asterisk.websocket_url": "wss://primary.example.com:8089/ws",
-    "asterisk.sip_domain": "example.com",
-    "asterisk.register_expires": "600",
-    "asterisk.stun_servers": "stun:a.example.com,stun:b.example.com",
-    "asterisk.turn_servers_json": "[]",
-    "asterisk.ice_servers_json": "[]",
-    "asterisk.extra_json": "{}",
+function runtimeConfig(
+  overrides: Partial<WebphoneRuntimeConfig> = {},
+): WebphoneRuntimeConfig {
+  return {
+    enabled: true,
+    sipDomain: "example.com",
+    realm: null,
+    outboundProxy: null,
+    fromDomain: null,
+    registrarServer: null,
+    contactUri: null,
+    registerExpires: 600,
+    sessionTimers: false,
+    traceSip: false,
+    iceTransportPolicy: "all",
+    endpoints: [{ websocketUrl: "wss://primary.example.com:8089/ws", priority: 0 }],
+    iceServers: [],
     ...overrides,
   };
-  return Object.entries(base).map(([key, value]) => ({ key, value }));
 }
 
-describe("asteriskSettingsFromSystemSettings", () => {
-  it("parses the primary websocket URL and leaves the secondary undefined when unset", () => {
-    const settings = asteriskSettingsFromSystemSettings(settingsFixture());
-    expect(settings.websocketUrl).toBe("wss://primary.example.com:8089/ws");
-    expect(settings.secondaryWebsocketUrl).toBeUndefined();
+function webphoneMe(overrides: Partial<WebphoneMe> = {}): WebphoneMe {
+  return {
+    enabled: true,
+    extension: "100",
+    sipUsername: "100",
+    sipPassword: "secret",
+    displayName: "Operator",
+    outboundCallerId: null,
+    transport: "wss",
+    passwordConfigured: true,
+    config: runtimeConfig(),
+    turnCredentials: { enabled: false, iceServers: [], expiresAt: null },
+    ...overrides,
+  };
+}
+
+describe("endpointSocketWeight", () => {
+  it("inverts priority so the lowest-priority endpoint gets the highest JsSIP weight", () => {
+    expect(endpointSocketWeight(0)).toBeGreaterThan(endpointSocketWeight(1));
+    expect(endpointSocketWeight(1)).toBeGreaterThan(endpointSocketWeight(10));
   });
 
-  it("parses a configured secondary websocket URL for SIP failover", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({ "asterisk.websocket_url_secondary": "wss://backup.example.com:8089/ws" }),
-    );
-    expect(settings.secondaryWebsocketUrl).toBe("wss://backup.example.com:8089/ws");
-  });
-
-  it("treats a blank secondary websocket URL as not configured", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({ "asterisk.websocket_url_secondary": "   " }),
-    );
-    expect(settings.secondaryWebsocketUrl).toBeUndefined();
-  });
-
-  it("splits comma-separated STUN servers and trims whitespace", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({ "asterisk.stun_servers": "stun:a.example.com , stun:b.example.com" }),
-    );
-    expect(settings.stunServers).toEqual(["stun:a.example.com", "stun:b.example.com"]);
-  });
-
-  it("falls back to an empty array for malformed ICE/TURN JSON", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({ "asterisk.turn_servers_json": "{not valid json" }),
-    );
-    expect(settings.turnServers).toEqual([]);
+  it("never produces a negative weight for an out-of-range priority", () => {
+    expect(endpointSocketWeight(10_000)).toBe(0);
   });
 });
 
 describe("isWebphoneReady", () => {
-  const settings = asteriskSettingsFromSystemSettings(settingsFixture());
-
-  it("is ready when settings and webphone credentials are both complete", () => {
-    expect(
-      isWebphoneReady(settings, { enabled: true, sipUsername: "100", sipPassword: "secret" }),
-    ).toBe(true);
+  it("is ready when the extension and its runtime config are both complete", () => {
+    expect(isWebphoneReady(webphoneMe({ passwordConfigured: false }))).toBe(true);
   });
 
   it("accepts passwordConfigured in place of a plaintext password", () => {
-    expect(
-      isWebphoneReady(settings, { enabled: true, sipUsername: "100", passwordConfigured: true }),
-    ).toBe(true);
+    expect(isWebphoneReady(webphoneMe({ sipPassword: null }))).toBe(true);
   });
 
-  it("is not ready when Asterisk is disabled", () => {
-    const disabled = asteriskSettingsFromSystemSettings(settingsFixture({ "asterisk.enabled": false }));
-    expect(isWebphoneReady(disabled, { enabled: true, sipUsername: "100", sipPassword: "secret" })).toBe(false);
+  it("is not ready when the module is disabled server-side", () => {
+    expect(isWebphoneReady(webphoneMe({ config: runtimeConfig({ enabled: false }) }))).toBe(false);
   });
 
   it("is not ready without a SIP username", () => {
-    expect(isWebphoneReady(settings, { enabled: true, sipPassword: "secret" })).toBe(false);
+    expect(isWebphoneReady(webphoneMe({ sipUsername: null }))).toBe(false);
+  });
+
+  it("is not ready without an enabled SIP endpoint to register against", () => {
+    expect(isWebphoneReady(webphoneMe({ config: runtimeConfig({ endpoints: [] }) }))).toBe(false);
+  });
+
+  it("is not ready when the caller has no extension", () => {
+    expect(isWebphoneReady(undefined)).toBe(false);
   });
 });
 
@@ -104,93 +102,75 @@ describe("normalizeCallTarget / sipUri", () => {
 });
 
 describe("iceServersFromSettings", () => {
-  it("combines explicit ICE servers, STUN servers, and TURN servers", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({
-        "asterisk.stun_servers": "stun:stun.example.com",
-        "asterisk.turn_servers_json": JSON.stringify([{ urls: "turn:turn.example.com", username: "u", credential: "p" }]),
-      }),
-    );
-    const servers = iceServersFromSettings(settings);
-    expect(servers).toContainEqual({ urls: "stun:stun.example.com" });
-    expect(servers).toContainEqual({ urls: "turn:turn.example.com", username: "u", credential: "p" });
+  it("maps the configured STUN/TURN entries in order", () => {
+    const config = runtimeConfig({
+      iceServers: [
+        { urls: ["stun:stun.example.com"] },
+        { urls: ["turn:turn.example.com"], username: "u", credential: "p" },
+      ],
+    });
+
+    expect(iceServersFromSettings(config)).toEqual([
+      { urls: ["stun:stun.example.com"], username: undefined, credential: undefined },
+      { urls: ["turn:turn.example.com"], username: "u", credential: "p" },
+    ]);
   });
 
-  it("returns an empty array when settings are undefined", () => {
+  it("drops malformed entries instead of handing them to the browser", () => {
+    const config = runtimeConfig({
+      iceServers: [
+        { urls: null } as unknown as WebphoneIceServer,
+        { urls: [] },
+        { urls: ["stun:stun.example.com"] },
+      ],
+    });
+
+    expect(iceServersFromSettings(config)).toEqual([
+      { urls: ["stun:stun.example.com"], username: undefined, credential: undefined },
+    ]);
+  });
+
+  it("returns an empty array when there is no config", () => {
     expect(iceServersFromSettings(undefined)).toEqual([]);
-  });
-});
-
-describe("asterisk.ice_transport_policy parsing", () => {
-  it("parses 'relay' into iceTransportPolicy", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({ "asterisk.ice_transport_policy": "relay" }),
-    );
-    expect(settings.iceTransportPolicy).toBe("relay");
-  });
-
-  it("parses 'all' into iceTransportPolicy", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({ "asterisk.ice_transport_policy": "all" }),
-    );
-    expect(settings.iceTransportPolicy).toBe("all");
-  });
-
-  it("ignores an unrecognized value rather than passing it through", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({ "asterisk.ice_transport_policy": "bogus" }),
-    );
-    expect(settings.iceTransportPolicy).toBeUndefined();
-  });
-
-  it("is undefined when the key is absent", () => {
-    const settings = asteriskSettingsFromSystemSettings(settingsFixture());
-    expect(settings.iceTransportPolicy).toBeUndefined();
   });
 });
 
 describe("pcConfigFromSettings", () => {
   it("sets iceTransportPolicy to 'relay' when configured", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({
-        "asterisk.ice_transport_policy": "relay",
-        "asterisk.turn_servers_json": JSON.stringify([{ urls: "turn:turn.example.com", username: "u", credential: "p" }]),
-      }),
-    );
-    const pcConfig = pcConfigFromSettings(settings);
+    const config = runtimeConfig({
+      iceTransportPolicy: "relay",
+      iceServers: [{ urls: ["turn:turn.example.com"], username: "u", credential: "p" }],
+    });
+    const pcConfig = pcConfigFromSettings(config);
+
     expect(pcConfig.iceTransportPolicy).toBe("relay");
-    expect(pcConfig.iceServers).toContainEqual({ urls: "turn:turn.example.com", username: "u", credential: "p" });
+    expect(pcConfig.iceServers).toContainEqual({
+      urls: ["turn:turn.example.com"],
+      username: "u",
+      credential: "p",
+    });
   });
 
-  it("omits iceTransportPolicy (browser default) when set to 'all' or unset", () => {
-    const allSettings = asteriskSettingsFromSystemSettings(
-      settingsFixture({ "asterisk.ice_transport_policy": "all" }),
-    );
-    expect(pcConfigFromSettings(allSettings).iceTransportPolicy).toBeUndefined();
-
-    const unsetSettings = asteriskSettingsFromSystemSettings(settingsFixture());
-    expect(pcConfigFromSettings(unsetSettings).iceTransportPolicy).toBeUndefined();
-  });
-
-  it("still includes ICE servers when settings are undefined", () => {
+  it("omits iceTransportPolicy (browser default) when set to 'all' or absent", () => {
+    expect(pcConfigFromSettings(runtimeConfig()).iceTransportPolicy).toBeUndefined();
     expect(pcConfigFromSettings(undefined)).toEqual({ iceServers: [] });
   });
 
-  it("appends ephemeral TURN REST ICE servers after the static settings-derived ones", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({ "asterisk.stun_servers": "stun:a.example.com" }),
-    );
+  it("appends ephemeral TURN REST ICE servers after the static config-derived ones", () => {
+    const config = runtimeConfig({ iceServers: [{ urls: ["stun:a.example.com"] }] });
     const ephemeral = [{ urls: ["turn:turn.example.com:3478"], username: "123:admin-1", credential: "sig" }];
 
-    const pcConfig = pcConfigFromSettings(settings, ephemeral);
-
-    expect(pcConfig.iceServers).toEqual([{ urls: "stun:a.example.com" }, ...ephemeral]);
+    expect(pcConfigFromSettings(config, ephemeral).iceServers).toEqual([
+      { urls: ["stun:a.example.com"], username: undefined, credential: undefined },
+      ...ephemeral,
+    ]);
   });
 
-  it("tolerates missing ephemeral ICE servers, falling back to the settings-derived ones only", () => {
-    const settings = asteriskSettingsFromSystemSettings(
-      settingsFixture({ "asterisk.stun_servers": "stun:a.example.com" }),
-    );
-    expect(pcConfigFromSettings(settings, undefined).iceServers).toEqual([{ urls: "stun:a.example.com" }]);
+  it("tolerates missing ephemeral ICE servers, falling back to the config-derived ones only", () => {
+    const config = runtimeConfig({ iceServers: [{ urls: ["stun:a.example.com"] }] });
+
+    expect(pcConfigFromSettings(config, undefined).iceServers).toEqual([
+      { urls: ["stun:a.example.com"], username: undefined, credential: undefined },
+    ]);
   });
 });
