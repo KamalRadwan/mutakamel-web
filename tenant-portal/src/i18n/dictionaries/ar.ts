@@ -37,7 +37,9 @@ export const ar = {
     showingOf: "عرض {from}–{to} من {total}",
     discardTitle: "تجاهل التغييرات غير المحفوظة؟",
     discardDescription: "لم يتم حفظ التغييرات. إذا أغلقت الآن، ستفقدها.",
-    discardConfirm: "تجاهل التغييرات"
+    discardConfirm: "تجاهل التغييرات",
+    branch: "الفرع",
+    selectBranch: "اختر فرعًا"
   },
   errors: {
     reference: "المرجع",
@@ -213,6 +215,35 @@ export const ar = {
   // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts
   // in phase 4 — see src/design-system/patterns/status-badge. An unmapped
   // key is not an error: StatusBadge falls back to the raw wire value.
+  crmCustomerProfiles: {
+    subtitle: "ملفات العملاء الحالية من CRM للفرع الموثوق في الجلسة.",
+    search: "ابحث بالاسم أو بيانات التواصل...",
+    name: "اسم العميل",
+    type: "النوع",
+    contact: "التواصل",
+    unavailable: "غير متوفر",
+    owner: "المالك",
+    source: "المصدر",
+    view: "عرض",
+    empty: "لا توجد ملفات عملاء مطابقة.",
+    confirmBlacklistTitle: "حظر هذا العميل؟",
+    confirmBlacklistMessage: "الحظر إجراء نهائي عمليًا — سيفقد العميل إمكانية الوصول فورًا.",
+    confirmBlacklistAction: "حظر العميل",
+    moveFailed: "تعذر حفظ تغيير الحالة. تمت استعادة البطاقة.",
+    profileTypes: {
+      INDIVIDUAL: "فرد",
+      CORPORATE: "شركة",
+    } as Record<string, string>,
+    detailTitle: "ملف العميل",
+    detailSubtitle: "عرض للبيانات المثبتة في CRM دون تعديل محلي.",
+    back: "العودة إلى العملاء",
+    loading: "جارٍ تحميل ملف العميل...",
+    company: "اسم الشركة",
+    branch: "معرّف الفرع",
+    profileId: "معرّف الملف",
+    email: "البريد الإلكتروني",
+    phone: "الهاتف"
+  },
   statusValues: {
     "LeadStageFlag.NEW": "جديد",
     "LeadStageFlag.CONTACTED": "تم التواصل",
@@ -226,7 +257,16 @@ export const ar = {
     "StageCategory.IN_PROGRESS": "قيد التنفيذ",
     "StageCategory.POSITIVE": "إيجابي",
     "StageCategory.NEGATIVE": "سلبي",
+    "CustomerStatus.PROSPECT": "محتمل",
+    "CustomerStatus.ACTIVE_CUSTOMER": "عميل نشط",
+    "CustomerStatus.INACTIVE": "غير نشط",
+    "CustomerStatus.BLACKLISTED": "محظور",
   } as Record<string, string>,
+  views: {
+    board: "لوحة",
+    card: "بطاقات",
+    table: "جدول"
+  },
   permissionGate: {
     title: "الوصول مقيد",
     description: "ليست لديك الصلاحية لعرض هذا القسم. تواصل مع مسؤول مساحة العمل إذا كنت تعتقد أن هذا خطأ."

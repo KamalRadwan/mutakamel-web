@@ -50,7 +50,22 @@ describe("CRM customer-profile contract", () => {
       companyName: "Acme Retail LLC",
       phone: "+201001112223",
       email: "info@acme.test",
+      ownerUserId: null,
+      acquisitionSourceNameAr: null,
+      acquisitionSourceNameEn: null,
     });
+  });
+
+  it("parses the joined ownerUserId and acquisitionSource when present — docs/design/views.md's card-fields", () => {
+    const withOwnerAndSource = {
+      ...profile,
+      ownerUserId: "0191e9a8-7f51-7b32-8d72-19f9217a41b7",
+      acquisitionSource: { id: "0191e9a8-7f51-7b32-8d72-19f9217a41b8", nameAr: "الإحالات", nameEn: "Referrals" },
+    };
+    const parsed = parseCustomerProfileResponse(withOwnerAndSource);
+    expect(parsed.ownerUserId).toBe("0191e9a8-7f51-7b32-8d72-19f9217a41b7");
+    expect(parsed.acquisitionSourceNameAr).toBe("الإحالات");
+    expect(parsed.acquisitionSourceNameEn).toBe("Referrals");
   });
 
   it("parses the raw page and preserves authoritative pagination", () => {

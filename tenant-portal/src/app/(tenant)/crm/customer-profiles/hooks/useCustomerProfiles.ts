@@ -35,6 +35,15 @@ export interface CustomerProfileItem {
   companyName: string | null;
   phone: string | null;
   email: string | null;
+  // Additive for the phase-4 card/board views (docs/design/views.md's
+  // per-screen card-fields table) — ownerUserId and the joined
+  // acquisitionSource are both genuinely on the response
+  // (CustomerProfileEntity / party-read-model.ts), verified against
+  // backend source since neither has a docs/api/*.md example. No
+  // owner-name enrichment exists server-side, so this is the raw id.
+  ownerUserId: string | null;
+  acquisitionSourceNameAr: string | null;
+  acquisitionSourceNameEn: string | null;
 }
 
 export interface CustomerProfilesPage {
@@ -145,6 +154,8 @@ export function parseCustomerProfileResponse(
   const companyPhone = nullableText(source, "companyPhone", 32);
   const primaryEmail = nullableText(source, "email", 180);
   const companyEmail = nullableText(source, "companyEmail", 180);
+  const ownerUserId = typeof source.ownerUserId === "string" && isUUIDv7(source.ownerUserId) ? source.ownerUserId : null;
+  const acquisitionSource = record(source.acquisitionSource);
 
   return {
     id: requiredUuidV7(source, "id"),
@@ -155,6 +166,9 @@ export function parseCustomerProfileResponse(
     companyName: nullableText(source, "companyName", 180),
     phone: primaryMobile ?? companyPhone,
     email: primaryEmail ?? companyEmail,
+    ownerUserId,
+    acquisitionSourceNameAr: acquisitionSource ? nullableText(acquisitionSource, "nameAr", 120) : null,
+    acquisitionSourceNameEn: acquisitionSource ? nullableText(acquisitionSource, "nameEn", 120) : null,
   };
 }
 

@@ -10,9 +10,10 @@ instead, and who can settle it.
 
 ## Status
 
-**All eleven questions opened during the rebuild are resolved** — nine during
-the 2026-08-27 documentation rebuild, two (Q10, Q11) during Phase 2/3
-execution.
+**Eleven of twelve questions opened during the rebuild are resolved** —
+nine during the 2026-08-27 documentation rebuild, two (Q10, Q11) during
+Phase 2/3 execution. Q12, opened during Phase 4, is a logged scope
+deferral rather than a settled answer — see below.
 The list is kept as a record of how each was settled, because the reasoning
 matters more than the answer.
 
@@ -132,6 +133,35 @@ implemented in `globals.css`'s Phase 2 commit (`--size-topbar`,
 `--size-sidebar`, `--size-rail`). Use these same token names and values when
 building `AppShell` in Phase 3 — do not reintroduce shell.md's
 `--size-sidebar-rail` name or its 48/240/52 values.
+
+## Q12 — Customer detail's full action cluster and custom fields · deferred, not resolved
+
+`docs/design/detail-screens.md` specs a capabilities-gated action cluster
+(Add contact, Edit via `FormDrawer` on `UpdateCustomerProfileDto`, Change
+status, Delete via `AlertDialog`) and a custom-fields rail card (`GET
+/custom-fields` + `GET /custom-fields/values`, rendered by
+`CrmCustomFieldTypeEnum`) for `/crm/customer-profiles/[id]`. This is not a
+documentation gap — the spec is exact — it is a scope decision made
+during Phase 4 screen 8: the detail page was restyled onto the new
+primitives (PageHeader, Card, StatusBadge, two-column layout) but the
+action cluster and custom-fields card were not built.
+
+**Why:** each of those four actions plus the custom-fields rendering is
+comparable in size to a full additional screen (new DTOs to verify against
+`docs/reference/dto-fields.md`, a mutation flow per action, an
+unverified `/custom-fields/values` response shape). Building placeholder
+buttons that do not work would violate
+[anti-patterns.md](../design/anti-patterns.md#13-fake-data-and-fake-success);
+building all four correctly did not fit this session's remaining budget
+alongside the leads and opportunities workspaces still ahead.
+
+**Settle with:** implement Add contact / Edit / Change status / Delete and
+the custom-fields card as their own follow-up pass, using the capabilities
+hook already built (`useCustomerProfilesCapabilities`) and the same
+`FormDrawer`/`AlertDialog` patterns already proven on the lead-stages and
+acquisition-sources screens. The lead-conversion three-step drawer in the
+same doc is a separate, larger piece of work with its own definition of
+done — treat it independently, not as part of this gap.
 
 ## How to add one
 

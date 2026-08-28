@@ -2,181 +2,111 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { ArrowLeft, Building2, RefreshCw } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { ArrowLeft, Building2, UserRound } from "lucide-react";
+import { Button, Card, CardContent, CardHeader, CardTitle, ErrorState, PageHeader, Skeleton, StatusBadge } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import {
-  type CustomerProfileStatus,
-  type CustomerProfileType,
-  useCustomerProfile,
-} from "../hooks/useCustomerProfiles";
+import { useCustomerProfile } from "../hooks/useCustomerProfiles";
 
-function DetailField({ label, value }: { label: string; value: string }) {
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-100 p-4 dark:border-slate-800">
-      <dt className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-        {label}
-      </dt>
-      <dd className="mt-1 break-words text-sm font-bold text-slate-900 dark:text-slate-100">
-        {value}
-      </dd>
+    <div>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 break-words text-xs font-medium text-foreground">{value}</dd>
     </div>
   );
 }
 
-function statusVariant(
-  status: CustomerProfileStatus,
-): "success" | "warning" | "danger" | "neutral" {
-  if (status === "ACTIVE_CUSTOMER") return "success";
-  if (status === "PROSPECT") return "warning";
-  if (status === "BLACKLISTED") return "danger";
-  return "neutral";
-}
-
-export default function CustomerProfilePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+// Restyled onto the design system per docs/design/detail-screens.md's layout
+// (PageHeader + two-column Card grid). The full spec also calls for a
+// capabilities-gated action cluster (Add contact / Edit / Change status /
+// Delete) and a custom-fields rail card — deliberately not built here: each
+// needs its own DTO verification and mutation flow, and this session's
+// scope stopped at the three-view workspace. Logged as Q12 in
+// docs/build/OPEN-QUESTIONS.md rather than shipped as a disabled or fake
+// affordance.
+export default function CustomerProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { lang } = useI18n();
+  const { t, lang } = useI18n();
   const { item, isLoading, error, reload } = useCustomerProfile(id);
-
-  const copy =
-    lang === "ar"
-      ? {
-          title: "ملف العميل",
-          subtitle: "عرض للبيانات المثبتة في CRM دون تعديل محلي.",
-          back: "العودة إلى العملاء",
-          reload: "إعادة المحاولة",
-          loading: "جارٍ تحميل ملف العميل...",
-          name: "الاسم",
-          company: "اسم الشركة",
-          type: "نوع الملف",
-          status: "الحالة",
-          phone: "الهاتف",
-          email: "البريد الإلكتروني",
-          branch: "معرّف الفرع",
-          profileId: "معرّف الملف",
-          unavailable: "غير متوفر",
-        }
-      : {
-          title: "Customer profile",
-          subtitle: "Verified CRM data displayed without local editing.",
-          back: "Back to customers",
-          reload: "Try again",
-          loading: "Loading customer profile...",
-          name: "Name",
-          company: "Company name",
-          type: "Profile type",
-          status: "Status",
-          phone: "Phone",
-          email: "Email",
-          branch: "Branch ID",
-          profileId: "Profile ID",
-          unavailable: "Not available",
-        };
-
-  const typeLabels: Record<CustomerProfileType, string> =
-    lang === "ar"
-      ? { INDIVIDUAL: "فرد", CORPORATE: "شركة" }
-      : { INDIVIDUAL: "Individual", CORPORATE: "Corporate" };
-  const statusLabels: Record<CustomerProfileStatus, string> =
-    lang === "ar"
-      ? {
-          PROSPECT: "محتمل",
-          ACTIVE_CUSTOMER: "نشط",
-          INACTIVE: "غير نشط",
-          BLACKLISTED: "محظور",
-        }
-      : {
-          PROSPECT: "Prospect",
-          ACTIVE_CUSTOMER: "Active customer",
-          INACTIVE: "Inactive",
-          BLACKLISTED: "Blacklisted",
-        };
+  const sourceName = item ? (lang === "ar" ? item.acquisitionSourceNameAr : item.acquisitionSourceNameEn) : null;
 
   return (
-    <div className="space-y-6">
-      <PageHeader title={item?.displayName ?? copy.title} subtitle={copy.subtitle}>
-        <Link
-          href="/crm/customer-profiles"
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-        >
-          <ArrowLeft className="size-4 rtl:rotate-180" aria-hidden="true" />
-          {copy.back}
-        </Link>
-      </PageHeader>
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title={item?.displayName ?? t.crmCustomerProfiles.detailTitle}
+        description={t.crmCustomerProfiles.detailSubtitle}
+        secondaryActions={
+          <Button variant="outline" asChild>
+            <Link href="/crm/customer-profiles">
+              <ArrowLeft className="size-4 rtl:rotate-180" aria-hidden="true" />
+              {t.crmCustomerProfiles.back}
+            </Link>
+          </Button>
+        }
+      />
 
       {isLoading && (
-        <p
-          role="status"
-          className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900"
-        >
-          {copy.loading}
-        </p>
-      )}
-
-      {!isLoading && error && (
-        <div
-          role="alert"
-          className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 sm:flex-row sm:items-center sm:justify-between dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
-        >
-          <span>{error}</span>
-          <Button type="button" variant="secondary" size="sm" onClick={reload}>
-            <RefreshCw className="size-4" aria-hidden="true" />
-            {copy.reload}
-          </Button>
+        <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+          <Skeleton className="h-48 rounded-md" />
+          <Skeleton className="h-48 rounded-md" />
         </div>
       )}
 
+      {!isLoading && error && <ErrorState title={error} onRetry={reload} retryLabel={t.common.retry} />}
+
       {!isLoading && !error && item && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="mb-5 flex items-center gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
-            <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-              <Building2 className="size-5" aria-hidden="true" />
-            </div>
-            <div>
-              <h2 className="font-bold text-slate-900 dark:text-slate-100">
-                {item.displayName}
-              </h2>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                <Badge variant="info">{typeLabels[item.profileType]}</Badge>
-                <Badge variant={statusVariant(item.status)}>
-                  {statusLabels[item.status]}
-                </Badge>
-              </div>
-            </div>
+        <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+          {/* MAIN */}
+          <div className="flex flex-col gap-3">
+            <Card>
+              <CardHeader className="flex-row items-center gap-3 border-b border-border">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-sm bg-muted">
+                  {item.profileType === "CORPORATE" ? (
+                    <Building2 className="size-5 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+                  ) : (
+                    <UserRound className="size-5 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+                  )}
+                </span>
+                <div>
+                  <CardTitle>{item.displayName}</CardTitle>
+                  <StatusBadge value={item.status} kind="CustomerStatus" className="mt-1" />
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
+                <DetailRow label={t.crmCustomerProfiles.name} value={item.displayName} />
+                <DetailRow label={t.crmCustomerProfiles.company} value={item.companyName ?? t.crmCustomerProfiles.unavailable} />
+                <DetailRow
+                  label={t.crmCustomerProfiles.type}
+                  value={t.crmCustomerProfiles.profileTypes[item.profileType] ?? item.profileType}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t.crmCustomerProfiles.contact}</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 p-4 pt-0 sm:grid-cols-2" dir="ltr">
+                <DetailRow label={t.crmCustomerProfiles.email} value={item.email ?? t.crmCustomerProfiles.unavailable} />
+                <DetailRow label={t.crmCustomerProfiles.phone} value={item.phone ?? t.crmCustomerProfiles.unavailable} />
+              </CardContent>
+            </Card>
           </div>
 
-          <dl className="grid gap-3 sm:grid-cols-2">
-            <DetailField label={copy.name} value={item.displayName} />
-            <DetailField
-              label={copy.company}
-              value={item.companyName ?? copy.unavailable}
-            />
-            <DetailField
-              label={copy.type}
-              value={typeLabels[item.profileType]}
-            />
-            <DetailField
-              label={copy.status}
-              value={statusLabels[item.status]}
-            />
-            <DetailField
-              label={copy.phone}
-              value={item.phone ?? copy.unavailable}
-            />
-            <DetailField
-              label={copy.email}
-              value={item.email ?? copy.unavailable}
-            />
-            <DetailField label={copy.branch} value={item.branchId} />
-            <DetailField label={copy.profileId} value={item.id} />
-          </dl>
-        </section>
+          {/* RAIL */}
+          <div className="flex flex-col gap-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t.common.history}</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 p-4 pt-0">
+                <DetailRow label={t.crmCustomerProfiles.source} value={sourceName ?? t.crmCustomerProfiles.unavailable} />
+                <DetailRow label={t.crmCustomerProfiles.branch} value={item.branchId} />
+                <DetailRow label={t.crmCustomerProfiles.profileId} value={item.id} />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       )}
     </div>
   );

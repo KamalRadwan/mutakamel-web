@@ -1,33 +1,46 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Building2, Eye, RefreshCw, UserRound } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Table } from "@/components/ui/Table";
-import { TableToolbar } from "@/components/ui/TableToolbar";
+import {
+  Badge,
+  BoardView,
+  Button,
+  CardView,
+  ConfirmActionModal,
+  FilterBar,
+  PageHeader,
+  StatusBadge,
+  TableView,
+  ViewSwitcher,
+  useToast,
+  useWorkspaceView,
+  type BoardCardMove,
+  type BoardColumnDef,
+  type ColumnDef,
+} from "@/design-system";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
+import { useI18n } from "@/i18n/I18nContext";
+import { formatTemplate } from "@/lib/format/template";
 import {
   type CustomerProfileItem,
   type CustomerProfileStatus,
-  type CustomerProfileType,
   useCustomerProfiles,
 } from "./hooks/useCustomerProfiles";
+import { useCustomerProfilesCapabilities } from "./hooks/useCustomerProfilesCapabilities";
+import { useUpdateCustomerProfileStatus } from "./hooks/useUpdateCustomerProfileStatus";
 
-function statusVariant(
-  status: CustomerProfileStatus,
-): "success" | "warning" | "danger" | "neutral" {
-  if (status === "ACTIVE_CUSTOMER") return "success";
-  if (status === "PROSPECT") return "warning";
-  if (status === "BLACKLISTED") return "danger";
-  return "neutral";
-}
+// Board axis is CustomerStatusEnum — fixed, 4 values, no catalogue fetch,
+// unlike leads/opportunities. See
+// docs/api/crm-customer-profiles.md#frontend-notes.
+const BOARD_STATUS_ORDER: CustomerProfileStatus[] = ["PROSPECT", "ACTIVE_CUSTOMER", "INACTIVE", "BLACKLISTED"];
+const TERMINAL_STATUS: CustomerProfileStatus = "BLACKLISTED";
 
 export default function CustomerProfilesPage() {
+  const { t, lang } = useI18n();
+  const toast = useToast();
   const {
-    t,
-    lang,
     items,
     branchIds,
     branchId,
@@ -41,84 +54,90 @@ export default function CustomerProfilesPage() {
     nextPage,
     reload,
   } = useCustomerProfiles();
+  const { capabilities } = useCustomerProfilesCapabilities(branchId);
+  const { updateStatus } = useUpdateCustomerProfileStatus();
+  const [view, setView] = useWorkspaceView("customerProfiles", "table");
+  // Optimistic move overrides layered on top of the read-only paginated
+  // fetch — the hook that owns items has no setter to reach into, and it
+  // does not need one: a failed move just clears its own override.
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, CustomerProfileStatus>>({});
+  // BLACKLISTED is terminal in practice — confirms via a real modal, not
+  // window.confirm. confirmMove needs a Promise<boolean>, so the pending
+  // move sits in state until the user resolves it here.
+  const [pendingTerminalMove, setPendingTerminalMove] = useState<{
+    move: BoardCardMove;
+    resolve: (confirmed: boolean) => void;
+  } | null>(null);
 
-  const copy =
-    lang === "ar"
-      ? {
-          subtitle: "ملفات العملاء الحالية من CRM للفرع الموثوق في الجلسة.",
-          reload: "إعادة التحميل",
-          search: "ابحث بالاسم أو بيانات التواصل...",
-          name: "اسم العميل",
-          type: "النوع",
-          contact: "التواصل",
-          status: "الحالة",
-          actions: "الإجراءات",
-          loading: "جارٍ تحميل ملفات العملاء...",
-          empty: "لا توجد ملفات عملاء مطابقة.",
-          unavailable: "غير متوفر",
-          view: "عرض",
-          previous: "السابق",
-          next: "التالي",
-          records: "ملف",
-          page: "صفحة",
-        }
-      : {
-          subtitle: "Current CRM customer profiles for the trusted session branch.",
-          reload: "Reload",
-          search: "Search by name or contact details...",
-          name: "Customer name",
-          type: "Type",
-          contact: "Contact",
-          status: "Status",
-          actions: "Actions",
-          loading: "Loading customer profiles...",
-          empty: "No matching customer profiles.",
-          unavailable: "Not available",
-          view: "View",
-          previous: "Previous",
-          next: "Next",
-          records: "profiles",
-          page: "Page",
-        };
+  const displayItems = useMemo(
+    () => items.map((item) => (item.id in statusOverrides ? { ...item, status: statusOverrides[item.id] } : item)),
+    [items, statusOverrides],
+  );
 
-  const typeLabels: Record<CustomerProfileType, string> =
-    lang === "ar"
-      ? { INDIVIDUAL: "فرد", CORPORATE: "شركة" }
-      : { INDIVIDUAL: "Individual", CORPORATE: "Corporate" };
-  const statusLabels: Record<CustomerProfileStatus, string> =
-    lang === "ar"
-      ? {
-          PROSPECT: "محتمل",
-          ACTIVE_CUSTOMER: "نشط",
-          INACTIVE: "غير نشط",
-          BLACKLISTED: "محظور",
-        }
-      : {
-          PROSPECT: "Prospect",
-          ACTIVE_CUSTOMER: "Active customer",
-          INACTIVE: "Inactive",
-          BLACKLISTED: "Blacklisted",
-        };
+  function clearOverride(id: string) {
+    setStatusOverrides((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
 
-  const columns = [
+  async function handleCardMove(move: BoardCardMove) {
+    const status = move.toColumnId as CustomerProfileStatus;
+    setStatusOverrides((current) => ({ ...current, [move.itemId]: status }));
+    const succeeded = await updateStatus(move.itemId, status);
+    clearOverride(move.itemId);
+    if (succeeded) {
+      await reload();
+    } else {
+      toast.error(t.crmCustomerProfiles.moveFailed);
+    }
+  }
+
+  function renderCard(item: CustomerProfileItem) {
+    const ProfileIcon = item.profileType === "CORPORATE" ? Building2 : UserRound;
+    const sourceName = lang === "ar" ? item.acquisitionSourceNameAr : item.acquisitionSourceNameEn;
+    return (
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2">
+          <ProfileIcon className="size-4 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+          <span className="truncate text-sm font-medium text-foreground">{item.displayName}</span>
+        </div>
+        {sourceName && <p className="truncate text-xs text-muted-foreground">{sourceName}</p>}
+        {item.ownerUserId && <p className="truncate font-mono text-2xs text-muted-foreground">{item.ownerUserId}</p>}
+        <StatusBadge value={item.status} kind="CustomerStatus" />
+      </div>
+    );
+  }
+
+  const boardColumns: BoardColumnDef[] = BOARD_STATUS_ORDER.map((status) => ({
+    id: status,
+    label: t.statusValues[`CustomerStatus.${status}`] ?? status,
+    count: displayItems.filter((item) => item.status === status).length,
+    outcomeRole: status === "ACTIVE_CUSTOMER" ? "positive" : status === "BLACKLISTED" ? "negative" : status === "INACTIVE" ? "caution" : undefined,
+  }));
+
+  const cardsByColumn = Object.fromEntries(
+    BOARD_STATUS_ORDER.map((status) => [status, displayItems.filter((item) => item.status === status)]),
+  );
+
+  const canUpdate = capabilities.update !== null;
+
+  const tableColumns: ColumnDef<CustomerProfileItem>[] = [
     {
-      header: copy.name,
-      cell: (item: CustomerProfileItem) => {
-        const ProfileIcon =
-          item.profileType === "CORPORATE" ? Building2 : UserRound;
+      id: "name",
+      header: t.crmCustomerProfiles.name,
+      cell: (item) => {
+        const ProfileIcon = item.profileType === "CORPORATE" ? Building2 : UserRound;
         return (
           <div className="flex items-center gap-2.5">
-            <div className="rounded-xl bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-              <ProfileIcon className="size-4" aria-hidden="true" />
-            </div>
+            <span className="flex size-7 items-center justify-center rounded-sm bg-muted">
+              <ProfileIcon className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+            </span>
             <div>
-              <p className="font-bold text-slate-900 dark:text-slate-100">
-                {item.displayName}
-              </p>
+              <p className="font-medium text-foreground">{item.displayName}</p>
               {item.companyName && item.companyName !== item.displayName && (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {item.companyName}
-                </p>
+                <p className="text-2xs text-muted-foreground">{item.companyName}</p>
               )}
             </div>
           </div>
@@ -126,132 +145,155 @@ export default function CustomerProfilesPage() {
       },
     },
     {
-      header: copy.type,
-      cell: (item: CustomerProfileItem) => (
-        <Badge variant="info">{typeLabels[item.profileType]}</Badge>
-      ),
+      id: "type",
+      header: t.crmCustomerProfiles.type,
+      cell: (item) => <Badge tone="neutral">{t.crmCustomerProfiles.profileTypes[item.profileType] ?? item.profileType}</Badge>,
     },
     {
-      header: copy.contact,
-      cell: (item: CustomerProfileItem) => (
-        <div className="space-y-0.5" dir="ltr">
-          <p>{item.email ?? copy.unavailable}</p>
-          {item.phone && (
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {item.phone}
-            </p>
-          )}
+      id: "contact",
+      header: t.crmCustomerProfiles.contact,
+      cell: (item) => (
+        <div dir="ltr">
+          <p>{item.email ?? t.crmCustomerProfiles.unavailable}</p>
+          {item.phone && <p className="text-2xs text-muted-foreground">{item.phone}</p>}
         </div>
       ),
     },
     {
-      header: copy.status,
-      cell: (item: CustomerProfileItem) => (
-        <Badge variant={statusVariant(item.status)}>
-          {statusLabels[item.status]}
-        </Badge>
-      ),
+      id: "status",
+      header: t.common.status,
+      cell: (item) => <StatusBadge value={item.status} kind="CustomerStatus" />,
     },
     {
-      header: copy.actions,
-      cell: (item: CustomerProfileItem) => (
-        <Link
-          href={"/crm/customer-profiles/" + encodeURIComponent(item.id)}
-          aria-label={copy.view + " " + item.displayName}
-          className="inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          <Eye className="size-4" aria-hidden="true" />
-          {copy.view}
-        </Link>
+      id: "actions",
+      header: t.common.actions,
+      align: "end",
+      sticky: "end",
+      cell: (item) => (
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={`/crm/customer-profiles/${encodeURIComponent(item.id)}`} aria-label={`${t.common.actions}: ${item.displayName}`}>
+            <Eye className="size-4" aria-hidden="true" />
+          </Link>
+        </Button>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-full flex-col gap-4">
       <PageHeader
         title={t.crm.customerProfilesAndCards}
-        subtitle={copy.subtitle}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <TenantBranchSelect
-            branchIds={branchIds}
-            branchId={branchId}
-            onChange={selectBranch}
-            disabled={isLoading}
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={reload}
-            disabled={isLoading}
-          >
-            <RefreshCw
-              className={"size-4 " + (isLoading ? "animate-spin" : "")}
-              aria-hidden="true"
-            />
-            {copy.reload}
+        description={t.crmCustomerProfiles.subtitle}
+        secondaryActions={
+          <Button variant="outline" onClick={reload} disabled={isLoading}>
+            <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+            {t.common.retry}
           </Button>
-        </div>
-      </PageHeader>
-
-      <TableToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        placeholder={copy.search}
+        }
       />
 
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <FilterBar
+          filters={[]}
+          values={{}}
+          onChange={() => undefined}
+          onReset={() => undefined}
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder={t.crmCustomerProfiles.search}
+        />
+        <div className="flex items-center gap-2">
+          <TenantBranchSelect branchIds={branchIds} branchId={branchId} onChange={selectBranch} disabled={isLoading} />
+          <ViewSwitcher
+            value={view}
+            onChange={setView}
+            available={["board", "card", "table"]}
+            labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
+          />
+        </div>
+      </div>
+
       {error && (
-        <div
-          role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
-        >
+        <div role="alert" className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
           {error}
         </div>
       )}
 
-      {isLoading ? (
-        <p
-          role="status"
-          className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900"
-        >
-          {copy.loading}
-        </p>
-      ) : error ? null : (
-        <Table columns={columns} data={items} emptyText={copy.empty} />
-      )}
+      <div className="min-h-0 flex-1">
+        {view === "board" && (
+          <BoardView
+            columns={boardColumns}
+            cardsByColumn={cardsByColumn}
+            itemKey={(item) => item.id}
+            renderCard={renderCard}
+            canDrag={() => canUpdate}
+            confirmMove={(move) =>
+              move.toColumnId === TERMINAL_STATUS
+                ? new Promise<boolean>((resolve) => setPendingTerminalMove({ move, resolve }))
+                : true
+            }
+            onCardMove={(move) => void handleCardMove(move)}
+            isLoading={isLoading}
+            error={null}
+            emptyColumnLabel={t.crmCustomerProfiles.empty}
+          />
+        )}
+        {view === "card" && (
+          <CardView
+            items={displayItems}
+            renderCard={renderCard}
+            itemKey={(item) => item.id}
+            isLoading={isLoading}
+            error={null}
+          />
+        )}
+        {view === "table" && (
+          <>
+            <TableView
+              columns={tableColumns}
+              rows={displayItems}
+              isLoading={isLoading}
+              error={null}
+              page={{ page: pagination?.page ?? 1, limit: pagination?.limit ?? 25, total: pagination?.total ?? 0 }}
+              onPageChange={(page) => (page > (pagination?.page ?? 1) ? nextPage() : previousPage())}
+              rowKey={(item) => item.id}
+              labels={{
+                retry: t.common.retry,
+                errorTitle: "",
+                emptyTitle: t.crmCustomerProfiles.empty,
+                selectAll: t.common.actions,
+                selectRow: t.common.actions,
+                sortAscending: t.common.actions,
+                sortDescending: t.common.actions,
+                notSorted: t.common.actions,
+                pagination: {
+                  previous: t.common.previousPage,
+                  next: t.common.nextPage,
+                  summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+                },
+              }}
+            />
+          </>
+        )}
+      </div>
 
-      {!isLoading && !error && pagination && (
-        <nav
-          aria-label={lang === "ar" ? "ترقيم صفحات العملاء" : "Customer profile pagination"}
-          className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900"
-        >
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            {pagination.total} {copy.records} · {copy.page} {pagination.page}
-            {pagination.totalPages > 0 ? " / " + pagination.totalPages : ""}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={previousPage}
-              disabled={!pagination.hasPrev}
-            >
-              {copy.previous}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={nextPage}
-              disabled={!pagination.hasNext}
-            >
-              {copy.next}
-            </Button>
-          </div>
-        </nav>
-      )}
+      <ConfirmActionModal
+        open={pendingTerminalMove !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            pendingTerminalMove?.resolve(false);
+            setPendingTerminalMove(null);
+          }
+        }}
+        title={t.crmCustomerProfiles.confirmBlacklistTitle}
+        description={t.crmCustomerProfiles.confirmBlacklistMessage}
+        confirmLabel={t.crmCustomerProfiles.confirmBlacklistAction}
+        cancelLabel={t.common.cancel}
+        onConfirm={() => {
+          pendingTerminalMove?.resolve(true);
+          setPendingTerminalMove(null);
+        }}
+      />
     </div>
   );
 }

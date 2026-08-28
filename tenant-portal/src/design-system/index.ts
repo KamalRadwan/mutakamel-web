@@ -61,6 +61,7 @@ export * from "./views/board/BoardView";
 export * from "./views/board/types";
 export * from "./views/card/CardView";
 export * from "./views/table/TableView";
+export * from "./views/useWorkspaceView";
 
 export * from "./shell/AppShell";
 export * from "./shell/LanguageToggle";

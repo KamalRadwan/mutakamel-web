@@ -1,6 +1,6 @@
 "use client";
 
-import { Select } from "@/components/ui/Select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 
 interface TenantBranchSelectProps {
@@ -10,30 +10,25 @@ interface TenantBranchSelectProps {
   disabled?: boolean;
 }
 
-export function TenantBranchSelect({
-  branchIds,
-  branchId,
-  onChange,
-  disabled = false,
-}: TenantBranchSelectProps) {
-  const { lang } = useI18n();
+// Every CRM read is branch-scoped — one of these per workspace. Hidden when
+// the account only has one accessible branch, since there is nothing to
+// choose. See docs/design/views.md#shared-behavior--identical-across-all-three-views.
+export function TenantBranchSelect({ branchIds, branchId, onChange, disabled = false }: TenantBranchSelectProps) {
+  const { t } = useI18n();
   if (branchIds.length < 2) return null;
-  const label = lang === "ar" ? "الفرع" : "Branch";
-  const select = lang === "ar" ? "اختر فرعًا" : "Select a branch";
 
   return (
-    <div className="w-72 max-w-full">
-      <Select
-        aria-label={label}
-        value={branchId ?? ""}
-        onChange={(event) => onChange(event.target.value)}
-        disabled={disabled}
-        className="font-mono"
-        options={[
-          { label: select, value: "" },
-          ...branchIds.map((id) => ({ label: id, value: id })),
-        ]}
-      />
-    </div>
+    <Select value={branchId ?? undefined} onValueChange={onChange} disabled={disabled}>
+      <SelectTrigger size="sm" aria-label={t.common.branch} className="w-56 font-mono">
+        <SelectValue placeholder={t.common.selectBranch} />
+      </SelectTrigger>
+      <SelectContent>
+        {branchIds.map((id) => (
+          <SelectItem key={id} value={id}>
+            {id}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

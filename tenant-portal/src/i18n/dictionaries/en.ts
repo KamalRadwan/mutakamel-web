@@ -39,7 +39,9 @@ export const en: Dictionary = {
     showingOf: "Showing {from}–{to} of {total}",
     discardTitle: "Discard unsaved changes?",
     discardDescription: "Your changes have not been saved. Closing now will lose them.",
-    discardConfirm: "Discard changes"
+    discardConfirm: "Discard changes",
+    branch: "Branch",
+    selectBranch: "Select a branch"
   },
   errors: {
     reference: "Ref",
@@ -211,6 +213,35 @@ export const en: Dictionary = {
     crmTitle: "CRM",
     crmDescription: "Open the first CRM workspace allowed by your account permissions."
   },
+  crmCustomerProfiles: {
+    subtitle: "Current CRM customer profiles for the trusted session branch.",
+    search: "Search by name or contact details…",
+    name: "Customer name",
+    type: "Type",
+    contact: "Contact",
+    unavailable: "Not available",
+    owner: "Owner",
+    source: "Source",
+    view: "View",
+    empty: "No matching customer profiles.",
+    confirmBlacklistTitle: "Blacklist this customer?",
+    confirmBlacklistMessage: "Blacklisting is terminal in practice — the customer will lose access immediately.",
+    confirmBlacklistAction: "Blacklist customer",
+    moveFailed: "The status change could not be saved. The card was restored.",
+    profileTypes: {
+      INDIVIDUAL: "Individual",
+      CORPORATE: "Corporate",
+    } as Record<string, string>,
+    detailTitle: "Customer profile",
+    detailSubtitle: "Verified CRM data displayed without local editing.",
+    back: "Back to customers",
+    loading: "Loading customer profile…",
+    company: "Company name",
+    branch: "Branch ID",
+    profileId: "Profile ID",
+    email: "Email",
+    phone: "Phone"
+  },
   statusValues: {
     "LeadStageFlag.NEW": "New",
     "LeadStageFlag.CONTACTED": "Contacted",
@@ -224,7 +255,16 @@ export const en: Dictionary = {
     "StageCategory.IN_PROGRESS": "In progress",
     "StageCategory.POSITIVE": "Positive",
     "StageCategory.NEGATIVE": "Negative",
+    "CustomerStatus.PROSPECT": "Prospect",
+    "CustomerStatus.ACTIVE_CUSTOMER": "Active customer",
+    "CustomerStatus.INACTIVE": "Inactive",
+    "CustomerStatus.BLACKLISTED": "Blacklisted",
   } as Record<string, string>,
+  views: {
+    board: "Board",
+    card: "Card",
+    table: "Table"
+  },
   permissionGate: {
     title: "Access restricted",
     description: "You don't have permission to view this section. Contact your workspace admin if you believe this is a mistake."
