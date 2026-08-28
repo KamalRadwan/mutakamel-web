@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Lock, TrendingUp } from "lucide-react";
+import { PageHeader } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -9,62 +10,49 @@ import {
   getFirstPermittedCrmRoute,
 } from "@/lib/navigation/tenant-routes";
 
+// Not a dashboard — there is no metrics endpoint. A launcher. Only
+// permitted destinations render, no disabled tiles — see
+// docs/design/DESIGN-SYSTEM.md#72-workspace-home--.
 export default function DashboardPage() {
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const { user } = useTenantAuth();
   const crmEntryRoute = getFirstPermittedCrmRoute(user?.permissions ?? []);
   const destinations = [
     {
       href: TENANT_ROUTES.coreSessions,
       icon: Lock,
-      title: lang === "ar" ? "جلسات تسجيل الدخول" : "Sign-in sessions",
-      description:
-        lang === "ar"
-          ? "راجع جلسات حسابك وألغِ الأجهزة غير المعروفة."
-          : "Review your account sessions and revoke unknown devices.",
+      title: t.workspaceHome.sessionsTitle,
+      description: t.workspaceHome.sessionsDescription,
     },
     ...(crmEntryRoute
       ? [
           {
             href: crmEntryRoute,
             icon: TrendingUp,
-            title: lang === "ar" ? "إدارة علاقات العملاء" : "CRM",
-            description:
-              lang === "ar"
-                ? "انتقل إلى أول مساحة CRM متاحة وفق صلاحيات حسابك."
-                : "Open the first CRM workspace allowed by your account permissions.",
+            title: t.workspaceHome.crmTitle,
+            description: t.workspaceHome.crmDescription,
           },
         ]
       : []),
   ];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-          {lang === "ar" ? "مساحة عمل متكامل" : "Mutakamel workspace"}
-        </h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          {lang === "ar"
-            ? "اختر إحدى الإمكانات المتصلة حاليًا بالخادم."
-            : "Choose one of the capabilities currently connected to the server."}
-        </p>
-      </header>
+    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+      <PageHeader
+        title={user ? t.workspaceHome.greeting(`${user.firstName} ${user.lastName}`) : ""}
+        description={t.workspaceHome.subtitle}
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         {destinations.map(({ href, icon: Icon, title, description }) => (
           <Link
             key={href}
             href={href}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/20"
+            className="rounded-md border border-border bg-card p-4 transition-colors hover:border-ink-300 hover:bg-accent"
           >
-            <Icon className="size-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
-            <h2 className="mt-3 text-base font-bold text-slate-900 dark:text-slate-100">
-              {title}
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
-              {description}
-            </p>
+            <Icon className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+            <h2 className="mt-2 text-sm font-medium text-foreground">{title}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{description}</p>
           </Link>
         ))}
       </div>

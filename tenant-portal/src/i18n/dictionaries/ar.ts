@@ -201,6 +201,14 @@ export const ar = {
       rule: "قاعدة",
     } as Record<string, string>
   },
+  workspaceHome: {
+    greeting: (name: string) => `مرحبًا، ${name}`,
+    subtitle: "اختر إحدى الإمكانات المتصلة حاليًا بالخادم.",
+    sessionsTitle: "جلسات تسجيل الدخول",
+    sessionsDescription: "راجع جلسات حسابك وألغِ الأجهزة غير المعروفة.",
+    crmTitle: "إدارة علاقات العملاء",
+    crmDescription: "انتقل إلى أول مساحة CRM متاحة وفق صلاحيات حسابك."
+  },
   // Enum wire value -> translated label, keyed "<StatusKind>.<VALUE>" (e.g.
   // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts
   // in phase 4 — see src/design-system/patterns/status-badge. An unmapped

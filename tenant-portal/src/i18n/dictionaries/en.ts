@@ -203,6 +203,14 @@ export const en: Dictionary = {
       rule: "Rule",
     } as Record<string, string>
   },
+  workspaceHome: {
+    greeting: (name: string) => `Welcome, ${name}`,
+    subtitle: "Choose one of the capabilities currently connected to the server.",
+    sessionsTitle: "Sign-in sessions",
+    sessionsDescription: "Review your account sessions and revoke unknown devices.",
+    crmTitle: "CRM",
+    crmDescription: "Open the first CRM workspace allowed by your account permissions."
+  },
   statusValues: {
     "LeadStageFlag.NEW": "New",
     "LeadStageFlag.CONTACTED": "Contacted",
