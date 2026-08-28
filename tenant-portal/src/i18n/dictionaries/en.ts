@@ -165,6 +165,25 @@ export const en: Dictionary = {
       PHONE: "Phone",
     } as Record<string, string>
   },
+  crmStaticCatalogue: {
+    subtitle: "Current CRM enum, label, and permission vocabulary. This catalogue is read-only.",
+    reload: "Reload",
+    search: "Search groups or values…",
+    group: "Contract group",
+    kind: "Type",
+    entries: "Entries",
+    examples: "Current values",
+    empty: "No matching catalogue groups.",
+    advertisedPolicy: "The attachment policy shown here is descriptive; the upload route and storage allowlist remain authoritative.",
+    kinds: {
+      enum: "Enum",
+      permission: "Permission",
+      owner: "Owner",
+      event: "Event",
+      attachment: "Attachment",
+      rule: "Rule",
+    } as Record<string, string>
+  },
   statusValues: {
     "LeadStageFlag.NEW": "New",
     "LeadStageFlag.CONTACTED": "Contacted",

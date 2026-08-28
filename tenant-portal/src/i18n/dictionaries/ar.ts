@@ -163,6 +163,25 @@ export const ar = {
       PHONE: "هاتف",
     } as Record<string, string>
   },
+  crmStaticCatalogue: {
+    subtitle: "مرجع للأنواع والتسميات والصلاحيات التي يعيدها CRM حاليًا. هذه البيانات للقراءة فقط.",
+    reload: "إعادة التحميل",
+    search: "ابحث باسم المجموعة أو بقيمة...",
+    group: "مجموعة العقد",
+    kind: "النوع",
+    entries: "العناصر",
+    examples: "قيم حالية",
+    empty: "لا توجد مجموعات مطابقة.",
+    advertisedPolicy: "سياسة المرفقات هنا وصفية فقط؛ مسار الرفع وقواعد التخزين هما المرجع الأمني النهائي.",
+    kinds: {
+      enum: "تعداد",
+      permission: "صلاحية",
+      owner: "مالك",
+      event: "حدث",
+      attachment: "مرفق",
+      rule: "قاعدة",
+    } as Record<string, string>
+  },
   // Enum wire value -> translated label, keyed "<StatusKind>.<VALUE>" (e.g.
   // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts
   // in phase 4 — see src/design-system/patterns/status-badge. An unmapped
