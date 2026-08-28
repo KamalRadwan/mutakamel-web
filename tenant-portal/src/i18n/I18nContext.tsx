@@ -1,11 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { safeStorage } from "@/lib/safeStorage";
+import React, { createContext, useContext } from "react";
 import { ar, Dictionary } from "./dictionaries/ar";
 import { en } from "./dictionaries/en";
+import { type Language, setLanguage, useLanguage } from "./useLanguage";
 
-export type Language = "ar" | "en";
+export type { Language };
 
 interface I18nContextType {
   lang: Language;
@@ -18,37 +18,18 @@ interface I18nContextType {
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Language>("ar");
-
-  useEffect(() => {
-    const savedLang = (safeStorage.getItem("tenant_lang") as Language) || "ar";
-    document.documentElement.setAttribute("dir", savedLang === "ar" ? "rtl" : "ltr");
-    document.documentElement.setAttribute("lang", savedLang);
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) setLangState(savedLang);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const setLang = (newLang: Language) => {
-    setLangState(newLang);
-    safeStorage.setItem("tenant_lang", newLang);
-    document.documentElement.setAttribute("dir", newLang === "ar" ? "rtl" : "ltr");
-    document.documentElement.setAttribute("lang", newLang);
-  };
+  const lang = useLanguage();
+  const dir = lang === "ar" ? "rtl" : "ltr";
+  const dictionary = lang === "ar" ? ar : en;
 
   const toggleLang = () => {
-    setLang(lang === "ar" ? "en" : "ar");
+    setLanguage(lang === "ar" ? "en" : "ar");
   };
 
-  const dictionary = lang === "ar" ? ar : en;
-  const dir = lang === "ar" ? "rtl" : "ltr";
-
   return (
-    <I18nContext.Provider value={{ lang, dir, t: dictionary, setLang, toggleLang }}>
+    <I18nContext.Provider
+      value={{ lang, dir, t: dictionary, setLang: setLanguage, toggleLang }}
+    >
       {children}
     </I18nContext.Provider>
   );

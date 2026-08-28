@@ -10,7 +10,8 @@ instead, and who can settle it.
 
 ## Status
 
-**All nine questions opened during the 2026-08-27 rebuild are resolved.**
+**All ten questions opened during the rebuild are resolved** — nine during
+the 2026-08-27 documentation rebuild, one (Q10) during Phase 2 execution.
 The list is kept as a record of how each was settled, because the reasoning
 matters more than the answer.
 
@@ -82,6 +83,35 @@ Extract from `trade-app/src/**/*.controller.ts` when a Trade screen is first
 built, and add the section in the same change.
 
 ---
+
+## Q10 — Hand-rolled theme mechanism vs. `next-themes` · resolved
+
+`docs/build/PHASE-2-FOUNDATION.md`'s theming step and
+[theming.md](../design/theming.md) give exact code for a hand-rolled
+`ThemeProvider` (`useSyncExternalStore` over `tenant_theme`, driven by the
+same inline bootstrap script that also fixes D4's language/direction flash).
+[DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md)'s library table separately
+lists `next-themes` — "Well-tested flash prevention; do not reimplement" —
+among the full system's dependencies.
+
+DESIGN-SYSTEM.md's supersession notice at the top names exactly what it
+overrides: "the warm-neutral palette and the 36px/40px density in
+tokens.md and geometry.md." It does not name theming.md, and its library
+table reads as a survey of every dependency the finished system uses across
+all phases (it also lists 16 Radix packages and `sonner`, which are Phase 3
+material), not a phase-2-specific instruction.
+
+**Assumed:** implemented Phase 2 exactly as theming.md/PHASE-2-FOUNDATION.md
+specify — no `next-themes`. One atomic inline script sets both `lang`/`dir`
+and the initial `.dark` class before hydration; a second, separate
+`next-themes` script would only cover the theme half and add a second
+blocking script for no compounding benefit. `ThemeProvider` lives at
+`src/design-system/theme/ThemeProvider.tsx` (no path was specified for it).
+
+**Settle with:** if a later phase wants `next-themes` specifically, swapping
+it in is a contained change — `ThemeProvider`'s public shape
+(`{ theme, isDark, setTheme }`) and the `tenant_theme` storage key can stay
+the same either way.
 
 ## How to add one
 

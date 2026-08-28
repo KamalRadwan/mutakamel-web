@@ -1,85 +1,639 @@
+/* Token source of truth. This file declares tokens; it styles nothing.
+   See docs/design/DESIGN-SYSTEM.md#5--no-stylesheet-of-component-classes —
+   no class selector, no @apply, no element selector beyond body/html[lang]. */
+
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
-  color-scheme: light;
-  --color-bg-canvas: #f8fafc;
-  --color-bg-surface: #ffffff;
-  --color-bg-raised: #ffffff;
-  --color-bg-subtle: #f1f5f9;
-  --color-bg-hover: #f8fafc;
-  --color-bg-selected: #eff6ff;
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #64748b;
-  --color-border-subtle: #e2e8f0;
-  --color-border-default: #cbd5e1;
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
+/* ---------- 1. Font variables, bridged from src/app/fonts.ts ---------- */
 
-  /* Tenant Theme Aliases for Dashboard Adapter */
-  --tenant-border: #e2e8f0;
-  --tenant-muted: #64748b;
-  --tenant-surface: #ffffff;
-  --tenant-text: #0f172a;
-  --tenant-field: #f1f5f9;
-  --tenant-primary: #2563eb;
-  --tenant-primary-soft: #eff6ff;
-  --tenant-green: #10b981;
-  --tenant-orange: #f59e0b;
-  --tenant-red: #ef4444;
+@theme inline {
+  --font-sans: var(--font-readex), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-mono: var(--font-dm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---------- 2. Ramps, type scale, radius, weight remap, easing ----------
+   Ramp values: docs/design/DESIGN-SYSTEM.md#1--color (cold blue, hue 240) —
+   supersedes the warm-graphite ramp in docs/design/tokens.md. */
+
+@theme {
+  /* INK — cold blue neutral, hue 240. 13 steps: ink-25 is the table zebra
+     row, ink-1000 the dark canvas. */
+  --color-ink-25:   oklch(0.992 0.004 240);
+  --color-ink-50:   oklch(0.983 0.006 240);
+  --color-ink-100:  oklch(0.963 0.010 240);
+  --color-ink-200:  oklch(0.923 0.016 240);
+  --color-ink-300:  oklch(0.865 0.022 240);
+  --color-ink-400:  oklch(0.712 0.028 240);
+  --color-ink-500:  oklch(0.585 0.030 240);
+  --color-ink-600:  oklch(0.482 0.030 240);
+  --color-ink-700:  oklch(0.399 0.028 240);
+  --color-ink-800:  oklch(0.316 0.026 240);
+  --color-ink-900:  oklch(0.247 0.023 240);
+  --color-ink-950:  oklch(0.174 0.020 240);
+  --color-ink-1000: oklch(0.126 0.017 240);
+
+  /* BRAND — blue, hue 258. Anchored at 600, the light-mode fill. */
+  --color-brand-50:  oklch(0.968 0.014 258);
+  --color-brand-100: oklch(0.936 0.030 258);
+  --color-brand-200: oklch(0.882 0.056 258);
+  --color-brand-300: oklch(0.800 0.097 258);
+  --color-brand-400: oklch(0.700 0.155 258);
+  --color-brand-500: oklch(0.606 0.180 258);
+  --color-brand-600: oklch(0.520 0.180 258);
+  --color-brand-700: oklch(0.442 0.155 258);
+  --color-brand-800: oklch(0.375 0.128 258);
+  --color-brand-900: oklch(0.318 0.102 258);
+  --color-brand-950: oklch(0.220 0.070 258);
+
+  /* POSITIVE — teal-green, hue 168->160. */
+  --color-positive-50:  oklch(0.972 0.016 168);
+  --color-positive-100: oklch(0.940 0.036 168);
+  --color-positive-200: oklch(0.884 0.066 168);
+  --color-positive-300: oklch(0.812 0.096 166);
+  --color-positive-400: oklch(0.740 0.118 165);
+  --color-positive-500: oklch(0.660 0.125 164);
+  --color-positive-600: oklch(0.565 0.113 163);
+  --color-positive-700: oklch(0.478 0.094 162);
+  --color-positive-800: oklch(0.402 0.077 161);
+  --color-positive-900: oklch(0.340 0.062 160);
+  --color-positive-950: oklch(0.232 0.042 160);
+
+  /* CAUTION — amber, hue 82->56. The torsion toward orange is deliberate:
+     without it the dark steps read olive. */
+  --color-caution-50:  oklch(0.981 0.018 82);
+  --color-caution-100: oklch(0.957 0.040 81);
+  --color-caution-200: oklch(0.914 0.076 78);
+  --color-caution-300: oklch(0.863 0.112 74);
+  --color-caution-400: oklch(0.809 0.150 69);
+  --color-caution-500: oklch(0.755 0.154 64);
+  --color-caution-600: oklch(0.663 0.146 60);
+  --color-caution-700: oklch(0.548 0.128 58);
+  --color-caution-800: oklch(0.458 0.104 57);
+  --color-caution-900: oklch(0.392 0.084 56);
+  --color-caution-950: oklch(0.257 0.056 56);
+
+  /* NEGATIVE — crimson, hue 20->13. Cold-compatible; stays far from amber. */
+  --color-negative-50:  oklch(0.971 0.014 20);
+  --color-negative-100: oklch(0.939 0.029 19);
+  --color-negative-200: oklch(0.886 0.056 18);
+  --color-negative-300: oklch(0.810 0.104 17);
+  --color-negative-400: oklch(0.712 0.160 16);
+  --color-negative-500: oklch(0.630 0.200 15);
+  --color-negative-600: oklch(0.556 0.208 15);
+  --color-negative-700: oklch(0.474 0.180 14);
+  --color-negative-800: oklch(0.400 0.148 14);
+  --color-negative-900: oklch(0.343 0.121 13);
+  --color-negative-950: oklch(0.228 0.082 13);
+
+  /* Type scale — docs/design/typography.md#the-7-step-scale. 13px floor,
+     14px base. Arabic lift applied below via html[lang="ar"]. */
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: 0.06em;
+
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-sm--letter-spacing: -0.003em;
+
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.5rem;
+  --text-base--letter-spacing: -0.006em;
+
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.5rem;
+  --text-lg--letter-spacing: -0.01em;
+
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: -0.014em;
+
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-2xl--letter-spacing: -0.018em;
+
+  /* Weight ceiling — only 400/500/600 are downloaded (src/app/fonts.ts).
+     Remapping bold/extrabold/black to 600 de-escalates every existing
+     font-bold call site with zero .tsx edits. */
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 600;
+  --font-weight-black: 600;
+
+  /* Radius — 4 steps, docs/design/DESIGN-SYSTEM.md#radius--4-steps-tight.
+     Nothing above 8px. */
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  /* Transitional squash: every existing rounded-xl/2xl/3xl call site
+     tightens with zero file edits. Delete once the codemod (phase 3/4)
+     rewrites them to rounded-md/rounded-sm and this squash has zero
+     remaining reason to exist — see docs/design/geometry.md#radius--4-steps. */
+  --radius-xl: var(--radius-lg);
+  --radius-2xl: var(--radius-lg);
+  --radius-3xl: var(--radius-lg);
+
+  /* Motion — docs/design/motion.md#standard-easing. One curve for
+     everything: fast start, soft landing. */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Arabic gets a lift on the three smallest steps, line-heights raised in
+   lockstep — Naskh forms need the extra room for dots and diacritics.
+   text-2xs is deliberately not lifted; it is Latin-only by definition. */
+html[lang="ar"] {
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.625rem;
+}
+
+/* ---------- 3. Semantic tokens, control sizes, elevation ----------
+   docs/design/DESIGN-SYSTEM.md#semantic-tokens and #3--sizing--density. */
+
+:root {
+  --background: var(--color-ink-50);
+  --foreground: var(--color-ink-900);
+  --canvas: var(--color-ink-100);
+  --card: white;
+  --card-foreground: var(--color-ink-900);
+  --popover: white;
+  --popover-foreground: var(--color-ink-900);
+  --primary: var(--color-brand-600);
+  --primary-foreground: white;
+  --secondary: var(--color-ink-100);
+  --secondary-foreground: var(--color-ink-800);
+  --muted: var(--color-ink-100);
+  --muted-foreground: var(--color-ink-600);
+  --accent: var(--color-ink-100);
+  --accent-foreground: var(--color-ink-900);
+  --destructive: var(--color-negative-700);
+  --destructive-foreground: white;
+  --border: var(--color-ink-200);
+  --input: var(--color-ink-200);
+  --ring: var(--color-brand-500);
+  --row-zebra: var(--color-ink-25);
+  --sidebar: white;
+  --sidebar-foreground: var(--color-ink-800);
+  --sidebar-active: var(--color-brand-700);
+
+  /* Control heights — docs/design/DESIGN-SYSTEM.md#3--sizing--density.
+     32px is the default, tighter than a developer-tool default would use,
+     tuned for many rows on a 1366x768 laptop. */
+  --size-control-xs: 1.5rem;
+  --size-control-sm: 1.75rem;
+  --size-control-md: 2rem;
+  --size-control-lg: 2.25rem;
+  --size-control-xl: 2.5rem;
+
+  --size-row: 2.25rem;
+  --size-topbar: 2.75rem;
+  --size-sidebar: 14.5rem;
+  --size-rail: 3rem;
+
+  /* Elevation — border + background step by default; these two shadows are
+     the only exception, for popovers/dropdowns/tooltips and dialogs/sheets.
+     Values: docs/design/tokens.md#elevation-and-control-tokens. */
+  --elevation-pop: 0 1px 2px oklch(0.174 0.020 240 / 0.08),
+    0 2px 6px oklch(0.174 0.020 240 / 0.06);
+  --elevation-overlay: 0 2px 4px oklch(0.174 0.020 240 / 0.10),
+    0 8px 24px oklch(0.174 0.020 240 / 0.12);
 }
 
 .dark {
-  color-scheme: dark;
-  --color-bg-canvas: #090d16;
-  --color-bg-surface: #111a2b;
-  --color-bg-raised: #172235;
-  --color-bg-subtle: #172235;
-  --color-bg-hover: #1e2b41;
-  --color-bg-selected: #102a4c;
-  --color-text-primary: #f8fafc;
-  --color-text-secondary: #cbd5e1;
-  --color-text-muted: #94a3b8;
-  --color-border-subtle: #1e293b;
-  --color-border-default: #334155;
-  --color-primary: #3b82f6;
-  --color-primary-hover: #60a5fa;
+  --background: var(--color-ink-1000);
+  --foreground: var(--color-ink-100);
+  --canvas: var(--color-ink-1000);
+  --card: var(--color-ink-950);
+  --card-foreground: var(--color-ink-100);
+  --popover: var(--color-ink-900);
+  --popover-foreground: var(--color-ink-100);
+  --primary: var(--color-brand-400);
+  --primary-foreground: var(--color-ink-950);
+  --secondary: var(--color-ink-800);
+  --secondary-foreground: var(--color-ink-100);
+  --muted: var(--color-ink-900);
+  --muted-foreground: var(--color-ink-400);
+  --accent: var(--color-ink-800);
+  --accent-foreground: var(--color-ink-100);
+  --destructive: var(--color-negative-700);
+  --destructive-foreground: white;
+  --border: var(--color-ink-800);
+  --input: var(--color-ink-800);
+  --ring: var(--color-brand-400);
+  --row-zebra: var(--color-ink-950);
+  --sidebar: var(--color-ink-950);
+  --sidebar-foreground: var(--color-ink-200);
+  --sidebar-active: var(--color-brand-300);
 
-  /* Dark Mode Tenant Theme Aliases */
-  --tenant-border: #1e293b;
-  --tenant-muted: #94a3b8;
-  --tenant-surface: #111a2b;
-  --tenant-text: #f8fafc;
-  --tenant-field: #1e2b41;
-  --tenant-primary: #3b82f6;
-  --tenant-primary-soft: #102a4c;
-  --tenant-green: #22c55e;
-  --tenant-orange: #fbbf24;
-  --tenant-red: #f87171;
+  /* A drop shadow against an already-dark canvas reads as mud — substitute
+     a top inset hairline instead. */
+  --elevation-pop: inset 0 1px 0 oklch(1 0 0 / 0.06);
+  --elevation-overlay: inset 0 1px 0 oklch(1 0 0 / 0.08), 0 8px 24px oklch(0 0 0 / 0.40);
 }
 
+/* ---------- 4. Bridge semantics into Tailwind utilities ---------- */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-canvas: var(--canvas);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-row-zebra: var(--row-zebra);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active: var(--sidebar-active);
+
+  /* Trap (docs/design/geometry.md#elevation): an undefined --shadow-* theme
+     key generates no utility at all under Tailwind v4, and every popover
+     then renders flat with no error. Verified after build — see
+     docs/build/PHASE-2-FOUNDATION.md#verify-the-elevation-bridge. */
+  --shadow-pop: var(--elevation-pop);
+  --shadow-overlay: var(--elevation-overlay);
+}
+
+/* ---------- 5. The theme flip ----------
+   Remaps Tailwind's own built-in color families onto the four roles, so
+   every existing raw-palette call site in the codebase repaints from this
+   one block with zero .tsx edits — docs/design/tokens.md#the-theme-flip.
+   slate maps to ink, not brand: it is overwhelmingly used as a neutral in
+   this codebase (1,075 of the original 1,992 color-utility usages). */
+
+@theme {
+  --color-blue-50: var(--color-brand-50);
+  --color-blue-100: var(--color-brand-100);
+  --color-blue-200: var(--color-brand-200);
+  --color-blue-300: var(--color-brand-300);
+  --color-blue-400: var(--color-brand-400);
+  --color-blue-500: var(--color-brand-500);
+  --color-blue-600: var(--color-brand-600);
+  --color-blue-700: var(--color-brand-700);
+  --color-blue-800: var(--color-brand-800);
+  --color-blue-900: var(--color-brand-900);
+  --color-blue-950: var(--color-brand-950);
+
+  --color-sky-50: var(--color-brand-50);
+  --color-sky-100: var(--color-brand-100);
+  --color-sky-200: var(--color-brand-200);
+  --color-sky-300: var(--color-brand-300);
+  --color-sky-400: var(--color-brand-400);
+  --color-sky-500: var(--color-brand-500);
+  --color-sky-600: var(--color-brand-600);
+  --color-sky-700: var(--color-brand-700);
+  --color-sky-800: var(--color-brand-800);
+  --color-sky-900: var(--color-brand-900);
+  --color-sky-950: var(--color-brand-950);
+
+  --color-cyan-50: var(--color-brand-50);
+  --color-cyan-100: var(--color-brand-100);
+  --color-cyan-200: var(--color-brand-200);
+  --color-cyan-300: var(--color-brand-300);
+  --color-cyan-400: var(--color-brand-400);
+  --color-cyan-500: var(--color-brand-500);
+  --color-cyan-600: var(--color-brand-600);
+  --color-cyan-700: var(--color-brand-700);
+  --color-cyan-800: var(--color-brand-800);
+  --color-cyan-900: var(--color-brand-900);
+  --color-cyan-950: var(--color-brand-950);
+
+  --color-indigo-50: var(--color-brand-50);
+  --color-indigo-100: var(--color-brand-100);
+  --color-indigo-200: var(--color-brand-200);
+  --color-indigo-300: var(--color-brand-300);
+  --color-indigo-400: var(--color-brand-400);
+  --color-indigo-500: var(--color-brand-500);
+  --color-indigo-600: var(--color-brand-600);
+  --color-indigo-700: var(--color-brand-700);
+  --color-indigo-800: var(--color-brand-800);
+  --color-indigo-900: var(--color-brand-900);
+  --color-indigo-950: var(--color-brand-950);
+
+  --color-violet-50: var(--color-brand-50);
+  --color-violet-100: var(--color-brand-100);
+  --color-violet-200: var(--color-brand-200);
+  --color-violet-300: var(--color-brand-300);
+  --color-violet-400: var(--color-brand-400);
+  --color-violet-500: var(--color-brand-500);
+  --color-violet-600: var(--color-brand-600);
+  --color-violet-700: var(--color-brand-700);
+  --color-violet-800: var(--color-brand-800);
+  --color-violet-900: var(--color-brand-900);
+  --color-violet-950: var(--color-brand-950);
+
+  --color-purple-50: var(--color-brand-50);
+  --color-purple-100: var(--color-brand-100);
+  --color-purple-200: var(--color-brand-200);
+  --color-purple-300: var(--color-brand-300);
+  --color-purple-400: var(--color-brand-400);
+  --color-purple-500: var(--color-brand-500);
+  --color-purple-600: var(--color-brand-600);
+  --color-purple-700: var(--color-brand-700);
+  --color-purple-800: var(--color-brand-800);
+  --color-purple-900: var(--color-brand-900);
+  --color-purple-950: var(--color-brand-950);
+
+  --color-emerald-50: var(--color-positive-50);
+  --color-emerald-100: var(--color-positive-100);
+  --color-emerald-200: var(--color-positive-200);
+  --color-emerald-300: var(--color-positive-300);
+  --color-emerald-400: var(--color-positive-400);
+  --color-emerald-500: var(--color-positive-500);
+  --color-emerald-600: var(--color-positive-600);
+  --color-emerald-700: var(--color-positive-700);
+  --color-emerald-800: var(--color-positive-800);
+  --color-emerald-900: var(--color-positive-900);
+  --color-emerald-950: var(--color-positive-950);
+
+  --color-green-50: var(--color-positive-50);
+  --color-green-100: var(--color-positive-100);
+  --color-green-200: var(--color-positive-200);
+  --color-green-300: var(--color-positive-300);
+  --color-green-400: var(--color-positive-400);
+  --color-green-500: var(--color-positive-500);
+  --color-green-600: var(--color-positive-600);
+  --color-green-700: var(--color-positive-700);
+  --color-green-800: var(--color-positive-800);
+  --color-green-900: var(--color-positive-900);
+  --color-green-950: var(--color-positive-950);
+
+  --color-teal-50: var(--color-positive-50);
+  --color-teal-100: var(--color-positive-100);
+  --color-teal-200: var(--color-positive-200);
+  --color-teal-300: var(--color-positive-300);
+  --color-teal-400: var(--color-positive-400);
+  --color-teal-500: var(--color-positive-500);
+  --color-teal-600: var(--color-positive-600);
+  --color-teal-700: var(--color-positive-700);
+  --color-teal-800: var(--color-positive-800);
+  --color-teal-900: var(--color-positive-900);
+  --color-teal-950: var(--color-positive-950);
+
+  --color-lime-50: var(--color-positive-50);
+  --color-lime-100: var(--color-positive-100);
+  --color-lime-200: var(--color-positive-200);
+  --color-lime-300: var(--color-positive-300);
+  --color-lime-400: var(--color-positive-400);
+  --color-lime-500: var(--color-positive-500);
+  --color-lime-600: var(--color-positive-600);
+  --color-lime-700: var(--color-positive-700);
+  --color-lime-800: var(--color-positive-800);
+  --color-lime-900: var(--color-positive-900);
+  --color-lime-950: var(--color-positive-950);
+
+  --color-amber-50: var(--color-caution-50);
+  --color-amber-100: var(--color-caution-100);
+  --color-amber-200: var(--color-caution-200);
+  --color-amber-300: var(--color-caution-300);
+  --color-amber-400: var(--color-caution-400);
+  --color-amber-500: var(--color-caution-500);
+  --color-amber-600: var(--color-caution-600);
+  --color-amber-700: var(--color-caution-700);
+  --color-amber-800: var(--color-caution-800);
+  --color-amber-900: var(--color-caution-900);
+  --color-amber-950: var(--color-caution-950);
+
+  --color-orange-50: var(--color-caution-50);
+  --color-orange-100: var(--color-caution-100);
+  --color-orange-200: var(--color-caution-200);
+  --color-orange-300: var(--color-caution-300);
+  --color-orange-400: var(--color-caution-400);
+  --color-orange-500: var(--color-caution-500);
+  --color-orange-600: var(--color-caution-600);
+  --color-orange-700: var(--color-caution-700);
+  --color-orange-800: var(--color-caution-800);
+  --color-orange-900: var(--color-caution-900);
+  --color-orange-950: var(--color-caution-950);
+
+  --color-yellow-50: var(--color-caution-50);
+  --color-yellow-100: var(--color-caution-100);
+  --color-yellow-200: var(--color-caution-200);
+  --color-yellow-300: var(--color-caution-300);
+  --color-yellow-400: var(--color-caution-400);
+  --color-yellow-500: var(--color-caution-500);
+  --color-yellow-600: var(--color-caution-600);
+  --color-yellow-700: var(--color-caution-700);
+  --color-yellow-800: var(--color-caution-800);
+  --color-yellow-900: var(--color-caution-900);
+  --color-yellow-950: var(--color-caution-950);
+
+  --color-red-50: var(--color-negative-50);
+  --color-red-100: var(--color-negative-100);
+  --color-red-200: var(--color-negative-200);
+  --color-red-300: var(--color-negative-300);
+  --color-red-400: var(--color-negative-400);
+  --color-red-500: var(--color-negative-500);
+  --color-red-600: var(--color-negative-600);
+  --color-red-700: var(--color-negative-700);
+  --color-red-800: var(--color-negative-800);
+  --color-red-900: var(--color-negative-900);
+  --color-red-950: var(--color-negative-950);
+
+  --color-rose-50: var(--color-negative-50);
+  --color-rose-100: var(--color-negative-100);
+  --color-rose-200: var(--color-negative-200);
+  --color-rose-300: var(--color-negative-300);
+  --color-rose-400: var(--color-negative-400);
+  --color-rose-500: var(--color-negative-500);
+  --color-rose-600: var(--color-negative-600);
+  --color-rose-700: var(--color-negative-700);
+  --color-rose-800: var(--color-negative-800);
+  --color-rose-900: var(--color-negative-900);
+  --color-rose-950: var(--color-negative-950);
+
+  --color-pink-50: var(--color-negative-50);
+  --color-pink-100: var(--color-negative-100);
+  --color-pink-200: var(--color-negative-200);
+  --color-pink-300: var(--color-negative-300);
+  --color-pink-400: var(--color-negative-400);
+  --color-pink-500: var(--color-negative-500);
+  --color-pink-600: var(--color-negative-600);
+  --color-pink-700: var(--color-negative-700);
+  --color-pink-800: var(--color-negative-800);
+  --color-pink-900: var(--color-negative-900);
+  --color-pink-950: var(--color-negative-950);
+
+  --color-fuchsia-50: var(--color-negative-50);
+  --color-fuchsia-100: var(--color-negative-100);
+  --color-fuchsia-200: var(--color-negative-200);
+  --color-fuchsia-300: var(--color-negative-300);
+  --color-fuchsia-400: var(--color-negative-400);
+  --color-fuchsia-500: var(--color-negative-500);
+  --color-fuchsia-600: var(--color-negative-600);
+  --color-fuchsia-700: var(--color-negative-700);
+  --color-fuchsia-800: var(--color-negative-800);
+  --color-fuchsia-900: var(--color-negative-900);
+  --color-fuchsia-950: var(--color-negative-950);
+
+  --color-slate-50: var(--color-ink-50);
+  --color-slate-100: var(--color-ink-100);
+  --color-slate-200: var(--color-ink-200);
+  --color-slate-300: var(--color-ink-300);
+  --color-slate-400: var(--color-ink-400);
+  --color-slate-500: var(--color-ink-500);
+  --color-slate-600: var(--color-ink-600);
+  --color-slate-700: var(--color-ink-700);
+  --color-slate-800: var(--color-ink-800);
+  --color-slate-900: var(--color-ink-900);
+  --color-slate-950: var(--color-ink-950);
+
+  --color-gray-50: var(--color-ink-50);
+  --color-gray-100: var(--color-ink-100);
+  --color-gray-200: var(--color-ink-200);
+  --color-gray-300: var(--color-ink-300);
+  --color-gray-400: var(--color-ink-400);
+  --color-gray-500: var(--color-ink-500);
+  --color-gray-600: var(--color-ink-600);
+  --color-gray-700: var(--color-ink-700);
+  --color-gray-800: var(--color-ink-800);
+  --color-gray-900: var(--color-ink-900);
+  --color-gray-950: var(--color-ink-950);
+
+  --color-zinc-50: var(--color-ink-50);
+  --color-zinc-100: var(--color-ink-100);
+  --color-zinc-200: var(--color-ink-200);
+  --color-zinc-300: var(--color-ink-300);
+  --color-zinc-400: var(--color-ink-400);
+  --color-zinc-500: var(--color-ink-500);
+  --color-zinc-600: var(--color-ink-600);
+  --color-zinc-700: var(--color-ink-700);
+  --color-zinc-800: var(--color-ink-800);
+  --color-zinc-900: var(--color-ink-900);
+  --color-zinc-950: var(--color-ink-950);
+
+  --color-neutral-50: var(--color-ink-50);
+  --color-neutral-100: var(--color-ink-100);
+  --color-neutral-200: var(--color-ink-200);
+  --color-neutral-300: var(--color-ink-300);
+  --color-neutral-400: var(--color-ink-400);
+  --color-neutral-500: var(--color-ink-500);
+  --color-neutral-600: var(--color-ink-600);
+  --color-neutral-700: var(--color-ink-700);
+  --color-neutral-800: var(--color-ink-800);
+  --color-neutral-900: var(--color-ink-900);
+  --color-neutral-950: var(--color-ink-950);
+
+  --color-stone-50: var(--color-ink-50);
+  --color-stone-100: var(--color-ink-100);
+  --color-stone-200: var(--color-ink-200);
+  --color-stone-300: var(--color-ink-300);
+  --color-stone-400: var(--color-ink-400);
+  --color-stone-500: var(--color-ink-500);
+  --color-stone-600: var(--color-ink-600);
+  --color-stone-700: var(--color-ink-700);
+  --color-stone-800: var(--color-ink-800);
+  --color-stone-900: var(--color-ink-900);
+  --color-stone-950: var(--color-ink-950);
+}
+
+/* ---------- 6. Body ---------- */
+
 body {
-  background-color: var(--color-bg-canvas);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  /* Only 400/500/600 are downloaded — this stops the browser synthesising a
+     fake bold for anything heavier that slips through the weight remap
+     above. */
+  font-synthesis-weight: none;
+}
+
+/* ---------- 7. Keyframes ----------
+   docs/design/motion.md#the-budget. animate-bell-ring is pre-existing and
+   temporary: its only consumer, NotificationsDropdown, is deleted in phase 3
+   (docs/build/PHASE-1-DELETE.md#5-old-presentation-layer) — remove this
+   keyframe in the same change. */
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
 }
 
 @keyframes bellRing {
-  0% { transform: rotate(0deg); }
-  10% { transform: rotate(25deg); }
-  20% { transform: rotate(-25deg); }
-  30% { transform: rotate(20deg); }
-  40% { transform: rotate(-20deg); }
-  50% { transform: rotate(12deg); }
-  60% { transform: rotate(-12deg); }
-  70% { transform: rotate(6deg); }
-  80% { transform: rotate(-6deg); }
-  100% { transform: rotate(0deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(25deg);
+  }
+  20% {
+    transform: rotate(-25deg);
+  }
+  30% {
+    transform: rotate(20deg);
+  }
+  40% {
+    transform: rotate(-20deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+  60% {
+    transform: rotate(-12deg);
+  }
+  70% {
+    transform: rotate(6deg);
+  }
+  80% {
+    transform: rotate(-6deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
 }
 
 .animate-bell-ring {
   animation: bellRing 1.4s ease-in-out infinite;
   transform-origin: top center;
+}
+
+/* ---------- 8. Reduced motion ----------
+   Non-negotiable — docs/design/motion.md#reduced-motion. The pending dot and
+   spinner survive this by falling back to a static state elsewhere in their
+   own component logic; this reset only removes the animation itself. */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
