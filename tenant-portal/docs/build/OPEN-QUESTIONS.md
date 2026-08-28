@@ -10,10 +10,11 @@ instead, and who can settle it.
 
 ## Status
 
-**Eleven of fourteen questions opened during the rebuild are resolved** —
+**Thirteen of fourteen questions opened during the rebuild are resolved** —
 nine during the 2026-08-27 documentation rebuild, two (Q10, Q11) during
-Phase 2/3 execution. Q12–Q14, opened during Phase 4, are logged scope
-deferrals and deviations rather than settled answers — see below.
+Phase 2/3 execution, and two (Q13, Q14) by explicit decision on 2026-08-28
+once Phase 5 closed out. Q12 is a logged scope deferral rather than a
+settled answer — see below.
 The list is kept as a record of how each was settled, because the reasoning
 matters more than the answer.
 
@@ -163,7 +164,7 @@ acquisition-sources screens. The lead-conversion three-step drawer in the
 same doc is a separate, larger piece of work with its own definition of
 done — treat it independently, not as part of this gap.
 
-## Q13 — `features/` layer specified but not followed · deviation, not resolved
+## Q13 — `features/` layer specified but not followed · resolved 2026-08-28
 
 [file-architecture.md](../architecture/file-architecture.md) specifies every
 screen as a thin `app/(tenant)/<module>/<segment>/page.tsx` delegating to
@@ -190,12 +191,16 @@ the inconsistency worse, not better. The hook keeps its documented name
 (`usePipelineWorkspace`, per [views.md](../design/views.md)) since only its
 file location changed.
 
-**Settle with:** a human decision on which convention is canonical, followed
-by either updating file-architecture.md to describe the colocated shape
-actually in use, or a dedicated follow-up pass migrating screens 1–9 to
-`features/`. Not a call to make silently mid-build.
+**Settled 2026-08-28, explicit human decision:** the colocated shape is
+canonical. [file-architecture.md](../architecture/file-architecture.md) is
+rewritten to describe it — the "Screen module shape" and "Route files"
+sections, the dependency-direction rules, and the "Where a new thing goes"
+table no longer mention `features/`. No code moved; screens 1–10 already
+matched this shape. [data-layer.md](../architecture/data-layer.md)'s API/
+validation example is corrected to match (request function + validator
+together in `hooks/use<Name>.ts`, not split `api.ts`/`schema.ts` files).
 
-## Q14 — Opportunities table has no customer/owner display names · deviation, not resolved
+## Q14 — Opportunities table has no customer/owner display names · resolved 2026-08-28
 
 [views.md](../design/views.md#opportunities-pipeline) specs the table's
 columns as "Title · Customer · Stage · Status · Owner · Expected close ·
@@ -219,11 +224,15 @@ fabricated name. `Owner` renders the raw `ownerUserId` in monospace, or "Not
 provided" when null — there is no owner-directory lookup anywhere in this
 app to resolve it further.
 
-**Settle with:** either the backend decorates `GET /opportunities` with
-display names (matching the card endpoint's shape), or views.md's column
-spec is corrected to document IDs-only for this table. A directory lookup
-hook (`GET /core/v1/directory/parties/:id` or similar) would also settle the
-owner half, if one is ever built for another screen.
+**Settled 2026-08-28, explicit human decision:** keep the shipped workaround
+as final, and correct the spec rather than wait on a backend change.
+[views.md](../design/views.md#opportunities-pipeline)'s table-columns row and
+its "Consequences you must design for" list are updated to document
+`Customer` as a link (not a name) and `Owner` as a raw id, with the same
+reasoning recorded there. No code changed — `page.tsx` already implemented
+this. If the backend ever decorates `GET /opportunities` with display names,
+or the app grows a directory-lookup hook for another screen, that is new
+work with its own decision, not a reopening of this one.
 
 ## How to add one
 

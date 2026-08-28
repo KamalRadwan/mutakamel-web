@@ -68,44 +68,56 @@ A Gateway route marked `WRITE_SENSITIVE` **and** `idempotent: true` requires an
 `x-idempotency-key`. The client attaches a UUIDv7 automatically; supply your
 own only when retrying the *same user intent*, and then reuse the exact key.
 
-## Feature API modules
+## Screen API calls and validation
+
+Request functions and their validators live together in the screen's own
+`hooks/use<Name>.ts` — see
+[file-architecture.md#screen-module-shape](file-architecture.md#screen-module-shape)
+for why this codebase never split them into separate `api.ts`/`schema.ts`
+modules despite an earlier draft of that spec saying it would.
 
 ```ts
-// features/crm/leads/api.ts
-import { axiosClient, unwrapCoreData } from "@/lib/api/axiosClient";
+// app/(tenant)/crm/leads/hooks/useLeads.ts
 
-export async function listLeads(params: LeadsQuery): Promise<LeadListPage> {
-  const search = buildLeadsQuery(params);
-  const response = await axiosClient.get(
-    `/api/tenant/crm/v1/leads?${search}`,
-    { cache: "no-store" },
-  );
-  return parseLeadListPage(response.data);   // schema.ts — always validate
+function parseLead(value: unknown): LeadItem {
+  const lead = record(value);
+  if (!lead) throw new Error("Invalid leads response.");
+  // ... field-by-field validation, exactly as it arrives on the wire
+  return { id: requiredUuidV7(lead, "id", "leads"), /* ... */ };
+}
+
+export function parseLeadsResponse(payload: unknown, expectedBranchId: string): LeadsPage {
+  // ... validates the envelope, maps each item through parseLead
+}
+
+export function useLeads() {
+  const fetchLeads = useCallback(async (signal?: AbortSignal) => {
+    const response = await axiosClient.get<unknown>(
+      `/api/tenant/crm/v1/leads?${query.toString()}`,
+      { signal, cache: "no-store" },
+    );
+    const page = parseLeadsResponse(response.data, branchId);   // always validate
+    // ...
+  }, [/* ... */]);
+  // ...
 }
 ```
 
 Rules:
 
-- No React. Testable without a renderer.
-- One function per endpoint, named for the operation.
-- Query strings built by a typed helper — never string concatenation of
+- **Every response passes through a validator before it reaches the UI** —
+  no exception.
+- The parse functions (`parseLead`, `parseLeadsResponse`, …) are exported
+  named functions, independently testable and tested beside the hook
+  (`useLeads.test.ts`) without rendering anything.
+- One request function per endpoint the hook calls, named for the operation.
+- Query strings built with `URLSearchParams` — never string concatenation of
   user input.
-- **Every response passes through a validator before it reaches the UI.**
 
 ## Runtime response validation
 
-Non-negotiable. A backend response is untrusted input.
-
-```ts
-// features/crm/leads/schema.ts
-export function parseLead(value: unknown): Lead {
-  const r = record(value);
-  if (!r || typeof r.id !== "string" || !isLeadStatus(r.status)) {
-    throw new Error("INVALID_LEAD");
-  }
-  return { id: r.id, status: r.status, /* ... */ };
-}
-```
+Non-negotiable. A backend response is untrusted input — see the `parseLead`
+example above.
 
 Two acceptable styles, both already present in the codebase:
 

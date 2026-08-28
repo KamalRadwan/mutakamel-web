@@ -263,7 +263,7 @@ The only per-screen code. Everything above is shared.
 | Default view | `board` |
 | Extra control | **Pipeline selector, required.** `pipelineId` in the URL |
 | Card fields | Title · customer display name · customer type · phone · city/country · lead source · owner name + avatar · `importance` (stars) · `openActivityCount` |
-| Table columns | Title · Customer · Stage · Status · Owner · Expected close · Actions |
+| Table columns | Title · Customer (link to the customer-profile detail page — see below) · Stage · Status · Owner (raw id — see below) · Expected close · Actions |
 | Sortable (table only) | `createdAt`, `expectedCloseDate` |
 | Filters | `pipelineId`, `stageId`, `status`, `customerProfileId`, `ownerUserId`, `expectedCloseFrom`, `expectedCloseTo` |
 | Terminal stages | Flags `WON` and `LOST` |
@@ -287,6 +287,16 @@ Consequences you must design for:
 - Each column also carries `activitySummary` with `overdueCount` — surface it,
   it is the most actionable number on the board.
 - `ownerAvatarUrl` is a safe, cache-busted server path. Render as given.
+- **The table's `Customer`/`Owner` columns cannot show a name.** `GET
+  /opportunities` returns the raw `OpportunityEntity` — `customerProfileId`
+  and `ownerUserId` only, verified against `opportunities.service.ts`'s
+  `findAll` return type. The card endpoint has display names because it is a
+  different, purpose-built projection; the table's generic list does not, and
+  there is no separate user/party-directory lookup to resolve `ownerUserId`
+  elsewhere in the app. Settled: `Customer` renders as a link to
+  `/crm/customer-profiles/:id` (a real, working affordance) instead of a
+  fabricated name; `Owner` renders the raw id. Do not build a fake name for
+  either — see [anti-patterns.md](anti-patterns.md#13-fake-data-and-fake-success).
 
 ## Accessibility
 
