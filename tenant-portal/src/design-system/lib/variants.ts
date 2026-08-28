@@ -1,4 +1,4 @@
-import { cva } from "class-variance-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 
 // Sizes and paddings from docs/design/DESIGN-SYSTEM.md#3--sizing--density —
 // that file supersedes geometry.md's 28-44px scale with a tighter 24-40px one.
@@ -14,6 +14,8 @@ export const controlSize = cva("", {
   },
   defaultVariants: { size: "md" },
 });
+
+export type ControlSizeProps = VariantProps<typeof controlSize>;
 
 // Controls below the 44px touch-target floor get an invisible expanded hit
 // area instead of a bigger visible box — see geometry.md#hit-area-expansion.
