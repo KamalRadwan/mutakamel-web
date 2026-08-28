@@ -53,7 +53,7 @@ regardless of the visiting user's actual preference.
 ```text
 src/design-system/
   index.ts        # public barrel — feature code imports only from here
-  lib/             cn.ts, variants.ts, tokens.ts
+  lib/             cn.ts, variants.ts
   primitives/      26 files — see primitives.md
   patterns/        15 directories — see patterns.md
   shell/           AppShell, Sidebar, Topbar, SubNav, MobileNav, CommandPalette,

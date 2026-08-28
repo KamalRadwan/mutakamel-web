@@ -7,9 +7,19 @@ import {
   Loader2,
   LockKeyhole,
   Package,
-  RefreshCw,
   Route,
 } from "lucide-react";
+import {
+  Badge,
+  Checkbox,
+  ErrorState,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type {
@@ -84,16 +94,18 @@ export function TenantApplicationsStep({
           <span className="mb-1.5 block">
             {copy.billingCycleLabel}
           </span>
-          <select
+          <Select
             value={billingCycle}
-            onChange={(event) =>
-              onBillingCycleChange(event.target.value as TenantBillingCycle)
-            }
-            className="min-h-11 w-full rounded-lg border border-border bg-ink-100 px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-ink-800"
+            onValueChange={(value) => onBillingCycleChange(value as TenantBillingCycle)}
           >
-            <option value="MONTHLY">{copy.monthlyOption}</option>
-            <option value="ANNUAL">{copy.annualOption}</option>
-          </select>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="MONTHLY">{copy.monthlyOption}</SelectItem>
+              <SelectItem value="ANNUAL">{copy.annualOption}</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
       </header>
 
@@ -116,7 +128,7 @@ export function TenantApplicationsStep({
       ) : null}
 
       {state === "error" ? (
-        <RetryCard
+        <ErrorState
           title={copy.loadErrorTitle}
           error={error}
           onRetry={onRetryCandidates}
@@ -151,15 +163,14 @@ export function TenantApplicationsStep({
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <input
+                  <Checkbox
                     id={`tenant-application-${candidate.key}`}
-                    type="checkbox"
                     checked={Boolean(selection)}
                     disabled={!candidate.selectionAllowed}
-                    onChange={(event) =>
-                      onToggle(candidate.key, event.target.checked)
+                    onCheckedChange={(checked) =>
+                      onToggle(candidate.key, checked === true)
                     }
-                    className="mt-1 size-4 rounded border-border text-brand-600 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-1"
                   />
                   <div className="min-w-0 flex-1">
                     <label
@@ -179,17 +190,13 @@ export function TenantApplicationsStep({
                       {candidate.description ?? copy.noDescriptionFallback}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-2xs font-semibold uppercase tracking-wide">
-                      <span className="rounded-full bg-card px-2 py-1 text-muted-foreground">
-                        {candidate.commercialMode}
-                      </span>
+                      <Badge tone="neutral">{candidate.commercialMode}</Badge>
                       {candidate.selectionAllowed ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-1 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
+                        <Badge tone="brand">
                           <CheckCircle2 className="size-3" /> {copy.readyBadge}
-                        </span>
+                        </Badge>
                       ) : (
-                        <span className="rounded-full bg-warn-100 px-2 py-1 text-warn-800 dark:bg-warn-950/60 dark:text-warn-300">
-                          {copy.unavailableBadge}
-                        </span>
+                        <Badge tone="warn">{copy.unavailableBadge}</Badge>
                       )}
                     </div>
                   </div>
@@ -213,25 +220,27 @@ export function TenantApplicationsStep({
                   <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_9rem]">
                     <label className="text-xs font-semibold text-foreground">
                       <span className="mb-1.5 block">{copy.tierLabel}</span>
-                      <select
+                      <Select
                         value={selection.tierId}
-                        onChange={(event) =>
-                          onUpdateSelection(candidate.key, {
-                            tierId: event.target.value,
-                          })
+                        onValueChange={(value) =>
+                          onUpdateSelection(candidate.key, { tierId: value })
                         }
-                        className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                       >
-                        {candidate.tiers.map((tier) => (
-                          <option key={tier.id} value={tier.id}>
-                            {tier.name} ({tier.key})
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {candidate.tiers.map((tier) => (
+                            <SelectItem key={tier.id} value={tier.id}>
+                              {tier.name} ({tier.key})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </label>
                     <label className="text-xs font-semibold text-foreground">
                       <span className="mb-1.5 block">{copy.seatsLabel}</span>
-                      <input
+                      <Input
                         type="number"
                         min={1}
                         max={100000}
@@ -242,7 +251,6 @@ export function TenantApplicationsStep({
                             seats: Number(event.target.value),
                           })
                         }
-                        className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                       />
                     </label>
                   </div>
@@ -285,7 +293,7 @@ export function TenantApplicationsStep({
             </p>
           ) : null}
           {previewState === "error" ? (
-            <RetryCard
+            <ErrorState
               title={copy.previewErrorTitle}
               error={previewError}
               onRetry={onRetryPreview}
@@ -336,33 +344,6 @@ export function TenantApplicationsStep({
         </div>
       </section>
     </section>
-  );
-}
-
-function RetryCard({
-  title,
-  error,
-  onRetry,
-}: {
-  title: string;
-  error: NormalizedApiError | null;
-  onRetry: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger-800 dark:border-danger-900 dark:bg-danger-950/40 dark:text-danger-300" role="alert">
-      <div className="flex items-start gap-2">
-        <AlertCircle className="mt-0.5 size-4 shrink-0" />
-        <div className="min-w-0">
-          <p className="text-xs font-semibold">{title}</p>
-          {error?.message ? <p className="mt-1 text-xs">{error.message}</p> : null}
-          {error?.correlationId ? <p className="mt-1 break-all font-mono text-xs">Correlation ID: {error.correlationId}</p> : null}
-        </div>
-      </div>
-      <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-danger-300 bg-card px-3 text-xs font-semibold hover:bg-danger-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-500 dark:border-danger-800 dark:hover:bg-danger-950">
-        <RefreshCw className="size-3.5" /> {t.tenants.wizard.retryButton}
-      </button>
-    </div>
   );
 }
 

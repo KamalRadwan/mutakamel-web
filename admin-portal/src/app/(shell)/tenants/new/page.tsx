@@ -11,6 +11,18 @@ import {
   Globe,
   MapPin,
 } from "lucide-react";
+import {
+  AmbiguousOutcomePanel,
+  Button,
+  Checkbox,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+} from "@/design-system";
 import { useRegisterTenant } from "./hooks/useRegisterTenant";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantApplicationsStep } from "./components/TenantApplicationsStep";
@@ -81,19 +93,20 @@ export default function RegisterTenantWizardPage() {
         {/* Header Title with Back Button */}
         <div className="flex items-center justify-between bg-card p-5 rounded-xl border border-border shadow-2xs">
           <div className="flex items-center gap-3">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onCancel}
               disabled={isSubmitting}
               aria-label={t.tenants.wizard.backToTenants}
-              className="p-2 rounded-xl border border-border hover:bg-ink-100 dark:hover:bg-ink-800 transition-colors cursor-pointer text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="p-2"
             >
               {lang === "ar" ? (
                 <ArrowRight className="w-4 h-4" />
               ) : (
                 <ArrowLeft className="w-4 h-4" />
               )}
-            </button>
+            </Button>
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-foreground flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-brand-600 dark:text-brand-400" />
@@ -107,38 +120,22 @@ export default function RegisterTenantWizardPage() {
         </div>
 
         {pendingCreateRecovery ? (
-          <section
-            role="status"
-            className="rounded-xl border border-warn-300 bg-warn-50 p-5 text-warn-950 dark:border-warn-900 dark:bg-warn-950/40 dark:text-warn-100"
-          >
-            <h2 className="font-semibold">
-              {t.tenants.wizard.recoveryBannerTitle}
-            </h2>
-            <p className="mt-2 text-sm leading-6">
-              {t.tenants.wizard.recoveryBannerDesc(pendingCreateRecovery.tenantName)}
-            </p>
-            <button
-              type="button"
-              onClick={() => void recoverTenantCreateStatus()}
-              disabled={isRecoveringCreate || !canReadTenants}
-              className="mt-4 min-h-11 rounded-xl bg-warn-800 px-4 text-sm font-semibold text-white hover:bg-warn-900 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isRecoveringCreate ? t.tenants.wizard.checkingStatus : t.tenants.wizard.checkTenantStatus}
-            </button>
-            {!canReadTenants ? (
-              <p className="mt-3 text-xs font-semibold">
-                {t.tenants.wizard.recoveryPermissionNote}
-              </p>
-            ) : null}
-            {createRecoveryError ? (
-              <p
-                role="alert"
-                className="mt-3 whitespace-pre-line text-xs font-semibold"
-              >
-                {createRecoveryError}
-              </p>
-            ) : null}
-          </section>
+          <AmbiguousOutcomePanel
+            idempotencyKey={pendingCreateRecovery.idempotencyKey}
+            message={[
+              t.tenants.wizard.recoveryBannerDesc(pendingCreateRecovery.tenantName),
+              !canReadTenants ? t.tenants.wizard.recoveryPermissionNote : null,
+              createRecoveryError,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onRetryExact={
+              canReadTenants
+                ? () => void recoverTenantCreateStatus()
+                : undefined
+            }
+            retrying={isRecoveringCreate}
+          />
         ) : null}
 
         {/* Wizard Step Navigation Bar */}
@@ -241,7 +238,7 @@ export default function RegisterTenantWizardPage() {
                       {t.tenants.wizard.tenantNameCodeLabel}
                     </label>
                     <div className="flex items-center gap-2">
-                      <input
+                      <Input
                         type="text"
                         value={formData.name}
                         onChange={(e) =>
@@ -253,26 +250,26 @@ export default function RegisterTenantWizardPage() {
                           })
                         }
                         placeholder="e.g. acme-retail"
-                        className="flex-1 px-3 py-2 text-xs font-mono bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl text-foreground"
+                        className="flex-1 font-mono"
                         required
                         aria-describedby="tenant-name-validation"
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
                         onClick={handleValidateIdentity}
                         disabled={
                           isValidatingIdentity ||
                           !formData.name.trim() ||
                           !formData.companyName.trim()
                         }
-                        className="px-3 py-2 text-xs font-semibold text-brand-700 bg-brand-50 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-200 dark:border-brand-800 rounded-lg hover:bg-brand-100 transition-colors cursor-pointer"
                       >
                         {isValidatingIdentity ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           t.tenants.wizard.checkAvailability
                         )}
-                      </button>
+                      </Button>
                     </div>
                     <p
                       id="tenant-name-validation"
@@ -296,7 +293,7 @@ export default function RegisterTenantWizardPage() {
                     <label className="text-xs font-semibold text-foreground">
                       {t.tenants.detailsTab.companyName} *
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={formData.companyName}
                       onChange={(e) =>
@@ -306,7 +303,7 @@ export default function RegisterTenantWizardPage() {
                         })
                       }
                       placeholder="e.g. Acme Retail LLC"
-                      className="w-full px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl text-foreground"
+                      className="w-full"
                       required
                       aria-describedby="tenant-company-validation"
                     />
@@ -355,13 +352,13 @@ export default function RegisterTenantWizardPage() {
                     <label className="text-xs font-semibold text-foreground">
                       {t.tenants.detailsTab.industry}
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={formData.industry}
                       onChange={(e) =>
                         setFormData({ ...formData, industry: e.target.value })
                       }
-                      className="w-full px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl text-foreground"
+                      className="w-full"
                     />
                   </div>
 
@@ -392,26 +389,28 @@ export default function RegisterTenantWizardPage() {
                     <label className="text-xs font-semibold text-foreground">
                       {t.tenants.detailsTab.timezone}
                     </label>
-                    <select
+                    <Select
                       value={formData.timezone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, timezone: e.target.value })
+                      onValueChange={(timezone) =>
+                        setFormData({ ...formData, timezone })
                       }
                       disabled={
                         wizardLocked || countryTimezoneOptions.length === 0
                       }
-                      required
-                      className="w-full px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <option value="">
-                        {t.tenants.wizard.chooseTimezone}
-                      </option>
-                      {countryTimezoneOptions.map((timezone) => (
-                        <option key={timezone} value={timezone}>
-                          {timezone}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue
+                          placeholder={t.tenants.wizard.chooseTimezone}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {countryTimezoneOptions.map((timezone) => (
+                          <SelectItem key={timezone} value={timezone}>
+                            {timezone}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -456,7 +455,7 @@ export default function RegisterTenantWizardPage() {
                   />
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <input
+                    <Input
                       type="text"
                       value={formData.street}
                       onChange={(e) =>
@@ -464,9 +463,8 @@ export default function RegisterTenantWizardPage() {
                       }
                       placeholder={t.tenants.detailsTab.street1}
                       maxLength={200}
-                      className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={formData.buildingNo}
                       onChange={(e) =>
@@ -474,9 +472,8 @@ export default function RegisterTenantWizardPage() {
                       }
                       placeholder={t.tenants.wizard.buildingNumberPlaceholder}
                       maxLength={100}
-                      className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={formData.city}
                       onChange={(e) =>
@@ -484,9 +481,8 @@ export default function RegisterTenantWizardPage() {
                       }
                       placeholder={t.tenants.detailsTab.city}
                       maxLength={100}
-                      className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={formData.state}
                       onChange={(e) =>
@@ -494,9 +490,8 @@ export default function RegisterTenantWizardPage() {
                       }
                       placeholder={t.tenants.wizard.stateProvincePlaceholder}
                       maxLength={100}
-                      className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={formData.district}
                       onChange={(e) =>
@@ -504,9 +499,8 @@ export default function RegisterTenantWizardPage() {
                       }
                       placeholder={t.tenants.wizard.districtPlaceholder}
                       maxLength={100}
-                      className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={formData.postalCode}
                       onChange={(e) =>
@@ -514,9 +508,8 @@ export default function RegisterTenantWizardPage() {
                       }
                       placeholder={t.tenants.wizard.postalCodePlaceholder}
                       maxLength={100}
-                      className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={formData.landmark}
                       onChange={(e) =>
@@ -524,19 +517,17 @@ export default function RegisterTenantWizardPage() {
                       }
                       placeholder={t.tenants.wizard.landmarkPlaceholder}
                       maxLength={100}
-                      className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
-                    <input
+                    <Input
                       type="text"
                       value={formData.taxNumber}
                       onChange={(e) =>
                         setFormData({ ...formData, taxNumber: e.target.value })
                       }
                       placeholder={t.tenants.detailsTab.taxNumber}
-                      className="px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl"
                     />
                   </div>
-                  <textarea
+                  <Textarea
                     value={formData.formattedAddress}
                     onChange={(e) =>
                       setFormData({
@@ -547,7 +538,7 @@ export default function RegisterTenantWizardPage() {
                     placeholder={t.tenants.wizard.formattedAddressPlaceholder}
                     maxLength={500}
                     rows={2}
-                    className="w-full resize-y rounded-xl border border-border bg-ink-100 px-3 py-2 text-xs dark:border-border dark:bg-ink-800/60"
+                    className="w-full resize-y"
                   />
                 </div>
               </div>
@@ -568,14 +559,14 @@ export default function RegisterTenantWizardPage() {
                     <label className="text-xs font-semibold text-foreground">
                       {t.tenants.wizard.ownerEmailLabel}
                     </label>
-                    <input
+                    <Input
                       type="email"
                       value={formData.ownerEmail}
                       onChange={(e) =>
                         setFormData({ ...formData, ownerEmail: e.target.value })
                       }
                       placeholder="owner@company.com"
-                      className="w-full px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl text-foreground"
+                      className="w-full"
                       required
                     />
                   </div>
@@ -584,7 +575,7 @@ export default function RegisterTenantWizardPage() {
                     <label className="text-xs font-semibold text-foreground">
                       {t.tenants.wizard.firstNameRequiredLabel}
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={formData.ownerFirstName}
                       onChange={(e) =>
@@ -594,7 +585,7 @@ export default function RegisterTenantWizardPage() {
                         })
                       }
                       placeholder="Mona"
-                      className="w-full px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl text-foreground"
+                      className="w-full"
                       required
                     />
                   </div>
@@ -603,7 +594,7 @@ export default function RegisterTenantWizardPage() {
                     <label className="text-xs font-semibold text-foreground">
                       {t.tenants.wizard.lastNameRequiredLabel}
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={formData.ownerLastName}
                       onChange={(e) =>
@@ -613,7 +604,7 @@ export default function RegisterTenantWizardPage() {
                         })
                       }
                       placeholder="Ali"
-                      className="w-full px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl text-foreground"
+                      className="w-full"
                       required
                     />
                   </div>
@@ -624,7 +615,7 @@ export default function RegisterTenantWizardPage() {
                     <label className="text-xs font-semibold text-foreground">
                       {t.tenants.wizard.jobTitleLabel}
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={formData.ownerJobTitle}
                       onChange={(e) =>
@@ -633,7 +624,7 @@ export default function RegisterTenantWizardPage() {
                           ownerJobTitle: e.target.value,
                         })
                       }
-                      className="w-full px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl text-foreground"
+                      className="w-full"
                     />
                   </div>
 
@@ -641,34 +632,36 @@ export default function RegisterTenantWizardPage() {
                     <label className="text-xs font-semibold text-foreground">
                       {t.tenants.detailsTab.phone}
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={formData.ownerPhone}
                       onChange={(e) =>
                         setFormData({ ...formData, ownerPhone: e.target.value })
                       }
-                      className="w-full px-3 py-2 text-xs bg-ink-100 dark:bg-ink-800/60 border border-border rounded-xl text-foreground"
+                      className="w-full"
                     />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-6 pt-3">
-                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-foreground">
-                    <input
-                      type="checkbox"
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="tenant-send-invitation"
                       checked={formData.sendInvitation}
-                      onChange={(e) =>
+                      onCheckedChange={(checked) =>
                         setFormData({
                           ...formData,
-                          sendInvitation: e.target.checked,
+                          sendInvitation: checked === true,
                         })
                       }
-                      className="w-4 h-4 rounded text-brand-600"
                     />
-                    <span>
+                    <label
+                      htmlFor="tenant-send-invitation"
+                      className="cursor-pointer select-none text-xs font-semibold text-foreground"
+                    >
                       {t.tenants.wizard.sendInvitationLabel}
-                    </span>
-                  </label>
+                    </label>
+                  </div>
                 </div>
               </div>
             )}
@@ -820,26 +813,24 @@ export default function RegisterTenantWizardPage() {
 
             {/* Wizard Controls Footer */}
             <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-border shadow-2xs">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={prevStep}
                 disabled={currentStep === 1}
-                className="px-4 py-2.5 text-xs font-semibold text-foreground bg-ink-100 dark:bg-ink-800 hover:bg-ink-200 dark:hover:bg-ink-700 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
               >
                 {t.tenants.wizard.previousStep}
-              </button>
+              </Button>
 
               {currentStep < 5 ? (
-                <button
-                  type="button"
-                  onClick={nextStep}
-                  className="px-5 py-2.5 text-xs font-semibold text-ink-950 bg-brand-500 hover:bg-brand-600 dark:bg-brand-400 dark:hover:bg-brand-500 rounded-lg transition-colors cursor-pointer"
-                >
+                <Button type="button" variant="primary" onClick={nextStep}>
                   {t.tenants.wizard.nextStepLabel}
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
                   type="submit"
+                  variant="primary"
+                  loading={isSubmitting}
                   disabled={
                     isSubmitting ||
                     !hasValidIdentityEvidence ||
@@ -848,17 +839,12 @@ export default function RegisterTenantWizardPage() {
                     !hasValidDatabaseSelection ||
                     !hasValidStorageSelection
                   }
-                  className="px-6 py-2.5 text-xs font-semibold text-ink-950 bg-brand-500 hover:bg-brand-600 dark:bg-brand-400 dark:hover:bg-brand-500 rounded-lg shadow-lg shadow-brand-600/20 transition-colors cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
                 >
-                  {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
+                  {!isSubmitting && <CheckCircle2 className="w-4 h-4" />}
                   <span>
                     {t.tenants.wizard.confirmCreation}
                   </span>
-                </button>
+                </Button>
               )}
             </div>
           </fieldset>

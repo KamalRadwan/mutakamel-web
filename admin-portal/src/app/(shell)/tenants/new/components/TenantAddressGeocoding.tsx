@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, MapPinned } from "lucide-react";
+import { Button, Input } from "@/design-system";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import {
   useTenantReverseGeocode,
@@ -60,19 +61,19 @@ export function TenantAddressGeocoding({
             state.validationCode?.startsWith("INVALID_LONGITUDE") ?? false
           }
         />
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => {
             void state.lookup().catch(() => undefined);
           }}
           disabled={disabled || state.isLoading}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 text-xs font-semibold text-ink-950 hover:bg-brand-600 dark:bg-brand-400 dark:hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {state.isLoading ? (
             <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
           ) : null}
           {state.isLoading ? copy.lookingUp : copy.lookup}
-        </button>
+        </Button>
       </div>
 
       {state.validationCode ? (
@@ -105,14 +106,15 @@ export function TenantAddressGeocoding({
               ? ` · city:${state.suggestion.cityId}`
               : ""}
           </p>
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => onApply(state.suggestion!)}
             disabled={disabled}
-            className="mt-3 min-h-10 rounded-xl bg-brand-700 px-4 text-xs font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-3"
           >
             {copy.apply}
-          </button>
+          </Button>
           <p className="mt-2 text-xs leading-4 opacity-80">
             {copy.editable}
           </p>
@@ -163,7 +165,7 @@ function CoordinateInput({
       className="space-y-1 text-xs font-semibold text-foreground"
     >
       <span>{label}</span>
-      <input
+      <Input
         id={id}
         type="text"
         inputMode="decimal"
@@ -173,7 +175,7 @@ function CoordinateInput({
         disabled={disabled}
         aria-invalid={invalid}
         placeholder="30.0444000"
-        className="w-full rounded-xl border border-border bg-white px-3 py-2 font-mono text-xs text-foreground dark:border-border dark:bg-ink-900 dark:text-foreground"
+        className="font-mono"
       />
     </label>
   );

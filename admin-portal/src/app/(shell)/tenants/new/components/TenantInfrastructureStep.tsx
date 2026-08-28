@@ -5,10 +5,17 @@ import {
   Database,
   HardDrive,
   Loader2,
-  RefreshCw,
   Server,
   ShieldCheck,
 } from "lucide-react";
+import {
+  ErrorState,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { TenantStoragePlacementOption } from "../../lib/storage-placement";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
@@ -78,25 +85,26 @@ export function TenantInfrastructureStep({
         idleText={copy.completeApplicationsFirst}
         emptyText={copy.noCompatibleDatabaseServer}
       >
-        <select
-          value={selectedDatabaseId}
-          onChange={(event) => onDatabaseChange(event.target.value)}
-          aria-invalid={showDatabaseSelectionError && !selectedDatabase}
-          required
-          className={`min-h-11 w-full rounded-xl border bg-white px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-ink-900 dark:text-foreground ${
-            showDatabaseSelectionError && !selectedDatabase
-              ? "border-danger-400 dark:border-danger-700"
-              : "border-border"
-          }`}
-        >
-          <option value="">{copy.selectDatabaseServerPlaceholder}</option>
-          {databaseOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name} · {option.currentTenants}/{option.maxTenants} {copy.tenantsSuffix}
-              {option.countryIsoCode ? ` · ${option.countryIsoCode}` : ""}
-            </option>
-          ))}
-        </select>
+        <Select value={selectedDatabaseId} onValueChange={onDatabaseChange}>
+          <SelectTrigger
+            aria-invalid={showDatabaseSelectionError && !selectedDatabase}
+            className={
+              showDatabaseSelectionError && !selectedDatabase
+                ? "border-danger-400 dark:border-danger-700"
+                : undefined
+            }
+          >
+            <SelectValue placeholder={copy.selectDatabaseServerPlaceholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {databaseOptions.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {option.name} · {option.currentTenants}/{option.maxTenants} {copy.tenantsSuffix}
+                {option.countryIsoCode ? ` · ${option.countryIsoCode}` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {showDatabaseSelectionError && !selectedDatabase ? (
           <ValidationMessage>
             {copy.selectDatabaseServerError}
@@ -121,25 +129,26 @@ export function TenantInfrastructureStep({
         onRetry={onRetryStorage}
         emptyText={copy.noEligibleStorageServer}
       >
-        <select
-          value={selectedStorageId}
-          onChange={(event) => onStorageChange(event.target.value)}
-          aria-invalid={showStorageSelectionError && !selectedStorage}
-          required
-          className={`min-h-11 w-full rounded-xl border bg-white px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-ink-900 dark:text-foreground ${
-            showStorageSelectionError && !selectedStorage
-              ? "border-danger-400 dark:border-danger-700"
-              : "border-border"
-          }`}
-        >
-          <option value="">{copy.selectStorageServerPlaceholder}</option>
-          {storageOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name} · {option.region} · {option.assignedTenants}
-              {option.maxTenants ? `/${option.maxTenants}` : ""} {copy.tenantsSuffix}
-            </option>
-          ))}
-        </select>
+        <Select value={selectedStorageId} onValueChange={onStorageChange}>
+          <SelectTrigger
+            aria-invalid={showStorageSelectionError && !selectedStorage}
+            className={
+              showStorageSelectionError && !selectedStorage
+                ? "border-danger-400 dark:border-danger-700"
+                : undefined
+            }
+          >
+            <SelectValue placeholder={copy.selectStorageServerPlaceholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {storageOptions.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {option.name} · {option.region} · {option.assignedTenants}
+                {option.maxTenants ? `/${option.maxTenants}` : ""} {copy.tenantsSuffix}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {showStorageSelectionError && !selectedStorage ? (
           <ValidationMessage>
             {copy.selectStorageServerError}
@@ -200,13 +209,11 @@ function PlacementSection({
         <PlacementNotice tone="amber" text={copy.permissionRequired} />
       ) : null}
       {state === "error" ? (
-        <div className="rounded-lg border border-danger-200 bg-danger-50 p-3 text-danger-800 dark:border-danger-900 dark:bg-danger-950/40 dark:text-danger-300" role="alert">
-          <p className="flex items-start gap-2 text-xs"><AlertCircle className="mt-0.5 size-4 shrink-0" /><span>{error?.message ?? copy.targetsLoadError}</span></p>
-          {error?.correlationId ? <p className="mt-1 break-all font-mono text-xs">Correlation ID: {error.correlationId}</p> : null}
-          <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-danger-300 bg-card px-3 text-xs font-semibold hover:bg-danger-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-500 dark:border-danger-800">
-            <RefreshCw className="size-3.5" /> {t.tenants.wizard.retryButton}
-          </button>
-        </div>
+        <ErrorState
+          title={error?.message ?? copy.targetsLoadError}
+          error={error ? { ...error, message: "" } : null}
+          onRetry={onRetry}
+        />
       ) : null}
       {state === "empty" ? <PlacementNotice tone="amber" text={emptyText} /> : null}
       {state === "ready" ? <div className="space-y-3">{children}</div> : null}
