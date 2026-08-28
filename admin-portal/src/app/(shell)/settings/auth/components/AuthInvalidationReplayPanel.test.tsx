@@ -116,7 +116,7 @@ describe("AuthInvalidationReplayPanel", () => {
     expect(alert).toHaveTextContent("The exact tenant database target is currently unavailable.");
     expect(alert).toHaveTextContent("CORE.AUTH_INVALIDATION_REPLAY.TENANT_UNAVAILABLE");
     expect(alert).toHaveTextContent("corr-outbox-503");
-    expect(within(alert).getByRole("button", { name: "Retry the exact request" }))
+    expect(within(alert).getByRole("button", { name: "Retry exact" }))
       .toBeInTheDocument();
   });
 });

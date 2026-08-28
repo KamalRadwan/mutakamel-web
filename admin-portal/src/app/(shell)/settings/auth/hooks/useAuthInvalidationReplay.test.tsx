@@ -84,6 +84,7 @@ describe("useAuthInvalidationReplay", () => {
     await act(async () => result.current.confirm());
     expect(result.current.retryMode).toBe("DRY_RUN");
     expect(result.current.error?.correlationId).toBe("corr-ambiguous");
+    expect(result.current.retryIdempotencyKey).toBe(DRY_COMMAND_ID);
 
     act(() => result.current.requestConfirmation("DRY_RUN"));
     await act(async () => result.current.confirm());
@@ -92,6 +93,7 @@ describe("useAuthInvalidationReplay", () => {
     expect(mocks.replay.mock.calls[0]).toEqual(mocks.replay.mock.calls[1]);
     expect(mocks.uuid).toHaveBeenCalledTimes(1);
     expect(result.current.retryMode).toBeNull();
+    expect(result.current.retryIdempotencyKey).toBeNull();
   });
 
   it("invalidates apply eligibility whenever the exact intent changes", async () => {

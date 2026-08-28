@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-08-28T01:28:36.669Z",
+  "generatedAt": "2026-08-28T01:58:49.104Z",
   "fileCount": 570,
   "counts": {
     "colorUtilityTotal": 0,
     "arbitraryTypeSize": 0,
-    "textXs": 821,
+    "textXs": 807,
     "fontBoldOrHeavier": 0,
-    "fontNormalOrMedium": 57,
-    "roundedXl": 167,
+    "fontNormalOrMedium": 55,
+    "roundedXl": 162,
     "rounded2xl": 0,
     "rounded3xl": 0,
     "gradients": 0,

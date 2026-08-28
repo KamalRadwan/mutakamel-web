@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Laptop, Loader2, LogOut, RefreshCw, ShieldOff } from "lucide-react";
-import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
+import { Laptop, Loader2, LogOut, RefreshCw, ShieldAlert, ShieldOff } from "lucide-react";
+import { Badge, Button, ConfirmActionModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { AuthSessionSummary } from "@/lib/auth/sessionApi";
 import { useAuthSessions } from "../hooks/useAuthSessions";
@@ -61,24 +61,26 @@ export function AuthSessionsPanel() {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setIsLogoutAllOpen(true)}
               disabled={isLoading || isBusy}
-              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-danger-200 px-3 text-xs font-semibold text-danger-600 hover:bg-danger-50 disabled:opacity-50 dark:border-danger-900 dark:text-danger-400 dark:hover:bg-danger-950/40"
+              className="border-danger-200 text-danger-600 hover:bg-danger-50 dark:border-danger-900 dark:text-danger-400 dark:hover:bg-danger-950/40"
             >
               <LogOut className="size-4" />
               {copy.logoutAllButton}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
               onClick={() => void reload()}
               disabled={isLoading || isBusy}
-              className="grid size-9 place-items-center rounded-xl border border-border text-muted-foreground hover:bg-ink-100 disabled:opacity-50 dark:border-border dark:hover:bg-ink-800"
+              className="w-9 p-0"
               aria-label={copy.refresh}
             >
               <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -105,11 +107,7 @@ export function AuthSessionsPanel() {
                     <span className="text-xs font-semibold text-foreground">
                       {session.deviceLabel ?? session.clientId}
                     </span>
-                    {session.current && (
-                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 dark:bg-brand-950/50 dark:text-brand-300">
-                        {copy.current}
-                      </span>
-                    )}
+                    {session.current && <Badge tone="brand">{copy.current}</Badge>}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {copy.lastUsed}: {formatDate(
@@ -129,19 +127,17 @@ export function AuthSessionsPanel() {
                   </p>
                 </div>
                 {!session.endedAt && (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => setPendingSession(session)}
                     disabled={isBusy}
-                    className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-danger-200 px-3 text-xs font-semibold text-danger-600 hover:bg-danger-50 disabled:opacity-50 dark:border-danger-900 dark:text-danger-400 dark:hover:bg-danger-950/40"
+                    loading={revokingId === session.id}
+                    className="border-danger-200 text-danger-600 hover:bg-danger-50 dark:border-danger-900 dark:text-danger-400 dark:hover:bg-danger-950/40"
                   >
-                    {revokingId === session.id ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <ShieldOff className="size-4" />
-                    )}
+                    {revokingId !== session.id && <ShieldOff className="size-4" />}
                     {session.current ? copy.endCurrent : copy.revoke}
-                  </button>
+                  </Button>
                 )}
               </article>
             ))}
@@ -154,34 +150,40 @@ export function AuthSessionsPanel() {
         )}
       </section>
 
-      <DestructiveActionModal
+      <ConfirmActionModal
         isOpen={pendingSession !== null}
         onClose={closeSessionConfirmation}
         onConfirm={() => void confirmRevocation()}
-        title={pendingSession?.current ? copy.endCurrentTitle : copy.revokeTitle}
-        description={pendingSession?.current
+        titleEn={pendingSession?.current ? copy.endCurrentTitle : copy.revokeTitle}
+        titleAr={pendingSession?.current ? copy.endCurrentTitle : copy.revokeTitle}
+        descriptionEn={pendingSession?.current
           ? copy.endCurrentDescription
           : copy.revokeDescription}
-        targetName={pendingSession?.deviceLabel ?? pendingSession?.clientId ?? ""}
-        actionType="revoke-session"
-        requireNameTyping={false}
-        isSubmitting={isConfirmingSession}
-        confirmLabel={pendingSession?.current ? copy.endCurrent : copy.revoke}
-        submittingLabel={pendingSession?.current ? copy.endingCurrent : copy.revoking}
+        descriptionAr={pendingSession?.current
+          ? copy.endCurrentDescription
+          : copy.revokeDescription}
+        variant="danger"
+        icon={ShieldAlert}
+        isLoading={isConfirmingSession}
+        confirmTextEn={pendingSession?.current ? copy.endCurrent : copy.revoke}
+        confirmTextAr={pendingSession?.current ? copy.endCurrent : copy.revoke}
+        loadingLabel={pendingSession?.current ? copy.endingCurrent : copy.revoking}
       />
 
-      <DestructiveActionModal
+      <ConfirmActionModal
         isOpen={isLogoutAllOpen}
         onClose={closeLogoutAllConfirmation}
         onConfirm={() => void confirmLogoutAll()}
-        title={copy.logoutAllTitle}
-        description={copy.logoutAllDescription}
-        targetName={copy.logoutAllTarget}
-        actionType="revoke-session"
-        requireNameTyping={false}
-        isSubmitting={isLoggingOutAll}
-        confirmLabel={copy.logoutAllConfirm}
-        submittingLabel={copy.logoutAllSubmitting}
+        titleEn={copy.logoutAllTitle}
+        titleAr={copy.logoutAllTitle}
+        descriptionEn={copy.logoutAllDescription}
+        descriptionAr={copy.logoutAllDescription}
+        variant="danger"
+        icon={ShieldAlert}
+        isLoading={isLoggingOutAll}
+        confirmTextEn={copy.logoutAllConfirm}
+        confirmTextAr={copy.logoutAllConfirm}
+        loadingLabel={copy.logoutAllSubmitting}
       />
     </>
   );

@@ -37,6 +37,8 @@ export function useAuthInvalidationReplay() {
     useState<AuthInvalidationReplayMode | null>(null);
   const [retryMode, setRetryMode] =
     useState<AuthInvalidationReplayMode | null>(null);
+  const [retryIdempotencyKey, setRetryIdempotencyKey] =
+    useState<string | null>(null);
   const [receipt, setReceipt] =
     useState<AuthInvalidationReplayReceipt | null>(null);
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -47,6 +49,7 @@ export function useAuthInvalidationReplay() {
     setValidationErrors({});
     setConfirmationMode(null);
     setRetryMode(null);
+    setRetryIdempotencyKey(null);
     setReceipt(null);
     setError(null);
     setValidatedScope(null);
@@ -136,6 +139,7 @@ export function useAuthInvalidationReplay() {
       intentKeys.current.delete(fingerprint);
       setReceipt(nextReceipt);
       setRetryMode(null);
+      setRetryIdempotencyKey(null);
       if (mode === "DRY_RUN") {
         setValidatedScope(authInvalidationReplayScopeFingerprint(command));
       } else {
@@ -148,6 +152,7 @@ export function useAuthInvalidationReplay() {
       if (mode === "APPLY" && !retainIntent) setValidatedScope(null);
       setError(normalized);
       setRetryMode(retainIntent ? mode : null);
+      setRetryIdempotencyKey(retainIntent ? idempotencyKey : null);
     } finally {
       setPendingMode(null);
       setConfirmationMode(null);
@@ -164,6 +169,7 @@ export function useAuthInvalidationReplay() {
     confirmationMode,
     pendingMode,
     retryMode,
+    retryIdempotencyKey,
     receipt,
     error,
     eventCount,
