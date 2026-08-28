@@ -23,12 +23,12 @@ The word "Kanban" must not appear in any user-facing string. It currently
 survives in three dictionary keys and several icon imports; all are renamed
 during the rebuild:
 
-| Current | Replace with |
+| Current (now removed) | Resolution |
 | --- | --- |
-| `t.crm.kanbanBoard` | `t.views.board` |
-| `t.crm.pipelinesKanbanBoards` | `t.crm.pipelines` |
-| `t.crm.buildInteractiveKanbanStyle` | `t.crm.pipelinesDescription` |
-| `import { Kanban } from "lucide-react"` | `import { Columns3 } from "lucide-react"` |
+| `t.crm.kanbanBoard` | Deleted — `ViewSwitcher`'s `t.views.board` covers it; nothing else referenced it |
+| `t.crm.pipelinesKanbanBoards` | Deleted — orphaned, no caller ever read it |
+| `t.crm.buildInteractiveKanbanStyle` | Deleted — orphaned, no caller ever read it |
+| `PipelineSelectDropdown`'s `Kanban` icon import | Deleted with the component; its design-system replacement uses no icon there |
 
 `Kanban` as a lucide icon *identifier* is acceptable only if the icon is
 genuinely the best glyph; prefer `Columns3`. The banned thing is the word
@@ -36,11 +36,13 @@ reaching a user.
 
 ## Current state
 
-| Screen | board | card | table | Work |
+All three screens now implement all three views — Phase 4 is complete.
+
+| Screen | board | card | table | Notes |
 | --- | :--: | :--: | :--: | --- |
-| Leads | ✅ | ✅ | ⚠️ named `list` | Rename `list` → `table`, convert to `DataTable` |
-| Opportunities (Pipeline) | ✅ | ❌ | ❌ | Build card + table |
-| Customer Profiles | ❌ | ❌ | ❌ | Build all three; currently a flat list, no switcher |
+| Leads | ✅ | ✅ | ✅ | `list` renamed to `table`, rebuilt on `DataTable` |
+| Opportunities (Pipeline) | ✅ | ✅ | ✅ | Card and table built against their own purpose-built/generic endpoints — see [../api/crm-opportunities.md](../api/crm-opportunities.md) |
+| Customer Profiles | ✅ | ✅ | ✅ | Built as one three-view workspace with `ViewSwitcher` |
 
 ## The grouping axis — this is not uniform
 

@@ -9,8 +9,8 @@ Owning app: **crm-app**
 Canonical prefix: `/api/tenant/crm/v1/opportunities`, `/pipelines`,
 `/opportunity-stages`
 
-Portal status: **live** — board view only. Card and table views are phase 4
-work.
+Portal status: **live** — board, card and table views, plus delete. See
+the full breakdown below.
 
 Source inspected:
 `crm-app/src/crm/opportunities/opportunities.controller.ts`,
@@ -245,12 +245,12 @@ they do not exist.
 
 | Capability | Status |
 | --- | --- |
-| List, branch-scoped, paginated | live |
+| List, branch-scoped, paginated | live — table view |
 | Board view + stage move | live |
-| **Card view** | **not built** |
-| **Table view** | **not built** |
-| Capabilities-driven actions | not wired |
+| Card view | live |
+| Capabilities-driven actions | live — update (drag/importance) and delete; see [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md#q14--opportunities-table-has-no-customerowner-display-names--deviation-not-resolved) for the table's Customer/Owner column gap |
+| Delete | live — `DELETE /:id`, capability-gated |
+| Create | not started — routed through lead conversion (deferred, see Q3/Q12 in OPEN-QUESTIONS.md), not a raw "add opportunity" button |
 | Pipeline transfer | not started |
 | Stage history | not started |
-| Create / update / delete | not started |
 | Detail route | not started |
