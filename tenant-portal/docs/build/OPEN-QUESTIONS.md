@@ -10,8 +10,9 @@ instead, and who can settle it.
 
 ## Status
 
-**All ten questions opened during the rebuild are resolved** — nine during
-the 2026-08-27 documentation rebuild, one (Q10) during Phase 2 execution.
+**All eleven questions opened during the rebuild are resolved** — nine during
+the 2026-08-27 documentation rebuild, two (Q10, Q11) during Phase 2/3
+execution.
 The list is kept as a record of how each was settled, because the reasoning
 matters more than the answer.
 
@@ -112,6 +113,25 @@ blocking script for no compounding benefit. `ThemeProvider` lives at
 it in is a contained change — `ThemeProvider`'s public shape
 (`{ theme, isDark, setTheme }`) and the `tenant_theme` storage key can stay
 the same either way.
+
+## Q11 — Shell size tokens: shell.md vs. DESIGN-SYSTEM.md · resolved
+
+[shell.md](../design/shell.md) defines `--size-topbar: 3rem` (48px),
+`--size-sidebar: 15rem` (240px), `--size-sidebar-rail: 3.25rem` (52px).
+[DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md) §3 defines the same three
+concerns under slightly different names — `--size-topbar: 2.75rem` (44px),
+`--size-sidebar: 14.5rem` (232px), `--size-rail: 3rem` (48px) — and opens §7
+with "Shell for every authenticated page: 232px sidebar (48px rail) + 44px
+topbar," restating shell numbers directly rather than only general density.
+
+Same resolution as Q10: DESIGN-SYSTEM.md is the newer (2026-08-28 vs
+2026-08-27), more specific "decisions" file, and gives explicit conflicting
+values for tokens it names itself — not silence on a mechanism shell.md
+owns. **Assumed:** DESIGN-SYSTEM.md's numbers (44px/232px/48px) win; already
+implemented in `globals.css`'s Phase 2 commit (`--size-topbar`,
+`--size-sidebar`, `--size-rail`). Use these same token names and values when
+building `AppShell` in Phase 3 — do not reintroduce shell.md's
+`--size-sidebar-rail` name or its 48/240/52 values.
 
 ## How to add one
 

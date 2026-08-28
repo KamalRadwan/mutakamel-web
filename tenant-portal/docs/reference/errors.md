@@ -21,7 +21,8 @@ stable contract. It may be *displayed*; it must never be *parsed*.
 
 ## Normalized shape
 
-`axiosClient` flattens all four failure shapes into one:
+`src/lib/api/errors.ts`'s `normalizeApiError()` flattens all four failure
+shapes into one, built on top of what `axiosClient` throws:
 
 ```ts
 interface NormalizedApiError {
@@ -35,6 +36,41 @@ interface NormalizedApiError {
 
 `correlationId` is the only way to trace a user report to a server log. Carry
 it into every error surface — `toast.errorFromApi` puts it in the message.
+
+**Corrected 2026-08-28, verified against source.** This page previously said
+DTO-shape validation returns 422 with a `fieldErrors` key on the wire.
+Neither half is true:
+
+- **Status is 400, not 422**, for a class-validator/`ValidationPipe` failure.
+  `core-app/src/main.ts` and `crm-app/src/main.ts` configure `ValidationPipe`
+  with no custom `errorHttpStatusCode`, so Nest's default (400) applies. The
+  95 codes in [error-codes.md](error-codes.md) that show `422` are a
+  *different* thing entirely — specific, manually-thrown business-rule
+  exceptions (`LEAD_CONTACT_NAME_REQUIRED`, `CUSTOM_FIELD_LIMIT_EXCEEDED`),
+  each its own single error code, not a bag of field errors.
+- **The wire key is `details`, not `fieldErrors`.** `fieldErrors` is this
+  app's normalized name for it, built by `normalizeApiError()` — it does not
+  appear in any response body.
+- **Core does not provide a real per-field breakdown.** Its `ValidationPipe`
+  has no custom `exceptionFactory`, so Nest's default handler collapses every
+  constraint violation into a flat array of strings with the field name
+  already lost. The shared `AllExceptionsFilter`
+  (`shared-libs/packages/common/src/filters/all-exceptions.filter.ts`)
+  buckets that array under the literal key `"_"`:
+  `{ "details": { "_": ["email must be an email", "name should not be empty"] } }`.
+  A `Field` cannot be targeted from this — render it as a single in-body
+  `ErrorState`-style summary instead of trying to map onto individual fields.
+- **CRM does provide real per-field breakdown.** `crm-app/src/main.ts` sets a
+  custom `exceptionFactory` that keeps `ValidationError[]`, and the filter's
+  `flattenValidation` recurses `property`/`constraints`/`children` into
+  genuine dot-path keys: `{ "details": { "email": ["Invalid value"],
+  "profile.age": ["Invalid value"] } }`. This *is* safe to map onto `Field`s
+  by path.
+
+Consequence for `normalizeApiError()`: read `fieldErrors` from
+`body.details`, and treat a details object whose only key is `"_"` as
+**not** field-mappable — surface those messages as a single in-body error
+instead of pretending they target a field.
 
 ## Failure shapes by producer
 
@@ -52,12 +88,12 @@ exception bodies, so its shape differs — do not assume Trade matches Core.
 
 | Status | Meaning | Required handling |
 | --- | --- | --- |
-| **400** | Malformed request | `Field` inline if `fieldErrors`, else `ErrorState` |
+| **400** | DTO-shape validation failed (`ValidationPipe`) | CRM: map `fieldErrors` onto their `Field`s, never a toast. Core: no real field breakdown (see below) — render as a single in-body message instead |
 | **401** | No or stale session | **Transport handles it.** Feature code does nothing |
 | **403** | Authenticated, not permitted | **Transport already raises a toast** — do not raise a second |
 | **404** | Not found, or outside scope | In-body not-found with a route back |
 | **409** | State conflict | Toast via `errorFromApi`, then refetch to show current state |
-| **422** | Validation failed | Map `fieldErrors` onto their `Field`s. **Never a toast** |
+| **422** | A specific business rule was violated (its own single error code — not a field-error bag) | Toast via `errorFromApi` with the code's dictionary message, unless the code names one specific field, in which case that `Field` |
 | **429** | Rate limited | Toast; disable the action briefly. Do not auto-retry in a loop |
 | **5xx** | Server or upstream failure | `ErrorState` with retry |
 | network / timeout | Unknown outcome | See [ambiguous outcomes](#ambiguous-outcomes) |

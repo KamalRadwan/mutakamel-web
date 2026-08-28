@@ -27,7 +27,17 @@ export const en: Dictionary = {
     history: "History & Logs",
     back: "Back",
     noData: "No data available",
-    loading: "Loading..."
+    loading: "Loading...",
+    dismiss: "Dismiss",
+    retry: "Retry"
+  },
+  errors: {
+    reference: "Ref"
+  },
+  statusValues: {} as Record<string, string>,
+  permissionGate: {
+    title: "Access restricted",
+    description: "You don't have permission to view this section. Contact your workspace admin if you believe this is a mistake."
   },
   nav: {
     workspaceCenter: "Workspace center",

@@ -205,11 +205,12 @@ messages by request language.
 
 | Status | Handling |
 | --- | --- |
-| 400 / 422 | Map `fieldErrors` onto `Field`s. Never a toast |
+| 400 | DTO validation. CRM: map `fieldErrors` onto `Field`s, never a toast. Core has no real field breakdown — see [errors.md](../reference/errors.md#normalized-shape) |
 | 401 | Transport handles refresh. Feature code does nothing |
 | 403 | **Transport already raises a toast** — do not raise a second |
 | 404 | In-body not-found, with a route back |
 | 409 | Toast via `errorFromApi`; refetch to show current state |
+| 422 | One specific business-rule code, not a field-error bag — toast via `errorFromApi` unless it names one field |
 | 5xx / network | `ErrorState` with retry |
 | Timeout on a write | **Ambiguous** — persist the evidence in-body |
 

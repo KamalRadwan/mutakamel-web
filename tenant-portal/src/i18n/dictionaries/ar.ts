@@ -25,7 +25,21 @@ export const ar = {
     history: "السجل والتغييرات",
     back: "عودة",
     noData: "لا توجد بيانات للعرض",
-    loading: "جاري التحميل..."
+    loading: "جاري التحميل...",
+    dismiss: "إغلاق",
+    retry: "إعادة المحاولة"
+  },
+  errors: {
+    reference: "المرجع"
+  },
+  // Enum wire value -> translated label, keyed "<StatusKind>.<VALUE>" (e.g.
+  // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts
+  // in phase 4 — see src/design-system/patterns/status-badge. An unmapped
+  // key is not an error: StatusBadge falls back to the raw wire value.
+  statusValues: {} as Record<string, string>,
+  permissionGate: {
+    title: "الوصول مقيد",
+    description: "ليست لديك الصلاحية لعرض هذا القسم. تواصل مع مسؤول مساحة العمل إذا كنت تعتقد أن هذا خطأ."
   },
   nav: {
     workspaceCenter: "Workspace center",
