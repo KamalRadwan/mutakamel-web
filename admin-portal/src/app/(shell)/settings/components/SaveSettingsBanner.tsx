@@ -1,6 +1,7 @@
 "use client";
 
-import { Save, Loader2, AlertCircle } from "lucide-react";
+import { Save, AlertCircle } from "lucide-react";
+import { Button } from "@/design-system";
 import { useToast } from "@/components/ui/ToastContext";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
@@ -34,15 +35,16 @@ export function SaveSettingsBanner({ hasUnsavedChanges, isSaving, onSave, lang }
           {copy.unsavedChanges}
         </p>
       </div>
-      <button
+      <Button
         type="button"
+        variant="primary"
         onClick={handleSave}
-        disabled={isSaving}
-        className="w-full sm:w-auto px-4 py-2 text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-ink-950 dark:bg-brand-400 dark:hover:bg-brand-500 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+        loading={isSaving}
+        className="w-full sm:w-auto"
       >
-        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        {!isSaving && <Save className="w-4 h-4" />}
         {copy.saveChanges}
-      </button>
+      </Button>
     </div>
   );
 }

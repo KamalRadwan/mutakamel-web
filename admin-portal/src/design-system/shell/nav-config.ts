@@ -202,18 +202,6 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-/** The 8 settings SubNav items — see SettingsSidebar.tsx (unchanged, no per-item RBAC there either). */
-export const SETTINGS_SUBNAV: { href: string; labelKey: { en: string; ar: string } }[] = [
-  { href: "/settings/platform", labelKey: { en: "Platform", ar: "المنصة" } },
-  { href: "/settings/auth", labelKey: { en: "Authentication", ar: "المصادقة" } },
-  { href: "/settings/billing", labelKey: { en: "Billing", ar: "الفواتير" } },
-  { href: "/settings/notifications", labelKey: { en: "Notifications", ar: "الإشعارات" } },
-  { href: "/settings/asterisk", labelKey: { en: "WebPhone (Asterisk)", ar: "الهاتف المرئي" } },
-  { href: "/settings/smtp", labelKey: { en: "Email (SMTP)", ar: "البريد الإلكتروني" } },
-  { href: "/settings/fatal-alerts", labelKey: { en: "Critical Alerts", ar: "التنبيهات الحرجة" } },
-  { href: "/settings/storage", labelKey: { en: "Storage Runtime", ar: "تشغيل التخزين" } },
-];
-
 /** The 6 backup SubNav items — see BackupModuleNav.tsx. */
 export const BACKUP_SUBNAV: { href: string; labelKey: { en: string; ar: string } }[] = [
   { href: "/backup", labelKey: { en: "Overview", ar: "نظرة عامة" } },
@@ -222,4 +210,16 @@ export const BACKUP_SUBNAV: { href: string; labelKey: { en: string; ar: string }
   { href: "/backup/runs", labelKey: { en: "Runs", ar: "التشغيلات" } },
   { href: "/backup/artifacts", labelKey: { en: "Artifacts", ar: "الأرشيفات" } },
   { href: "/backup/restores", labelKey: { en: "Restores", ar: "الاستعادات" } },
+];
+
+/** The 8 settings SubNav items — see SettingsSidebar.tsx. */
+export const SETTINGS_SUBNAV: { href: string; labelKey: { en: string; ar: string } }[] = [
+  { href: "/settings/platform", labelKey: { en: "Platform & Branding", ar: "الهوية والهوية البصرية" } },
+  { href: "/settings/auth", labelKey: { en: "Auth & Security", ar: "المصادقة والأمان" } },
+  { href: "/settings/billing", labelKey: { en: "Billing & Gateways", ar: "الفواتير وبوابات الدفع" } },
+  { href: "/settings/notifications", labelKey: { en: "Notifications & Alerts", ar: "الإشعارات والتنبيهات" } },
+  { href: "/settings/asterisk", labelKey: { en: "WebPhone (Asterisk SIP)", ar: "الهاتف المرئي (Asterisk SIP)" } },
+  { href: "/settings/smtp", labelKey: { en: "Email (SMTP)", ar: "البريد الإلكتروني (SMTP)" } },
+  { href: "/settings/fatal-alerts", labelKey: { en: "Fatal Alerts", ar: "التنبيهات الحرجة" } },
+  { href: "/settings/storage", labelKey: { en: "Storage Runtime", ar: "تشغيل التخزين" } },
 ];

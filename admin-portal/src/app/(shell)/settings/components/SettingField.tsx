@@ -1,7 +1,16 @@
 "use client";
 
 import { Save, Info, Lock, RefreshCw } from "lucide-react";
-import { AmbiguousOutcomePanel } from "@/design-system";
+import {
+  AmbiguousOutcomePanel,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Switch,
+} from "@/design-system";
 import { localSettingsError, SettingFieldData } from "../hooks/useSettings";
 import { useToast } from "@/components/ui/ToastContext";
 import { en } from "@/i18n/dictionaries/en";
@@ -67,10 +76,6 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
     handleChange(!localValue);
   };
 
-  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    handleChange(e.target.value);
-  };
-
   return (
     <div className={`p-5 rounded-lg border transition-colors ${readOnly ? "bg-ink-100 dark:bg-ink-800/30 border-border" : "bg-card border-border hover:border-brand-200 dark:hover:border-brand-800/50"} group`}>
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -102,20 +107,17 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
           <div className="w-full flex items-center gap-2">
             <div className="flex-1">
               {uiMeta.inputType === "boolean" && (
-                <div className="flex items-center justify-start h-9">
-                  <button
-                    type="button"
-                    onClick={handleToggle}
+                <div className="flex h-9 items-center justify-start">
+                  <Switch
+                    checked={Boolean(localValue)}
+                    onCheckedChange={handleToggle}
                     disabled={readOnly}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${localValue ? "bg-brand-500" : "bg-ink-200 dark:bg-ink-700"} ${readOnly ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localValue ? "translate-x-6" : "translate-x-1"}`} />
-                  </button>
+                  />
                 </div>
               )}
 
               {uiMeta.inputType === "string" && (
-                <input
+                <Input
                   type="text"
                   value={
                     typeof localValue === "string"
@@ -125,12 +127,12 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
                   onChange={(e) => handleChange(e.target.value)}
                   disabled={readOnly}
                   placeholder={uiMeta.placeholder}
-                  className="w-full px-3 py-2 text-sm bg-ink-100 dark:bg-ink-800/60 border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed font-mono"
+                  className="w-full font-mono"
                 />
               )}
 
               {uiMeta.inputType === "number" && (
-                <input
+                <Input
                   type="number"
                   value={
                     typeof localValue === "number" ? localValue : ""
@@ -139,27 +141,31 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
                   disabled={readOnly}
                   min={uiMeta.min}
                   max={uiMeta.max}
-                  className="w-full px-3 py-2 text-sm bg-ink-100 dark:bg-ink-800/60 border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed font-mono"
+                  className="w-full font-mono"
                 />
               )}
 
               {uiMeta.inputType === "enum" && (
-                <select
+                <Select
                   value={
                     typeof localValue === "boolean"
                       ? ""
-                      : localValue || ""
+                      : String(localValue ?? "")
                   }
-                  onChange={handleSelectChange}
+                  onValueChange={handleChange}
                   disabled={readOnly}
-                  className="w-full px-3 py-2 text-sm bg-ink-100 dark:bg-ink-800/60 border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {uiMeta.options?.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {lang === "ar" && opt.labelAr ? opt.labelAr : opt.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {uiMeta.options?.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {lang === "ar" && opt.labelAr ? opt.labelAr : opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
           </div>
