@@ -1,8 +1,8 @@
 "use client";
 
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { LeadItem } from "../hooks/useLeads";
+import { ConfirmActionModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import type { LeadItem } from "../hooks/useLeads";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -13,26 +13,21 @@ interface DeleteModalProps {
   error: string | null;
 }
 
-export function DeleteLeadsConfirmModal({
-  isOpen,
-  item,
-  onClose,
-  onConfirm,
-  isDeleting,
-  error,
-}: DeleteModalProps) {
-    const { t, lang } = useI18n();
+export function DeleteLeadsConfirmModal({ isOpen, item, onClose, onConfirm, isDeleting, error }: DeleteModalProps) {
+  const { t } = useI18n();
+
   return (
-    <ConfirmModal
-      isOpen={isOpen}
-      onClose={onClose}
+    <ConfirmActionModal
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title={t.crmLeads.deleteTitle}
+      description={error ?? t.crmLeads.deleteMessage(item?.leadName ?? "")}
+      confirmLabel={isDeleting ? t.crmLeads.deleting : t.common.delete}
+      cancelLabel={t.common.cancel}
       onConfirm={onConfirm}
-      title={t.crm.deleteTheLead}
-      message={`${lang === "ar" ? `هل أنت متأكد من حذف العميل المحتمل "${item?.leadName || ""}" (${item?.company || ""})؟` : `Are you sure you want to delete the lead "${item?.leadName || ""}" (${item?.company || ""})?`}${error ? ` ${error}` : ""}`}
-      confirmText={t.crm.deleteClient}
-      isDanger
-      isSubmitting={isDeleting}
-      closeOnConfirm={false}
+      loading={isDeleting}
     />
   );
 }
