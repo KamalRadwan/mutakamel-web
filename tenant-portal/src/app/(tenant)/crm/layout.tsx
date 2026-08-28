@@ -1,19 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Navbar } from "@/components/layout/Navbar";
 
+// The pipeline screen's old markup manages its own full-height layout and
+// needs this wrapper until phase 4 converts it. AppShell's <main> now owns
+// the shell chrome and page padding; this layout no longer duplicates either.
 export default function CrmLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isPipeline =
-    pathname === "/crm/pipeline" || pathname.startsWith("/crm/pipeline/");
+  const isPipeline = pathname === "/crm/pipeline" || pathname.startsWith("/crm/pipeline/");
 
-  return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#090d16]">
-      <Navbar />
-      <main className={`flex-1 w-full p-4 ${isPipeline ? "overflow-hidden flex flex-col" : ""}`}>
-        {children}
-      </main>
-    </div>
-  );
+  return <div className={isPipeline ? "flex h-full flex-col overflow-hidden" : undefined}>{children}</div>;
 }

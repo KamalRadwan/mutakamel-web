@@ -29,10 +29,15 @@ export const en: Dictionary = {
     noData: "No data available",
     loading: "Loading...",
     dismiss: "Dismiss",
-    retry: "Retry"
+    retry: "Retry",
+    markAllRead: "Mark all read",
+    switchToLight: "Switch to light theme",
+    switchToDark: "Switch to dark theme",
+    switchToSystem: "Switch to system theme"
   },
   errors: {
-    reference: "Ref"
+    reference: "Ref",
+    notificationUpdateFailed: "Could not update notifications. Try again."
   },
   statusValues: {} as Record<string, string>,
   permissionGate: {
@@ -72,6 +77,7 @@ export const en: Dictionary = {
 
     // CRM Navigation items
     crmDashboard: "Dashboard",
+    crmSetup: "CRM Setup",
     leads: "Leads",
     customerProfiles: "Customers",
     salesPipelineWorkspace: "Pipeline",

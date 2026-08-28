@@ -27,10 +27,15 @@ export const ar = {
     noData: "لا توجد بيانات للعرض",
     loading: "جاري التحميل...",
     dismiss: "إغلاق",
-    retry: "إعادة المحاولة"
+    retry: "إعادة المحاولة",
+    markAllRead: "تحديد الكل كمقروء",
+    switchToLight: "التبديل إلى المظهر الفاتح",
+    switchToDark: "التبديل إلى المظهر الداكن",
+    switchToSystem: "التبديل إلى مظهر النظام"
   },
   errors: {
-    reference: "المرجع"
+    reference: "المرجع",
+    notificationUpdateFailed: "تعذر تحديث حالة الإشعارات. حاول مرة أخرى."
   },
   // Enum wire value -> translated label, keyed "<StatusKind>.<VALUE>" (e.g.
   // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts
@@ -74,6 +79,7 @@ export const ar = {
 
     // CRM Navigation items
     crmDashboard: "لوحة التحكم",
+    crmSetup: "إعدادات CRM",
     leads: "العملاء المحتملون",
     customerProfiles: "العملاء",
     salesPipelineWorkspace: "مسار المبيعات",

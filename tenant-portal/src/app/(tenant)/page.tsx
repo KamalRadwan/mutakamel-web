@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Lock, TrendingUp } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -40,38 +39,35 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16]">
-      <Navbar />
-      <main className="mx-auto max-w-5xl space-y-6 p-6">
-        <header>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-            {lang === "ar" ? "مساحة عمل متكامل" : "Mutakamel workspace"}
-          </h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            {lang === "ar"
-              ? "اختر إحدى الإمكانات المتصلة حاليًا بالخادم."
-              : "Choose one of the capabilities currently connected to the server."}
-          </p>
-        </header>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <header>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          {lang === "ar" ? "مساحة عمل متكامل" : "Mutakamel workspace"}
+        </h1>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+          {lang === "ar"
+            ? "اختر إحدى الإمكانات المتصلة حاليًا بالخادم."
+            : "Choose one of the capabilities currently connected to the server."}
+        </p>
+      </header>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {destinations.map(({ href, icon: Icon, title, description }) => (
-            <Link
-              key={href}
-              href={href}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/20"
-            >
-              <Icon className="size-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
-              <h2 className="mt-3 text-base font-bold text-slate-900 dark:text-slate-100">
-                {title}
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                {description}
-              </p>
-            </Link>
-          ))}
-        </div>
-      </main>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {destinations.map(({ href, icon: Icon, title, description }) => (
+          <Link
+            key={href}
+            href={href}
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/20"
+          >
+            <Icon className="size-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+            <h2 className="mt-3 text-base font-bold text-slate-900 dark:text-slate-100">
+              {title}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
+              {description}
+            </p>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
