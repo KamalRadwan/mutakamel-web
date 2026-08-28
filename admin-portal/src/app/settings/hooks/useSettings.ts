@@ -510,52 +510,6 @@ function validateSettingValue(
   ) {
     throw new Error(lang === "ar" ? "قيمة غير صالحة." : "Invalid option selected.");
   }
-
-  const invalidJsonArray =
-    lang === "ar"
-      ? "يجب إدخال مصفوفة JSON صحيحة من إعدادات RTCIceServer."
-      : "Enter a valid JSON array of RTCIceServer objects.";
-  const invalidJsonObject =
-    lang === "ar" ? "يجب إدخال كائن JSON صحيح." : "Enter a valid JSON object.";
-
-  if (key === "asterisk.turn_servers_json" || key === "asterisk.ice_servers_json") {
-    if (typeof value !== "string" || value.length > 10_000) {
-      throw new Error(invalidJsonArray);
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      throw new Error(invalidJsonArray);
-    }
-    if (!Array.isArray(parsed) || !parsed.every(isValidIceServerObject)) {
-      throw new Error(invalidJsonArray);
-    }
-  }
-
-  if (key === "asterisk.extra_json") {
-    if (typeof value !== "string" || value.length > 10_000) {
-      throw new Error(invalidJsonObject);
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      throw new Error(invalidJsonObject);
-    }
-    if (!plainRecord(parsed)) throw new Error(invalidJsonObject);
-  }
-
-  if (
-    key === "asterisk.websocket_url" &&
-    (typeof value !== "string" || (value !== "" && !/^wss?:\/\/\S+$/iu.test(value)))
-  ) {
-    throw new Error(
-      lang === "ar"
-        ? "رابط WebSocket يجب أن يبدأ بـ ws:// أو wss:// بدون مسافات."
-        : "WebSocket URL must start with ws:// or wss:// and contain no spaces.",
-    );
-  }
 }
 
 function toFieldData(
@@ -667,19 +621,6 @@ function isSettingValue(value: unknown): value is SystemSettingValue {
 
 function isTopUpKey(key: string): boolean {
   return key === MIN_TOP_UP_KEY || key === MAX_TOP_UP_KEY;
-}
-
-function isValidIceServerObject(value: unknown): boolean {
-  const record = plainRecord(value);
-  if (!record) return false;
-  if (typeof record.urls === "string") return Boolean(record.urls.trim());
-  return (
-    Array.isArray(record.urls) &&
-    record.urls.length > 0 &&
-    record.urls.every(
-      (url) => typeof url === "string" && Boolean(url.trim()),
-    )
-  );
 }
 
 function plainRecord(value: unknown): Record<string, unknown> | null {

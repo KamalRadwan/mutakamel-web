@@ -90,7 +90,7 @@ is not an authorization boundary.
 |-- /settings/platform
 |-- /settings/auth
 |-- /settings/billing
-|-- /settings/asterisk
+|-- /settings/webphone
 |-- /settings/notifications
 |-- /settings/smtp
 |-- /settings/fatal-alerts

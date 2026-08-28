@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-27**
+Last source verification: **2026-08-28**
 
 Verified against the current API Gateway route contracts, Core controller,
 DTOs, registry, services, entities, migrations, SMTP verifier, the private
@@ -15,7 +15,7 @@ This is the implementation contract for:
 - `/settings/auth`
 - `/settings/billing`
 - `/settings/notifications`
-- `/settings/asterisk`
+- `/settings/webphone`
 - `/settings/smtp`
 - `/settings/fatal-alerts`
 - `/settings/storage`
@@ -35,9 +35,9 @@ contract.
 | Guard | `AdminGuard` |
 | Read permission | `admin.settings.read` |
 | Mutation permission | Generic PUT, SMTP PATCH, fatal-alert PATCH, and storage-runtime PATCH: `admin.settings.update` + `admin.settings.critical`; SMTP verification: `admin.settings.update` |
-| Generic registry keys | 31 |
+| Generic registry keys | 14 |
 | Gateway method/path contracts | 11 |
-| Current Admin Portal integration | All eleven routes are source-integrated, including exact by-key reload, settings, Asterisk, SMTP, fatal-alert switching, storage-runtime controls, and verification states |
+| Current Admin Portal integration | All eleven routes are source-integrated, including exact by-key reload, settings, SMTP, fatal-alert switching, storage-runtime controls, and verification states |
 
 The Gateway exposes exactly these eleven method/path contracts:
 
@@ -167,10 +167,9 @@ interface SystemSettingQueryDto {
 Filtering is a case-sensitive `key.startsWith(prefix)` operation. Examples:
 
 - `billing.` returns five settings.
-- `asterisk.` returns twenty-two.
 - `notifications.` returns four.
 - an unknown prefix returns an empty array.
-- absent or empty `prefix` returns all 36 settings.
+- absent or empty `prefix` returns all 14 settings.
 
 The list follows registry insertion order. It is not searchable, sortable, or
 paginated.
@@ -247,100 +246,40 @@ The descriptions express intended product behavior, but the verified runtime
 boundary above is authoritative. In particular, toggling maintenance mode does
 not currently prove that tenant login is blocked.
 
-### Asterisk and WebRTC
+### WebPhone (formerly the `asterisk.*` keys)
 
-> **Scheduled for removal.** Every `asterisk.*` key below is accurate today and
-> remains the live contract, but all 22 are planned to move out of the
-> key/value settings registry into typed WebPhone entities under a dedicated
-> `webphone` schema, owned by a new `webphone-app` application.
->
-> Reasons for the move: the registry cannot express structure (server lists and
-> ICE servers are JSON text inside a `varchar`), cannot express per-tenant
-> configuration at all, and stores TURN credentials in plaintext.
->
-> Backend design: `backend/docs/LLD/00-shared/12_webphone/en/`. The
-> key-by-key mapping is in `03_Configuration.md` §2 and the phased cutover —
-> which keeps this contract working until the final contract phase — is in
-> `09_Migration_Plan.md`.
->
-> **Do not build new screens against these keys.** The Asterisk settings page is
-> generated from the generic settings registry and will need a dedicated screen
-> once the keys are removed.
+> **Removed.** All 22 `asterisk.*` keys are gone from `SYSTEM_SETTINGS_REGISTRY`.
+> WebPhone configuration is now typed rows in a dedicated `webphone` schema, not
+> bounded strings with JSON embedded in them, and it is per-tenant rather than
+> platform-wide.
 
-| Key | Type | Default | Validation |
-|:---|:---|:---|:---|
-| `asterisk.enabled` | boolean | `false` | strict boolean |
-| `asterisk.websocket_url` | string | `wss://callcenter.mersany.com:8089/ws` | empty or `ws://` / `wss://` without whitespace; max 512 |
-| `asterisk.websocket_url_secondary` | string | empty | empty or `ws://` / `wss://` without whitespace; max 512 |
-| `asterisk.sip_domain` | string | `callcenter.mersany.com` | empty or domain-like text with optional port; max 253 |
-| `asterisk.realm` | string | `asterisk` | max 253 |
-| `asterisk.outbound_proxy` | string | empty | empty or `sip:` URI without whitespace; max 512 |
-| `asterisk.default_caller_id` | string | empty | max 64 |
-| `asterisk.from_domain` | string | empty | empty or domain-like text with optional port; max 253 |
-| `asterisk.registrar_server` | string | empty | empty or `sip:` URI without whitespace; max 512 |
-| `asterisk.contact_uri` | string | empty | empty or `sip:` URI without whitespace; max 512 |
-| `asterisk.register_expires` | integer | `600` | `30..86400` |
-| `asterisk.session_timers` | boolean | `false` | strict boolean |
-| `asterisk.trace_sip` | boolean | `false` | strict boolean |
-| `asterisk.allow_invalid_tls_certificate` | boolean | `false` | strict boolean |
-| `asterisk.stun_servers` | string | `stun:stun.l.google.com:19302` | max 2048; no server-side URL validation |
-| `asterisk.turn_servers_json` | string | `[]` | max 10000; no server-side JSON validation |
-| `asterisk.turn_rest_enabled` | boolean | `false` | strict boolean |
-| `asterisk.turn_rest_ttl_seconds` | integer | `3600` | `60..86400` |
-| `asterisk.turn_rest_uris` | string | empty | max 2048; no server-side URL validation |
-| `asterisk.ice_servers_json` | string | `[]` | max 10000; no server-side JSON validation |
-| `asterisk.ice_transport_policy` | string | `all` | enum: `all`, `relay` |
-| `asterisk.extra_json` | string | `{}` | max 10000; no server-side JSON validation |
+The registry could not express structure (server lists and ICE servers were JSON
+text inside a `varchar`), could not express per-tenant configuration at all, and
+held TURN credentials in plaintext. None of those are fixable inside a key/value
+registry, so the model moved rather than being patched.
 
-The Admin WebPhone loads this prefix through the canonical Gateway endpoint
-and parses the JSON-text settings client-side. The Asterisk settings UI now
-validates the two server lists as JSON arrays of `RTCIceServer`-compatible
-objects and `extra_json` as a JSON object before saving; Core currently checks
-only that they are bounded strings.
+| Concern | Where it lives now |
+|:---|:---|
+| Admin browser prefix | `/api/admin/webphone/v1` |
+| Tenant browser prefix | `/api/tenant/webphone/v1` |
+| Admin screen | `/settings/webphone` |
+| Read/update permissions | `admin.webphone.read` / `admin.webphone.update` |
+| Cross-tenant write | `admin.webphone.update` + `admin.webphone.critical` |
 
-`allow_invalid_tls_certificate` documents a backend-proxy capability. Browser
-WebRTC cannot be made to trust an invalid certificate merely by changing this
-value.
+Key-by-key mapping from the old settings to the new columns and rows:
+`backend/docs/LLD/00-shared/12_webphone/en/03_Configuration.md` §2. Route and
+error contracts: `07_API_Contracts.md`. Screen requirements:
+`10_Frontend_Integration.md` §10.
 
-**Secondary SIP server (failover).** `asterisk.websocket_url_secondary` is an
-optional backup WebSocket transport. When set, the webphone hands JsSIP both
-endpoints as weighted sockets (primary weight 10, secondary weight 0) so it
-tries the primary first and automatically fails over to the secondary on
-connection loss — this is JsSIP's native multi-socket transport failover, not
-custom reconnect logic. Only the transport URL fails over; the SIP domain/AOR,
-outbound proxy, and registrar stay governed by the primary `asterisk.*` keys.
-See `packages/webphone/src/config.ts` and
-`admin-portal/src/components/layout/hooks/useWebRTCPhone.ts` (`connectPhone`).
+Two values that used to be readable are now write-only and never returned: an
+ICE server's TURN `credential` and an extension's `sipPassword`. Responses carry
+`credentialConfigured` / `passwordConfigured` instead, and the admin screen
+renders those flags rather than any stored value. `ASTERISK_TURN_SHARED_SECRET`
+remains an environment variable on Core, never a setting and never a column.
 
-**ICE transport policy.** `asterisk.ice_transport_policy` maps directly to
-`RTCConfiguration.iceTransportPolicy`. Left at `all` (the default), calls
-attempt direct/STUN paths before falling back to TURN; set to `relay` to
-force every call's media through the configured TURN server(s) in
-`asterisk.turn_servers_json` — useful behind restrictive corporate NATs or
-firewalls where direct/STUN connectivity is unreliable. `all` is passed
-through as `undefined` to the browser (its own default) rather than set
-explicitly. See `packages/webphone/src/config.ts` (`pcConfigFromSettings`).
-
-**Ephemeral TURN REST credentials.** `asterisk.turn_rest_enabled`,
-`asterisk.turn_rest_ttl_seconds`, and `asterisk.turn_rest_uris` opt into
-minting short-lived, per-admin TURN credentials on each `GET
-me/webphone` call instead of relying only on the long-lived static
-credentials in `asterisk.turn_servers_json`. This follows the widely
-implemented "TURN REST API" convention (coturn's `--use-auth-secret`
-mode): `username = "<expiryUnixSeconds>:<adminUserId>"`, `credential =
-base64(HMAC-SHA1(secret, username))`. It additionally requires the
-`ASTERISK_TURN_SHARED_SECRET` **environment variable** (≥32 bytes) on
-Core, set to the exact same secret configured on the TURN server —
-deliberately not a system setting, since secrets don't belong in that
-registry (see its own header comment). Leaving `turn_rest_enabled` off
-(the default) or the env var unset makes `getMyWebphoneConfig()`'s
-`turnCredentials.enabled` field `false` with no other effect; nothing
-about the existing static TURN config changes. Minted credentials are
-appended to, not a replacement for, `asterisk.turn_servers_json` /
-`asterisk.ice_servers_json` in `pcConfigFromSettings`. See
-`mutakamel-apps/core-app/src/admin/system-settings/asterisk-turn-credentials.service.ts`
-(backend) and `useWebRTCPhone.ts`'s TURN-credential refresh effect
-(frontend, re-fetches ~60s before `expiresAt`).
+`allow_invalid_tls_certificate` is carried forward as a column and stays inert:
+it documents a backend-proxy capability, and browser WebRTC cannot be made to
+trust an invalid certificate by changing it.
 
 ### Notifications
 

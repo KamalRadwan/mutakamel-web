@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Lock, TrendingUp } from "lucide-react";
+import { Lock, Phone, TrendingUp } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -23,6 +23,18 @@ export default function DashboardPage() {
         lang === "ar"
           ? "راجع جلسات حسابك وألغِ الأجهزة غير المعروفة."
           : "Review your account sessions and revoke unknown devices.",
+    },
+    {
+      // Listed whether or not the workspace is subscribed: the screen itself
+      // states why it is unavailable, and hiding it would keep the capability
+      // a secret from the customer who might want it.
+      href: TENANT_ROUTES.coreWebphoneSettings,
+      icon: Phone,
+      title: lang === "ar" ? "إعدادات الهاتف المرئي" : "WebPhone settings",
+      description:
+        lang === "ar"
+          ? "اضبط خادم SIP والنواقل وخوادم ICE والامتدادات، وراجع مقاعدك."
+          : "Configure the SIP server, transports, ICE servers, and extensions, and review your seats.",
     },
     ...(crmEntryRoute
       ? [

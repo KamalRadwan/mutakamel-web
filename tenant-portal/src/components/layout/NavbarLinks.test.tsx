@@ -57,6 +57,18 @@ describe("Tenant Navbar active links", () => {
       "aria-current",
       "page",
     );
+    expect(
+      screen.getByRole("link", { name: "WebPhone settings" }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("offers WebPhone settings from the Core nav", () => {
+    navigation.pathname = "/core/settings/webphone";
+    render(<CoreNavbarLinks />);
+
+    expect(
+      screen.getByRole("link", { name: "WebPhone settings" }),
+    ).toHaveAttribute("aria-current", "page");
   });
 
   it("marks a nested customer-profile route as current", () => {

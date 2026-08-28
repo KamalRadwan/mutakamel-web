@@ -1,0 +1,377 @@
+/**
+ * Localized copy for the admin WebPhone settings screen.
+ *
+ * Extracted from the page because four sections and their forms share it. The
+ * shape mirrors the sibling settings pages' inline `COPY` constant.
+ */
+export const WEBPHONE_COPY = {
+  en: {
+    title: "WebPhone",
+    subtitle:
+      "SIP server configuration, transports, ICE servers, and platform extensions. Credentials are write-only: Core stores them encrypted and never returns them.",
+    save: "Save configuration",
+    saving: "Saving...",
+    unsavedChanges: "You have unsaved server-configuration changes.",
+    readOnly:
+      "Read-only view. Changes require the admin.webphone.update permission.",
+    adding: "Adding...",
+    remove: "Remove",
+    enable: "Enable",
+    disable: "Disable",
+    enabled: "Enabled",
+    disabled: "Disabled",
+    configured: "Configured",
+    notConfigured: "Not configured",
+    savedNotice: "The WebPhone configuration was updated.",
+
+    serverSection: "Server configuration",
+    serverSectionHelp:
+      "Enabling requires a SIP domain and at least one enabled endpoint.",
+    enabledLabel: "WebPhone enabled",
+    sipDomain: "SIP domain",
+    realm: "Authentication realm",
+    outboundProxy: "Outbound SIP proxy",
+    fromDomain: "From-domain override",
+    registrarServer: "Registrar server URI",
+    contactUri: "Contact URI override",
+    registerExpires: "Registration expiry (seconds)",
+    sessionTimers: "SIP session timers",
+    traceSip: "Verbose SIP tracing",
+    allowInvalidTls: "Allow invalid backend TLS certificate",
+    allowInvalidTlsHelp:
+      "Documents a backend-proxy capability only. A browser cannot be made to trust an invalid certificate by toggling this.",
+    iceTransportPolicy: "ICE transport policy",
+    iceTransportPolicyAll: "All (direct and relay)",
+    iceTransportPolicyRelay: "Relay only (force TURN)",
+    defaultCallerId: "Default caller ID",
+
+    endpointsSection: "SIP endpoints",
+    endpointsSectionHelp:
+      "Ordered by priority, lowest first. The browser fails over to the next enabled endpoint.",
+    endpointsEmpty: "No SIP endpoint is configured yet.",
+    endpointLabel: "Label",
+    endpointEnabledLabel: "Endpoint enabled",
+    websocketUrl: "WebSocket URL",
+    priority: "Priority",
+    addEndpoint: "Add endpoint",
+    endpointRegion: "SIP endpoint",
+
+    iceSection: "ICE servers",
+    iceSectionHelp:
+      "STUN and TURN entries. A TURN credential is write-only: it is sent once and never displayed again.",
+    iceEmpty: "No ICE server is configured yet.",
+    iceKind: "Kind",
+    iceUrls: "URLs",
+    iceUrlsHelp: "One or more stun:, stuns:, turn:, or turns: URIs, comma or space separated.",
+    iceUsername: "TURN username",
+    iceCredential: "TURN credential (write-only)",
+    iceCredentialKeepHelp:
+      "Leave blank to keep the stored credential. Typing a value replaces it.",
+    iceCredentialState: "Credential",
+    iceEnabledLabel: "ICE server enabled",
+    sortOrder: "Sort order",
+    addIceServer: "Add ICE server",
+    iceRegion: "ICE server",
+
+    turnRestSection: "TURN REST credentials",
+    turnRestSectionHelp:
+      "Mints short-lived TURN credentials for the enabled TURN entries below. Requires the ASTERISK_TURN_SHARED_SECRET server environment variable; without it minting stays off.",
+    turnRestEnabled: "Mint short-lived TURN credentials",
+    turnRestTtl: "Credential lifetime (seconds)",
+    turnRestUris: "URIs the minted credential is valid for",
+    turnRestNoUris:
+      "Minting is enabled but no enabled TURN server supplies URIs, so no credential can be minted.",
+
+    extensionsSection: "Extensions",
+    extensionsSectionHelp:
+      "Platform extensions occupy no seat. Seat allowances apply to tenants and are shown below.",
+    extensionsEmpty: "No extension exists yet.",
+    ownerId: "Owner user ID",
+    extension: "Extension",
+    sipUsername: "SIP username",
+    sipPassword: "SIP password (write-only)",
+    sipPasswordKeepHelp:
+      "Leave blank to keep the stored password. Typing a value replaces it.",
+    passwordState: "Password",
+    displayName: "Display name",
+    outboundCallerId: "Outbound caller ID",
+    transport: "Transport",
+    extensionEnabledLabel: "Extension enabled",
+    addExtension: "Add extension",
+    extensionRegion: "Extension",
+    deleteExtensionTitle: "Delete this extension?",
+    deleteExtensionDescription:
+      "The extension is soft-deleted and its seat is released. The configuration is retained.",
+    confirmDelete: "Delete extension",
+    deleting: "Deleting...",
+
+    seatsSection: "Tenant seat usage",
+    seatsSectionHelp:
+      "Seats occupied across tenants. Occupancy above the allowance is possible because reducing seats never disables a working phone.",
+    seatsEmpty: "No tenant seat usage to report.",
+    seatsAllowed: "Allowed",
+    seatsOccupied: "Occupied",
+    seatsAvailable: "Available",
+    overAllowance: "Over allowance",
+    overAllowanceBy: "over allowance",
+    seatsWithinAllowance: "Within allowance",
+
+    // Toggle / control accessible names
+    toggleEndpointOn: "Enable endpoint",
+    toggleEndpointOff: "Disable endpoint",
+    removeEndpoint: "Remove endpoint",
+    toggleIceOn: "Enable ICE server",
+    toggleIceOff: "Disable ICE server",
+    removeIceServer: "Remove ICE server",
+    toggleExtensionOn: "Enable extension",
+    toggleExtensionOff: "Disable extension",
+    removeExtension: "Delete extension",
+    showCredential: "Show credential",
+    hideCredential: "Hide credential",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+  },
+  ar: {
+    title: "الهاتف المرئي",
+    subtitle:
+      "إعدادات خادم SIP والنواقل وخوادم ICE وامتدادات المنصة. بيانات الاعتماد للكتابة فقط: يخزّنها Core مشفّرة ولا يعيدها أبداً.",
+    save: "حفظ الإعدادات",
+    saving: "جارٍ الحفظ...",
+    unsavedChanges: "لديك تغييرات غير محفوظة في إعدادات الخادم.",
+    readOnly: "العرض فقط. يتطلب التعديل صلاحية admin.webphone.update.",
+    adding: "جارٍ الإضافة...",
+    remove: "حذف",
+    enable: "تفعيل",
+    disable: "إيقاف",
+    enabled: "مفعّل",
+    disabled: "متوقف",
+    configured: "مهيأ",
+    notConfigured: "غير مهيأ",
+    savedNotice: "تم تحديث إعدادات الهاتف المرئي.",
+
+    serverSection: "إعدادات الخادم",
+    serverSectionHelp: "يتطلب التفعيل نطاق SIP ونقطة اتصال مفعّلة واحدة على الأقل.",
+    enabledLabel: "تفعيل الهاتف المرئي",
+    sipDomain: "نطاق SIP",
+    realm: "نطاق المصادقة (Realm)",
+    outboundProxy: "خادم البروكسي الصادر",
+    fromDomain: "تجاوز نطاق From",
+    registrarServer: "عنوان خادم التسجيل",
+    contactUri: "تجاوز عنوان Contact",
+    registerExpires: "مدة صلاحية التسجيل (ثواني)",
+    sessionTimers: "مؤقتات جلسة SIP",
+    traceSip: "تتبع SIP المفصّل",
+    allowInvalidTls: "السماح بشهادة TLS غير صالحة في الخادم الخلفي",
+    allowInvalidTlsHelp:
+      "يوثّق قدرة في الوسيط الخلفي فقط. لا يمكن جعل المتصفح يثق بشهادة غير صالحة عبر هذا الخيار.",
+    iceTransportPolicy: "سياسة نقل ICE",
+    iceTransportPolicyAll: "الكل (مباشر وعبر TURN)",
+    iceTransportPolicyRelay: "عبر TURN فقط (إجباري)",
+    defaultCallerId: "رقم المتصل الافتراضي",
+
+    endpointsSection: "نقاط اتصال SIP",
+    endpointsSectionHelp:
+      "مرتبة حسب الأولوية، الأقل أولاً. ينتقل المتصفح إلى النقطة المفعّلة التالية عند الفشل.",
+    endpointsEmpty: "لا توجد نقطة اتصال SIP مهيأة بعد.",
+    endpointLabel: "التسمية",
+    endpointEnabledLabel: "تفعيل نقطة الاتصال",
+    websocketUrl: "رابط WebSocket",
+    priority: "الأولوية",
+    addEndpoint: "إضافة نقطة اتصال",
+    endpointRegion: "نقطة اتصال SIP",
+
+    iceSection: "خوادم ICE",
+    iceSectionHelp:
+      "مدخلات STUN وTURN. بيانات اعتماد TURN للكتابة فقط: تُرسل مرة واحدة ولا تُعرض بعدها أبداً.",
+    iceEmpty: "لا يوجد خادم ICE مهيأ بعد.",
+    iceKind: "النوع",
+    iceUrls: "العناوين",
+    iceUrlsHelp: "عنوان أو أكثر بصيغة stun: أو stuns: أو turn: أو turns:، مفصولة بفاصلة أو مسافة.",
+    iceUsername: "اسم مستخدم TURN",
+    iceCredential: "بيانات اعتماد TURN (للكتابة فقط)",
+    iceCredentialKeepHelp:
+      "اتركه فارغاً للإبقاء على القيمة المخزّنة. إدخال قيمة يستبدلها.",
+    iceCredentialState: "بيانات الاعتماد",
+    iceEnabledLabel: "تفعيل خادم ICE",
+    sortOrder: "ترتيب العرض",
+    addIceServer: "إضافة خادم ICE",
+    iceRegion: "خادم ICE",
+
+    turnRestSection: "بيانات اعتماد TURN REST",
+    turnRestSectionHelp:
+      "يصدر بيانات اعتماد TURN قصيرة الأجل لمدخلات TURN المفعّلة أدناه. يتطلب متغير البيئة ASTERISK_TURN_SHARED_SECRET على الخادم، وبدونه يبقى الإصدار متوقفاً.",
+    turnRestEnabled: "إصدار بيانات اعتماد TURN قصيرة الأجل",
+    turnRestTtl: "مدة صلاحية بيانات الاعتماد (ثواني)",
+    turnRestUris: "العناوين التي تصلح لها بيانات الاعتماد المُصدرة",
+    turnRestNoUris:
+      "الإصدار مفعّل لكن لا يوجد خادم TURN مفعّل يوفّر عناوين، لذا لا يمكن إصدار أي بيانات اعتماد.",
+
+    extensionsSection: "الامتدادات",
+    extensionsSectionHelp:
+      "امتدادات المنصة لا تستهلك مقاعد. تنطبق حدود المقاعد على المستأجرين وتظهر أدناه.",
+    extensionsEmpty: "لا يوجد امتداد بعد.",
+    ownerId: "معرّف المستخدم المالك",
+    extension: "الامتداد",
+    sipUsername: "اسم مستخدم SIP",
+    sipPassword: "كلمة مرور SIP (للكتابة فقط)",
+    sipPasswordKeepHelp:
+      "اتركها فارغة للإبقاء على كلمة المرور المخزّنة. إدخال قيمة يستبدلها.",
+    passwordState: "كلمة المرور",
+    displayName: "الاسم المعروض",
+    outboundCallerId: "رقم المتصل الصادر",
+    transport: "الناقل",
+    extensionEnabledLabel: "تفعيل الامتداد",
+    addExtension: "إضافة امتداد",
+    extensionRegion: "امتداد",
+    deleteExtensionTitle: "حذف هذا الامتداد؟",
+    deleteExtensionDescription:
+      "يُحذف الامتداد حذفاً ناعماً ويُحرَّر مقعده، مع الاحتفاظ بالإعدادات.",
+    confirmDelete: "حذف الامتداد",
+    deleting: "جارٍ الحذف...",
+
+    seatsSection: "استهلاك مقاعد المستأجرين",
+    seatsSectionHelp:
+      "المقاعد المشغولة لدى المستأجرين. تجاوز الحد ممكن لأن تقليل المقاعد لا يوقف هاتفاً عاملاً.",
+    seatsEmpty: "لا توجد بيانات مقاعد لعرضها.",
+    seatsAllowed: "المسموح",
+    seatsOccupied: "المشغول",
+    seatsAvailable: "المتاح",
+    overAllowance: "تجاوز الحد",
+    overAllowanceBy: "فوق الحد المسموح",
+    seatsWithinAllowance: "ضمن الحد المسموح",
+
+    toggleEndpointOn: "تفعيل نقطة الاتصال",
+    toggleEndpointOff: "إيقاف نقطة الاتصال",
+    removeEndpoint: "حذف نقطة الاتصال",
+    toggleIceOn: "تفعيل خادم ICE",
+    toggleIceOff: "إيقاف خادم ICE",
+    removeIceServer: "حذف خادم ICE",
+    toggleExtensionOn: "تفعيل الامتداد",
+    toggleExtensionOff: "إيقاف الامتداد",
+    removeExtension: "حذف الامتداد",
+    showCredential: "إظهار بيانات الاعتماد",
+    hideCredential: "إخفاء بيانات الاعتماد",
+    showPassword: "إظهار كلمة المرور",
+    hidePassword: "إخفاء كلمة المرور",
+  },
+} as const;
+
+/**
+ * Localizes a field-validation code. Unknown codes fall back to a generic
+ * message rather than leaking the raw code into the interface.
+ */
+export function webphoneFieldErrorText(
+  code: string,
+  lang: "ar" | "en",
+): string {
+  const english: Record<string, string> = {
+    INVALID_SIP_DOMAIN: "Enter a domain, optionally with a port, up to 253 characters.",
+    SIP_DOMAIN_REQUIRED: "A SIP domain is required before WebPhone can be enabled.",
+    INVALID_SIP_URI: "Enter a sip: URI without whitespace, up to 512 characters.",
+    INVALID_WS_URL: "Enter a ws:// or wss:// URL without whitespace, up to 512 characters.",
+    INVALID_ICE_URLS: "Enter 1 to 8 stun:, stuns:, turn:, or turns: URIs.",
+    INVALID_EXTENSION: "Use 1 to 32 characters made of digits, *, # or +.",
+    INVALID_SIP_USERNAME: "Enter a SIP username up to 120 characters.",
+    OUT_OF_RANGE: "Enter a whole number inside the allowed range.",
+    TOO_LONG: "This value is longer than the field allows.",
+    OWNER_REQUIRED: "Select the user who will own this extension.",
+    PASSWORD_REQUIRED_TO_ENABLE: "An enabled extension needs a SIP password.",
+    STUN_HAS_NO_CREDENTIALS: "STUN entries carry no username or credential.",
+    TURN_CREDENTIAL_PAIR_REQUIRED: "Supply the TURN username and credential together.",
+  };
+  if (lang === "en") return english[code] ?? "This value is invalid.";
+
+  const arabic: Record<string, string> = {
+    INVALID_SIP_DOMAIN: "أدخل نطاقاً، مع منفذ اختياري، بحد أقصى 253 حرفاً.",
+    SIP_DOMAIN_REQUIRED: "يلزم نطاق SIP قبل تفعيل الهاتف المرئي.",
+    INVALID_SIP_URI: "أدخل عنوان sip: بدون مسافات وبحد أقصى 512 حرفاً.",
+    INVALID_WS_URL: "أدخل رابط ws:// أو wss:// بدون مسافات وبحد أقصى 512 حرفاً.",
+    INVALID_ICE_URLS: "أدخل من 1 إلى 8 عناوين stun: أو stuns: أو turn: أو turns:.",
+    INVALID_EXTENSION: "استخدم من 1 إلى 32 خانة من الأرقام أو * أو # أو +.",
+    INVALID_SIP_USERNAME: "أدخل اسم مستخدم SIP بحد أقصى 120 حرفاً.",
+    OUT_OF_RANGE: "أدخل رقماً صحيحاً ضمن المدى المسموح.",
+    TOO_LONG: "القيمة أطول مما يسمح به الحقل.",
+    OWNER_REQUIRED: "اختر المستخدم الذي سيملك هذا الامتداد.",
+    PASSWORD_REQUIRED_TO_ENABLE: "الامتداد المفعّل يحتاج كلمة مرور SIP.",
+    STUN_HAS_NO_CREDENTIALS: "مدخلات STUN لا تحمل اسم مستخدم أو بيانات اعتماد.",
+    TURN_CREDENTIAL_PAIR_REQUIRED: "أدخل اسم مستخدم TURN وبيانات الاعتماد معاً.",
+  };
+  return arabic[code] ?? "هذه القيمة غير صالحة.";
+}
+
+/**
+ * Localizes a server error code. The WebPhone module's codes are the ones an
+ * operator can act on, so each gets a real sentence; anything else falls back
+ * to the code itself so support can still trace it.
+ */
+export function webphoneErrorText(
+  code: string | null | undefined,
+  lang: "ar" | "en",
+  details?: Record<string, string[]> | null,
+): string {
+  const safeCode = code ?? "UNKNOWN_ERROR";
+  const allowed = details?.allowed?.[0];
+  const occupied = details?.occupied?.[0];
+
+  if (lang === "en") {
+    const english: Record<string, string> = {
+      WEBPHONE_SEAT_LIMIT_REACHED:
+        allowed && occupied
+          ? `Enabling this would exceed the seat allowance (${occupied} occupied of ${allowed} allowed).`
+          : "Enabling this would exceed the seat allowance.",
+      WEBPHONE_CONFIG_INCOMPLETE:
+        "The extension is missing fields required to enable it, such as its SIP password.",
+      WEBPHONE_CONFIG_NO_ENDPOINT:
+        "WebPhone cannot be enabled without at least one enabled SIP endpoint.",
+      WEBPHONE_RELAY_WITHOUT_TURN:
+        "Relay-only transport needs at least one enabled TURN server, or every call loses its media path.",
+      WEBPHONE_LAST_ENDPOINT:
+        "This is the last enabled endpoint of an enabled configuration and cannot be removed.",
+      WEBPHONE_EXTENSION_TAKEN: "That extension number is already in use here.",
+      WEBPHONE_SIP_USERNAME_TAKEN: "That SIP username is already in use here.",
+      WEBPHONE_OWNER_HAS_EXTENSION: "That user already has an extension.",
+      WEBPHONE_MODULE_NOT_PURCHASED: "The WebPhone module is not subscribed.",
+      WEBPHONE_MODULE_INACTIVE: "The WebPhone subscription is suspended.",
+      WEBPHONE_PROVISIONING_PENDING:
+        "WebPhone is purchased but its setup is still in progress.",
+      NO_WEBPHONE_CHANGES: "There are no changes to save.",
+      WEBPHONE_VALIDATION_FAILED: "Review and correct the highlighted fields.",
+      WEBPHONE_UPDATE_PERMISSION_REQUIRED:
+        "Changing this requires the admin.webphone.update permission.",
+    };
+    return (
+      english[safeCode] ??
+      `The operation could not be completed safely. Error code: ${safeCode}`
+    );
+  }
+
+  const arabic: Record<string, string> = {
+    WEBPHONE_SEAT_LIMIT_REACHED:
+      allowed && occupied
+        ? `التفعيل سيتجاوز حد المقاعد (${occupied} مشغول من ${allowed} مسموح).`
+        : "التفعيل سيتجاوز حد المقاعد المسموح.",
+    WEBPHONE_CONFIG_INCOMPLETE:
+      "ينقص الامتداد حقول لازمة للتفعيل، مثل كلمة مرور SIP.",
+    WEBPHONE_CONFIG_NO_ENDPOINT:
+      "لا يمكن تفعيل الهاتف المرئي بدون نقطة اتصال SIP مفعّلة واحدة على الأقل.",
+    WEBPHONE_RELAY_WITHOUT_TURN:
+      "يتطلب النقل عبر TURN فقط خادم TURN مفعّلاً واحداً على الأقل، وإلا فقدت كل مكالمة مسار الوسائط.",
+    WEBPHONE_LAST_ENDPOINT:
+      "هذه آخر نقطة اتصال مفعّلة في إعداد مفعّل ولا يمكن حذفها.",
+    WEBPHONE_EXTENSION_TAKEN: "رقم الامتداد مستخدم بالفعل هنا.",
+    WEBPHONE_SIP_USERNAME_TAKEN: "اسم مستخدم SIP مستخدم بالفعل هنا.",
+    WEBPHONE_OWNER_HAS_EXTENSION: "هذا المستخدم لديه امتداد بالفعل.",
+    WEBPHONE_MODULE_NOT_PURCHASED: "وحدة الهاتف المرئي غير مشترك بها.",
+    WEBPHONE_MODULE_INACTIVE: "اشتراك الهاتف المرئي موقوف حالياً.",
+    WEBPHONE_PROVISIONING_PENDING:
+      "تم شراء الهاتف المرئي لكن تهيئته ما زالت جارية.",
+    NO_WEBPHONE_CHANGES: "لا توجد تغييرات لحفظها.",
+    WEBPHONE_VALIDATION_FAILED: "راجع الحقول المميزة وصحّحها.",
+    WEBPHONE_UPDATE_PERMISSION_REQUIRED:
+      "يتطلب التغيير صلاحية admin.webphone.update.",
+  };
+  return (
+    arabic[safeCode] ??
+    `تعذر إكمال العملية بأمان. رمز الخطأ: ${safeCode}`
+  );
+}

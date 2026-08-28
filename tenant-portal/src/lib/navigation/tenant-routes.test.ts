@@ -9,10 +9,18 @@ import {
 } from "./tenant-routes";
 
 describe("Tenant Portal production route surface", () => {
-  it("allows only the server-backed Core page", () => {
+  it("allows only the server-backed Core pages", () => {
     expect(isSupportedCorePath(TENANT_ROUTES.coreSessions)).toBe(true);
     expect(isSupportedCorePath("/core/users")).toBe(false);
     expect(isSupportedCorePath("/core/provisioning-updates/job/general")).toBe(false);
+  });
+
+  it("keeps WebPhone settings reachable regardless of subscription", () => {
+    // The screen renders disabled for an unsubscribed workspace, so redirecting
+    // it away would hide the capability instead of explaining it.
+    expect(isSupportedCorePath(TENANT_ROUTES.coreWebphoneSettings)).toBe(true);
+    expect(isSupportedCorePath("/core/settings")).toBe(false);
+    expect(isSupportedCorePath("/core/settings/webphone/extra")).toBe(false);
   });
 
   it("allows the implemented CRM slices and one customer detail segment", () => {

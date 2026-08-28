@@ -2,6 +2,7 @@ export const TENANT_ROUTES = {
   home: "/",
   core: "/core",
   coreSessions: "/core/authentication",
+  coreWebphoneSettings: "/core/settings/webphone",
   crm: "/crm",
   crmHome: "/crm",
   crmLeads: "/crm/leads",
@@ -129,8 +130,17 @@ export function getFirstPermittedCrmRoute(
   );
 }
 
+// WebPhone settings are reachable even for a workspace that has not subscribed:
+// the screen renders disabled and states why, so the capability stays
+// discoverable instead of vanishing behind a redirect.
+const CORE_EXACT_PATHS = new Set<string>([
+  TENANT_ROUTES.core,
+  TENANT_ROUTES.coreSessions,
+  TENANT_ROUTES.coreWebphoneSettings,
+]);
+
 export function isSupportedCorePath(pathname: string): boolean {
-  return pathname === TENANT_ROUTES.core || pathname === TENANT_ROUTES.coreSessions;
+  return CORE_EXACT_PATHS.has(pathname);
 }
 
 export function isSupportedCrmPath(pathname: string): boolean {

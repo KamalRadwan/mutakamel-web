@@ -46,7 +46,7 @@ export function SettingsSidebar() {
       color: "text-amber-500",
     },
     {
-      href: "/settings/asterisk",
+      href: "/settings/webphone",
       label: t.settings.tabs.webphone,
       icon: Phone,
       color: "text-purple-500",
