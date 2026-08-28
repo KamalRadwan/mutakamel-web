@@ -1,4 +1,4 @@
-export interface StorageRuntimeConfig {
+interface StorageRuntimeConfig {
   enabled: boolean;
   configured: boolean;
   brokerConfigured: boolean;

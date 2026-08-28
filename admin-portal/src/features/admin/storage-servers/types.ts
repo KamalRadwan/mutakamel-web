@@ -1,12 +1,12 @@
 export type StorageServerStatus = "DRAFT" | "ACTIVE" | "DRAINING" | "OFFLINE";
-export type StorageConnectionTestStatus = "NOT_TESTED" | "PASSED" | "FAILED";
+type StorageConnectionTestStatus = "NOT_TESTED" | "PASSED" | "FAILED";
 export type StorageServerSortField =
   | "name"
   | "createdAt"
   | "updatedAt"
   | "lastConnectionTestedAt";
 
-export interface StorageCredentialsDto {
+interface StorageCredentialsDto {
   accessKeyId: string;
   secretAccessKey: string;
 }
@@ -42,7 +42,7 @@ export interface RotateStorageCredentialsDto {
   graceHours?: number;
 }
 
-export type StorageCredentialRotationStatus = "STAGED" | "ACTIVATED" | "REVOKED";
+type StorageCredentialRotationStatus = "STAGED" | "ACTIVATED" | "REVOKED";
 
 /** Secret-free by construction — Core never returns raw key material. */
 export interface StorageCredentialRotationView {

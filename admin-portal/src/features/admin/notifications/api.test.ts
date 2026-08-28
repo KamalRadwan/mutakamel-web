@@ -14,7 +14,6 @@ vi.mock("@/lib/api/axiosClient", () => ({
     post: postMock,
     put: putMock,
   },
-  unwrapCoreData: (value: unknown) => value,
 }));
 
 import {
@@ -36,24 +35,25 @@ const WRITE_OPTIONS = {
   replayAfterRefresh: true,
   skipAutoIdempotency: true,
 };
+const envelope = (data: unknown) => ({ data: { success: true, data } });
 
 describe("admin notifications API", () => {
   beforeEach(() => {
     deleteMock.mockReset().mockResolvedValue({ data: undefined });
     getMock.mockReset();
-    postMock.mockReset().mockImplementation((url: string) => Promise.resolve({
-      data: /\/(?:read-all|mark-all-read)$/.test(url) ? { updated: 3 } : undefined,
-    }));
-    putMock.mockReset().mockResolvedValue({ data: preferenceFixture() });
+    postMock.mockReset().mockImplementation((url: string) => Promise.resolve(
+      envelope(/\/(?:read-all|mark-all-read)$/.test(url) ? { updated: 3 } : undefined),
+    ));
+    putMock.mockReset().mockResolvedValue(envelope(preferenceFixture()));
   });
 
   it("uses all four exact read routes and only supported list query fields", async () => {
     const controller = new AbortController();
     getMock.mockImplementation((url: string) => {
-      if (url.endsWith("/config")) return Promise.resolve({ data: runtimeFixture() });
-      if (url.endsWith("/preferences")) return Promise.resolve({ data: [preferenceFixture()] });
-      if (url.endsWith("/unread-count")) return Promise.resolve({ data: { unreadCount: 2 } });
-      return Promise.resolve({ data: pageFixture() });
+      if (url.endsWith("/config")) return Promise.resolve(envelope(runtimeFixture()));
+      if (url.endsWith("/preferences")) return Promise.resolve(envelope([preferenceFixture()]));
+      if (url.endsWith("/unread-count")) return Promise.resolve(envelope({ unreadCount: 2 }));
+      return Promise.resolve(envelope(pageFixture()));
     });
 
     await expect(listAdminNotifications(
@@ -85,11 +85,11 @@ describe("admin notifications API", () => {
 
   it("makes every write and compatibility-alias route a direct naturally-idempotent call", async () => {
     postMock.mockImplementation((url: string) => {
-      if (url.endsWith("/device-tokens")) return Promise.resolve({ data: deviceReceiptFixture() });
+      if (url.endsWith("/device-tokens")) return Promise.resolve(envelope(deviceReceiptFixture()));
       if (/\/(?:read-all|mark-all-read)$/.test(url)) {
-        return Promise.resolve({ data: { updated: 3 } });
+        return Promise.resolve(envelope({ updated: 3 }));
       }
-      return Promise.resolve({ data: undefined });
+      return Promise.resolve(envelope(undefined));
     });
 
     await expect(upsertAdminNotificationPreference({

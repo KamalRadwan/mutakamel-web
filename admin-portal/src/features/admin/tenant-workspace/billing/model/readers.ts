@@ -269,7 +269,7 @@ export function readSubscriptionItems(
   return items;
 }
 
-export function readSubscriptionItem(
+function readSubscriptionItem(
   value: unknown,
   expected: BillingReadIdentity = {},
 ): SubscriptionItemView {

@@ -3,8 +3,8 @@ import type {
   DatabaseServerSslMode,
 } from "../types";
 
-export const DATABASE_SSL_MATERIAL_MAX_LENGTH = 20_000;
-export const DATABASE_SSL_PASSPHRASE_MAX_LENGTH = 1_024;
+const DATABASE_SSL_MATERIAL_MAX_LENGTH = 20_000;
+const DATABASE_SSL_PASSPHRASE_MAX_LENGTH = 1_024;
 
 export function compactDatabaseSslConfig(
   config: DatabaseServerSslConfigDto | undefined,

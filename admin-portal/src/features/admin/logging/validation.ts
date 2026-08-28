@@ -127,7 +127,7 @@ export function buildLiveQuery(
       };
 }
 
-export function localDateTimeToIso(value: string): string | null {
+function localDateTimeToIso(value: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u.test(value)) return null;
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;

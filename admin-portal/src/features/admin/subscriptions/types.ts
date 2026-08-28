@@ -1,4 +1,5 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import type { PageResult, SortDirection } from "@/types/common";
 
 export const SUBSCRIPTION_STATUSES = [
   "TRIAL",
@@ -16,13 +17,12 @@ export const SUBSCRIPTION_SORT_FIELDS = [
   "createdAt",
 ] as const;
 
-export type SubscriptionSortField = (typeof SUBSCRIPTION_SORT_FIELDS)[number];
-export type SortDirection = "ASC" | "DESC";
+type SubscriptionSortField = (typeof SUBSCRIPTION_SORT_FIELDS)[number];
 
 export type TenantStatus =
   "PROVISIONING" | "PROVISIONING_FAILED" | "ACTIVE" | "SUSPENDED" | "DELETED";
 
-export interface SubscriptionHeader {
+interface SubscriptionHeader {
   id: string;
   tenantId: string | null;
   allowedUsers: number;
@@ -62,7 +62,7 @@ export interface SubscriptionItem {
   features: string[] | null;
 }
 
-export interface SubscriptionTenantSummary {
+interface SubscriptionTenantSummary {
   id: string;
   name: string;
   companyName: string;
@@ -77,17 +77,10 @@ export interface SubscriptionListItem {
   tenant: SubscriptionTenantSummary | null;
 }
 
-export interface SubscriptionPage {
-  items: SubscriptionListItem[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
+export type SubscriptionPage = PageResult<SubscriptionListItem> & {
   correlationId: string;
   timestamp: string;
-}
+};
 
 export interface SubscriptionListQuery {
   page: number;

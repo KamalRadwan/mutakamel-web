@@ -1,7 +1,6 @@
 import {
   TENANT_USER_STATUSES,
   type BranchOption,
-  type DeliveryState,
   type OrganizationOption,
   type PageResult,
   type RoleOption,
@@ -239,15 +238,30 @@ function readPage<T>(
   reader: (item: unknown) => T,
   code: string,
 ): PageResult<T> {
+  const envelope = plainObject(value);
+  if (envelope?.success === true && Array.isArray(envelope.data)) {
+    return readPageParts(envelope.data, envelope.meta, reader, code);
+  }
+
   const page = object(coreData(value), code);
+  return readPageParts(page.items, page, reader, code);
+}
+
+function readPageParts<T>(
+  items: unknown,
+  metadata: unknown,
+  reader: (item: unknown) => T,
+  code: string,
+): PageResult<T> {
+  const meta = object(metadata, code);
   const result = {
-    items: array(page.items, code).map(reader),
-    total: nonNegativeInteger(page.total, code),
-    page: positiveInteger(page.page, code),
-    limit: positiveInteger(page.limit, code),
-    totalPages: nonNegativeInteger(page.totalPages, code),
-    hasNext: boolean(page.hasNext, code),
-    hasPrev: boolean(page.hasPrev, code),
+    items: array(items, code).map(reader),
+    total: nonNegativeInteger(meta.total, code),
+    page: positiveInteger(meta.page, code),
+    limit: positiveInteger(meta.limit, code),
+    totalPages: nonNegativeInteger(meta.totalPages, code),
+    hasNext: boolean(meta.hasNext, code),
+    hasPrev: boolean(meta.hasPrev, code),
   };
   if (result.totalPages === 0 && result.total !== 0) invalid(code);
   return result;
@@ -362,5 +376,3 @@ function oneOf<const Values extends readonly string[]>(
 function invalid(code: string): never {
   throw new Error(code);
 }
-
-export type { DeliveryState };

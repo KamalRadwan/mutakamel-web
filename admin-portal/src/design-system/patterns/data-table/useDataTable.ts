@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { DataTableProps } from "./types";
 
-export interface DataTableRow<T> {
+interface DataTableRow<T> {
   id: string;
   original: T;
 }

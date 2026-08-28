@@ -148,7 +148,7 @@ export function FleetStatePanel({
   );
 }
 
-export function FleetProblem({
+function FleetProblem({
   error,
 }: {
   error: NormalizedApiError;
@@ -276,36 +276,6 @@ export function FleetFieldError({
     <span id={id} role="alert" className="text-xs font-semibold text-danger-600 dark:text-danger-400">
       {message}
     </span>
-  );
-}
-
-export function FleetPagination({
-  page,
-  totalPages,
-  hasPrev,
-  hasNext,
-  onPage,
-  copy,
-}: {
-  page: number;
-  totalPages: number;
-  hasPrev: boolean;
-  hasNext: boolean;
-  onPage: (page: number) => void;
-  copy: ProvisioningFleetCopy;
-}) {
-  return (
-    <nav aria-label={copy.page} className="flex items-center justify-between gap-3 border-t border-border pt-4">
-      <Button type="button" variant="outline" disabled={!hasPrev} onClick={() => onPage(page - 1)}>
-        {copy.previous}
-      </Button>
-      <span className="text-sm font-semibold text-foreground">
-        {copy.page} {page} {copy.of} {Math.max(1, totalPages)}
-      </span>
-      <Button type="button" variant="outline" disabled={!hasNext} onClick={() => onPage(page + 1)}>
-        {copy.next}
-      </Button>
-    </nav>
   );
 }
 

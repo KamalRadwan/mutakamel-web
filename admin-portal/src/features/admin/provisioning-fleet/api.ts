@@ -21,7 +21,7 @@ import type {
   ManageFleetRolloutCommand,
 } from "./types";
 
-export const PROVISIONING_FLEET_ROOT = "/api/admin/core/v1/provisioning";
+const PROVISIONING_FLEET_ROOT = "/api/admin/core/v1/provisioning";
 
 function readConfig(signal?: AbortSignal) {
   return {

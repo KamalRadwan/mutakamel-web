@@ -13,6 +13,7 @@ import {
 import {
   META,
   OPERATION_ID,
+  RETRY_OPERATION_ID,
   componentInstallation,
   operationDetail,
   operationSummary,
@@ -29,6 +30,61 @@ describe("TenantProvisioningWorkspaceView", () => {
     expect(screen.getByText("Schema installation started.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Request cancel" }));
     expect(model.provisioning.cancelOperation).toHaveBeenCalledWith(OPERATION_ID);
+  });
+
+  it("offers retry for a retryable latest operation", () => {
+    const model = makeModel({ operationStatus: "FAILED_RETRYABLE" });
+    render(<TenantProvisioningWorkspaceView model={model} />);
+
+    const retry = screen.getByRole("button", { name: /^Retry$/u });
+    fireEvent.click(retry);
+
+    expect(model.provisioning.retryOperation).toHaveBeenCalledWith(OPERATION_ID);
+  });
+
+  it("treats a superseded retryable operation as read-only history", () => {
+    const model = makeModel({
+      operationStatus: "FAILED_RETRYABLE",
+      selectedGeneration: 6,
+      latestGeneration: 7,
+    });
+    render(<TenantProvisioningWorkspaceView model={model} />);
+
+    expect(
+      screen.queryByRole("button", { name: /^Retry$/u }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /generation 6 was superseded by generation 7; retry and cancel actions are available only for the latest operation/i,
+      ),
+    ).toBeInTheDocument();
+    expect(model.provisioning.retryOperation).not.toHaveBeenCalled();
+  });
+
+  it("hides cancel for a superseded active operation", () => {
+    const model = makeModel({ selectedGeneration: 6, latestGeneration: 7 });
+    render(<TenantProvisioningWorkspaceView model={model} />);
+
+    expect(
+      screen.queryByRole("button", { name: "Request cancel" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/this is a historical operation/i),
+    ).toBeInTheDocument();
+    expect(model.provisioning.cancelOperation).not.toHaveBeenCalled();
+  });
+
+  it("localizes a superseded-operation conflict returned after a race", () => {
+    const model = makeModel({
+      localError: "TENANT_PROVISIONING_OPERATION_SUPERSEDED",
+    });
+    render(<TenantProvisioningWorkspaceView model={model} />);
+
+    expect(
+      screen.getByText(
+        /this operation was superseded by a newer generation\. refresh the history and select the latest operation/i,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("uses add-Application terminology and contains no stale reconcile/add-module action", () => {
@@ -66,6 +122,24 @@ describe("TenantProvisioningWorkspaceView", () => {
     expect(container.querySelector("section")?.getAttribute("dir")).toBe("rtl");
     expect(screen.getByRole("button", { name: "طلب الإلغاء" })).toBeInTheDocument();
   });
+
+  it("disables prerequisite requests when the selected plan has none", () => {
+    const model = makeModel({ section: "prerequisites", prerequisiteCount: 0 });
+    render(<TenantProvisioningWorkspaceView model={model} />);
+
+    expect(screen.getByRole("button", { name: "Request" })).toBeDisabled();
+    expect(screen.getByText(/plan has no backup or maintenance prerequisites/i)).toBeInTheDocument();
+  });
+
+  it("enables prerequisite requests only when the selected plan requires them", () => {
+    const model = makeModel({ section: "prerequisites", prerequisiteCount: 1 });
+    render(<TenantProvisioningWorkspaceView model={model} />);
+
+    const request = screen.getByRole("button", { name: "Request" });
+    expect(request).toBeEnabled();
+    fireEvent.click(request);
+    expect(model.requestSelectedPrerequisites).toHaveBeenCalled();
+  });
 });
 
 function makeModel(
@@ -73,10 +147,41 @@ function makeModel(
     lang?: "ar" | "en";
     section?: "operations" | "updates" | "state" | "prerequisites" | "managed";
     seedRevision?: number | null;
+    prerequisiteCount?: number;
+    operationStatus?: "RUNNING" | "FAILED_RETRYABLE";
+    selectedGeneration?: number;
+    latestGeneration?: number;
+    localError?: string;
   } = {},
 ): TenantProvisioningWorkspaceModel {
-  const summary = readTenantOperationSummary(operationSummary());
-  const detail = readTenantOperationDetail(operationDetail());
+  const operationStatus = options.operationStatus ?? "RUNNING";
+  const selectedGeneration = options.selectedGeneration ?? 1;
+  const summary = readTenantOperationSummary(
+    operationSummary({ status: operationStatus, generation: selectedGeneration }),
+  );
+  const detail = readTenantOperationDetail(
+    operationDetail({
+      status: operationStatus,
+      generation: selectedGeneration,
+      prerequisiteCount: options.prerequisiteCount ?? 0,
+    }),
+  );
+  const operations = [summary];
+  if (
+    options.latestGeneration !== undefined &&
+    options.latestGeneration > selectedGeneration
+  ) {
+    operations.unshift(
+      readTenantOperationSummary(
+        operationSummary({
+          id: RETRY_OPERATION_ID,
+          generation: options.latestGeneration,
+          type: "RETRY",
+          status: "SUCCEEDED",
+        }),
+      ),
+    );
+  }
   const seed = readTenantSeedState(
     seedState(
       options.seedRevision === undefined
@@ -127,7 +232,7 @@ function makeModel(
     setConflictDecision: noop,
     conflictReasonCode: "ADMIN.SEED_CONFLICT",
     setConflictReasonCode: noop,
-    localError: null,
+    localError: options.localError ?? null,
     clearLocalError: noop,
     applySelectedUpdates: asyncNoop,
     requestSelectedPrerequisites: asyncNoop,
@@ -148,7 +253,7 @@ function makeModel(
         canDecommission: true,
         canResolveConflicts: true,
       },
-      operations: ready({ items: [summary], meta: META }),
+      operations: ready({ items: operations, meta: META }),
       selectedOperationId: OPERATION_ID,
       selectedOperation: ready(detail),
       timeline: ready({

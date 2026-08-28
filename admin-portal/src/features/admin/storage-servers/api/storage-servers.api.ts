@@ -1,4 +1,5 @@
 import { axiosClient } from "@/lib/api/axiosClient";
+import { extractCoreData } from "@/shared/api/core-envelope";
 import type { SuccessResponse } from "@/types/common";
 import type {
   CreateStorageServerDto,
@@ -32,7 +33,7 @@ export const storageServersApi = {
       `${ROOT}${suffix}`,
       { signal },
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   async get(id: string, signal?: AbortSignal) {
@@ -40,7 +41,7 @@ export const storageServersApi = {
       `${ROOT}/${encodeURIComponent(id)}`,
       { signal },
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   async create(dto: CreateStorageServerDto, idempotencyKey: string) {
@@ -49,7 +50,7 @@ export const storageServersApi = {
       dto,
       commandHeaders(idempotencyKey),
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   async update(
@@ -62,7 +63,7 @@ export const storageServersApi = {
       dto,
       commandHeaders(idempotencyKey),
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   async activate(id: string, idempotencyKey: string) {
@@ -71,7 +72,7 @@ export const storageServersApi = {
       {},
       commandHeaders(idempotencyKey),
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   async probe(
@@ -86,7 +87,7 @@ export const storageServersApi = {
       dto,
       commandHeaders(idempotencyKey),
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   async offline(id: string, idempotencyKey: string) {
@@ -95,7 +96,7 @@ export const storageServersApi = {
       {},
       commandHeaders(idempotencyKey),
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   async drain(id: string, idempotencyKey: string) {
@@ -104,7 +105,7 @@ export const storageServersApi = {
       {},
       commandHeaders(idempotencyKey),
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   /**
@@ -125,7 +126,7 @@ export const storageServersApi = {
       dto,
       commandHeaders(idempotencyKey),
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   /** Call once the grace window has expired to prove the previous credential is rejected. */
@@ -141,7 +142,7 @@ export const storageServersApi = {
       {},
       commandHeaders(idempotencyKey),
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   async delete(id: string, idempotencyKey: string) {

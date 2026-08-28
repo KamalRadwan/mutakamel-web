@@ -114,7 +114,8 @@ as a fallback. The proactive timer runs before access expiry with an adaptive
 of early jitter. A protected request also performs the same coordinated check
 before it is sent, covering throttled background-tab timers. Focus, visibility,
 page-show, and online events re-evaluate the schedule without changing the
-visible authenticated state.
+visible authenticated state. An authenticated visible tab separately maintains
+bounded presence through the dedicated presence route described below.
 
 Web Locks plus a non-secret BroadcastChannel/storage epoch and safe expiry
 snapshot reduce duplicate cross-tab refreshes; correctness does not depend on
@@ -296,12 +297,12 @@ does not reconstruct, replace, or broadly scan event payloads.
 ## POST `/api/admin/core/v1/auth/activity`
 
 Protected by `AdminGuard`; returns HTTP `204`. The shared client emits the
-exact `x-auth-user-activity: 1` marker only after a trusted, visible-tab
-pointer, keyboard, or touch event. The first eligible input checkpoints this
-Core route immediately; successful checkpoints coalesce further input for one
-minute, while a failed attempt may retry after five seconds. There is no idle
-heartbeat. Polling, refresh, focus/visibility events, hidden tabs, synthetic DOM
-events, and Realtime traffic never extend idle time.
+exact `x-auth-user-activity: 1` marker only after trusted pointer, keyboard, or
+touch input in a visible tab. A qualifying event checkpoints this route
+immediately; successful checkpoints coalesce further input for one minute,
+while a failed attempt may retry after five seconds. Polling, access refresh,
+focus/visibility, synthetic DOM events, hidden tabs, and Realtime traffic never
+claim human activity.
 
 Core owns the bounded idle-deadline touch. Core business requests still carry
 the same recent-input marker, and an activity-marked Worker request waits for
@@ -311,6 +312,41 @@ blocks UI work or logs out for network, rate-limit, `5xx`, or permission/CSRF
 failure. Only an explicit terminal session/security code for the still-bound
 session may end local authentication. WSS employee-duration accounting remains
 independent.
+
+## POST `/api/admin/core/v1/auth/presence`
+
+Protected by `AdminGuard` and the normal Web CSRF channel; returns HTTP `200`.
+This is the explicit non-human presence contract for an authenticated Admin
+Portal tab. It extends only the current session's idle deadline, bounded by the
+absolute deadline, and does not change `lastUserActivityAt`, refresh-use, or
+access-issue counters. The client sends no request body and never adds
+`x-auth-user-activity`.
+
+The response is server-authoritative and session-fenced:
+
+```json
+{
+  "sessionId": "uuid-v7",
+  "sessionExpiresIn": 1800,
+  "idleExpiresAt": "2026-08-26T14:30:00.000Z",
+  "absoluteExpiresAt": "2026-08-27T01:00:00.000Z"
+}
+```
+
+The scheduler starts from the remaining auth metadata deadline, then uses each
+presence response without changing the stored access-token timing. It normally
+runs halfway through the current remaining window, capped at five minutes; a
+fresh five-minute Core minimum therefore schedules after 150 seconds. A stale
+or shorter positive remainder is never clamped beyond its deadline. Transient
+failures use bounded exponential retry, and a refresh/session timing update
+cannot replace an already earlier retry.
+
+Restoring visibility, focus, page-show, or connectivity performs an immediate
+checkpoint. Hiding the tab cancels future presence work, and a closed tab has
+no browser work, so hidden/closed sessions still expire under the idle policy.
+When Core reports `idleExpiresAt === absoluteExpiresAt`, the scheduler stops
+because no further presence can extend the session. Core remains authoritative
+for terminal idle and absolute expiry.
 
 ## GET `/api/admin/core/v1/auth/me`
 
@@ -397,8 +433,10 @@ Implemented in `src/context/AuthContext.tsx` and
 - explicit terminal, permission-denied, and retained-repair error provenance;
 - bounded single-flight recovery after transient bootstrap/refresh failures;
 - pending-route protection until post-refresh `/auth/me` hydration completes;
-- trusted visible-input idle activity with an immediate, coalesced Core
-  checkpoint and the same bounded checkpoint before Worker calls;
+- trusted visible-input idle activity plus a separate adaptive, session-fenced
+  visible-presence checkpoint; presence never claims human activity or changes
+  access-token timing, while Worker activity retains its bounded Core
+  checkpoint;
 - public accept-invite and reset-password routes with exact DTO validation,
   one-time fragment handling, bilingual copy, and accessible error states;
 - current-session list and revoke controls under Authentication settings;

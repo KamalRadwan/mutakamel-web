@@ -1,5 +1,5 @@
 // Exact contract from docs/components/filter-bar.md.
-export interface FilterOption {
+interface FilterOption {
   value: string;
   labelEn: string;
   labelAr: string;

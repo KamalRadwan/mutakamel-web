@@ -1,10 +1,13 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import type { PaginationMeta } from "@/types/common";
+
+export type { PaginationMeta };
 
 export const COMPONENT_KINDS = ["FOUNDATION", "MODULE"] as const;
-export type ComponentKind = (typeof COMPONENT_KINDS)[number];
+type ComponentKind = (typeof COMPONENT_KINDS)[number];
 
 export const RELEASE_RISKS = ["LOW", "MEDIUM", "HIGH"] as const;
-export type ReleaseRisk = (typeof RELEASE_RISKS)[number];
+type ReleaseRisk = (typeof RELEASE_RISKS)[number];
 
 export const DISCOVERY_MODES = [
   "SCHEDULED",
@@ -12,8 +15,8 @@ export const DISCOVERY_MODES = [
   "CATCH_UP",
   "DRY_RUN",
 ] as const;
-export type DiscoveryMode = (typeof DISCOVERY_MODES)[number];
-export type ManualDiscoveryMode = Extract<DiscoveryMode, "MANUAL" | "DRY_RUN">;
+type DiscoveryMode = (typeof DISCOVERY_MODES)[number];
+type ManualDiscoveryMode = Extract<DiscoveryMode, "MANUAL" | "DRY_RUN">;
 
 export const DISCOVERY_STATUSES = [
   "RUNNING",
@@ -21,7 +24,7 @@ export const DISCOVERY_STATUSES = [
   "FAILED",
   "DRY_RUN",
 ] as const;
-export type DiscoveryStatus = (typeof DISCOVERY_STATUSES)[number];
+type DiscoveryStatus = (typeof DISCOVERY_STATUSES)[number];
 
 export const DISCOVERED_STATES = [
   "READY",
@@ -30,16 +33,7 @@ export const DISCOVERED_STATES = [
   "DRIFTED",
   "INCOMPATIBLE",
 ] as const;
-export type DiscoveredState = (typeof DISCOVERED_STATES)[number];
-
-export interface PaginationMeta {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
-}
+type DiscoveredState = (typeof DISCOVERED_STATES)[number];
 
 export interface ProvisioningRelease {
   id: string;

@@ -54,7 +54,7 @@ export function readInvoiceSnapshot(payload: unknown): CoreSnapshot<Invoice> {
   return snapshot(envelope, readInvoice(envelope.data, true));
 }
 
-export function readInvoice(value: unknown, detail = true): Invoice {
+function readInvoice(value: unknown, detail = true): Invoice {
   const row = requiredRecord(value);
   const purpose = oneOf(row.purpose, INVOICE_PURPOSES);
   const status = oneOf(row.status, INVOICE_STATUSES);

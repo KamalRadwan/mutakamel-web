@@ -1,3 +1,5 @@
+import type { PageResult } from "@/types/common";
+
 export const REPORT_KINDS = [
   "OVERVIEW",
   "TENANTS",
@@ -16,7 +18,7 @@ export const TENANT_REPORT_STATUSES = [
   "DELETED",
 ] as const;
 
-export type TenantReportStatus = (typeof TENANT_REPORT_STATUSES)[number];
+type TenantReportStatus = (typeof TENANT_REPORT_STATUSES)[number];
 
 export interface ReportWindowQuery {
   from?: string;
@@ -62,15 +64,7 @@ export interface TenantReportRow {
   createdAt: string;
 }
 
-export interface TenantReportPage {
-  items: TenantReportRow[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
-}
+export type TenantReportPage = PageResult<TenantReportRow>;
 
 export interface ServerReportRow {
   id: string;

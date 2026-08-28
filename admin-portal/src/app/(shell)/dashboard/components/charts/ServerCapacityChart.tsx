@@ -13,7 +13,7 @@ import {
 import { ChartTooltip } from "./ChartTooltip";
 import { DashboardMetricTone } from "@/types/dashboard";
 
-export interface ServerCapacityItem {
+interface ServerCapacityItem {
   id: string;
   name: string;
   currentTenants: number;

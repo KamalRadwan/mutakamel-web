@@ -104,6 +104,10 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
       setLocalError("TENANT_PROVISIONING_OPERATION_REQUIRED");
       return;
     }
+    if (operation.prerequisiteCount === 0) {
+      setLocalError("TENANT_PROVISIONING_PREREQUISITE_NOT_REQUIRED");
+      return;
+    }
     try {
       await provisioning.requestPrerequisites({
         operationId: operation.id,

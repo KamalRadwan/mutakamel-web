@@ -1,3 +1,5 @@
+import { logger } from './logger';
+
 /**
  * A safe wrapper around browser localStorage to prevent crashes in strict privacy modes
  * (e.g., Safari Private Browsing) or environments where window is undefined.
@@ -9,7 +11,7 @@ export const safeStorage = {
         return window.localStorage.getItem(key);
       }
     } catch (e) {
-      console.warn(`Failed to read ${key} from localStorage`, e);
+      logger.warn(`Failed to read ${key} from localStorage`, { error: e });
     }
     return null;
   },
@@ -20,7 +22,7 @@ export const safeStorage = {
         window.localStorage.setItem(key, value);
       }
     } catch (e) {
-      console.warn(`Failed to set ${key} in localStorage`, e);
+      logger.warn(`Failed to set ${key} in localStorage`, { error: e });
     }
   },
 
@@ -30,7 +32,7 @@ export const safeStorage = {
         window.localStorage.removeItem(key);
       }
     } catch (e) {
-      console.warn(`Failed to remove ${key} from localStorage`, e);
+      logger.warn(`Failed to remove ${key} from localStorage`, { error: e });
     }
   }
 };
@@ -41,7 +43,7 @@ export const safeSessionStorage = {
         return window.sessionStorage.getItem(key);
       }
     } catch (e) {
-      console.warn(`Failed to read ${key} from sessionStorage`, e);
+      logger.warn(`Failed to read ${key} from sessionStorage`, { error: e });
     }
     return null;
   },
@@ -52,7 +54,7 @@ export const safeSessionStorage = {
         window.sessionStorage.setItem(key, value);
       }
     } catch (e) {
-      console.warn(`Failed to set ${key} in sessionStorage`, e);
+      logger.warn(`Failed to set ${key} in sessionStorage`, { error: e });
     }
   },
 
@@ -62,7 +64,7 @@ export const safeSessionStorage = {
         window.sessionStorage.removeItem(key);
       }
     } catch (e) {
-      console.warn(`Failed to remove ${key} from sessionStorage`, e);
+      logger.warn(`Failed to remove ${key} from sessionStorage`, { error: e });
     }
   }
 };

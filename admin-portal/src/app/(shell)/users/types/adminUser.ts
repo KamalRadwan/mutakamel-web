@@ -1,6 +1,6 @@
 export type AdminUserStatus = "INVITED" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
 
-export interface AdminRoleI18n {
+interface AdminRoleI18n {
   en?: string;
   ar?: string;
 }
@@ -107,33 +107,6 @@ export interface UpdateAdminUserDto {
 
 export interface AssignRoleDto {
   roleId: string;
-}
-
-export interface WebphoneCallLogEntry {
-  id: string;
-  adminUserId: string;
-  type: "IN_ANS" | "IN_NOANS" | "OUT";
-  displayName?: string | null;
-  phoneNumber: string;
-  startedAt?: string | null;
-  answeredAt?: string | null;
-  endedAt?: string | null;
-  durationSeconds?: number | null;
-  cause?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string | null;
-}
-
-export interface CreateWebphoneCallLogDto {
-  type: "IN_ANS" | "IN_NOANS" | "OUT";
-  displayName?: string | null;
-  phoneNumber: string;
-  startedAt?: string | null;
-  answeredAt?: string | null;
-  endedAt?: string | null;
-  durationSeconds?: number | null;
-  cause?: string | null;
 }
 
 export type AdminUserErrorCode =

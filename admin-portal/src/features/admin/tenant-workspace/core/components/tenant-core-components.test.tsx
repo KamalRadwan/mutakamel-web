@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   CUSTOM_FQDN_ID,
-  TENANT_ID,
   customFqdnFixture,
   tenantFixture,
 } from "../__tests__/fixtures";
@@ -13,19 +12,6 @@ import type { UseTenantFqdnManagementResult } from "../hooks/useTenantFqdnManage
 import { createTenantProfileDraft } from "../model/readers";
 import type { TenantStatus, TenantView } from "../types";
 
-const hooks = vi.hoisted(() => ({
-  core: vi.fn(),
-  fqdn: vi.fn(),
-}));
-
-vi.mock("../hooks/useTenantCoreWorkspace", () => ({
-  useTenantCoreWorkspace: hooks.core,
-}));
-vi.mock("../hooks/useTenantFqdnManagement", () => ({
-  useTenantFqdnManagement: hooks.fqdn,
-}));
-
-import { TenantCoreWorkspace } from "./TenantCoreWorkspace";
 import { TenantFqdnPanel } from "./TenantFqdnPanel";
 import { TenantLifecyclePanel } from "./TenantLifecyclePanel";
 import { TenantProfilePanel } from "./TenantProfilePanel";
@@ -99,70 +85,6 @@ function fqdnFixture(
     ...overrides,
   } as UseTenantFqdnManagementResult;
 }
-
-describe("TenantCoreWorkspace", () => {
-  beforeEach(() => {
-    hooks.core.mockReset();
-    hooks.fqdn.mockReset();
-  });
-
-  it("renders a compact Arabic tenant-first workspace with readiness evidence", () => {
-    const workspace = workspaceFixture("PROVISIONING", {
-      isPolling: true,
-    });
-    hooks.core.mockReturnValue(workspace);
-    hooks.fqdn.mockReturnValue(fqdnFixture(workspace.tenant!));
-
-    render(<TenantCoreWorkspace tenantId={TENANT_ID} locale="ar" />);
-    const root = screen.getByTestId("tenant-core-workspace");
-    expect(root).toHaveAttribute("dir", "rtl");
-    expect(screen.getByText("إدارة المستأجر")).toBeInTheDocument();
-    expect(
-      screen.getByText("الوصول لقاعدة المستأجر غير متاح بعد"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "إلغاء التجهيز" }),
-    ).toBeInTheDocument();
-  });
-
-  it("shows forbidden, error correlation, and destroyed states independently", () => {
-    hooks.fqdn.mockReturnValue(fqdnFixture());
-    hooks.core.mockReturnValue(
-      workspaceFixture("ACTIVE", {
-        tenant: null,
-        resourceState: "forbidden",
-      }),
-    );
-    const { rerender } = render(<TenantCoreWorkspace tenantId={TENANT_ID} />);
-    expect(screen.getByText(/do not have permission/i)).toBeInTheDocument();
-
-    hooks.core.mockReturnValue(
-      workspaceFixture("ACTIVE", {
-        tenant: null,
-        resourceState: "error",
-        loadError: {
-          isNormalized: true,
-          httpStatus: 503,
-          errorCode: "TEMPORARY",
-          message: "Temporarily unavailable",
-          correlationId: "corr-1",
-        },
-      }),
-    );
-    rerender(<TenantCoreWorkspace tenantId={TENANT_ID} />);
-    expect(screen.getByText("Temporarily unavailable")).toBeInTheDocument();
-    expect(screen.getByText(/corr-1/)).toBeInTheDocument();
-
-    hooks.core.mockReturnValue(
-      workspaceFixture("DELETED", {
-        tenant: null,
-        resourceState: "destroyed",
-      }),
-    );
-    rerender(<TenantCoreWorkspace tenantId={TENANT_ID} />);
-    expect(screen.getByText(/permanently destroyed/i)).toBeInTheDocument();
-  });
-});
 
 describe("tenant profile and lifecycle panels", () => {
   it("handles a null address and updates all profile fields through one draft", () => {

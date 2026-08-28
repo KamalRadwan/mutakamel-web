@@ -86,7 +86,7 @@ export interface CoreSnapshot<T> {
   responseTimestamp: string;
 }
 
-export interface ReleaseDraftBodyDto {
+interface ReleaseDraftBodyDto {
   componentId: string;
   releaseVersion: string;
   manifestVersion: number;

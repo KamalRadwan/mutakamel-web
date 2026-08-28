@@ -58,7 +58,7 @@ export function readProvisioningPage<T>(
   };
 }
 
-export function readPaginationMeta(
+function readPaginationMeta(
   value: unknown,
   code = "INVALID_PROVISIONING_PAGE_RESPONSE",
 ): PaginationMeta {
@@ -106,13 +106,14 @@ export function readTenantOperationDetail(value: unknown): TenantOperationDetail
   const operation = object(value, code);
   return {
     ...readTenantOperationSummary(operation),
+    prerequisiteCount: nonNegativeInteger(operation.prerequisiteCount, code),
     progress: readProgress(operation.progress, code),
     timelineEventCount: nonNegativeInteger(operation.timelineEventCount, code),
     steps: array(operation.steps, code).map(readTenantOperationStep),
   };
 }
 
-export function readTenantOperationStep(value: unknown): TenantOperationStep {
+function readTenantOperationStep(value: unknown): TenantOperationStep {
   const code = "INVALID_TENANT_OPERATION_STEP_RESPONSE";
   const step = object(value, code);
   return {

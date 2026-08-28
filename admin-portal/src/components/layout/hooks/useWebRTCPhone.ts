@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { playDtmfTone, iceServersFromSettings, isWebphoneReady, normalizeCallTarget, sipUri } from '@mutakamel/webphone';
 import { createMyWebphoneCallLog, loadAsteriskSettings, loadMyWebphoneCallLogs, loadMyWebphoneConfig } from '../webphone/api';
 import { safeStorage } from "@/lib/safeStorage";
+import { logger } from "@/lib/logger";
 import type {
   ActiveCallContext,
   AdminWebphoneConfig,
@@ -938,7 +939,7 @@ function assertMediaEnvironment() {
 
 function tracePhone(settings: AsteriskIntegrationSettings | undefined, event: string, payload: Record<string, unknown>) {
   if (!settings?.traceSip) return;
-  console.info(`[WebPhone] ${event}`, payload);
+  logger.trace(`[WebPhone] ${event}`, payload);
 }
 
 function safeErrorDetails(error: unknown) {
@@ -1122,7 +1123,7 @@ function createIncomingRingTone() {
   }
 }
 
-export function formatWebphoneDuration(totalSeconds: number) {
+function formatWebphoneDuration(totalSeconds: number) {
   const safeSeconds = Math.max(0, totalSeconds);
   const hours = Math.floor(safeSeconds / 3600);
   const minutes = Math.floor((safeSeconds % 3600) / 60);

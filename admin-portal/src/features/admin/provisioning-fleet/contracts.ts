@@ -28,14 +28,14 @@ import {
   FLEET_TENANT_STATUSES,
 } from "./types";
 
-export const UUID_V7 =
+const UUID_V7 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
-export const SHA256 = /^[0-9a-f]{64}$/u;
-export const COMPONENT_KEY = /^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_-]*)*$/u;
-export const APPLICATION_KEY = /^[a-z][a-z0-9_-]{0,63}$/u;
-export const RELEASE_VERSION = /^[A-Za-z0-9][A-Za-z0-9._:+-]{0,119}$/u;
-export const SAFE_CODE = /^[A-Z][A-Z0-9._-]{2,95}$/u;
-export const ED25519_SIGNATURE_BASE64 = /^[A-Za-z0-9+/]{86}==$/u;
+const SHA256 = /^[0-9a-f]{64}$/u;
+const COMPONENT_KEY = /^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_-]*)*$/u;
+const APPLICATION_KEY = /^[a-z][a-z0-9_-]{0,63}$/u;
+const RELEASE_VERSION = /^[A-Za-z0-9][A-Za-z0-9._:+-]{0,119}$/u;
+const SAFE_CODE = /^[A-Z][A-Z0-9._-]{2,95}$/u;
+const ED25519_SIGNATURE_BASE64 = /^[A-Za-z0-9+/]{86}==$/u;
 
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
 const CORRELATION = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/u;

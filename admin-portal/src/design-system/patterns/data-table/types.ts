@@ -19,13 +19,13 @@ export interface DataTablePaginationProps {
   onLimitChange?: (limit: number) => void;
 }
 
-export interface DataTableSortProps {
+interface DataTableSortProps {
   sortBy: string;
   sortDir: "ASC" | "DESC";
   onSortChange: (sortBy: string, sortDir: "ASC" | "DESC") => void;
 }
 
-export interface DataTableEmptyState {
+interface DataTableEmptyState {
   titleEn: string;
   titleAr: string;
   descriptionEn?: string;

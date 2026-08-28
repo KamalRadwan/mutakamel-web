@@ -12,8 +12,8 @@ import {
   type UpdateRoleCommand,
 } from "./contract";
 
-export const ADMIN_ROLES_URL = "/api/admin/core/v1/roles";
-export const ADMIN_PERMISSIONS_URL = "/api/admin/core/v1/permissions";
+const ADMIN_ROLES_URL = "/api/admin/core/v1/roles";
+const ADMIN_PERMISSIONS_URL = "/api/admin/core/v1/permissions";
 
 export interface RoleListQuery {
   page: number;

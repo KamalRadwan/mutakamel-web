@@ -1,4 +1,4 @@
-export type SettingInputType = "string" | "number" | "boolean" | "enum";
+type SettingInputType = "string" | "number" | "boolean" | "enum";
 
 export interface SettingUIMetadata {
   key: string;

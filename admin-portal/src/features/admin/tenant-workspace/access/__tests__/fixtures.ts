@@ -9,15 +9,14 @@ import type {
 
 export const TENANT_ID = "019ff251-02e5-71fc-a7e9-05495cb3c6a8";
 export const USER_ID = "019ff251-1000-7000-8000-000000000001";
-export const OWNER_ID = "019ff251-1000-7000-8000-000000000002";
 export const COMPANY_ID = "019ff251-2000-7000-8000-000000000001";
 export const BRANCH_ID = "019ff251-2000-7000-8000-000000000002";
 export const DEPARTMENT_ID = "019ff251-2000-7000-8000-000000000003";
 export const TEAM_ID = "019ff251-2000-7000-8000-000000000004";
 export const ROLE_ID = "019ff251-3000-7000-8000-000000000001";
-export const ASSIGNMENT_ID = "019ff251-3000-7000-8000-000000000002";
+const ASSIGNMENT_ID = "019ff251-3000-7000-8000-000000000002";
 export const COMMAND_ID = "019ff251-4000-7000-8000-000000000001";
-export const NOW = "2026-08-11T19:33:49.000Z";
+const NOW = "2026-08-11T19:33:49.000Z";
 
 export function userPayload(
   overrides: Record<string, unknown> = {},
@@ -122,3 +121,11 @@ export function pageFixture<T>(items: T[], overrides: Partial<PageResult<T>> = {
 }
 
 export const envelope = (data: unknown) => ({ data: { success: true, data } });
+
+export function pageEnvelope<T>(
+  items: T[],
+  overrides: Partial<PageResult<T>> = {},
+) {
+  const { items: data, ...meta } = pageFixture(items, overrides);
+  return { data: { success: true, data, meta } };
+}

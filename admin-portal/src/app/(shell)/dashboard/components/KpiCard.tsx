@@ -26,7 +26,7 @@ interface KpiCardProps {
   currencyCode?: string;
 }
 
-export function getCardIcon(key: string, label: string): LucideIcon {
+function getCardIcon(key: string, label: string): LucideIcon {
   const k = (key + " " + label).toLowerCase();
 
   if (k.includes("deleted") || k.includes("trash")) return Trash2;

@@ -1,6 +1,6 @@
 export const ADMIN_PASSWORD_MIN_LENGTH = 12;
 export const ADMIN_PASSWORD_MAX_LENGTH = 128;
-export const ADMIN_ACTION_TOKEN_MIN_LENGTH = 16;
+const ADMIN_ACTION_TOKEN_MIN_LENGTH = 16;
 export const ADMIN_ACTION_TOKEN_MAX_LENGTH = 512;
 
 export interface AdminPasswordChecks {

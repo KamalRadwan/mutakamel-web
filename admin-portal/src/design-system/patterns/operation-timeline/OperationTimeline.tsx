@@ -1,7 +1,7 @@
 import { Check, CircleDashed, Loader2, ShieldAlert, X } from "lucide-react";
 import { cn } from "../../lib/cn";
 
-export type OperationTimelineStepState = "done" | "active" | "warning" | "failed" | "pending";
+type OperationTimelineStepState = "done" | "active" | "warning" | "failed" | "pending";
 
 export interface OperationTimelineStep {
   label: string;

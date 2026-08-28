@@ -8,7 +8,7 @@ import type {
 
 export const LIVE_EVENT_LIMIT = 200;
 export const LIVE_HEARTBEAT_STALE_MS = 35_000;
-export const LIVE_RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const;
+const LIVE_RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const;
 
 export function openLoggingEventSource(query: LiveLoggingQuery): EventSource {
   return new EventSource(liveLoggingUrl(query), { withCredentials: true });

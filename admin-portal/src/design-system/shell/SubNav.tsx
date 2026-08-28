@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
 import { cn } from "../lib/cn";
 
-export interface SubNavItem {
+interface SubNavItem {
   href: string;
   labelKey: { en: string; ar: string };
 }

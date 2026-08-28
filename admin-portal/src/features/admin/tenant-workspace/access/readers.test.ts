@@ -67,9 +67,14 @@ describe("tenant access response readers", () => {
   });
 
   it("validates pagination metadata and user rows", () => {
+    const canonical = pageFixture([userPayload()]);
+    const { items, ...meta } = canonical;
     expect(
-      readTenantUserPage({ success: true, data: pageFixture([userPayload()]) }),
+      readTenantUserPage({ success: true, data: items, meta }),
     ).toMatchObject({ total: 1, page: 1, hasPrev: false });
+    expect(() =>
+      readTenantUserPage({ success: true, data: items }),
+    ).toThrow("INVALID_TENANT_USER_LIST_RESPONSE");
     expect(() =>
       readTenantUserPage({ ...pageFixture([]), total: 1, totalPages: 0 }),
     ).toThrow("INVALID_TENANT_USER_LIST_RESPONSE");

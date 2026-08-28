@@ -29,7 +29,7 @@ import {
   branchFixture,
   departmentFixture,
   envelope,
-  pageFixture,
+  pageEnvelope,
   roleFixture,
   summaryFixture,
   teamFixture,
@@ -41,12 +41,12 @@ describe("tenant access API", () => {
     deleteMock.mockReset().mockResolvedValue({ status: 204 });
     getMock.mockReset().mockImplementation((url: string) => {
       if (url.includes("/users/summary")) return Promise.resolve(envelope(summaryFixture));
-      if (url.includes("/access/roles")) return Promise.resolve(envelope(pageFixture([roleFixture])));
-      if (url.includes("/access/branches")) return Promise.resolve(envelope(pageFixture([branchFixture])));
-      if (url.includes("/access/departments")) return Promise.resolve(envelope(pageFixture([departmentFixture])));
-      if (url.includes("/access/teams")) return Promise.resolve(envelope(pageFixture([teamFixture])));
+      if (url.includes("/access/roles")) return Promise.resolve(pageEnvelope([roleFixture]));
+      if (url.includes("/access/branches")) return Promise.resolve(pageEnvelope([branchFixture]));
+      if (url.includes("/access/departments")) return Promise.resolve(pageEnvelope([departmentFixture]));
+      if (url.includes("/access/teams")) return Promise.resolve(pageEnvelope([teamFixture]));
       if (url.endsWith("/users") || url.includes("/users?")) {
-        return Promise.resolve(envelope(pageFixture([userPayload()])));
+        return Promise.resolve(pageEnvelope([userPayload()]));
       }
       return Promise.resolve(envelope(userPayload()));
     });

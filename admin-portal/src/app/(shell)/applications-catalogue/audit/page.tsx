@@ -1,21 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import { applicationsApi } from "@/features/admin/applications/api/applications.api";
 import type {
   CatalogueAuditEntityType,
   CatalogueAuditEventView,
-  CatalogueAuditPageView,
 } from "@/features/admin/applications/types";
 import { useI18n } from "@/i18n/I18nContext";
-import { adminCanAll } from "@/lib/auth/rbac";
-import {
-  normalizeApiError,
-  type NormalizedApiError,
-} from "@/shared/api/normalized-api-error";
 import {
   PageHeader,
   FilterBar,
@@ -26,6 +17,7 @@ import {
   ErrorState,
   type ColumnDef,
 } from "@/design-system";
+import { useCatalogueAuditPage } from "./hooks/useCatalogueAuditPage";
 
 const ENTITY_TYPES = [
   "APPLICATION",
@@ -36,42 +28,22 @@ const ENTITY_TYPES = [
 ] as const satisfies readonly CatalogueAuditEntityType[];
 
 export default function CatalogueAuditPage() {
-  const { user, isLoading: isAuthLoading } = useAuth();
   const { lang, dir } = useI18n();
   const text = auditCopy(lang);
-  const canRead = adminCanAll(user, ["admin.catalog.read"]);
-  const [data, setData] = useState<CatalogueAuditPageView | null>(null);
-  const [page, setPage] = useState(1);
-  const [entityType, setEntityType] =
-    useState<CatalogueAuditEntityType | "ALL">("ALL");
-  const [action, setAction] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<NormalizedApiError | null>(null);
-
-  const load = useCallback(async () => {
-    if (isAuthLoading || !canRead) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      setData(
-        await applicationsApi.getGlobalAudit({
-          page,
-          limit: 20,
-          ...(entityType !== "ALL" ? { entityType } : {}),
-          ...(action.trim() ? { action: action.trim() } : {}),
-        }),
-      );
-    } catch (requestError) {
-      setData(null);
-      setError(normalizeApiError(requestError));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [action, canRead, entityType, isAuthLoading, page]);
-
-  useEffect(() => {
-    queueMicrotask(() => void load());
-  }, [load]);
+  const {
+    isAuthLoading,
+    canRead,
+    data,
+    page,
+    setPage,
+    entityType,
+    setEntityType,
+    action,
+    setAction,
+    isLoading,
+    error,
+    load,
+  } = useCatalogueAuditPage();
 
   const columns: ColumnDef<CatalogueAuditEventView>[] = [
     {

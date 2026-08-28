@@ -31,11 +31,12 @@ import {
 } from "@/design-system";
 import { formatAuditValue } from "../lib/control-plane-audit-utils";
 import { useControlPlaneAudit } from "../hooks/use-control-plane-audit";
+import { useAuditEventDetail } from "../hooks/use-audit-event-detail";
 import {
   CONTROL_PLANE_AUDIT_ACTOR_TYPES,
   CONTROL_PLANE_AUDIT_OUTCOMES,
   CONTROL_PLANE_AUDIT_SOURCE_TYPES,
-  type ControlPlaneAuditEvent,
+  type ControlPlaneAuditEventSummary,
   type ControlPlaneAuditFilterDraft,
 } from "../types/control-plane-audit";
 
@@ -423,10 +424,12 @@ function AuditEventCard({
   copy,
   lang,
 }: {
-  event: ControlPlaneAuditEvent;
+  event: ControlPlaneAuditEventSummary;
   copy: Copy;
   lang: "ar" | "en";
 }) {
+  const detail = useAuditEventDetail(event.id);
+
   return (
     <article className="rounded-lg border border-border bg-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -457,7 +460,12 @@ function AuditEventCard({
         <EvidenceDatum icon={<Braces className="size-3.5" />} label={copy.correlationId} value={event.correlationId || copy.notRecorded} mono />
       </div>
 
-      <details className="mt-3 rounded-lg border border-border bg-card">
+      <details
+        className="mt-3 rounded-lg border border-border bg-card"
+        onToggle={(toggleEvent) => {
+          if (toggleEvent.currentTarget.open) detail.load();
+        }}
+      >
         <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-brand-700 marker:text-brand-500 dark:text-brand-400">
           {copy.evidence}
         </summary>
@@ -477,12 +485,26 @@ function AuditEventCard({
               <strong>{copy.reason}:</strong> {event.reason}
             </div>
           ) : null}
-          <div className="grid gap-3 xl:grid-cols-2">
-            <AuditJson title={copy.before} value={event.before} empty={copy.noSnapshot} />
-            <AuditJson title={copy.after} value={event.after} empty={copy.noSnapshot} />
-            <AuditJson title={copy.diff} value={event.diff} empty={copy.noSnapshot} />
-            <AuditJson title={copy.metadata} value={event.metadata} empty={copy.noSnapshot} />
-          </div>
+          {detail.status === "LOADING" || detail.status === "IDLE" ? (
+            <div className="flex items-center gap-2 rounded-lg border border-border p-4 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+              {copy.loading}
+            </div>
+          ) : detail.status === "UNAVAILABLE" ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-danger-200 bg-danger-50 p-3 text-xs text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-100">
+              <span>{detail.error?.message || copy.unavailable}</span>
+              <Button type="button" size="sm" variant="destructive" onClick={detail.retry}>
+                {copy.retry}
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-3 xl:grid-cols-2">
+              <AuditJson title={copy.before} value={detail.data?.before ?? null} empty={copy.noSnapshot} />
+              <AuditJson title={copy.after} value={detail.data?.after ?? null} empty={copy.noSnapshot} />
+              <AuditJson title={copy.diff} value={detail.data?.diff ?? []} empty={copy.noSnapshot} />
+              <AuditJson title={copy.metadata} value={detail.data?.metadata ?? null} empty={copy.noSnapshot} />
+            </div>
+          )}
           <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
             <p><strong className="text-foreground">IP:</strong> {event.ip || copy.notRecorded}</p>
             <p className="break-all"><strong className="text-foreground">User-Agent:</strong> {event.userAgent || copy.notRecorded}</p>

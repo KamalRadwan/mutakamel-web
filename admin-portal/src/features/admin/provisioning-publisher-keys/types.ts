@@ -1,7 +1,7 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 
 export const PUBLISHER_KEY_STATUSES = ["ACTIVE", "REVOKED"] as const;
-export type PublisherKeyStatus = (typeof PUBLISHER_KEY_STATUSES)[number];
+type PublisherKeyStatus = (typeof PUBLISHER_KEY_STATUSES)[number];
 
 export interface PublisherKey {
   publisherKeyId: string;

@@ -34,9 +34,9 @@ export interface TenantReverseGeocodedAddress {
   formattedAddress?: string;
 }
 
-export type TenantIdentityValidationReason = "REQUIRED" | "TAKEN";
+type TenantIdentityValidationReason = "REQUIRED" | "TAKEN";
 
-export interface TenantIdentityFieldValidation {
+interface TenantIdentityFieldValidation {
   valid: boolean;
   available: boolean;
   reason?: TenantIdentityValidationReason;
@@ -57,7 +57,7 @@ export interface TenantIdentityValidationEvidence {
   result: TenantIdentityValidationResult;
 }
 
-export interface TenantApplicationTierOption {
+interface TenantApplicationTierOption {
   id: string;
   key: string;
   name: string;
@@ -104,14 +104,14 @@ export interface TenantDatabasePlacementOption {
   maxTenants: number;
 }
 
-export interface TenantProvisioningSeedPackPreview {
+interface TenantProvisioningSeedPackPreview {
   key: string;
   version: string;
   policy: string;
   checksum?: string;
 }
 
-export interface TenantProvisioningComponentPreview {
+interface TenantProvisioningComponentPreview {
   componentId: string;
   componentKey: string;
   ownerApp: string;
@@ -128,7 +128,7 @@ export interface TenantProvisioningComponentPreview {
   seedPacks: TenantProvisioningSeedPackPreview[];
 }
 
-export interface TenantProvisioningStepPreview {
+interface TenantProvisioningStepPreview {
   stepKey: string;
   componentKey?: string;
   kind:

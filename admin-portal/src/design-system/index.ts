@@ -5,7 +5,6 @@
 
 export * from "./lib/cn";
 export * from "./lib/variants";
-export * from "./lib/tokens";
 
 export * from "./feedback/AppToast";
 export * from "./feedback/useToast";

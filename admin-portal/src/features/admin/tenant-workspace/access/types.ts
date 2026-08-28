@@ -1,4 +1,5 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import type { PageResult as SharedPageResult, SortDirection } from "@/types/common";
 import type { TenantStatus } from "../core/types";
 
 export const TENANT_USER_STATUSES = [
@@ -10,7 +11,7 @@ export const TENANT_USER_STATUSES = [
 
 export type TenantUserStatus = (typeof TENANT_USER_STATUSES)[number];
 export type TenantUserVisibility = "ACTIVE" | "DELETED" | "ALL";
-export type TenantUserSortField =
+type TenantUserSortField =
   | "email"
   | "firstName"
   | "lastName"
@@ -18,10 +19,9 @@ export type TenantUserSortField =
   | "status"
   | "lastLoginAt"
   | "createdAt";
-export type SortDirection = "ASC" | "DESC";
-export type TenantUserRoleScope = "TENANT" | "COMPANY" | "BRANCH";
-export type DeliveryState = "QUEUED" | "ALREADY_QUEUED";
-export type TeamMembershipRole = "MEMBER" | "LEAD" | "MANAGER";
+type TenantUserRoleScope = "TENANT" | "COMPANY" | "BRANCH";
+type DeliveryState = "QUEUED" | "ALREADY_QUEUED";
+type TeamMembershipRole = "MEMBER" | "LEAD" | "MANAGER";
 
 export interface TenantUserOrganizationRef {
   id: string;
@@ -93,15 +93,7 @@ export interface TenantUserSummary {
   locked: number;
 }
 
-export interface PageResult<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
-}
+export type PageResult<T> = SharedPageResult<T>;
 
 export interface TenantUserListQuery {
   page: number;
@@ -166,7 +158,7 @@ export interface BranchRoleAssignmentInput {
   roleId: string;
 }
 
-export interface TeamMembershipInput {
+interface TeamMembershipInput {
   teamId: string;
   role?: TeamMembershipRole;
   isPrimary?: boolean;
@@ -230,7 +222,7 @@ export interface TenantUserInvitationResult {
   delivery: DeliveryState;
 }
 
-export type TenantAccessResourceStatus =
+type TenantAccessResourceStatus =
   | "idle"
   | "loading"
   | "ready"

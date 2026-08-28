@@ -15,7 +15,7 @@ import {
 import { ChartTooltip } from "./ChartTooltip";
 import { useI18n } from "@/i18n/I18nContext";
 
-export interface GrowthPoint {
+interface GrowthPoint {
   month: string;
   tenants: number;
   collected: number;

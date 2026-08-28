@@ -2,13 +2,13 @@ import { axiosClient, unwrapCoreData } from "@/lib/api/axiosClient";
 
 export const AUTH_INVALIDATION_REPLAY_PERMISSION =
   "admin.auth_invalidation_outbox.replay";
-export const AUTH_INVALIDATION_REPLAY_REASON_MIN_LENGTH = 8;
+const AUTH_INVALIDATION_REPLAY_REASON_MIN_LENGTH = 8;
 export const AUTH_INVALIDATION_REPLAY_REASON_MAX_LENGTH = 500;
-export const AUTH_INVALIDATION_REPLAY_MAX_EVENTS = 25;
+const AUTH_INVALIDATION_REPLAY_MAX_EVENTS = 25;
 
 export type AuthInvalidationReplayTarget = "CONTROL_PLANE" | "TENANT";
 export type AuthInvalidationReplayMode = "DRY_RUN" | "APPLY";
-export type AuthInvalidationReplayOutcome =
+type AuthInvalidationReplayOutcome =
   | "DRY_RUN_VALIDATED"
   | "REPLAY_SCHEDULED";
 
@@ -66,7 +66,7 @@ export interface AuthInvalidationReplayBuildResult {
 const UUID_V7 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-export function isCanonicalUUIDv7(value: string): boolean {
+function isCanonicalUUIDv7(value: string): boolean {
   return UUID_V7.test(value);
 }
 

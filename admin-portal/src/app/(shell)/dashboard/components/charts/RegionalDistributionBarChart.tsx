@@ -13,7 +13,7 @@ import { ChartTooltip } from "./ChartTooltip";
 import { DashboardMetricTone } from "@/types/dashboard";
 import { useI18n } from "@/i18n/I18nContext";
 
-export interface RegionalPoint {
+interface RegionalPoint {
   key: string;
   countryName: string;
   countryIsoCode: string;

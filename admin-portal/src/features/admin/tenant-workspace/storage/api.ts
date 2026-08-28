@@ -1,4 +1,5 @@
 import { axiosClient } from "@/lib/api/axiosClient";
+import { extractCoreData } from "@/shared/api/core-envelope";
 import type { SuccessResponse } from "@/types/common";
 import type { StartTenantStorageMigrationDto, TenantStorageMigrationView } from "./types";
 
@@ -36,13 +37,13 @@ export const tenantStorageMigrationApi = {
       dto,
       commandHeaders(idempotencyKey),
     );
-    return response.data.data;
+    return extractCoreData(response);
   },
 
   async get(migrationId: string, signal?: AbortSignal) {
     const response = await axiosClient.get<
       SuccessResponse<TenantStorageMigrationView>
     >(`${MIGRATIONS_ROOT}/${encodeURIComponent(migrationId)}`, { signal });
-    return response.data.data;
+    return extractCoreData(response);
   },
 };

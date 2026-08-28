@@ -3,26 +3,26 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-08-25T03:45:38.578Z**
+Generated at: **2026-08-27T18:29:03.949Z**
 
-Frontend revision: `5611e5b9a5cd+dirty`
+Frontend revision: `67034e343dff+dirty`
 
 Backend revision: `3cbfe3e8ddd7+dirty`
 
 ## Coverage
 
-This inventory contains **250** browser-visible Core Admin routes.
+This inventory contains **252** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
 
 | Route class | Routes |
 | --- | ---: |
-| AUTHENTICATED | 87 |
+| AUTHENTICATED | 89 |
 | PUBLIC | 6 |
 | READ_HEAVY | 21 |
 | WRITE_SENSITIVE | 136 |
-| **Total** | **250** |
+| **Total** | **252** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -32,8 +32,8 @@ Machine-readable source:
 | Gateway route-key domain | Routes |
 | --- | ---: |
 | applications | 15 |
-| audit | 2 |
-| auth | 11 |
+| audit | 3 |
+| auth | 12 |
 | auth-invalidation-outbox | 1 |
 | catalog | 17 |
 | dashboard | 1 |
@@ -80,6 +80,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning/primary-component` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.technical-provisioning.primary-component.create` |
 | POST | `/api/admin/core/v1/applications/onboarding` | WRITE_SENSITIVE | yes | ALL | admin.applications.create + admin.applications.update + admin.applications.critical | `core.admin.applications.onboard` |
 | GET | `/api/admin/core/v1/audit` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.list` |
+| GET | `/api/admin/core/v1/audit/:id` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.detail` |
 | GET | `/api/admin/core/v1/audit/entities/:entityType/:entityId` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.entity-history` |
 | POST | `/api/admin/core/v1/auth-invalidation-outbox/replay` | WRITE_SENSITIVE | yes | ALL | admin.auth_invalidation_outbox.replay | `core.admin.auth-invalidation-outbox.replay` |
 | POST | `/api/admin/core/v1/auth/accept-invite` | PUBLIC | no | ALL | — | `core.admin.auth.accept-invite` |
@@ -89,6 +90,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/auth/logout` | PUBLIC | yes | ALL | — | `core.admin.auth.logout` |
 | POST | `/api/admin/core/v1/auth/logout-all` | AUTHENTICATED | yes | ALL | — | `core.admin.auth.logout-all` |
 | GET | `/api/admin/core/v1/auth/me` | AUTHENTICATED | yes | ALL | — | `core.admin.auth.me` |
+| POST | `/api/admin/core/v1/auth/presence` | AUTHENTICATED | no | ALL | — | `core.admin.auth.presence` |
 | POST | `/api/admin/core/v1/auth/refresh` | PUBLIC | no | ALL | — | `core.admin.auth.refresh` |
 | POST | `/api/admin/core/v1/auth/reset-password` | PUBLIC | no | ALL | — | `core.admin.auth.reset-password` |
 | GET | `/api/admin/core/v1/auth/sessions` | AUTHENTICATED | yes | ALL | — | `core.admin.auth.sessions.list` |

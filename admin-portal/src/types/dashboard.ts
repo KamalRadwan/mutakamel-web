@@ -1,5 +1,5 @@
-export type DashboardMetricKind = "integer" | "money" | "percent" | "ratio";
-export type DashboardRangeGranularity = "day" | "month";
+type DashboardMetricKind = "integer" | "money" | "percent" | "ratio";
+type DashboardRangeGranularity = "day" | "month";
 export type DashboardMetricTone =
   | "amber"
   | "blue"
@@ -27,7 +27,7 @@ export const DASHBOARD_GROUP_KEYS = [
 
 export type DashboardGroupKey = (typeof DASHBOARD_GROUP_KEYS)[number];
 
-export type DashboardGroupPermission =
+type DashboardGroupPermission =
   | "admin.reports.tenants"
   | "admin.reports.domains"
   | "admin.reports.subscriptions"
@@ -59,7 +59,7 @@ export interface DashboardGroupAlert {
   message: string;
 }
 
-export interface DashboardAvailableGroup {
+interface DashboardAvailableGroup {
   key: DashboardGroupKey;
   permission: DashboardGroupPermission;
   available: true;
@@ -71,7 +71,7 @@ export interface DashboardAvailableGroup {
   cards: DashboardMetric[];
 }
 
-export interface DashboardUnavailableGroup {
+interface DashboardUnavailableGroup {
   key: DashboardGroupKey;
   permission: DashboardGroupPermission;
   available: false;
@@ -89,7 +89,7 @@ export type DashboardGroup =
   | DashboardAvailableGroup
   | DashboardUnavailableGroup;
 
-export type DashboardGroups = Partial<
+type DashboardGroups = Partial<
   Record<DashboardGroupKey, DashboardGroup>
 >;
 
@@ -98,41 +98,41 @@ export type DashboardUnavailableReason =
   | "SOURCE_NOT_CONFIGURED"
   | "TARGET_NOT_CONFIGURED";
 
-export interface DashboardAvailableDataset<T> {
+interface DashboardAvailableDataset<T> {
   available: true;
   data: T;
 }
 
-export interface DashboardUnavailableDataset {
+interface DashboardUnavailableDataset {
   available: false;
   reasonCode: DashboardUnavailableReason;
   message: string;
 }
 
-export type DashboardDataset<T> =
+type DashboardDataset<T> =
   | DashboardAvailableDataset<T>
   | DashboardUnavailableDataset;
 
-export interface DashboardNamedValue {
+interface DashboardNamedValue {
   key: string;
   label: string;
   value: number;
 }
 
-export interface DashboardTimeSeriesPoint {
+interface DashboardTimeSeriesPoint {
   bucket: string;
   label: string;
   value: number;
 }
 
-export interface DashboardDualTimeSeriesPoint {
+interface DashboardDualTimeSeriesPoint {
   bucket: string;
   label: string;
   primary: number;
   secondary: number;
 }
 
-export interface DashboardBreakdownItem {
+interface DashboardBreakdownItem {
   key: string;
   label: string;
   value: number;
@@ -141,7 +141,7 @@ export interface DashboardBreakdownItem {
   description?: string;
 }
 
-export interface DashboardDatabaseCapacityItem {
+interface DashboardDatabaseCapacityItem {
   id: string;
   name: string;
   metadata: string;

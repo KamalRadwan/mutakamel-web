@@ -1,5 +1,5 @@
-export type PlatformSmtpProtocol = "smtp" | "smtps";
-export type SmtpHistoryValue = string | number | boolean | null;
+type PlatformSmtpProtocol = "smtp" | "smtps";
+type SmtpHistoryValue = string | number | boolean | null;
 
 export interface PlatformSmtpConfig {
   configured: boolean;
@@ -27,7 +27,7 @@ export interface SmtpFormState {
   smtpUsername: string;
 }
 
-export interface SmtpAuditChange {
+interface SmtpAuditChange {
   field: string;
   label: string;
   previousValue: SmtpHistoryValue;

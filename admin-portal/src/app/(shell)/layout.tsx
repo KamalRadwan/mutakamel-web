@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { AppShell } from "@/design-system/shell/AppShell";
+import { AppShell } from "@/design-system";
 
 // Reading the ds_sidebar cookie here — instead of only in useSidebar's
 // client-side useState initializer — lets the very first server-rendered

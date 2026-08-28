@@ -7,8 +7,8 @@ export type AuthFailureDisposition =
 
 export const ADMIN_AUTH_RETRY_BASE_MS = 1_000;
 export const ADMIN_AUTH_RETRY_MAX_MS = 30_000;
-export const ADMIN_REFRESH_MIN_LEAD_MS = 10_000;
-export const ADMIN_REFRESH_MAX_LEAD_MS = 60_000;
+const ADMIN_REFRESH_MIN_LEAD_MS = 10_000;
+const ADMIN_REFRESH_MAX_LEAD_MS = 60_000;
 export const ADMIN_REFRESH_MAX_EARLY_JITTER_MS = 5_000;
 
 const ADMIN_REFRESH_LEAD_RATIO = 0.2;
@@ -102,7 +102,7 @@ export function isDefinitiveAuthFailure(error: unknown): boolean {
   );
 }
 
-export function isSessionEndingAuthCode(code?: string): boolean {
+function isSessionEndingAuthCode(code?: string): boolean {
   return code !== undefined && SESSION_ENDING_AUTH_CODES.has(code);
 }
 

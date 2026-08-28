@@ -16,7 +16,7 @@ export const TENANT_FQDN_VALIDATION_STATUSES = [
   "INVALID",
 ] as const;
 
-export type TenantFqdnValidationStatus =
+type TenantFqdnValidationStatus =
   (typeof TENANT_FQDN_VALIDATION_STATUSES)[number];
 
 export interface TenantAddress {
@@ -136,7 +136,7 @@ export interface UpdateTenantProfileDto extends TenantProfileDraft {
   expectedUpdatedAt: string;
 }
 
-export type FqdnPreflightReason =
+type FqdnPreflightReason =
   | "INVALID_FORMAT"
   | "TAKEN"
   | "DNS_NOT_FOUND"
@@ -165,7 +165,7 @@ export const TENANT_OPERATION_STATUSES = [
   "CANCELLED",
 ] as const;
 
-export type TenantOperationStatus =
+type TenantOperationStatus =
   (typeof TENANT_OPERATION_STATUSES)[number];
 
 export const TENANT_OPERATION_TYPES = [
@@ -177,7 +177,7 @@ export const TENANT_OPERATION_TYPES = [
   "DECOMMISSION",
 ] as const;
 
-export type TenantOperationType = (typeof TENANT_OPERATION_TYPES)[number];
+type TenantOperationType = (typeof TENANT_OPERATION_TYPES)[number];
 
 export interface TenantProvisioningCommandResult {
   replayed: boolean;

@@ -19,7 +19,7 @@ export type ApplicationPublicationStatus =
   | "UNPUBLISHED"
   | "PUBLISHED";
 
-export type ApplicationDatabaseAccessMode =
+type ApplicationDatabaseAccessMode =
   | "NONE"
   | "TENANT_DATABASE";
 
@@ -29,7 +29,7 @@ export type ApplicationDatabaseDeployment =
   | "PREWARM"
   | "REQUIRED";
 
-export type ApplicationCommandOperation =
+type ApplicationCommandOperation =
   | "CREATE"
   | "UPDATE"
   | "ADOPT_TECHNICAL_PACKAGE"
@@ -42,7 +42,7 @@ export type ApplicationCommandOperation =
 
 export type BillingCycle = "MONTHLY" | "ANNUAL";
 
-export type ApplicationManifestPublicationSource = "MIGRATION" | "SIGNED_API";
+type ApplicationManifestPublicationSource = "MIGRATION" | "SIGNED_API";
 
 export type CatalogueAuditEntityType =
   | "MODULE"
@@ -76,7 +76,7 @@ export type ApplicationTechnicalReadinessReason =
   | "DATABASE_PERMISSION_MANIFEST_REQUIRED"
   | "DATABASE_PERMISSION_MANIFEST_INVALID";
 
-export type ApplicationTechnicalReadinessStatus =
+type ApplicationTechnicalReadinessStatus =
   | "READY"
   | "NOT_REQUIRED"
   | "BLOCKED";
@@ -88,7 +88,7 @@ export type ApplicationSelectionBlocker =
   | "APPLICATION_NON_BILLABLE"
   | "TECHNICAL_READINESS_BLOCKED";
 
-export interface ApplicationTechnicalComponentView {
+interface ApplicationTechnicalComponentView {
   id: string;
   key: string;
   ownerApp: string;
@@ -144,7 +144,7 @@ export interface AdoptApplicationTechnicalPackageDto {
   reason: string;
 }
 
-export interface ApplicationTechnicalIdentityView {
+interface ApplicationTechnicalIdentityView {
   runtimeTarget: string;
   primaryComponentKey: string;
   databasePrincipal: string | null;
@@ -152,7 +152,7 @@ export interface ApplicationTechnicalIdentityView {
   contractVersion: 1;
 }
 
-export interface ApplicationDatabasePolicyView {
+interface ApplicationDatabasePolicyView {
   enableOnNewServers: boolean;
   rotationEnabled: boolean;
   rotationIntervalHours: number;
@@ -347,7 +347,7 @@ export interface UpdateFeatureDto {
   isActive?: boolean;
 }
 
-export interface OutboundEmailConfig {
+interface OutboundEmailConfig {
   dailyQuota: number;
   rateLimitPerMin: number;
 }
@@ -362,7 +362,7 @@ export interface TierFeatureGrantView {
   updatedAt: string;
 }
 
-export interface TierFeatureInput {
+interface TierFeatureInput {
   featureId: string;
   config?: OutboundEmailConfig | Record<string, unknown>;
 }

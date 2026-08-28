@@ -23,14 +23,6 @@ import {
 } from "@/features/admin/tenant-workspace/core/model/intent-keys";
 import { databaseServersApi } from "@/features/admin/database-servers/api/database-servers.api";
 
-export const TENANT_DIRECTORY_STATUSES = [
-  "ACTIVE",
-  "PROVISIONING",
-  "PROVISIONING_FAILED",
-  "SUSPENDED",
-  "DELETED",
-] as const satisfies readonly TenantStatus[];
-
 export type TenantStatusFilter = TenantStatus | "ALL";
 export type TenantDirectoryModalAction = "activate" | "suspend" | "delete";
 export type TenantDirectoryAction = TenantDirectoryModalAction | "reprovision";
@@ -620,7 +612,7 @@ export function readTenantDirectoryPage(
   };
 }
 
-export function toTenantRecord(tenant: TenantView): TenantRecord {
+function toTenantRecord(tenant: TenantView): TenantRecord {
   const primary = tenant.fqdns.find((fqdn) => fqdn.isPrimary);
   return {
     id: tenant.id,

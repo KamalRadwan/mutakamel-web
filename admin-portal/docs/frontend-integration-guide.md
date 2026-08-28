@@ -281,13 +281,23 @@ field errors and `correlationId`. See
 - Unsafe calls without a verified caller-owned UUIDv7 (or an explicitly
   documented naturally idempotent contract) repair authentication but are not
   automatically replayed.
-- Emit user-activity evidence only for trusted pointer, keyboard, or touch input
-  in a visible tab. Checkpoint Core immediately, coalesce successful touches for
-  one minute, and retry a failed best-effort attempt no faster than five
-  seconds. Core requests also carry recent-input evidence; Worker requests wait
-  for the same five-second-bounded Core checkpoint. Polling, refresh,
-  focus/visibility events, synthetic events, hidden tabs, and WSS never extend
-  idle auth time; employee WSS-duration accounting is independent.
+- Emit the activity marker only for trusted pointer, keyboard, or touch input
+  in a visible tab. Checkpoint direct input immediately, coalesce successful
+  touches for one minute, and retry failed best-effort activity no faster than
+  five seconds. Core requests also carry recent input evidence; Worker requests
+  wait for the same five-second-bounded Core activity checkpoint. Polling,
+  access refresh, focus/visibility, synthetic events, hidden tabs, and WSS do
+  not claim human activity; employee WSS-duration accounting is independent.
+- While an authenticated tab remains visible, call the dedicated, CSRF-bound
+  `/auth/presence` contract on an adaptive cadence without the human-activity
+  marker. Seed from the current remaining session timing, cap the normal delay
+  at five minutes, never clamp a short positive remainder past its deadline,
+  and adopt only a same-session server response. Presence must not overwrite
+  the metadata timestamp that anchors access expiry. Use bounded exponential
+  retry while preserving any earlier retry across refresh timing updates.
+  Focus/page-show/online or visibility recovery checks immediately. Hidden and
+  closed tabs do no ongoing presence work, and stop scheduling when the idle
+  deadline reaches Core's absolute deadline.
 - Backup start, restore start, and restore promotion participate in the single
   coordinated refresh retry with their original UUIDv7 key and exact body;
   Worker returns the accepted run instead of dispatching a duplicate effect.

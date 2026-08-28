@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 import type { useTenantCoreWorkspace } from "../hooks/useTenantCoreWorkspace";
-import type { TenantAddress, TenantProfileDraft } from "../types";
+import type { TenantProfileDraft } from "../types";
 import {
   tenantWorkspaceCopy,
   type TenantWorkspaceLocale,
@@ -272,5 +272,3 @@ function NullableField({
     />
   );
 }
-
-export type TenantProfileAddressField = keyof TenantAddress;

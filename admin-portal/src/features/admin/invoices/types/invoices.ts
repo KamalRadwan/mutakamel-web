@@ -1,4 +1,5 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import type { PageResult, SortDirection } from "@/types/common";
 
 export const INVOICE_STATUSES = [
   "DRAFT",
@@ -29,8 +30,7 @@ export const INVOICE_SORT_FIELDS = [
   "createdAt",
 ] as const;
 
-export type InvoiceSortField = (typeof INVOICE_SORT_FIELDS)[number];
-export type SortDirection = "ASC" | "DESC";
+type InvoiceSortField = (typeof INVOICE_SORT_FIELDS)[number];
 
 export interface InvoiceLine {
   id: string;
@@ -72,15 +72,7 @@ export interface Invoice {
   lines?: InvoiceLine[];
 }
 
-export interface InvoicePage {
-  items: Invoice[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
-}
+export type InvoicePage = PageResult<Invoice>;
 
 export interface CoreSnapshot<T> {
   data: T;

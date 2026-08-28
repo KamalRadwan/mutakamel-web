@@ -44,11 +44,3 @@ export const surface = cva("", {
   },
   defaultVariants: { level: "base" },
 });
-
-/**
- * Expands the clickable/tappable area of a control without growing its box
- * — for icon-only controls below the 40px touch-target floor (the pattern
- * ToastContext.tsx already used ad hoc: `relative` + an absolutely
- * positioned pseudo-element inset by a negative margin).
- */
-export const hitArea = "relative after:absolute after:-inset-[6px] after:content-['']";

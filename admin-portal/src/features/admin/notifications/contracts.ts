@@ -10,10 +10,10 @@ import type {
 } from "./types";
 
 export const NOTIFICATION_LIST_LIMITS = [10, 20, 50] as const;
-export const NOTIFICATION_TYPE_MAX_LENGTH = 128;
-export const DEVICE_TOKEN_MAX_LENGTH = 4096;
-export const DEVICE_ID_MAX_LENGTH = 128;
-export const DEVICE_PLATFORM_MAX_LENGTH = 32;
+const NOTIFICATION_TYPE_MAX_LENGTH = 128;
+const DEVICE_TOKEN_MAX_LENGTH = 4096;
+const DEVICE_ID_MAX_LENGTH = 128;
+const DEVICE_PLATFORM_MAX_LENGTH = 32;
 
 const UUID_V7 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;

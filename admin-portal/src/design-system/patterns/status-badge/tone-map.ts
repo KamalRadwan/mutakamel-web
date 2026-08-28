@@ -5,9 +5,9 @@
 // not a 5th hue (docs/design-system/tokens.md's no-fifth-hue rule) —
 // motion survives colorblindness and this badge always renders a text
 // label anyway, so hue was never the only signal.
-export type StatusTone = "success" | "progress" | "warning" | "danger" | "neutral";
+type StatusTone = "success" | "progress" | "warning" | "danger" | "neutral";
 
-export interface ToneStyle {
+interface ToneStyle {
   bg: string;
   text: string;
   border: string;

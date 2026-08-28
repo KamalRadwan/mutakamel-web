@@ -1,27 +1,27 @@
 export const TENANT_ID = "019f0000-0000-7000-8000-000000000001";
 export const OPERATION_ID = "019f0000-0000-7000-8000-000000000010";
 export const RETRY_OPERATION_ID = "019f0000-0000-7000-8000-000000000011";
-export const STEP_ID = "019f0000-0000-7000-8000-000000000020";
-export const EVENT_ID = "019f0000-0000-7000-8000-000000000030";
-export const EVENT_ROW_ID = "019f0000-0000-7000-8000-000000000031";
+const STEP_ID = "019f0000-0000-7000-8000-000000000020";
+const EVENT_ID = "019f0000-0000-7000-8000-000000000030";
+const EVENT_ROW_ID = "019f0000-0000-7000-8000-000000000031";
 export const COMPONENT_ID = "019f0000-0000-7000-8000-000000000040";
 export const INSTALLATION_ID = "019f0000-0000-7000-8000-000000000041";
 export const RELEASE_ID = "019f0000-0000-7000-8000-000000000050";
 export const TARGET_RELEASE_ID = "019f0000-0000-7000-8000-000000000051";
 export const SEED_ID = "019f0000-0000-7000-8000-000000000060";
-export const REQUEST_ID = "019f0000-0000-7000-8000-000000000070";
-export const EVIDENCE_ID = "019f0000-0000-7000-8000-000000000080";
-export const FENCE_ID = "019f0000-0000-7000-8000-000000000090";
-export const RUN_ID = "019f0000-0000-7000-8000-0000000000a0";
-export const ARTIFACT_ID = "019f0000-0000-7000-8000-0000000000a1";
-export const LEASE_ID = "019f0000-0000-7000-8000-0000000000b0";
-export const RESOLUTION_ID = "019f0000-0000-7000-8000-0000000000c0";
-export const ADMIN_ID = "019f0000-0000-7000-8000-0000000000d0";
+const REQUEST_ID = "019f0000-0000-7000-8000-000000000070";
+const EVIDENCE_ID = "019f0000-0000-7000-8000-000000000080";
+const FENCE_ID = "019f0000-0000-7000-8000-000000000090";
+const RUN_ID = "019f0000-0000-7000-8000-0000000000a0";
+const ARTIFACT_ID = "019f0000-0000-7000-8000-0000000000a1";
+const LEASE_ID = "019f0000-0000-7000-8000-0000000000b0";
+const RESOLUTION_ID = "019f0000-0000-7000-8000-0000000000c0";
+const ADMIN_ID = "019f0000-0000-7000-8000-0000000000d0";
 export const COMMAND_ID = "019f0000-0000-7000-8000-0000000000e0";
 export const SHA_A = "a".repeat(64);
 export const SHA_B = "b".repeat(64);
-export const SHA_C = "c".repeat(64);
-export const NOW = "2026-08-11T19:33:49.000Z";
+const SHA_C = "c".repeat(64);
+const NOW = "2026-08-11T19:33:49.000Z";
 
 export const META = {
   page: 1,
@@ -58,7 +58,7 @@ export function operationSummary(
   };
 }
 
-export function operationStep(
+function operationStep(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
@@ -95,6 +95,7 @@ export function operationDetail(
 ): Record<string, unknown> {
   return {
     ...operationSummary(),
+    prerequisiteCount: 0,
     progress: {
       totalSteps: 2,
       completedSteps: 1,
@@ -129,7 +130,7 @@ export function timelineEvent(
   };
 }
 
-export function safeRelease(
+function safeRelease(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
