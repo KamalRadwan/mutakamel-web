@@ -7,7 +7,6 @@ import { BackupDialog } from "../components/BackupDialog";
 import { BackupErrorBanner } from "../components/BackupErrorBanner";
 import { BackupPageHeader } from "../components/BackupPageHeader";
 import { BackupServerSelect } from "../components/BackupServerSelect";
-import { BackupStatusBadge } from "../components/BackupStatusBadge";
 import { useBackupRuns } from "../hooks/useBackupRuns";
 import { formatBackupDate, shortBackupId } from "../lib/backup-format";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
@@ -27,6 +26,7 @@ import {
   DataTable,
   DegradedBanner,
   AmbiguousOutcomePanel,
+  StatusBadge,
   type ColumnDef,
 } from "@/design-system";
 
@@ -93,7 +93,7 @@ export function BackupRunsScreen() {
       headerAr: "الحالة",
       cell: (run) => (
         <div>
-          <BackupStatusBadge status={run.status} />
+          <StatusBadge status={run.status} />
           {run.hasFailure && <p className="mt-2 max-w-xs text-xs text-danger-600 dark:text-danger-400">{t.backup.artifactsScreen.failureRetainedNote}</p>}
         </div>
       ),

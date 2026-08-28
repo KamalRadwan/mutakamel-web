@@ -67,6 +67,7 @@ docs/
 | [views.md](design/views.md) | **The three-view contract** — board, card, table |
 | [detail-screens.md](design/detail-screens.md) | Lead & customer detail, and the conversion flow |
 | [accessibility.md](design/accessibility.md) | The single per-screen a11y checklist |
+| [SKILL-AUDIT.md](design/SKILL-AUDIT.md) | ui-ux-pro-max audit — 17 gaps, 5 divergences |
 | [shell.md](design/shell.md) | Sidebar, topbar, navigation map |
 | [theming.md](design/theming.md) | Light/dark, RTL, and the no-flash requirement |
 | [i18n.md](design/i18n.md) | Dictionary structure and the zero-ternary rule |

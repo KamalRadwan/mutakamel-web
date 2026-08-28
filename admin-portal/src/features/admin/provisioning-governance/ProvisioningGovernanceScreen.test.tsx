@@ -171,7 +171,10 @@ describe("ProvisioningGovernanceScreen", () => {
     // fires it.
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Discovery runs" }));
     fireEvent.click(screen.getByRole("button", { name: "Review command" }));
-    const confirmation = screen.getByLabelText("Type RUN");
+    // The typed-confirmation field now comes from the shared
+    // ConfirmActionModal (F-FE-003 consolidation), which always renders this
+    // fixed bilingual aria-label rather than the old "Type RUN" field label.
+    const confirmation = screen.getByLabelText("Type the exact name to confirm");
     const submit = screen.getByRole("button", { name: "Start discovery" });
     expect(submit).toBeDisabled();
     fireEvent.change(confirmation, { target: { value: "RUN" } });

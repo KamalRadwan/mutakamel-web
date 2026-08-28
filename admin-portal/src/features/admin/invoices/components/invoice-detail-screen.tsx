@@ -16,6 +16,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  StatusBadge,
   type ColumnDef,
 } from "@/design-system";
 import { useInvoiceDetail } from "../hooks/use-invoice-detail";
@@ -30,7 +31,6 @@ import {
   InvoicePageFrame,
   InvoiceSnapshotMeta,
   InvoiceStatePanel,
-  InvoiceStatusBadge,
   invoiceValidationMessage,
   RetryInvoiceButton,
   type InvoiceCopy,
@@ -97,7 +97,7 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 dir="ltr" className="font-mono text-xl font-semibold text-start sm:text-2xl">{invoice.number}</h1>
-              <InvoiceStatusBadge status={invoice.status} />
+              <StatusBadge status={invoice.status} />
             </div>
             <code dir="ltr" className="mt-2 block break-all text-start text-xs text-muted-foreground">{invoice.id}</code>
             <p className="mt-2 font-mono text-xs font-semibold text-brand-700 dark:text-brand-400">{invoice.purpose}</p>

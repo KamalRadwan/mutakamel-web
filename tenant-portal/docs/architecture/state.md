@@ -16,6 +16,7 @@ hold the same fact, one of them is stale.
 | Current user, permissions | `AuthContext`, from `/auth/me` | Advisory in the UI; backend is authoritative |
 | Per-branch action capabilities | Feature hook, from the capabilities endpoint | Re-derived, never cached across branch changes |
 | Filters, page, sort, view, branch | **URL search params** | Shareable, survives refresh |
+| Scroll position on back-navigation | Browser (table) / persisted (board) | See below — a board column scrolls inside its own container |
 | Unsaved form draft | Feature-local form state | Discarded on close, guarded when dirty |
 | Sidebar collapsed | `tenant_sidebar` cookie | Read server-side, no flash |
 | Theme | `localStorage["tenant_theme"]` | Pre-hydration bootstrap |
@@ -23,6 +24,19 @@ hold the same fact, one of them is stale.
 | Per-screen view preference | `localStorage["tenant_view_<screen>"]` | Fallback when no `?view=` |
 | Toasts | `sonner` | Transient; never the only record of a result |
 | Realtime notifications | `lib/notifications` runtime | `useSyncExternalStore` |
+
+### Scroll position
+
+Filters and pagination come back for free because they live in the URL. Scroll
+position does not, and it is the one users notice: inspecting row 40 and
+returning to row 1 means re-finding your place on every record.
+
+The **table** view scrolls the page — Next's scroll restoration covers it, so
+do not fight it with a `scrollTo(0)` on mount. The **board** view scrolls
+inside its own column container, which the browser does not restore; persist
+that offset alongside the view preference.
+
+A filter change is a new result set — resetting to the top is correct there.
 
 ## Rules
 

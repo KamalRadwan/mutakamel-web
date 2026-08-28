@@ -168,7 +168,7 @@ The server's localized message may be shown as supporting detail, but the
 headline is ours and is translated.
 
 The transport's own forbidden toast is currently hardcoded English — that is
-[DEFECTS.md](../build/DEFECTS.md#d9) D9, and it is the one permitted i18n fix
+[DEFECTS.md](../build/DEFECTS.md#d9--transports-forbidden-toast-is-hardcoded-english) D9, and it is the one permitted i18n fix
 inside `axiosClient.ts`.
 
 ## Never

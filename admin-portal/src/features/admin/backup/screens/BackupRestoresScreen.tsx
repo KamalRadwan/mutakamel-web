@@ -7,7 +7,6 @@ import { BackupDialog } from "../components/BackupDialog";
 import { BackupErrorBanner } from "../components/BackupErrorBanner";
 import { BackupPageHeader } from "../components/BackupPageHeader";
 import { BackupStatePanel } from "../components/BackupStatePanel";
-import { BackupStatusBadge } from "../components/BackupStatusBadge";
 import { useBackupRestores } from "../hooks/useBackupRestores";
 import { formatBackupDate, shortBackupId } from "../lib/backup-format";
 import { useI18n } from "@/i18n/I18nContext";
@@ -26,6 +25,7 @@ import {
   DataTable,
   DegradedBanner,
   AmbiguousOutcomePanel,
+  StatusBadge,
   type ColumnDef,
 } from "@/design-system";
 
@@ -113,7 +113,7 @@ export function BackupRestoresScreen() {
       headerAr: "الحالة",
       cell: (restore) => (
         <div>
-          <BackupStatusBadge status={restore.status} />
+          <StatusBadge status={restore.status} />
           {restore.hasFailure && <p className="mt-2 max-w-xs text-xs text-danger-600 dark:text-danger-400">{t.backup.artifactsScreen.failureRetainedNote}</p>}
         </div>
       ),

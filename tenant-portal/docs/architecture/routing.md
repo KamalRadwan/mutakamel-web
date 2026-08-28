@@ -142,7 +142,7 @@ within it. Any changed user-facing URL gets a redirect, never a silent break.
 A route file may parse params, run server-only admission, pick a feature entry
 point, and declare metadata. It may not hold API clients, permission logic, DTO
 validation, or stateful components. See
-[file-architecture.md](file-architecture.md#route-files-are-thin).
+[file-architecture.md](file-architecture.md#route-files).
 
 ## URL state
 

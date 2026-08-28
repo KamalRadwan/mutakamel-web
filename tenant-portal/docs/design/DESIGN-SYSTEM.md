@@ -203,7 +203,7 @@ Fallback if Readex Pro's Arabic proves too wide at row density: **Zain**.
 | --- | ---: | ---: | ---: | --- |
 | `text-2xs` | 12px | 12px | 16 | Latin uppercase micro-labels **only** |
 | `text-xs` | **13px** | **14px** | 18 / 20 | **Workhorse** — table cells, badges, metadata |
-| `text-sm` | **14px** | **15px** | 20 / 22 | Base — body, inputs, buttons, nav |
+| `text-sm` | **14px** | **15px** | 20 / 22 | Base — body, buttons, nav ([not inputs on mobile](#inputs-are-16px-on-mobile)) |
 | `text-base` | 15px | 16px | 24 / 26 | Prose, dialog description |
 | `text-lg` | 17px | 17px | 24 | Card and dialog titles |
 | `text-xl` | 20px | 20px | 28 | Page title |
@@ -214,6 +214,27 @@ tighter spacing and shorter rows, never smaller type — 11px Arabic is
 unreadable, and a screen nobody can read fits zero items. Arabic gains 1px on
 the three smallest steps because Naskh forms need the room for dots and
 diacritics.
+
+### Inputs are 16px on mobile
+
+**Every text-entry control renders at 16px below `sm` (640px), and drops to
+`text-sm` from `sm:` upward.**
+
+```
+text-base sm:text-sm      /* Input, Textarea, Select trigger, search */
+```
+
+This is not a style preference. **Mobile Safari zooms the viewport whenever a
+focused input is smaller than 16px** — the page jumps, the layout leaves the
+frame, and the user has to pinch back out to carry on. It fires on every focus,
+on every visit.
+
+Desktop density is untouched: the rule only applies under 640px, where there is
+no dense table to protect. `/login` is the screen this actually saves, since it
+is the one page genuinely opened from a phone.
+
+Applies to anything that receives typed input, including the `FilterBar` search
+field. It does **not** apply to buttons, labels, or read-only text.
 
 ## Weights — three, physically enforced
 
@@ -253,6 +274,28 @@ Tuned for many rows on a 1366×768 laptop.
   --size-rail:     3rem;        /* 48px collapsed */
 }
 ```
+
+## Stacking order
+
+Six real layers, and they collide if left to chance — a sticky table column
+will happily cover an open dropdown. Declare the ladder once; never write a
+bare `z-50`.
+
+```css
+:root {
+  --z-sticky-cell:   10;   /* sticky first / action column */
+  --z-sticky-header: 20;   /* sticky table header — above its own cells */
+  --z-topbar:        30;   /* app chrome, above page content */
+  --z-dropdown:      40;   /* popover, select, tooltip, flyout */
+  --z-overlay:      100;   /* dialog, sheet, and their scrim */
+  --z-toast:       1000;   /* always last — must clear a modal */
+}
+```
+
+Two ordering facts that are easy to get backwards: the sticky **header** sits
+above the sticky **cell** (or the first column covers the header on horizontal
+scroll), and the **toast** sits above the **overlay** (a confirm dialog's
+result has to be visible over the dialog that triggered it).
 
 **What this buys:** 44px topbar + 36px header + 36px rows on 768px of viewport
 gives **16 rows visible without scrolling**, against 11 at the previous
@@ -435,6 +478,28 @@ Titles and messages come from the dictionary. `sonner` mounted once in the root
 layout; RTL-aware; bottom-`end` anchored so it never covers the primary action
 in `PageHeader`.
 
+### The accessibility contract
+
+Because **every** write result in this product is a toast, this contract is
+load-bearing — a toast that a screen-reader user never hears means they get no
+confirmation of any action they take.
+
+- **`aria-live="polite"`. Never `assertive`.** A save confirmation must not
+  interrupt what the user is reading mid-sentence.
+- **A toast never takes focus.** Focus stays where the user put it; stealing it
+  after a save throws a keyboard user out of the form they were in.
+- **Any toast carrying an action must be keyboard-reachable.** This covers the
+  5xx retry and, critically, the permanent `duration: 0` ambiguous-outcome
+  toast — its Retry is sometimes the only path to resolving a write, so it must
+  be operable without a mouse and must not auto-dismiss out from under a
+  keyboard user.
+- **Never convey a result by color alone.** Success and failure toasts carry an
+  icon and a text label, not just a green or red edge.
+
+Timed dismissal at 4000ms is a *default*, not a rule for every case: a toast
+whose only purpose is confirmation may be shorter (2s for a stage move), and
+one carrying evidence must be permanent.
+
 ## Mapping
 
 | Event | Surface |
@@ -511,7 +576,8 @@ orbs, no illustration.
 | Brand mark | 28px square, `bg-brand-600`, `rounded-sm`, above the card |
 | Card | `bg-card`, `border-border`, `rounded-md`, `p-6`, **no shadow** |
 | Title | `text-lg` / 600 |
-| Fields | `Field` + `Input`, `size="lg"` (36px) — the one place bigger is right |
+| Fields | `Field` + `Input`, `size="lg"` (36px) — the one place bigger is right. `text-base sm:text-sm` per the [mobile input rule](#inputs-are-16px-on-mobile) |
+| Autofill | `autocomplete="username"` on email, `autocomplete="current-password"` on password. **Never block paste** — WCAG 2.2 AA `accessible-authentication` requires password managers to work |
 | Submit | `Button variant="primary" size="lg"`, full width |
 | Forgot password | `Button variant="link"`, `text-xs`, under the password field |
 | Toggles | Language + theme, top-inline-end of the viewport |
@@ -559,9 +625,25 @@ error / loading states. **A view never fetches.**
 ### Toolbar — 28px controls
 
 Search input `size="sm"`, 240px, leading `Search` icon, 300ms debounce, `q` in
-the URL. Filters collapse behind a `Filters` button with a count badge below
-`lg`. Active filters show as removable chips on a second line **only when set**
-— an always-present empty chip row wastes 32px.
+the URL, and `text-base sm:text-sm` — it takes typed input, so the
+[mobile input rule](#inputs-are-16px-on-mobile) applies to it too.
+
+Filters collapse behind a `Filters` button with a count badge below `lg`.
+Active filters show as removable chips on a second line **only when set** — an
+always-present empty chip row wastes 32px.
+
+**Chip overflow.** With eight filters set the row has to give somewhere, and
+the wrong answer is shrinking labels until they truncate — a chip reading
+`Acquisition so…` tells the user nothing about what is filtering their data.
+
+1. **Wrap the collection first.** Chips reflow onto a second row at full label
+   width before anything shrinks.
+2. **Past two rows, collapse to `+n`.** That `+n` is a real `Button` that opens
+   a popover listing the remaining chips, each still individually removable —
+   **not** a static count. A number the user cannot act on hides state they are
+   entitled to change.
+3. **Never truncate a chip label.** If a value is genuinely too long for one
+   line, it belongs in the popover, not in an ellipsis.
 
 ### View switcher
 
@@ -719,6 +801,20 @@ above 16 rows of data.
 - **No hand-rolled** `<button>` `<input>` `<select>` `<table>`.
 - **No mock data, no simulated success.**
 - Every icon-only control has a translated `aria-label` **and** a tooltip.
+- **`cursor-pointer` on everything clickable.** Neither Radix nor Tailwind
+  Preflight sets it, and a native `<button>` does not get it for free. It lives
+  in the `Button` base CVA; a clickable row, card, or chip has to add it. A
+  clickable surface with a text cursor reads as inert.
+- **Text-entry controls are `text-base sm:text-sm`** — see
+  [the mobile input rule](#inputs-are-16px-on-mobile).
+- **Identifiers wrap, they do not overflow.** `overflow-wrap: anywhere` on the
+  mono/ID utility, so a 36-character UUID, `correlationId`, or idempotency key
+  reflows instead of pushing a toast or a cell off-screen. **Never
+  `word-break: break-all`** — it applies to prose too and mangles ordinary
+  sentences mid-word.
+- **Prose is capped at `max-w-[65ch]`.** Dialog descriptions, empty states, and
+  the ambiguous-outcome panel. Table cells, labels, and badges are exempt —
+  they are not prose.
 
 ## Gates
 

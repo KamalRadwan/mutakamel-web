@@ -74,6 +74,10 @@ const STATUS_ENTRIES: Record<string, [StatusTone, string, string]> = {
   COPYING: ["progress", "Copying", "جارٍ النسخ"],
   COPIED: ["progress", "Copied", "تم النسخ"],
   PLACEMENT_COMMITTED: ["progress", "Placement Committed", "تم اعتماد التوزيع"],
+  // Backup encryption-key rotation actively swapping the active key —
+  // non-terminal, same "progress" treatment as the storage-credential
+  // rotation steps above.
+  ROTATING: ["progress", "Rotating", "قيد التدوير"],
 
   SUSPENDED: ["warning", "Suspended", "معلق"],
   ISSUED: ["warning", "Issued", "صادر"],
@@ -83,6 +87,11 @@ const STATUS_ENTRIES: Record<string, [StatusTone, string, string]> = {
   // A migration actively unwinding after a failure — not yet the terminal
   // ROLLED_BACK state, so it reads as an active caution, not a hard danger.
   ROLLING_BACK: ["warning", "Rolling Back", "جارٍ التراجع"],
+  // Backup job finished but recorded errors along the way — worse than a
+  // clean COMPLETED, not yet a hard FAILED.
+  COMPLETED_WITH_ERRORS: ["warning", "Completed with Errors", "مكتمل مع أخطاء"],
+  DEFERRED: ["warning", "Deferred", "مؤجل"],
+  DUE: ["warning", "Due", "مستحق"],
 
   FAILED: ["danger", "Failed", "فشل"],
   FAILURE: ["danger", "Failure", "فشل"],
@@ -90,17 +99,28 @@ const STATUS_ENTRIES: Record<string, [StatusTone, string, string]> = {
   OVERDUE: ["danger", "Overdue", "متأخر"],
   OFFLINE: ["danger", "Offline", "غير متصل"],
   ROLLED_BACK: ["danger", "Rolled Back", "تم التراجع"],
+  EXPIRED: ["danger", "Expired", "منتهي الصلاحية"],
+  BLOCKED: ["danger", "Blocked", "محظور"],
 
   COMPLETED: ["success", "Completed", "مكتمل"],
   // Terminal state of a credential rotation: the previous key is proven
   // rejected. Distinct from VOID/CANCELLED below — REVOKED is the
   // successful end of a rotation, not an abandoned one.
   REVOKED: ["success", "Revoked", "مُبطل"],
+  // Backup evidence states: a verified restore point, or a snapshot
+  // promoted to become the new primary/active copy.
+  VERIFIED: ["success", "Verified", "تم التحقق"],
+  PROMOTED: ["success", "Promoted", "تمت الترقية"],
+  READY: ["success", "Ready", "جاهز"],
 
   DELETED: ["neutral", "Deleted", "محذوف"],
   CANCELLED: ["neutral", "Cancelled", "ملغى"],
   VOID: ["neutral", "Void", "لاغٍ"],
   OFF: ["neutral", "Off", "متوقف"],
+  // Invoice lifecycle: an unissued manual draft, editable and not yet
+  // transmitted — same neutral tone as VOID/CANCELLED (not yet "real"),
+  // but a distinct label so operators don't confuse the two.
+  DRAFT: ["neutral", "Draft", "مسودة"],
 };
 
 export function resolveStatusTone(status: string): ToneStyle {

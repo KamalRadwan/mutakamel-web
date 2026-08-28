@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmActionModal,
   DataTable,
   Field,
   Input,
@@ -18,7 +19,6 @@ import { useFleetPreview } from "./hooks";
 import {
   FleetBackLink,
   FleetCommandNotice,
-  FleetConfirmDialog,
   FleetDatum,
   FleetFieldError,
   FleetHero,
@@ -39,6 +39,8 @@ import type {
 export function FleetPreviewScreen({ previewId }: { previewId: string }) {
   const { lang, dir } = useI18n();
   const copy = getProvisioningFleetCopy(lang);
+  const copyEn = getProvisioningFleetCopy("en");
+  const copyAr = getProvisioningFleetCopy("ar");
   const view = useFleetPreview(previewId);
   const preview = view.preview.data?.data ?? null;
   const [draft, setDraft] = useState<FleetRolloutDraft>(() =>
@@ -203,13 +205,15 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
         </>
       ) : null}
 
-      <FleetConfirmDialog
-        open={pendingCommand !== null}
-        title={copy.confirmLaunchTitle}
-        body={copy.confirmLaunchBody}
-        target={pendingCommand ? JSON.stringify(pendingCommand) : ""}
-        copy={copy}
-        pending={pending}
+      <ConfirmActionModal
+        isOpen={pendingCommand !== null}
+        titleEn={copyEn.confirmLaunchTitle}
+        titleAr={copyAr.confirmLaunchTitle}
+        descriptionEn={copyEn.confirmLaunchBody}
+        descriptionAr={copyAr.confirmLaunchBody}
+        confirmTextEn={copyEn.confirm}
+        confirmTextAr={copyAr.confirm}
+        isLoading={pending}
         onClose={() => !pending && setPendingCommand(null)}
         onConfirm={() => {
           if (!pendingCommand) return;

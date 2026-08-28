@@ -6,7 +6,7 @@ Written: **2026-08-27**
 
 Source of truth once implemented: `src/app/fonts.ts`, `src/app/globals.css`.
 
-## The current state this replaces
+## What this replaced (pre-rebuild, for context)
 
 The app loads **zero fonts**. There is no `next/font` call anywhere, and no
 Arabic face — so an Arabic-first product currently renders in whatever the
@@ -220,6 +220,37 @@ Money and quantity arrive as exact decimal strings. **Never** `Number()` them �
 that silently loses precision past 2^53 and rounds trailing digits. Format for
 display from the string; never compute totals in the browser. See
 [architecture/data-layer.md](../architecture/data-layer.md#decimals).
+
+## Three rules the scale alone does not cover
+
+### Inputs are 16px on mobile
+
+Text-entry controls render `text-base sm:text-sm`. Mobile Safari zooms the
+viewport on focus for any input under 16px, which breaks the layout on every
+visit. Full rule and rationale in
+[DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#inputs-are-16px-on-mobile).
+
+### Prose is capped at 65 characters
+
+`max-w-[65ch]` on dialog descriptions, empty states, error prose, and the
+ambiguous-outcome panel. Past roughly 75 characters the eye loses the line
+return; in a full-width ERP container prose otherwise runs to 160+.
+
+Exempt: table cells, labels, badges, nav items. Those are not prose and a
+`ch` cap would only introduce ragged wrapping.
+
+### Identifiers wrap, never overflow
+
+UUIDs, `correlationId`s, idempotency keys and error codes are unbroken
+36-character tokens with no natural break point. In a toast or a narrow cell
+they push their container off-screen.
+
+```css
+overflow-wrap: anywhere;   /* on the mono / ID utility */
+```
+
+**Never `word-break: break-all`** — it applies to ordinary prose as well and
+hyphenates normal Arabic and English words mid-syllable.
 
 ## Applying the scale
 

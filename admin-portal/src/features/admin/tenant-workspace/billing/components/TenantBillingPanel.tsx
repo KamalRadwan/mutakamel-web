@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
+import { ShieldAlert } from "lucide-react";
 import {
   Card,
   Field,
   Input,
   Button,
   DataTable,
+  EmptyState,
   type ColumnDef,
 } from "@/design-system";
 import type { UseTenantBillingWorkspaceResult } from "../hooks/useTenantBillingWorkspace";
@@ -727,10 +729,10 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
           <ErrorNotice error={workspace.ledgerError} lang={lang} />
         ) : null}
         {workspace.ledgerState === "forbidden" ? (
-          <p className="mt-3 text-sm text-warn-700 dark:text-warn-400">{copy.ledgerForbidden}</p>
+          <LedgerForbiddenState title={copy.ledgerForbidden} />
         ) : null}
         {workspace.ledgerState === "empty" ? (
-          <p className="mt-3 text-sm text-muted-foreground">{copy.noLedger}</p>
+          <EmptyState title={copy.noLedger} />
         ) : null}
         {workspace.ledgerState === "ready" ? (
           <div className="mt-3">
@@ -1308,6 +1310,19 @@ function Metric({
 function StateCard({ children }: { children: ReactNode }) {
   return (
     <Card className="p-5 text-sm text-muted-foreground">{children}</Card>
+  );
+}
+
+// A 403 is not an empty state (AGENTS.md) — same layout rhythm as the shared
+// EmptyState pattern, but a distinct icon and an "alert" role so assistive
+// tech and a quick visual scan both tell a permission gap apart from a
+// genuinely empty ledger.
+function LedgerForbiddenState({ title }: { title: string }) {
+  return (
+    <div role="alert" className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+      <ShieldAlert className="mb-1 size-8 text-ink-300 dark:text-ink-600" aria-hidden="true" />
+      <p className="text-sm font-medium text-foreground">{title}</p>
+    </div>
   );
 }
 

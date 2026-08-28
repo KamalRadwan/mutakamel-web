@@ -42,12 +42,13 @@ matters more than the answer.
 - **DM Mono** — available at 400 and 500.
 - **Zain** — available, confirmed as a viable fallback.
 
-**Still open:** whether Readex Pro's Arabic is too wide for a 40px table row at
+**Still open:** whether Readex Pro's Arabic is too wide for a **36px** table row at
 `text-xs`. That needs a rendered look, which this environment could not
 reliably produce.
 
-**Action in phase 2:** load the fonts, open a populated table in Arabic, and
-look. If rows overflow, switch to **Zain** and record the change in
+**Action:** the fonts are loaded and the app now renders — open a populated
+table in Arabic and look. This is the last unverified visual assumption in the
+system. If rows overflow, switch to **Zain** and record the change in
 [typography.md](../design/typography.md).
 
 ---
@@ -69,7 +70,8 @@ values rather than estimating them. Running it the first time found:
    never a filled button"* stands, but on **semantic** grounds, not contrast.
 
 All twelve required pairings now pass. The tightest is `brand-500` as the light
-focus ring at **3.19** against a 3.0 bar — noted in
+focus ring at **3.74** against a 3.0 bar (it was 3.19 under the superseded
+warm palette) — noted in
 [tokens.md](../design/tokens.md#contrast-resolution) so nobody erodes it.
 
 ---

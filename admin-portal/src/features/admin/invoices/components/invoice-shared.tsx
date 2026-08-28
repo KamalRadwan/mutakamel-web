@@ -5,7 +5,6 @@ import { AlertTriangle, FileText, Loader2, RefreshCw, ShieldAlert } from "lucide
 import { PageHeader, Badge, Button } from "@/design-system";
 import type {
   CoreSnapshot,
-  Invoice,
   InvoiceMutationState,
   InvoiceValidationCode,
 } from "../types/invoices";
@@ -341,22 +340,6 @@ export function InvoiceSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSn
       <p><strong className="text-foreground">{copy.responseAt}:</strong> {formatInvoiceDate(snapshot.responseTimestamp, lang)}</p>
       <p className="min-w-0"><strong className="text-foreground">{copy.correlation}:</strong> <code dir="ltr" className="ms-1 select-all break-all">{snapshot.correlationId}</code></p>
     </footer>
-  );
-}
-
-export function InvoiceStatusBadge({ status }: { status: Invoice["status"] }) {
-  const tone: "brand" | "neutral" | "warn" | "danger" =
-    status === "PAID"
-      ? "brand"
-      : status === "DRAFT" || status === "VOID"
-        ? "neutral"
-        : status === "ISSUED" || status === "PARTIALLY_PAID"
-          ? "warn"
-          : "danger";
-  return (
-    <Badge dir="ltr" tone={tone} className="font-mono">
-      {status}
-    </Badge>
   );
 }
 

@@ -152,12 +152,12 @@ existing choices already avoid each one; do not reintroduce them.
 | Cliché | What this system does instead |
 | --- | --- |
 | Purple-to-blue gradient hero | No hero. A CRM opens on data |
-| Warm cream `#F4F1EA` + serif + terracotta | Warm graphite `ink` + Readex Pro + petrol |
+| Warm cream `#F4F1EA` + serif + terracotta | Cold-blue `ink` + Readex Pro + blue brand |
 | Near-black with one acid-green pop | Four roles, none acid |
 | Inter / Geist / Space Grotesk / Cairo as the "safe" face | Readex Pro, a bilingual superfamily |
-| Generic SaaS blue at hue 250 | Petrol at 218 |
+| Generic SaaS blue at hue 250 | Blue at **258**, on a cold-blue neutral at 240 — same family, deliberately not the Bootstrap default |
 | Glassmorphism panels | Border + background step |
-| Big rounded stat cards with an accent bar | 40px rows and `StatCard` at `rounded-md` |
+| Big rounded stat cards with an accent bar | 36px rows and `StatCard` at `rounded-md` |
 | Floating action button | Actions live in `PageHeader` |
 | Illustrated empty states | One icon, one line, one action |
 | Animated page transitions | See [motion.md](motion.md#the-budget) |
@@ -167,7 +167,7 @@ existing choices already avoid each one; do not reintroduce them.
 Reviewers sometimes justify a violation with "it's a dense admin UI". Density
 is achieved by:
 
-- 40px rows, 36px controls, tight `gap` values
+- 36px rows, 32px controls, tight `gap` values
 - A 13px workhorse type size — not 10px
 - Short labels — not smaller labels
 - Fewer columns — not narrower columns

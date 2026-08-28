@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmActionModal,
   DataTable,
   Field,
   Input,
@@ -23,7 +24,6 @@ import { isFleetActionAllowed } from "./model";
 import {
   FleetBackLink,
   FleetCommandNotice,
-  FleetConfirmDialog,
   FleetDatum,
   FleetHero,
   FleetMeta,
@@ -55,6 +55,8 @@ type Confirmation =
 export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
   const { lang, dir } = useI18n();
   const copy = getProvisioningFleetCopy(lang);
+  const copyEn = getProvisioningFleetCopy("en");
+  const copyAr = getProvisioningFleetCopy("ar");
   const view = useFleetRollout(rolloutId);
   const rollout = view.rollout.data?.data ?? null;
   const report = view.report.data?.data ?? null;
@@ -125,13 +127,13 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
 
   const confirmationCopy = confirmation
     ? confirmation.kind === "attest"
-      ? { title: copy.confirmAttestTitle, body: copy.confirmAttestBody }
+      ? { titleEn: copyEn.confirmAttestTitle, titleAr: copyAr.confirmAttestTitle, bodyEn: copyEn.confirmAttestBody, bodyAr: copyAr.confirmAttestBody }
       : confirmation.action === "pause"
-        ? { title: copy.confirmPauseTitle, body: copy.confirmPauseBody }
+        ? { titleEn: copyEn.confirmPauseTitle, titleAr: copyAr.confirmPauseTitle, bodyEn: copyEn.confirmPauseBody, bodyAr: copyAr.confirmPauseBody }
         : confirmation.action === "resume"
-          ? { title: copy.confirmResumeTitle, body: copy.confirmResumeBody }
-          : { title: copy.confirmCancelTitle, body: copy.confirmCancelBody }
-    : { title: "", body: "" };
+          ? { titleEn: copyEn.confirmResumeTitle, titleAr: copyAr.confirmResumeTitle, bodyEn: copyEn.confirmResumeBody, bodyAr: copyAr.confirmResumeBody }
+          : { titleEn: copyEn.confirmCancelTitle, titleAr: copyAr.confirmCancelTitle, bodyEn: copyEn.confirmCancelBody, bodyAr: copyAr.confirmCancelBody }
+    : { titleEn: "", titleAr: "", bodyEn: "", bodyAr: "" };
 
   return (
     <FleetPageFrame dir={dir}>
@@ -284,13 +286,15 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
         ) : null}
       </Card>
 
-      <FleetConfirmDialog
-        open={confirmation !== null}
-        title={confirmationCopy.title}
-        body={confirmationCopy.body}
-        target={confirmation ? JSON.stringify(confirmation.command) : ""}
-        copy={copy}
-        pending={pendingManage || pendingAttest}
+      <ConfirmActionModal
+        isOpen={confirmation !== null}
+        titleEn={confirmationCopy.titleEn}
+        titleAr={confirmationCopy.titleAr}
+        descriptionEn={confirmationCopy.bodyEn}
+        descriptionAr={confirmationCopy.bodyAr}
+        confirmTextEn={copyEn.confirm}
+        confirmTextAr={copyAr.confirm}
+        isLoading={pendingManage || pendingAttest}
         onClose={() => {
           if (!pendingManage && !pendingAttest) setConfirmation(null);
         }}

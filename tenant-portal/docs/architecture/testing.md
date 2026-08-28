@@ -125,9 +125,18 @@ changed something in the spine that you should not have.
 - `Button` — `loading` sets `aria-busy`; `asChild` renders one child
 - `Field` — `htmlFor`, `aria-describedby`, `aria-invalid` wiring
 - `Dialog` — focus trap, `Escape`, focus restoration
-- `DataTable` — pagination and sort callbacks fire with the right arguments; empty and error states render
+- `DataTable` — pagination and sort callbacks fire with the right arguments;
+  empty and error states render; the sorted column reports `aria-sort` and the
+  rest report `none`
 - `ViewSwitcher` — arrow-key navigation, `aria-checked`
 - `StatusBadge` — **an unmapped value renders a fallback rather than throwing**
+- `FormDrawer` — a 422 with two invalid fields moves focus to the **first**
+  invalid field
+- `Field` — validates on **blur**, not on keystroke; `readOnly` renders
+  `aria-readonly` and is not `disabled`
+- `BoardCard` — the **Move to…** menu item is present and fires the same move
+  mutation as a drag (the WCAG single-pointer alternative)
+- `AppShell` — the skip link is the first focusable element and targets `#main`
 
 ### Phase 4 defect regressions
 

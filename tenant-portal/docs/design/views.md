@@ -78,7 +78,7 @@ re-implements one.
   `branchId` is a **required** query parameter on all three list endpoints.
 - **Permissions.** Action visibility comes from the screen's `capabilities`
   endpoint, not from guessing at `/auth/me` strings. See
-  [api/crm-leads.md](../api/crm-leads.md#capabilities).
+  [api/crm-leads.md](../api/crm-leads.md#get-leadscapabilities).
 - **Empty / error / forbidden / loading.** `EmptyState`, `ErrorState`,
   `PermissionGate`, `Skeleton` — rendered by the workspace, above the view.
 - **Bilingual and themed.** Every view, in both languages and both themes.
@@ -98,6 +98,21 @@ export type WorkspaceView = "board" | "card" | "table";
   Profiles → `table` (a customer list is a directory, not a funnel).
 - Storage reads and writes go through `safeStorage` and must survive a throwing
   or absent `localStorage`.
+
+### Returning from a detail screen restores position
+
+Filters, page, sort, view and branch already live in the URL, so they come back
+for free. **Scroll position does not** — and a table is where it matters most:
+opening row 40, then coming back to row 1, means re-scrolling and re-finding
+your place on every single record you inspect.
+
+- The **table view** scrolls the page; Next's scroll restoration handles it, so
+  do not intercept it with a manual `scrollTo(0)` on mount.
+- The **board view** scrolls *inside* its own column container, which browser
+  restoration does not cover. Persist the column scroll offset with the view
+  preference and restore it on mount.
+- Never reset scroll on a filter change — that is a new result set, and the top
+  is correct there.
 
 ## The switcher
 
@@ -165,6 +180,25 @@ blank space, which reads as broken.
   opens a confirm dialog before committing, because it is not freely
   reversible. Leads and Opportunities both need this.
 
+### Every card carries a "Move to…" action — not optional
+
+**WCAG 2.2 AA (`dragging-alternative`) requires a single-pointer alternative to
+every drag operation, in addition to the keyboard path.** The keyboard path
+above satisfies only half of it.
+
+Each board card's overflow menu contains **Move to…**, opening the same stage
+`Select` the detail screen uses and calling the same move mutation. One
+control, no new endpoint, no new state.
+
+This is a conformance requirement, not a convenience. A user with a tremor, a
+motor impairment, a trackpad they struggle with, or a switch device cannot
+complete a sustained press-move-release — and without this menu the board is
+**completely unusable** to them, because moving a card between stages is the
+only thing a board is for.
+
+Applies to all three board screens. The menu item is subject to the same
+capability gate as dragging, and a terminal destination confirms the same way.
+
 **Card content** is per-screen; see the table at the end of this file.
 
 ## Card view
@@ -201,7 +235,7 @@ src/design-system/views/table/TableView.tsx  →  wraps DataTable
 Not a hand-rolled `<table>`. It configures `DataTable` — see
 [patterns.md](patterns.md#datatable) — which already owns sticky headers,
 column sizing, row selection, sorting, pagination, keyboard navigation, the
-40px row height, and the zebra row token.
+36px row height, and the zebra row token.
 
 - Row height 40px, `text-xs`, weight 400.
 - Sticky header, `bg-card` with a bottom `border-border`.

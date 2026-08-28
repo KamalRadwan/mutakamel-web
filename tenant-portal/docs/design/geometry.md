@@ -12,7 +12,7 @@ Source of truth once implemented: `src/app/globals.css`,
 > graphite, and controls/rows are **32px/36px**, not 36px/40px. This page keeps the
 > longer reasoning behind the radius scale, elevation model and budgets.
 
-## The current state this replaces
+## What this replaced (pre-rebuild, for context)
 
 112 `rounded-xl` (12px), 38 `rounded-2xl` (16px) and 1 `rounded-3xl` (24px)
 usages, with no scale behind any of them. Oversized corner radius is the single
@@ -44,71 +44,45 @@ There is no `rounded-xl` and above in this system. The migration handles the
    transitional aliases**. Leaving them in place permanently is how the scale
    quietly grows back to six steps.
 
-## Control heights — 5 steps
+## Control heights and row density
 
-```css
-:root {
-  --size-control-xs: 1.75rem;  /* 28px */
-  --size-control-sm: 2rem;     /* 32px */
-  --size-control-md: 2.25rem;  /* 36px — DEFAULT */
-  --size-control-lg: 2.5rem;   /* 40px */
-  --size-control-xl: 2.75rem;  /* 44px */
-}
-```
+> **The size values that were here are superseded and have been removed.**
+> They specified 36px controls and 40px rows; the implemented density is
+> **32px controls / 36px rows**, which is what fits 16 rows on a 1366×768
+> laptop instead of 11. The exact token block is in
+> **[DESIGN-SYSTEM.md § Sizing & density](DESIGN-SYSTEM.md#3--sizing--density)**.
+>
+> Removed rather than annotated because they were copyable CSS — an agent
+> reading "the control scale" here would have implemented the looser one.
 
-**36px is the default, not 32px.** This is a deliberate divergence from a
-developer-tool default. The people using this app are sales and operations
-staff, not engineers; they hit these controls hundreds of times a shift, often
-on a trackpad, and the Arabic label inside needs the extra 4px of vertical room
-that [typography.md](typography.md#arabic-gets-a-lift)'s Arabic lift implies.
+Two mechanisms behind those numbers do still apply, and are not repeated in
+DESIGN-SYSTEM.md:
 
-Consumed through Tailwind v4's arbitrary-variable syntax by the shared CVA
-fragment every sized primitive spreads in:
+### The shared `controlSize` fragment
 
-```ts
-// src/design-system/lib/variants.ts
-export const controlSize = cva("", {
-  variants: {
-    size: {
-      xs: "h-(--size-control-xs) px-2   text-xs gap-1.5",
-      sm: "h-(--size-control-sm) px-2.5 text-xs gap-1.5",
-      md: "h-(--size-control-md) px-3   text-sm gap-2",
-      lg: "h-(--size-control-lg) px-3.5 text-sm gap-2",
-      xl: "h-(--size-control-xl) px-4   text-base gap-2.5",
-    },
-  },
-  defaultVariants: { size: "md" },
-});
-```
+Every sized primitive spreads one CVA fragment rather than declaring its own
+heights, so a density change is a single-token edit and not a sweep across 21
+components. Consumed through Tailwind v4's arbitrary-variable syntax —
+`h-(--size-control-md)`.
 
-### Hit-area expansion
+### Hit-area expansion, not bigger boxes
 
-Controls below the 44px touch-target floor — `xs`, `sm`, `md`, `lg` — get an
-**invisible expanded hit area**, not a bigger box:
+Controls below the touch floor get an **invisible expanded hit area**:
 
 ```ts
 export const hitArea =
   "relative after:absolute after:-inset-1.5 after:content-['']";
 ```
 
-The visible control keeps its density; the tap target clears the floor. Never
-solve a touch-target audit by growing the visible control — that is how a dense
-table turns into a phone app.
+The visible control keeps its density; the tap target grows. **Never solve a
+target-size finding by enlarging the visible control** — that is how a dense
+table turns into a phone app one component at a time.
 
-## Row density — 40px
-
-```css
-:root { --size-row: 2.5rem; }  /* 40px */
-```
-
-`DataTable` rows are a fixed 40px: `px-3 py-2`, `text-xs`, weight 400. On a
-1366×768 laptop with the shell chrome subtracted, that shows **14 rows without
-scrolling** — the number that makes a lead list scannable in one glance.
-
-There is exactly one row height. There is no density toggle. If one is ever
-added it needs a token (`--size-row-compact`) and a persisted preference, and
-this paragraph must be rewritten — do not add a local `compact` prop to
-`DataTable` instead.
+Note the bar for web is **24×24 CSS px** (WCAG 2.2 AA `web-target-size`), not
+the 44pt native figure — see
+[accessibility.md](accessibility.md#wcag-22-criteria-this-app-specifically-has-to-meet).
+The 32px default clears it outright; the 24px `xs` sits at it and keeps the
+expansion above.
 
 ## Spacing
 
@@ -174,6 +148,16 @@ already-dark canvas reads as mud, not lift.
 > completely flat with no error anywhere. This exact bug shipped undetected in
 > the sibling portal across eleven call sites.
 
+## Stacking order
+
+Six layers, declared once as tokens rather than left to ad-hoc `z-50`. The full
+ladder and the two non-obvious orderings (sticky header above sticky cell;
+toast above overlay) are in
+[DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#stacking-order).
+
+A bare `z-` utility in feature code is a bug — it works until the day two
+layers meet.
+
 ## Borders
 
 One width: `1px`. There are no 2px borders in this system except the active-nav
@@ -199,11 +183,10 @@ export const focusRing =
 
 ## Gradient and blur budgets
 
-The app currently has **19 gradients** and **14 `backdrop-blur`** usages. None
-are load-bearing; all are decorative, and together they are a large part of why
-the current UI reads as generated.
-
-Going forward:
+Before the rebuild this app carried **19 gradients** and **14 `backdrop-blur`**
+usages — none load-bearing, all decorative, and together a large part of why
+the old UI read as generated. Both are now at **0** and the budgets below are
+what keeps them there.
 
 - **Gradients: 2 total.** The brand mark, and `Skeleton`'s shimmer sweep.
 - **Blur: 1 total.** The modal scrim.

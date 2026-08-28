@@ -31,8 +31,7 @@ export function useDatabaseServers() {
 
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [search, setSearchState] = useState("");
   const [statusFilter, setStatusFilter] = useState<DatabaseServerStatus | "ALL">("ALL");
   const [countryFilter, setCountryFilter] = useState<string>("ALL");
   const [deletionFilter, setDeletionFilter] = useState<"CURRENT" | "DELETED">("CURRENT");
@@ -44,7 +43,7 @@ export function useDatabaseServers() {
   const currentQueryIdentity = JSON.stringify({
     page,
     limit,
-    debouncedSearch,
+    search,
     statusFilter,
     countryFilter,
     deletionFilter,
@@ -68,13 +67,12 @@ export function useDatabaseServers() {
 
   };
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [search]);
+  // `search` already arrives debounced from FilterBar (see useFilterBar);
+  // resetting the page here keeps pagination in sync with a new search term.
+  const setSearch = useCallback((value: string) => {
+    setSearchState(value);
+    setPage(1);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -104,7 +102,7 @@ export function useDatabaseServers() {
       const query: DatabaseServerQueryDto = {
         page,
         limit,
-        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+        ...(search ? { search } : {}),
         ...(statusFilter !== "ALL" ? { status: statusFilter } : {}),
         ...(countryFilter !== "ALL" ? { countryIsoCode: countryFilter } : {}),
         ...(deletionFilter === "DELETED" ? { deleted: true } : {}),
@@ -137,7 +135,7 @@ export function useDatabaseServers() {
     } finally {
       if (generation === requestGeneration.current) setIsLoading(false);
     }
-  }, [page, limit, debouncedSearch, statusFilter, countryFilter, deletionFilter, toast, currentQueryIdentity, copy.genericErrorTitle]);
+  }, [page, limit, search, statusFilter, countryFilter, deletionFilter, toast, currentQueryIdentity, copy.genericErrorTitle]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

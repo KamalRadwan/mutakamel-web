@@ -26,8 +26,7 @@ export function useApplications() {
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [search, setSearchState] = useState("");
 
   const [typeFilter, setTypeFilter] = useState<ApplicationType | "ALL">("ALL");
   const [commercialFilter, setCommercialFilter] = useState<ApplicationCommercialMode | "ALL">("ALL");
@@ -43,14 +42,12 @@ export function useApplications() {
     hasPrev: false
   });
 
-  // Debounce search input
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [search]);
+  // `search` already arrives debounced from FilterBar (see useFilterBar);
+  // resetting the page here keeps pagination in sync with a new search term.
+  const setSearch = useCallback((value: string) => {
+    setSearchState(value);
+    setPage(1);
+  }, []);
 
   const fetchApplications = useCallback(async () => {
     setIsLoading(true);
@@ -59,7 +56,7 @@ export function useApplications() {
       const query: ApplicationListQueryDto = {
         page,
         limit,
-        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+        ...(search ? { search } : {}),
         ...(typeFilter !== "ALL" ? { applicationType: typeFilter } : {}),
         ...(commercialFilter !== "ALL" ? { commercialMode: commercialFilter } : {}),
         ...(visibilityFilter !== "ALL" ? { catalogueVisibility: visibilityFilter } : {}),
@@ -79,7 +76,7 @@ export function useApplications() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, debouncedSearch, typeFilter, commercialFilter, visibilityFilter, lifecycleFilter, publicationFilter, deploymentFilter, toast]);
+  }, [page, limit, search, typeFilter, commercialFilter, visibilityFilter, lifecycleFilter, publicationFilter, deploymentFilter, toast]);
 
   useEffect(() => {
     queueMicrotask(() => {

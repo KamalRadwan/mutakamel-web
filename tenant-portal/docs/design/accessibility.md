@@ -32,7 +32,7 @@ regression.
 
 - Body and UI text: **≥ 4.5:1**
 - Non-text (focus rings, borders carrying meaning): **≥ 3:1**
-- `brand-500` as the light focus ring is the tightest value at **3.19** — do
+- `brand-500` as the light focus ring is the tightest value at **3.74** — do
   not lighten `ink-50` or lower `brand-500`'s chroma without re-running.
 
 ### Color is never the only signal
@@ -87,7 +87,7 @@ remove focus indication.
 ### Touch targets
 
 Controls below 44px get an **invisible hit-area expansion**, not a bigger box
-([geometry.md](geometry.md#hit-area-expansion)). Never solve a target audit by
+([geometry.md](geometry.md#hit-area-expansion-not-bigger-boxes)). Never solve a target audit by
 growing the visible control.
 
 ### No keyboard traps
@@ -149,6 +149,26 @@ sentence, and the displayed value is wrong rather than merely ugly.
 pre-hydration bootstrap. A screen reader reading Arabic content announced as
 `lang="en"` uses the wrong voice for the whole page.
 
+## WCAG 2.2 criteria this app specifically has to meet
+
+The 2.2 additions are the ones a dense, drag-driven, sticky-chrome app trips
+over. Each is specified in full where it applies; collected here so a review
+can check them in one pass.
+
+| Criterion | Where it bites us | Rule |
+| --- | --- | --- |
+| **`dragging-alternative`** (AA) | The three board views | Every card has a **Move to…** menu item — a single-pointer path, not just the keyboard one — [views.md](views.md#every-card-carries-a-move-to-action--not-optional) |
+| **`focus-not-obscured`** (AA) | Four overlapping sticky layers in `DataTable` | `scroll-margin` sized to the sticky offsets — [patterns.md](patterns.md#datatable) |
+| **`accessible-authentication`** (AA) | `/login` | `autocomplete` attributes present; **paste never blocked** — [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#71-login--login) |
+| **`redundant-entry`** (A) | Lead conversion | Prefilled from the lead; the user never retypes captured data |
+| **`consistent-help`** (A) | Every screen | Topbar controls keep the same order on every route |
+| **`web-target-size`** (AA) | Dense 24–32px controls | **24×24 CSS px** is the web bar, not the native 44pt. Our 32px default clears it; the 24px `xs` sits at it and keeps its hit-area expansion |
+
+`web-target-size` is worth stating explicitly because the native 44pt figure
+is widely quoted and would force a pointless resize of the entire system. The
+WCAG text is explicit that native units are not substituted for the web
+criterion.
+
 ## Per-screen review checklist
 
 - [ ] Tab through the entire screen — everything reachable, focus always visible
@@ -162,6 +182,19 @@ pre-hydration bootstrap. A screen reader reading Arabic content announced as
 - [ ] `prefers-reduced-motion` on — nothing animates, nothing is lost
 - [ ] Zoom to 200% — no content lost, no horizontal page scroll
 - [ ] Identifiers wrapped in `<bdi>`
+- [ ] **Skip link** is the first `Tab` stop and becomes visible on focus
+- [ ] **Tab to the first and last column of the top and bottom row** — the
+      focus ring is never behind a sticky header or sticky column
+- [ ] **Submit a form with two invalid fields** — focus lands on the first
+      invalid field and its error is announced
+- [ ] **Move a board card without dragging**, using only the Move to… menu
+- [ ] Sorted column reports `aria-sort`; the others report `none`
+- [ ] Toast announces politely, does **not** steal focus, and any Retry in it
+      is keyboard-reachable
+- [ ] Unread badge announces a full phrase, not a bare number
+- [ ] **Open a text input on a real phone** — the page does not zoom on focus
+- [ ] Password manager fills the login form; paste works in the password field
+- [ ] Read-only fields keep full text contrast and are not styled as disabled
 
 ## What the gates catch, and what they do not
 

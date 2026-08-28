@@ -88,7 +88,7 @@ A green run proves *type-validated, lint-validated, unit-tested*. It does
 when you report.
 
 > `pnpm typecheck` is currently red for a stale-artifact reason. Run
-> `rm -rf .next` first. See [DEFECTS.md](DEFECTS.md#d7).
+> `rm -rf .next` first. See [DEFECTS.md](DEFECTS.md#d7--typecheck-is-red-on-a-stale-artifact).
 
 ## Non-negotiables
 
@@ -141,11 +141,11 @@ both are deliberate:
 
 | Gap | Why, and what to do |
 | --- | --- |
-| **Readex Pro has not been rendered** | Availability and the Arabic subset are verified; whether its Arabic fits a 40px row at `text-xs` needs a look. **Check it in phase 2, before converting screens.** Fallback is Zain |
+| **Readex Pro has not been rendered** | Availability and the Arabic subset are verified; whether its Arabic fits a **36px** row at `text-xs` needs a look — the app now renders, so open a populated table in Arabic. Fallback is Zain |
 | **Semantic detail for 412 routes** | Core beyond auth/notifications, and all of Trade. Route-level tables cover them. No screen uses them — documenting a contract nobody builds against rots before it is read |
 
 Everything else is specified to a value, not a principle: tokens (with
-**computed** contrast), type, geometry, motion, all 21 primitives and 12
+**computed** contrast), type, geometry, motion, all 25 primitives and 13
 patterns, the three-view contract, both detail screens, the conversion flow,
 shell, theming, i18n, accessibility, testing, security headers, the CRM
 contracts, 293 DTO fields, 95 error codes, and every permission and enum wire

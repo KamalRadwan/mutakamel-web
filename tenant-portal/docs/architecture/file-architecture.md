@@ -4,7 +4,7 @@ Status: **Specification**
 
 Written: **2026-08-27**. Screen module shape corrected **2026-08-28** to
 match what all 10 converted screens actually shipped — see
-[Q13 in OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md#q13--features-layer-specified-but-not-followed--deviation-not-resolved)
+[Q13 in OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md#q13--features-layer-specified-but-not-followed--resolved-2026-08-28)
 for why the original `features/` layer described here never happened.
 
 ## The tree
@@ -164,7 +164,7 @@ Rules:
   response validation, view-model types, and the React state/effects/handlers
   a component consumes. Splitting these into separate `api.ts`/`schema.ts`
   files was specified once and never followed by a single shipped screen —
-  see [Q13](../build/OPEN-QUESTIONS.md#q13--features-layer-specified-but-not-followed--deviation-not-resolved).
+  see [Q13](../build/OPEN-QUESTIONS.md#q13--features-layer-specified-but-not-followed--resolved-2026-08-28).
 - **The hook is the only place state lives.** Components receive props.
 - **Components hold markup and classNames.** State, effects, handlers and API
   calls belong in the hook. This is the existing house rule and it stays.

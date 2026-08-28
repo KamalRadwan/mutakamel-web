@@ -25,8 +25,7 @@ export function useStorageServers() {
   const [servers, setServers] = useState<StorageServerView[]>([]);
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [search, setSearchState] = useState("");
   const [status, setStatus] = useState<StorageServerStatus | "ALL">("ALL");
   const [sortBy, setSortBy] = useState<StorageServerSortField>("name");
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
@@ -38,13 +37,12 @@ export function useStorageServers() {
   const canRead = adminCan(user, "admin.storage_servers.read");
   const canCreate = adminCanAll(user, ADMIN_RBAC_CRITICAL.STORAGE_SERVERS_CREATE);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setDebouncedSearch(search.trim());
-      setPage(1);
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [search]);
+  // `search` already arrives debounced from FilterBar (see useFilterBar);
+  // resetting the page here keeps pagination in sync with a new search term.
+  const setSearch = useCallback((value: string) => {
+    setSearchState(value);
+    setPage(1);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -74,7 +72,7 @@ export function useStorageServers() {
         {
           page,
           limit,
-          search: debouncedSearch || undefined,
+          search: search.trim() || undefined,
           status: status === "ALL" ? undefined : status,
           sortBy,
           sortDir,
@@ -99,7 +97,7 @@ export function useStorageServers() {
     } finally {
       if (generation === requestGeneration.current) setIsLoading(false);
     }
-  }, [canRead, debouncedSearch, isAuthLoading, limit, page, sortBy, sortDir, status]);
+  }, [canRead, search, isAuthLoading, limit, page, sortBy, sortDir, status]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void refresh(), 0);

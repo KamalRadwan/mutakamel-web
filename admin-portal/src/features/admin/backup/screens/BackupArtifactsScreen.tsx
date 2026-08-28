@@ -6,12 +6,11 @@ import { ArchiveRestore, FileArchive, Filter, RefreshCw, Trash2 } from "lucide-r
 import { BackupArtifactStatus, type BackupArtifact } from "../types";
 import { BackupErrorBanner } from "../components/BackupErrorBanner";
 import { BackupPageHeader } from "../components/BackupPageHeader";
-import { BackupStatusBadge } from "../components/BackupStatusBadge";
 import { useBackupArtifacts } from "../hooks/useBackupArtifacts";
 import { formatBackupBytes, formatBackupDate, shortBackupId } from "../lib/backup-format";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { useI18n } from "@/i18n/I18nContext";
-import { Card, CardContent, Field, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Button, DataTable, DegradedBanner, type ColumnDef } from "@/design-system";
+import { Card, CardContent, Field, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Button, DataTable, DegradedBanner, StatusBadge, type ColumnDef } from "@/design-system";
 
 export function BackupArtifactsScreen() {
   const { lang, t } = useI18n();
@@ -69,7 +68,7 @@ export function BackupArtifactsScreen() {
       headerAr: "الحالة",
       cell: (artifact) => (
         <div>
-          <BackupStatusBadge status={artifact.status} />
+          <StatusBadge status={artifact.status} />
           {artifact.hasFailure && <p className="mt-2 max-w-xs text-xs text-danger-600 dark:text-danger-400">{copy.failureRetainedNote}</p>}
         </div>
       ),

@@ -15,22 +15,18 @@ Source of truth once implemented: `src/app/globals.css`.
 
 | Role | Ramp | Hue | Meaning |
 | --- | --- | --- | --- |
-| Brand | `brand` | 216 → 226 (petrol) | Primary actions, active nav, focus rings, links |
-| Positive | `positive` | 142 → 150 (moss) | Won, converted, active, healthy |
+| Brand | `brand` | **258** (blue) | Primary actions, active nav, focus rings, links |
+| Positive | `positive` | **168 → 160** (teal-green) | Won, converted, active, healthy |
 | Caution | `caution` | 82 → 56 (amber) | On hold, nurturing, degraded, needs attention |
-| Negative | `negative` | 34 → 28 (clay) | Lost, disqualified, blacklisted, destructive, error |
-| Neutral | `ink` | 70 → 80 (warm graphite) | Text, borders, surfaces, and **every in-progress state** |
+| Negative | `negative` | **20 → 13** (crimson) | Lost, disqualified, blacklisted, destructive, error |
+| Neutral | `ink` | **240** (cold blue) | Text, borders, surfaces, and **every in-progress state** |
 
-**Why petrol and not blue.** The default SaaS accent sits at hue 250–260. 218
-is far enough away to not read as "the Bootstrap blue", close enough to stay
-calm for eight-hour use, and it is nowhere near `admin-portal`'s emerald.
-
-**Why a warm neutral.** `ink` is hue ~75 at chroma ~0.010 — a warm graphite,
-not a cool slate. Nearly every dense SaaS UI pairs a cool accent with a cool
-grey, which is what makes them read interchangeable and clinical. Warm grey
-under a cool accent reads as ink on paper, and it measurably softens long
-Arabic reading sessions where the script's density already carries a lot of
-visual weight.
+> The earlier version of this table specified a petrol brand (hue 216–226) on a
+> **warm graphite** neutral, and argued at length for both. That palette is
+> superseded — the product direction is a **cold blue** light theme. The
+> rationale for the current hues, including why `positive` moved to teal-green
+> and `negative` to crimson to stay coherent against a cold ground, is in
+> [DESIGN-SYSTEM.md § Color](DESIGN-SYSTEM.md#1--color).
 
 `ink` has **13 steps**. `ink-25` exists because a dense table needs a zebra
 row one step above `50`; `ink-1000` exists because the dark canvas must sit
@@ -38,107 +34,48 @@ below the darkest card surface. Tailwind's stock 11-step families have neither.
 
 ## Ramps
 
-Declared in `@theme` so they generate `bg-brand-600`, `text-ink-500`, etc.
+> **The ramp values that were here are superseded and have been removed.**
+> They specified the earlier petrol/warm-graphite palette (brand hue 221, ink
+> hue ~75). The implemented palette is **cold blue** — brand hue 258, ink hue
+> 240 — and its 57 exact OKLCH values live in one place only:
+> **[DESIGN-SYSTEM.md § Ramps](DESIGN-SYSTEM.md#ramps--exact-values)**.
+>
+> They were deleted rather than left with a warning because they were valid,
+> copyable CSS: an agent skimming for "the ramps" would have implemented the
+> wrong palette and every contrast number in this file with it.
 
-```css
-@theme {
-  /* Brand — petrol. Hue drifts warmer as it darkens so low steps do not
-     collapse into navy-grey. Anchored at 600, the light-mode fill. */
-  --color-brand-50:  oklch(0.974 0.012 216);
-  --color-brand-100: oklch(0.941 0.028 217);
-  --color-brand-200: oklch(0.887 0.053 218);
-  --color-brand-300: oklch(0.812 0.083 219);
-  --color-brand-400: oklch(0.722 0.111 220);
-  --color-brand-500: oklch(0.631 0.111 221);
-  --color-brand-600: oklch(0.540 0.096 222);
-  --color-brand-700: oklch(0.456 0.082 223);
-  --color-brand-800: oklch(0.386 0.070 224);
-  --color-brand-900: oklch(0.325 0.059 225);
-  --color-brand-950: oklch(0.224 0.043 226);
+The structural decisions behind the ramps **do** still hold, and are why the
+current palette is shaped the way it is:
 
-  /* Ink — warm graphite. 13 steps: ink-25 is the table zebra row above 50,
-     ink-1000 is the dark canvas below the darkest card. */
-  --color-ink-25:   oklch(0.991 0.002 70);
-  --color-ink-50:   oklch(0.981 0.003 70);
-  --color-ink-100:  oklch(0.959 0.004 72);
-  --color-ink-200:  oklch(0.917 0.006 73);
-  --color-ink-300:  oklch(0.857 0.008 74);
-  --color-ink-400:  oklch(0.704 0.011 75);
-  --color-ink-500:  oklch(0.578 0.012 76);
-  --color-ink-600:  oklch(0.476 0.012 76);
-  --color-ink-700:  oklch(0.394 0.011 77);
-  --color-ink-800:  oklch(0.312 0.010 78);
-  --color-ink-900:  oklch(0.244 0.009 79);
-  --color-ink-950:  oklch(0.172 0.008 79);
-  --color-ink-1000: oklch(0.128 0.007 80);
+- **`ink` carries 13 steps, not 11.** A dense table needs a zebra row one step
+  above `50`, and the dark canvas has to sit below the darkest card surface.
+  Tailwind's stock families have neither, so `ink-25` and `ink-1000` are
+  additions.
+- **Amber's hue torsion is physics, not taste.** The `caution` ramp travels
+  from hue 82 down to 56 as it darkens; without that drift the 700–950 steps
+  read olive rather than amber.
+- **Each role peaks its chroma mid-ramp.** The 50 and 950 ends stay low-chroma
+  so tints and dark fills do not turn muddy.
+- **Matching numeric steps across roles are near-luminance matched**, which is
+  what lets the theme flip swap a family without anything going unreadable.
 
-  /* Positive — moss. Lower chroma and cooler than a notification green:
-     "earned", not "alert". Deliberately far from admin-portal's emerald. */
-  --color-positive-50:  oklch(0.972 0.016 142);
-  --color-positive-100: oklch(0.940 0.036 143);
-  --color-positive-200: oklch(0.884 0.066 144);
-  --color-positive-300: oklch(0.812 0.096 145);
-  --color-positive-400: oklch(0.728 0.117 146);
-  --color-positive-500: oklch(0.640 0.121 147);
-  --color-positive-600: oklch(0.548 0.110 148);
-  --color-positive-700: oklch(0.462 0.092 148);
-  --color-positive-800: oklch(0.390 0.075 149);
-  --color-positive-900: oklch(0.330 0.060 150);
-  --color-positive-950: oklch(0.226 0.041 150);
-
-  /* Caution — amber. The 26-degree hue torsion toward orange is physics,
-     not taste: without it the 700-950 steps read olive. */
-  --color-caution-50:  oklch(0.981 0.018 82);
-  --color-caution-100: oklch(0.957 0.043 81);
-  --color-caution-200: oklch(0.914 0.083 78);
-  --color-caution-300: oklch(0.863 0.124 74);
-  --color-caution-400: oklch(0.809 0.150 69);
-  --color-caution-500: oklch(0.755 0.154 64);
-  --color-caution-600: oklch(0.663 0.146 60);
-  --color-caution-700: oklch(0.548 0.128 58);
-  --color-caution-800: oklch(0.458 0.104 57);
-  --color-caution-900: oklch(0.392 0.084 56);
-  --color-caution-950: oklch(0.257 0.056 56);
-
-  /* Negative — clay. Warm red at hue ~30. Not rose (~15), which reads pink
-     and fights amber at badge size. */
-  --color-negative-50:  oklch(0.971 0.014 34);
-  --color-negative-100: oklch(0.939 0.031 33);
-  --color-negative-200: oklch(0.886 0.060 32);
-  --color-negative-300: oklch(0.810 0.101 31);
-  --color-negative-400: oklch(0.714 0.155 30);
-  --color-negative-500: oklch(0.634 0.196 29);
-  --color-negative-600: oklch(0.563 0.204 29);
-  --color-negative-700: oklch(0.483 0.177 28);
-  --color-negative-800: oklch(0.407 0.145 28);
-  --color-negative-900: oklch(0.349 0.119 28);
-  --color-negative-950: oklch(0.230 0.081 28);
-}
-```
 
 ## Contrast resolution
 
-The brand fill uses **different steps in each theme**, because one step cannot
-serve both grounds:
+Every ratio is **computed, not estimated** — `node scripts/design/contrast.mjs`
+reproduces them and fails if any token falls outside the sRGB gamut.
 
-Every ratio below is **computed**, not estimated — run
-`node scripts/design/contrast.mjs` to reproduce. That script also fails if any
-token falls outside the sRGB gamut, and it is what caught the brand ramp's
-original chroma being 6–15% too high at steps 500–900 (the browser would have
-silently clipped them to a different color than specified).
+**The authoritative table is [DESIGN-SYSTEM.md § Measured contrast](DESIGN-SYSTEM.md#measured-contrast).**
+It is not duplicated here: two copies of a number that must match the running
+CSS is exactly how one of them goes quietly wrong.
 
-| Use | Light | Dark | Computed ratio |
-| --- | --- | --- | --- |
-| Fill (`--primary`) | `brand-600` + white label | `brand-400` + `ink-950` label | **4.91** / **8.00** |
-| Text and links | `brand-700` on white | `brand-300` on `ink-1000` | **7.07** / **11.51** |
-| Focus ring (non-text, needs 3.0) | `brand-500` on `ink-50` | `brand-400` on `ink-1000` | **3.19** / **8.46** |
-| Muted text | `ink-600` on white | `ink-400` on `ink-1000` | **6.66** / **7.65** |
-| Body text | `ink-900` on `ink-50` | `ink-100` on `ink-1000` | **15.41** / **17.89** |
-| Destructive fill | `negative-700` + white | `negative-700` + white | **7.07** |
+Two facts worth carrying in your head:
 
-`brand-500` at 3.19 is the tightest number in the system. It is a **non-text**
-focus ring, where the bar is 3.0 — but it has only 0.19 of headroom, so do not
-lighten `ink-50` or lower `brand-500`'s chroma without re-running the script.
+- The brand fill uses **different ramp steps per theme** — a single step cannot
+  clear 4.5:1 against both a light and a dark ground.
+- The **focus ring is the tightest value in the system** (3.74 against a 3.0
+  bar for non-text). Do not lighten `ink-50` or lower `brand-500`'s chroma
+  without re-running the script.
 
 ### Two rules whose original justification was wrong
 
@@ -167,7 +104,7 @@ in with no edits. Declared on `:root` and overridden in `.dark`.
 
 **Trap:** shadcn's `--accent` means *neutral hover fill*, not brand. It stays
 `ink` here on purpose. Brand-as-accent lives only in `--primary` and `--ring`.
-Wiring a new component's hover to `--accent` expecting petrol is the single
+Wiring a new component's hover to `--accent` expecting brand blue is the single
 most common way to reintroduce the "everything glows the accent color" look.
 
 | Token | Light | Dark |

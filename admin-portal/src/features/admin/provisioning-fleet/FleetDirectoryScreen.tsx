@@ -11,6 +11,7 @@ import {
   Card,
   CardContent,
   Checkbox,
+  ConfirmActionModal,
   Field,
   Input,
   Select,
@@ -31,7 +32,6 @@ import { useFleetDirectory } from "./hooks";
 import {
   FleetBackLink,
   FleetCommandNotice,
-  FleetConfirmDialog,
   FleetDatum,
   FleetFieldError,
   FleetHero,
@@ -53,6 +53,8 @@ import type {
 export function FleetDirectoryScreen() {
   const { lang, dir } = useI18n();
   const copy = getProvisioningFleetCopy(lang);
+  const copyEn = getProvisioningFleetCopy("en");
+  const copyAr = getProvisioningFleetCopy("ar");
   const view = useFleetDirectory();
   const router = useRouter();
   const [draft, setDraft] = useState<FleetPreviewDraft>(initialPreviewDraft);
@@ -277,13 +279,15 @@ export function FleetDirectoryScreen() {
         )}
       </Card>
 
-      <FleetConfirmDialog
-        open={pendingCommand !== null}
-        title={copy.confirmPreviewTitle}
-        body={copy.confirmPreviewBody}
-        target={pendingCommand ? JSON.stringify(pendingCommand) : ""}
-        copy={copy}
-        pending={pending}
+      <ConfirmActionModal
+        isOpen={pendingCommand !== null}
+        titleEn={copyEn.confirmPreviewTitle}
+        titleAr={copyAr.confirmPreviewTitle}
+        descriptionEn={copyEn.confirmPreviewBody}
+        descriptionAr={copyAr.confirmPreviewBody}
+        confirmTextEn={copyEn.confirm}
+        confirmTextAr={copyAr.confirm}
+        isLoading={pending}
         onClose={() => !pending && setPendingCommand(null)}
         onConfirm={() => {
           if (!pendingCommand) return;

@@ -65,6 +65,20 @@ browser chrome does not clip the board view.
   `dir === "rtl" ? "left" : "right"`.
 - The sidebar is `bg-sidebar` — **white in light mode.**
 
+## Skip link — the first focusable element in the app
+
+`AppShell` renders a visually-hidden **"Skip to content"** link as its very
+first focusable child, targeting `<main id="main" tabIndex={-1}>`. It becomes
+visible on focus — styled like an `outline` button, pinned to the inline-start
+of the topbar.
+
+Without it, a keyboard user tabs through the entire sidebar — up to eleven nav
+items plus the collapse control — **on every single page load** before reaching
+anything on the page they asked for. That is the difference between a keyboard
+user being able to work in this app and merely being able to reach it.
+
+The link text comes from the dictionary like everything else.
+
 ## Topbar — 48px
 
 Inline start: mobile menu trigger (below `lg`), breadcrumbs.
@@ -75,6 +89,24 @@ Inline end, in order: `LanguageToggle` · `ThemeToggle` ·
 No search in the topbar. Search belongs to a workspace's `FilterBar`, scoped to
 that workspace's data. A global search implies a global index that does not
 exist.
+
+### The unread badge has to be announced
+
+The notification count changes on its own, pushed over the realtime connection
+— which means for a screen-reader user it currently changes in total silence.
+
+- A **polite** live region announces a **complete phrase** from the dictionary
+  — "3 unread notifications" — not a bare number. "3" announced with no context
+  is noise.
+- **Never move focus** on an update. The count changing is not a reason to
+  interrupt what someone is doing.
+- Announce the **count**, not each arriving notification. A busy tenant would
+  otherwise produce a stream of announcements nobody can follow.
+- The badge is not the only signal: the dropdown trigger's `aria-label` carries
+  the same count, so it is available on demand rather than only at the moment
+  it changes.
+
+Same rule covers the topbar badge and any count rendered in the sidebar.
 
 ## Navigation map
 

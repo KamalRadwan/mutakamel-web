@@ -4,7 +4,7 @@ Status: **Specification**
 
 Written: **2026-08-27**
 
-## The current state this replaces
+## What this replaced (pre-rebuild, for context)
 
 Four separate defects, all in the same seam:
 

@@ -16,19 +16,13 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
   Badge,
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  ConfirmActionModal,
   DataTable,
   Field,
   Input,
@@ -103,7 +97,7 @@ export function PublisherKeysScreen() {
       <RevokePanel view={view} copy={copy} />
 
       <MutationFeedback view={view} copy={copy} />
-      <ConfirmationDialog view={view} copy={copy} />
+      <ConfirmationDialog view={view} />
     </div>
   );
 }
@@ -585,69 +579,41 @@ function MutationFeedback({
 
 function ConfirmationDialog({
   view,
-  copy,
 }: {
   view: PublisherKeysView;
-  copy: PublisherKeyCopy;
 }) {
   const intent = view.mutation.pendingIntent;
-  const open = Boolean(intent && (intent.kind === "REGISTER" || intent.kind === "REVOKE"));
   if (!intent || (intent.kind !== "REGISTER" && intent.kind !== "REVOKE")) {
-    return (
-      <AlertDialog open={false}>
-        <AlertDialogContent />
-      </AlertDialog>
-    );
+    return null;
   }
   const register = intent.kind === "REGISTER";
+  // The exact identifier the operator must type mirrors the value they are
+  // about to act on (the registration challenge, or the key being revoked) —
+  // a stronger, typed-confirmation replacement for the old read-only <dl>.
+  const requiredConfirmationText = register
+    ? intent.command.challengeId
+    : intent.publisherKeyId;
+  const descriptionEn = register
+    ? `${COPY.en.confirmRegisterBody} ${COPY.en.challengeId}: ${intent.command.challengeId}`
+    : `${COPY.en.confirmRevokeBody} ${COPY.en.publisherKeyId}: ${intent.publisherKeyId} — ${COPY.en.revision}: ${intent.command.expectedRevision} — ${COPY.en.expectedStatus}: ${intent.command.expectedStatus} — ${COPY.en.reasonCode}: ${intent.command.reasonCode}`;
+  const descriptionAr = register
+    ? `${COPY.ar.confirmRegisterBody} ${COPY.ar.challengeId}: ${intent.command.challengeId}`
+    : `${COPY.ar.confirmRevokeBody} ${COPY.ar.publisherKeyId}: ${intent.publisherKeyId} — ${COPY.ar.revision}: ${intent.command.expectedRevision} — ${COPY.ar.expectedStatus}: ${intent.command.expectedStatus} — ${COPY.ar.reasonCode}: ${intent.command.reasonCode}`;
+
   return (
-    <AlertDialog open={open} onOpenChange={(next) => !next && view.closeConfirmation()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-danger-100 text-danger-700 dark:bg-danger-950 dark:text-danger-300">
-              <AlertTriangle className="size-5" aria-hidden="true" />
-            </span>
-            <div>
-              <AlertDialogTitle>{register ? copy.confirmRegisterTitle : copy.confirmRevokeTitle}</AlertDialogTitle>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {register ? copy.confirmRegisterBody : copy.confirmRevokeBody}
-              </p>
-            </div>
-          </div>
-        </AlertDialogHeader>
-        <dl className="space-y-2 rounded-lg bg-ink-100 p-3 text-xs dark:bg-ink-900">
-          {register ? (
-            <Detail label={copy.challengeId}><CodeValue>{intent.command.challengeId}</CodeValue></Detail>
-          ) : (
-            <>
-              <Detail label={copy.publisherKeyId}><CodeValue>{intent.publisherKeyId}</CodeValue></Detail>
-              <Detail label={copy.revision}>{intent.command.expectedRevision}</Detail>
-              <Detail label={copy.expectedStatus}>{intent.command.expectedStatus}</Detail>
-              <Detail label={copy.reasonCode}><CodeValue>{intent.command.reasonCode}</CodeValue></Detail>
-            </>
-          )}
-        </dl>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{copy.cancel}</AlertDialogCancel>
-          <AlertDialogAction
-            destructive
-            onClick={(event) => {
-              // AlertDialogAction is Radix's Dialog.Close under the hood, so
-              // it auto-closes on click - preventDefault so the dialog's
-              // visibility stays driven by view.mutation.pendingIntent (the
-              // hook's own state machine already transitions that away from
-              // CONFIRMING_* once confirmMutation runs) rather than closing
-              // twice from two different triggers.
-              event.preventDefault();
-              view.confirmMutation();
-            }}
-          >
-            {copy.confirm}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmActionModal
+      isOpen
+      onClose={() => view.closeConfirmation()}
+      onConfirm={() => view.confirmMutation()}
+      titleEn={register ? COPY.en.confirmRegisterTitle : COPY.en.confirmRevokeTitle}
+      titleAr={register ? COPY.ar.confirmRegisterTitle : COPY.ar.confirmRevokeTitle}
+      descriptionEn={descriptionEn}
+      descriptionAr={descriptionAr}
+      confirmTextEn={COPY.en.confirm}
+      confirmTextAr={COPY.ar.confirm}
+      requiredConfirmationText={requiredConfirmationText}
+      isLoading={view.mutation.state === "PENDING"}
+    />
   );
 }
 

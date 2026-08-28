@@ -248,7 +248,7 @@ they do not exist.
 | List, branch-scoped, paginated | live — table view |
 | Board view + stage move | live |
 | Card view | live |
-| Capabilities-driven actions | live — update (drag/importance) and delete; see [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md#q14--opportunities-table-has-no-customerowner-display-names--deviation-not-resolved) for the table's Customer/Owner column gap |
+| Capabilities-driven actions | live — update (drag/importance) and delete; see [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md#q14--opportunities-table-has-no-customerowner-display-names--resolved-2026-08-28) for the table's Customer/Owner column gap |
 | Delete | live — `DELETE /:id`, capability-gated |
 | Create | not started — routed through lead conversion (deferred, see Q3/Q12 in OPEN-QUESTIONS.md), not a raw "add opportunity" button |
 | Pipeline transfer | not started |

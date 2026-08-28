@@ -14,7 +14,6 @@ import {
   InvoicePageFrame,
   InvoiceSnapshotMeta,
   InvoiceStatePanel,
-  InvoiceStatusBadge,
   RetryInvoiceButton,
   type InvoiceCopy,
 } from "./invoice-shared";
@@ -30,6 +29,7 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  StatusBadge,
   type ColumnDef,
 } from "@/design-system";
 
@@ -236,7 +236,7 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
         </div>
       ),
     },
-    { key: "status", headerEn: copy.status, headerAr: copy.status, cell: (invoice) => <InvoiceStatusBadge status={invoice.status} /> },
+    { key: "status", headerEn: copy.status, headerAr: copy.status, cell: (invoice) => <StatusBadge status={invoice.status} /> },
     { key: "purpose", headerEn: copy.purpose, headerAr: copy.purpose, cell: (invoice) => <span className="font-mono text-xs font-semibold">{invoice.purpose}</span> },
     {
       key: "tenant",

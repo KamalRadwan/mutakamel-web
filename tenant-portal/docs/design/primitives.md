@@ -33,8 +33,8 @@ pnpm add @radix-ui/react-alert-dialog @radix-ui/react-avatar \
 | Primitive | Built on | Notes |
 | --- | --- | --- |
 | `Button` | `@radix-ui/react-slot` | See below |
-| `Input` | plain `<input>` | `controlSize`, `focusRing`, `aria-invalid` |
-| `Textarea` | plain `<textarea>` | Min 3 rows, resize-y only |
+| `Input` | plain `<input>` | `controlSize`, `focusRing`, `aria-invalid`, `text-base sm:text-sm` |
+| `Textarea` | plain `<textarea>` | Min 3 rows, resize-y only, `text-base sm:text-sm` |
 | `Label` | `@radix-ui/react-label` | Weight 500, `text-sm` |
 | `Field` | plain + `useId` | See below — constraint-critical |
 | `Select` | `@radix-ui/react-select` | Propagates `dir` for RTL keys |
@@ -77,6 +77,11 @@ asChild?: boolean
 Rules:
 
 - **At most one `primary` per screen**, in `PageHeader`.
+- **`cursor-pointer` lives in the base CVA.** Neither Radix nor Tailwind
+  Preflight adds it, and a native `<button>` does not carry it by default —
+  without this line every button in the app shows a text cursor. Anything else
+  clickable that is not a `Button` (a row, a card, a chip) has to add it
+  itself.
 - `loading` renders a spinning `Loader2` before the label and sets `aria-busy`.
   It does **not** replace the label — a button that becomes a bare spinner
   loses its accessible name and its width.
@@ -106,6 +111,35 @@ error text, sets `aria-invalid`, and marks required state.
 **A field error stays inline and never becomes a toast.** It must remain a
 persistent, programmatically-associated target for the input. See
 [patterns.md](patterns.md#where-a-result-belongs).
+
+### Validate on blur, not on keystroke
+
+A field validates when it **loses focus**, not while the user is typing. Once
+it has errored, and only then, it re-validates on change so the error clears
+the moment the input becomes valid.
+
+Validating per keystroke marks an email invalid after the first character —
+the user is told they are wrong before they have had a chance to be right.
+
+### `readOnly` is not `disabled`
+
+Three distinct states, and conflating the last two is a real information bug:
+
+| State | Looks like | Semantics | Means |
+| --- | --- | --- | --- |
+| Normal | full contrast | — | Edit it |
+| `readOnly` | **full contrast**, muted border, no focus ring on the input itself | `aria-readonly` | The value matters, you just cannot change it here |
+| `disabled` | `opacity-50`, `cursor-not-allowed` | `disabled` | Not applicable, or temporarily unavailable |
+
+`readOnly` keeps **normal text contrast** — the value is still information the
+user needs to read. Dimming it to 50% says "this doesn't apply to you", which
+is false.
+
+This is not hypothetical: `crm-catalogues.md` documents CRM settings sections
+that are deliberately read-only in this portal. Rendering those as `disabled`
+tells the user to come back later for something that will never become
+editable here. A `readOnly` field takes a short reason line in its `hint` slot
+saying where it *is* editable.
 
 ## Badge
 

@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "docs:routes": "node scripts/docs/generate-route-inventory.mjs",
     "docs:routes:check": "node scripts/docs/generate-route-inventory.mjs --check",
-    "docs:check": "npm run docs:routes:check && npm run docs:api-reference:check && npm run docs:dto:check && npm run docs:errors:check && npm run docs:verify-claims && npm run docs:audit-api && node scripts/docs/check-docs.mjs",
+    "docs:check": "npm run docs:routes:check && npm run docs:api-reference:check && npm run docs:dto:check && npm run docs:errors:check && npm run docs:verify-claims && npm run docs:audit-api && npm run docs:verify-anchors && node scripts/docs/check-docs.mjs",
     "docs:api-reference": "node scripts/docs/generate-api-reference.mjs",
     "docs:api-reference:check": "node scripts/docs/generate-api-reference.mjs --check",
     "design:census": "node scripts/design/census.mjs",
@@ -26,7 +26,8 @@
     "docs:errors": "node scripts/docs/generate-error-reference.mjs",
     "docs:errors:check": "node scripts/docs/generate-error-reference.mjs --check",
     "docs:verify-called-routes": "node scripts/docs/verify-called-routes.mjs",
-    "knip": "knip"
+    "knip": "knip",
+    "docs:verify-anchors": "node scripts/docs/verify-anchors.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

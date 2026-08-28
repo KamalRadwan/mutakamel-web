@@ -201,6 +201,119 @@ Found by `pnpm docs:verify-called-routes`, which is now a standing gate — see
 
 ---
 
+## D14 — Missing `"use client"` took every route down
+
+**Severity: total outage. Found by driving the app, not by any gate.**
+
+`src/design-system/views/board/BoardColumn.tsx` imports `Droppable` from
+`@hello-pangea/dnd` without the `"use client"` directive. Its two siblings —
+`BoardCard.tsx` and `BoardView.tsx` — both have it.
+
+Because the `@/design-system` barrel is imported by the **root layout**, that
+one omission pulled a React class component into the server module graph for
+*every* route:
+
+```
+TypeError: Class extends value undefined is not a constructor or null
+  at BoardColumn.tsx  →  design-system/index.ts  →  app/layout.tsx
+```
+
+`/` and `/login` both returned **500**. The app could not serve a single page.
+
+**Fixed** by adding the directive (matching the siblings). Verified by
+restarting the dev server and reloading both routes.
+
+### Why nothing caught it
+
+`typecheck`, `lint`, `test` and `build` were all green — none of them execute
+a server render. Only loading a page in a browser surfaces it.
+
+**The lesson worth keeping:** a green gate run is not evidence the app runs.
+Every phase needs one actual page load.
+
+### The wider risk
+
+22 of 25 primitives — including `Button` and `Dialog` — also omit
+`"use client"`. They are **not** currently breaking: Radix's hook-based
+exports have no top-level `class extends`, which is what `@hello-pangea/dnd`
+does. But the inconsistency is real, and it is one dependency change away from
+repeating this outage.
+
+**Action:** add `"use client"` to every primitive that imports a client-only
+library, so the rule is "all of them" rather than "the ones that happen to
+break".
+
+---
+
+## D15 — `pnpm dev` cannot start
+
+Next 16 defaults to Turbopack. `next.config.ts` still carries a `webpack()`
+customization and the `dev` script does not pass `--webpack` — so the dev
+server exits immediately:
+
+```
+ERROR: This build is using Turbopack, with a `webpack` config and no `turbopack` config.
+[ELIFECYCLE] Command failed with exit code 1.
+```
+
+`build` already passes `--webpack`; `dev` was never updated. **Pre-existing** —
+confirmed present before the rebuild via `git show 68466d3^`.
+
+**Workaround:** `npx next dev -p 5002 --webpack`.
+
+**Fix:** either add `--webpack` to the `dev` script, or migrate the
+`watchOptions` block to a `turbopack` config and drop the webpack one. The
+second is the better end state; the first unblocks today.
+
+---
+
+## D16 — Two auth screens were never converted
+
+`src/components/auth/TenantAuthGuard.tsx` and
+`TenantHostStateBoundary.tsx` still carry the **original** pre-rebuild code:
+raw `slate-950` / `amber-*` / `blue-600` palette classes, `rounded-xl` and
+`rounded-2xl`, and **unconditionally hardcoded Arabic** with no English path.
+
+They render on every session-loading flicker and on any degraded or suspended
+tenant state — the paths a real outage actually goes through.
+
+They were missed because they fit neither bucket in the phase plan: they do
+not import `components/ui/*` (so the delete sweep did not reach them) and they
+are not one of the 11 screens in Phase 4 (they are cross-cutting auth chrome).
+
+**Fix:** convert both onto the design system and move every string into both
+dictionaries. Together they account for most of the remaining census debt in
+D17 below.
+
+---
+
+## D17 — The census baseline was banked with violations in it
+
+`docs/design/census.baseline.json` was committed carrying
+`roundedXlOrAbove: 4`, `languageTernaries: 19`, `colorFamiliesInUse: 3` and
+`colorUtilityTotal: 19` — rather than being driven to the zero targets that
+[enforcement.md](../design/enforcement.md) and
+[anti-patterns.md](../design/anti-patterns.md) actually state.
+
+`pnpm design:census -- --check` therefore reports **clean**, which is true
+against its own baseline and misleading against the documented standard.
+
+Most of the remaining count is D16's two files. Of the 19 counted
+`languageTernaries`, roughly 13–15 are
+`lang === "ar" ? item.nameAr : item.nameEn` — selecting between two
+**backend-supplied bilingual data fields**, not choosing UI copy. That is
+architecturally different from what the zero-ternary rule targets, and
+[i18n.md](../design/i18n.md) never carved out the exception.
+
+**Fix, in order:**
+
+1. Convert D16's two files — that clears most of the color and radius counts.
+2. Decide explicitly whether bilingual **data-field** selection is exempt from
+   the zero-ternary rule, and write that into `i18n.md` either way.
+3. Only then re-baseline, so the numbers mean what the docs say they mean.
+
+---
+
 ## Not defects
 
 Deliberate, do not "fix":

@@ -1,6 +1,8 @@
 # Design System
 
-Status: **Specification — not yet implemented**
+Status: **Implemented** — Phases 1–5 shipped 2026-08-28. See
+[SKILL-AUDIT.md](SKILL-AUDIT.md) for the 17 refinements specified but not
+yet coded.
 
 Written: **2026-08-27**
 
@@ -100,6 +102,7 @@ it from direction rather than hardcoding — see [theming.md](theming.md#rtl).
 | Concern | File |
 | --- | --- |
 | **Everything, in one file — start here** | **[DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)** |
+| Third-party UI/UX audit — 17 gaps to refactor | [SKILL-AUDIT.md](SKILL-AUDIT.md) |
 | Color roles, OKLCH ramps, semantic tokens, status mapping | [tokens.md](tokens.md) |
 | Font pairing, type scale, weights, Arabic lift, numerals | [typography.md](typography.md) |
 | Radius, spacing, control heights, row density, elevation | [geometry.md](geometry.md) |

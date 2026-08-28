@@ -7,11 +7,10 @@ import { BackupErrorBanner } from "../components/BackupErrorBanner";
 import { BackupPageHeader } from "../components/BackupPageHeader";
 import { BackupServerSelect } from "../components/BackupServerSelect";
 import { BackupStatePanel } from "../components/BackupStatePanel";
-import { BackupStatusBadge } from "../components/BackupStatusBadge";
 import { useBackupDatabaseAccess } from "../hooks/useBackupDatabaseAccess";
 import { formatBackupDate } from "../lib/backup-format";
 import { useI18n } from "@/i18n/I18nContext";
-import { Card, CardContent, Field, Input, Textarea, Checkbox, Button } from "@/design-system";
+import { Card, CardContent, Field, Input, Textarea, Checkbox, Button, StatusBadge } from "@/design-system";
 
 type DialogName = "policy" | "regenerate" | "reconcile" | null;
 
@@ -103,7 +102,7 @@ export function BackupAccessScreen() {
                       <p className="mt-1 font-mono text-base font-semibold">{view.binding.databasePrincipal}</p>
                     </div>
                   </div>
-                  <BackupStatusBadge status={view.binding.status} />
+                  <StatusBadge status={view.binding.status} />
                 </div>
 
                 <dl className="mt-6 grid gap-4 sm:grid-cols-2">

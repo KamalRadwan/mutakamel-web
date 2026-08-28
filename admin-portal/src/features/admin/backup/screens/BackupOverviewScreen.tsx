@@ -6,11 +6,10 @@ import { BackupPageHeader } from "../components/BackupPageHeader";
 import { BackupErrorBanner } from "../components/BackupErrorBanner";
 import { BackupServerSelect } from "../components/BackupServerSelect";
 import { BackupStatePanel } from "../components/BackupStatePanel";
-import { BackupStatusBadge } from "../components/BackupStatusBadge";
 import { useBackupOverview } from "../hooks/useBackupOverview";
 import { formatBackupDate } from "../lib/backup-format";
 import { useI18n } from "@/i18n/I18nContext";
-import { StatGrid, StatCard, Card, CardHeader, CardTitle, CardContent, Button, OperationTimeline, type OperationTimelineStep } from "@/design-system";
+import { StatGrid, StatCard, Card, CardHeader, CardTitle, CardContent, Button, OperationTimeline, StatusBadge, type OperationTimelineStep } from "@/design-system";
 
 export function BackupOverviewScreen() {
   const { lang, t } = useI18n();
@@ -180,7 +179,7 @@ export function BackupOverviewScreen() {
                   <p className="font-mono text-sm font-semibold">{view.selectedData.latestRun.id}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{formatBackupDate(view.selectedData.latestRun.startedAt, lang === "ar" ? "ar-EG" : "en-US")}</p>
                 </div>
-                <BackupStatusBadge status={view.selectedData.latestRun.status} />
+                <StatusBadge status={view.selectedData.latestRun.status} />
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">{copy.noEvidenceText}</p>
@@ -202,7 +201,7 @@ export function BackupOverviewScreen() {
                   <p className="font-mono text-sm font-semibold">{view.selectedData.latestRestore.id}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{formatBackupDate(view.selectedData.latestRestore.startedAt, lang === "ar" ? "ar-EG" : "en-US")}</p>
                 </div>
-                <BackupStatusBadge status={view.selectedData.latestRestore.status} />
+                <StatusBadge status={view.selectedData.latestRestore.status} />
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">{copy.noEvidenceText}</p>

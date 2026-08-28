@@ -10,7 +10,7 @@ pieces, then convert in phase 4.
 The install list is in
 [../design/primitives.md](../design/primitives.md#dependencies-to-install).
 
-## 2. The 21 primitives
+## 2. The primitives
 
 `src/design-system/primitives/`, one file each. Exact specs in
 [primitives.md](../design/primitives.md).

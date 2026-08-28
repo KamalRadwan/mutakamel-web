@@ -4,7 +4,7 @@ Status: **Specification**
 
 Written: **2026-08-27**
 
-Implementation: `src/design-system/patterns/` — 12 directories.
+Implementation: `src/design-system/patterns/` — 13 directories.
 
 A pattern composes primitives into something a screen uses directly, and unlike
 a primitive it usually carries real product behavior: server pagination, dirty
@@ -13,7 +13,7 @@ guards, permission projection, idempotency evidence.
 **Feature code reaches for a pattern first**, and drops to a bare primitive
 only when no pattern fits.
 
-## The 12
+## The patterns
 
 | Pattern | Directory | Purpose |
 | --- | --- | --- |
@@ -29,6 +29,7 @@ only when no pattern fits.
 | `DegradedBanner` | `degraded-banner/` | Partial or stale data |
 | `Pagination` | `pagination/` | Page controls |
 | `StatCard` | `kpi/` | A single metric tile |
+| `UnavailableState` | `unavailable-state/` | The sealed-route boundary — a capability that is genuinely not built yet |
 
 ## DataTable
 
@@ -66,12 +67,21 @@ interface ColumnDef<T> {
 
 Owns, so no screen re-implements them:
 
-- 40px rows, `text-xs`, weight **400**
+- **36px** rows, `text-xs`, weight **400**
 - Sticky header, `bg-card`, bottom `border-border`
 - Zebra rows via `--row-zebra`
 - **Server** pagination and sorting — never client-side over a page of results
+- **`aria-sort` on every sortable `<th>`** — `"ascending"`, `"descending"`, or
+  `"none"`, driven by `SortState`. Exactly one column carries a value other
+  than `none`. Without it a screen-reader user cannot tell which column is
+  sorted or which way, and the sort arrow is a purely visual signal
 - Row selection with a header select-all reflecting indeterminate state
 - Keyboard row navigation; the action cluster is reachable
+- **`scroll-margin` on focusable row content**, sized to the sticky offsets, so
+  a `Tab` into a row action never lands underneath the sticky header or the
+  sticky inline-start/end columns (WCAG 2.2 AA `focus-not-obscured`). Four
+  sticky layers overlap this grid; without the margin the focus ring ends up
+  behind one of them with no visual indication at all
 - `DataTableSkeleton` matching real column widths while loading
 - Empty, error and forbidden states rendered in-body
 - Horizontal overflow inside its own container — **the page never scrolls
@@ -100,9 +110,17 @@ interface FilterBarProps {
 
 - **Filter state lives in the URL**, so a filtered view is shareable and
   survives refresh.
-- Search debounces 300ms before touching the URL.
+- Search debounces 300ms before touching the URL, and renders
+  `text-base sm:text-sm` — it takes typed input, so the
+  [mobile input rule](DESIGN-SYSTEM.md#inputs-are-16px-on-mobile) applies.
 - Active filters render as removable chips; a "Clear all" appears only when at
   least one is set.
+- **Chips wrap before they shrink, and never truncate.** Past two rows the
+  remainder collapses into a `+n` **button** that opens a popover of the rest,
+  each still removable. A static `+n` count hides filter state the user is
+  entitled to change; a truncated chip label (`Acquisition so…`) tells them
+  nothing about what is filtering their data. Full rule in
+  [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#toolbar--28px-controls).
 - Filters that map to an enum build their options from
   [../reference/enums.md](../reference/enums.md) with `t.status.*` labels.
 - Collapses behind a "Filters" button with a count badge below `lg`.
@@ -134,6 +152,27 @@ scrollbar in a dialog belongs in a drawer.
   toast. See below.
 - Success closes the drawer and raises a toast.
 - Errors that are not field-level render in-body at the top of the drawer.
+- Fields **validate on blur**, then re-validate on change only once they have
+  already errored — see [primitives.md](primitives.md#validate-on-blur-not-on-keystroke).
+
+### Focus after a failed submit
+
+**On a 422, move focus to the first invalid field.** Not the drawer, not the
+submit button, not nowhere.
+
+WCAG 2.2 allows two paths here: a focusable error summary at the top of the
+form, or focus on the first invalid field. **We take the second** — it keeps
+the toaster-only rule intact (no in-body error card) while still giving
+keyboard and screen-reader users somewhere to land.
+
+Leaving focus on the submit button after a rejected save is the failure mode
+worth naming: a sighted user sees a toast, but a screen-reader user hears a
+message about errors and is then sitting on a button, with no route to the
+field that is actually wrong.
+
+The field's own `aria-describedby` error text is what gets announced on
+arrival, which is why [`Field`](primitives.md#field) wiring is
+constraint-critical rather than cosmetic.
 
 ## StatusBadge
 
@@ -207,6 +246,11 @@ toast.errorFromApi(title, error: NormalizedApiError, duration?)
 
 - Rendered by `sonner`, mounted once in the root layout.
 - `duration <= 0` means permanent; omitted uses the 4000ms default.
+- **`aria-live="polite"`, never `assertive`; never takes focus; any toast
+  carrying an action is keyboard-reachable.** Full contract in
+  [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#the-accessibility-contract) — it matters
+  more here than in most products because every write result in this app is a
+  toast.
 - `errorFromApi` puts `errorCode` and `correlationId` in the message so the
   evidence is not lost.
 - **Titles and messages come from the dictionary.** The transport's own

@@ -18,8 +18,8 @@ Create `src/app/fonts.ts` exactly as specified in
 and apply both `.variable` classNames to `<html>` in `src/app/layout.tsx`.
 
 **Look at the result before continuing.** If Readex Pro's Arabic proves too
-wide for a 40px row at `text-xs`, switch to Zain and record it — see
-[OPEN-QUESTIONS.md](OPEN-QUESTIONS.md#q4--font-validation).
+wide for a **36px** row at `text-xs`, switch to Zain and record it — see
+[OPEN-QUESTIONS.md](OPEN-QUESTIONS.md#q4--font-validation--partially-closed).
 
 ## 3. globals.css
 

@@ -191,7 +191,17 @@ describe("PublisherKeysScreen", () => {
     expect(
       screen.getByRole("alertdialog", { name: "Confirm critical key registration" }),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    // F-FE-003 consolidation: the shared ConfirmActionModal now requires
+    // typing the exact challenge ID before Confirm is enabled, replacing the
+    // old read-only <dl> preview with a stronger typed-confirmation gate.
+    const confirmButton = screen.getByRole("button", { name: "Confirm" });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.change(
+      screen.getByLabelText("Type the exact name to confirm"),
+      { target: { value: CHALLENGE_ID } },
+    );
+    expect(confirmButton).toBeEnabled();
+    fireEvent.click(confirmButton);
     expect(view.confirmMutation).toHaveBeenCalledOnce();
   });
 

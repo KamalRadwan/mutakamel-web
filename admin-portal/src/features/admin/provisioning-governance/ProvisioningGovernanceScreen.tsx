@@ -15,18 +15,12 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
   AmbiguousOutcomePanel,
   Badge,
   Button,
   Card,
   CardContent,
+  ConfirmActionModal,
   DataTable,
   Dialog,
   DialogContent,
@@ -727,13 +721,11 @@ function DiscoveryWorkspace({
   });
   const [validation, setValidation] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const [confirmation, setConfirmation] = useState("");
 
   const requestConfirmation = () => {
     const error = validateCommand(command, copy);
     setValidation(error);
     if (!error) {
-      setConfirmation("");
       setConfirming(true);
     }
   };
@@ -866,38 +858,20 @@ function DiscoveryWorkspace({
         <DiscoveryDetailDialog view={view} copy={copy} lang={lang} />
       ) : null}
 
-      <AlertDialog open={confirming} onOpenChange={setConfirming}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{copy.confirmationTitle}</AlertDialogTitle>
-            <p className="text-sm text-muted-foreground">{copy.confirmationText}</p>
-          </AlertDialogHeader>
-          <Field label={copy.confirmationToken}>
-            {(fieldProps) => (
-              <Input
-                {...fieldProps}
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-                autoComplete="off"
-              />
-            )}
-          </Field>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{copy.close}</AlertDialogCancel>
-            <AlertDialogAction
-              destructive
-              disabled={confirmation !== "RUN" || view.mutation.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                if (confirmation !== "RUN") return;
-                void submit();
-              }}
-            >
-              {view.mutation.isPending ? copy.running : copy.run}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmActionModal
+        isOpen={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={submit}
+        titleEn={COPY.en.confirmationTitle}
+        titleAr={COPY.ar.confirmationTitle}
+        descriptionEn={COPY.en.confirmationText}
+        descriptionAr={COPY.ar.confirmationText}
+        confirmTextEn={COPY.en.run}
+        confirmTextAr={COPY.ar.run}
+        loadingLabel={copy.running}
+        requiredConfirmationText="RUN"
+        isLoading={view.mutation.isPending}
+      />
     </div>
   );
 }

@@ -4,7 +4,7 @@ Status: **Specification**
 
 Written: **2026-08-27**
 
-## The current state this replaces
+## What this replaced (pre-rebuild, for context)
 
 Six surfaces in the live shell — the notifications dropdown, user dropdown,
 pipeline select, country select, toast, and modal scrim — carry animation

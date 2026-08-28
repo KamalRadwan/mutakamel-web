@@ -13,13 +13,6 @@ import {
 import { type ReactNode } from "react";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
   Button,
   Card,
   CodeRef,
@@ -276,54 +269,6 @@ export function FleetFieldError({
     <span id={id} role="alert" className="text-xs font-semibold text-danger-600 dark:text-danger-400">
       {message}
     </span>
-  );
-}
-
-export function FleetConfirmDialog({
-  open,
-  title,
-  body,
-  target,
-  copy,
-  pending,
-  onClose,
-  onConfirm,
-}: {
-  open: boolean;
-  title: string;
-  body: string;
-  target: string;
-  copy: ProvisioningFleetCopy;
-  pending: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <AlertDialog open={open} onOpenChange={(next) => !next && !pending && onClose()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <p className="text-sm leading-6 text-muted-foreground">{body}</p>
-        </AlertDialogHeader>
-        <code dir="ltr" className="mt-4 block max-h-40 overflow-auto break-all rounded-lg bg-ink-100 p-3 text-start text-xs dark:bg-ink-950">
-          {target}
-        </code>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>{copy.close}</AlertDialogCancel>
-          <AlertDialogAction
-            destructive
-            disabled={pending}
-            onClick={(event) => {
-              event.preventDefault();
-              onConfirm();
-            }}
-          >
-            {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
-            {copy.confirm}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   );
 }
 
