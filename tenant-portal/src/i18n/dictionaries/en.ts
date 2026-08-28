@@ -165,6 +165,25 @@ export const en: Dictionary = {
       PHONE: "Phone",
     } as Record<string, string>
   },
+  crmSettings: {
+    loading: "Loading CRM settings…",
+    unavailable: "CRM settings are unavailable. Use reload to try again.",
+    retry: "Reload",
+    qualification: "Require a qualified stage before lead conversion",
+    retention: "Outbound email content retention (days)",
+    retentionHelp: "Enter an integer from 30 through 2555 days.",
+    save: "Save settings",
+    saving: "Saving…",
+    reset: "Discard changes",
+    serverState: "Read-only server state",
+    defaultLeadStage: "Default lead-stage ID",
+    defaultPipeline: "Default opportunity-pipeline ID",
+    policyRevision: "Retention policy revision",
+    notSet: "Not set",
+    asterisk: "Asterisk integration",
+    insecureTls: "Invalid TLS certificates are allowed on the server. This is a high-risk setting and this page does not modify it.",
+    readOnly: "You have read-only access to these settings."
+  },
   crmStaticCatalogue: {
     subtitle: "Current CRM enum, label, and permission vocabulary. This catalogue is read-only.",
     reload: "Reload",
