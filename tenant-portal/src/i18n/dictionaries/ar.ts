@@ -39,6 +39,29 @@ export const ar = {
     accessDenied: "تم رفض الوصول",
     accessDeniedMessage: "ليست لديك الصلاحية لتنفيذ هذا الإجراء."
   },
+  auth: {
+    title: "تسجيل الدخول إلى بوابة المستأجر",
+    subtitle: "أدخل بيانات الحساب للوصول إلى لوحة التحكم والعمليات الخاصة بك",
+    emailLabel: "البريد الإلكتروني",
+    passwordLabel: "كلمة المرور",
+    forgotPassword: "نسيت كلمة المرور؟",
+    rememberMe: "تذكر الجلسة",
+    submit: "تسجيل الدخول",
+    submitting: "جاري الدخول...",
+    resetTitle: "استعادة كلمة المرور",
+    resetDescription: "أدخل بريدك الإلكتروني المسجل وسيتم إرسال رابط لإعادة تعيين كلمة المرور.",
+    resetEmailPlaceholder: "name@company.com",
+    resetSubmit: "إرسال الرابط",
+    signInSuccess: "تم تسجيل الدخول",
+    signInSuccessMessage: "تم التحقق من الجلسة بنجاح.",
+    signInFailed: "فشل تسجيل الدخول",
+    invalidCredentials: "بيانات الدخول غير صحيحة.",
+    resetLinkSent: "تم إرسال رابط إعادة التعيين",
+    resetLinkSentMessage: "إذا كان البريد مسجلاً، ستصل إليه تعليمات إعادة تعيين كلمة المرور.",
+    resetFailed: "تعذر الإرسال",
+    resetFailedMessage: "حاول مرة أخرى لاحقًا.",
+    footer: "© 2026 متكامل كراود كابيتال. جميع الحقوق محفوظة."
+  },
   // Enum wire value -> translated label, keyed "<StatusKind>.<VALUE>" (e.g.
   // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts
   // in phase 4 — see src/design-system/patterns/status-badge. An unmapped

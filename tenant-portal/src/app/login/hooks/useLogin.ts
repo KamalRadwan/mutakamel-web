@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
-import { useToast } from "@/components/ui/ToastContext";
+import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
 
 export function useLogin() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const { login } = useTenantAuth();
   const [email, setEmail] = useState("");
@@ -16,30 +17,28 @@ export function useLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  // D1 (docs/build/DEFECTS.md#d1): the reset dialog previously had no bound
+  // state at all, so whatever the user typed there was discarded and the
+  // request went out with the login field's value instead.
+  const [resetEmail, setResetEmail] = useState("");
 
   const toggleShowPassword = () => setShowPassword((prev) => !prev);
   const toggleRememberMe = () => setRememberMe((prev) => !prev);
+
+  const openForgotModal = () => {
+    setResetEmail("");
+    setIsForgotModalOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
       await login({ email, password, rememberMe });
-      toast.success(
-        lang === "ar" ? "تم تسجيل الدخول" : "Signed in",
-        lang === "ar" ? "تم التحقق من الجلسة بنجاح." : "Your session was verified successfully.",
-      );
+      toast.success(t.auth.signInSuccess, t.auth.signInSuccessMessage);
     } catch (error) {
-      const payload = error as {
-        response?: { data?: { message?: string } };
-        message?: string;
-      };
-      toast.error(
-        lang === "ar" ? "فشل تسجيل الدخول" : "Sign-in failed",
-        payload.response?.data?.message ??
-          payload.message ??
-          (lang === "ar" ? "بيانات الدخول غير صحيحة." : "Invalid credentials."),
-      );
+      const normalized = normalizeApiError(error);
+      toast.error(t.auth.signInFailed, normalized.message ?? t.auth.invalidCredentials);
     } finally {
       setIsSubmitting(false);
     }
@@ -51,21 +50,13 @@ export function useLogin() {
     try {
       await axiosClient.post(
         "/api/tenant/core/v1/auth/forgot-password",
-        { email },
+        { email: resetEmail },
         { skipAuthRefresh: true, skipAutoIdempotency: true },
       );
-      toast.info(
-        lang === "ar" ? "تم إرسال رابط إعادة التعيين" : "Reset Link Sent",
-        lang === "ar"
-          ? "إذا كان البريد مسجلاً، ستصل إليه تعليمات إعادة تعيين كلمة المرور."
-          : "If the email is registered, password reset instructions will be sent.",
-      );
+      toast.info(t.auth.resetLinkSent, t.auth.resetLinkSentMessage);
       setIsForgotModalOpen(false);
     } catch {
-      toast.error(
-        lang === "ar" ? "تعذر الإرسال" : "Request failed",
-        lang === "ar" ? "حاول مرة أخرى لاحقًا." : "Please try again later.",
-      );
+      toast.error(t.auth.resetFailed, t.auth.resetFailedMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -82,6 +73,9 @@ export function useLogin() {
     isSubmitting,
     isForgotModalOpen,
     setIsForgotModalOpen,
+    openForgotModal,
+    resetEmail,
+    setResetEmail,
     toggleShowPassword,
     toggleRememberMe,
     handleSubmit,
