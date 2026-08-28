@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-27**
+Last source verification: **2026-08-28**
 
 Owner: **Admin Portal**
 
@@ -97,15 +97,33 @@ provisioning/storage sub-modules) — no longer a single 4,189-line file;
 every panel in that module (`TenantFqdnPanel`, `TenantProfilePanel`,
 `TenantLifecyclePanel`, `TenantBillingPanel`, `TenantWorkspaceScreen`, the
 access panel/dialogs) renders through `Card`/`CardHeader`/`Badge`/`Button`.
-**Remaining pattern-layer gap:** the tenant-creation wizard
-(`tenants/new/*`, 4 files) and most of Settings (9 files, including
-`SettingField.tsx` — the field renderer every settings page shares) are
-still hand-rolling forms/buttons/selects with correct tokens but no shared
-components. Settings additionally has a real pre-existing gap worth closing
-alongside that conversion: `useSettings.ts` already tracks per-setting
-idempotency-key/ambiguous-write-outcome evidence, but it never reaches the
-UI today — the only place it surfaces is a toast, which disappears, the
-exact failure mode AGENTS.md's non-negotiable rule exists to prevent.
+**The tenant-creation wizard and Settings pattern-layer gap are now closed
+too.** `tenants/new/*` (`page.tsx`, `TenantApplicationsStep.tsx`,
+`TenantInfrastructureStep.tsx`, `TenantAddressGeocoding.tsx`) renders every
+input/select/checkbox/textarea/button through the shared primitives now; the
+wizard's create-recovery banner (a client-persisted idempotency-key retry
+marker) moved from a hand-rolled warn box to `AmbiguousOutcomePanel`. The
+5-pill step nav and the tri-state loading/forbidden/empty tiles stayed
+hand-rolled deliberately — no stepper or generic tri-state primitive exists
+elsewhere to align with, the same "forbidden ≠ a 403 client gate" pattern
+already accepted, unmigrated, in `invoice-shared.tsx`/`release-shared.tsx`.
+
+Settings converted the same way: `SettingsSidebar` moved from a vertical
+icon list to `SubNav` (adding `SETTINGS_SUBNAV` to `nav-config.ts`, which
+finally makes `SubNav`'s own doc comment — "Backup, Settings, and
+Provisioning all use this" — true); `SettingField.tsx`'s boolean/string/
+number/enum controls moved to `Switch`/`Input`/`Select`; `SettingSearch`,
+`SaveSettingsBanner`, and `SettingsResourceBoundary` moved to `Input`/
+`Button`/`ErrorState`; `AuthSessionsPanel` and `AuthInvalidationReplayPanel`
+moved to `Button`/`Badge`/`Field`/`ConfirmActionModal`. The real pre-existing
+gap flagged here previously — `useSettings.ts` tracking idempotency-key/
+ambiguous-write-outcome evidence internally but never exposing it, so an
+unconfirmed save only ever showed a toast that disappeared — is fixed:
+`SettingFieldData` now carries `ambiguous`/`idempotencyKey`/`correlationId`,
+and `SettingField` renders `AmbiguousOutcomePanel` with a working
+retry-exact action instead. The same gap existed a second time in
+`useAuthInvalidationReplay.ts` (an idempotency key computed and retained per
+retryable fingerprint, never returned) and got the identical fix.
 
 `StatCard` (`src/design-system/patterns/kpi/StatCard.tsx`) gained an optional
 `tone` prop (`brand`/`warn`/`danger`/`neutral`) driving an icon badge and a
