@@ -70,6 +70,7 @@ export default function BillingSettingsPage() {
                     ? billing.reloadSetting(key)
                     : tenants.reloadSetting(key)
                 }
+                onRetryExact={saveAll}
               />
             ))
           ) : (

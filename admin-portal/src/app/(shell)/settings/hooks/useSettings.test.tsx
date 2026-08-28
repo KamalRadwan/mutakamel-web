@@ -169,6 +169,11 @@ describe("useSettings", () => {
     expect(firstConfig.headers["x-idempotency-key"]).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     );
+    expect(result.current.settings[0].ambiguous).toBe(true);
+    expect(result.current.settings[0].idempotencyKey).toBe(
+      firstConfig.headers["x-idempotency-key"],
+    );
+    expect(result.current.settings[0].correlationId).toBe("corr-ambiguous");
 
     await act(async () => {
       await result.current.saveAllSettings();
@@ -177,6 +182,9 @@ describe("useSettings", () => {
       firstConfig.headers["x-idempotency-key"],
     );
     expect(result.current.hasUnsavedChanges).toBe(false);
+    expect(result.current.settings[0].ambiguous).toBeFalsy();
+    expect(result.current.settings[0].idempotencyKey).toBeUndefined();
+    expect(result.current.settings[0].correlationId).toBeUndefined();
   });
 
   it("renders unavailable state rather than an empty list and supports retry", async () => {

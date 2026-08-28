@@ -39,6 +39,7 @@ export default function AuthSettingsPage() {
                 lang={lang}
                 onUpdate={settingsState.updateSetting}
                 onReload={settingsState.reloadSetting}
+                onRetryExact={settingsState.saveAllSettings}
               />
             ))
           ) : (

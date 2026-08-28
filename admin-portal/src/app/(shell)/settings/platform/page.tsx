@@ -86,6 +86,7 @@ export default function PlatformSettingsPage() {
                     ? platform.reloadSetting(key)
                     : support.reloadSetting(key)
                 }
+                onRetryExact={saveAll}
               />
             ))
           ) : (

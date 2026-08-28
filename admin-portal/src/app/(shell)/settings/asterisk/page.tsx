@@ -36,6 +36,7 @@ export default function AsteriskSettingsPage() {
                 lang={lang}
                 onUpdate={settingsState.updateSetting}
                 onReload={settingsState.reloadSetting}
+                onRetryExact={settingsState.saveAllSettings}
               />
             ))
           ) : (

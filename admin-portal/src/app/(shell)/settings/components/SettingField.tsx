@@ -1,10 +1,17 @@
 "use client";
 
 import { Save, Info, Lock, RefreshCw } from "lucide-react";
-import { SettingFieldData } from "../hooks/useSettings";
+import { AmbiguousOutcomePanel } from "@/design-system";
+import { localSettingsError, SettingFieldData } from "../hooks/useSettings";
 import { useToast } from "@/components/ui/ToastContext";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
+
+const KNOWN_SETTING_ERROR_CODES = [
+  "SETTINGS_CRITICAL_PERMISSION_REQUIRED",
+  "SETTING_NOT_LOADED",
+  "PENDING_SETTING_WRITE_MUST_BE_RECONCILED",
+];
 
 interface SettingFieldProps {
   setting: SettingFieldData;
@@ -14,9 +21,10 @@ interface SettingFieldProps {
     value: string | number | boolean,
   ) => Promise<void> | void;
   onReload: (key: string) => Promise<void> | void;
+  onRetryExact: () => Promise<void> | void;
 }
 
-export function SettingField({ setting, lang, onUpdate, onReload }: SettingFieldProps) {
+export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }: SettingFieldProps) {
   const toast = useToast();
   const copy = (lang === "ar" ? ar : en).settings.field;
   const {
@@ -50,7 +58,7 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
     } catch (err: unknown) {
       toast.error(
         copy.invalidValueTitle,
-        errorText(err) || copy.valueSaveFailed,
+        errorText(err, lang) || copy.valueSaveFailed,
       );
     }
   };
@@ -181,7 +189,18 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
               </button>
             )}
           </div>
-          {setting.error ? (
+          {setting.ambiguous ? (
+            <AmbiguousOutcomePanel
+              className="w-full"
+              idempotencyKey={setting.idempotencyKey}
+              correlationId={setting.correlationId}
+              message={setting.error ?? undefined}
+              onRetryExact={() =>
+                void Promise.resolve(onRetryExact()).catch(() => undefined)
+              }
+              retrying={isSaving}
+            />
+          ) : setting.error ? (
             <p role="alert" className="w-full text-start text-xs text-danger-700 dark:text-danger-300">
               {setting.error}
             </p>
@@ -192,6 +211,10 @@ export function SettingField({ setting, lang, onUpdate, onReload }: SettingField
   );
 }
 
-function errorText(error: unknown) {
-  return error instanceof Error ? error.message : "";
+function errorText(error: unknown, lang: string) {
+  if (!(error instanceof Error)) return "";
+  if (KNOWN_SETTING_ERROR_CODES.includes(error.message)) {
+    return localSettingsError(lang === "ar" ? "ar" : "en", error.message);
+  }
+  return error.message;
 }

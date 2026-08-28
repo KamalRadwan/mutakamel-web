@@ -41,6 +41,9 @@ export interface SettingFieldData extends MergedSystemSetting {
   permissionLocked?: boolean;
   isRefreshing?: boolean;
   hasPendingChange?: boolean;
+  ambiguous?: boolean;
+  idempotencyKey?: string;
+  correlationId?: string;
 }
 
 const SETTINGS_SAVE_PERMISSIONS = [
@@ -278,11 +281,11 @@ export function useSettings(prefix: string) {
       } catch (caught) {
         if (isTopUpKey(key)) topUpWriteFailed = true;
         const normalized = normalizeApiError(caught);
-        if (
+        const ambiguous =
           getApiRequestOutcome(caught) === "settled-before-session-change" ||
           isAmbiguousWriteOutcome(normalized) ||
-          /(?:UPSTREAM|UNAVAILABLE|TIMEOUT)/u.test(normalized.errorCode)
-        ) {
+          /(?:UPSTREAM|UNAVAILABLE|TIMEOUT)/u.test(normalized.errorCode);
+        if (ambiguous) {
           writeIntentsRef.current.set(key, { ...intent, ambiguous: true });
         } else {
           writeIntentsRef.current.delete(key);
@@ -294,7 +297,14 @@ export function useSettings(prefix: string) {
         setSettings((current) =>
           current.map((setting) =>
             setting.key === key
-              ? { ...setting, isSaving: false, error: message }
+              ? {
+                  ...setting,
+                  isSaving: false,
+                  error: message,
+                  ambiguous,
+                  idempotencyKey: ambiguous ? intent.idempotencyKey : undefined,
+                  correlationId: ambiguous ? normalized.correlationId : undefined,
+                }
               : setting,
           ),
         );
@@ -396,7 +406,7 @@ export function combineSettingsLoadStates(
   return "READY";
 }
 
-export function classifySettingsLoadError(
+function classifySettingsLoadError(
   error: NormalizedApiError,
 ): SettingsLoadState {
   if (error.httpStatus === 403) return "FORBIDDEN";
@@ -667,7 +677,7 @@ function settingWriteFingerprint(
   });
 }
 
-function localSettingsError(lang: "ar" | "en", code: string): string {
+export function localSettingsError(lang: "ar" | "en", code: string): string {
   const copy = (lang === "ar" ? ar : en).settings.validation;
   if (code === "PENDING_SETTING_WRITE_MUST_BE_RECONCILED") {
     return copy.unresolvedWrite;
