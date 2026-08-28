@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Modal } from "@/components/ui/Modal";
-import { Select } from "@/components/ui/Select";
+import { Checkbox, Field, FormDrawer, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   CREATABLE_LEAD_STAGE_FLAGS,
@@ -29,152 +26,107 @@ const initialForm: CreateLeadStageFormData = {
   isDefault: false,
 };
 
-export function CreateLeadStagesModal({
-  isOpen,
-  isSubmitting,
-  error,
-  onClose,
-  onSubmit,
-}: CreateModalProps) {
-  const { t, lang } = useI18n();
+export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, onSubmit }: CreateModalProps) {
+  const { t } = useI18n();
   const [form, setForm] = useState<CreateLeadStageFormData>(initialForm);
-  const copy =
-    lang === "ar"
-      ? {
-          title: "إضافة مرحلة عميل",
-          nameAr: "الاسم بالعربية",
-          nameEn: "الاسم بالإنجليزية",
-          flag: "الدلالة التشغيلية",
-          category: "التصنيف",
-          isDefault: "استخدامها كمرحلة افتراضية للعملاء الجدد",
-          submit: "إنشاء المرحلة",
-          submitting: "جارٍ إنشاء المرحلة...",
-        }
-      : {
-          title: "Add lead stage",
-          nameAr: "Arabic name",
-          nameEn: "English name",
-          flag: "Lifecycle flag",
-          category: "Category",
-          isDefault: "Use as the default stage for new leads",
-          submit: "Create stage",
-          submitting: "Creating stage...",
-        };
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
   const close = () => {
-    if (isSubmitting) return;
     setForm(initialForm);
     onClose();
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleSubmit = async () => {
     if (await onSubmit(form)) setForm(initialForm);
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={close}
-      title={copy.title}
-      maxWidth="md"
-      closeDisabled={isSubmitting}
+    <FormDrawer
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) close();
+      }}
+      title={t.crmLeadStages.addTitle}
+      isDirty={isDirty}
+      isSubmitting={isSubmitting}
+      onSubmit={() => void handleSubmit()}
+      error={error ?? undefined}
+      labels={{
+        submit: isSubmitting ? t.crmLeadStages.creating : t.common.create,
+        cancel: t.common.cancel,
+        discardTitle: t.common.discardTitle,
+        discardDescription: t.common.discardDescription,
+        discardConfirm: t.common.discardConfirm,
+        discardCancel: t.common.cancel,
+      }}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <p
-            role="alert"
-            className="rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300"
-          >
-            {error}
-          </p>
-        )}
-        <Input
-          label={copy.nameAr}
-          value={form.nameAr}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, nameAr: event.target.value }))
-          }
-          maxLength={80}
-          required
-          disabled={isSubmitting}
-          dir="rtl"
-        />
-        <Input
-          label={copy.nameEn}
-          value={form.nameEn}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, nameEn: event.target.value }))
-          }
-          maxLength={80}
-          required
-          disabled={isSubmitting}
-          dir="ltr"
-        />
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex flex-col gap-4">
+        <Field label={t.crmLeadStages.arabicName} required>
+          <Input
+            dir="rtl"
+            value={form.nameAr}
+            onChange={(event) => setForm((current) => ({ ...current, nameAr: event.target.value }))}
+            maxLength={80}
+            required
+            disabled={isSubmitting}
+          />
+        </Field>
+        <Field label={t.crmLeadStages.englishName} required>
+          <Input
+            dir="ltr"
+            value={form.nameEn}
+            onChange={(event) => setForm((current) => ({ ...current, nameEn: event.target.value }))}
+            maxLength={80}
+            required
+            disabled={isSubmitting}
+          />
+        </Field>
+        <Field label={t.crmLeadStages.flag}>
           <Select
-            label={copy.flag}
             value={form.flag}
-            onChange={(event) => {
-              const flag = event.target
-                .value as CreateLeadStageFormData["flag"];
-              setForm((current) => ({
-                ...current,
-                flag,
-                isDefault: flag === "CONVERTED" ? false : current.isDefault,
-              }));
+            onValueChange={(value) => {
+              const flag = value as CreateLeadStageFormData["flag"];
+              setForm((current) => ({ ...current, flag, isDefault: flag === "CONVERTED" ? false : current.isDefault }));
             }}
-            options={CREATABLE_LEAD_STAGE_FLAGS.map((value) => ({
-              value,
-              label: value.replaceAll("_", " "),
-            }))}
-            disabled={isSubmitting}
-          />
-          <Select
-            label={copy.category}
-            value={form.category}
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                category: event.target.value as LeadStageCategory,
-              }))
-            }
-            options={LEAD_STAGE_CATEGORIES.map((value) => ({
-              value,
-              label: value.replaceAll("_", " "),
-            }))}
-            disabled={isSubmitting}
-          />
-        </div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-          <input
-            type="checkbox"
-            checked={form.isDefault}
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                isDefault: event.target.checked,
-              }))
-            }
-            disabled={isSubmitting || form.flag === "CONVERTED"}
-            className="size-4 rounded border-slate-300"
-          />
-          {copy.isDefault}
-        </label>
-        <div className="flex justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={close}
-            disabled={isSubmitting}
           >
-            {t.common.cancel}
-          </Button>
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? copy.submitting : copy.submit}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+            <SelectTrigger disabled={isSubmitting}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CREATABLE_LEAD_STAGE_FLAGS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {t.statusValues[`LeadStageFlag.${value}`] ?? value}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label={t.crmLeadStages.category}>
+          <Select
+            value={form.category}
+            onValueChange={(value) => setForm((current) => ({ ...current, category: value as LeadStageCategory }))}
+          >
+            <SelectTrigger disabled={isSubmitting}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LEAD_STAGE_CATEGORIES.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {t.statusValues[`StageCategory.${value}`] ?? value}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <label className="flex items-center gap-2 text-xs text-foreground">
+          <Checkbox
+            checked={form.isDefault}
+            onCheckedChange={(checked) => setForm((current) => ({ ...current, isDefault: checked === true }))}
+            disabled={isSubmitting || form.flag === "CONVERTED"}
+          />
+          {t.crmLeadStages.isDefaultOption}
+        </label>
+      </div>
+    </FormDrawer>
   );
 }

@@ -34,7 +34,10 @@ export const ar = {
     switchToSystem: "التبديل إلى مظهر النظام",
     previousPage: "الصفحة السابقة",
     nextPage: "الصفحة التالية",
-    showingOf: "عرض {from}–{to} من {total}"
+    showingOf: "عرض {from}–{to} من {total}",
+    discardTitle: "تجاهل التغييرات غير المحفوظة؟",
+    discardDescription: "لم يتم حفظ التغييرات. إذا أغلقت الآن، ستفقدها.",
+    discardConfirm: "تجاهل التغييرات"
   },
   errors: {
     reference: "المرجع",
@@ -90,11 +93,41 @@ export const ar = {
     clientTypeAndroid: "Android",
     clientTypeDesktop: "سطح المكتب"
   },
+  crmLeadStages: {
+    arabicName: "الاسم بالعربية",
+    englishName: "الاسم بالإنجليزية",
+    semantics: "دلالة دورة العميل",
+    order: "الترتيب",
+    default: "افتراضية",
+    setDefault: "تعيين كافتراضية",
+    addTitle: "إضافة مرحلة عميل",
+    flag: "الدلالة التشغيلية",
+    category: "التصنيف",
+    isDefaultOption: "استخدامها كمرحلة افتراضية للعملاء الجدد",
+    creating: "جارٍ إنشاء المرحلة...",
+    deleteTitle: "حذف مرحلة العميل",
+    deleteMessage: (name: string) => `هل تريد حذف مرحلة «${name}»؟ قد يرفض الخادم الحذف إذا كانت مستخدمة.`,
+    deleting: "جارٍ الحذف...",
+    empty: "لا توجد مراحل عملاء مطابقة"
+  },
   // Enum wire value -> translated label, keyed "<StatusKind>.<VALUE>" (e.g.
   // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts
   // in phase 4 — see src/design-system/patterns/status-badge. An unmapped
   // key is not an error: StatusBadge falls back to the raw wire value.
-  statusValues: {} as Record<string, string>,
+  statusValues: {
+    "LeadStageFlag.NEW": "جديد",
+    "LeadStageFlag.CONTACTED": "تم التواصل",
+    "LeadStageFlag.QUALIFYING": "قيد التأهيل",
+    "LeadStageFlag.QUALIFIED": "مؤهل",
+    "LeadStageFlag.DISQUALIFIED": "غير مؤهل",
+    "LeadStageFlag.CONVERTED": "تم التحويل",
+    "LeadStageFlag.NURTURING": "قيد المتابعة",
+    "LeadStageFlag.ON_HOLD": "معلّق",
+    "StageCategory.OPEN": "مفتوح",
+    "StageCategory.IN_PROGRESS": "قيد التنفيذ",
+    "StageCategory.POSITIVE": "إيجابي",
+    "StageCategory.NEGATIVE": "سلبي",
+  } as Record<string, string>,
   permissionGate: {
     title: "الوصول مقيد",
     description: "ليست لديك الصلاحية لعرض هذا القسم. تواصل مع مسؤول مساحة العمل إذا كنت تعتقد أن هذا خطأ."

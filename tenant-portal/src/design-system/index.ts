@@ -68,6 +68,7 @@ export * from "./shell/MobileNav";
 export * from "./shell/nav-config";
 export * from "./shell/NotificationsDropdown";
 export * from "./shell/Sidebar";
+export * from "./shell/SubNav";
 export * from "./shell/ThemeToggle";
 export * from "./shell/Topbar";
 export * from "./shell/useNavTree";

@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { ConfirmActionModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { LeadStageItem } from "../lead-stage-contract";
 
@@ -13,34 +13,22 @@ interface DeleteModalProps {
   onConfirm: () => void;
 }
 
-export function DeleteLeadStagesConfirmModal({
-  isOpen,
-  isSubmitting,
-  item,
-  error,
-  onClose,
-  onConfirm,
-}: DeleteModalProps) {
+export function DeleteLeadStagesConfirmModal({ isOpen, isSubmitting, item, error, onClose, onConfirm }: DeleteModalProps) {
   const { t, lang } = useI18n();
   const name = item ? (lang === "ar" ? item.nameAr : item.nameEn) : "";
 
   return (
-    <ConfirmModal
-      isOpen={isOpen}
-      onClose={onClose}
+    <ConfirmActionModal
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title={t.crmLeadStages.deleteTitle}
+      description={error ?? t.crmLeadStages.deleteMessage(name)}
+      confirmLabel={isSubmitting ? t.crmLeadStages.deleting : t.common.delete}
+      cancelLabel={t.common.cancel}
       onConfirm={onConfirm}
-      title={lang === "ar" ? "حذف مرحلة العميل" : "Delete lead stage"}
-      message={
-        lang === "ar"
-          ? `هل تريد حذف مرحلة «${name}»؟ قد يرفض الخادم الحذف إذا كانت مستخدمة.`
-          : `Delete “${name}”? The server will reject deletion if the stage is in use.`
-      }
-      confirmText={t.common.delete}
-      loadingText={lang === "ar" ? "جارٍ الحذف..." : "Deleting..."}
-      isSubmitting={isSubmitting}
-      error={error}
-      closeOnConfirm={false}
-      isDanger
+      loading={isSubmitting}
     />
   );
 }

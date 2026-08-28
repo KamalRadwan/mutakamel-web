@@ -36,7 +36,10 @@ export const en: Dictionary = {
     switchToSystem: "Switch to system theme",
     previousPage: "Previous page",
     nextPage: "Next page",
-    showingOf: "Showing {from}–{to} of {total}"
+    showingOf: "Showing {from}–{to} of {total}",
+    discardTitle: "Discard unsaved changes?",
+    discardDescription: "Your changes have not been saved. Closing now will lose them.",
+    discardConfirm: "Discard changes"
   },
   errors: {
     reference: "Ref",
@@ -92,7 +95,37 @@ export const en: Dictionary = {
     clientTypeAndroid: "Android",
     clientTypeDesktop: "Desktop"
   },
-  statusValues: {} as Record<string, string>,
+  crmLeadStages: {
+    arabicName: "Arabic name",
+    englishName: "English name",
+    semantics: "Lifecycle semantics",
+    order: "Order",
+    default: "Default",
+    setDefault: "Set as default",
+    addTitle: "Add lead stage",
+    flag: "Lifecycle flag",
+    category: "Category",
+    isDefaultOption: "Use as the default stage for new leads",
+    creating: "Creating stage…",
+    deleteTitle: "Delete lead stage",
+    deleteMessage: (name: string) => `Delete "${name}"? The server will reject deletion if the stage is in use.`,
+    deleting: "Deleting…",
+    empty: "No matching lead stages"
+  },
+  statusValues: {
+    "LeadStageFlag.NEW": "New",
+    "LeadStageFlag.CONTACTED": "Contacted",
+    "LeadStageFlag.QUALIFYING": "Qualifying",
+    "LeadStageFlag.QUALIFIED": "Qualified",
+    "LeadStageFlag.DISQUALIFIED": "Disqualified",
+    "LeadStageFlag.CONVERTED": "Converted",
+    "LeadStageFlag.NURTURING": "Nurturing",
+    "LeadStageFlag.ON_HOLD": "On hold",
+    "StageCategory.OPEN": "Open",
+    "StageCategory.IN_PROGRESS": "In progress",
+    "StageCategory.POSITIVE": "Positive",
+    "StageCategory.NEGATIVE": "Negative",
+  } as Record<string, string>,
   permissionGate: {
     title: "Access restricted",
     description: "You don't have permission to view this section. Contact your workspace admin if you believe this is a mistake."
