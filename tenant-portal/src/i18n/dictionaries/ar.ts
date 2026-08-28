@@ -125,6 +125,44 @@ export const ar = {
     deleteMessage: (name: string) => `هل تريد حذف مصدر الاستقطاب «${name}»؟ قد يرفض CRM الحذف إذا كان المصدر مستخدمًا.`,
     deleting: "جارٍ الحذف..."
   },
+  crmCustomFields: {
+    subtitle: "تعريفات الحقول المخصصة الحالية من CRM. الإنشاء هنا يقتصر على الأنواع التي لا تحتاج قائمة خيارات.",
+    reload: "إعادة التحميل",
+    search: "ابحث بالاسم أو المفتاح أو نوع السجل...",
+    owner: "نوع السجل",
+    fieldType: "نوع الحقل",
+    properties: "الخصائص",
+    searchable: "قابل للبحث",
+    optionsCount: (count: number) => `${count} خيار`,
+    empty: "لا توجد تعريفات مطابقة.",
+    addTitle: "إضافة حقل مخصص",
+    key: "المفتاح",
+    simpleTypesNote: "أنواع الاختيار تحتاج محرر خيارات غير متاح هنا، لذلك لا تُرسل من هذا النموذج.",
+    invalidKey: "يجب أن يبدأ المفتاح بحرف إنجليزي وأن يحتوي حروفًا صغيرة أو أرقامًا أو شرطات سفلية فقط.",
+    invalidNames: "الاسمان العربي والإنجليزي مطلوبان.",
+    create: "إنشاء الحقل",
+    creating: "جارٍ الإنشاء...",
+    ownerTypes: {
+      LEAD: "عميل محتمل",
+      PARTY: "طرف",
+      CUSTOMER_PROFILE: "ملف عميل",
+      OPPORTUNITY: "فرصة",
+      LEAD_AND_PARTY: "عميل محتمل وطرف",
+    } as Record<string, string>,
+    fieldTypes: {
+      TEXT: "نص",
+      TEXTAREA: "نص طويل",
+      NUMBER: "رقم",
+      DATE: "تاريخ",
+      DATETIME: "تاريخ ووقت",
+      BOOLEAN: "نعم/لا",
+      SELECT: "اختيار",
+      MULTI_SELECT: "اختيار متعدد",
+      URL: "رابط",
+      EMAIL: "بريد إلكتروني",
+      PHONE: "هاتف",
+    } as Record<string, string>
+  },
   // Enum wire value -> translated label, keyed "<StatusKind>.<VALUE>" (e.g.
   // "LeadStatus.CONVERTED"). Populated incrementally as each screen converts
   // in phase 4 — see src/design-system/patterns/status-badge. An unmapped

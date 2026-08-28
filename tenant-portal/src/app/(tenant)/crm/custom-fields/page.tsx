@@ -1,21 +1,16 @@
 "use client";
 
 import { FormInput, RefreshCw } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Table } from "@/components/ui/Table";
-import { TableToolbar } from "@/components/ui/TableToolbar";
+import { Badge, Button, DataTable, FilterBar, PageHeader, SubNav, NAV_SECTIONS, type ColumnDef } from "@/design-system";
+import { formatTemplate } from "@/lib/format/template";
 import { CreateCrmCustomFieldsModal } from "./components/CreateCrmCustomFieldsModal";
-import {
-  type CustomFieldItem,
-  useCrmCustomFields,
-} from "./hooks/useCrmCustomFields";
+import { type CustomFieldItem, useCrmCustomFields } from "./hooks/useCrmCustomFields";
+
+const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup")?.items ?? [];
 
 export default function CrmCustomFieldsPage() {
   const {
     t,
-    lang,
     items,
     searchQuery,
     setSearchQuery,
@@ -31,158 +26,116 @@ export default function CrmCustomFieldsPage() {
     reload,
   } = useCrmCustomFields();
 
-  const copy =
-    lang === "ar"
-      ? {
-          subtitle:
-            "تعريفات الحقول المخصصة الحالية من CRM. الإنشاء هنا يقتصر على الأنواع التي لا تحتاج قائمة خيارات.",
-          reload: "إعادة التحميل",
-          search: "ابحث بالاسم أو المفتاح أو نوع السجل...",
-          arabicName: "الاسم بالعربية",
-          englishName: "الاسم بالإنجليزية",
-          owner: "نوع السجل",
-          fieldType: "نوع الحقل",
-          properties: "الخصائص",
-          searchable: "قابل للبحث",
-          options: "خيارات",
-          active: "نشط",
-          inactive: "غير نشط",
-          loading: "جارٍ تحميل تعريفات الحقول المخصصة...",
-          empty: "لا توجد تعريفات مطابقة.",
-        }
-      : {
-          subtitle:
-            "Current CRM custom-field definitions. Creation is limited to field types that do not require option configuration.",
-          reload: "Reload",
-          search: "Search by name, key, or record type...",
-          arabicName: "Arabic name",
-          englishName: "English name",
-          owner: "Record type",
-          fieldType: "Field type",
-          properties: "Properties",
-          searchable: "Searchable",
-          options: "options",
-          active: "Active",
-          inactive: "Inactive",
-          loading: "Loading custom-field definitions...",
-          empty: "No matching definitions.",
-        };
+  const canCreate = canManage && !isLoading && !error;
 
-  const columns = [
+  const columns: ColumnDef<CustomFieldItem>[] = [
     {
-      header: copy.arabicName,
-      cell: (item: CustomFieldItem) => (
+      id: "name",
+      header: t.crmLeadStages.arabicName,
+      cell: (item) => (
         <div className="flex items-center gap-2.5">
-          <div className="rounded-xl bg-violet-50 p-2 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400">
-            <FormInput className="size-4" aria-hidden="true" />
-          </div>
+          <span className="flex size-7 items-center justify-center rounded-sm bg-muted">
+            <FormInput className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+          </span>
           <div>
-            <p
-              className="font-bold text-slate-900 dark:text-slate-100"
-              dir="rtl"
-            >
+            <p dir="rtl" className="font-medium text-foreground">
               {item.nameAr}
             </p>
-            <code className="text-[11px] text-slate-500 dark:text-slate-400">
-              {item.fieldKey}
-            </code>
+            <code className="font-mono text-2xs text-muted-foreground">{item.fieldKey}</code>
           </div>
         </div>
       ),
     },
     {
-      header: copy.englishName,
-      cell: (item: CustomFieldItem) => <span dir="ltr">{item.nameEn}</span>,
+      id: "nameEn",
+      header: t.crmLeadStages.englishName,
+      cell: (item) => <span dir="ltr">{item.nameEn}</span>,
     },
     {
-      header: copy.owner,
-      cell: (item: CustomFieldItem) => (
-        <Badge variant="info">{item.ownerType.replaceAll("_", " ")}</Badge>
-      ),
+      id: "owner",
+      header: t.crmCustomFields.owner,
+      cell: (item) => <Badge tone="neutral">{t.crmCustomFields.ownerTypes[item.ownerType] ?? item.ownerType}</Badge>,
     },
     {
-      header: copy.fieldType,
-      cell: (item: CustomFieldItem) => (
-        <Badge variant="neutral">{item.type.replaceAll("_", " ")}</Badge>
-      ),
+      id: "fieldType",
+      header: t.crmCustomFields.fieldType,
+      cell: (item) => <Badge tone="neutral">{t.crmCustomFields.fieldTypes[item.type] ?? item.type}</Badge>,
     },
     {
-      header: copy.properties,
-      cell: (item: CustomFieldItem) => (
+      id: "properties",
+      header: t.crmCustomFields.properties,
+      cell: (item) => (
         <div className="flex flex-wrap gap-1.5">
-          <Badge variant={item.isActive ? "success" : "neutral"}>
-            {item.isActive ? copy.active : copy.inactive}
-          </Badge>
-          {item.isSearchable && (
-            <Badge variant="warning">{copy.searchable}</Badge>
-          )}
-          {item.optionsCount > 0 && (
-            <Badge variant="neutral">
-              {item.optionsCount} {copy.options}
-            </Badge>
-          )}
+          <Badge tone={item.isActive ? "positive" : "neutral"}>{item.isActive ? t.common.active : t.common.inactive}</Badge>
+          {item.isSearchable && <Badge tone="caution">{t.crmCustomFields.searchable}</Badge>}
+          {item.optionsCount > 0 && <Badge tone="neutral">{t.crmCustomFields.optionsCount(item.optionsCount)}</Badge>}
         </div>
       ),
     },
   ];
-  const canCreate = canManage && !isLoading && !error;
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title={t.crm.cRMFormCustomFieldsCustom}
-        subtitle={copy.subtitle}
-        actionLabel={canCreate ? t.crm.addACustomField : undefined}
-        onAction={canCreate ? openCreate : undefined}
-      >
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => void reload()}
-          disabled={isLoading}
-        >
-          <RefreshCw
-            className={`size-4 ${isLoading ? "animate-spin" : ""}`}
-            aria-hidden="true"
-          />
-          {copy.reload}
-        </Button>
-      </PageHeader>
+        description={t.crmCustomFields.subtitle}
+        primaryAction={canCreate ? { label: t.crm.addACustomField, onClick: openCreate } : undefined}
+        secondaryActions={
+          <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+            <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+            {t.crmCustomFields.reload}
+          </Button>
+        }
+      />
+
+      <SubNav items={CRM_SETUP_ITEMS} />
 
       {error && (
-        <div
-          role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
-        >
+        <div role="alert" className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
           {error}
         </div>
       )}
 
       {createError && !isCreateOpen ? (
-        <div
-          role="alert"
-          className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-        >
+        <div role="alert" className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
           {createError}
         </div>
       ) : null}
 
-      <TableToolbar
-        searchQuery={searchQuery}
+      <FilterBar
+        filters={[]}
+        values={{}}
+        onChange={() => undefined}
+        onReset={() => undefined}
+        searchValue={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder={copy.search}
+        searchPlaceholder={t.crmCustomFields.search}
       />
 
-      {isLoading ? (
-        <p
-          role="status"
-          className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900"
-        >
-          {copy.loading}
-        </p>
-      ) : (
-        <Table columns={columns} data={items} emptyText={copy.empty} />
-      )}
+      <DataTable
+        columns={columns}
+        rows={items}
+        isLoading={isLoading}
+        error={null}
+        page={{ page: 1, limit: Math.max(items.length, 1), total: items.length }}
+        onPageChange={() => undefined}
+        rowKey={(item) => item.id}
+        labels={{
+          retry: t.common.retry,
+          errorTitle: "",
+          emptyTitle: t.crmCustomFields.empty,
+          selectAll: t.common.actions,
+          selectRow: t.common.actions,
+          sortAscending: t.common.actions,
+          sortDescending: t.common.actions,
+          notSorted: t.common.actions,
+          pagination: {
+            previous: t.common.previousPage,
+            next: t.common.nextPage,
+            summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+          },
+        }}
+      />
 
       <CreateCrmCustomFieldsModal
         key={isCreateOpen ? "open" : "closed"}
