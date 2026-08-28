@@ -5,7 +5,6 @@ import {
   getFirstPermittedCrmRoute,
   isSupportedCorePath,
   isSupportedCrmPath,
-  isSupportedTradePath,
 } from "./tenant-routes";
 
 describe("Tenant Portal production route surface", () => {
@@ -115,11 +114,5 @@ describe("Tenant Portal production route surface", () => {
       ]),
     ).toBe(TENANT_ROUTES.crmStaticCatalogue);
     expect(getFirstPermittedCrmRoute(["crm.activities.read.all"])).toBeNull();
-  });
-
-  it("keeps every mock Trade capability behind the unavailable boundary", () => {
-    expect(isSupportedTradePath(TENANT_ROUTES.trade)).toBe(true);
-    expect(isSupportedTradePath("/trade/business-document-pdf-render-jobs")).toBe(false);
-    expect(isSupportedTradePath("/trade/inventory/item/general")).toBe(false);
   });
 });

@@ -139,7 +139,3 @@ export function isSupportedCrmPath(pathname: string): boolean {
     /^\/crm\/customer-profiles\/[^/]+$/u.test(pathname)
   );
 }
-
-export function isSupportedTradePath(pathname: string): boolean {
-  return pathname === TENANT_ROUTES.trade;
-}

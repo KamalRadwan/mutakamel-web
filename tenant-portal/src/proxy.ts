@@ -3,15 +3,13 @@ import { NextResponse } from "next/server";
 import {
   isSupportedCorePath,
   isSupportedCrmPath,
-  isSupportedTradePath,
 } from "./lib/navigation/tenant-routes";
 
-type TenantModule = "core" | "crm" | "trade";
+type TenantModule = "core" | "crm";
 
 const SUPPORTED_PATH_CHECKS: Record<TenantModule, (pathname: string) => boolean> = {
   core: isSupportedCorePath,
   crm: isSupportedCrmPath,
-  trade: isSupportedTradePath,
 };
 
 export function proxy(request: NextRequest): NextResponse {
@@ -41,5 +39,5 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/core/:path*", "/crm/:path*", "/trade/:path*"],
+  matcher: ["/core/:path*", "/crm/:path*"],
 };
