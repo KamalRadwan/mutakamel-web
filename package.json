@@ -1,4 +1,8 @@
 {
   "name": "mutakamel-frontend-workspace",
-  "private": true
+  "private": true,
+  "scripts": {
+    "scripts-runnable:check": "node scripts/check-runnable-scripts.mjs",
+    "scripts-runnable:test": "node --test scripts/check-runnable-scripts.test.mjs"
+  }
 }
