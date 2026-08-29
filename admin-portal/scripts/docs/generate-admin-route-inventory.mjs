@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -9,7 +9,33 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const checkOnly = process.argv.includes("--check");
 const portalRoot = resolve(scriptDirectory, "../..");
 const frontendRoot = resolve(portalRoot, "..");
-const backendRepository = resolve(frontendRoot, "../backend");
+const backendRepository = locateBackendRepository();
+
+/**
+ * The backend is a sibling checkout of the frontend, but "sibling of the
+ * frontend root" only holds in the primary checkout. Inside a git worktree the
+ * frontend root is `frontend/.claude/worktrees/<name>`, and the naive
+ * `../backend` resolves to `frontend/.claude/worktrees/backend`, which does not
+ * exist -- so this gate could never run from a worktree. Walk up instead, and
+ * let an explicit env var win for checkouts laid out some other way.
+ */
+function locateBackendRepository() {
+  const override = process.env.MUTAKAMEL_BACKEND_ROOT;
+  if (override) return resolve(override);
+  let directory = frontendRoot;
+  for (;;) {
+    const candidate = resolve(directory, "../backend");
+    if (existsSync(resolve(candidate, "mutakamel-apps"))) return candidate;
+    const parent = dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  throw new Error(
+    "Cannot locate the backend checkout. Expected a `backend` directory " +
+      "containing `mutakamel-apps` beside the frontend checkout, or set " +
+      "MUTAKAMEL_BACKEND_ROOT.",
+  );
+}
 const gatewayRoot = resolve(
   backendRepository,
   "mutakamel-apps/api-gateway-app",

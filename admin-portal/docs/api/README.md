@@ -17,6 +17,9 @@ source contracts, not authenticated runtime or deployment evidence.
 - [Storage Servers](storage-servers.md) — Core-owned registry, write-only
   credentials, lifecycle, durable probes, and freshness-gated placement.
 - [Tenants](tenants.md) — tenant registry and provisioning entry points.
+- [WebPhone](webphone.md) — its own Gateway namespace at
+  `/api/admin/webphone/v1/*`; platform SIP configuration, admin extensions,
+  cross-tenant reads, and fleet seat usage.
 
 All write-sensitive idempotent routes require a caller-owned UUIDv7
 `x-idempotency-key`. Follow each feature document for exact permissions, DTOs,

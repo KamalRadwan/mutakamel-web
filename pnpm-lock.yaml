@@ -99,6 +99,12 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.2.3(@types/react@19.2.17)
+      eslint:
+        specifier: ^9
+        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      eslint-config-next:
+        specifier: 16.3.3
+        version: 16.3.3(@typescript-eslint/parser@8.65.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1
@@ -747,10 +753,10 @@ packages:
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
   '@mutakamel/realtime-app-client@0.0.2':
-    resolution: {integrity: sha512-f2GnLcLauhEmcPe2k+w+UAige/to1B9RP1wD7L5KIpdmwOReKVECpN3E8+fvLefnr/jW6IGujAJ5cCuzFrU5sQ==, tarball: https://npm.pkg.github.com/download/@mutakamel/realtime-app-client/0.0.2/48aea74c5b346a480fb7e962fc9a086ab0d4c01e}
+    resolution: {integrity: sha512-+fJuvUu+w5pqgKJpkPG6j5O1Hu3K3KNUec3GNnJYS7nP7SEzJX9BOX7k0tlZtbrCC5tcGMZRg1VjP0jPAWsWTA==, tarball: https://npm.pkg.github.com/download/@mutakamel/realtime-app-client/0.0.2/f483b0ff5bd104e354b472c8a138388d42f20888}
 
-  '@mutakamel/realtime-app-contracts@0.0.1':
-    resolution: {integrity: sha512-6vXzOwyuH7+umxxemXQvER/6q0LLWYb+kDcKU0EjLvQmJdsm2S3Vr3a+VOkm9jFMRS30fd7aYmh3KOKVyjF3bg==, tarball: https://npm.pkg.github.com/download/@mutakamel/realtime-app-contracts/0.0.1/2998b35ade0cee3745e7238db8f5ede75640c98c}
+  '@mutakamel/realtime-app-contracts@0.0.2':
+    resolution: {integrity: sha512-buCCTW3fjR1UxflP0MSfdkfdyh7JaA/5RhFZmed7scvTV2Q5s+voXWI4Ak80gqsyWS0spafMYU3dFRcP3FDtiw==, tarball: https://npm.pkg.github.com/download/@mutakamel/realtime-app-contracts/0.0.2/db203733c9918db6a8f5175eb30222d503f2a471}
 
   '@napi-rs/wasm-runtime@1.1.6':
     resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
@@ -3659,7 +3665,7 @@ snapshots:
 
   '@mutakamel/realtime-app-client@0.0.2(supports-color@7.2.0)':
     dependencies:
-      '@mutakamel/realtime-app-contracts': 0.0.1
+      '@mutakamel/realtime-app-contracts': 0.0.2
       socket.io-client: 4.8.3(supports-color@7.2.0)
       tslib: 2.8.1
     transitivePeerDependencies:
@@ -3667,7 +3673,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@mutakamel/realtime-app-contracts@0.0.1':
+  '@mutakamel/realtime-app-contracts@0.0.2':
     dependencies:
       tslib: 2.8.1
       zod: 4.4.3

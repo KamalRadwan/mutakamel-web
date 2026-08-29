@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  existsSync,
   mkdirSync,
   readFileSync,
   writeFileSync,
@@ -13,7 +14,33 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const checkOnly = process.argv.includes("--check");
 const portalRoot = resolve(scriptDirectory, "../..");
 const workspaceRoot = resolve(portalRoot, "..");
-const backendRepository = resolve(workspaceRoot, "../backend");
+const backendRepository = locateBackendRepository();
+
+/**
+ * The backend is a sibling checkout of the frontend, but "sibling of the
+ * workspace root" only holds in the primary checkout. Inside a git worktree the
+ * workspace root is `frontend/.claude/worktrees/<name>`, and the naive
+ * `../backend` resolves to `worktrees/backend`, which does not exist -- so this
+ * gate could never run from a worktree. Walk up instead, and let an explicit
+ * env var win for checkouts laid out some other way.
+ */
+function locateBackendRepository() {
+  const override = process.env.MUTAKAMEL_BACKEND_ROOT;
+  if (override) return resolve(override);
+  let directory = workspaceRoot;
+  for (;;) {
+    const candidate = resolve(directory, "../backend");
+    if (existsSync(resolve(candidate, "mutakamel-apps"))) return candidate;
+    const parent = dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  throw new Error(
+    "Cannot locate the backend checkout. Expected a `backend` directory " +
+      "containing `mutakamel-apps` beside the frontend checkout, or set " +
+      "MUTAKAMEL_BACKEND_ROOT.",
+  );
+}
 const backendApps = resolve(backendRepository, "mutakamel-apps");
 const routeContractDirectory = resolve(
   backendApps,
@@ -35,6 +62,15 @@ const sources = [
     app: "trade",
     variableName: "TRADE_ROUTE_CONTRACTS",
     fileName: "trade.route-contracts.ts",
+  },
+  // WebPhone is its own Gateway namespace served by core-app, so its routes
+  // live in neither the core nor the crm/trade contracts. Without this entry
+  // the inventory silently omitted every tenant WebPhone route while the
+  // portal shipped the screens that call them.
+  {
+    app: "webphone",
+    variableName: "WEBPHONE_ROUTE_CONTRACTS",
+    fileName: "webphone.route-contracts.ts",
   },
 ];
 const policySources = [
@@ -178,6 +214,12 @@ function canonicalize(app, legacyPath) {
       "/api/tenant/trade/v$1/$2",
     );
   }
+  if (app === "webphone") {
+    return legacyPath.replace(
+      /^\/api\/v([1-9][0-9]*)\/tenant\/webphone\/(.+)$/u,
+      "/api/tenant/webphone/v$1/$2",
+    );
+  }
 
   const mappings = [
     [
@@ -265,8 +307,10 @@ const routes = [];
 for (const source of sources) {
   const sourcePath = resolve(routeContractDirectory, source.fileName);
   const extracted = extractArray(sourcePath, source.variableName);
+  // crm and trade contracts are wholly tenant-facing; core and webphone both
+  // carry admin routes in the same file and must be filtered.
   const tenantRoutes =
-    source.app === "core"
+    source.app === "core" || source.app === "webphone"
       ? extracted.filter(coreRouteBelongsToTenant)
       : extracted;
 

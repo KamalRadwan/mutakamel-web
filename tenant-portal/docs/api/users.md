@@ -31,7 +31,9 @@ user's `authorizationVersion`: stale access JWTs must be reissued and
 security action such as suspension, password change, compromise response, or
 logout-all can end the applicable sessions.
 
-User/profile/Webphone responses are private and must not be shared-cached; Webphone self runtime explicitly requires no-store handling. These routes are synchronous from the portal contract. Invitation email delivery does not expose a client-polled async job.
+User and profile responses are private and must not be shared-cached. These routes are synchronous from the portal contract. Invitation email delivery does not expose a client-polled async job.
+
+WebPhone is no longer part of this surface. The per-user `webphone_*` columns and their routes were removed; the module now lives at `/api/tenant/webphone/v1/*` and is documented in [webphone.md](webphone.md).
 
 ## Self-service routes
 
@@ -39,22 +41,8 @@ User/profile/Webphone responses are private and must not be shared-cached; Webph
 |---|---|---|
 | `GET /api/tenant/core/v1/users/me/profile` | Authenticated self | Profile preferences |
 | `PUT /api/tenant/core/v1/users/me/profile` | Authenticated self | Merge accepted preference fields |
-| `GET /api/tenant/core/v1/users/me/webphone` | Authenticated self | Runtime SIP configuration; `private, no-store` |
-| `GET /api/tenant/core/v1/users/me/webphone/call-logs` | Authenticated self | Recent self call logs |
-| `POST /api/tenant/core/v1/users/me/webphone/call-logs` | Authenticated self | Store one self call log |
 
 Profile accepts `themeKey` (maximum 64), `language` (`en|ar`, maximum 8), and `extensions` (object). Serialized extensions are capped at 32 KiB; excess returns `PROFILE_EXTENSIONS_TOO_LARGE`.
-
-Call-log create fields:
-
-- `type`: `IN_ANS|IN_NOANS|OUT`.
-- `phoneNumber`: required/non-empty, maximum 80.
-- `displayName`: optional/nullable, maximum 120.
-- `startedAt`, `answeredAt`, `endedAt`: optional/nullable ISO date strings.
-- `durationSeconds`: optional/nullable integer 0–86,400.
-- `cause`: optional/nullable, maximum 120.
-
-The self webphone response may contain `sipPassword` because it is runtime secret material. It must never enter logs, analytics, error telemetry, persisted client state, or another user's projection.
 
 ## User-management routes
 
@@ -64,7 +52,6 @@ The self webphone response may contain `sipPassword` because it is runtime secre
 | `GET /api/tenant/core/v1/users` | `users.user.read` | Paginated, scope-filtered |
 | `GET /api/tenant/core/v1/users/:id` | `users.user.read` | Scope-filtered detail |
 | `PATCH /api/tenant/core/v1/users/:id` | `users.user.update` | Identity/placement update |
-| `PATCH /api/tenant/core/v1/users/:id/webphone` | `users.user.update` | Webphone administration |
 | `POST /api/tenant/core/v1/users/:id/suspend` | `users.user.deactivate` | Invalidate sessions and suspend |
 | `POST /api/tenant/core/v1/users/:id/activate` | `users.user.deactivate` | Activate valid suspended/invited state; seat checks apply |
 | `DELETE /api/tenant/core/v1/users/:id` | `users.user.delete` | `204`, protected soft delete |
@@ -100,10 +87,6 @@ Content-Type: application/json
 }
 ```
 
-### Webphone administration
-
-Accepted fields are `enabled` boolean; nullable `extension` (32), `sipUsername` (120), `sipPassword` (255), `displayName` (120), `outboundCallerId` (64); and `transport=ws|wss`. Enabling requires a complete valid configuration. Extension and SIP username are unique. Other-user responses never return the SIP password.
-
 ## Team memberships
 
 | Method and canonical path | Permission |
@@ -124,11 +107,10 @@ Expected errors include:
 - Identity/placement: `TENANT_USER_NOT_FOUND`, `TENANT_EMAIL_TAKEN`, `EMPLOYEE_CODE_TAKEN`, `PLACEMENT_INCONSISTENT`, `MANAGER_NOT_FOUND`, `MANAGER_CYCLE`, `BRANCH_ACCESS_DENIED`, `PERMISSION_SCOPE_UNAVAILABLE`.
 - Protection/status: `USER_SELF_FORBIDDEN`, `TENANT_OWNER_PROTECTED`, `INVALID_STATUS_TRANSITION`, `USER_LIMIT_REACHED`.
 - Teams: `TEAM_MEMBERSHIP_NOT_FOUND`, `TEAM_MEMBERSHIP_PRIMARY_CONFLICT`, `PRIMARY_TEAM_MEMBERSHIP_PROTECTED`.
-- Webphone/profile: `WEBPHONE_CONFIG_INCOMPLETE`, `WEBPHONE_EXTENSION_TAKEN`, `WEBPHONE_SIP_USERNAME_TAKEN`, `PROFILE_EXTENSIONS_TOO_LARGE`.
+- Profile: `PROFILE_EXTENSIONS_TOO_LARGE`.
 
 ## AI implementation rules
 
-- Never expose `sipPassword` outside the in-memory self runtime.
 - Build placement choices top-down and submit the full consistent tuple.
 - Refetch current user/session after self-profile changes. After an
   access-affecting mutation, refresh/reissue the access JWT and reload

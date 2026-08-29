@@ -64,7 +64,8 @@ See [Documentation contract](../DOCUMENTATION_CONTRACT.md).
 | Tenant auth and session | [Authentication](auth.md) |
 | Host admission and public platform validation | [Tenant host](tenant-host.md) |
 | Companies, branches, departments, teams | [Organization](organization.md) |
-| Tenant users, profile, webphone, memberships | [Users](users.md) |
+| Tenant users, profile, memberships | [Users](users.md) |
+| WebPhone config, extensions, seats, self runtime | [WebPhone](webphone.md) |
 | Party directory | [Directory](directory.md) |
 | Roles, permissions, scope assignments | [Roles](roles.md) |
 | Per-user module seats | [User modules](user-modules.md) |

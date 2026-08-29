@@ -39,7 +39,6 @@ the browser.
 | `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/reset-password` | `admin.tenant_users.reset_password` + `admin.tenant_users.critical` | `202` | Required |
 | `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/resend-invite` | `admin.tenant_users.invite` + `admin.tenant_users.critical` | `202` | Required |
 | `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/change-password` | `admin.tenant_users.reset_password` + `admin.tenant_users.critical` | `200` | Required |
-| `PATCH` | `/api/admin/core/v1/tenants/:id/users/:userId/webphone` | `admin.tenant_users.manage_webphone` + `admin.tenant_users.critical` | `200` | Required |
 | `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/suspend` | `admin.tenant_users.suspend` + `admin.tenant_users.critical` | `200` | Required |
 | `POST` | `/api/admin/core/v1/tenants/:id/users/:userId/activate` | `admin.tenant_users.suspend` + `admin.tenant_users.critical` | `200` | Required |
 | `PATCH` | `/api/admin/core/v1/tenants/:id/users/:userId/roles` | `admin.tenant_users.assign_roles` + `admin.tenant_users.critical` | `200` | Required |
@@ -56,8 +55,6 @@ type AdminTenantUserVisibility = 'ACTIVE' | 'DELETED' | 'ALL';
 type TeamMembershipRole = 'MEMBER' | 'LEAD' | 'MANAGER';
 
 type AdminTenantUserRoleScope = 'TENANT' | 'COMPANY' | 'BRANCH';
-
-type WebphoneTransport = 'ws' | 'wss';
 ```
 
 `DELETED` is **not** a `UserStatus`. A deleted user has a non-null `deletedAt`
@@ -99,15 +96,6 @@ interface AdminTenantUserView {
     companyId: string | null;
     branchId: string | null;
   }>;
-  webphone: {
-    enabled: boolean;
-    extension: string | null;
-    sipUsername: string | null;
-    displayName: string | null;
-    outboundCallerId: string | null;
-    transport: WebphoneTransport;
-    passwordConfigured: boolean;
-  };
   lastLoginAt: string | null;
   lockedUntil: string | null;
   createdAt: string;
@@ -122,9 +110,7 @@ interface OrganizationRef {
 }
 ```
 
-Never expect a password hash, invite/reset token, SIP password, or encrypted
-SIP credential in a response. `webphone.passwordConfigured` is the only
-credential-presence signal.
+Never expect a password hash or an invite/reset token in a response.
 
 ## Directory and summary
 
@@ -190,7 +176,6 @@ interface AdminTenantUserSummary {
   deactivated: number;
   deleted: number;
   owners: number;
-  webphoneEnabled: number;
   locked: number;
 }
 ```
@@ -388,28 +373,10 @@ password-reset tokens.
 
 ## WebPhone
 
-`PATCH /api/admin/core/v1/tenants/:id/users/:userId/webphone`
-
-```ts
-interface UpdateTenantUserWebphoneDto {
-  enabled?: boolean;             // strict boolean
-  extension?: string | null;     // trimmed, max 32
-  sipUsername?: string | null;   // trimmed, max 120
-  sipPassword?: string | null;   // max 255, write-only
-  displayName?: string | null;   // trimmed, max 120
-  outboundCallerId?: string | null; // trimmed, max 64
-  transport?: 'ws' | 'wss';
-}
-
-interface TenantUserWebphoneConfig {
-  enabled: boolean;
-  extension: string | null;
-  sipUsername: string | null;
-  displayName: string | null;
-  outboundCallerId: string | null;
-  transport: 'ws' | 'wss';
-  passwordConfigured: boolean;
-}
+WebPhone is no longer administered through tenant users. The per-user
+`webphone_*` columns and this route were removed; extensions are managed in the
+WebPhone namespace at `/api/admin/webphone/v1/*`, documented in
+[webphone.md](webphone.md).
 ```
 
 If `enabled` is true, extension, SIP username, and an existing or newly
@@ -501,9 +468,6 @@ tab until the tenant reaches an eligible state.
 | `TENANT_USER_PASSWORD_CHANGE_UNAVAILABLE` | Direct change is blocked for invited/deactivated users. |
 | `PASSWORD_CONFIRMATION_MISMATCH` | Password fields differ. |
 | `WEAK_PASSWORD` | Password does not satisfy the strong-password policy. |
-| `WEBPHONE_CONFIG_INCOMPLETE` | Enabled WebPhone is missing extension, username, or password. |
-| `WEBPHONE_EXTENSION_TAKEN` | Extension is already assigned. |
-| `WEBPHONE_SIP_USERNAME_TAKEN` | SIP username is already assigned. |
 | `TENANT_USER_RESTORE_CONFLICT` | Email/employee code was reused while this row was deleted. |
 | `TENANT_USER_CREATED_EMAIL_DELIVERY_FAILED` | User exists; use returned `userId` to resend invitation. |
 | `TENANT_USER_EMAIL_DELIVERY_UNAVAILABLE` | Security-email delivery is unavailable; do not report success. |
@@ -520,9 +484,9 @@ loads no tenant-database resource before tenant status is `ACTIVE` or
 and summary share exact filters while roles, branches, departments, and teams
 retain independent permission/error states.
 
-The UI uses structured organization, role-assignment, manager, and WebPhone
-projections. Invite, edit, reset/resend/change-password, WebPhone, role,
-lifecycle, delete, and restore commands use their canonical `POST`/`PATCH`/
+The UI uses structured organization, role-assignment, and manager
+projections. Invite, edit, reset/resend/change-password, role, lifecycle,
+delete, and restore commands use their canonical `POST`/`PATCH`/
 `DELETE` verbs and stable caller-owned UUIDv7 identities. Deleted visibility,
 owner protection, cascade confirmations, write-only password handling, and
 partial email-delivery outcomes are represented explicitly.
@@ -535,8 +499,7 @@ partial email-delivery outcomes are represented explicitly.
 - Keep active/deleted visibility separate from `UserStatus`.
 - Implement dependent organization selectors from the access catalogue APIs.
 - Disable owner profile, password, role, lifecycle, and delete mutations based
-  on `isTenantOwner`; the dedicated WebPhone route does not apply that owner
-  restriction.
+  on `isTenantOwner`.
 - Reuse the same idempotency key for an exact retry; create a new key for a new
   user intent.
 - Refresh rows from mutation responses instead of patching local guesses.
@@ -571,8 +534,6 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
   `../backend/mutakamel-apps/core-app/src/tenant/tenant-roles/dto/set-user-branch-roles.dto.ts`
 - Team membership DTO:
   `../backend/mutakamel-apps/core-app/src/tenant/tenant-users/dto/team-membership.dto.ts`
-- WebPhone DTO:
-  `../backend/mutakamel-apps/core-app/src/tenant/tenant-users/dto/update-tenant-user-webphone.dto.ts`
 - Response DTO:
   `../backend/mutakamel-apps/core-app/src/admin/tenants/dto/admin-tenant-user-view.dto.ts`
 - Status enum:

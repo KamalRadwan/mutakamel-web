@@ -3,26 +3,26 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-08-25T03:45:38.578Z**
+Generated at: **2026-08-29T12:19:27.818Z**
 
-Frontend revision: `5611e5b9a5cd+dirty`
+Frontend revision: `5783c4436da7+dirty`
 
-Backend revision: `3cbfe3e8ddd7+dirty`
+Backend revision: `949ca7fedc23`
 
 ## Coverage
 
-This inventory contains **250** browser-visible Core Admin routes.
+This inventory contains **246** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
 
 | Route class | Routes |
 | --- | ---: |
-| AUTHENTICATED | 87 |
+| AUTHENTICATED | 86 |
 | PUBLIC | 6 |
 | READ_HEAVY | 21 |
-| WRITE_SENSITIVE | 136 |
-| **Total** | **250** |
+| WRITE_SENSITIVE | 133 |
+| **Total** | **246** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -32,8 +32,8 @@ Machine-readable source:
 | Gateway route-key domain | Routes |
 | --- | ---: |
 | applications | 15 |
-| audit | 2 |
-| auth | 11 |
+| audit | 3 |
+| auth | 12 |
 | auth-invalidation-outbox | 1 |
 | catalog | 17 |
 | dashboard | 1 |
@@ -51,8 +51,8 @@ Machine-readable source:
 | subscriptions | 8 |
 | system-settings | 11 |
 | tenant-fqdns | 1 |
-| tenants | 54 |
-| users | 15 |
+| tenants | 53 |
+| users | 10 |
 | wallets | 6 |
 
 ## Routes
@@ -80,6 +80,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning/primary-component` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.technical-provisioning.primary-component.create` |
 | POST | `/api/admin/core/v1/applications/onboarding` | WRITE_SENSITIVE | yes | ALL | admin.applications.create + admin.applications.update + admin.applications.critical | `core.admin.applications.onboard` |
 | GET | `/api/admin/core/v1/audit` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.list` |
+| GET | `/api/admin/core/v1/audit/:id` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.detail` |
 | GET | `/api/admin/core/v1/audit/entities/:entityType/:entityId` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.entity-history` |
 | POST | `/api/admin/core/v1/auth-invalidation-outbox/replay` | WRITE_SENSITIVE | yes | ALL | admin.auth_invalidation_outbox.replay | `core.admin.auth-invalidation-outbox.replay` |
 | POST | `/api/admin/core/v1/auth/accept-invite` | PUBLIC | no | ALL | — | `core.admin.auth.accept-invite` |
@@ -89,6 +90,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/auth/logout` | PUBLIC | yes | ALL | — | `core.admin.auth.logout` |
 | POST | `/api/admin/core/v1/auth/logout-all` | AUTHENTICATED | yes | ALL | — | `core.admin.auth.logout-all` |
 | GET | `/api/admin/core/v1/auth/me` | AUTHENTICATED | yes | ALL | — | `core.admin.auth.me` |
+| POST | `/api/admin/core/v1/auth/presence` | AUTHENTICATED | no | ALL | — | `core.admin.auth.presence` |
 | POST | `/api/admin/core/v1/auth/refresh` | PUBLIC | no | ALL | — | `core.admin.auth.refresh` |
 | POST | `/api/admin/core/v1/auth/reset-password` | PUBLIC | no | ALL | — | `core.admin.auth.reset-password` |
 | GET | `/api/admin/core/v1/auth/sessions` | AUTHENTICATED | yes | ALL | — | `core.admin.auth.sessions.list` |
@@ -253,7 +255,6 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/tenants/:id/users/:userId/restore` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.restore + admin.tenant_users.critical | `core.admin.tenants.users.restore` |
 | PATCH | `/api/admin/core/v1/tenants/:id/users/:userId/roles` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.assign_roles + admin.tenant_users.critical | `core.admin.tenants.users.roles.update` |
 | POST | `/api/admin/core/v1/tenants/:id/users/:userId/suspend` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.suspend + admin.tenant_users.critical | `core.admin.tenants.users.suspend` |
-| PATCH | `/api/admin/core/v1/tenants/:id/users/:userId/webphone` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.manage_webphone + admin.tenant_users.critical | `core.admin.tenants.users.webphone.update` |
 | GET | `/api/admin/core/v1/tenants/:id/users/summary` | AUTHENTICATED | yes | ALL | admin.tenant_users.read | `core.admin.tenants.users.summary` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/billing-summary` | AUTHENTICATED | yes | ALL | admin.invoices.read | `core.admin.tenants.billing-summary.get` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/operations` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.operations.list` |
@@ -300,12 +301,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/users/:id/activate` | WRITE_SENSITIVE | yes | ALL | admin.users.suspend + admin.users.critical | `core.admin.users.activate` |
 | PATCH | `/api/admin/core/v1/users/:id/roles` | WRITE_SENSITIVE | yes | ALL | admin.users.assign_roles + admin.users.critical | `core.admin.users.roles.set` |
 | POST | `/api/admin/core/v1/users/:id/suspend` | WRITE_SENSITIVE | yes | ALL | admin.users.suspend + admin.users.critical | `core.admin.users.suspend` |
-| GET | `/api/admin/core/v1/users/:id/webphone` | AUTHENTICATED | yes | ALL | admin.users.read | `core.admin.users.webphone.get` |
-| PATCH | `/api/admin/core/v1/users/:id/webphone` | WRITE_SENSITIVE | yes | ALL | admin.users.update + admin.users.critical | `core.admin.users.webphone.update` |
 | GET | `/api/admin/core/v1/users/me/profile` | AUTHENTICATED | yes | ALL | — | `core.admin.users.profile.get` |
 | PATCH | `/api/admin/core/v1/users/me/profile` | WRITE_SENSITIVE | yes | ALL | — | `core.admin.users.profile.update` |
-| GET | `/api/admin/core/v1/users/me/webphone` | AUTHENTICATED | yes | ALL | — | `core.admin.users.webphone.me` |
-| GET | `/api/admin/core/v1/users/me/webphone/call-logs` | AUTHENTICATED | yes | ALL | — | `core.admin.users.webphone.call-logs.list` |
-| POST | `/api/admin/core/v1/users/me/webphone/call-logs` | WRITE_SENSITIVE | no | ALL | — | `core.admin.users.webphone.call-logs.create` |
 | GET | `/api/admin/core/v1/wallet/input-currencies` | AUTHENTICATED | yes | ALL | admin.wallet.read | `core.admin.wallets.input-currencies.list` |
 | GET | `/api/admin/core/v1/wallets/:walletId/ledger` | AUTHENTICATED | yes | ALL | admin.wallet.read | `core.admin.wallets.ledger` |

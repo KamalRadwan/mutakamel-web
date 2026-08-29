@@ -1,8 +1,8 @@
-# Admin Users, Profile, and WebPhone API
+# Admin Users and Profile API
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-29**
 
 Owner: **Core**
 
@@ -20,15 +20,14 @@ Canonical browser prefix: `/api/admin/core/v1/users`
 | `POST /api/admin/core/v1/users/:id/activate` | `admin.users.suspend` + `admin.users.critical` | `201` | `DONE` |
 | `DELETE /api/admin/core/v1/users/:id` | `admin.users.delete` + `admin.users.critical` | `204` | `DONE` |
 | `PATCH /api/admin/core/v1/users/:id/roles` | `admin.users.assign_roles` + `admin.users.critical` | `204` | `DONE` |
-| `GET /api/admin/core/v1/users/:id/webphone` | `admin.users.read` | `200` | `DONE` |
-| `PATCH /api/admin/core/v1/users/:id/webphone` | `admin.users.update` + `admin.users.critical` | `200` | `DONE` |
 | `GET /api/admin/core/v1/users/me/profile` | Authenticated | `200` | `DONE` |
 | `PATCH /api/admin/core/v1/users/me/profile` | Authenticated | `200` | `DONE` |
-| `GET /api/admin/core/v1/users/me/webphone` | Authenticated | `200` | `DONE` |
-| `GET /api/admin/core/v1/users/me/webphone/call-logs` | Authenticated | `200` | `DONE` |
-| `POST /api/admin/core/v1/users/me/webphone/call-logs` | Authenticated | `201` | `DONE` |
 
 Every paired permission uses ALL semantics.
+
+WebPhone is not part of this surface. The per-user `webphone_*` columns and
+their five routes were removed; the module is its own Gateway namespace at
+`/api/admin/webphone/v1/*`, documented in [webphone.md](webphone.md).
 
 ## Invite
 
@@ -83,33 +82,6 @@ The current Portal exposes `/profile`, reads this projection from
 `PATCH /users/me/profile`. Loading, forbidden, unavailable, save-failure, and
 safe retry states are rendered explicitly.
 
-## WebPhone
-
-The self-service WebPhone route may return the SIP password required for active
-browser registration. It may exist only in current component memory.
-
-The administrative projection omits the password and returns
-`passwordConfigured`. Initialize edit password fields empty; blank means
-preserve unless the DTO explicitly represents a clear action.
-
-Never write SIP passwords to browser storage, logs, analytics, diagnostics, or
-fixtures.
-
-Call logs use:
-
-```ts
-interface CreateAdminWebphoneCallLogDto {
-  type: string;
-  displayName?: string | null;
-  phoneNumber: string;
-  startedAt?: string | null;
-  answeredAt?: string | null;
-  endedAt?: string | null;
-  durationSeconds?: number | null;
-  cause?: string | null;
-}
-```
-
 ## Idempotency and state
 
 Gateway write-sensitive routes require UUIDv7 intent keys where declared in the
@@ -124,12 +96,10 @@ A missing read permission renders forbidden, not an empty user list.
 - `src/app/users/[id]/hooks/useUserDetail.ts`
 - `src/app/profile/hooks/useMyProfile.ts`
 - `src/app/profile/page.tsx`
-- `src/components/layout/webphone/`
-- `src/components/layout/hooks/useWebRTCPhone.ts`
 
-The user list, invite, detail, lifecycle, role assignment, administrative
-WebPhone, self WebPhone, call logs, and self profile use real APIs. Authenticated
-runtime and deployment verification remain separate from source integration.
+The user list, invite, detail, lifecycle, role assignment, and self profile use
+real APIs. Authenticated runtime and deployment verification remain separate
+from source integration.
 
 ## Source map
 
@@ -180,33 +150,6 @@ runtime and deployment verification remain separate from source integration.
   themeKey?: string;                    // @IsOptional, @MaxLength(64)
   language?: string;                   // @IsOptional, @IsIn(SUPPORTED_LANGUAGES)
   extensions?: Record<string, unknown>; // @IsOptional, @IsObject, shallow-merged
-}
-```
-
-### `UpdateAdminUserWebphoneDto`
-```typescript
-{
-  enabled?: boolean;
-  extension?: string | null;          // @MaxLength(32)
-  sipUsername?: string | null;        // @MaxLength(120)
-  sipPassword?: string | null;       // @MaxLength(255)
-  displayName?: string | null;       // @MaxLength(120)
-  outboundCallerId?: string | null;  // @MaxLength(64)
-  transport?: 'ws' | 'wss';
-}
-```
-
-### `CreateAdminWebphoneCallLogDto`
-```typescript
-{
-  type: WebphoneCallLogType;
-  displayName?: string | null;       // @MaxLength(120)
-  phoneNumber: string;               // @IsNotEmpty, @MaxLength(80)
-  startedAt?: string | null;         // @IsDateString
-  answeredAt?: string | null;        // @IsDateString
-  endedAt?: string | null;           // @IsDateString
-  durationSeconds?: number | null;   // @IsInt, @Min(0), @Max(86400)
-  cause?: string | null;             // @MaxLength(120)
 }
 ```
 

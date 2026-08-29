@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-08-26T00:28:19.553Z**
+Generated at: **2026-08-29T12:24:48.347Z**
 
-Frontend revision: `6f465221c373+dirty`
+Frontend revision: `5783c4436da7+dirty`
 
-Backend revision: `3cbfe3e8ddd7+dirty`
+Backend revision: `949ca7fedc23+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -17,10 +17,11 @@ canonical Gateway path mappings.
 
 | App | Routes |
 | --- | ---: |
-| core | 199 |
+| core | 195 |
 | crm | 143 |
 | trade | 231 |
-| **Total** | **573** |
+| webphone | 18 |
+| **Total** | **587** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -215,7 +216,6 @@ Machine-readable source:
 | core | POST | `/api/tenant/core/v1/users/:id/team-memberships` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.team-memberships.add` |
 | core | PUT | `/api/tenant/core/v1/users/:id/team-memberships` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.team-memberships.set` |
 | core | DELETE | `/api/tenant/core/v1/users/:id/team-memberships/:membershipId` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.team-memberships.delete` |
-| core | PATCH | `/api/tenant/core/v1/users/:id/webphone` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.webphone.update` |
 | core | GET | `/api/tenant/core/v1/users/:userId/assignments` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.assignments.list` |
 | core | POST | `/api/tenant/core/v1/users/:userId/assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.assignments.add` |
 | core | PUT | `/api/tenant/core/v1/users/:userId/assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.assignments.set` |
@@ -227,9 +227,6 @@ Machine-readable source:
 | core | PUT | `/api/tenant/core/v1/users/:userId/scope-role-assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.scope-role-assignments.set` |
 | core | GET | `/api/tenant/core/v1/users/me/profile` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.profile.get` |
 | core | PUT | `/api/tenant/core/v1/users/me/profile` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.profile.update` |
-| core | GET | `/api/tenant/core/v1/users/me/webphone` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.webphone.me.get` |
-| core | GET | `/api/tenant/core/v1/users/me/webphone/call-logs` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.webphone.call-logs.list` |
-| core | POST | `/api/tenant/core/v1/users/me/webphone/call-logs` | TENANT_PORTAL | WRITE_SENSITIVE | no | `core.tenant.users.webphone.call-logs.create` |
 | core | GET | `/api/tenant/core/v1/wallet` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.wallets.list` |
 | core | GET | `/api/tenant/core/v1/wallet/ledger` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.wallets.ledger` |
 | core | GET | `/api/tenant/core/v1/workspace-settings` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.workspace-settings.get` |
@@ -608,3 +605,21 @@ Machine-readable source:
 | trade | GET | `/api/tenant/trade/v1/workflows` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.workflows.get` |
 | trade | POST | `/api/tenant/trade/v1/workflows` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.workflows.post` |
 | trade | POST | `/api/tenant/trade/v1/workflows/:id/versions` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.workflows.by-id.versions.post` |
+| webphone | GET | `/api/tenant/webphone/v1/config` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.config.get` |
+| webphone | PATCH | `/api/tenant/webphone/v1/config` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.update` |
+| webphone | GET | `/api/tenant/webphone/v1/config/endpoints` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.config.endpoints.list` |
+| webphone | POST | `/api/tenant/webphone/v1/config/endpoints` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.endpoints.create` |
+| webphone | DELETE | `/api/tenant/webphone/v1/config/endpoints/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.endpoints.delete` |
+| webphone | PATCH | `/api/tenant/webphone/v1/config/endpoints/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.endpoints.update` |
+| webphone | GET | `/api/tenant/webphone/v1/config/ice-servers` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.config.ice-servers.list` |
+| webphone | POST | `/api/tenant/webphone/v1/config/ice-servers` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.ice-servers.create` |
+| webphone | DELETE | `/api/tenant/webphone/v1/config/ice-servers/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.ice-servers.delete` |
+| webphone | PATCH | `/api/tenant/webphone/v1/config/ice-servers/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.ice-servers.update` |
+| webphone | GET | `/api/tenant/webphone/v1/extensions` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.extensions.list` |
+| webphone | POST | `/api/tenant/webphone/v1/extensions` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.extensions.create` |
+| webphone | DELETE | `/api/tenant/webphone/v1/extensions/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.extensions.delete` |
+| webphone | PATCH | `/api/tenant/webphone/v1/extensions/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.extensions.update` |
+| webphone | GET | `/api/tenant/webphone/v1/me` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.me.get` |
+| webphone | GET | `/api/tenant/webphone/v1/me/call-logs` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.me.call-logs.list` |
+| webphone | POST | `/api/tenant/webphone/v1/me/call-logs` | TENANT_PORTAL | WRITE_SENSITIVE | no | `webphone.tenant.me.call-logs.create` |
+| webphone | GET | `/api/tenant/webphone/v1/seats` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.seats.get` |
