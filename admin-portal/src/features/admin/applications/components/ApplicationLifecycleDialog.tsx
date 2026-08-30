@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, Field, Textarea, Button } from "@/design-system";
 import type { ApplicationLifecycleStatus } from "../types";
@@ -17,13 +16,17 @@ interface Props {
 export function ApplicationLifecycleDialog({ action, currentStatus, isSubmitting, onClose, onConfirm }: Props) {
   const { t } = useI18n();
   const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [reasonError, setReasonError] = useState<string | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const submissionErrorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (action) {
       queueMicrotask(() => {
         setReason("");
-        setError(null);
+        setReasonError(null);
+        setSubmissionError(null);
       });
     }
   }, [action]);
@@ -33,18 +36,25 @@ export function ApplicationLifecycleDialog({ action, currentStatus, isSubmitting
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!reason.trim()) return setError(t.applications.detail.lifecycle.reasonRequired);
+    if (!reason.trim()) {
+      setReasonError(t.applications.detail.lifecycle.reasonRequired);
+      queueMicrotask(() => reasonRef.current?.focus());
+      return;
+    }
+    setReasonError(null);
+    setSubmissionError(null);
     try {
       await onConfirm(reason.trim());
       onClose();
     } catch (submissionError) {
-      setError(readSubmissionMessage(submissionError, t.applications.detail.lifecycle.failed));
+      setSubmissionError(readSubmissionMessage(submissionError, t.applications.detail.lifecycle.failed));
+      queueMicrotask(() => submissionErrorRef.current?.focus());
     }
   };
 
   return (
     <Dialog open onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-sm">
             {t.applications.detail.lifecycle[action]} {t.applications.detail.lifecycle.titleSuffix}
@@ -53,23 +63,39 @@ export function ApplicationLifecycleDialog({ action, currentStatus, isSubmitting
             {t.applications.detail.lifecycle.transitionPrefix} {currentStatus} {t.applications.detail.lifecycle.transitionJoin} {targetStatus}.
           </p>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
-          <Field label={t.applications.detail.lifecycle.reason}>
+        <form onSubmit={submit} noValidate className="space-y-4">
+          <Field label={t.applications.detail.lifecycle.reason} required error={reasonError ?? undefined}>
             {(fp) => (
-              <Textarea {...fp} required maxLength={256} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} />
+              <Textarea
+                {...fp}
+                ref={reasonRef}
+                required
+                invalid={Boolean(reasonError)}
+                maxLength={256}
+                rows={3}
+                value={reason}
+                onChange={(event) => {
+                  setReason(event.target.value);
+                  if (reasonError) setReasonError(null);
+                }}
+              />
             )}
           </Field>
-          {error && (
-            <p role="alert" className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-xs text-danger-700 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-300">
-              {error}
-            </p>
+          {submissionError && (
+            <div
+              ref={submissionErrorRef}
+              role="alert"
+              tabIndex={-1}
+              className="rounded-md border border-destructive bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {submissionError}
+            </div>
           )}
-          <footer className="flex justify-end gap-2">
+          <footer className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" disabled={isSubmitting} onClick={onClose}>
               {t.applications.cancel}
             </Button>
-            <Button type="submit" variant="primary" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+            <Button type="submit" variant="primary" loading={isSubmitting}>
               {t.applications.detail.lifecycle.confirm} {t.applications.detail.lifecycle[action]}
             </Button>
           </footer>

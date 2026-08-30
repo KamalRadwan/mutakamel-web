@@ -50,12 +50,8 @@ describe("tenant access API", () => {
       }
       return Promise.resolve(envelope(userPayload()));
     });
-    patchMock.mockReset().mockImplementation((url: string) =>
-      Promise.resolve(
-        url.endsWith("/webphone")
-          ? envelope((userPayload().webphone as Record<string, unknown>))
-          : envelope(userPayload()),
-      ),
+    patchMock.mockReset().mockImplementation(() =>
+      Promise.resolve(envelope(userPayload())),
     );
     postMock.mockReset().mockImplementation((url: string) => {
       if (url.endsWith("/users")) {
@@ -136,7 +132,6 @@ describe("tenant access API", () => {
     await tenantAccessApi.resetPassword(TENANT_ID, USER_ID, COMMAND_ID);
     await tenantAccessApi.resendInvite(TENANT_ID, USER_ID, COMMAND_ID);
     await tenantAccessApi.changePassword(TENANT_ID, USER_ID, { newPassword: "StrongPassword!2026", passwordConfirmation: "StrongPassword!2026" }, COMMAND_ID);
-    await tenantAccessApi.updateWebphone(TENANT_ID, USER_ID, { enabled: true, sipPassword: "write-only" }, COMMAND_ID);
     await tenantAccessApi.suspendUser(TENANT_ID, USER_ID, COMMAND_ID);
     await tenantAccessApi.activateUser(TENANT_ID, USER_ID, COMMAND_ID);
     await tenantAccessApi.replaceRoles(TENANT_ID, USER_ID, { assignments: [{ branchId: BRANCH_ID, roleId: ROLE_ID }] }, COMMAND_ID);
@@ -155,14 +150,13 @@ describe("tenant access API", () => {
     ]);
     expect(patchMock.mock.calls.map((call) => call[0])).toEqual([
       user,
-      `${user}/webphone`,
       `${user}/roles`,
     ]);
     expect(deleteMock).toHaveBeenCalledWith(user, config);
     for (const call of postMock.mock.calls) expect(call[2]).toEqual(config);
     for (const call of patchMock.mock.calls) expect(call[2]).toEqual(config);
     expect(postMock).toHaveBeenCalledTimes(7);
-    expect(patchMock).toHaveBeenCalledTimes(3);
+    expect(patchMock).toHaveBeenCalledTimes(2);
     expect(deleteMock).toHaveBeenCalledTimes(1);
   });
 

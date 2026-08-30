@@ -48,6 +48,9 @@ export interface UsePollWhileOptions {
  * whenever the effect last started.
  *
  * The timer is cleared on unmount and whenever `active` becomes false.
+ * Interactive surfaces should compose `active` with
+ * `!useOperatorRefreshGuard(...).isPaused`; the poller deliberately stays
+ * unaware of DOM ownership and product-specific overlay/call signals.
  */
 export function usePollWhile(
   active: boolean,

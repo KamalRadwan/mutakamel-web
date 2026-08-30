@@ -1,8 +1,8 @@
 # Theming & Direction
 
-Status: **[Verified]**
+Status: **[Verified current source; approved light-theme target linked]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-29**
 
 Owner: **Admin Portal**
 
@@ -85,6 +85,38 @@ mechanism, not custom code — `attribute="class"` matches the app's
 falls back to `isDark = true` before mount, matching the layout's
 `defaultTheme="dark"`, so the toggle's icon never flashes from one state to
 another as `next-themes` resolves the real stored value.
+
+### Approved cold-blue target
+
+The light theme adopts the cold-blue surface and action contract in
+[Cold-Blue Design Update](design-update.md#target-light-palette). The dark
+surface palette keeps its current visual character, but both themes adopt the
+same `action` versus `success` semantic split.
+
+This update does not change the first-visit default from dark. Changing the
+default theme requires a separate product decision and first-paint verification.
+
+Theme-sensitive components use semantic tokens. Direct `bg-white`, `ink-*`,
+or `brand-*` values inside primitives and feature components are migration
+targets because they prevent a complete theme change.
+
+Login, invite, and reset screens must expose the same theme and language
+controls through a shared auth shell. Inheriting a stored preference without a
+way to change it on the primary login screen is not sufficient.
+
+## Localization is more than direction
+
+Correct `dir` wiring does not prove localized content or interaction behavior.
+Visible labels, screen-reader-only text, titles, placeholders, validation,
+toasts, chart summaries, and dialog close names must all be bilingual.
+
+Mixed-direction identifiers—emails, URLs, IP addresses, phone numbers, UUIDs,
+correlation IDs, and idempotency keys—use isolated LTR rendering inside Arabic
+content. Number/date/currency formatting uses an explicit application locale
+and timezone rather than runtime defaults.
+
+See
+[Accessibility, responsive behavior, and localization](accessibility-responsive-and-localization.md#numbers-dates-identifiers-and-bidirectionality).
 
 ## First-paint proof
 

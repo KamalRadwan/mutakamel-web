@@ -111,6 +111,11 @@ describe("SubscriptionsScreen", () => {
     const tenantLink = screen.getByRole("link", { name: "Acme LLC" });
     expect(tenantLink.getAttribute("href")).toBe(`/tenants/${TENANT_ID}`);
     expect(screen.getByText("crm")).toBeTruthy();
+    expect(screen.queryByText("Professional")).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect plan items: Acme LLC (1)" }),
+    );
+    expect(screen.getByText(/Professional/u)).toBeTruthy();
     expect(screen.getAllByText(/120\.0000 USD/u).length).toBeGreaterThan(0);
     expect(
       screen.getByText(/019f0000-0000-7000-8000-000000000006/u),

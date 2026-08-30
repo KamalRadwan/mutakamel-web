@@ -85,3 +85,8 @@ export function useI18n() {
   }
   return context;
 }
+
+/** Design-system primitives may render in isolated tests without a provider. */
+export function useOptionalI18n() {
+  return useContext(I18nContext);
+}

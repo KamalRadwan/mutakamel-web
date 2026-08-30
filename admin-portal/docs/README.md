@@ -1,8 +1,10 @@
 # Admin Portal Documentation
 
-Status: **[Verified]**
+Status: **[Partially verified; generated Admin route inventory is stale]**
 
 Last source verification: **2026-08-26**
+
+Last design documentation update: **2026-08-29**
 
 This documentation describes the current Admin Portal source, all
 browser-visible Core Admin capabilities, exact integration defects, required
@@ -16,7 +18,7 @@ not mean frontend parity or deployment completion.
 3. [Frontend integration guide](frontend-integration-guide.md)
 4. [Frontend capability matrix](audit/frontend-capability-matrix.md)
 5. [API domain index](api/README.md)
-6. [Generated 240-route inventory](generated/admin-core-api-routes.md)
+6. [Generated Admin route inventory](generated/admin-core-api-routes.md)
 7. [Known gaps](ai/KNOWN_GAPS.md)
 8. [Implementation playbook](ai/IMPLEMENTATION_PLAYBOOK.md)
 9. [Test matrix](ai/TEST_MATRIX.md)
@@ -60,18 +62,23 @@ Do not store JWT access or refresh tokens in browser-readable storage.
 | Permission catalogue | [rbac/permissions.md](rbac/permissions.md) |
 | Navigation mapping | [guides/sidebar-navigation.md](guides/sidebar-navigation.md) |
 | Reusable component behavior | [components/README.md](components/README.md) |
-| Design system: tokens, primitives, patterns, shell, migration record | [design-system/README.md](design-system/README.md) |
+| Design system: current source and approved cold-blue target | [design-system/README.md](design-system/README.md) |
+| Cold-blue design update | [design-system/design-update.md](design-system/design-update.md) |
+| Operational UX presentation | [design-system/operational-ux.md](design-system/operational-ux.md) |
+| Data, accessibility, responsive, and localization contracts | [design-system/data-experiences.md](design-system/data-experiences.md), [design-system/accessibility-responsive-and-localization.md](design-system/accessibility-responsive-and-localization.md) |
+| UI-quality evidence tracker | [audit/ui-quality-matrix.md](audit/ui-quality-matrix.md) |
 
 ## Current route evidence
 
-The hard-checked current Core Admin inventory contains 240 canonical browser
-routes: 97 GET operations and 143 non-GET operations. Core and Gateway expose
-the same 240 method/path set with zero missing, orphan, or duplicate contracts.
-Worker Admin routes are documented separately and are not counted in that
-inventory.
+The generated Admin route inventory is currently stale against source, and the
+full `docs:check` command stops at that gate. Do not use the previously recorded
+240-route count as current evidence until `docs:routes` is regenerated and the
+dependent hand-written counts/statuses are reviewed in a separate API
+documentation task.
 
 The generated inventory is transport evidence only. Controller/DTO behavior
-comes from the hand-written domain guides and owning backend source.
+comes from the hand-written domain guides and owning backend source. The
+cold-blue design update does not change or reverify API route inventory.
 
 ## Status boundaries
 
@@ -81,10 +88,12 @@ comes from the hand-written domain guides and owning backend source.
 - Live authenticated status requires a real authorized Gateway/Core session.
 - Deployment-verified status requires evidence from the target environment.
 
-The current Web source has 240 direct Core Admin calls, 0 equivalent-only
-representations, and 0 missing route capabilities. Call this **source route
-parity**, not authenticated runtime, deployment verification, or release
-readiness while those independent gates remain open.
+The last verified hand-written baseline recorded 240 direct Core Admin calls,
+0 equivalent-only representations, and 0 missing route capabilities. Because
+the generated inventory is now stale, do not carry that count or the **source
+route parity** label forward as current evidence until regeneration and review.
+Even after re-verification, source parity would not prove authenticated runtime,
+deployment verification, or release readiness.
 
 ## Validation
 

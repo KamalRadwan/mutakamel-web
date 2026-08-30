@@ -107,6 +107,7 @@ describe("AdminNotificationsScreen", () => {
     }));
     fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
     fireEvent.click(screen.getByRole("button", { name: "Acknowledge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Compatibility aliases" }));
     fireEvent.click(screen.getByRole("button", { name: "Acknowledge via /ack alias" }));
 
     expect(viewMock.performBulkAction).toHaveBeenNthCalledWith(1, "read-all");
@@ -127,6 +128,7 @@ describe("AdminNotificationsScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     expect(viewMock.performItemAction).toHaveBeenCalledWith(ID, "dismiss");
 
+    fireEvent.click(screen.getByRole("button", { name: "Compatibility aliases" }));
     fireEvent.click(screen.getByRole("button", { name: "Dismiss via POST alias" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     expect(viewMock.performItemAction).toHaveBeenCalledWith(

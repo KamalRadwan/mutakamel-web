@@ -80,7 +80,7 @@ export function InviteUserModal({
       }
     >
       <form id="invite-user-form" onSubmit={handleSubmit} className="space-y-4 py-1">
-        <div className="rounded-md border border-warn-200 bg-warn-50 p-3 text-xs leading-relaxed text-warn-800 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-300">
+        <div className="rounded-md border border-warning/30 bg-warning-subtle p-3 text-xs leading-relaxed text-warning-subtle-foreground">
           {t.users.invitedInfoBanner}
         </div>
 
@@ -141,7 +141,7 @@ export function InviteUserModal({
 
           {(fieldProps) =>
             rolesForbidden ? (
-              <div className="flex items-center gap-2 rounded-md border border-warn-200 bg-warn-50 p-2.5 text-xs text-warn-700 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-400">
+              <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground">
                 <ShieldAlert className="size-4 shrink-0" />
                 <span>{t.users.rolesUnavailable}</span>
               </div>

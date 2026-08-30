@@ -63,7 +63,7 @@ function ApplicationRegistrationOnlyContent() {
       <div className="grid place-items-center py-16">
         <Card className="w-full max-w-xl">
           <CardContent className="text-center">
-            <AppWindow className="mx-auto size-10 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+            <AppWindow className="mx-auto size-10 text-info" aria-hidden="true" />
             <h1 className="mt-4 text-xl font-semibold">{t.applications.registrationOnlyTitle}</h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.applications.registrationOnlyDescription}</p>
             <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -136,7 +136,7 @@ function ApplicationsCatalogueContent() {
       headerAr: t.applications.tableHeaders.application,
       cell: (app) => (
         <Link href={`/applications-catalogue/${app.key}`} className="group inline-block">
-          <span className="font-semibold text-sm text-foreground group-hover:text-brand-600 dark:group-hover:text-brand-400">
+          <span className="text-sm font-semibold text-foreground group-hover:text-primary">
             {app.name}
           </span>
           {app.description && (
@@ -173,7 +173,9 @@ function ApplicationsCatalogueContent() {
       key: "lifecycle",
       headerEn: t.applications.tableHeaders.lifecycle,
       headerAr: t.applications.tableHeaders.lifecycle,
-      cell: (app) => <StatusBadge status={app.lifecycleStatus} />,
+      cell: (app) => (
+        <StatusBadge status={app.lifecycleStatus} enumType="application" />
+      ),
     },
   ];
 
@@ -283,12 +285,12 @@ function ApplicationsBoundary({ loading = false }: { loading?: boolean }) {
         <CardContent role={loading ? "status" : undefined} className="text-center">
           {loading ? (
             <>
-              <AppWindow className="mx-auto size-8 animate-pulse text-brand-500" />
+              <AppWindow className="mx-auto size-8 animate-pulse text-info motion-reduce:animate-none" aria-hidden="true" />
               <h1 className="mt-3 font-semibold">{t.applications.checkingAccess}</h1>
             </>
           ) : (
             <>
-              <ShieldAlert className="mx-auto size-8 text-warn-500" />
+              <ShieldAlert className="mx-auto size-8 text-warning" aria-hidden="true" />
               <h1 className="mt-3 font-semibold">{t.applications.accessDeniedTitle}</h1>
             </>
           )}

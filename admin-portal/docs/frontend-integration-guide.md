@@ -388,6 +388,14 @@ Each independent resource must distinguish loading, refreshing, data, empty,
 forbidden, unavailable, validation, conflict, stale, transport, replay, and
 terminal async failure.
 
+Initial loading may reserve the surface with a skeleton. Background refresh
+keeps safe prior data, controls, pagination, selection, scroll position, and
+focus mounted; expose `aria-busy` and one concise status instead of replacing
+the region. Forbidden is never empty, stale/partial data remains visibly
+qualified, validation stays associated with fields, and blocking errors retain
+a retry or recovery action. See
+[Operational UX](design-system/operational-ux.md#page-and-query-state-model).
+
 Keep money, FX, byte quotas, and capacities as strings. Do not use `parseFloat`
 for authoritative financial calculations.
 

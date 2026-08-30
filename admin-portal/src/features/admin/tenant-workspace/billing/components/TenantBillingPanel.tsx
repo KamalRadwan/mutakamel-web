@@ -1,17 +1,28 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ShieldAlert } from "lucide-react";
 import {
   Card,
+  Checkbox,
   Field,
   Input,
   Button,
   DataTable,
   EmptyState,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   type ColumnDef,
 } from "@/design-system";
 import type { UseTenantBillingWorkspaceResult } from "../hooks/useTenantBillingWorkspace";
+import { localeForLanguage } from "@/i18n/locale";
 import type {
   BillingCycle,
   PaymentReconciliationAction,
@@ -36,8 +47,15 @@ export function TenantBillingPanel({
   const [section, setSection] = useState<BillingSection>("subscription");
   const rtl = lang === "ar";
   const copy = billingCopy[lang];
+  const refreshing = [
+    workspace.subscriptionState,
+    workspace.walletState,
+    workspace.ledgerState,
+    workspace.paymentsState,
+    workspace.billingSummaryState,
+  ].includes("loading");
   return (
-    <section className="space-y-4" dir={rtl ? "rtl" : "ltr"}>
+    <section className="space-y-4" dir={rtl ? "rtl" : "ltr"} aria-busy={refreshing || undefined}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-foreground">
@@ -45,45 +63,35 @@ export function TenantBillingPanel({
           </h2>
           <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>
-        <Button type="button" variant="outline" onClick={() => void workspace.refresh()}>
+        <Button type="button" variant="outline" loading={refreshing} onClick={() => void workspace.refresh()}>
           {copy.refresh}
         </Button>
       </div>
 
-      <div
-        className="flex flex-wrap gap-2"
-        role="tablist"
-        aria-label={copy.title}
-      >
-        {(["subscription", "wallet", "payments"] as const).map((key) => (
-          <Button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={section === key}
-            variant={section === key ? "secondary" : "ghost"}
-            onClick={() => setSection(key)}
-          >
-            {copy.sections[key]}
-          </Button>
-        ))}
-      </div>
+      <Tabs value={section} onValueChange={(value) => setSection(value as BillingSection)} className="space-y-4">
+        <TabsList aria-label={copy.title} className="max-w-full overflow-x-auto">
+          {(["subscription", "wallet", "payments"] as const).map((key) => (
+            <TabsTrigger key={key} value={key} className="shrink-0 px-3">
+              {copy.sections[key]}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {refreshing ? <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{copy.refreshing}</p> : null}
 
-      {workspace.mutation.error ? (
-        <ErrorNotice error={workspace.mutation.error} lang={lang} />
-      ) : null}
-      {section === "subscription" ? (
-        <div className="space-y-4">
+        {workspace.mutation.error ? (
+          <ErrorNotice error={workspace.mutation.error} lang={lang} focusOnMount />
+        ) : null}
+        <TabsContent value="subscription" className="mt-0 space-y-4">
           <BillingSummary workspace={workspace} lang={lang} />
           <SubscriptionSection workspace={workspace} lang={lang} />
-        </div>
-      ) : null}
-      {section === "wallet" ? (
+        </TabsContent>
+        <TabsContent value="wallet" className="mt-0">
         <WalletSection workspace={workspace} lang={lang} />
-      ) : null}
-      {section === "payments" ? (
+        </TabsContent>
+        <TabsContent value="payments" className="mt-0">
         <PaymentsSection workspace={workspace} lang={lang} />
-      ) : null}
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
@@ -91,7 +99,7 @@ export function TenantBillingPanel({
 function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
   const copy = billingCopy[lang];
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("MONTHLY");
-  const [trialDays, setTrialDays] = useState("14");
+  const [trialDays, setTrialDays] = useState(String(DEFAULT_TRIAL_DAYS));
   const [moduleKey, setModuleKey] = useState("");
   const [tierKey, setTierKey] = useState("");
   const [seats, setSeats] = useState("1");
@@ -104,8 +112,9 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
 
   if (
-    workspace.subscriptionState === "loading" ||
-    workspace.subscriptionState === "idle"
+    (workspace.subscriptionState === "loading" ||
+      workspace.subscriptionState === "idle") &&
+    !workspace.subscription
   ) {
     return <StateCard>{copy.loadingSubscription}</StateCard>;
   }
@@ -140,12 +149,14 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
           >
             <SelectField
               label={copy.billingCycle}
+              name="billingCycle"
               value={billingCycle}
               onChange={(value) => setBillingCycle(value as BillingCycle)}
               options={["MONTHLY", "ANNUAL"]}
             />
             <TextField
               label={copy.trialDays}
+              name="trialDays"
               value={trialDays}
               onChange={setTrialDays}
               type="number"
@@ -154,18 +165,21 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
             />
             <TextField
               label={copy.moduleKey}
+              name="moduleKey"
               value={moduleKey}
               onChange={setModuleKey}
               required
             />
             <TextField
               label={copy.tierKey}
+              name="tierKey"
               value={tierKey}
               onChange={setTierKey}
               required
             />
             <TextField
               label={copy.seats}
+              name="seats"
               value={seats}
               onChange={setSeats}
               type="number"
@@ -290,7 +304,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
               {copy.periodEnd}: {formatDate(header.currentPeriodEnd, lang)}
             </p>
             {header.cancelAt ? (
-              <p className="text-xs text-warn-700 dark:text-warn-400">
+              <p className="text-xs text-warning-subtle-foreground">
                 {copy.cancelAt}: {formatDate(header.cancelAt, lang)}
               </p>
             ) : null}
@@ -299,11 +313,12 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
           header.status !== "CANCELLED" &&
           header.cancelAt === null ? (
             <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
+              <label htmlFor="cancel-subscription-confirmation" className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground">
+                <Checkbox
+                  id="cancel-subscription-confirmation"
+                  name="cancelSubscriptionConfirmed"
                   checked={cancelConfirmed}
-                  onChange={(event) => setCancelConfirmed(event.target.checked)}
+                  onCheckedChange={(checked) => setCancelConfirmed(checked === true)}
                 />
                 {copy.confirmCancel}
               </label>
@@ -344,6 +359,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
           >
             <SelectField
               label={copy.operation}
+              name="planChangeOperation"
               value={operation}
               onChange={(value) =>
                 updatePlanDraft(() =>
@@ -353,28 +369,19 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
               options={["ADD", "CHANGE", "REMOVE"]}
             />
             {operation !== "ADD" ? (
-              <label className="space-y-1 text-sm">
-                <span>{copy.item}</span>
-                <select
-                  className={selectClassName}
-                  required
-                  value={itemId}
-                  onChange={(event) =>
-                    updatePlanDraft(() => setItemId(event.target.value))
-                  }
-                >
-                  <option value="">{copy.selectItem}</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.moduleName ?? item.moduleKey ?? item.id} ·{" "}
-                      {item.tierName ?? item.tierKey}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <SelectField
+                label={copy.item}
+                name="subscriptionItemId"
+                value={itemId}
+                placeholder={copy.selectItem}
+                required
+                onChange={(value) => updatePlanDraft(() => setItemId(value))}
+                options={items.map((item) => [item.id, `${item.moduleName ?? item.moduleKey ?? item.id} · ${item.tierName ?? item.tierKey}`] as const)}
+              />
             ) : (
               <TextField
                 label={copy.moduleKey}
+                name="moduleKey"
                 value={changeModuleKey}
                 onChange={(value) =>
                   updatePlanDraft(() => setChangeModuleKey(value))
@@ -385,6 +392,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
             {operation !== "REMOVE" ? (
               <TextField
                 label={copy.tierKey}
+                name="tierKey"
                 value={changeTierKey}
                 onChange={(value) =>
                   updatePlanDraft(() => setChangeTierKey(value))
@@ -395,6 +403,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
             {operation !== "REMOVE" ? (
               <TextField
                 label={copy.seats}
+                name="seats"
                 value={changeSeats}
                 onChange={(value) =>
                   updatePlanDraft(() => setChangeSeats(value))
@@ -411,7 +420,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
             </div>
           </form>
           {workspace.planPreview ? (
-            <div className="mt-4 rounded-lg border border-brand-500/30 bg-brand-500/5 p-4 text-sm dark:bg-brand-500/10">
+            <div className="mt-4 rounded-lg border border-info/30 bg-info-subtle p-4 text-sm text-info-subtle-foreground">
               <div className="grid gap-2 md:grid-cols-4">
                 <Metric
                   label={copy.operation}
@@ -457,7 +466,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
                 />
               </div>
               {!previewIsCurrent ? (
-                <p className="mt-3 text-sm text-danger-700 dark:text-danger-400">
+                <p className="mt-3 text-sm text-destructive-subtle-foreground">
                   {copy.previewExpired}
                 </p>
               ) : null}
@@ -497,7 +506,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [note, setNote] = useState("");
-  if (workspace.walletState === "loading" || workspace.walletState === "idle")
+  if ((workspace.walletState === "loading" || workspace.walletState === "idle") && !workspace.wallet)
     return <StateCard>{copy.loadingWallet}</StateCard>;
   if (workspace.walletState === "forbidden")
     return <StateCard>{copy.walletForbidden}</StateCard>;
@@ -591,7 +600,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
             <ErrorNotice error={workspace.inputCurrenciesError} lang={lang} />
           ) : null}
           {workspace.inputCurrenciesState === "forbidden" ? (
-            <p className="mt-3 text-sm text-warn-700 dark:text-warn-400">
+            <p className="mt-3 text-sm text-warning-subtle-foreground">
               {copy.currenciesForbidden}
             </p>
           ) : null}
@@ -621,6 +630,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
             >
               <SelectField
                 label={copy.direction}
+                name="walletAdjustmentDirection"
                 value={direction}
                 onChange={(value) =>
                   updateWalletDraft(() =>
@@ -631,13 +641,15 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
               />
               <TextField
                 label={copy.sourceAmount}
+                name="sourceAmount"
                 value={amount}
                 onChange={(value) => updateWalletDraft(() => setAmount(value))}
                 required
-                pattern="^(?:0|[1-9]\\d{0,13})(?:\\.\\d{1,4})?$"
+                pattern="^(?:0|[1-9]\d{0,13})(?:\.\d{1,4})?$"
               />
               <SelectField
                 label={copy.currency}
+                name="sourceCurrencyCode"
                 value={selectedCurrency}
                 onChange={(value) =>
                   updateWalletDraft(() => setCurrency(value))
@@ -654,7 +666,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
             <p className="mt-3 text-sm text-muted-foreground">{copy.noCurrencies}</p>
           ) : null}
           {workspace.walletPreview ? (
-            <div className="mt-4 rounded-lg border border-brand-500/30 bg-brand-500/5 p-4 dark:bg-brand-500/10">
+            <div className="mt-4 rounded-lg border border-info/30 bg-info-subtle p-4 text-info-subtle-foreground">
               <div className="grid gap-2 md:grid-cols-4">
                 <Metric
                   label={copy.sourceAmount}
@@ -678,7 +690,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                 />
               </div>
               {!previewIsCurrent ? (
-                <p className="mt-3 text-sm text-danger-700 dark:text-danger-400">
+                <p className="mt-3 text-sm text-destructive-subtle-foreground">
                   {copy.previewExpired}
                 </p>
               ) : null}
@@ -686,6 +698,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                 <div className="mt-3 flex flex-wrap items-end gap-3">
                   <TextField
                     label={copy.auditNote}
+                    name="auditNote"
                     value={note}
                     onChange={setNote}
                     required
@@ -709,7 +722,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                   </Button>
                 </div>
               ) : (
-                <p className="mt-3 text-sm text-warn-700 dark:text-warn-400">
+                <p className="mt-3 text-sm text-warning-subtle-foreground">
                   {copy.previewOnly}
                 </p>
               )}
@@ -734,7 +747,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
         {workspace.ledgerState === "empty" ? (
           <EmptyState title={copy.noLedger} />
         ) : null}
-        {workspace.ledgerState === "ready" ? (
+        {workspace.ledgerState === "ready" || (workspace.ledgerState === "loading" && workspace.ledger.items.length > 0) ? (
           <div className="mt-3">
             <DataTable
               columns={ledgerColumns}
@@ -762,8 +775,9 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
     Record<string, boolean>
   >({});
   if (
-    workspace.paymentsState === "loading" ||
-    workspace.paymentsState === "idle"
+    (workspace.paymentsState === "loading" ||
+      workspace.paymentsState === "idle") &&
+    workspace.payments.items.length === 0
   )
     return <StateCard>{copy.loadingPayments}</StateCard>;
   if (workspace.paymentsState === "forbidden")
@@ -818,25 +832,31 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
           {workspace.permissions.canRefundPayment &&
           payment.status === "SUCCEEDED" ? (
             <>
-              <Input
-                value={refundNotes[payment.paymentId] ?? ""}
-                onChange={(event) =>
-                  setRefundNotes((current) => ({
-                    ...current,
-                    [payment.paymentId]: event.target.value,
-                  }))
-                }
-                placeholder={copy.refundNote}
-                maxLength={500}
-              />
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
+              <Field id={`refund-note-${payment.paymentId}`} label={copy.refundNote}>
+                {(field) => (
+                  <Input
+                    {...field}
+                    name={`refundNote.${payment.paymentId}`}
+                    value={refundNotes[payment.paymentId] ?? ""}
+                    onChange={(event) =>
+                      setRefundNotes((current) => ({
+                        ...current,
+                        [payment.paymentId]: event.target.value,
+                      }))
+                    }
+                    maxLength={500}
+                  />
+                )}
+              </Field>
+              <label htmlFor={`refund-confirmation-${payment.paymentId}`} className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground">
+                <Checkbox
+                  id={`refund-confirmation-${payment.paymentId}`}
+                  name={`refundConfirmed.${payment.paymentId}`}
                   checked={refundConfirmations[payment.paymentId] ?? false}
-                  onChange={(event) =>
+                  onCheckedChange={(checked) =>
                     setRefundConfirmations((current) => ({
                       ...current,
-                      [payment.paymentId]: event.target.checked,
+                      [payment.paymentId]: checked === true,
                     }))
                   }
                 />
@@ -1004,6 +1024,7 @@ function PaymentReconciliationPanel({
             >
               <SelectField
                 label={copy.action}
+                name="reconciliationAction"
                 value={effectiveAction}
                 onChange={(value) => {
                   setAction(value as PaymentReconciliationAction);
@@ -1014,6 +1035,7 @@ function PaymentReconciliationPanel({
               />
               <TextField
                 label={copy.evidenceReference}
+                name="evidenceReference"
                 value={effectiveEvidence}
                 onChange={setEvidence}
                 required
@@ -1023,6 +1045,7 @@ function PaymentReconciliationPanel({
               {providerReferenceRequired ? (
                 <TextField
                   label={copy.providerReference}
+                  name="providerOutcomeReference"
                   value={effectiveProviderReference}
                   onChange={setProviderReference}
                   required
@@ -1032,6 +1055,7 @@ function PaymentReconciliationPanel({
               ) : null}
               <TextField
                 label={copy.auditNote}
+                name="proposalNote"
                 value={proposalNote}
                 onChange={setProposalNote}
                 required
@@ -1081,7 +1105,7 @@ function PaymentReconciliationPanel({
                   <p className="mt-2 text-sm">{row.proposalNote}</p>
                   {row.status === "PROPOSED" &&
                   row.proposedByAdminId === workspace.actorId ? (
-                    <p className="mt-3 text-sm text-warn-700 dark:text-warn-400">
+                    <p className="mt-3 text-sm text-warning-subtle-foreground">
                       {copy.makerChecker}
                     </p>
                   ) : null}
@@ -1089,6 +1113,7 @@ function PaymentReconciliationPanel({
                     <div className="mt-3 flex flex-wrap items-end gap-2">
                       <TextField
                         label={copy.decisionNote}
+                        name={`decisionNote.${row.id}`}
                         value={decisionNotes[row.id] ?? ""}
                         onChange={(value) =>
                           setDecisionNotes((current) => ({
@@ -1228,6 +1253,7 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
       </div>
       <TextField
         label={copy.sourceAmount}
+        name="sourceAmount"
         value={amount}
         onChange={(value) => updateDraft(() => setAmount(value))}
         required
@@ -1236,6 +1262,7 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
       />
       <TextField
         label={copy.currency}
+        name="currencyCode"
         value={currencyCode}
         onChange={(value) =>
           updateDraft(() => setCurrencyCode(value.toUpperCase()))
@@ -1247,6 +1274,7 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
       />
       <TextField
         label={copy.offlineReference}
+        name="reference"
         value={reference}
         onChange={(value) => updateDraft(() => setReference(value))}
         required
@@ -1254,15 +1282,17 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
       />
       <TextField
         label={copy.auditNote}
+        name="note"
         value={note}
         onChange={(value) => updateDraft(() => setNote(value))}
         maxLength={500}
       />
-      <label className="flex items-center gap-2 text-xs text-muted-foreground md:col-span-2">
-        <input
-          type="checkbox"
+      <label htmlFor="offline-payment-confirmation" className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground md:col-span-2">
+        <Checkbox
+          id="offline-payment-confirmation"
+          name="offlinePaymentConfirmed"
           checked={confirmed}
-          onChange={(event) => setConfirmed(event.target.checked)}
+          onCheckedChange={(checked) => setConfirmed(checked === true)}
         />
         {copy.confirmOfflinePayment}
       </label>
@@ -1320,7 +1350,7 @@ function StateCard({ children }: { children: ReactNode }) {
 function LedgerForbiddenState({ title }: { title: string }) {
   return (
     <div role="alert" className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-      <ShieldAlert className="mb-1 size-8 text-ink-300 dark:text-ink-600" aria-hidden="true" />
+      <ShieldAlert className="mb-1 size-8 text-muted-foreground" aria-hidden="true" />
       <p className="text-sm font-medium text-foreground">{title}</p>
     </div>
   );
@@ -1329,15 +1359,23 @@ function LedgerForbiddenState({ title }: { title: string }) {
 function ErrorNotice({
   error,
   lang,
+  focusOnMount = false,
 }: {
   error: { message: string; errorCode: string; correlationId?: string } | null;
   lang: "ar" | "en";
+  focusOnMount?: boolean;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error && focusOnMount) ref.current?.focus();
+  }, [error, focusOnMount]);
   if (!error) return null;
   return (
     <div
+      ref={ref}
       role="alert"
-      className="rounded-lg border border-danger-200 bg-danger-50 p-3 text-sm text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-100"
+      tabIndex={-1}
+      className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <p className="font-medium">{error.message}</p>
       <p className="mt-1 font-mono text-xs">
@@ -1352,12 +1390,14 @@ function ErrorNotice({
 
 function TextField({
   label,
+  name,
   value,
   onChange,
   type = "text",
   ...inputProps
 }: {
   label: string;
+  name?: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
@@ -1371,6 +1411,7 @@ function TextField({
         <Input
           id={fp.id}
           {...inputProps}
+          name={name}
           type={type}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -1380,35 +1421,57 @@ function TextField({
   );
 }
 
-const selectClassName =
-  "flex h-(--size-control-lg) w-full rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-brand-500";
+const EMPTY_SELECT_VALUE = "__none__";
+/**
+ * Prefill for the manual trial length. Core's `tenants.trial_days` setting is
+ * what applies when no explicit value is sent; this only seeds the input an
+ * admin is about to override.
+ */
+const DEFAULT_TRIAL_DAYS = 7;
 
 function SelectField({
   label,
+  name,
   value,
   onChange,
   options,
+  placeholder,
+  required,
 }: {
   label: string;
+  name?: string;
   value: string;
   onChange: (value: string) => void;
-  options: readonly string[];
+  options: ReadonlyArray<string | readonly [string, string]>;
+  placeholder?: string;
+  required?: boolean;
 }) {
+  const entries = options.map((option) => typeof option === "string" ? [option, option] as const : option);
+  const generatedId = useId();
+  const id = name ? `tenant-billing-${name}` : generatedId;
+  const labelId = `${id}-label`;
   return (
-    <label className="space-y-1 text-sm">
-      <span>{label}</span>
-      <select
-        className={selectClassName}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
+    <div className="space-y-1.5">
+      <span id={labelId} className="text-sm font-medium text-foreground">
+        {label}
+        {required ? <span className="ms-0.5 text-destructive" aria-hidden="true">*</span> : null}
+      </span>
+      <Select
+        name={name}
+        value={value || EMPTY_SELECT_VALUE}
+        onValueChange={(next) => onChange(next === EMPTY_SELECT_VALUE ? "" : next)}
       >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
+        <SelectTrigger id={id} aria-labelledby={labelId} aria-required={required || undefined}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {placeholder ? <SelectItem value={EMPTY_SELECT_VALUE}>{placeholder}</SelectItem> : null}
+          {entries.map(([optionValue, optionLabel]) => (
+            <SelectItem key={optionValue} value={optionValue}>{optionLabel}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 
@@ -1417,7 +1480,7 @@ function formatDate(value: string | null, lang: "ar" | "en"): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB", {
+    : new Intl.DateTimeFormat(localeForLanguage(lang), {
         dateStyle: "medium",
         timeStyle: "short",
       }).format(date);
@@ -1433,6 +1496,7 @@ const billingCopy = {
     title: "Subscription, wallet & payments",
     subtitle: "Authoritative billing state and reviewed financial commands.",
     refresh: "Refresh",
+    refreshing: "Refreshing billing data while keeping the current view available…",
     correlationLabel: "Correlation",
     sections: {
       subscription: "Subscription",
@@ -1562,6 +1626,7 @@ const billingCopy = {
     title: "الاشتراك والمحفظة والمدفوعات",
     subtitle: "حالة فوترة موثوقة وأوامر مالية بعد المراجعة.",
     refresh: "تحديث",
+    refreshing: "جارٍ تحديث بيانات الفوترة مع إبقاء العرض الحالي متاحًا…",
     correlationLabel: "معرّف الارتباط",
     sections: {
       subscription: "الاشتراك",

@@ -3,6 +3,7 @@
 import { Save, Info, Lock, RefreshCw } from "lucide-react";
 import {
   AmbiguousOutcomePanel,
+  Button,
   Input,
   Select,
   SelectContent,
@@ -52,13 +53,18 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
 
   if (!uiMeta) {
     return (
-      <div className="p-4 border border-danger-200 bg-danger-50 text-danger-600 rounded-lg text-xs">
+      <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-xs text-destructive-subtle-foreground">
         Missing UI Metadata for {key}
       </div>
     );
   }
 
   const title = lang === "ar" ? uiMeta.titleAr : uiMeta.titleEn;
+  const fieldId = `setting-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const titleId = `${fieldId}-title`;
+  const descriptionId = `${fieldId}-description`;
+  const readOnlyReasonId = readOnly ? `${fieldId}-read-only-reason` : undefined;
+  const describedBy = [descriptionId, readOnlyReasonId].filter(Boolean).join(" ");
 
   const handleChange = async (newVal: string | number | boolean) => {
     if (readOnly) return;
@@ -77,25 +83,25 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
   };
 
   return (
-    <div className={`p-5 rounded-lg border transition-colors ${readOnly ? "bg-ink-100 dark:bg-ink-800/30 border-border" : "bg-card border-border hover:border-brand-200 dark:hover:border-brand-800/50"} group`}>
+    <div className={`rounded-lg border p-5 transition-colors motion-reduce:transition-none ${readOnly ? "border-border bg-muted" : "border-border bg-card hover:border-primary/30"} group`}>
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
 
         {/* Left Side: Label and Description */}
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <h3 id={titleId} className="flex items-center gap-2 text-sm font-semibold text-foreground">
               {title}
-              {readOnly && <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
+              {readOnly && <Lock className="size-3.5 text-muted-foreground" aria-hidden="true" />}
             </h3>
           </div>
 
-          <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl flex items-start gap-1.5 mt-1.5">
-            <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+          <p id={descriptionId} className="mt-1.5 flex max-w-2xl items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             {lang === "ar" ? descriptionI18n.ar : descriptionI18n.en}
           </p>
 
           {readOnly && (
-            <p className="text-xs text-warn-700 dark:text-warn-400 font-medium mt-2 bg-warn-50 dark:bg-warn-950/20 px-2 py-1 rounded w-fit">
+            <p id={readOnlyReasonId} className="mt-2 w-fit rounded bg-warning-subtle px-2 py-1 text-xs font-medium text-warning-subtle-foreground">
               {permissionLocked ? copy.permissionLockedNote : copy.environmentLockedNote}
             </p>
           )}
@@ -109,6 +115,9 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
               {uiMeta.inputType === "boolean" && (
                 <div className="flex h-9 items-center justify-start">
                   <Switch
+                    id={fieldId}
+                    aria-labelledby={titleId}
+                    aria-describedby={describedBy}
                     checked={Boolean(localValue)}
                     onCheckedChange={handleToggle}
                     disabled={readOnly}
@@ -118,6 +127,9 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
 
               {uiMeta.inputType === "string" && (
                 <Input
+                  id={fieldId}
+                  aria-labelledby={titleId}
+                  aria-describedby={describedBy}
                   type="text"
                   value={
                     typeof localValue === "string"
@@ -133,6 +145,9 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
 
               {uiMeta.inputType === "number" && (
                 <Input
+                  id={fieldId}
+                  aria-labelledby={titleId}
+                  aria-describedby={describedBy}
                   type="number"
                   value={
                     typeof localValue === "number" ? localValue : ""
@@ -155,7 +170,7 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
                   onValueChange={handleChange}
                   disabled={readOnly}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger id={fieldId} aria-labelledby={titleId} aria-describedby={describedBy} className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -171,28 +186,30 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
           </div>
 
           {/* Feedback States */}
-          <div className="h-5 flex items-center justify-end text-xs font-medium transition-opacity w-full">
+          <div className="flex min-h-6 w-full items-center justify-end text-xs font-medium">
             {isSaving ? (
-              <span className="flex items-center gap-1.5 text-brand-600 dark:text-brand-400 animate-pulse">
-                <Save className="w-3.5 h-3.5" />
+              <span className="flex items-center gap-1.5 text-primary" role="status">
+                <Save className="size-3.5 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
                 {copy.saving}
               </span>
             ) : (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 onClick={() => {
                   void Promise.resolve(onReload(key)).catch(() => undefined);
                 }}
                 disabled={isRefreshing || hasPendingChange}
                 title={hasPendingChange ? copy.reloadDisabledHint : copy.reloadHint}
-                className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-brand-300"
+                className="h-auto px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground"
               >
                 <RefreshCw
-                  className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+                  className={`size-3.5 ${isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`}
                   aria-hidden="true"
                 />
                 {copy.reload}
-              </button>
+              </Button>
             )}
           </div>
           {setting.ambiguous ? (
@@ -207,7 +224,7 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
               retrying={isSaving}
             />
           ) : setting.error ? (
-            <p role="alert" className="w-full text-start text-xs text-danger-700 dark:text-danger-300">
+            <p role="alert" className="w-full text-start text-xs text-destructive-subtle-foreground">
               {setting.error}
             </p>
           ) : null}

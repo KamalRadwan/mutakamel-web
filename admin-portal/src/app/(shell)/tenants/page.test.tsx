@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { hookMock, i18nMock } = vi.hoisted(() => ({
@@ -53,20 +53,22 @@ describe("TenantsDirectoryPage", () => {
   });
 
   it("renders the exact failed status and only real observed database servers", () => {
+    const controller = baseController();
+    hookMock.mockReturnValue(controller as never);
     render(<TenantsDirectoryPage />);
 
     const status = screen.getByRole("combobox", { name: "Filter by status" });
-    expect(
-      within(status).getByRole("option", { name: "Provisioning failed" }),
-    ).toHaveValue("PROVISIONING_FAILED");
-    expect(within(status).queryByDisplayValue("FAILED")).not.toBeInTheDocument();
+    fireEvent.click(status);
+    fireEvent.click(screen.getByRole("option", { name: "Provisioning failed" }));
+    expect(controller.setStatusFilter).toHaveBeenCalledWith("PROVISIONING_FAILED");
+    expect(screen.queryByRole("option", { name: "FAILED" })).not.toBeInTheDocument();
 
     const server = screen.getByRole("combobox", {
       name: "Filter by database server",
     });
-    expect(
-      within(server).getByRole("option", { name: "Postgres Cairo" }),
-    ).toHaveValue(DATABASE_ID);
+    fireEvent.click(server);
+    fireEvent.click(screen.getByRole("option", { name: "Postgres Cairo" }));
+    expect(controller.setServerFilter).toHaveBeenCalledWith(DATABASE_ID);
     expect(document.body.textContent).not.toContain("srv-eg-01");
     expect(document.body.textContent).not.toContain("srv-de-02");
   });
@@ -93,15 +95,20 @@ describe("TenantsDirectoryPage", () => {
     expect(
       screen.queryByRole("link", { name: "Register tenant" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Suspend" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Soft delete Acme deleted" }),
-    ).not.toBeInTheDocument();
+    openMenu("Tenant actions: Acme active");
+    expect(screen.getByRole("menuitem", { name: "Suspend" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Retry provisioning" }),
-    );
+    openMenu("Tenant actions: Acme suspended");
+    expect(screen.getByRole("menuitem", { name: "Activate" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    openMenu("Tenant actions: Acme deleted");
+    expect(screen.queryByRole("menuitem", { name: "Soft delete" })).not.toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    openMenu("Tenant actions: Acme failed");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Retry provisioning" }));
     expect(controller.handleReprovision).toHaveBeenCalledWith(failed);
     expect(controller.handleReprovision).toHaveBeenCalledTimes(1);
   });
@@ -166,10 +173,11 @@ describe("TenantsDirectoryPage", () => {
     render(<TenantsDirectoryPage />);
 
     expect(screen.getByText("عزل متعدد المستأجرين")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("combobox", { name: "تصفية حسب الحالة" }));
     expect(screen.getAllByText("فشل التجهيز")).toHaveLength(2);
-    expect(
-      screen.getByRole("button", { name: "إعادة محاولة التجهيز" }),
-    ).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    openMenu("إجراءات المستأجر: Acme failed");
+    expect(screen.getByRole("menuitem", { name: "إعادة محاولة التجهيز" })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/[ØÙâÂ]/);
   });
 
@@ -210,19 +218,18 @@ describe("TenantsDirectoryPage", () => {
     hookMock.mockReturnValue(controller as never);
     render(<TenantsDirectoryPage />);
 
-    const writeButtons = screen.getAllByRole("button").filter((button) =>
-      ["Suspend", "Soft delete"].some(
-        (label) =>
-          button.textContent?.includes(label) ||
-          button.getAttribute("aria-label")?.includes(label),
-      ),
-    );
-    expect(writeButtons.length).toBeGreaterThan(0);
-    expect(writeButtons.every((button) => button.hasAttribute("disabled"))).toBe(
-      true,
-    );
+    openMenu("Tenant actions: Acme active");
+    expect(screen.getByRole("menuitem", { name: "Suspend" })).toHaveAttribute("data-disabled");
+    expect(screen.getByRole("menuitem", { name: "Soft delete" })).toHaveAttribute("data-disabled");
   });
 });
+
+function openMenu(name: string) {
+  fireEvent.pointerDown(screen.getByRole("button", { name }), {
+    button: 0,
+    ctrlKey: false,
+  });
+}
 
 function baseController(overrides: Record<string, unknown> = {}) {
   const tenants = [tenantRecord("ACTIVE", "active")];
@@ -235,6 +242,9 @@ function baseController(overrides: Record<string, unknown> = {}) {
     serverFilter: "ALL",
     setServerFilter: vi.fn(),
     databaseServerOptions: [{ id: DATABASE_ID, name: "Postgres Cairo" }],
+    databaseServerOptionsState: "ready",
+    databaseServerOptionsError: null,
+    retryDatabaseServerOptions: vi.fn().mockResolvedValue(undefined),
     page: 1,
     setPage: vi.fn(),
     limit: 10,

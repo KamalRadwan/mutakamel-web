@@ -14,6 +14,10 @@ import { AddDatabaseApplicationDialog } from "./AddDatabaseApplicationDialog";
 vi.mock("@/features/admin/applications/api/applications.api", () => ({
   applicationsApi: { list: vi.fn() },
 }));
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({ lang: "en", dir: "ltr" }),
+  useOptionalI18n: () => null,
+}));
 
 const listApplications = vi.mocked(applicationsApi.list);
 

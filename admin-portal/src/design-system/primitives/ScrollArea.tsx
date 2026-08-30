@@ -12,15 +12,15 @@ export const ScrollArea = forwardRef<
     <ScrollAreaPrimitive.Viewport className="size-full">{children}</ScrollAreaPrimitive.Viewport>
     <ScrollAreaPrimitive.Scrollbar
       orientation="vertical"
-      className="flex w-2.5 touch-none select-none border-s border-transparent p-px transition-colors"
+      className="flex w-2.5 touch-none select-none border-s border-transparent p-px transition-colors motion-reduce:transition-none"
     >
-      <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-ink-300 dark:bg-ink-600" />
+      <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-muted-foreground" />
     </ScrollAreaPrimitive.Scrollbar>
     <ScrollAreaPrimitive.Scrollbar
       orientation="horizontal"
-      className="flex h-2.5 touch-none select-none border-t border-transparent p-px transition-colors"
+      className="flex h-2.5 touch-none select-none border-t border-transparent p-px transition-colors motion-reduce:transition-none"
     >
-      <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-ink-300 dark:bg-ink-600" />
+      <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-muted-foreground" />
     </ScrollAreaPrimitive.Scrollbar>
     <ScrollAreaPrimitive.Corner />
   </ScrollAreaPrimitive.Root>

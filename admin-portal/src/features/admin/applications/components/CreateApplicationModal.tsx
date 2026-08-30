@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   Dialog,
@@ -38,12 +39,21 @@ export function CreateApplicationModal({
     onCreate,
     onOnboard,
   });
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const submissionErrorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const invalidFields = Object.keys(form.fieldErrors);
+    if (invalidFields.length === 1) document.getElementById(`application-${invalidFields[0]}`)?.focus();
+    if (invalidFields.length > 1) errorSummaryRef.current?.focus();
+    if (form.submissionError) submissionErrorRef.current?.focus();
+  }, [form.fieldErrors, form.submissionError]);
 
   if (!isOpen) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !form.isSubmitting && form.close()}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-sm">
             {canOnboard ? copy.onboardTitle : copy.registerTitle}
@@ -52,13 +62,24 @@ export function CreateApplicationModal({
             {canOnboard ? copy.onboardDescription : copy.legacyDescription}
           </p>
         </DialogHeader>
-        <form onSubmit={form.submit} className="space-y-4">
-          <Field label={copy.key} required>
+        <form onSubmit={form.submit} noValidate className="space-y-4">
+          {Object.keys(form.fieldErrors).length > 1 && (
+            <div ref={errorSummaryRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <p className="font-semibold">{copy.errorSummary}</p>
+              <ul className="mt-2 list-disc space-y-1 ps-5">
+                {Object.entries(form.fieldErrors).map(([field, message]) => (
+                  <li key={field}><a className="underline underline-offset-2" href={`#application-${field}`}>{message}</a></li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <Field id="application-key" label={copy.key} required error={form.fieldErrors.key}>
             {(fp) => (
               <Input
                 {...fp}
                 autoFocus
                 required
+                invalid={Boolean(form.fieldErrors.key)}
                 pattern="^[a-z][a-z0-9_]{0,31}$"
                 maxLength={32}
                 dir="ltr"
@@ -69,14 +90,14 @@ export function CreateApplicationModal({
             )}
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label={copy.commercialMode}>
               {(fp) => (
                 <Select
                   value={form.formData.commercialMode}
                   onValueChange={(value) => form.setCommercialMode(value as typeof form.formData.commercialMode)}
                 >
-                  <SelectTrigger id={fp.id}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -100,7 +121,7 @@ export function CreateApplicationModal({
                   value={form.formData.catalogueVisibility}
                   onValueChange={(value) => form.setVisibility(value as typeof form.formData.catalogueVisibility)}
                 >
-                  <SelectTrigger id={fp.id}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -112,11 +133,12 @@ export function CreateApplicationModal({
             </Field>
           </div>
 
-          <Field label={copy.name} required>
+          <Field id="application-name" label={copy.name} required error={form.fieldErrors.name}>
             {(fp) => (
               <Input
                 {...fp}
                 required
+                invalid={Boolean(form.fieldErrors.name)}
                 maxLength={128}
                 value={form.formData.name}
                 onChange={(event) => form.setText("name", event.target.value)}
@@ -141,7 +163,7 @@ export function CreateApplicationModal({
                 value={form.formData.applicationType}
                 onValueChange={(value) => form.setApplicationType(value as typeof form.formData.applicationType)}
               >
-                <SelectTrigger id={fp.id}>
+                <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -174,11 +196,12 @@ export function CreateApplicationModal({
                   </Select>
                 )}
               </Field>
-              <Field label={copy.reason} required>
+              <Field id="application-reason" label={copy.reason} required error={form.fieldErrors.reason}>
                 {(fp) => (
                   <Textarea
                     {...fp}
                     required
+                    invalid={Boolean(form.fieldErrors.reason)}
                     maxLength={256}
                     rows={3}
                     value={form.formData.reason}
@@ -190,14 +213,20 @@ export function CreateApplicationModal({
             </>
           )}
 
-          <footer className="flex justify-end gap-2 pt-2">
+          {form.submissionError && (
+            <div ref={submissionErrorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              {form.submissionError}
+            </div>
+          )}
+
+          <footer className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" disabled={form.isSubmitting} onClick={form.close}>
               {copy.cancel}
             </Button>
             <Button
               type="submit"
               variant="primary"
-              disabled={form.isSubmitting || (canOnboard && form.formData.reason.trim().length === 0)}
+              loading={form.isSubmitting}
             >
               {form.isSubmitting ? copy.saving : canOnboard ? copy.onboard : copy.createDraft}
             </Button>
@@ -240,6 +269,7 @@ function onboardingCopy(lang: "ar" | "en") {
         saving: "جارٍ الحفظ…",
         onboard: "تهيئة التطبيق",
         createDraft: "إنشاء المسودة",
+        errorSummary: "راجع الحقول التالية قبل الحفظ.",
       }
     : {
         onboardTitle: "Onboard Application",
@@ -271,5 +301,6 @@ function onboardingCopy(lang: "ar" | "en") {
         saving: "Saving…",
         onboard: "Onboard Application",
         createDraft: "Create Draft",
+        errorSummary: "Review the following fields before saving.",
       };
 }

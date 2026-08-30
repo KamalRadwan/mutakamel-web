@@ -109,7 +109,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     return (
       <div className="grid place-items-center py-16">
         <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-          <RefreshCw className="size-5 animate-spin text-brand-500" />
+          <RefreshCw className="size-5 animate-spin text-info motion-reduce:animate-none" aria-hidden="true" />
           {t.users.loadingUserDetails}
         </span>
       </div>
@@ -178,7 +178,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-sm">
-                <User className="size-4 text-brand-500" />
+                <User className="size-4 text-info" aria-hidden="true" />
                 {t.users.identityProfile}
               </CardTitle>
               {identityHasChanges && permissions.canEdit && <Badge tone="warn">{t.users.unsavedBadge}</Badge>}
@@ -217,8 +217,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
               {permissions.isCurrentSuperAdmin && (
                 <label
-                  className={`flex items-center gap-3 rounded-md border px-3 py-2.5 text-xs font-semibold transition-colors ${
-                    isSuperAdmin ? "border-danger-200 bg-danger-50 text-danger-700 dark:border-danger-800/50 dark:bg-danger-950/20 dark:text-danger-400" : "border-border bg-card text-foreground"
+                  className={`flex items-center gap-3 rounded-md border px-3 py-2.5 text-xs font-semibold transition-colors motion-reduce:transition-none ${
+                    isSuperAdmin ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground" : "border-border bg-card text-foreground"
                   } ${!permissions.canEdit || isSaving ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
                 >
                   <Checkbox
@@ -268,7 +268,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-sm">
-                <Shield className="size-4 text-brand-500" />
+                <Shield className="size-4 text-info" aria-hidden="true" />
                 {t.users.assignedRoleTitle}
               </CardTitle>
               {roleHasChanges && permissions.canAssignRole && <Badge tone="warn">{t.users.unsavedRoleBadge}</Badge>}
@@ -300,9 +300,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 </p>
               )}
 
-              <div className="flex gap-2 rounded-md border border-warn-200 bg-warn-50 p-3 dark:border-warn-800/60 dark:bg-warn-950/30">
-                <AlertCircle className="mt-0.5 size-4 shrink-0 text-warn-600 dark:text-warn-400" />
-                <p className="text-xs leading-relaxed text-warn-800 dark:text-warn-300">{t.users.roleChangeWarning}</p>
+              <div className="flex gap-2 rounded-md border border-warning/30 bg-warning-subtle p-3 text-warning-subtle-foreground">
+                <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+                <p className="text-xs leading-relaxed">{t.users.roleChangeWarning}</p>
               </div>
             </CardContent>
             {permissions.canAssignRole && !permissions.isSelf && roleHasChanges && (
@@ -335,7 +335,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-sm">
-                    <PhoneCall className="size-4 text-brand-500" />
+                    <PhoneCall className="size-4 text-info" aria-hidden="true" />
                     {t.users.webphoneConfig}
                   </CardTitle>
                   <p className="mt-0.5 text-xs text-muted-foreground">
@@ -380,26 +380,38 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 <Field
                   label={t.users.sipPasswordLabel}
                   hint={passwordConfigured ? t.users.keepCurrentPasswordHint : t.users.passwordRequiredHint}
+                  labelAction={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      aria-label={
+                        showSipPassword
+                          ? t.authActions.common.hidePassword
+                          : t.authActions.common.showPassword
+                      }
+                      aria-pressed={showSipPassword}
+                      onClick={() => setShowSipPassword((visible) => !visible)}
+                      className="h-auto px-1.5 py-1"
+                    >
+                      {showSipPassword ? (
+                        <EyeOff className="size-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="size-4" aria-hidden="true" />
+                      )}
+                    </Button>
+                  }
                 >
                   {(fieldProps) => (
-                    <div className="relative">
-                      <Input
-                        {...fieldProps}
-                        type={showSipPassword ? "text" : "password"}
-                        maxLength={255}
-                        value={sipPassword}
-                        onChange={(e) => setSipPassword(e.target.value)}
-                        placeholder={passwordConfigured ? "••••••••••••" : ""}
-                        className="pe-9 font-mono"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowSipPassword(!showSipPassword)}
-                        className="absolute end-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-                      >
-                        {showSipPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                      </button>
-                    </div>
+                    <Input
+                      {...fieldProps}
+                      type={showSipPassword ? "text" : "password"}
+                      maxLength={255}
+                      value={sipPassword}
+                      onChange={(e) => setSipPassword(e.target.value)}
+                      placeholder={passwordConfigured ? "••••••••••••" : ""}
+                      className="font-mono"
+                    />
                   )}
                 </Field>
                 <Field label={t.users.displayNameLabel}>

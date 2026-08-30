@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/design-system";
 import { DateRangePreset } from "../hooks/useDashboardData";
+import type { DashboardPrintFallbackReason } from "../hooks/useDashboardPrint";
 
 export type AutoRefreshInterval = "off" | "30s" | "60s" | "5m";
 
@@ -25,8 +26,12 @@ interface DashboardHeaderProps {
   customRange?: { from?: string; to?: string };
   onCustomRangeChange?: (range: { from?: string; to?: string }) => void;
   autoRefreshInterval?: AutoRefreshInterval;
+  autoRefreshPaused?: boolean;
   onAutoRefreshChange?: (interval: AutoRefreshInterval) => void;
+  onAutoRefreshMenuOpenChange?: (open: boolean) => void;
   onPrintReport?: () => void;
+  isPreparingPrint?: boolean;
+  printFallbackReason?: DashboardPrintFallbackReason | null;
 }
 
 export function DashboardHeader({
@@ -37,8 +42,12 @@ export function DashboardHeader({
   customRange,
   onCustomRangeChange,
   autoRefreshInterval = "off",
+  autoRefreshPaused = false,
   onAutoRefreshChange,
+  onAutoRefreshMenuOpenChange,
   onPrintReport,
+  isPreparingPrint = false,
+  printFallbackReason = null,
 }: DashboardHeaderProps) {
   const { t } = useI18n();
 
@@ -46,24 +55,44 @@ export function DashboardHeader({
     <PageHeader
       title={t.dashboard.title}
       description={t.dashboard.welcome}
-      status={<Badge tone="neutral">{t.dashboard.liveBadge}</Badge>}
+      status={
+        <Badge
+          tone={
+            autoRefreshInterval === "off"
+              ? "neutral"
+              : autoRefreshPaused
+                ? "warn"
+                : "info"
+          }
+        >
+          {autoRefreshInterval === "off"
+            ? t.dashboard.autoRefreshOff
+            : autoRefreshPaused
+              ? t.dashboard.autoRefreshPausedTitle
+              : t.dashboard.autoRefreshActiveTitle}
+        </Badge>
+      }
       action={
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-ink-100 p-1 text-xs dark:bg-ink-900">
+          <div
+            role="group"
+            aria-label={t.dashboard.rangePresetGroupLabel}
+            className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted p-1 text-xs"
+          >
             <Calendar className="ms-1.5 size-3.5 text-muted-foreground" aria-hidden="true" />
-            <Button type="button" variant={rangePreset === "thisMonth" ? "primary" : "ghost"} size="sm" onClick={() => onRangeChange("thisMonth")}>
+            <Button type="button" variant={rangePreset === "thisMonth" ? "primary" : "ghost"} size="sm" aria-pressed={rangePreset === "thisMonth"} onClick={() => onRangeChange("thisMonth")}>
               {t.dashboard.thisMonth}
             </Button>
-            <Button type="button" variant={rangePreset === "lastMonth" ? "primary" : "ghost"} size="sm" onClick={() => onRangeChange("lastMonth")}>
+            <Button type="button" variant={rangePreset === "lastMonth" ? "primary" : "ghost"} size="sm" aria-pressed={rangePreset === "lastMonth"} onClick={() => onRangeChange("lastMonth")}>
               {t.dashboard.lastMonth}
             </Button>
-            <Button type="button" variant={rangePreset === "custom" ? "primary" : "ghost"} size="sm" onClick={() => onRangeChange("custom")}>
+            <Button type="button" variant={rangePreset === "custom" ? "primary" : "ghost"} size="sm" aria-pressed={rangePreset === "custom"} onClick={() => onRangeChange("custom")}>
               {t.dashboard.customRangeLabel}
             </Button>
           </div>
 
           {rangePreset === "custom" && onCustomRangeChange && (
-            <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-ink-100 p-1 text-xs dark:bg-ink-900">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted p-1 text-xs">
               <Input
                 type="date"
                 value={customRange?.from ?? ""}
@@ -88,9 +117,13 @@ export function DashboardHeader({
           )}
 
           {onAutoRefreshChange && (
-            <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-ink-100 p-1 text-xs dark:bg-ink-900">
+            <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted p-1 text-xs">
               <Clock className="ms-1 size-3.5 text-muted-foreground" aria-hidden="true" />
-              <Select value={autoRefreshInterval} onValueChange={(value) => onAutoRefreshChange(value as AutoRefreshInterval)}>
+              <Select
+                value={autoRefreshInterval}
+                onValueChange={(value) => onAutoRefreshChange(value as AutoRefreshInterval)}
+                onOpenChange={onAutoRefreshMenuOpenChange}
+              >
                 <SelectTrigger aria-label={t.dashboard.refresh} className="h-7 border-0 bg-transparent px-1.5 text-xs">
                   <SelectValue />
                 </SelectTrigger>
@@ -104,13 +137,42 @@ export function DashboardHeader({
             </div>
           )}
 
-          <Button type="button" variant="outline" size="sm" onClick={onPrintReport || (() => window.print())} title={t.dashboard.printPdfReport}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onPrintReport || (() => window.print())}
+            disabled={isPreparingPrint}
+            aria-busy={isPreparingPrint || undefined}
+            aria-label={
+              isPreparingPrint
+                ? t.dashboard.preparingPdfReport
+                : t.dashboard.printPdfReport
+            }
+            title={
+              isPreparingPrint
+                ? t.dashboard.preparingPdfReport
+                : t.dashboard.printPdfReport
+            }
+          >
             <Printer className="size-4" aria-hidden="true" />
           </Button>
 
           <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={isRefreshing} title={t.dashboard.refresh}>
-            <RotateCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+            <RotateCw className={`size-4 ${isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
           </Button>
+
+          {printFallbackReason && (
+            <p
+              role="status"
+              aria-live="polite"
+              className="w-full max-w-2xl text-end text-xs leading-5 text-warning-subtle-foreground print:hidden"
+            >
+              {printFallbackReason === "charts-unavailable"
+                ? t.dashboard.printFallbackChartsUnavailable
+                : t.dashboard.printFallbackReadinessTimeout}
+            </p>
+          )}
         </div>
       }
     />

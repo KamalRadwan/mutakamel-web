@@ -5,31 +5,37 @@ import { useState } from "react";
 import { ArchiveRestore, FileArchive, Filter, RefreshCw, Trash2 } from "lucide-react";
 import { BackupArtifactStatus, type BackupArtifact } from "../types";
 import { BackupErrorBanner } from "../components/BackupErrorBanner";
+import { BackupDialog } from "../components/BackupDialog";
 import { BackupPageHeader } from "../components/BackupPageHeader";
 import { useBackupArtifacts } from "../hooks/useBackupArtifacts";
 import { formatBackupBytes, formatBackupDate, shortBackupId } from "../lib/backup-format";
-import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { useI18n } from "@/i18n/I18nContext";
 import { Card, CardContent, Field, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Button, DataTable, DegradedBanner, StatusBadge, type ColumnDef } from "@/design-system";
 
 export function BackupArtifactsScreen() {
-  const { lang, t } = useI18n();
+  const { dir, lang, t } = useI18n();
   const copy = t.backup.artifactsScreen;
   const view = useBackupArtifacts();
-  const [runId, setRunId] = useState(view.query.runId ?? "");
-  const [databaseServerId, setDatabaseServerId] = useState(view.query.databaseServerId ?? "");
-  const [tenantId, setTenantId] = useState(view.query.tenantId ?? "");
+  const queryKey = `${view.query.runId ?? ""}|${view.query.databaseServerId ?? ""}|${view.query.tenantId ?? ""}`;
+  const queryDraft = {
+    queryKey,
+    runId: view.query.runId ?? "",
+    databaseServerId: view.query.databaseServerId ?? "",
+    tenantId: view.query.tenantId ?? "",
+  };
+  const [filterDraft, setFilterDraft] = useState(queryDraft);
+  const currentFilterDraft = filterDraft.queryKey === queryKey ? filterDraft : queryDraft;
+  const { runId, databaseServerId, tenantId } = currentFilterDraft;
+  const updateFilterDraft = (next: Partial<Omit<typeof currentFilterDraft, "queryKey">>) => {
+    setFilterDraft({ ...currentFilterDraft, ...next, queryKey });
+  };
   const [deletingArtifact, setDeletingArtifact] = useState<BackupArtifact | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
-  const [prevQuery, setPrevQuery] = useState(view.query);
-  if (view.query !== prevQuery) {
-    setPrevQuery(view.query);
-    setRunId(view.query.runId ?? "");
-    setDatabaseServerId(view.query.databaseServerId ?? "");
-    setTenantId(view.query.tenantId ?? "");
-  }
-
-  const invalidUuid = [runId, databaseServerId, tenantId].some((value) => value && !uuidPattern.test(value));
+  const runIdError = runId && !uuidPattern.test(runId) ? copy.invalidUuidError : undefined;
+  const serverIdError = databaseServerId && !uuidPattern.test(databaseServerId) ? copy.invalidUuidError : undefined;
+  const tenantIdError = tenantId && !uuidPattern.test(tenantId) ? copy.invalidUuidError : undefined;
+  const invalidUuid = Boolean(runIdError || serverIdError || tenantIdError);
 
   const columns: ColumnDef<BackupArtifact>[] = [
     {
@@ -38,12 +44,12 @@ export function BackupArtifactsScreen() {
       headerAr: "النسخة",
       cell: (artifact) => (
         <div className="flex gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-brand-500/10 text-brand-700 dark:text-brand-400">
-            <FileArchive className="size-4" />
+          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-info-subtle text-info-subtle-foreground">
+            <FileArchive className="size-4" aria-hidden="true" />
           </span>
           <div>
-            <p className="font-mono font-semibold" title={artifact.id}>{shortBackupId(artifact.id)}</p>
-            <p className="mt-1 font-mono text-xs text-muted-foreground" title={artifact.runId}>{copy.runLabel}: {shortBackupId(artifact.runId)}</p>
+            <p dir="ltr" className="font-mono font-semibold" title={artifact.id}>{shortBackupId(artifact.id)}</p>
+            <p className="mt-1 text-xs text-muted-foreground" title={artifact.runId}>{copy.runLabel}: <span dir="ltr" className="font-mono">{shortBackupId(artifact.runId)}</span></p>
           </div>
         </div>
       ),
@@ -54,13 +60,13 @@ export function BackupArtifactsScreen() {
       headerAr: "قاعدة البيانات",
       cell: (artifact) => (
         <div>
-          <p className="font-mono font-semibold">{artifact.databaseName}</p>
-          <p className="mt-1 font-mono text-xs text-muted-foreground" title={artifact.tenantId}>{shortBackupId(artifact.tenantId)}</p>
+          <p dir="ltr" className="font-mono font-semibold">{artifact.databaseName}</p>
+          <p dir="ltr" className="mt-1 font-mono text-xs text-muted-foreground" title={artifact.tenantId}>{shortBackupId(artifact.tenantId)}</p>
         </div>
       ),
     },
-    { key: "size", headerEn: "Size", headerAr: "الحجم", cell: (artifact) => <span className="font-mono font-semibold">{formatBackupBytes(artifact.sizeBytes, lang === "ar" ? "ar-EG" : "en-US")}</span> },
-    { key: "sha256", headerEn: "SHA-256", headerAr: "SHA-256", cell: (artifact) => <span className="font-mono text-xs" title={artifact.sha256 ?? ""}>{artifact.sha256 ? `${artifact.sha256.slice(0, 12)}…` : "—"}</span> },
+    { key: "size", headerEn: "Size", headerAr: "الحجم", cell: (artifact) => <span dir="ltr" className="font-mono font-semibold">{formatBackupBytes(artifact.sizeBytes, lang === "ar" ? "ar-EG" : "en-US")}</span> },
+    { key: "sha256", headerEn: "SHA-256", headerAr: "SHA-256", cell: (artifact) => <span dir="ltr" className="font-mono text-xs" title={artifact.sha256 ?? ""}>{artifact.sha256 ? `${artifact.sha256.slice(0, 12)}…` : "—"}</span> },
     { key: "finished", headerEn: "Finished", headerAr: "الاكتمال", cell: (artifact) => <span className="text-muted-foreground">{formatBackupDate(artifact.finishedAt, lang === "ar" ? "ar-EG" : "en-US")}</span> },
     {
       key: "status",
@@ -68,8 +74,8 @@ export function BackupArtifactsScreen() {
       headerAr: "الحالة",
       cell: (artifact) => (
         <div>
-          <StatusBadge status={artifact.status} />
-          {artifact.hasFailure && <p className="mt-2 max-w-xs text-xs text-danger-600 dark:text-danger-400">{copy.failureRetainedNote}</p>}
+          <StatusBadge status={artifact.status} enumType="backup-artifact" />
+          {artifact.hasFailure && <p className="mt-2 max-w-xs text-xs text-destructive">{copy.failureRetainedNote}</p>}
         </div>
       ),
     },
@@ -85,20 +91,26 @@ export function BackupArtifactsScreen() {
             {view.canRestore && artifact.status === BackupArtifactStatus.COMPLETED && (
               <Button type="button" variant="ghost" size="sm" asChild>
                 <Link href={`/backup/restores?artifactId=${encodeURIComponent(artifact.id)}`}>
-                  <ArchiveRestore className="size-4" />
+                  <ArchiveRestore className="size-4" aria-hidden="true" />
                   {copy.restoreAction}
                 </Link>
               </Button>
             )}
             {view.canDelete && terminal && (
-              <button
+              <Button
                 type="button"
-                onClick={() => setDeletingArtifact(artifact)}
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setDeletingArtifact(artifact);
+                  setDeleteConfirmation("");
+                }}
+                disabled={Boolean(view.activeAction)}
                 aria-label={copy.deleteAriaLabel}
-                className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-950/40 dark:hover:text-danger-400"
+                className="size-9 p-0 text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
               >
-                <Trash2 className="size-4" />
-              </button>
+                <Trash2 className="size-4" aria-hidden="true" />
+              </Button>
             )}
           </div>
         );
@@ -116,12 +128,12 @@ export function BackupArtifactsScreen() {
 
       <Card>
         <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto_auto] xl:items-end">
-          <Field label={copy.runIdLabel}>
-            {(fp) => <Input {...fp} value={runId} onChange={(e) => setRunId(e.target.value.trim())} placeholder="UUIDv7" />}
+          <Field label={copy.runIdLabel} error={runIdError}>
+            {(fp) => <Input {...fp} dir="ltr" value={runId} onChange={(e) => updateFilterDraft({ runId: e.target.value.trim() })} placeholder="UUIDv7" />}
           </Field>
-          <Field label={copy.serverLabel}>
+          <Field label={copy.serverLabel} error={serverIdError}>
             {(fp) => (
-              <Select value={databaseServerId} onValueChange={setDatabaseServerId}>
+              <Select value={databaseServerId} onValueChange={(value) => updateFilterDraft({ databaseServerId: value })} dir={dir}>
                 <SelectTrigger {...fp}>
                   <SelectValue placeholder={copy.allServersPlaceholder} />
                 </SelectTrigger>
@@ -133,8 +145,8 @@ export function BackupArtifactsScreen() {
               </Select>
             )}
           </Field>
-          <Field label={copy.tenantIdLabel}>
-            {(fp) => <Input {...fp} value={tenantId} onChange={(e) => setTenantId(e.target.value.trim())} placeholder="UUIDv7" />}
+          <Field label={copy.tenantIdLabel} error={tenantIdError}>
+            {(fp) => <Input {...fp} dir="ltr" value={tenantId} onChange={(e) => updateFilterDraft({ tenantId: e.target.value.trim() })} placeholder="UUIDv7" />}
           </Field>
           <Button
             type="button"
@@ -142,18 +154,17 @@ export function BackupArtifactsScreen() {
             onClick={() => view.setQuery({ ...(runId ? { runId } : {}), ...(databaseServerId ? { databaseServerId } : {}), ...(tenantId ? { tenantId } : {}) })}
             disabled={invalidUuid}
           >
-            <Filter className="size-4" />
+            <Filter className="size-4" aria-hidden="true" />
             {copy.applyButton}
           </Button>
-          <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={view.isLoading}>
-            <RefreshCw className={`size-4 ${view.isLoading ? "animate-spin" : ""}`} />
+          <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
+            {!view.isLoading && <RefreshCw className="size-4" aria-hidden="true" />}
             {copy.refreshButton}
           </Button>
         </CardContent>
-        {invalidUuid && <p className="px-5 pb-4 text-xs font-semibold text-danger-600">{copy.invalidUuidError}</p>}
       </Card>
 
-      {view.error && <BackupErrorBanner error={view.error} />}
+      {view.error && !deletingArtifact && <BackupErrorBanner error={view.error} />}
       {view.enrichmentWarning && (
         <DegradedBanner>
           <p className="font-medium">{copy.degradedTitle}</p>
@@ -161,13 +172,18 @@ export function BackupArtifactsScreen() {
         </DegradedBanner>
       )}
 
-      {view.error ? null : (
-        <div className="rounded-lg border border-border bg-card">
+      {view.error && view.artifacts.length === 0 ? null : (
+        <div className="space-y-3">
           <DataTable
+            labelEn="Backup artifacts"
+            labelAr="نسخ النسخ الاحتياطي"
             columns={columns}
             data={view.artifacts}
-            isLoading={view.isLoading}
+            isLoading={view.isLoading && view.artifacts.length === 0}
+            isRefreshing={view.isLoading && view.artifacts.length > 0}
             getRowId={(artifact) => artifact.id}
+            getRowLabel={(artifact) => `${lang === "ar" ? "نسخة" : "Artifact"} ${shortBackupId(artifact.id)}`}
+            responsiveMode="record-cards"
             pagination={{ page: 1, limit: view.artifacts.length || 1, totalItems: view.artifacts.length, totalPages: 1, onPageChange: () => {} }}
             emptyState={{
               titleEn: "No matching artifacts",
@@ -176,28 +192,43 @@ export function BackupArtifactsScreen() {
               descriptionAr: "غيّر الفلاتر أو راجع عمليات النسخ.",
             }}
           />
-          <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+          <p className="rounded-md border border-border bg-muted px-4 py-3 text-xs text-muted-foreground">
             {copy.noSensitiveDataNote}
           </p>
         </div>
       )}
 
-      <DestructiveActionModal
-        isOpen={deletingArtifact !== null}
+      <BackupDialog
+        open={deletingArtifact !== null}
+        title={copy.deleteModalTitle}
+        description={copy.deleteModalDescription}
+        confirmLabel={copy.deleteAriaLabel}
         onClose={() => {
-          if (!view.activeAction) setDeletingArtifact(null);
+          if (!view.activeAction) {
+            setDeletingArtifact(null);
+            setDeleteConfirmation("");
+          }
         }}
         onConfirm={() => {
           if (!deletingArtifact) return;
-          void view.deleteArtifact(deletingArtifact.id).then(() => setDeletingArtifact(null)).catch(() => undefined);
+          void view.deleteArtifact(deletingArtifact.id).then(() => {
+            setDeletingArtifact(null);
+            setDeleteConfirmation("");
+          }).catch(() => undefined);
         }}
-        title={copy.deleteModalTitle}
-        description={copy.deleteModalDescription}
-        targetName={deletingArtifact?.id ?? ""}
-        actionType="destroy"
-        requireNameTyping
         isSubmitting={deletingArtifact ? view.activeAction === `delete:${deletingArtifact.id}` : false}
-      />
+        confirmDisabled={!deletingArtifact || deleteConfirmation !== deletingArtifact.id}
+        destructive
+        error={view.error}
+      >
+        <div className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground">
+          <p>{lang === "ar" ? "معرّف النسخة المطلوب:" : "Required artifact ID:"}</p>
+          <p dir="ltr" className="mt-1 break-all font-mono font-semibold">{deletingArtifact?.id}</p>
+        </div>
+        <Field label={lang === "ar" ? "اكتب معرّف النسخة للتأكيد" : "Type the artifact ID to confirm"} required>
+          {(fp) => <Input {...fp} dir="ltr" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} />}
+        </Field>
+      </BackupDialog>
     </div>
   );
 }

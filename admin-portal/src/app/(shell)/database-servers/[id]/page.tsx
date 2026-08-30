@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import { Loader2, ShieldAlert } from "lucide-react";
-import { ErrorState, Card } from "@/design-system";
+import { ErrorState, Card, TabsContent } from "@/design-system";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { EditDatabaseServerModal } from "@/features/admin/database-servers/components/EditDatabaseServerModal";
 import { DatabaseCredentialActionDialog } from "@/features/admin/database-servers/components/DatabaseCredentialActionDialog";
@@ -42,13 +42,13 @@ export default function DatabaseServerDetailPage({
 
 function DatabaseServerDetailContent({ id }: { id: string }) {
   const page = useDatabaseServerDetailPage(id);
-  const { t } = useI18n();
+  const { lang, t } = useI18n();
   const d = t.databaseServerDetail;
 
   if (page.isLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="size-8 animate-spin text-brand-600 dark:text-brand-400" aria-hidden="true" />
+      <div role="status" aria-label={lang === "ar" ? "جارٍ تحميل خادم قاعدة البيانات" : "Loading database server"} className="flex items-center justify-center py-16">
+        <Loader2 className="size-8 animate-spin text-info motion-reduce:animate-none" aria-hidden="true" />
       </div>
     );
   }
@@ -56,7 +56,7 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
   if (page.error || !page.server) {
     return (
       <div className="rounded-lg border border-border bg-card">
-        <ErrorState title={page.error || "Server not found"} />
+        <ErrorState title={page.error || (lang === "ar" ? "تعذر العثور على الخادم" : "Server not found")} onRetry={page.fetchServer} />
       </div>
     );
   }
@@ -130,15 +130,12 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
           bindingsCount={page.bindings.length}
           historyCount={page.history.length}
           bootstrapStatus={server.credentialBootstrap.status}
-        />
-
-        {/* Active Tab Panel Rendering */}
-        <div className="pt-2">
-          {page.activeTab === "overview" && (
+        >
+          <TabsContent value="overview" className="pt-2">
             <DatabaseServerOverviewTab server={server} />
-          )}
+          </TabsContent>
 
-          {page.activeTab === "readiness" && (
+          <TabsContent value="readiness" className="pt-2">
             <DatabaseServerReadinessTab
               server={server}
               provisioningPrincipal={page.provisioningPrincipal}
@@ -157,9 +154,9 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
                 page.updateProvisioningRotationPolicy
               }
             />
-          )}
+          </TabsContent>
 
-          {page.activeTab === "bindings" && (
+          <TabsContent value="bindings" className="pt-2">
             <DatabaseServerApplicationBindingsTab
               server={server}
               bindings={page.bindings}
@@ -177,21 +174,21 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
               onAddApplicationOpen={() => page.setIsAddApplicationOpen(true)}
               onOpenCredentialMutation={page.openCredentialMutation}
             />
-          )}
+          </TabsContent>
 
-          {page.activeTab === "security" && (
+          <TabsContent value="security" className="pt-2">
             <DatabaseServerSecurityTab server={server} />
-          )}
+          </TabsContent>
 
-          {page.activeTab === "history" && (
+          <TabsContent value="history" className="pt-2">
             <DatabaseServerHistoryTab
               history={page.history}
               isHistoryLoading={page.isHistoryLoading}
               historyError={page.historyError}
               fetchHistory={page.fetchHistory}
             />
-          )}
-        </div>
+          </TabsContent>
+        </DatabaseServerTabsNav>
 
       {/* Action Dialogs */}
       <DatabaseCredentialActionDialog
@@ -226,9 +223,9 @@ function DatabaseServerDetailBoundary({
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="grid place-items-center py-16">
       <Card role={loading ? "status" : undefined} className="flex max-w-xl flex-col items-center p-8 text-center text-foreground">
         {loading ? (
-          <Loader2 className="size-8 animate-spin text-brand-600 dark:text-brand-400" aria-hidden="true" />
+          <Loader2 className="size-8 animate-spin text-info motion-reduce:animate-none" aria-hidden="true" />
         ) : (
-          <ShieldAlert className="size-8 text-warn-600 dark:text-warn-400" aria-hidden="true" />
+          <ShieldAlert className="size-8 text-warning" aria-hidden="true" />
         )}
         <h1 className="mt-3 font-semibold">
           {loading ? t.databaseServerDetail.checkingAccess : t.databaseServerDetail.forbiddenTitle}

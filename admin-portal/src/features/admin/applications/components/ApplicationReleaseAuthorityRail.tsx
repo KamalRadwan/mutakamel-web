@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   CircleDashed,
   GitBranch,
-  Loader2,
   PackageCheck,
   Route,
   ShieldAlert,
@@ -52,7 +51,7 @@ export function ApplicationReleaseAuthorityRail({
     <Card aria-labelledby="release-authority-title">
       <header className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center">
         <div>
-          <p className="font-mono text-2xs font-semibold uppercase tracking-[0.2em] text-brand-700 dark:text-brand-400">
+          <p className="text-xs font-semibold text-primary">
             {copy.eyebrow}
           </p>
           <h2 id="release-authority-title" className="mt-1 text-sm font-semibold text-foreground">
@@ -61,10 +60,8 @@ export function ApplicationReleaseAuthorityRail({
           <p className="mt-1 text-xs text-muted-foreground">{copy.subtitle}</p>
         </div>
         {canOfferPublish && canPublish && (
-          <Button type="button" variant="primary" disabled={isPublishing} onClick={onPublish} className="shrink-0">
-            {isPublishing ? (
-              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-            ) : (
+          <Button type="button" variant="primary" loading={isPublishing} onClick={onPublish} className="shrink-0">
+            {!isPublishing && (
               <BookOpenCheck className="size-3.5" aria-hidden="true" />
             )}
             {isPublishing ? copy.publishing : copy.publish}
@@ -142,10 +139,10 @@ export function ApplicationReleaseAuthorityRail({
               </span>
             </div>
           ) : (
-            <p className="text-warn-700 dark:text-warn-400">{copy.unpublishedHint}</p>
+            <p className="text-warning-subtle-foreground">{copy.unpublishedHint}</p>
           )}
           {canOfferPublish && !canPublish && (
-            <p className="font-mono text-warn-700 dark:text-warn-400">{copy.permissionRequired}</p>
+            <p className="font-mono text-warning-subtle-foreground">{copy.permissionRequired}</p>
           )}
         </div>
       </div>
@@ -167,22 +164,22 @@ function AuthorityStage({
   state: "ready" | "blocked" | "neutral";
 }) {
   const tone = {
-    ready: "border-brand-500/30 bg-brand-500/5 dark:bg-brand-500/10",
-    blocked: "border-warn-500/30 bg-warn-500/5 dark:bg-warn-500/10",
+    ready: "border-success/30 bg-success-subtle",
+    blocked: "border-warning/30 bg-warning-subtle",
     neutral: "border-border bg-muted",
   }[state];
   const StateIcon = state === "ready" ? CheckCircle2 : state === "blocked" ? ShieldAlert : CircleDashed;
   const stateIconTone =
     state === "ready"
-      ? "text-brand-600 dark:text-brand-400"
+      ? "text-success"
       : state === "blocked"
-        ? "text-warn-600 dark:text-warn-400"
+        ? "text-warning"
         : "text-muted-foreground";
 
   return (
-    <li className={`rounded-xl border p-3 ${tone}`}>
+    <li className={`rounded-md border p-3 ${tone}`}>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
           <Icon className="size-3.5" aria-hidden="true" />
           {label}
         </div>

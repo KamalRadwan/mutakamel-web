@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { AlertTriangle, FileJson2, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { Badge, Button, Card, PageHeader } from "@/design-system";
 import type {
@@ -243,7 +243,7 @@ export function ReleaseStatePanel({ kind, title, detail, correlationId, copy, ac
   return (
     <Card>
       <section role={kind === "error" || kind === "forbidden" ? "alert" : "status"} className="flex min-h-56 flex-col items-center justify-center p-6 text-center">
-        <Icon className={`mb-3 size-9 text-muted-foreground ${kind === "loading" ? "animate-spin" : ""}`} aria-hidden="true" />
+        <Icon className={`mb-3 size-9 text-muted-foreground ${kind === "loading" ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
         <h2 className="font-semibold text-foreground">{title}</h2>
         {detail ? <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{detail}</p> : null}
         {correlationId ? <p className="mt-2 text-xs"><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{correlationId}</code></p> : null}
@@ -254,12 +254,27 @@ export function ReleaseStatePanel({ kind, title, detail, correlationId, copy, ac
 }
 
 export function ReleaseMutationNotice({ mutation, copy }: { mutation: ReleaseMutationState; copy: ReleaseCopy }) {
+  const noticeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (mutation.phase !== "IDLE" && mutation.phase !== "PENDING" && mutation.phase !== "SUCCEEDED") {
+      noticeRef.current?.focus();
+    }
+  }, [mutation.phase]);
   if (mutation.phase === "IDLE" || mutation.phase === "PENDING") return null;
   const message = { SUCCEEDED: copy.commandSucceeded, FORBIDDEN: copy.commandForbidden, CONFLICT: copy.commandConflict, VALIDATION: copy.commandValidation, IN_FLIGHT: copy.commandInFlight, UNAVAILABLE: copy.commandUnavailable, ERROR: copy.commandError }[mutation.phase];
   const danger = mutation.phase === "ERROR" || mutation.phase === "FORBIDDEN";
-  const tone = danger ? "border-danger-300 bg-danger-50 text-danger-900 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-100" : mutation.phase === "SUCCEEDED" ? "border-brand-300 bg-brand-50 text-brand-900 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-100" : "border-warn-300 bg-warn-50 text-warn-950 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-100";
+  const tone = danger
+    ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
+    : mutation.phase === "SUCCEEDED"
+      ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+      : "border-warning/30 bg-warning-subtle text-warning-subtle-foreground";
   return (
-    <div role={danger ? "alert" : "status"} className={`rounded-lg border px-4 py-3 text-sm ${tone}`}>
+    <div
+      ref={noticeRef}
+      role={mutation.phase === "SUCCEEDED" ? "status" : "alert"}
+      tabIndex={mutation.phase === "SUCCEEDED" ? undefined : -1}
+      className={`rounded-lg border px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tone}`}
+    >
       <p className="font-semibold">{message}</p>
       {mutation.error ? <p className="mt-1">{mutation.error.message}</p> : null}
       {mutation.error?.errorCode ? <code dir="ltr" className="mt-1 block break-all text-xs">{mutation.error.errorCode}</code> : null}
@@ -280,20 +295,20 @@ export function ReleaseSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSn
 }
 
 export function StatusBadge({ status }: { status: ReleaseDraftStatus | ReleaseStatus }) {
-  const tone = status === "PUBLISHED" ? "brand" : status === "RETIRED" || status === "ABANDONED" ? "neutral" : status === "VALIDATED" ? "neutral" : "warn";
+  const tone = status === "PUBLISHED" ? "success" : status === "RETIRED" || status === "ABANDONED" ? "neutral" : status === "VALIDATED" ? "info" : "warn";
   return <Badge tone={tone} className="font-mono" dir="ltr">{status}</Badge>;
 }
 
 export function ReleaseFieldError({ id, code, copy }: { id: string; code?: ReleaseValidationCode; copy: ReleaseCopy }) {
   if (!code) return null;
   const message = { INVALID_UUID_V7: copy.invalidUuid, INVALID_VERSION: copy.invalidVersion, INVALID_POSITIVE_INTEGER: copy.invalidInteger, INVALID_BUILD_SHA: copy.invalidBuildSha, INVALID_SCHEMA_TARGET: copy.invalidSchemaTarget, INVALID_SHA256: copy.invalidSha, INVALID_JSON_OBJECT: copy.invalidJson, JSON_TOO_LARGE: copy.jsonTooLarge, SECRET_FIELD_FORBIDDEN: copy.secretForbidden, INVALID_MANIFEST_STRUCTURE: copy.invalidManifest, INVALID_COMPATIBILITY: copy.invalidCompatibility, INVALID_SIGNATURE: copy.invalidSignature, INVALID_REASON_CODE: copy.invalidReason, CONFIRMATION_REQUIRED: copy.confirmationRequired }[code];
-  return <span id={id} role="alert" className="text-xs font-medium text-danger-600 dark:text-danger-400">{message}</span>;
+  return <span id={id} role="alert" className="text-xs font-medium text-destructive-subtle-foreground">{message}</span>;
 }
 
 export function JsonEvidence({ title, value }: { title: string; value: Record<string, unknown> }) {
   return (
-    <section className="min-w-0 rounded-lg border border-border bg-ink-950 p-3 text-ink-100">
-      <h3 className="text-xs font-semibold text-ink-300">{title}</h3>
+    <section className="min-w-0 rounded-lg border border-border bg-muted p-3 text-foreground">
+      <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
       <pre dir="ltr" className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all text-start font-mono text-xs leading-5">{JSON.stringify(value, null, 2)}</pre>
     </section>
   );

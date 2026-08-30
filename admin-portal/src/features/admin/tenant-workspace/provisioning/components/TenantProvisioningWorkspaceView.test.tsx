@@ -28,6 +28,7 @@ describe("TenantProvisioningWorkspaceView", () => {
     expect(screen.getByText("Tenant provisioning")).toBeInTheDocument();
     expect(screen.getByText("50%")).toBeInTheDocument();
     expect(screen.getByText("Schema installation started.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Initial provision/i })).toHaveAttribute("aria-current", "true");
     fireEvent.click(screen.getByRole("button", { name: "Request cancel" }));
     expect(model.provisioning.cancelOperation).toHaveBeenCalledWith(OPERATION_ID);
   });

@@ -127,7 +127,7 @@ function JsonField({
               rows={16}
               invalid={Boolean(error)}
               onChange={(event) => onChange(event.target.value)}
-              className="min-h-72 resize-y bg-ink-950 font-mono text-xs font-normal leading-5 text-ink-100"
+              className="min-h-72 resize-y bg-muted font-mono text-xs font-normal leading-5 text-foreground"
             />
             <ReleaseFieldError id={errorId} code={error} copy={copy} />
           </div>
@@ -139,7 +139,7 @@ function JsonField({
 
 function BooleanField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (
-    <label className="flex min-h-12 items-center gap-3 rounded-lg border border-border bg-ink-100 px-3 text-sm font-semibold text-foreground dark:bg-ink-900">
+    <label className="flex min-h-12 items-center gap-3 rounded-lg border border-border bg-muted px-3 text-sm font-semibold text-foreground">
       <Checkbox checked={checked} onCheckedChange={(next) => onChange(next === true)} />
       <span>{label}</span>
     </label>

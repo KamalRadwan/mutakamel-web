@@ -42,17 +42,17 @@ export function AmbiguousOutcomePanel({
     <div
       role="alert"
       className={cn(
-        "flex flex-col gap-2 rounded-md border border-warn-200 bg-warn-50 p-3 text-sm dark:border-warn-800/60 dark:bg-warn-950/30",
+        "flex flex-col gap-2 rounded-md border border-warning/30 bg-warning-subtle p-3 text-sm text-warning-subtle-foreground",
         className,
       )}
     >
       <div className="flex items-start gap-2">
-        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn-600 dark:text-warn-400" aria-hidden="true" />
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-warn-900 dark:text-warn-200">
+          <p className="font-medium text-warning-subtle-foreground">
             {lang === "ar" ? "النتيجة غير مؤكدة" : "Outcome unconfirmed"}
           </p>
-          <p className="mt-0.5 text-warn-800 dark:text-warn-300">
+          <p className="mt-0.5 text-warning-subtle-foreground">
             {message ??
               (lang === "ar"
                 ? "لم يتم تأكيد اكتمال هذا الإجراء. يُرجى إعادة المحاولة بنفس المفتاح أو التحقق من الحالة الفعلية قبل المتابعة."

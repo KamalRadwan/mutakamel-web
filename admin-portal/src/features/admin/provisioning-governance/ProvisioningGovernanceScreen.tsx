@@ -110,19 +110,19 @@ function ProvisioningModuleLinks({
       href: "/provisioning/fleet",
       label: copy.fleet,
       allowed: view.permissions.canReadFleet,
-      icon: <Rocket className="size-4" />,
+      icon: <Rocket className="size-4" aria-hidden="true" />,
     },
     {
       href: "/provisioning/releases",
       label: copy.releaseGovernance,
       allowed: view.permissions.canReadReleases,
-      icon: <Tags className="size-4" />,
+      icon: <Tags className="size-4" aria-hidden="true" />,
     },
     {
       href: "/provisioning/publisher-keys",
       label: copy.publisherKeys,
       allowed: view.permissions.canReadPublisherKeys,
-      icon: <KeyRound className="size-4" />,
+      icon: <KeyRound className="size-4" aria-hidden="true" />,
     },
   ].filter((module) => module.allowed);
   if (!modules.length) return null;
@@ -130,7 +130,7 @@ function ProvisioningModuleLinks({
     <nav aria-label={copy.openWorkspace} className="grid gap-2 md:grid-cols-3">
       {modules.map((module) => (
         <Link key={module.href} href={module.href}>
-          <Card className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-brand-400 dark:hover:border-brand-500">
+          <Card className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary motion-reduce:transition-none">
             <span className="inline-flex items-center gap-2">
               {module.icon}
               {module.label}
@@ -302,7 +302,7 @@ function CatalogueWorkspace({
                     view.resetComponentFilters();
                   }}
                 >
-                  <RotateCcw className="size-3.5" />
+                  <RotateCcw className="size-3.5" aria-hidden="true" />
                   {copy.reset}
                 </Button>
                 <Button
@@ -311,7 +311,7 @@ function CatalogueWorkspace({
                   onClick={view.refreshComponents}
                   loading={catalogue.isRefreshing}
                 >
-                  <RefreshCw className="size-3.5" />
+                  <RefreshCw className="size-3.5" aria-hidden="true" />
                   {copy.refresh}
                 </Button>
                 <Button type="submit" variant="primary">
@@ -335,6 +335,7 @@ function CatalogueWorkspace({
             data={data}
             copy={copy}
             lang={lang}
+            isRefreshing={catalogue.isRefreshing}
             onInspect={view.selectComponent}
             onPage={view.setComponentPage}
           />
@@ -352,12 +353,14 @@ function ComponentTable({
   data,
   copy,
   lang,
+  isRefreshing,
   onInspect,
   onPage,
 }: {
   data: Paginated<ProvisioningComponent>;
   copy: ProvisioningGovernanceCopy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
   onInspect: (value: ProvisioningComponent) => void;
   onPage: (value: number) => void;
 }) {
@@ -368,7 +371,7 @@ function ComponentTable({
       headerAr: COPY.ar.component,
       cell: (component) => (
         <div>
-          <p className="font-mono text-xs font-semibold text-brand-700 dark:text-brand-300">
+          <p className="font-mono text-xs font-semibold text-primary">
             {component.key}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -433,20 +436,21 @@ function ComponentTable({
   ];
 
   return (
-    <Card>
-      <DataTable
-        columns={columns}
-        data={data.items}
-        getRowId={(row) => row.id}
-        pagination={{
-          page: data.page,
-          limit: data.limit,
-          totalItems: data.total,
-          totalPages: data.totalPages,
-          onPageChange: onPage,
-        }}
-      />
-    </Card>
+    <DataTable
+      labelEn={COPY.en.catalogue}
+      labelAr={COPY.ar.catalogue}
+      columns={columns}
+      data={data.items}
+      isRefreshing={isRefreshing}
+      getRowId={(row) => row.id}
+      pagination={{
+        page: data.page,
+        limit: data.limit,
+        totalItems: data.total,
+        totalPages: data.totalPages,
+        onPageChange: onPage,
+      }}
+    />
   );
 }
 
@@ -602,7 +606,7 @@ function ReleaseDialog({
                   {copy.apply}
                 </Button>
                 <Button type="button" variant="outline" onClick={view.resetReleaseFilters}>
-                  <RotateCcw className="size-3.5" />
+                  <RotateCcw className="size-3.5" aria-hidden="true" />
                   {copy.reset}
                 </Button>
               </div>
@@ -657,7 +661,7 @@ function ReleaseList({
                   {copy.schema}: {release.schemaTarget}
                 </p>
               </div>
-              <Badge tone="neutral">{release.riskLevel}</Badge>
+              <Badge tone={riskTone(release.riskLevel)}>{release.riskLevel}</Badge>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <Stat
@@ -686,7 +690,7 @@ function ReleaseList({
               />
             </dl>
             {!release.manifestSummaryAvailable ? (
-              <p className="mt-3 rounded-md bg-warn-50 p-2 text-xs text-warn-800 dark:bg-warn-950/40 dark:text-warn-200">
+              <p className="mt-3 rounded-md bg-warning-subtle p-2 text-xs text-warning-subtle-foreground">
                 {copy.manifestUnavailable}
               </p>
             ) : null}
@@ -759,7 +763,7 @@ function DiscoveryWorkspace({
               onClick={view.refreshDiscovery}
               loading={view.discovery.isRefreshing}
             >
-              <RefreshCw className="size-3.5" />
+              <RefreshCw className="size-3.5" aria-hidden="true" />
               {copy.refresh}
             </Button>
           </div>
@@ -821,7 +825,7 @@ function DiscoveryWorkspace({
             </div>
           ) : null}
           {validation ? (
-            <p role="alert" className="mt-3 text-xs font-semibold text-danger-600 dark:text-danger-400">
+            <p role="alert" className="mt-3 text-xs font-semibold text-destructive-subtle-foreground">
               {validation}
             </p>
           ) : null}
@@ -849,6 +853,7 @@ function DiscoveryWorkspace({
             timestamp={data.timestamp}
             copy={copy}
             lang={lang}
+            isRefreshing={view.discovery.isRefreshing}
             onInspect={view.selectRun}
           />
         )}
@@ -882,6 +887,7 @@ function DiscoveryTable({
   timestamp,
   copy,
   lang,
+  isRefreshing,
   onInspect,
 }: {
   runs: DiscoveryRun[];
@@ -889,6 +895,7 @@ function DiscoveryTable({
   timestamp: string;
   copy: ProvisioningGovernanceCopy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
   onInspect: (runId: string) => void;
 }) {
   const columns: ColumnDef<DiscoveryRun>[] = [
@@ -898,7 +905,7 @@ function DiscoveryTable({
       headerAr: COPY.ar.mode,
       cell: (run) => (
         <div>
-          <Badge tone="neutral">{run.mode}</Badge>
+          <Badge tone={run.mode === "DRY_RUN" ? "info" : "neutral"}>{run.mode}</Badge>
           <p className="mt-2 max-w-44 break-all font-mono text-xs text-muted-foreground">
             {run.runId}
           </p>
@@ -911,9 +918,9 @@ function DiscoveryTable({
       headerAr: COPY.ar.status,
       cell: (run) => (
         <div>
-          <Badge tone="neutral">{run.status}</Badge>
+          <Badge tone={operationalTone(run.status)}>{run.status}</Badge>
           {run.safeErrorCode ? (
-            <p className="mt-2 text-xs text-danger-600 dark:text-danger-400">{run.safeErrorCode}</p>
+            <p className="mt-2 text-xs text-destructive-subtle-foreground">{run.safeErrorCode}</p>
           ) : null}
         </div>
       ),
@@ -963,12 +970,20 @@ function DiscoveryTable({
   ];
 
   return (
-    <Card>
-      <DataTable columns={columns} data={runs} getRowId={(row) => row.runId} pagination={{ page: 1, limit: runs.length || 1, totalItems: runs.length, totalPages: 1, onPageChange: () => undefined }} />
+    <section className="space-y-2" aria-label={copy.discovery}>
+      <DataTable
+        labelEn={COPY.en.discovery}
+        labelAr={COPY.ar.discovery}
+        columns={columns}
+        data={runs}
+        isRefreshing={isRefreshing}
+        getRowId={(row) => row.runId}
+        pagination={{ page: 1, limit: runs.length || 1, totalItems: runs.length, totalPages: 1, onPageChange: () => undefined }}
+      />
       <p className="border-t border-border px-4 py-3 break-all font-mono text-xs text-muted-foreground">
         {copy.correlation}: {correlationId} · {copy.responseAt}: {formatDate(timestamp, lang, true)}
       </p>
-    </Card>
+    </section>
   );
 }
 
@@ -989,7 +1004,7 @@ function DiscoveryDetailDialog({
           <p className="break-all font-mono text-xs text-muted-foreground">{view.selectedRunId}</p>
         </DialogHeader>
         <DetailState view={view.detail} copy={copy}>
-          {(detail) => <DiscoveryResults detail={detail} copy={copy} lang={lang} />}
+          {(detail) => <DiscoveryResults detail={detail} copy={copy} lang={lang} isRefreshing={view.detail.isRefreshing} />}
         </DetailState>
       </DialogContent>
     </Dialog>
@@ -1000,10 +1015,12 @@ function DiscoveryResults({
   detail,
   copy,
   lang,
+  isRefreshing,
 }: {
   detail: DiscoveryRunDetail;
   copy: ProvisioningGovernanceCopy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
 }) {
   const columns: ColumnDef<DiscoveryRunDetail["results"][number]>[] = [
     {
@@ -1022,7 +1039,7 @@ function DiscoveryResults({
       key: "status",
       headerEn: COPY.en.status,
       headerAr: COPY.ar.status,
-      cell: (result) => <Badge tone="neutral">{result.discoveredState}</Badge>,
+      cell: (result) => <Badge tone={operationalTone(result.discoveredState)}>{result.discoveredState}</Badge>,
     },
     {
       key: "observed",
@@ -1041,19 +1058,20 @@ function DiscoveryResults({
   return (
     <div className="space-y-3">
       {detail.resultsTruncated ? (
-        <p role="status" className="rounded-md bg-warn-50 p-2 text-xs font-semibold text-warn-800 dark:bg-warn-950/40 dark:text-warn-200">
+        <p role="status" className="rounded-md bg-warning-subtle p-2 text-xs font-semibold text-warning-subtle-foreground">
           {copy.truncated}
         </p>
       ) : null}
       {detail.results.length ? (
-        <Card>
-          <DataTable
-            columns={columns}
-            data={detail.results}
-            getRowId={(row) => `${row.tenantId}:${row.componentId}`}
-            pagination={{ page: 1, limit: detail.results.length || 1, totalItems: detail.results.length, totalPages: 1, onPageChange: () => undefined }}
-          />
-        </Card>
+        <DataTable
+          labelEn={COPY.en.results}
+          labelAr={COPY.ar.results}
+          columns={columns}
+          data={detail.results}
+          isRefreshing={isRefreshing}
+          getRowId={(row) => `${row.tenantId}:${row.componentId}`}
+          pagination={{ page: 1, limit: detail.results.length || 1, totalItems: detail.results.length, totalPages: 1, onPageChange: () => undefined }}
+        />
       ) : (
         <EmptyState title={copy.emptyRuns} />
       )}
@@ -1123,7 +1141,7 @@ function DetailState<T>({
 function PermissionRequiredPanel({ title }: { title: string }) {
   return (
     <section role="alert" className="flex min-h-48 flex-col items-center justify-center gap-1 rounded-lg border border-border p-6 text-center">
-      <ShieldAlert className="mb-2 size-8 text-ink-300 dark:text-ink-600" aria-hidden="true" />
+      <ShieldAlert className="mb-2 size-8 text-muted-foreground" aria-hidden="true" />
       <h2 className="font-semibold text-foreground">{title}</h2>
     </section>
   );
@@ -1193,11 +1211,25 @@ function BooleanSelect({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-ink-100 p-2 dark:bg-ink-800">
+    <div className="rounded-md bg-muted p-2">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="mt-1 font-semibold text-foreground">{value}</dd>
     </div>
   );
+}
+
+function riskTone(risk: string): "neutral" | "warn" | "danger" {
+  if (risk === "HIGH") return "danger";
+  if (risk === "MEDIUM") return "warn";
+  return "neutral";
+}
+
+function operationalTone(status: string): "success" | "info" | "warn" | "danger" | "neutral" {
+  if (status === "SUCCEEDED" || status === "READY") return "success";
+  if (status === "RUNNING") return "info";
+  if (status === "FAILED" || status === "INCOMPATIBLE") return "danger";
+  if (status === "OUTDATED" || status === "DRIFTED") return "warn";
+  return "neutral";
 }
 function formatDate(
   value: string,

@@ -24,11 +24,11 @@ export function TenantAddressGeocoding({
   const copy = lang === "ar" ? AR : EN;
 
   return (
-    <section className="rounded-lg border border-brand-200 bg-brand-50/60 p-4 dark:border-brand-900 dark:bg-brand-950/20">
+    <section className="rounded-lg border border-info/30 bg-info-subtle p-4">
       <div className="flex items-start gap-2">
         <MapPinned
           aria-hidden="true"
-          className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400"
+          className="mt-0.5 h-4 w-4 shrink-0 text-info-subtle-foreground"
         />
         <div>
           <h4 className="text-xs font-semibold text-foreground">
@@ -50,6 +50,7 @@ export function TenantAddressGeocoding({
           invalid={
             state.validationCode?.startsWith("INVALID_LATITUDE") ?? false
           }
+          errorId="tenant-map-coordinate-error"
         />
         <CoordinateInput
           id="tenant-map-longitude"
@@ -60,6 +61,7 @@ export function TenantAddressGeocoding({
           invalid={
             state.validationCode?.startsWith("INVALID_LONGITUDE") ?? false
           }
+          errorId="tenant-map-coordinate-error"
         />
         <Button
           type="button"
@@ -70,7 +72,10 @@ export function TenantAddressGeocoding({
           disabled={disabled || state.isLoading}
         >
           {state.isLoading ? (
-            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+            <Loader2
+              aria-hidden="true"
+              className="h-4 w-4 animate-spin motion-reduce:animate-none"
+            />
           ) : null}
           {state.isLoading ? copy.lookingUp : copy.lookup}
         </Button>
@@ -78,8 +83,9 @@ export function TenantAddressGeocoding({
 
       {state.validationCode ? (
         <p
+          id="tenant-map-coordinate-error"
           role="alert"
-          className="mt-2 text-xs font-semibold text-danger-700 dark:text-danger-300"
+          className="mt-2 text-xs font-semibold text-destructive-subtle-foreground"
         >
           {coordinateMessage(copy, state.validationCode)}
         </p>
@@ -90,7 +96,7 @@ export function TenantAddressGeocoding({
       {state.suggestion ? (
         <div
           role="status"
-          className="mt-3 rounded-xl border border-brand-200 bg-brand-50 p-3 text-xs text-brand-950 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-100"
+          className="mt-3 rounded-lg border border-info/30 bg-card p-3 text-xs text-foreground"
         >
           <p className="font-semibold">{copy.suggestion}</p>
           <p className="mt-1 leading-5">
@@ -132,7 +138,7 @@ export function TenantReverseGeocodeError({
   return (
     <div
       role="alert"
-      className="mt-3 rounded-xl border border-danger-200 bg-danger-50 p-3 text-xs text-danger-900 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-200"
+      className="mt-3 rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground"
     >
       <p>{error.message}</p>
       {error.correlationId ? (
@@ -151,6 +157,7 @@ function CoordinateInput({
   onChange,
   disabled,
   invalid,
+  errorId,
 }: {
   id: string;
   label: string;
@@ -158,6 +165,7 @@ function CoordinateInput({
   onChange: (value: string) => void;
   disabled: boolean;
   invalid: boolean;
+  errorId: string;
 }) {
   return (
     <label
@@ -167,6 +175,7 @@ function CoordinateInput({
       <span>{label}</span>
       <Input
         id={id}
+        name={id.endsWith("latitude") ? "latitude" : "longitude"}
         type="text"
         inputMode="decimal"
         dir="ltr"
@@ -174,6 +183,7 @@ function CoordinateInput({
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
         aria-invalid={invalid}
+        aria-describedby={invalid ? errorId : undefined}
         placeholder="30.0444000"
         className="font-mono"
       />

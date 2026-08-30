@@ -34,7 +34,7 @@ export function PermissionGate(props: PermissionGateProps) {
 
     return (
       <section role="alert" className="flex flex-col items-center justify-center gap-1 p-12 text-center">
-        <ShieldAlert className="mb-3 size-10 text-ink-300 dark:text-ink-600" aria-hidden="true" />
+        <ShieldAlert className="mb-3 size-10 text-muted-foreground" aria-hidden="true" />
         <h2 className="text-lg font-semibold text-foreground">
           {lang === "ar" ? "غير مصرح لك" : "Permission required"}
         </h2>

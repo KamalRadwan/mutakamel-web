@@ -293,17 +293,17 @@ export function InvoiceStatePanel({
 }) {
   const Icon = kind === "loading" ? Loader2 : kind === "forbidden" ? ShieldAlert : kind === "error" || kind === "unavailable" ? AlertTriangle : FileText;
   const tone = kind === "error"
-    ? "border-danger-200 bg-danger-50 text-danger-950 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-100"
+    ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
     : kind === "forbidden" || kind === "unavailable"
-      ? "border-warn-200 bg-warn-50 text-warn-950 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-100"
+      ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
       : "border-border bg-card text-foreground";
   return (
-    <section role={kind === "error" || kind === "forbidden" ? "alert" : "status"} className={`flex min-h-56 flex-col items-center justify-center rounded-xl border p-6 text-center shadow-sm ${tone}`}>
-      <Icon className={`mb-3 size-9 opacity-70 ${kind === "loading" ? "animate-spin" : ""}`} aria-hidden="true" />
+    <section role={kind === "loading" || kind === "empty" ? "status" : "alert"} className={`flex min-h-56 flex-col items-center justify-center rounded-lg border p-6 text-center ${tone}`}>
+      <Icon className={`mb-3 size-9 opacity-70 ${kind === "loading" ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
       <h2 className="text-base font-semibold">{title}</h2>
       {detail ? <p className="mt-2 max-w-2xl text-sm leading-6 opacity-85">{detail}</p> : null}
       {correlationId ? (
-        <p className="mt-2 max-w-full text-xs">
+        <p className="mt-2 max-w-full text-sm">
           <strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{correlationId}</code>
         </p>
       ) : null}
@@ -324,19 +324,26 @@ export function InvoiceMutationNotice({ mutation, copy }: { mutation: InvoiceMut
     ERROR: copy.commandError,
   }[mutation.phase];
   const danger = mutation.phase === "ERROR" || mutation.phase === "FORBIDDEN";
+  const tone = danger
+    ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
+    : mutation.phase === "SUCCEEDED"
+      ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+      : mutation.phase === "IN_FLIGHT"
+        ? "border-info/30 bg-info-subtle text-info-subtle-foreground"
+        : "border-warning/30 bg-warning-subtle text-warning-subtle-foreground";
   return (
-    <div role={danger ? "alert" : "status"} className={`rounded-lg border px-4 py-3 text-sm ${danger ? "border-danger-200 bg-danger-50 text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-100" : mutation.phase === "SUCCEEDED" ? "border-brand-200 bg-brand-500/5 text-brand-900 dark:border-brand-800/60 dark:text-brand-100" : "border-warn-200 bg-warn-50 text-warn-950 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-100"}`}>
+    <div role={danger || mutation.phase === "CONFLICT" || mutation.phase === "VALIDATION" || mutation.phase === "UNAVAILABLE" ? "alert" : "status"} aria-live="polite" className={`rounded-lg border px-4 py-3 text-sm ${tone}`}>
       <p className="font-semibold">{message}</p>
       {mutation.error ? <p className="mt-1 leading-6">{mutation.error.message}</p> : null}
-      {mutation.error?.errorCode ? <code dir="ltr" className="mt-1 block break-all text-xs">{mutation.error.errorCode}</code> : null}
-      {mutation.correlationId ? <p className="mt-1 text-xs"><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{mutation.correlationId}</code></p> : null}
+      {mutation.error?.errorCode ? <code dir="ltr" className="mt-1 block break-all text-sm">{mutation.error.errorCode}</code> : null}
+      {mutation.correlationId ? <p className="mt-1 text-sm"><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{mutation.correlationId}</code></p> : null}
     </div>
   );
 }
 
 export function InvoiceSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSnapshot<unknown>; copy: InvoiceCopy; lang: "ar" | "en" }) {
   return (
-    <footer className="grid gap-2 rounded-xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground sm:grid-cols-2">
+    <footer className="grid gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground sm:grid-cols-2">
       <p><strong className="text-foreground">{copy.responseAt}:</strong> {formatInvoiceDate(snapshot.responseTimestamp, lang)}</p>
       <p className="min-w-0"><strong className="text-foreground">{copy.correlation}:</strong> <code dir="ltr" className="ms-1 select-all break-all">{snapshot.correlationId}</code></p>
     </footer>
@@ -345,7 +352,7 @@ export function InvoiceSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSn
 
 export function InvoiceFieldError({ id, code, copy }: { id: string; code?: InvoiceValidationCode; copy: InvoiceCopy }) {
   if (!code) return null;
-  return <span id={id} role="alert" className="text-xs font-medium text-danger-600 dark:text-danger-300">{invoiceValidationMessage(code, copy)}</span>;
+  return <span id={id} role="alert" className="text-sm font-medium text-destructive-subtle-foreground">{invoiceValidationMessage(code, copy)}</span>;
 }
 
 export function invoiceValidationMessage(code: InvoiceValidationCode, copy: InvoiceCopy): string {

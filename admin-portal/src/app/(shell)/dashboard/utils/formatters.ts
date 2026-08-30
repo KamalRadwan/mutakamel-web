@@ -18,14 +18,24 @@ export function formatDashboardMetric(
   }
 
   if (metric.kind === "percent" || metric.kind === "ratio") {
-    const num = typeof metric.value === "string" ? parseFloat(metric.value) : metric.value;
+    // `ratio` is not always a fraction: Core also uses the kind for
+    // pre-rendered "3 / 10" capacity strings. parseFloat returns 3 for
+    // those, which the percent formatter then printed as "300%".
+    const num =
+      typeof metric.value === "string" ? Number(metric.value.trim()) : metric.value;
+    if (!Number.isFinite(num)) return String(metric.value);
     return new Intl.NumberFormat(locale, {
       style: "percent",
       maximumFractionDigits: 1,
     }).format(num);
   }
 
-  return String(metric.value);
+  const integer = typeof metric.value === "string"
+    ? Number(metric.value)
+    : metric.value;
+  return Number.isFinite(integer)
+    ? new Intl.NumberFormat(locale).format(integer)
+    : String(metric.value);
 }
 
 export type MetricTone = "brand" | "warn" | "danger" | "neutral";

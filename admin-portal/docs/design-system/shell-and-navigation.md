@@ -1,8 +1,8 @@
 # Shell & Navigation
 
-Status: **[Verified]**
+Status: **[Verified shell topology; navigation reachability gaps recorded]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-29**
 
 Owner: **Admin Portal**
 
@@ -33,9 +33,13 @@ navbar was permanently dark for everyone.
 
 | State | Width | Behavior |
 | --- | --- | --- |
-| `expanded` | 240px | Full labels, `SubNav` items inline |
-| `collapsed` | 52px | Icon rail; labels move to `Tooltip`; sub-navs become a `DropdownMenu` flyout |
-| `mobile` (`variant="mobile"`) | full-width sheet | Rendered inside `MobileNav`'s `Sheet side="start"` |
+| `expanded` | 240px | Full top-level section and item labels |
+| `collapsed` | 52px | Top-level icon rail; labels move to `Tooltip` |
+| `mobile` (`variant="mobile"`) | full-width sheet | Top-level items rendered inside `MobileNav`'s `Sheet side="start"` |
+
+Current `Sidebar.tsx` does not render inline SubNav children or collapsed
+DropdownMenu flyouts. Those behaviors were previously documented but are not
+present in source.
 
 Collapse state persists in the `ds_sidebar` cookie, read server-side in
 `src/app/(shell)/layout.tsx` (an async Server Component) so there is no
@@ -43,20 +47,25 @@ collapse-flash on load. `Ctrl`/`Cmd`+`B` toggles it. Active state is a 2px
 logical inset-start bar plus `font-medium` — not a filled/bordered chip,
 which was judged to read as the AI-generated look.
 
-RTL handling: the collapse chevron mirrors, and flyout `side` (Radix's
-`side` prop is physical, not logical) is computed as `dir === "rtl" ?
-"left" : "right"` rather than hardcoded.
+RTL handling: the collapse chevron mirrors and the mobile sheet uses the logical
+start side. Future physical popover/flyout props require explicit direction
+tests because the static RTL guard cannot infer them.
 
 ## Command palette
 
 `⌘`/`Ctrl`+`K` opens `CommandPalette` (`cmdk`-based, wrapped in the design
 system `Dialog` with `showCloseButton={false}`), searching the same
-`nav-config.ts` tree the sidebar renders, across all 54 routes.
+`nav-config.ts` entries the sidebar renders.
 
-## The 54-route map
+Current `NAV_SECTIONS` contains top-level destinations rather than a complete
+nested route tree. The command palette therefore does **not** currently search
+all 54 route destinations described below. Backup, Settings, Provisioning,
+detail, and creation routes may exist without being individually searchable.
 
-`nav-config.ts`'s `NAV_SECTIONS` is the single source of truth for the
-sidebar; `useNavTree.ts` filters it against the exact same
+## The 54-route inventory
+
+`nav-config.ts`'s `NAV_SECTIONS` is the current source of truth for top-level
+sidebar entries; `useNavTree.ts` filters it against the exact same
 `adminCan`/`adminCanAll`/`adminCanAny` permission checks the old
 `useNavbar.ts` hook used (the RBAC logic is carried over verbatim — only its
 output shape changed, from hook-computed booleans to data a sidebar can
@@ -91,13 +100,45 @@ logging (1) + settings incl. index (9) + notifications/profile (2) + auth
 group (3) + root redirect (1) = **54**, matching the route count measured
 at the start of this migration. Nothing was dropped.
 
+## Approved navigation target
+
+One canonical nested route tree will supply:
+
+- expanded and collapsed sidebar navigation;
+- mobile navigation;
+- breadcrumbs and parent relationships;
+- module SubNav items;
+- command-palette search and aliases;
+- permission requirements and hidden/disabled behavior.
+
+Dynamic detail routes may use resolvers for resource labels, but their parent
+and route shape remain represented. Search results must distinguish direct
+destinations from actions and must never expose a forbidden route.
+
+The shell also requires:
+
+- a skip link targeting a focusable `<main>`;
+- route-change focus on the page heading/main region;
+- visible focus for SubNav, menu, search, and sidebar controls;
+- focus return when mobile navigation, menus, or command search close;
+- a 320–360px topbar that prioritizes menu, page identity, and urgent state;
+- explicit overflow for secondary topbar actions;
+- safe spacing so the WebPhone cannot obscure focused content.
+
+See
+[Accessibility, responsive behavior, and localization](accessibility-responsive-and-localization.md#responsive-task-policy)
+and [Operational UX](operational-ux.md#permission-aware-interaction).
+
 ## `SubNav`
 
 `SubNav` (`src/design-system/shell/SubNav.tsx`) is a generic horizontal
-second-level nav — active-state underline via `usePathname()` — used by the
-three modules with a real second level: Backup (6 items), Settings (8
-items), Provisioning (9 items, defined inline in that route's own nav rather
-than `nav-config.ts`'s `SETTINGS_SUBNAV`/`BACKUP_SUBNAV` exports).
+second-level nav with active-state underline via `usePathname()`. Current shared
+usage is Backup and Settings. Provisioning has second-level destinations but
+does not currently consume this shared `SubNav` implementation.
+
+The target adds a visible overflow affordance at narrow widths and a labelled
+compact selector when horizontal scrolling would hide the current location.
+Removing the native outline without the shared focus ring is prohibited.
 
 ## Layout wiring
 

@@ -32,7 +32,7 @@ export function SettingsResourceBoundary({
         role="status"
         className="flex min-h-40 items-center justify-center gap-2 rounded-lg border border-border bg-card p-8 text-sm text-muted-foreground"
       >
-        <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+        <Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
         {copy.loading}
       </div>
     );

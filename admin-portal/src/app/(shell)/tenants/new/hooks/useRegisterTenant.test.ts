@@ -83,6 +83,44 @@ vi.mock("@/i18n/I18nContext", () => ({
           countryTimezoneRequiredDesc:
             "Choose a country from the canonical registry and one of its timezones.",
         },
+        wizard: {
+          requiredField: (label: string) => `${label} is required.`,
+          invalidEmail: "Enter a valid email address.",
+          identityValidationRequired:
+            "Check that the current tenant name and company name are available.",
+          fieldLabels: {
+            tenantName: "Tenant name code",
+            companyName: "Company commercial name",
+            industry: "Industry / sector",
+            country: "Country",
+            timezone: "Timezone",
+            tenantPhoneCountryCode: "Tenant phone country code",
+            tenantPhone: "Tenant phone number",
+            street: "Street line 1",
+            buildingNumber: "Building number",
+            city: "City",
+            stateProvince: "State / province",
+            district: "District / neighborhood",
+            postalCode: "Postal code",
+            landmark: "Landmark",
+            formattedAddress: "Formatted address",
+            taxNumber: "Tax ID number",
+            commercialRegistrationNumber: "Commercial registration number",
+            ownerEmail: "Owner email",
+            firstName: "First name",
+            lastName: "Last name",
+            jobTitle: "Job title",
+            ownerPhoneCountryCode: "Owner phone country code",
+            ownerPhone: "Owner phone number",
+          },
+          applicationsStep: {
+            selectionRequiredError: "Select at least one eligible Application.",
+          },
+          infrastructureStep: {
+            selectDatabaseServerError: "Select an eligible Database Server.",
+            selectStorageServerError: "Select an eligible Storage Server.",
+          },
+        },
       },
     },
   }),
@@ -596,6 +634,61 @@ describe("useRegisterTenant silent quote recovery", () => {
       expect.stringContaining("Your session was kept; try again."),
     );
     expect(pushMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("moves focus to a persistent validation summary when required fields block progression", async () => {
+    const { result, unmount } = renderHook(() => useRegisterTenant());
+    const summary = document.createElement("div");
+    summary.tabIndex = -1;
+    document.body.append(summary);
+    result.current.validationSummaryRef.current = summary;
+
+    act(() => {
+      result.current.nextStep();
+    });
+
+    await waitFor(() => {
+      expect(result.current.validationErrors.length).toBeGreaterThan(0);
+      expect(document.activeElement).toBe(summary);
+    });
+    expect(result.current.validationErrors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fieldId: "tenant-name", step: 1 }),
+        expect.objectContaining({ fieldId: "tenant-company-name", step: 1 }),
+        expect.objectContaining({ fieldId: "tenant-country", step: 1 }),
+      ]),
+    );
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    summary.remove();
+    unmount();
+  });
+
+  it("blocks the owner step and reports a malformed owner email", async () => {
+    const { result, unmount } = await renderReadyRegistration();
+
+    act(() => {
+      result.current.setFormData((current) => ({
+        ...current,
+        ownerEmail: "owner@",
+      }));
+    });
+    act(() => {
+      result.current.goToStep(3);
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe(2);
+      expect(result.current.validationErrors).toContainEqual({
+        fieldId: "tenant-owner-email",
+        message: "Enter a valid email address.",
+        step: 2,
+      });
+    });
+    expect(quoteMock).not.toHaveBeenCalled();
+    expect(createMock).not.toHaveBeenCalled();
+
     unmount();
   });
 });

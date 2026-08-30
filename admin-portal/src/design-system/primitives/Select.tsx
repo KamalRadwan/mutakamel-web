@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "../lib/cn";
-import { focusRing } from "../lib/variants";
+import { focusRing, hitArea } from "../lib/variants";
 
 export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
@@ -17,10 +17,11 @@ export const SelectTrigger = forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-(--size-control-lg) w-full items-center justify-between gap-2 rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none transition-colors",
+      "flex h-(--size-control-lg) w-full items-center justify-between gap-2 rounded-md border border-input bg-card px-3 text-sm text-foreground outline-none transition-colors motion-reduce:transition-none",
       "data-[placeholder]:text-muted-foreground",
       "disabled:cursor-not-allowed disabled:opacity-50",
       focusRing,
+      hitArea,
       className,
     )}
     {...props}
@@ -61,16 +62,17 @@ export const SelectItem = forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-pointer select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none",
-      "focus:bg-ink-100 dark:focus:bg-ink-800",
+      "relative flex w-full cursor-pointer select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none transition-colors motion-reduce:transition-none",
+      "focus:bg-accent focus:text-accent-foreground",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      hitArea,
       className,
     )}
     {...props}
   >
     <span className="absolute start-2 flex size-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check className="size-3.5 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+        <Check className="size-3.5 text-primary" aria-hidden="true" />
       </SelectPrimitive.ItemIndicator>
     </span>
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>

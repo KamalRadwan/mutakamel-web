@@ -1,8 +1,8 @@
 # Typography
 
-Status: **[Verified]**
+Status: **[Verified current source; target conformance gaps recorded]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-29**
 
 Owner: **Admin Portal**
 
@@ -80,7 +80,7 @@ values below are also self-documented there as comments):
 
 | Token | Size / line-height | Use |
 | --- | --- | --- |
-| `text-2xs` | 12px / 16px | Latin uppercase micro-labels only (auto-lifts to 13px under `html[lang="ar"]`) |
+| `text-2xs` | 12px / 16px | Legacy/transitional only; target product text does not use this step |
 | `text-xs` | 13px / 18px | **Workhorse** — table cells, badges, metadata |
 | `text-sm` | 14px / 20px | **Base** — body, inputs, buttons, labels, nav |
 | `text-base` | 15px / 24px | Prose, dialog descriptions |
@@ -96,7 +96,7 @@ migration 69% of all text was 12px or smaller (415 arbitrary
 collapsing onto `text-2xs`/`text-xs`, was one of the single largest
 legibility fixes in the whole migration.
 
-## Arabic gets a lift
+## Arabic lift and current gap
 
 The three smallest steps get +1px in Arabic, with line-heights raised in
 lockstep so ascenders/descenders don't clip:
@@ -111,9 +111,21 @@ html[lang="ar"] {
 
 Plex Arabic needs this where Plex Latin doesn't — Naskh-style Arabic forms
 need slightly more room at small sizes to keep dots and diacritics legible.
-`text-2xs` is deliberately **not** lifted: it's documented as Latin-uppercase-only
-(there is no uppercase in Arabic), so it never renders Arabic text in the
-first place.
+`text-2xs` is **not** lifted by current source. The intended rule was
+Latin-uppercase-only, but current Arabic-capable table headers, sidebar labels,
+KPI labels, and status badges still use it. That makes the earlier assumption
+that it “never renders Arabic” false.
+
+The approved target is explicit:
+
+- Arabic-capable microcopy is at least 13px;
+- Arabic uses normal casing and zero tracking;
+- translated table headings, statuses, controls, and chart ticks may not use
+  `text-2xs`;
+- chart and axis labels are at least 13px in both languages.
+
+See
+[Accessibility, responsive behavior, and localization](accessibility-responsive-and-localization.md#bilingual-typography).
 
 ## Numeral policy
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FilePlus2 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { Button, Card, CardHeader, DataTable, type ColumnDef } from "@/design-system";
+import { Button, DataTable, type ColumnDef } from "@/design-system";
 import { useReleaseIndex } from "../hooks/use-release-index";
 import type { ProvisioningRelease, ReleaseDraft } from "../types/provisioning-releases";
 import {
@@ -82,8 +82,8 @@ function IndexBody({ index, copy, lang }: { index: ReturnType<typeof useReleaseI
   }
   return (
     <div className="space-y-4" aria-busy={index.isRefreshing}>
-      <DraftTable drafts={index.drafts.data} copy={copy} lang={lang} />
-      <ReleaseTable releases={index.releases.data} copy={copy} lang={lang} />
+      <DraftTable drafts={index.drafts.data} copy={copy} lang={lang} isRefreshing={index.isRefreshing} />
+      <ReleaseTable releases={index.releases.data} copy={copy} lang={lang} isRefreshing={index.isRefreshing} />
       <div className="grid gap-3 xl:grid-cols-2">
         <ReleaseSnapshotMeta snapshot={index.drafts} copy={copy} lang={lang} />
         <ReleaseSnapshotMeta snapshot={index.releases} copy={copy} lang={lang} />
@@ -92,7 +92,7 @@ function IndexBody({ index, copy, lang }: { index: ReturnType<typeof useReleaseI
   );
 }
 
-function DraftTable({ drafts, copy, lang }: { drafts: ReleaseDraft[]; copy: ReleaseCopy; lang: "ar" | "en" }) {
+function DraftTable({ drafts, copy, lang, isRefreshing }: { drafts: ReleaseDraft[]; copy: ReleaseCopy; lang: "ar" | "en"; isRefreshing: boolean }) {
   const columns: ColumnDef<ReleaseDraft>[] = [
     { key: "releaseVersion", headerEn: copy.releaseVersion, headerAr: copy.releaseVersion, cell: (row) => <span dir="ltr" className="font-mono text-xs">{row.releaseVersion}</span> },
     { key: "status", headerEn: copy.status, headerAr: copy.status, cell: (row) => <StatusBadge status={row.status} /> },
@@ -113,26 +113,29 @@ function DraftTable({ drafts, copy, lang }: { drafts: ReleaseDraft[]; copy: Rele
     },
   ];
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <h2 className="font-semibold text-foreground">{copy.drafts}</h2>
+    <section aria-labelledby="release-drafts-title" className="space-y-2">
+      <div className="flex items-center justify-between gap-3 px-1">
+        <h2 id="release-drafts-title" className="font-semibold text-foreground">{copy.drafts}</h2>
         <span className="font-mono text-xs text-muted-foreground">{drafts.length}</span>
-      </CardHeader>
+      </div>
       {drafts.length ? (
         <DataTable
+          labelEn={RELEASE_COPY.en.drafts}
+          labelAr={RELEASE_COPY.ar.drafts}
           columns={columns}
           data={drafts}
+          isRefreshing={isRefreshing}
           getRowId={(row) => row.draftId}
           pagination={{ page: 1, limit: drafts.length || 1, totalItems: drafts.length, totalPages: 1, onPageChange: () => undefined }}
         />
       ) : (
         <p className="border-t border-border p-5 text-sm text-muted-foreground">{copy.noDrafts}</p>
       )}
-    </Card>
+    </section>
   );
 }
 
-function ReleaseTable({ releases, copy, lang }: { releases: ProvisioningRelease[]; copy: ReleaseCopy; lang: "ar" | "en" }) {
+function ReleaseTable({ releases, copy, lang, isRefreshing }: { releases: ProvisioningRelease[]; copy: ReleaseCopy; lang: "ar" | "en"; isRefreshing: boolean }) {
   const columns: ColumnDef<ProvisioningRelease>[] = [
     { key: "releaseVersion", headerEn: copy.releaseVersion, headerAr: copy.releaseVersion, cell: (row) => <span dir="ltr" className="font-mono text-xs">{row.releaseVersion}</span> },
     { key: "status", headerEn: copy.status, headerAr: copy.status, cell: (row) => <StatusBadge status={row.status} /> },
@@ -153,21 +156,24 @@ function ReleaseTable({ releases, copy, lang }: { releases: ProvisioningRelease[
     },
   ];
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <h2 className="font-semibold text-foreground">{copy.releases}</h2>
+    <section aria-labelledby="published-releases-title" className="space-y-2">
+      <div className="flex items-center justify-between gap-3 px-1">
+        <h2 id="published-releases-title" className="font-semibold text-foreground">{copy.releases}</h2>
         <span className="font-mono text-xs text-muted-foreground">{releases.length}</span>
-      </CardHeader>
+      </div>
       {releases.length ? (
         <DataTable
+          labelEn={RELEASE_COPY.en.releases}
+          labelAr={RELEASE_COPY.ar.releases}
           columns={columns}
           data={releases}
+          isRefreshing={isRefreshing}
           getRowId={(row) => row.releaseId}
           pagination={{ page: 1, limit: releases.length || 1, totalItems: releases.length, totalPages: 1, onPageChange: () => undefined }}
         />
       ) : (
         <p className="border-t border-border p-5 text-sm text-muted-foreground">{copy.noReleases}</p>
       )}
-    </Card>
+    </section>
   );
 }

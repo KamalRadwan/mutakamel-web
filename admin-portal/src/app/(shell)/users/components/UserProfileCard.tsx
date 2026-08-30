@@ -9,8 +9,8 @@ export function UserProfileCard({ profile }: { profile?: AdminUserProfile | null
 
   if (!profile) {
     return (
-      <div className="bg-card rounded-xl border border-border shadow-2xs overflow-hidden">
-        <div className="p-4 border-b border-border bg-ink-100/50 dark:bg-ink-800/30">
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="border-b border-border bg-muted/50 p-4">
           <h2 className="text-xs font-semibold text-foreground flex items-center gap-2">
             <Sliders className="w-4 h-4 text-muted-foreground" />
             <span>{t.users.profilePreferences}</span>
@@ -24,8 +24,8 @@ export function UserProfileCard({ profile }: { profile?: AdminUserProfile | null
   }
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-2xs overflow-hidden">
-      <div className="p-4 border-b border-border bg-ink-100/50 dark:bg-ink-800/30">
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="border-b border-border bg-muted/50 p-4">
         <h2 className="text-xs font-semibold text-foreground flex items-center gap-2">
           <Sliders className="w-4 h-4 text-muted-foreground" />
           <span>{t.users.profilePreferences}</span>

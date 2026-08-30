@@ -3,26 +3,26 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-08-27T18:29:03.949Z**
+Generated at: **2026-08-30T18:08:52.020Z**
 
-Frontend revision: `67034e343dff+dirty`
+Frontend revision: `684f503f0279+dirty`
 
-Backend revision: `3cbfe3e8ddd7+dirty`
+Backend revision: `989ee35f6578+dirty`
 
 ## Coverage
 
-This inventory contains **252** browser-visible Core Admin routes.
+This inventory contains **247** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
 
 | Route class | Routes |
 | --- | ---: |
-| AUTHENTICATED | 89 |
+| AUTHENTICATED | 86 |
 | PUBLIC | 6 |
 | READ_HEAVY | 21 |
-| WRITE_SENSITIVE | 136 |
-| **Total** | **252** |
+| WRITE_SENSITIVE | 134 |
+| **Total** | **247** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -52,7 +52,7 @@ Machine-readable source:
 | system-settings | 11 |
 | tenant-fqdns | 1 |
 | tenants | 54 |
-| users | 15 |
+| users | 10 |
 | wallets | 6 |
 
 ## Routes
@@ -242,6 +242,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/tenants/:id/fqdns/:fqdnId/primary` | WRITE_SENSITIVE | yes | ALL | admin.tenants.manage_fqdns + admin.tenants.critical | `core.admin.tenants.fqdns.primary` |
 | POST | `/api/admin/core/v1/tenants/:id/provisioning/cancel` | WRITE_SENSITIVE | yes | ALL | admin.tenants.reprovision + admin.tenants.critical | `core.admin.tenants.provisioning.cancel` |
 | POST | `/api/admin/core/v1/tenants/:id/reprovision` | WRITE_SENSITIVE | yes | ALL | admin.tenants.reprovision + admin.tenants.critical | `core.admin.tenants.reprovision` |
+| POST | `/api/admin/core/v1/tenants/:id/restore` | WRITE_SENSITIVE | yes | ALL | admin.tenants.restore + admin.tenants.critical | `core.admin.tenants.restore` |
 | POST | `/api/admin/core/v1/tenants/:id/suspend` | WRITE_SENSITIVE | yes | ALL | admin.tenants.suspend + admin.tenants.critical | `core.admin.tenants.suspend` |
 | GET | `/api/admin/core/v1/tenants/:id/users` | AUTHENTICATED | yes | ALL | admin.tenant_users.read | `core.admin.tenants.users.list` |
 | POST | `/api/admin/core/v1/tenants/:id/users` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.invite + admin.tenant_users.critical | `core.admin.tenants.users.invite` |
@@ -255,7 +256,6 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/tenants/:id/users/:userId/restore` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.restore + admin.tenant_users.critical | `core.admin.tenants.users.restore` |
 | PATCH | `/api/admin/core/v1/tenants/:id/users/:userId/roles` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.assign_roles + admin.tenant_users.critical | `core.admin.tenants.users.roles.update` |
 | POST | `/api/admin/core/v1/tenants/:id/users/:userId/suspend` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.suspend + admin.tenant_users.critical | `core.admin.tenants.users.suspend` |
-| PATCH | `/api/admin/core/v1/tenants/:id/users/:userId/webphone` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.manage_webphone + admin.tenant_users.critical | `core.admin.tenants.users.webphone.update` |
 | GET | `/api/admin/core/v1/tenants/:id/users/summary` | AUTHENTICATED | yes | ALL | admin.tenant_users.read | `core.admin.tenants.users.summary` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/billing-summary` | AUTHENTICATED | yes | ALL | admin.invoices.read | `core.admin.tenants.billing-summary.get` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/operations` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.operations.list` |
@@ -302,12 +302,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/users/:id/activate` | WRITE_SENSITIVE | yes | ALL | admin.users.suspend + admin.users.critical | `core.admin.users.activate` |
 | PATCH | `/api/admin/core/v1/users/:id/roles` | WRITE_SENSITIVE | yes | ALL | admin.users.assign_roles + admin.users.critical | `core.admin.users.roles.set` |
 | POST | `/api/admin/core/v1/users/:id/suspend` | WRITE_SENSITIVE | yes | ALL | admin.users.suspend + admin.users.critical | `core.admin.users.suspend` |
-| GET | `/api/admin/core/v1/users/:id/webphone` | AUTHENTICATED | yes | ALL | admin.users.read | `core.admin.users.webphone.get` |
-| PATCH | `/api/admin/core/v1/users/:id/webphone` | WRITE_SENSITIVE | yes | ALL | admin.users.update + admin.users.critical | `core.admin.users.webphone.update` |
 | GET | `/api/admin/core/v1/users/me/profile` | AUTHENTICATED | yes | ALL | — | `core.admin.users.profile.get` |
 | PATCH | `/api/admin/core/v1/users/me/profile` | WRITE_SENSITIVE | yes | ALL | — | `core.admin.users.profile.update` |
-| GET | `/api/admin/core/v1/users/me/webphone` | AUTHENTICATED | yes | ALL | — | `core.admin.users.webphone.me` |
-| GET | `/api/admin/core/v1/users/me/webphone/call-logs` | AUTHENTICATED | yes | ALL | — | `core.admin.users.webphone.call-logs.list` |
-| POST | `/api/admin/core/v1/users/me/webphone/call-logs` | WRITE_SENSITIVE | no | ALL | — | `core.admin.users.webphone.call-logs.create` |
 | GET | `/api/admin/core/v1/wallet/input-currencies` | AUTHENTICATED | yes | ALL | admin.wallet.read | `core.admin.wallets.input-currencies.list` |
 | GET | `/api/admin/core/v1/wallets/:walletId/ledger` | AUTHENTICATED | yes | ALL | admin.wallet.read | `core.admin.wallets.ledger` |

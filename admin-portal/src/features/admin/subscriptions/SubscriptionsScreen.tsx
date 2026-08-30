@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import {
   AlertTriangle,
   CalendarClock,
+  ChevronDown,
   Filter,
   Layers3,
   Loader2,
@@ -38,6 +39,10 @@ import {
   SelectContent,
   SelectItem,
   Button,
+  Badge,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   type ColumnDef,
 } from "@/design-system";
 
@@ -59,8 +64,8 @@ export function SubscriptionsScreen() {
         title={copy.title}
         action={
           view.isRefreshing ? (
-            <span className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground" aria-live="polite">
-              <Loader2 className="size-3.5 animate-spin" />
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground" aria-live="polite">
+              <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
               {copy.loading}
             </span>
           ) : undefined
@@ -69,13 +74,13 @@ export function SubscriptionsScreen() {
 
       {view.data ? (
         <StatGrid className="sm:grid-cols-3">
-          <StatCard label={copy.total} value={view.data.total} icon={Layers3} />
-          <StatCard label={copy.activeOnPage} value={activeOnPage} icon={UsersRound} />
-          <StatCard label={copy.scheduledOnPage} value={scheduledOnPage} icon={CalendarClock} />
+          <StatCard label={copy.total} value={formatInteger(view.data.total, lang)} icon={Layers3} />
+          <StatCard label={copy.activeOnPage} value={formatInteger(activeOnPage, lang)} icon={UsersRound} />
+          <StatCard label={copy.scheduledOnPage} value={formatInteger(scheduledOnPage, lang)} icon={CalendarClock} />
         </StatGrid>
       ) : null}
 
-      {showControls ? <SubscriptionFilters copy={copy} view={view} /> : null}
+      {showControls ? <SubscriptionFilters copy={copy} view={view} lang={lang} /> : null}
       <SubscriptionResults copy={copy} view={view} lang={lang} />
     </div>
   );
@@ -84,9 +89,11 @@ export function SubscriptionsScreen() {
 function SubscriptionFilters({
   copy,
   view,
+  lang,
 }: {
   copy: SubscriptionsCopy;
   view: SubscriptionsViewModel;
+  lang: "ar" | "en";
 }) {
   return (
     <Card>
@@ -100,20 +107,20 @@ function SubscriptionFilters({
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <Filter className="size-4 text-brand-600 dark:text-brand-400" />
+              <Filter className="size-4 text-primary" aria-hidden="true" />
               {copy.filters}
             </h2>
             {view.activeFilterCount ? (
-              <span className="rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-semibold text-brand-700 dark:text-brand-300">
-                {view.activeFilterCount} {copy.activeFilters}
-              </span>
+              <Badge tone="info">
+                {formatInteger(view.activeFilterCount, lang)} {copy.activeFilters}
+              </Badge>
             ) : null}
           </div>
           <div className="grid gap-3 lg:grid-cols-[180px_minmax(260px,1fr)_220px_130px]">
             <Field label={copy.status}>
               {(fp) => (
                 <Select value={view.draft.status || "ALL"} onValueChange={(value) => view.setDraftField("status", (value === "ALL" ? "" : value) as "" | SubscriptionStatus)}>
-                  <SelectTrigger id={fp.id}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -153,7 +160,7 @@ function SubscriptionFilters({
                     view.setDraftField("sortDir", sortDir);
                   }}
                 >
-                  <SelectTrigger id={fp.id}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -170,13 +177,13 @@ function SubscriptionFilters({
             <Field label={copy.pageSize}>
               {(fp) => (
                 <Select value={String(view.limit)} onValueChange={(value) => view.setLimit(Number(value))}>
-                  <SelectTrigger id={fp.id}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {[20, 50, 100].map((value) => (
                       <SelectItem key={value} value={String(value)}>
-                        {value}
+                        {formatInteger(value, lang)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -190,7 +197,7 @@ function SubscriptionFilters({
               {copy.clear}
             </Button>
             <Button type="button" variant="outline" onClick={view.refresh} disabled={view.isRefreshing}>
-              <RefreshCw className={`size-3.5 ${view.isRefreshing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`size-3.5 ${view.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
               {copy.refresh}
             </Button>
             <Button type="submit" variant="primary">
@@ -214,7 +221,7 @@ function SubscriptionResults({
   lang: "ar" | "en";
 }) {
   if (view.requestState === "LOADING") {
-    return <StatePanel icon={<Loader2 className="size-7 animate-spin" />} title={copy.loading} />;
+    return <StatePanel icon={<Loader2 className="size-7 animate-spin motion-reduce:animate-none" />} title={copy.loading} />;
   }
   if (view.requestState === "FORBIDDEN") {
     return (
@@ -245,17 +252,18 @@ function SubscriptionResults({
         <div className="max-w-52">
           {item.tenant ? (
             <>
-              <Link href={`/tenants/${item.tenant.id}`} className="font-semibold text-brand-700 hover:underline dark:text-brand-400">
+              <Link href={`/tenants/${item.tenant.id}`} className="font-semibold text-action hover:underline">
                 {item.tenant.companyName}
               </Link>
-              <p className="mt-1 text-xs text-muted-foreground">{item.tenant.name}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{copy.tenantStatus}: {item.tenant.status}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{item.tenant.name}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{copy.tenantStatus}: {item.tenant.status}</p>
             </>
           ) : (
-            <p className="font-semibold text-warn-700 dark:text-warn-400">{copy.tenantUnavailable}</p>
+            <p className="font-semibold text-warning-subtle-foreground">{copy.tenantUnavailable}</p>
           )}
-          <p className="mt-2 break-all font-mono text-xs text-muted-foreground" title={item.subscription.id}>
-            {copy.subscriptionId}: {item.subscription.id}
+          <p className="mt-2 break-all text-sm text-muted-foreground" title={item.subscription.id}>
+            {copy.subscriptionId}:{" "}
+            <code dir="ltr" className="font-mono">{item.subscription.id}</code>
           </p>
         </div>
       ),
@@ -266,10 +274,10 @@ function SubscriptionResults({
       headerAr: copy.lifecycle,
       cell: (item) => (
         <div>
-          <StatusBadge status={item.subscription.status} customLabelEn={statusLabel(item.subscription.status, SUBSCRIPTIONS_COPY.en)} customLabelAr={statusLabel(item.subscription.status, SUBSCRIPTIONS_COPY.ar)} />
-          <p className="mt-2 text-xs text-muted-foreground">{item.subscription.billingCycle ?? copy.notConfigured}</p>
+          <StatusBadge status={item.subscription.status} enumType="subscription" customLabelEn={statusLabel(item.subscription.status, SUBSCRIPTIONS_COPY.en)} customLabelAr={statusLabel(item.subscription.status, SUBSCRIPTIONS_COPY.ar)} />
+          <p className="mt-2 text-sm text-muted-foreground">{item.subscription.billingCycle ?? copy.notConfigured}</p>
           {item.subscription.cancelAt ? (
-            <p className="mt-1 text-xs font-semibold text-warn-700 dark:text-warn-400">
+            <p className="mt-1 text-sm font-semibold text-warning-subtle-foreground">
               {copy.cancels}: {formatDate(item.subscription.cancelAt, lang)}
             </p>
           ) : null}
@@ -285,33 +293,45 @@ function SubscriptionResults({
           <div className="flex flex-wrap gap-1">
             {item.enabledModules.length ? (
               item.enabledModules.map((module) => (
-                <span key={module} className="rounded-md bg-brand-500/10 px-2 py-1 font-mono text-xs font-semibold text-brand-700 dark:text-brand-300">
+                <Badge key={module} tone="info" className="font-mono">
                   {module.replace(/^module\./u, "")}
-                </span>
+                </Badge>
               ))
             ) : (
-              <span className="text-xs text-muted-foreground">{copy.noItems}</span>
+              <span className="text-sm text-muted-foreground">{copy.noItems}</span>
             )}
           </div>
-          <details className="mt-2">
-            <summary className="cursor-pointer text-xs font-semibold text-brand-700 marker:text-brand-500 dark:text-brand-400">
-              {copy.inspectItems} ({item.items.length})
-            </summary>
-            <div className="mt-2 space-y-2">
+          <Collapsible className="mt-2">
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="group px-2 text-action"
+                aria-label={`${copy.inspectItems}: ${item.tenant?.companyName ?? item.subscription.id} (${formatInteger(item.items.length, lang)})`}
+              >
+                <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+                {copy.inspectItems} ({formatInteger(item.items.length, lang)})
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 space-y-2 motion-reduce:transition-none">
               {item.items.length ? (
                 item.items.map((planItem) => (
-                  <div key={planItem.id} className="rounded-lg border border-border bg-muted p-2 text-xs">
+                  <div key={planItem.id} className="rounded-md border border-border bg-muted p-2 text-sm">
                     <p className="font-semibold">{copy.module}: {planItem.moduleName ?? planItem.moduleKey ?? copy.enrichmentUnavailable}</p>
                     <p className="mt-1">{copy.tier}: {planItem.tierName ?? planItem.tierKey ?? copy.enrichmentUnavailable}</p>
-                    <p className="mt-1 font-mono">{planItem.seats} {copy.seats} · {planItem.lineTotal} {planItem.currencyCode ?? item.subscription.currencyCode ?? ""}</p>
-                    <p className="mt-1 text-muted-foreground">{planItem.features === null ? copy.enrichmentUnavailable : `${planItem.features.length} ${copy.features}`}</p>
+                    <p className="mt-1">
+                      <span className="font-mono">{formatInteger(planItem.seats, lang)}</span> {copy.seats}{" · "}
+                      <bdi dir="ltr" className="font-mono">{planItem.lineTotal} {planItem.currencyCode ?? item.subscription.currencyCode ?? ""}</bdi>
+                    </p>
+                    <p className="mt-1 text-muted-foreground">{planItem.features === null ? copy.enrichmentUnavailable : `${formatInteger(planItem.features.length, lang)} ${copy.features}`}</p>
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-muted-foreground">{copy.noItems}</p>
+                <p className="text-sm text-muted-foreground">{copy.noItems}</p>
               )}
-            </div>
-          </details>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       ),
     },
@@ -321,8 +341,8 @@ function SubscriptionResults({
       headerAr: copy.seats,
       cell: (item) => (
         <div>
-          <p className="font-mono text-base font-semibold">{item.effectiveAllowedUsers}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{copy.baseSeats}: {item.subscription.allowedUsers}</p>
+          <p className="font-mono text-base font-semibold">{formatInteger(item.effectiveAllowedUsers, lang)}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{copy.baseSeats}: {formatInteger(item.subscription.allowedUsers, lang)}</p>
         </div>
       ),
     },
@@ -342,10 +362,10 @@ function SubscriptionResults({
       headerEn: copy.period,
       headerAr: copy.period,
       cell: (item) => (
-        <div className="text-xs">
+        <div className="text-sm">
           <p><span className="font-semibold">{copy.ends}:</span> {formatDate(item.subscription.currentPeriodEnd, lang)}</p>
           <p className="mt-1 text-muted-foreground"><span className="font-semibold">{copy.started}:</span> {formatDate(item.subscription.currentPeriodStart ?? item.subscription.startedAt, lang)}</p>
-          {!item.subscription.cancelAt ? <p className="mt-1 text-xs text-muted-foreground">{copy.noCancellation}</p> : null}
+          {!item.subscription.cancelAt ? <p className="mt-1 text-sm text-muted-foreground">{copy.noCancellation}</p> : null}
         </div>
       ),
     },
@@ -353,15 +373,18 @@ function SubscriptionResults({
       key: "updated",
       headerEn: copy.updated,
       headerAr: copy.updated,
-      cell: (item) => <span className="text-xs text-muted-foreground">{formatDate(item.subscription.updatedAt, lang, true)}</span>,
+      cell: (item) => <span className="text-sm text-muted-foreground">{formatDate(item.subscription.updatedAt, lang, true)}</span>,
     },
   ];
 
   return (
     <div className="space-y-3">
       <DataTable
+        labelEn={SUBSCRIPTIONS_COPY.en.title}
+        labelAr={SUBSCRIPTIONS_COPY.ar.title}
         columns={columns}
         data={view.data.items}
+        isRefreshing={view.isRefreshing}
         getRowId={(item) => item.subscription.id}
         pagination={{
           page: view.page,
@@ -372,8 +395,11 @@ function SubscriptionResults({
         }}
         emptyState={{ titleEn: copy.empty, titleAr: copy.empty }}
       />
-      <p className="break-all rounded-lg border border-border bg-card px-4 py-3 font-mono text-xs text-muted-foreground">
-        {copy.correlation}: {view.data.correlationId} · {copy.responseAt}: {formatDate(view.data.timestamp, lang, true)}
+      <p className="break-all rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+        <strong className="font-semibold text-foreground">{copy.correlation}:</strong>{" "}
+        <code dir="ltr" className="select-all font-mono">{view.data.correlationId}</code>{" · "}
+        <strong className="font-semibold text-foreground">{copy.responseAt}:</strong>{" "}
+        {formatDate(view.data.timestamp, lang, true)}
       </p>
     </div>
   );
@@ -395,7 +421,7 @@ function FailurePanel({
       detail={errorDetail(view, copy)}
       tone="danger"
       action={
-        <Button type="button" variant="destructive" onClick={view.refresh}>
+        <Button type="button" variant="outline" onClick={view.refresh}>
           {copy.retry}
         </Button>
       }
@@ -448,6 +474,12 @@ function formatDate(
   }).format(new Date(value));
 }
 
+function formatInteger(value: number, lang: "ar" | "en"): string {
+  return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 function StatePanel({
   icon,
   title,
@@ -463,19 +495,19 @@ function StatePanel({
 }) {
   const colors =
     tone === "danger"
-      ? "border-danger-200 bg-danger-50 text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-100"
+      ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
       : tone === "warning"
-        ? "border-warn-200 bg-warn-50 text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/40 dark:text-warn-100"
+        ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
         : "border-border bg-card text-muted-foreground";
   return (
     <section
-      role={tone === "danger" ? "alert" : undefined}
-      className={`flex min-h-56 flex-col items-center justify-center rounded-xl border p-6 text-center ${colors}`}
+      role={tone === "neutral" ? "status" : "alert"}
+      className={`flex min-h-56 flex-col items-center justify-center rounded-lg border p-6 text-center ${colors}`}
     >
       <span className="mb-3 opacity-75">{icon}</span>
       <h2 className="text-sm font-semibold">{title}</h2>
       {detail ? (
-        <p className="mt-2 max-w-3xl break-all text-xs opacity-85">{detail}</p>
+        <p className="mt-2 max-w-3xl break-all text-sm opacity-85">{detail}</p>
       ) : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </section>

@@ -37,7 +37,16 @@ export function useBackupRuns() {
   const [servers, setServers] = useState<BackupDatabaseServerOption[]>([]);
   const [runs, setRuns] = useState<BackupRun[]>([]);
   const routeDatabaseServerId = searchParams.get("databaseServerId") ?? "";
-  const [databaseServerId, setDatabaseServerId] = useState(routeDatabaseServerId);
+  const [serverFilter, setServerFilter] = useState({
+    routeValue: routeDatabaseServerId,
+    value: routeDatabaseServerId,
+  });
+  const databaseServerId = serverFilter.routeValue === routeDatabaseServerId
+    ? serverFilter.value
+    : routeDatabaseServerId;
+  const setDatabaseServerId = (value: string) => {
+    setServerFilter({ routeValue: routeDatabaseServerId, value });
+  };
   const [status, setStatus] = useState<BackupRunStatus | "">("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -47,12 +56,6 @@ export function useBackupRuns() {
   const [retryableCommandError, setRetryableCommandError] =
     useState<NormalizedApiError | null>(null);
   const refreshGenerationRef = useRef(0);
-  const [prevRouteDb, setPrevRouteDb] = useState(routeDatabaseServerId);
-  if (routeDatabaseServerId !== prevRouteDb) {
-    setPrevRouteDb(routeDatabaseServerId);
-    setDatabaseServerId(routeDatabaseServerId);
-  }
-
   const refresh = useCallback(async () => {
     const refreshGeneration = ++refreshGenerationRef.current;
     setIsLoading(true);
@@ -90,7 +93,6 @@ export function useBackupRuns() {
     if (enrichment.ok) {
       setServers(enrichment.data);
     } else {
-      setServers([]);
       setEnrichmentWarning(enrichment.error);
     }
   }, [canReadServers, databaseServerId, status]);

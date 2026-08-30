@@ -28,8 +28,8 @@ export function SaveSettingsBanner({ hasUnsavedChanges, isSaving, onSave, lang }
   if (!hasUnsavedChanges && !isSaving) return null;
 
   return (
-    <div className="bg-warn-50 dark:bg-warn-950/20 border border-warn-200 dark:border-warn-800/50 p-4 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 animate-in slide-in-from-top-2 fade-in duration-300">
-      <div className="flex items-center gap-3 text-warn-800 dark:text-warn-300">
+    <div className="mb-6 flex flex-col items-center justify-between gap-4 rounded-lg border border-warning/30 bg-warning-subtle p-4 text-warning-subtle-foreground sm:flex-row">
+      <div className="flex items-center gap-3">
         <AlertCircle className="w-5 h-5 shrink-0" />
         <p className="text-sm font-semibold">
           {copy.unsavedChanges}

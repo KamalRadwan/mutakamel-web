@@ -61,7 +61,6 @@ export function useBackupArtifacts() {
     if (enrichment.ok) {
       setServers(enrichment.data);
     } else {
-      setServers([]);
       setEnrichmentWarning(enrichment.error);
     }
   }, [canReadServers, query]);

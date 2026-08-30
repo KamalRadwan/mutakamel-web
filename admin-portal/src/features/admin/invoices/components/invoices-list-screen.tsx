@@ -58,7 +58,7 @@ export function InvoicesListScreen() {
         <InvoiceStatePanel kind="forbidden" title={copy.forbiddenRead} detail={copy.readPermission} copy={copy} />
       ) : (
         <>
-          <InvoiceFilters invoices={invoices} copy={copy} />
+          <InvoiceFilters invoices={invoices} copy={copy} lang={lang} />
           <InvoiceListBody invoices={invoices} copy={copy} lang={lang} />
         </>
       )}
@@ -69,9 +69,11 @@ export function InvoicesListScreen() {
 function InvoiceFilters({
   invoices,
   copy,
+  lang,
 }: {
   invoices: ReturnType<typeof useInvoicesList>;
   copy: InvoiceCopy;
+  lang: "ar" | "en";
 }) {
   return (
     <Card>
@@ -79,11 +81,11 @@ function InvoiceFilters({
         <form aria-label={copy.filters} onSubmit={invoices.submitFilters} className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="inline-flex items-center gap-2 text-base font-semibold">
-              <Filter className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+              <Filter className="size-4 text-primary" aria-hidden="true" />
               {copy.filters}
             </h2>
             <Button type="button" variant="outline" size="sm" onClick={invoices.refresh} disabled={invoices.isRefreshing}>
-              <RefreshCw className={`size-4 ${invoices.isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+              <RefreshCw className={`size-4 ${invoices.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
               {copy.refresh}
             </Button>
           </div>
@@ -116,7 +118,7 @@ function InvoiceFilters({
                   value={invoices.draft.status || "ALL"}
                   onValueChange={(value) => invoices.updateFilter("status", (value === "ALL" ? "" : value) as InvoiceListFilterDraft["status"])}
                 >
-                  <SelectTrigger id={fp.id}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -133,7 +135,7 @@ function InvoiceFilters({
             <Field label={copy.sortBy}>
               {(fp) => (
                 <Select value={invoices.draft.sortBy} onValueChange={(value) => invoices.updateFilter("sortBy", value as InvoiceListFilterDraft["sortBy"])}>
-                  <SelectTrigger id={fp.id}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -149,7 +151,7 @@ function InvoiceFilters({
             <Field label={copy.sortDirection}>
               {(fp) => (
                 <Select value={invoices.draft.sortDir} onValueChange={(value) => invoices.updateFilter("sortDir", value as InvoiceListFilterDraft["sortDir"])}>
-                  <SelectTrigger id={fp.id}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -162,13 +164,13 @@ function InvoiceFilters({
             <Field label={copy.pageSize} error={invoices.validationErrors.limit ? errorText(invoices.validationErrors.limit, copy) : undefined}>
               {(fp) => (
                 <Select value={String(invoices.draft.limit)} onValueChange={(value) => invoices.updateFilter("limit", value)}>
-                  <SelectTrigger id={fp.id}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {[10, 20, 25, 50, 100].map((limit) => (
                       <SelectItem key={limit} value={String(limit)}>
-                        {limit}
+                        {formatInvoiceInteger(limit, lang)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -215,6 +217,12 @@ function errorText(code: Parameters<typeof InvoiceFieldError>[0]["code"], copy: 
   }[code];
 }
 
+function formatInvoiceInteger(value: number, lang: "ar" | "en"): string {
+  return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof useInvoicesList>; copy: InvoiceCopy; lang: "ar" | "en" }) {
   if (invoices.state === "LOADING") return <InvoiceStatePanel kind="loading" title={copy.loading} copy={copy} />;
   if (invoices.state === "UNAVAILABLE") return <InvoiceStatePanel kind="unavailable" title={copy.unavailable} detail={invoices.error?.message} correlationId={invoices.error?.correlationId} copy={copy} action={<RetryInvoiceButton label={copy.retry} onClick={invoices.refresh} />} />;
@@ -229,21 +237,21 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
       headerAr: copy.number,
       cell: (invoice) => (
         <div>
-          <Link href={`/invoices/${invoice.id}`} className="font-mono font-semibold text-brand-700 hover:underline dark:text-brand-400">
+          <Link href={`/invoices/${invoice.id}`} className="font-mono font-semibold text-action hover:underline">
             {invoice.number}
           </Link>
-          <code dir="ltr" className="mt-1 block text-xs text-muted-foreground">{invoice.id}</code>
+          <code dir="ltr" className="mt-1 block break-all text-start text-sm text-muted-foreground">{invoice.id}</code>
         </div>
       ),
     },
-    { key: "status", headerEn: copy.status, headerAr: copy.status, cell: (invoice) => <StatusBadge status={invoice.status} /> },
-    { key: "purpose", headerEn: copy.purpose, headerAr: copy.purpose, cell: (invoice) => <span className="font-mono text-xs font-semibold">{invoice.purpose}</span> },
+    { key: "status", headerEn: copy.status, headerAr: copy.status, cell: (invoice) => <StatusBadge status={invoice.status} enumType="invoice" /> },
+    { key: "purpose", headerEn: copy.purpose, headerAr: copy.purpose, cell: (invoice) => <span className="font-mono text-sm font-semibold">{invoice.purpose}</span> },
     {
       key: "tenant",
       headerEn: copy.tenant,
       headerAr: copy.tenant,
       cell: (invoice) => (
-        <Link href={`/tenants/${invoice.tenantId}`} className="font-mono text-xs text-brand-700 hover:underline dark:text-brand-400">
+        <Link dir="ltr" href={`/tenants/${invoice.tenantId}`} className="font-mono text-sm text-action hover:underline">
           {invoice.tenantId}
         </Link>
       ),
@@ -261,7 +269,7 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
       cell: (invoice) => (
         <span className="whitespace-nowrap">
           {formatInvoiceDate(invoice.periodStart, lang)}
-          <span className="mx-1">→</span>
+          <span className="mx-1">{lang === "ar" ? "←" : "→"}</span>
           {formatInvoiceDate(invoice.periodEnd, lang)}
         </span>
       ),
@@ -275,7 +283,7 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
       align: "end",
       cell: (invoice) => (
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/invoices/${invoice.id}`}>{copy.open}</Link>
+          <Link href={`/invoices/${invoice.id}`} aria-label={`${copy.open}: ${invoice.number}`}>{copy.open}</Link>
         </Button>
       ),
     },
@@ -284,8 +292,11 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
   return (
     <div className="space-y-3">
       <DataTable
+        labelEn={INVOICE_COPY.en.title}
+        labelAr={INVOICE_COPY.ar.title}
         columns={columns}
         data={data.items}
+        isRefreshing={invoices.isRefreshing}
         getRowId={(invoice) => invoice.id}
         pagination={{
           page: data.page,

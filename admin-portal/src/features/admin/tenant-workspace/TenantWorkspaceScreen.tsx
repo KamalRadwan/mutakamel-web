@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Database, HardDrive, ReceiptText, Settings2, Users } from "lucide-react";
-import { Button } from "@/design-system";
+import { ArrowLeft, ArrowRight, Database, HardDrive, ReceiptText, RefreshCw, Settings2, Users } from "lucide-react";
+import { Badge, Button, Card } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantAccessPanel } from "./access";
 import { TenantBillingPanel } from "./billing/components/TenantBillingPanel";
@@ -23,6 +23,8 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
   const router = useRouter();
   const { lang, dir } = useI18n();
   const copy = workspaceCopy[lang];
+  const activePanelRef = useRef<HTMLDivElement>(null);
+  const mutationErrorRef = useRef<HTMLDivElement>(null);
   const [tabSelection, setTabSelection] = useState<{
     tenantId: string;
     tab: WorkspaceTab;
@@ -37,9 +39,17 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
   const provisioningDefault =
     tenant?.status === "PROVISIONING" ||
     tenant?.status === "PROVISIONING_FAILED";
+  // A deleted tenant runs nothing. Provisioning commands and storage
+  // migrations both refuse it, so those panels are closed rather than left to
+  // fail one request at a time. Overview stays open: it carries the lifecycle
+  // controls, including restore.
+  const deleted = tenant?.status === "DELETED";
+  const unavailableTab = (tab: WorkspaceTab): boolean =>
+    (tab === "access" && !databaseReady) ||
+    (deleted && (tab === "provisioning" || tab === "storage"));
   const activeTab: WorkspaceTab = !selection.userSelected && provisioningDefault
     ? "provisioning"
-    : selection.tab === "access" && !databaseReady
+    : unavailableTab(selection.tab)
       ? provisioningDefault
         ? "provisioning"
         : "overview"
@@ -54,6 +64,14 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
   const billing = useTenantBillingWorkspace(tenantId, {
     enabled: activeTab === "billing",
   });
+
+  useEffect(() => {
+    if (selection.userSelected) activePanelRef.current?.focus();
+  }, [activeTab, selection.userSelected]);
+
+  useEffect(() => {
+    if (core.mutation.error) mutationErrorRef.current?.focus();
+  }, [core.mutation.error]);
 
   if (core.resourceState === "loading" || core.resourceState === "idle") {
     return <PageFrame><WorkspaceState>{copy.loading}</WorkspaceState></PageFrame>;
@@ -76,56 +94,94 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
     );
   }
 
-  const tabs: Array<{ key: WorkspaceTab; label: string; icon: typeof Settings2; disabled?: boolean; hint?: string }> = [
+  // Each disabled tab points at the note that explains its own reason, so a
+  // screen reader does not hear the access explanation on the storage tab.
+  const DELETED_HINT_ID = "tenant-deleted-unavailable";
+  const ACCESS_HINT_ID = "tenant-access-unavailable";
+  const tabs: Array<{
+    key: WorkspaceTab;
+    label: string;
+    icon: typeof Settings2;
+    disabled?: boolean;
+    hintId?: string;
+  }> = [
     { key: "overview", label: copy.overview, icon: Settings2 },
-    { key: "provisioning", label: copy.provisioning, icon: Database },
+    {
+      key: "provisioning",
+      label: copy.provisioning,
+      icon: Database,
+      disabled: deleted,
+      hintId: DELETED_HINT_ID,
+    },
     {
       key: "access",
       label: copy.access,
       icon: Users,
       disabled: !databaseReady,
-      hint: !databaseReady ? copy.accessNotReady : undefined,
+      hintId: deleted ? DELETED_HINT_ID : ACCESS_HINT_ID,
     },
     { key: "billing", label: copy.billing, icon: ReceiptText },
-    { key: "storage", label: copy.storage, icon: HardDrive },
+    {
+      key: "storage",
+      label: copy.storage,
+      icon: HardDrive,
+      disabled: deleted,
+      hintId: DELETED_HINT_ID,
+    },
   ];
 
   return (
     <PageFrame>
       <div dir={dir} className="space-y-4">
-        <button type="button" className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-white" onClick={() => router.push("/tenants")}>
-          {dir === "rtl" ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
+        <Button type="button" variant="link" className="px-0" onClick={() => router.push("/tenants")}>
+          {dir === "rtl" ? <ArrowRight size={16} aria-hidden="true" /> : <ArrowLeft size={16} aria-hidden="true" />}
           {copy.back}
-        </button>
+        </Button>
 
-        <header className="rounded-xl border border-border bg-card p-5 shadow-xs">
+        <header>
+        <Card className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{copy.tenantWorkspace}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">{copy.tenantWorkspace}</p>
               <h1 className="mt-1 text-2xl font-semibold text-foreground">{tenant.companyName}</h1>
               <p className="mt-1 font-mono text-xs text-muted-foreground">{tenant.name} · {tenant.id}</p>
             </div>
-            <div className="text-end">
-              <span className={statusClass(tenant.status)}>{tenant.status}</span>
+            <div
+              className="text-end"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              aria-busy={core.isPolling || undefined}
+            >
+              <Badge tone={statusTone(tenant.status)} className="font-mono">{tenant.status}</Badge>
               <p className="mt-2 text-xs text-muted-foreground">{databaseReady ? copy.databaseReady : copy.databaseNotReady}</p>
-              {tenant.status === "PROVISIONING" && core.isPolling ? <p className="mt-1 text-xs text-muted-foreground">{copy.polling}</p> : null}
-              {core.pollExhausted ? <button type="button" className="mt-1 text-xs font-semibold text-brand-700 dark:text-brand-400 underline" onClick={() => void core.refresh()}>{copy.resumePolling}</button> : null}
+              {tenant.status === "PROVISIONING" && core.isPolling ? (
+                <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <RefreshCw className="size-3 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                  {copy.polling}
+                </p>
+              ) : null}
+              {core.pollExhausted ? <Button type="button" variant="link" size="sm" className="mt-1 px-0" onClick={() => void core.refresh()}>{copy.resumePolling}</Button> : null}
             </div>
           </div>
+        </Card>
         </header>
 
-        <nav className="flex gap-2 overflow-x-auto rounded-xl border border-border bg-card p-2" aria-label={copy.tenantWorkspace}>
+        <nav className="overflow-x-auto rounded-lg border border-border bg-card p-2" aria-label={copy.sectionsLabel} tabIndex={0}>
+          <div className="flex min-w-max gap-2">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const selected = activeTab === tab.key;
             return (
-              <button
+              <Button
                 key={tab.key}
                 type="button"
-                title={tab.hint}
                 disabled={tab.disabled}
                 aria-current={selected ? "page" : undefined}
-                className={`inline-flex min-w-max items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${selected ? "bg-brand-500 text-ink-950 dark:bg-brand-400" : "text-muted-foreground hover:bg-ink-100 dark:hover:bg-ink-900"} disabled:cursor-not-allowed disabled:opacity-45`}
+                aria-describedby={tab.disabled ? tab.hintId : undefined}
+                variant={selected ? "primary" : "ghost"}
+                size="lg"
+                className="min-w-max"
                 onClick={() => {
                   setTabSelection({
                     tenantId,
@@ -134,20 +190,34 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
                   });
                 }}
               >
-                <Icon size={16} />
+                <Icon size={16} aria-hidden="true" />
                 {tab.label}
-              </button>
+              </Button>
             );
           })}
+          </div>
         </nav>
+        {deleted ? (
+          <p id={DELETED_HINT_ID} className="text-xs text-muted-foreground">{copy.deletedSections}</p>
+        ) : !databaseReady ? (
+          <p id={ACCESS_HINT_ID} className="text-xs text-muted-foreground">{copy.accessNotReady}</p>
+        ) : null}
 
         {core.mutation.error ? (
-          <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm text-danger-800 dark:border-danger-900 dark:bg-danger-950/40 dark:text-danger-200">
+          <div ref={mutationErrorRef} role="alert" tabIndex={-1} className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <p>{core.mutation.error.message}</p>
             <p className="mt-1 font-mono text-xs">{core.mutation.error.errorCode}{core.mutation.error.correlationId ? ` · ${copy.correlation}: ${core.mutation.error.correlationId}` : ""}</p>
           </div>
         ) : null}
 
+        <div
+          ref={activePanelRef}
+          id={`tenant-workspace-panel-${activeTab}`}
+          role="region"
+          aria-label={tabs.find((item) => item.key === activeTab)?.label}
+          tabIndex={-1}
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
         {activeTab === "overview" ? (
           <div className="space-y-4">
             <div className="grid gap-4 xl:grid-cols-2">
@@ -172,6 +242,7 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
         ) : null}
         {activeTab === "billing" ? <TenantBillingPanel workspace={billing} lang={lang} /> : null}
         {activeTab === "storage" ? <TenantStorageMigrationPanel /> : null}
+        </div>
       </div>
     </PageFrame>
   );
@@ -182,18 +253,14 @@ function PageFrame({ children }: { children: React.ReactNode }) {
 }
 
 function WorkspaceState({ children, alert = false }: { children: React.ReactNode; alert?: boolean }) {
-  return <div role={alert ? "alert" : "status"} className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">{children}</div>;
+  return <div role={alert ? "alert" : "status"} className="rounded-lg border border-border bg-card p-10 text-center text-sm text-muted-foreground">{children}</div>;
 }
 
-function statusClass(status: string): string {
-  const tone = status === "ACTIVE"
-    ? "bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-200"
-    : status === "PROVISIONING_FAILED"
-      ? "bg-danger-100 text-danger-800 dark:bg-danger-950 dark:text-danger-200"
-      : status === "PROVISIONING"
-        ? "bg-ink-100 text-foreground dark:bg-ink-800 dark:text-foreground animate-pulse motion-reduce:animate-none"
-        : "bg-ink-100 text-foreground dark:bg-ink-800 dark:text-foreground";
-  return `inline-flex rounded-full px-3 py-1 font-mono text-xs font-semibold ${tone}`;
+function statusTone(status: string): "success" | "danger" | "warn" | "neutral" {
+  if (status === "ACTIVE") return "success";
+  if (status === "PROVISIONING_FAILED") return "danger";
+  if (status === "SUSPENDED") return "warn";
+  return "neutral";
 }
 
 const workspaceCopy = {
@@ -206,6 +273,7 @@ const workspaceCopy = {
     retry: "Retry",
     back: "Back to tenants",
     tenantWorkspace: "Tenant workspace",
+    sectionsLabel: "Tenant workspace sections",
     databaseReady: "Tenant database ready",
     databaseNotReady: "Tenant database access is not ready",
     polling: "Provisioning status is refreshing automatically.",
@@ -216,6 +284,7 @@ const workspaceCopy = {
     billing: "Billing",
     storage: "Storage",
     accessNotReady: "Users and access become available when the tenant is ACTIVE or SUSPENDED.",
+    deletedSections: "This tenant is deleted. Provisioning, users and storage stay closed until it is restored.",
   },
   ar: {
     loading: "جارٍ تحميل مساحة المستأجر…",
@@ -226,6 +295,7 @@ const workspaceCopy = {
     retry: "إعادة المحاولة",
     back: "العودة إلى المستأجرين",
     tenantWorkspace: "مساحة عمل المستأجر",
+    sectionsLabel: "أقسام مساحة عمل المستأجر",
     databaseReady: "قاعدة بيانات المستأجر جاهزة",
     databaseNotReady: "الوصول إلى قاعدة بيانات المستأجر غير جاهز",
     polling: "يتم تحديث حالة التجهيز تلقائياً.",
@@ -236,5 +306,6 @@ const workspaceCopy = {
     billing: "الفوترة",
     storage: "التخزين",
     accessNotReady: "يتاح المستخدمون والوصول عندما تصبح حالة المستأجر ACTIVE أو SUSPENDED.",
+    deletedSections: "هذا المستأجر محذوف. تظل أقسام التجهيز والمستخدمين والتخزين مغلقة حتى تتم استعادته.",
   },
 } as const;

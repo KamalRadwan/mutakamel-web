@@ -71,7 +71,7 @@ function DraftBody({ detail, copy, lang }: { detail: ReturnType<typeof useReleas
       <ReleaseMutationNotice mutation={detail.mutation} copy={copy} />
 
       {detail.published ? (
-        <Card className="border-brand-300 bg-brand-50 p-4 text-brand-950 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-100">
+        <Card className="border-success/30 bg-success-subtle p-4 text-success-subtle-foreground">
           <section role="status">
             <h2 className="font-semibold">{copy.published}</h2>
             <Button asChild variant="primary" className="mt-3">
@@ -123,7 +123,7 @@ function DraftBody({ detail, copy, lang }: { detail: ReturnType<typeof useReleas
 function ValidationForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDraftDetail>; copy: ReleaseCopy }) {
   const pending = detail.mutation.phase === "PENDING";
   return (
-    <Card className="border-ink-300 bg-ink-100 p-5 dark:border-ink-800 dark:bg-ink-900/40">
+    <Card className="border-border bg-muted p-5">
       <form
         aria-label={copy.validationTitle}
         onSubmit={(event) => {
@@ -137,7 +137,7 @@ function ValidationForm({ detail, copy }: { detail: ReturnType<typeof useRelease
           <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.validationHelp}</p>
         </div>
         {detail.definitionDirty ? (
-          <p role="alert" className="rounded-lg border border-warn-300 bg-warn-50 p-3 text-sm font-semibold text-warn-950 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-100">
+          <p role="alert" className="rounded-lg border border-warning/30 bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
             {copy.unsavedDefinition}
           </p>
         ) : null}
@@ -167,14 +167,14 @@ function ValidationForm({ detail, copy }: { detail: ReturnType<typeof useRelease
 function PublishForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDraftDetail>; copy: ReleaseCopy }) {
   const pending = detail.mutation.phase === "PENDING";
   return (
-    <Card className="space-y-4 border-warn-300 bg-warn-50 p-5 dark:border-warn-900 dark:bg-warn-950/20">
+    <Card className="space-y-4 border-warning/30 bg-warning-subtle p-5">
       <div>
         <h2 className="text-lg font-semibold text-foreground">{copy.publishTitle}</h2>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.publishHelp}</p>
       </div>
       <SigningPayload detail={detail} copy={copy} />
       {detail.definitionDirty ? (
-        <p role="alert" className="rounded-lg border border-warn-400 bg-card/70 p-3 text-sm font-semibold text-warn-950 dark:border-warn-800 dark:text-warn-100">
+        <p role="alert" className="rounded-lg border border-warning/40 bg-card/70 p-3 text-sm font-semibold text-warning-subtle-foreground">
           {copy.unsavedDefinition}
         </p>
       ) : null}
@@ -205,7 +205,7 @@ function PublishForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDra
             )}
           </Field>
           <ReleaseFieldError id="release-signature-error" code={detail.publishErrors.signatureBase64} copy={copy} />
-          <label className="flex items-start gap-3 rounded-lg border border-warn-300 bg-card/60 p-3 text-sm font-semibold text-foreground dark:border-warn-900">
+          <label className="flex items-start gap-3 rounded-lg border border-warning/30 bg-card/60 p-3 text-sm font-semibold text-foreground">
             <Checkbox
               checked={detail.publishDraft.confirmed}
               onCheckedChange={(next) => detail.updatePublishDraft("confirmed", next === true)}
@@ -226,13 +226,13 @@ function PublishForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDra
 
 function SigningPayload({ detail, copy }: { detail: ReturnType<typeof useReleaseDraftDetail>; copy: ReleaseCopy }) {
   if (detail.signingEvidence.phase === "CHECKING") return <p role="status" className="text-sm text-foreground">{copy.payloadChecking}</p>;
-  if (detail.signingEvidence.phase === "UNAVAILABLE") return <p role="alert" className="text-sm font-semibold text-danger-600 dark:text-danger-400">{copy.payloadUnavailable}</p>;
-  if (detail.signingEvidence.phase === "MISMATCH") return <p role="alert" className="text-sm font-semibold text-danger-600 dark:text-danger-400">{copy.payloadMismatch}</p>;
+  if (detail.signingEvidence.phase === "UNAVAILABLE") return <p role="alert" className="text-sm font-semibold text-destructive-subtle-foreground">{copy.payloadUnavailable}</p>;
+  if (detail.signingEvidence.phase === "MISMATCH") return <p role="alert" className="text-sm font-semibold text-destructive-subtle-foreground">{copy.payloadMismatch}</p>;
   if (detail.signingEvidence.phase !== "VERIFIED") return null;
   return (
     <Field label={copy.payloadBase64}>
       {(fieldProps) => (
-        <Textarea {...fieldProps} readOnly dir="ltr" rows={6} value={detail.signingEvidence.payloadBase64 ?? ""} className="bg-ink-950 font-mono text-xs text-ink-100" />
+        <Textarea {...fieldProps} readOnly dir="ltr" rows={6} value={detail.signingEvidence.payloadBase64 ?? ""} className="bg-muted font-mono text-xs text-foreground" />
       )}
     </Field>
   );
@@ -284,7 +284,7 @@ function EvidenceCard({ title, children }: { title: string; children: React.Reac
 
 function Evidence({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-lg bg-ink-100 px-3 py-2 dark:bg-ink-900">
+    <div className="rounded-lg bg-muted px-3 py-2">
       <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
       <dd dir={mono ? "ltr" : undefined} className={`mt-1 break-all text-sm font-semibold text-foreground ${mono ? "text-start font-mono" : ""}`}>{value}</dd>
     </div>

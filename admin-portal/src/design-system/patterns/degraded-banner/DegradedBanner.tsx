@@ -11,7 +11,7 @@ export function DegradedBanner({ children, className }: { children: React.ReactN
     <div
       role="status"
       className={cn(
-        "flex items-start gap-2 rounded-md border border-warn-200 bg-warn-50 px-3 py-2 text-sm text-warn-800 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-300",
+        "flex items-start gap-2 rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-sm text-warning-subtle-foreground",
         className,
       )}
     >

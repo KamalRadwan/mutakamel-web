@@ -17,13 +17,8 @@ const baselinePath = resolve(portalRoot, "docs/design-system/census.baseline.jso
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".css"]);
 const SKIP_DIR_NAMES = new Set(["node_modules", ".next", "coverage"]);
-// src/design-system/ is the target system, not the sprawl being measured —
-// it legitimately defines and uses the tokens/utilities this census counts
-// (the same exemption ESLint's design-system rules apply in eslint.config.mjs).
-const SKIP_ABSOLUTE_DIRS = new Set([resolve(srcRoot, "design-system")]);
 
 function walk(directory) {
-  if (SKIP_ABSOLUTE_DIRS.has(directory)) return [];
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     if (entry.isDirectory()) {
       if (SKIP_DIR_NAMES.has(entry.name)) return [];
@@ -44,13 +39,123 @@ const COLOR_FAMILIES = [
   "red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal",
   "cyan", "sky", "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose",
 ];
+const DESIGN_RAMP_FAMILIES = [
+  "brand",
+  "ink",
+  "warn",
+  "danger",
+  "action",
+  "surface",
+  "success",
+  "info",
+];
+const DIRECT_RAMP_FAMILIES = [...COLOR_FAMILIES, ...DESIGN_RAMP_FAMILIES];
 const COLOR_UTILITY_RE = new RegExp(
   `\\b(?:bg|text|border|ring|from|to|via|fill|stroke|shadow|decoration|outline|divide|accent)-(?:${COLOR_FAMILIES.join("|")})-[0-9]{2,3}\\b`,
   "g",
 );
+const DIRECT_RAMP_UTILITY_RE = new RegExp(
+  `\\b(?:bg|text|border|ring|from|to|via|fill|stroke|shadow|decoration|outline|divide|accent)-(?:${DIRECT_RAMP_FAMILIES.join("|")})-[0-9]{2,4}\\b`,
+  "g",
+);
+const THEME_SENSITIVE_WHITE_RE =
+  /\b(?:bg|text|border|ring|from|to|via|fill|stroke|shadow|decoration|outline|divide|accent)-white\b/g;
+const STOCK_SHADOW_RE =
+  /\b(?:shadow(?:-(?:2xs|xs|sm|md|lg|xl|2xl|inner))?(?!-[\w[])|drop-shadow(?:-(?:xs|sm|md|lg|xl|2xl))?(?!-[\w[]))\b/g;
+const RAW_HEX_RE = /#[0-9a-f]{3,8}\b/gi;
+const SUB_FLOOR_NAMED_TEXT_RE = /\btext-(?:2xs|3xs)\b/g;
+const ARBITRARY_TEXT_SIZE_RE = /\btext-\[([0-9]*\.?[0-9]+)(px|rem)\]/gi;
+const MOTION_SITE_RE =
+  /\b(?:animate-(?!none\b)[\w[\]./-]+|transition(?:-(?:all|transform|opacity))?\b|duration-[0-9]+|delay-[0-9]+|(?:slide|zoom|fade)-(?:in|out)[\w/-]*)\b/;
+const REDUCED_MOTION_GUARD_RE = /\bmotion-(?:reduce|safe):/;
+const NATIVE_CONTROL_RE = /<(button|input|select|textarea)\b/g;
+const TABLE_RE = /<table\b/g;
+
+const CANONICAL_NATIVE_PRIMITIVES = new Map([
+  ["src/design-system/primitives/Button.tsx", new Set(["button"])],
+  ["src/design-system/primitives/Input.tsx", new Set(["input"])],
+  ["src/design-system/primitives/Range.tsx", new Set(["input"])],
+  ["src/design-system/primitives/Textarea.tsx", new Set(["textarea"])],
+  // Next's root global error boundary must be self-contained because the root
+  // layout/design-system providers may be the failing code path.
+  ["src/app/global-error.tsx", new Set(["button"])],
+]);
+const CANONICAL_TABLE_PRIMITIVE = "src/design-system/primitives/Table.tsx";
+
+function portalRelativePath(path) {
+  return relative(portalRoot, path).replaceAll("\\", "/");
+}
+
+function isTestSource(file) {
+  return /\.(?:test|spec)\.(?:ts|tsx)$/u.test(portalRelativePath(file));
+}
+
+function countSubFloorText(text) {
+  let total = countMatches(text, SUB_FLOOR_NAMED_TEXT_RE);
+  for (const match of text.matchAll(ARBITRARY_TEXT_SIZE_RE)) {
+    const value = Number(match[1]);
+    const pixels = match[2].toLowerCase() === "rem" ? value * 16 : value;
+    if (pixels < 13) total += 1;
+  }
+  return total;
+}
+
+// This is intentionally a census rather than a parser/linter: each source
+// line that introduces visible motion is one site. A motion-safe or
+// motion-reduce variant on that same class declaration marks the site as
+// reviewed. The count makes unreviewed animation drift visible in CI.
+function countMotionSitesMissingReduction(text) {
+  return text.split(/\r?\n/u).reduce((total, line) => {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) return total;
+    if (!MOTION_SITE_RE.test(line)) return total;
+    return REDUCED_MOTION_GUARD_RE.test(line) ? total : total + 1;
+  }, 0);
+}
+
+function countNativeOneOffControls(text, file) {
+  const displayPath = portalRelativePath(file);
+  // Test harness controls are fixtures, not shipped interface one-offs.
+  if (isTestSource(file)) return 0;
+  const allowedTags = CANONICAL_NATIVE_PRIMITIVES.get(displayPath);
+  let total = 0;
+  for (const match of text.matchAll(NATIVE_CONTROL_RE)) {
+    if (!allowedTags?.has(match[1])) total += 1;
+  }
+  return total;
+}
+
+function isChartSource(file, text) {
+  const displayPath = portalRelativePath(file);
+  return (
+    /(?:^|\/)charts?(?:\/|$)/iu.test(displayPath) ||
+    /Chart(?:s)?(?:\.(?:test|spec))?\.(?:ts|tsx)$/u.test(displayPath) ||
+    /\bfrom\s+["'](?:recharts|chart\.js|echarts)["']/u.test(text)
+  );
+}
 
 const CHECKS = {
   colorUtilityTotal: { pattern: COLOR_UTILITY_RE, files: ["ts", "tsx"] },
+  directRampUtilityTotal: { pattern: DIRECT_RAMP_UTILITY_RE, files: ["ts", "tsx"] },
+  themeSensitiveWhite: { pattern: THEME_SENSITIVE_WHITE_RE, files: ["ts", "tsx"] },
+  stockShadows: { pattern: STOCK_SHADOW_RE, files: ["ts", "tsx"] },
+  rawChartHex: {
+    count: ({ file, text }) => (isChartSource(file, text) ? countMatches(text, RAW_HEX_RE) : 0),
+    files: ["ts", "tsx"],
+  },
+  subFloorText: { count: ({ text }) => countSubFloorText(text), files: ["ts", "tsx"] },
+  motionSitesMissingReducedMotion: {
+    // Test names and fixture copy can legitimately use words such as
+    // "transition"; only shipped interface motion needs a reduced-motion
+    // fallback.
+    count: ({ file, text }) =>
+      isTestSource(file) ? 0 : countMotionSitesMissingReduction(text),
+    files: ["ts", "tsx"],
+  },
+  nativeOneOffControls: {
+    count: ({ file, text }) => countNativeOneOffControls(text, file),
+    files: ["tsx"],
+  },
   arbitraryTypeSize: { pattern: /\btext-\[[0-9]+px\]/g, files: ["ts", "tsx"] },
   textXs: { pattern: /\btext-xs\b/g, files: ["ts", "tsx"] },
   fontBoldOrHeavier: { pattern: /\bfont-(?:bold|extrabold|black)\b/g, files: ["ts", "tsx"] },
@@ -61,7 +166,11 @@ const CHECKS = {
   gradients: { pattern: /\bbg-gradient-to-/g, files: ["ts", "tsx"] },
   backdropBlur: { pattern: /\bbackdrop-blur\b/g, files: ["ts", "tsx"] },
   navbarRenderSites: { pattern: /<Navbar\b/g, files: ["ts", "tsx"] },
-  handRolledTables: { pattern: /<table\b/g, files: ["ts", "tsx"] },
+  handRolledTables: {
+    count: ({ file, text }) =>
+      portalRelativePath(file) === CANONICAL_TABLE_PRIMITIVE ? 0 : countMatches(text, TABLE_RE),
+    files: ["ts", "tsx"],
+  },
   physicalRtlViolations: {
     pattern: /\b(?:ml|mr|pl|pr|left|right)-(?:\[[^\]]+\]|[0-9]+(?:\.[0-9]+)?)\b|\btext-(?:left|right)\b|\bfile:m[lr]-/g,
     files: ["ts", "tsx"],
@@ -77,6 +186,7 @@ function runCensus() {
   const files = walk(srcRoot);
   const counts = Object.fromEntries(Object.keys(CHECKS).map((k) => [k, 0]));
   const colorFamilyCounts = Object.fromEntries(COLOR_FAMILIES.map((f) => [f, 0]));
+  const directRampFamilyCounts = Object.fromEntries(DIRECT_RAMP_FAMILIES.map((f) => [f, 0]));
 
   for (const file of files) {
     const kind = fileKind(file);
@@ -84,15 +194,23 @@ function runCensus() {
 
     for (const [name, check] of Object.entries(CHECKS)) {
       if (!check.files.includes(kind)) continue;
-      counts[name] += countMatches(text, check.pattern);
+      counts[name] += check.count
+        ? check.count({ file, kind, text })
+        : countMatches(text, check.pattern);
     }
 
-    for (const family of COLOR_FAMILIES) {
+    if (kind !== "ts" && kind !== "tsx") continue;
+
+    for (const family of DIRECT_RAMP_FAMILIES) {
       const re = new RegExp(
-        `\\b(?:bg|text|border|ring|from|to|via|fill|stroke|shadow|decoration|outline|divide|accent)-${family}-[0-9]{2,3}\\b`,
+        `\\b(?:bg|text|border|ring|from|to|via|fill|stroke|shadow|decoration|outline|divide|accent)-${family}-[0-9]{2,4}\\b`,
         "g",
       );
-      colorFamilyCounts[family] += countMatches(text, re);
+      const familyCount = countMatches(text, re);
+      directRampFamilyCounts[family] += familyCount;
+      if (Object.hasOwn(colorFamilyCounts, family)) {
+        colorFamilyCounts[family] += familyCount;
+      }
     }
   }
 
@@ -102,22 +220,57 @@ function runCensus() {
     counts,
     colorFamilyCounts,
     colorFamiliesInUse: Object.values(colorFamilyCounts).filter((n) => n > 0).length,
+    directRampFamilyCounts,
+    directRampFamiliesInUse: Object.values(directRampFamilyCounts).filter((n) => n > 0).length,
   };
+}
+
+function appendCountMapDiff(lines, label, beforeMap = {}, afterMap = {}) {
+  const keys = [...new Set([...Object.keys(beforeMap), ...Object.keys(afterMap)])].sort();
+  for (const key of keys) {
+    const before = beforeMap[key] ?? 0;
+    const after = afterMap[key] ?? 0;
+    if (before !== after) {
+      lines.push(`  ${label}.${key}: ${before} -> ${after} (${after - before >= 0 ? "+" : ""}${after - before})`);
+    }
+  }
 }
 
 function diff(baseline, current) {
   const lines = [];
-  for (const key of Object.keys(current.counts)) {
+  if ((baseline.fileCount ?? 0) !== current.fileCount) {
+    const delta = current.fileCount - (baseline.fileCount ?? 0);
+    lines.push(`  fileCount: ${baseline.fileCount ?? 0} -> ${current.fileCount} (${delta >= 0 ? "+" : ""}${delta})`);
+  }
+  const countKeys = [...new Set([...Object.keys(baseline.counts ?? {}), ...Object.keys(current.counts)])].sort();
+  for (const key of countKeys) {
     const before = baseline.counts[key] ?? 0;
-    const after = current.counts[key];
+    const after = current.counts[key] ?? 0;
     if (before !== after) {
       lines.push(`  ${key}: ${before} -> ${after} (${after - before >= 0 ? "+" : ""}${after - before})`);
     }
   }
-  const familiesBefore = baseline.colorFamiliesInUse ?? Object.keys(baseline.colorFamilyCounts ?? {}).length;
+  appendCountMapDiff(lines, "colorFamilyCounts", baseline.colorFamilyCounts, current.colorFamilyCounts);
+  appendCountMapDiff(
+    lines,
+    "directRampFamilyCounts",
+    baseline.directRampFamilyCounts,
+    current.directRampFamilyCounts,
+  );
+  const familiesBefore =
+    baseline.colorFamiliesInUse ??
+    Object.values(baseline.colorFamilyCounts ?? {}).filter((n) => n > 0).length;
   const familiesAfter = current.colorFamiliesInUse;
   if (familiesBefore !== familiesAfter) {
     lines.push(`  colorFamiliesInUse: ${familiesBefore} -> ${familiesAfter}`);
+  }
+  const directFamiliesBefore =
+    baseline.directRampFamiliesInUse ??
+    Object.values(baseline.directRampFamilyCounts ?? {}).filter((n) => n > 0).length;
+  if (directFamiliesBefore !== current.directRampFamiliesInUse) {
+    lines.push(
+      `  directRampFamiliesInUse: ${directFamiliesBefore} -> ${current.directRampFamiliesInUse}`,
+    );
   }
   return lines;
 }
@@ -138,12 +291,21 @@ if (isCheck) {
   }
   console.log("design:census — changes vs baseline:");
   console.log(changes.join("\n"));
-  // This script only reports; phases that intend a change update the
-  // baseline explicitly (see below) rather than having --check fail here.
-  process.exit(0);
+  console.error("design:census — baseline drift must be reviewed; run with --update only after approval.");
+  process.exit(1);
 } else {
   console.log(`design:census — scanned ${result.fileCount} files under src/.`);
-  console.log(JSON.stringify({ counts: result.counts, colorFamiliesInUse: result.colorFamiliesInUse }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        counts: result.counts,
+        colorFamiliesInUse: result.colorFamiliesInUse,
+        directRampFamiliesInUse: result.directRampFamiliesInUse,
+      },
+      null,
+      2,
+    ),
+  );
   if (!existsSync(baselinePath)) {
     writeFileSync(baselinePath, JSON.stringify(result, null, 2) + "\n");
     console.log(`Wrote baseline to ${relative(portalRoot, baselinePath)}`);

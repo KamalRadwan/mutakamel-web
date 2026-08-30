@@ -59,7 +59,7 @@ export default function NewDatabaseServerPage() {
           canRetrySetup={canRetrySetup}
         />
       ) : (
-        <section role="alert" className="mx-auto flex min-h-72 max-w-3xl flex-col items-center justify-center rounded-lg border border-warn-200 bg-warn-50 p-8 text-center text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-200">
+        <section role="alert" className="mx-auto flex min-h-72 max-w-3xl flex-col items-center justify-center rounded-lg border border-warning/30 bg-warning-subtle p-8 text-center text-warning-subtle-foreground">
           <ShieldAlert className="size-10" aria-hidden="true" />
           <h1 className="mt-4 text-lg font-semibold">{copy.unavailable}</h1>
           <p className="mt-2 max-w-md text-sm leading-6">

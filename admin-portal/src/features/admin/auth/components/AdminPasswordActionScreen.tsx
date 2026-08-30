@@ -10,10 +10,9 @@ import {
   Loader2,
   ShieldCheck,
 } from "lucide-react";
-import { LanguageToggle } from "@/components/layout/LanguageToggle";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { useI18n } from "@/i18n/I18nContext";
-import { Card, Field, Input, Button } from "@/design-system";
+import { Field, Input, Button } from "@/design-system";
 import {
   ADMIN_PASSWORD_MAX_LENGTH,
   ADMIN_PASSWORD_MIN_LENGTH,
@@ -37,20 +36,20 @@ export function AdminPasswordActionScreen({
 
   if (!action.isTokenReady) {
     return (
-      <PublicAuthShell>
+      <AuthShell>
         <div role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+          <Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
           <span>{common.checkingLink}</span>
         </div>
-      </PublicAuthShell>
+      </AuthShell>
     );
   }
 
   if (action.token === null) {
     return (
-      <PublicAuthShell>
+      <AuthShell>
         <div className="space-y-5 text-center">
-          <div className="mx-auto grid size-12 place-items-center rounded-xl bg-danger-50 text-danger-600 dark:bg-danger-950/40 dark:text-danger-300">
+          <div className="mx-auto grid size-12 place-items-center rounded-lg bg-destructive-subtle text-destructive-subtle-foreground">
             <KeyRound className="size-6" aria-hidden="true" />
           </div>
           <div>
@@ -61,14 +60,11 @@ export function AdminPasswordActionScreen({
               {common.missingTokenDescription}
             </p>
           </div>
-          <Link
-            href="/login"
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-600 px-5 text-xs font-semibold text-white hover:bg-brand-500"
-          >
-            {common.backToSignIn}
-          </Link>
+          <Button asChild variant="primary" size="lg">
+            <Link href="/login">{common.backToSignIn}</Link>
+          </Button>
         </div>
-      </PublicAuthShell>
+      </AuthShell>
     );
   }
 
@@ -82,13 +78,13 @@ export function AdminPasswordActionScreen({
   const errorMessage = action.error ? common.errors[action.error] : null;
 
   return (
-    <PublicAuthShell>
+    <AuthShell>
       <div className="space-y-6">
         <div className="text-center">
-          <div className="mx-auto mb-3 grid size-12 place-items-center rounded-xl bg-brand-500 text-ink-950">
+          <div className="mx-auto mb-3 grid size-12 place-items-center rounded-lg bg-primary text-primary-foreground">
             <ShieldCheck className="size-6" aria-hidden="true" />
           </div>
-          <p className="text-2xs font-semibold uppercase tracking-[0.22em] text-brand-700 dark:text-brand-400">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary rtl:normal-case rtl:tracking-normal">
             {copy.eyebrow}
           </p>
           <h1 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
@@ -111,13 +107,21 @@ export function AdminPasswordActionScreen({
             autoComplete="new-password"
           />
 
-          <div className="grid gap-2 rounded-xl border border-border bg-muted p-3" aria-label={common.passwordRequirements}>
+          <div
+            role="group"
+            className="grid gap-2 rounded-lg border border-border bg-muted p-3"
+            aria-label={common.passwordRequirements}
+          >
             {rules.map(([key, label]) => {
               const passed = action.passwordChecks[key];
+              const stateLabel = passed
+                ? common.requirementMet
+                : common.requirementNotMet;
               return (
-                <div key={key} className={`flex items-center gap-2 text-2xs ${passed ? "text-brand-700 dark:text-brand-400" : "text-muted-foreground"}`}>
+                <div key={key} className={`flex items-center gap-2 text-xs ${passed ? "text-success" : "text-muted-foreground"}`}>
                   {passed ? <CheckCircle2 className="size-3.5" aria-hidden="true" /> : <Circle className="size-3.5" aria-hidden="true" />}
                   <span>{label}</span>
+                  <span className="ms-auto font-medium">{stateLabel}</span>
                 </div>
               );
             })}
@@ -135,38 +139,24 @@ export function AdminPasswordActionScreen({
           />
 
           {errorMessage ? (
-            <p role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2.5 text-xs font-semibold text-danger-700 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-300">
+            <p role="alert" tabIndex={-1} className="rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2.5 text-xs font-semibold text-destructive-subtle-foreground">
               {errorMessage}
             </p>
           ) : null}
 
           <Button type="submit" variant="primary" disabled={action.isSubmitting} className="w-full justify-center">
-            {action.isSubmitting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <KeyRound className="size-4" aria-hidden="true" />}
+            {action.isSubmitting ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <KeyRound className="size-4" aria-hidden="true" />}
             <span>{action.isSubmitting ? copy.submitting : copy.submit}</span>
           </Button>
         </form>
 
         <div className="text-center">
-          <Link href="/login" className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-400">
+          <Link href="/login" className="rounded-sm text-xs font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
             {common.backToSignIn}
           </Link>
         </div>
       </div>
-    </PublicAuthShell>
-  );
-}
-
-function PublicAuthShell({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="relative flex min-h-screen items-center justify-center bg-canvas p-4 text-foreground sm:p-6">
-      <div className="absolute end-4 top-4 z-20 flex items-center gap-2">
-        <LanguageToggle />
-        <ThemeToggle />
-      </div>
-      <Card className="relative z-10 w-full max-w-md p-6 shadow-2xl sm:p-8">
-        {children}
-      </Card>
-    </main>
+    </AuthShell>
   );
 }
 
@@ -190,7 +180,7 @@ function PasswordField({
   autoComplete: "new-password";
 }) {
   return (
-    <Field label={label}>
+    <Field label={label} required>
       {(fp) => (
         <div className="relative">
           <KeyRound className="absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -205,14 +195,17 @@ function PasswordField({
             required
             className="ps-10 pe-10"
           />
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={toggle}
             aria-label={visible ? hideLabel : showLabel}
-            className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-pressed={visible}
+            className="absolute end-1 top-1/2 size-7 -translate-y-1/2 p-0 text-muted-foreground hover:text-foreground"
           >
             {visible ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
-          </button>
+          </Button>
         </div>
       )}
     </Field>

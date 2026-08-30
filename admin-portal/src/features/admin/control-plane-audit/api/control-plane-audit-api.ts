@@ -8,6 +8,9 @@ import type {
 } from "../types/control-plane-audit";
 import {
   CONTROL_PLANE_AUDIT_ACTOR_TYPES,
+  CONTROL_PLANE_AUDIT_CODE_QUALITIES,
+  CONTROL_PLANE_AUDIT_DISPOSITIONS,
+  CONTROL_PLANE_AUDIT_FAULT_DOMAINS,
   CONTROL_PLANE_AUDIT_OUTCOMES,
 } from "../types/control-plane-audit";
 
@@ -164,6 +167,15 @@ function parseAuditEventCore(event: Record<string, unknown>): ControlPlaneAuditE
     ip: nullableString(event.ip),
     userAgent: nullableString(event.userAgent),
     occurredAt,
+    // Null on a successful event, and null on a failure served by a Core
+    // that predates the classification. An absent field is not an invalid
+    // response, so the row still renders instead of failing the whole page.
+    faultDomain:
+      enumValue(event.faultDomain, CONTROL_PLANE_AUDIT_FAULT_DOMAINS) ?? null,
+    disposition:
+      enumValue(event.disposition, CONTROL_PLANE_AUDIT_DISPOSITIONS) ?? null,
+    codeQuality:
+      enumValue(event.codeQuality, CONTROL_PLANE_AUDIT_CODE_QUALITIES) ?? null,
   };
 }
 

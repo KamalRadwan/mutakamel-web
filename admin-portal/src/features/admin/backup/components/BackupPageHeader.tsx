@@ -13,8 +13,8 @@ export function BackupPageHeader({ eyebrow, title, description, actions }: Backu
   return (
     <PageHeader
       breadcrumb={
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-700 dark:text-brand-400">
-          <span className="grid size-6 place-items-center rounded-md bg-brand-500/10">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-info-subtle-foreground rtl:normal-case rtl:tracking-normal">
+          <span className="grid size-6 place-items-center rounded-md bg-info-subtle">
             <ShieldCheck className="size-3.5" aria-hidden="true" />
           </span>
           {eyebrow}

@@ -4,6 +4,7 @@
 .pnp.js
 /.agents
 /.claude
+.claude
 /.code*
 
 # testing

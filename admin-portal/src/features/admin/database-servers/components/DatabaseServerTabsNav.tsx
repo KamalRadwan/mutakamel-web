@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { LayoutDashboard, ShieldCheck, Database, Lock, History } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { Tabs, TabsList, TabsTrigger, Badge } from "@/design-system";
@@ -9,6 +10,7 @@ interface DatabaseServerTabsNavProps {
   bindingsCount: number;
   historyCount: number;
   bootstrapStatus: string;
+  children: ReactNode;
 }
 
 export function DatabaseServerTabsNav({
@@ -17,8 +19,9 @@ export function DatabaseServerTabsNav({
   bindingsCount,
   historyCount,
   bootstrapStatus,
+  children,
 }: DatabaseServerTabsNavProps) {
-  const { t } = useI18n();
+  const { lang, t } = useI18n();
   const d = t.databaseServerDetail.tabs;
 
   const tabs: {
@@ -26,7 +29,7 @@ export function DatabaseServerTabsNav({
     label: string;
     icon: typeof LayoutDashboard;
     badge?: string | number;
-    badgeTone?: "brand" | "warn" | "danger" | "neutral";
+    badgeTone?: "success" | "warn" | "danger" | "neutral";
   }[] = [
     { id: "overview", label: d.overview, icon: LayoutDashboard },
     {
@@ -34,7 +37,7 @@ export function DatabaseServerTabsNav({
       label: d.readiness,
       icon: ShieldCheck,
       badge: bootstrapStatus,
-      badgeTone: bootstrapStatus === "READY" ? "brand" : bootstrapStatus === "DEGRADED" ? "danger" : "warn",
+      badgeTone: bootstrapStatus === "READY" ? "success" : bootstrapStatus === "DEGRADED" ? "danger" : "warn",
     },
     { id: "bindings", label: d.bindings, icon: Database, badge: bindingsCount, badgeTone: "neutral" },
     { id: "security", label: d.security, icon: Lock },
@@ -42,23 +45,29 @@ export function DatabaseServerTabsNav({
   ];
 
   return (
-    <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as DatabaseServerTab)}>
-      <TabsList aria-label="Database Server Details Tabs" className="h-auto flex-wrap gap-1 border-b-0 bg-ink-100 p-1.5 dark:bg-ink-900/60">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <TabsTrigger
-              key={tab.id}
-              value={tab.id}
-              className="h-9 gap-2 rounded-md px-3 data-[state=active]:bg-card data-[state=active]:text-brand-700 data-[state=active]:shadow-sm dark:data-[state=active]:text-brand-400 after:hidden"
-            >
-              <Icon className="size-4 shrink-0" aria-hidden="true" />
-              {tab.label}
-              {tab.badge !== undefined && <Badge tone={tab.badgeTone ?? "neutral"}>{tab.badge}</Badge>}
-            </TabsTrigger>
-          );
-        })}
-      </TabsList>
+    <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as DatabaseServerTab)} dir={lang === "ar" ? "rtl" : "ltr"}>
+      <div className="overflow-x-auto rounded-lg border border-border bg-muted p-1.5">
+        <TabsList
+          aria-label={lang === "ar" ? "تفاصيل خادم قاعدة البيانات" : "Database server details"}
+          className="h-auto min-w-max border-b-0 bg-transparent"
+        >
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className="h-(--size-control-lg) gap-2 rounded-md px-3 data-[state=active]:bg-info-subtle data-[state=active]:text-info-subtle-foreground after:hidden"
+              >
+                <Icon className="size-4 shrink-0" aria-hidden="true" />
+                {tab.label}
+                {tab.badge !== undefined && <Badge tone={tab.badgeTone ?? "neutral"}>{tab.badge}</Badge>}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </div>
+      {children}
     </Tabs>
   );
 }

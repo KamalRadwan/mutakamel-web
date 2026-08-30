@@ -1,8 +1,8 @@
 # Migration
 
-Status: **[Verified]**
+Status: **[Verified historical record; next target approved]**
 
-Last source verification: **2026-08-28**
+Last source verification: **2026-08-29**
 
 Owner: **Admin Portal**
 
@@ -12,10 +12,22 @@ exists so a future change to any of the numbers below has a baseline to
 diff against, and so nobody re-derives a decision (like why `warn` is never
 a filled button) that was already made and reasoned about once.
 
+## Next design update
+
+The emerald-primary migration recorded below is not the final visual contract.
+The approved cold-blue update separates cobalt `action` from emerald `success`,
+adds operational UX and accessibility contracts, and corrects enforcement gaps
+discovered after this migration was documented.
+
+Use [Cold-Blue Design Update](design-update.md) for the target and
+[Cold-Blue Design Update Roadmap](design-update-roadmap.md) for implementation
+phases. The historical phase record below is preserved as evidence rather than
+rewritten as if the new design already shipped.
+
 ## Verification gate
 
-Every phase below was required to clear the same commands before it counted
-as done, run from `admin-portal/`:
+Every phase below was intended to clear the same commands before it counted as
+done, run from `admin-portal/`:
 
 ```bash
 npx tsc --noEmit
@@ -26,15 +38,17 @@ node scripts/design/census.mjs --check
 node scripts/design/rtl-guard.mjs
 ```
 
-`census.mjs` (`scripts/design/census.mjs`) counts color-utility usage by
-Tailwind family, arbitrary type sizes, bold-or-heavier font weight sites,
-`rounded-2xl`/`3xl` usage, gradients, `backdrop-blur`, physical RTL
-utilities, `<Navbar />` render sites, hand-rolled `<table>` sites, and toast
-call sites, and diffs the total against
-`docs/design-system/census.baseline.json`. `--check` fails the phase's gate
-on any undeclared regression; `--update` moves the baseline forward once a
-phase's delta has been reviewed and is the *intended* delta, not an
-accident. `rtl-guard.mjs` hard-fails if physical direction utilities
+`census.mjs` (`scripts/design/census.mjs`) scans all of `src`, including
+`src/design-system`. It counts stock and product-ramp utilities, direct white,
+stock shadows, raw chart hex values, sub-13px text, visible-motion sites
+without a reduced-motion variant, native one-off controls, hand-built tables,
+and the earlier geometry, typography, RTL, navigation, and toast signals. The
+canonical native input/button/textarea owners and canonical Table primitive
+are excluded only from their corresponding one-off counts.
+
+`--check` hard-fails on file-count, metric, or family-distribution drift.
+`--update` moves `docs/design-system/census.baseline.json` only after review.
+`rtl-guard.mjs` independently hard-fails if physical direction utilities
 (`ml-`/`mr-`/`pl-`/`pr-`/`left-`/`right-`/`text-left`/`text-right`) exceed
 its limit (0, as of the current baseline — all real violations were fixed
 early and the transitional headroom removed).
@@ -58,7 +72,7 @@ actually produced.
 **Part B — Component layer (Phases 8–14).** The toast system
 ([toast-contract.md](toast-contract.md)), the 26 primitives and 15 patterns
 ([primitives.md](primitives.md), [patterns.md](patterns.md)), and the app
-shell — sidebar, topbar, command palette, and the full 54-route nav map
+  shell — sidebar, topbar, command palette, and the 54-route inventory
 ([shell-and-navigation.md](shell-and-navigation.md)) — which replaced the
 permanently-dark, hue-coded 15-item `Navbar.tsx` entirely.
 
@@ -133,7 +147,9 @@ onto the same shared primitive every other KPI tile in the app already uses
 roles, subscriptions) instead of staying a one-off. The prop is optional and
 every existing untoned call site is unaffected.
 
-**Phase 22 — Dashboard charts.** Recovered the 37 chart components deleted
+### Phase 22
+
+**Dashboard charts.** Recovered the 37 chart components deleted
 in commit `adb263e` (`recharts` had been installed with zero imports since).
 The first pass wired 9 to always-present `overview`/`panels` data and 14
 more to `src/types/dashboard.ts`'s `analytics.subscriptions.*`/
@@ -270,36 +286,19 @@ font-weight sites (280 of them `font-black`) against 101 normal/medium; zero
 loaded fonts; 467 hand-rolled `<button>` elements against 21 using a shared
 class; and a permanently-dark 15-item navbar with per-item hue-coded icons.
 
-The current baseline (`census.baseline.json`, regenerated 2026-08-27, after
-every route converted and the dead CSS shims removed):
+The current baseline (`census.baseline.json`, regenerated 2026-08-29 for
+roadmap Phase 0) is the machine-readable source for current counts. It covers
+the whole application, including shared design-system code, and records known
+migration debt rather than claiming conformance. Keep the values in the JSON
+instead of duplicating a table here; every reviewed implementation phase can
+then update one authoritative snapshot.
 
-| Metric | Current |
-| --- | --- |
-| `colorUtilityTotal` | **0** |
-| Color families in use | **2** — both false positives, see below |
-| `arbitraryTypeSize` | **0** |
-| `fontBoldOrHeavier` | **0** |
-| `rounded-2xl`/`rounded-3xl` | **0** / **0** |
-| `gradients` | **0** |
-| `backdropBlur` | **0** |
-| `physicalRtlViolations` | **0** |
-| `navbarRenderSites` | **0** |
-| `handRolledTables` | **3** |
-| `toastCallSites` | **158** |
-
-**Every literal Tailwind color-family usage in live component code is gone
-— the "12 families → 4 roles" renaming work this doc used to describe as
-outstanding is done.** The census's `colorFamiliesInUse: 2` (2 `slate`, 2
-`blue`) is a measurement artifact, not a real remainder: the script's
-per-family counter scans `.css` files without filtering by file kind the
-way its `colorUtilityTotal` check does, and the only two matches left are
-`globals.css` **comments** — prose text describing the theme flip
-("`bg-slate-900` / `text-blue-400`") — not live `@apply`/utility classes. A
-manual grep for the actual utility-class regex
-(`\b(bg|text|border|...)-(slate|blue|...)-[0-9]{2,3}\b`) across every `.ts`,
-`.tsx`, and `.css` file in `src/` returns zero matches. Not worth editing
-those two comments just to force the number to literal 0 — they're
-historical narration, not code.
+The legacy stock Tailwind-family counter now uses the same `.ts`/`.tsx` scope
+as `colorUtilityTotal`, eliminating the former `globals.css` comment false
+positives. The separate direct-ramp total and per-family map expose remaining
+`brand`, `ink`, `warn`, `danger`, `action`, `surface`, `success`, and `info`
+usage even when the stock-family count is zero. A semantic-token migration is
+therefore visible instead of being mistaken for completion.
 
 `handRolledTables: 3` is the last real, honest signal of unconverted
 surface: `LoggingScreen.tsx`'s `LiveRowsTable` (a continuously-appending

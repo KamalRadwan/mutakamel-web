@@ -6,6 +6,7 @@ import {
   Globe,
   HardDrive,
   Loader2,
+  MoreHorizontal,
   Plus,
   RotateCcw,
   Server,
@@ -19,7 +20,18 @@ import {
   DataTable,
   ErrorState,
   FilterBar,
+  Field,
   PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusBadge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   type ColumnDef,
 } from "@/design-system";
 import {
@@ -75,10 +87,10 @@ export default function TenantsDirectoryPage() {
       cell: (tenant) => (
         <Link href={`/tenants/${tenant.id}`} className="group inline-flex flex-col">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-brand-700 group-hover:underline dark:text-brand-400">
+            <span className="text-xs font-semibold text-primary group-hover:underline">
               {tenant.companyName}
             </span>
-            <span className="rounded-sm bg-ink-100 px-1.5 py-0.5 font-mono text-xs text-muted-foreground dark:bg-ink-800">
+            <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
               {tenant.name}
             </span>
           </div>
@@ -141,7 +153,7 @@ export default function TenantsDirectoryPage() {
       key: "status",
       headerEn: "Status",
       headerAr: "الحالة",
-      cell: (tenant) => <TenantStatusBadge status={tenant.status} lang={lang} />,
+      cell: (tenant) => <StatusBadge status={tenant.status} enumType="tenant" />,
     },
     {
       key: "actions",
@@ -213,42 +225,58 @@ export default function TenantsDirectoryPage() {
             />
           </div>
 
-          <div className="flex flex-wrap items-start gap-2">
-            <select
-              aria-label={copy.statusFilter}
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as TenantStatusFilter)}
-              className="h-(--size-control-lg) rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option value="ALL">{t.tenants.allStatuses}</option>
-              <option value="ACTIVE">{t.tenants.statusNames.ACTIVE}</option>
-              <option value="PROVISIONING">{t.tenants.statusNames.PROVISIONING}</option>
-              <option value="PROVISIONING_FAILED">{copy.provisioningFailed}</option>
-              <option value="SUSPENDED">{t.tenants.statusNames.SUSPENDED}</option>
-              <option value="DELETED">{t.tenants.statusNames.DELETED}</option>
-            </select>
+          <div className="grid items-start gap-2 sm:grid-cols-2">
+            <Field label={copy.statusFilter}>
+              {(field) => (
+                <Select
+                  name="tenant-status-filter"
+                  value={statusFilter}
+                  onValueChange={(value) => setStatusFilter(value as TenantStatusFilter)}
+                >
+                  <SelectTrigger id={field.id} aria-describedby={field["aria-describedby"]}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">{t.tenants.allStatuses}</SelectItem>
+                    <SelectItem value="ACTIVE">{t.tenants.statusNames.ACTIVE}</SelectItem>
+                    <SelectItem value="PROVISIONING">{t.tenants.statusNames.PROVISIONING}</SelectItem>
+                    <SelectItem value="PROVISIONING_FAILED">{copy.provisioningFailed}</SelectItem>
+                    <SelectItem value="SUSPENDED">{t.tenants.statusNames.SUSPENDED}</SelectItem>
+                    <SelectItem value="DELETED">{t.tenants.statusNames.DELETED}</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
 
             <div className="flex min-w-48 flex-col gap-1">
-              <select
-                aria-label={copy.databaseServerFilter}
-                value={serverFilter}
-                disabled={databaseServerOptionsState !== "ready"}
-                onChange={(event) => setServerFilter(event.target.value)}
-                className="h-(--size-control-lg) min-w-48 rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <option value="ALL">
-                  {databaseServerOptionsState === "loading" ? copy.databaseServerLoading : t.tenants.allServers}
-                </option>
-                {databaseServerOptions.map((server) => (
-                  <option key={server.id} value={server.id}>
-                    {server.name}
-                  </option>
-                ))}
-              </select>
+              <Field label={copy.databaseServerFilter}>
+                {(field) => (
+                  <Select
+                    name="tenant-database-server-filter"
+                    value={serverFilter}
+                    disabled={databaseServerOptionsState !== "ready"}
+                    onValueChange={setServerFilter}
+                  >
+                    <SelectTrigger id={field.id} aria-describedby={field["aria-describedby"]} className="min-w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">
+                        {databaseServerOptionsState === "loading" ? copy.databaseServerLoading : t.tenants.allServers}
+                      </SelectItem>
+                      {databaseServerOptions.map((server) => (
+                        <SelectItem key={server.id} value={server.id}>
+                          {server.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </Field>
               {databaseServerOptionsState === "forbidden" ? (
-                <span className="text-xs text-warn-700 dark:text-warn-300">{copy.databaseServerForbidden}</span>
+                <span className="text-xs text-warning-subtle-foreground">{copy.databaseServerForbidden}</span>
               ) : databaseServerOptionsState === "error" ? (
-                <span role="alert" className="text-xs text-danger-700 dark:text-danger-300">
+                <span role="alert" className="text-xs text-destructive-subtle-foreground">
                   {copy.databaseServerUnavailable}
                   {databaseServerOptionsError?.errorCode ? ` · ${databaseServerOptionsError.errorCode}` : ""}
                   {databaseServerOptionsError?.correlationId ? ` · ${databaseServerOptionsError.correlationId}` : ""}
@@ -329,78 +357,47 @@ function TenantRowActions({
   const busy = pendingAction !== null;
   const thisRowBusy = pendingAction?.tenantId === tenant.id;
   return (
-    <div className="flex items-center justify-end gap-1">
-      <Button asChild variant="ghost" size="sm">
-        <Link href={`/tenants/${tenant.id}`}>
-          {copy.details}
-          <ExternalLink className="size-3" aria-hidden="true" />
-        </Link>
-      </Button>
-
-      {canSuspendOrActivate && tenant.status === "SUSPENDED" ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          onClick={() => onActivate(tenant)}
-          className="text-brand-700 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950/30"
-        >
-          {thisRowBusy ? <Loader2 className="size-3 animate-spin" aria-hidden="true" /> : copy.activate}
-        </Button>
-      ) : null}
-      {canSuspendOrActivate && tenant.status === "ACTIVE" ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          onClick={() => onSuspend(tenant)}
-          className="text-warn-700 hover:bg-warn-50 dark:text-warn-400 dark:hover:bg-warn-950/30"
-        >
-          {thisRowBusy ? <Loader2 className="size-3 animate-spin" aria-hidden="true" /> : copy.suspend}
-        </Button>
-      ) : null}
-      {canReprovision && tenant.status === "PROVISIONING_FAILED" ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          onClick={() => void onReprovision(tenant)}
-        >
-          {thisRowBusy ? <Loader2 className="size-3 animate-spin" aria-hidden="true" /> : <RotateCcw className="size-3" aria-hidden="true" />}
-          {copy.reprovision}
-        </Button>
-      ) : null}
-      {canSoftDelete && tenant.status !== "DELETED" ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          onClick={() => onDelete(tenant)}
-          aria-label={`${copy.delete} ${tenant.companyName}`}
-          title={copy.delete}
-          className="text-danger-600 hover:bg-danger-50 hover:text-danger-700 dark:text-danger-400 dark:hover:bg-danger-950/30"
-        >
-          <Trash2 className="size-3.5" aria-hidden="true" />
-        </Button>
-      ) : null}
+    <div className="flex justify-end">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="md" aria-label={`${copy.actions}: ${tenant.companyName}`} className="size-8 p-0">
+            {thisRowBusy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <MoreHorizontal className="size-4" aria-hidden="true" />}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link href={`/tenants/${tenant.id}`}>
+              <ExternalLink className="size-4" aria-hidden="true" />
+              {copy.details}
+            </Link>
+          </DropdownMenuItem>
+          {canSuspendOrActivate && tenant.status === "SUSPENDED" ? (
+            <DropdownMenuItem disabled={busy} onSelect={() => onActivate(tenant)}>
+              <RotateCcw className="size-4 text-success" aria-hidden="true" />
+              {copy.activate}
+            </DropdownMenuItem>
+          ) : null}
+          {canSuspendOrActivate && tenant.status === "ACTIVE" ? (
+            <DropdownMenuItem disabled={busy} onSelect={() => onSuspend(tenant)} className="text-warning">
+              {copy.suspend}
+            </DropdownMenuItem>
+          ) : null}
+          {canReprovision && tenant.status === "PROVISIONING_FAILED" ? (
+            <DropdownMenuItem disabled={busy} onSelect={() => void onReprovision(tenant)}>
+              <RotateCcw className="size-4" aria-hidden="true" />
+              {copy.reprovision}
+            </DropdownMenuItem>
+          ) : null}
+          {canSoftDelete && tenant.status !== "DELETED" ? (
+            <DropdownMenuItem destructive disabled={busy} onSelect={() => onDelete(tenant)}>
+              <Trash2 className="size-4" aria-hidden="true" />
+              {copy.delete}
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
-}
-
-function TenantStatusBadge({ status, lang }: { status: TenantRecord["status"]; lang: "ar" | "en" }) {
-  const labels = {
-    ACTIVE: { en: "Active", ar: "نشط", tone: "brand" },
-    PROVISIONING: { en: "Provisioning", ar: "جارٍ التجهيز", tone: "neutral" },
-    PROVISIONING_FAILED: { en: "Provisioning failed", ar: "فشل التجهيز", tone: "danger" },
-    SUSPENDED: { en: "Suspended", ar: "معلّق", tone: "warn" },
-    DELETED: { en: "Deleted", ar: "محذوف", tone: "neutral" },
-  } as const;
-  const value = labels[status];
-  return <Badge tone={value.tone}>{value[lang]}</Badge>;
 }
 
 function TenantActionModal({
@@ -474,7 +471,7 @@ function ErrorBanner({
   return (
     <div
       role="alert"
-      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-xs text-danger-800 dark:border-danger-900/70 dark:bg-danger-950/30 dark:text-danger-300"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive-subtle px-4 py-3 text-xs text-destructive-subtle-foreground"
     >
       <p>
         <strong>{errorCode}</strong> · {message}
@@ -502,6 +499,7 @@ function directoryCopy(lang: "ar" | "en") {
         storageServer: "خادم التخزين",
         seats: (count: number) => `${count} مقعد`,
         details: "التفاصيل",
+        actions: "إجراءات المستأجر",
         activate: "تفعيل",
         suspend: "إيقاف مؤقت",
         reprovision: "إعادة محاولة التجهيز",
@@ -527,6 +525,7 @@ function directoryCopy(lang: "ar" | "en") {
         storageServer: "Storage server",
         seats: (count: number) => `${count} seats`,
         details: "Details",
+        actions: "Tenant actions",
         activate: "Activate",
         suspend: "Suspend",
         reprovision: "Retry provisioning",

@@ -13,7 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { Button } from "@/design-system";
+import { Badge, Button } from "@/design-system";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type {
   ApplicationTechnicalReadinessReason,
@@ -82,11 +82,11 @@ export function ApplicationTechnicalProvisioningPanel({
   return (
     <section
       aria-labelledby="technical-readiness-title"
-      className="overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+      className="overflow-hidden rounded-lg border border-border bg-card"
     >
-      <header className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center">
+      <header className="flex flex-col justify-between gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:px-5">
         <div>
-          <p className="font-mono text-2xs font-semibold uppercase tracking-[0.2em] text-brand-700 dark:text-brand-400">
+          <p className="text-xs font-semibold text-primary">
             {copy.eyebrow}
           </p>
           <h2 id="technical-readiness-title" className="mt-1 flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -94,24 +94,26 @@ export function ApplicationTechnicalProvisioningPanel({
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">{copy.subtitle}</p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={onRetry}
           disabled={isLoading || isRefreshing}
-          className="inline-flex min-h-11 self-start items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+          loading={isRefreshing}
+          className="self-start"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+          {!isRefreshing && <RefreshCw className="size-3.5" aria-hidden="true" />}
           {copy.refresh}
-        </button>
+        </Button>
       </header>
 
-      <div className="space-y-5 p-5">
+      <div className="space-y-5 p-4 sm:p-5">
         {isLoading ? (
           <div role="status" className="flex min-h-28 items-center justify-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> {copy.loading}
+            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> {copy.loading}
           </div>
         ) : error || !readiness ? (
-          <div role="alert" className="rounded-xl border border-warn-200 bg-warn-50 p-4 text-xs text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-200">
+          <div role="alert" className="rounded-md border border-warning bg-warning-subtle p-4 text-xs text-warning-subtle-foreground">
             <p className="font-semibold">{error?.httpStatus === 403 ? copy.readinessForbidden : copy.unavailable}</p>
             {error?.message && error.httpStatus !== 403 && <p className="mt-1">{error.message}</p>}
             {error?.correlationId && (
@@ -125,9 +127,9 @@ export function ApplicationTechnicalProvisioningPanel({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 {readiness.activationAllowed ? (
-                  <CheckCircle2 className="h-7 w-7 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+                  <CheckCircle2 className="size-7 text-success" aria-hidden="true" />
                 ) : (
-                  <ShieldAlert className="h-7 w-7 text-warn-600 dark:text-warn-400" aria-hidden="true" />
+                  <ShieldAlert className="size-7 text-warning" aria-hidden="true" />
                 )}
                 <div>
                   <div className="text-sm font-semibold text-foreground">{copy.statuses[readiness.status]}</div>
@@ -137,32 +139,32 @@ export function ApplicationTechnicalProvisioningPanel({
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <code className="rounded-lg bg-muted px-2.5 py-1.5 text-xs font-semibold text-foreground" dir="ltr">
+                <code className="rounded-md bg-muted px-2.5 py-1.5 text-xs font-semibold text-foreground" dir="ltr">
                   {applicationKey}
                 </code>
-                <code className="rounded-lg bg-brand-500/10 px-2.5 py-1.5 text-xs font-semibold text-brand-800 dark:text-brand-200" dir="ltr">
+                <code className="rounded-md bg-info-subtle px-2.5 py-1.5 text-xs font-semibold text-info-subtle-foreground" dir="ltr">
                   {copy.workerTarget}: {readiness.runtimeTarget ?? copy.notAdopted}
                 </code>
               </div>
             </div>
 
-            <div className="rounded-xl border border-brand-500/30 bg-brand-500/5 p-4 dark:bg-brand-500/10">
-              <div className="grid items-center gap-2 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]" dir="ltr">
+            <div className="rounded-md border border-info/30 bg-info-subtle p-4">
+              <div className="grid items-center gap-2 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]" dir={dir}>
                 <ChainStep label={copy.applicationKey} value={applicationKey} />
-                <ArrowRight className="mx-auto hidden h-4 w-4 text-brand-500 sm:block" aria-hidden="true" />
+                <ArrowRight className="mx-auto hidden size-4 text-primary rtl:rotate-180 sm:block" aria-hidden="true" />
                 <ChainStep
                   label={copy.workerTarget}
                   value={readiness.runtimeTarget ?? identity.runtimeTarget}
                 />
-                <ArrowRight className="mx-auto hidden h-4 w-4 text-brand-500 sm:block" aria-hidden="true" />
+                <ArrowRight className="mx-auto hidden size-4 text-primary rtl:rotate-180 sm:block" aria-hidden="true" />
                 <ChainStep
                   label={copy.databasePrincipal}
                   value={databasePrincipal ?? identity.databasePrincipal}
                 />
-                <ArrowRight className="mx-auto hidden h-4 w-4 text-brand-500 sm:block" aria-hidden="true" />
+                <ArrowRight className="mx-auto hidden size-4 text-primary rtl:rotate-180 sm:block" aria-hidden="true" />
                 <ChainStep label={copy.componentKey} value={identity.primaryComponentKey} />
               </div>
-              <p className="mt-3 text-xs text-brand-700 dark:text-brand-300">
+              <p className="mt-3 text-xs text-info-subtle-foreground">
                 {readiness.runtimeTarget ? copy.identityAuthoritative : copy.identityPreview}
               </p>
             </div>
@@ -177,7 +179,7 @@ export function ApplicationTechnicalProvisioningPanel({
             </div>
 
             {readiness.reasons.length > 0 && (
-              <ul className="space-y-2 rounded-xl border border-warn-200 bg-warn-50 p-4 text-xs text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-200">
+              <ul className="space-y-2 rounded-md border border-warning bg-warning-subtle p-4 text-xs text-warning-subtle-foreground">
                 {readiness.reasons.map((item) => (
                   <li key={item} className="flex gap-2">
                     <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -188,12 +190,12 @@ export function ApplicationTechnicalProvisioningPanel({
             )}
 
             {readiness.selectionBlockers.length > 0 && (
-              <div className="rounded-xl border border-border bg-muted p-4">
+              <div className="rounded-md border border-border bg-muted p-4">
                 <h3 className="text-xs font-semibold text-foreground">{copy.selectionTitle}</h3>
                 <ul className="mt-2 grid gap-2 text-xs text-foreground sm:grid-cols-2">
                   {readiness.selectionBlockers.map((item) => (
                     <li key={item} className="flex gap-2">
-                      <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn-500" aria-hidden="true" />
+                      <XCircle className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden="true" />
                       <span>{selectionLabels[item]}</span>
                     </li>
                   ))}
@@ -202,29 +204,29 @@ export function ApplicationTechnicalProvisioningPanel({
             )}
 
             {readiness.components.map((component) => (
-              <article key={component.id} className="rounded-xl border border-border p-4">
+              <article key={component.id} className="rounded-md border border-border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="font-mono text-xs font-semibold text-brand-700 dark:text-brand-300" dir="ltr">{component.key}</p>
+                    <p className="font-mono text-xs font-semibold text-primary" dir="ltr">{component.key}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{component.kind} · {copy.contractShort} {component.contractVersion}</p>
                   </div>
                   {component.latestPublishedRelease ? (
-                    <span className="rounded-full bg-brand-100 px-2 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+                    <Badge tone="success">
                       {copy.release} {component.latestPublishedRelease.releaseVersion}
-                    </span>
+                    </Badge>
                   ) : (
-                    <span className="rounded-full bg-warn-100 px-2 py-1 text-xs font-semibold text-warn-800 dark:bg-warn-950 dark:text-warn-200">
+                    <Badge tone="warn">
                       {copy.releaseRequired}
-                    </span>
+                    </Badge>
                   )}
                 </div>
-                <div className="mt-4 grid items-center gap-2 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]" dir="ltr">
+                <div className="mt-4 grid items-center gap-2 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]" dir={dir}>
                   <ChainStep label={copy.applicationKey} value={applicationKey} />
-                  <ArrowRight className={`mx-auto hidden h-4 w-4 text-brand-500 sm:block ${dir === "rtl" ? "rotate-180" : ""}`} aria-hidden="true" />
+                  <ArrowRight className="mx-auto hidden size-4 text-primary rtl:rotate-180 sm:block" aria-hidden="true" />
                   <ChainStep label={copy.componentKey} value={component.key} />
-                  <ArrowRight className={`mx-auto hidden h-4 w-4 text-brand-500 sm:block ${dir === "rtl" ? "rotate-180" : ""}`} aria-hidden="true" />
+                  <ArrowRight className="mx-auto hidden size-4 text-primary rtl:rotate-180 sm:block" aria-hidden="true" />
                   <ChainStep label={copy.workerTarget} value={component.workerTarget ?? copy.notAdopted} />
-                  <ArrowRight className={`mx-auto hidden h-4 w-4 text-brand-500 sm:block ${dir === "rtl" ? "rotate-180" : ""}`} aria-hidden="true" />
+                  <ArrowRight className="mx-auto hidden size-4 text-primary rtl:rotate-180 sm:block" aria-hidden="true" />
                   <ChainStep label={copy.release} value={component.latestPublishedRelease?.releaseVersion ?? copy.pending} />
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">{copy.noCredential}</p>
@@ -232,12 +234,12 @@ export function ApplicationTechnicalProvisioningPanel({
             ))}
 
             {showAdoptionAction && (
-              <div className="flex flex-col justify-between gap-3 rounded-xl border border-brand-500/30 bg-brand-500/5 p-4 sm:flex-row sm:items-center dark:bg-brand-500/10">
+              <div className="flex flex-col justify-between gap-3 rounded-md border border-info/30 bg-info-subtle p-4 sm:flex-row sm:items-center">
                 <div>
-                  <h3 className="text-xs font-semibold text-brand-800 dark:text-brand-200">{copy.adoptionCalloutTitle}</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-brand-700 dark:text-brand-300">{copy.adoptionCalloutDescription}</p>
+                  <h3 className="text-xs font-semibold text-info-subtle-foreground">{copy.adoptionCalloutTitle}</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-info-subtle-foreground">{copy.adoptionCalloutDescription}</p>
                   {!canManage && (
-                    <p className="mt-2 font-mono text-xs text-warn-700 dark:text-warn-400">{copy.permissionRequired}</p>
+                    <p className="mt-2 font-mono text-xs text-warning-subtle-foreground">{copy.permissionRequired}</p>
                   )}
                 </div>
                 {canManage && (
@@ -249,12 +251,12 @@ export function ApplicationTechnicalProvisioningPanel({
             )}
 
             {showBindingAction && (
-              <div className="flex flex-col justify-between gap-3 rounded-xl border border-brand-500/30 bg-brand-500/5 p-4 sm:flex-row sm:items-center dark:bg-brand-500/10">
+              <div className="flex flex-col justify-between gap-3 rounded-md border border-info/30 bg-info-subtle p-4 sm:flex-row sm:items-center">
                 <div>
-                  <h3 className="text-xs font-semibold text-brand-800 dark:text-brand-200">{copy.bindingCalloutTitle}</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-brand-700 dark:text-brand-300">{copy.bindingCalloutDescription}</p>
+                  <h3 className="text-xs font-semibold text-info-subtle-foreground">{copy.bindingCalloutTitle}</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-info-subtle-foreground">{copy.bindingCalloutDescription}</p>
                   {!canManage && (
-                    <p className="mt-2 font-mono text-xs text-warn-700 dark:text-warn-400">{copy.permissionRequired}</p>
+                    <p className="mt-2 font-mono text-xs text-warning-subtle-foreground">{copy.permissionRequired}</p>
                   )}
                 </div>
                 {canManage && (
@@ -273,21 +275,21 @@ export function ApplicationTechnicalProvisioningPanel({
 
 function Check({ label, value, icon: Icon, passed, blocked }: { label: string; value: boolean; icon: typeof Boxes; passed: string; blocked: string }) {
   return (
-    <div className={`rounded-xl border p-3 ${value ? "border-brand-500/30 bg-brand-500/5 dark:bg-brand-500/10" : "border-warn-500/30 bg-warn-500/5 dark:bg-warn-500/10"}`}>
+    <div className={`rounded-md border p-3 ${value ? "border-success/30 bg-success-subtle" : "border-warning/30 bg-warning-subtle"}`}>
       <div className="flex items-center gap-2">
-        <Icon className={`h-4 w-4 ${value ? "text-brand-600 dark:text-brand-400" : "text-warn-600 dark:text-warn-400"}`} aria-hidden="true" />
+        <Icon className={`size-4 ${value ? "text-success" : "text-warning"}`} aria-hidden="true" />
         <span className="text-xs font-semibold text-foreground">{label}</span>
       </div>
-      <div className="mt-1 text-2xs uppercase tracking-wider text-muted-foreground">{value ? passed : blocked}</div>
+      <div className={`mt-1 text-xs ${value ? "text-success-subtle-foreground" : "text-warning-subtle-foreground"}`}>{value ? passed : blocked}</div>
     </div>
   );
 }
 
 function ChainStep({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-muted px-3 py-2">
-      <div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="mt-1 break-all font-mono text-xs font-semibold text-foreground">{value}</div>
+    <div className="rounded-md bg-muted px-3 py-2">
+      <div className="text-xs font-semibold text-muted-foreground">{label}</div>
+      <div className="mt-1 break-all font-mono text-xs font-semibold text-foreground" dir="ltr">{value}</div>
     </div>
   );
 }

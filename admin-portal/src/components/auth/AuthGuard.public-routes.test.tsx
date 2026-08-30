@@ -26,6 +26,18 @@ vi.mock("@/context/AuthContext", () => ({
     ["BOOTSTRAPPING", "STALE", "REFRESHING"].includes(authState),
 }));
 
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({
+    t: {
+      common: {
+        sessionChecking: "Checking your session...",
+        sessionUnavailable: "Session unavailable",
+        retry: "Retry",
+      },
+    },
+  }),
+}));
+
 describe("AuthGuard public one-time action routes", () => {
   beforeEach(() => {
     state.pathname = "/admin/accept-invite";

@@ -13,6 +13,7 @@ import {
   Badge,
   Checkbox,
   ErrorState,
+  Field,
   Input,
   Select,
   SelectContent,
@@ -32,6 +33,7 @@ import type {
 } from "../types";
 
 interface TenantApplicationsStepProps {
+  headingRef?: React.Ref<HTMLHeadingElement>;
   candidates: readonly TenantApplicationCandidate[];
   selections: Readonly<Record<string, TenantApplicationSelection>>;
   state: TenantRegistrationLoadState;
@@ -39,6 +41,7 @@ interface TenantApplicationsStepProps {
   selectedLines: readonly TenantSubscriptionLine[];
   billingCycle: TenantBillingCycle;
   showSelectionError: boolean;
+  selectionError?: string;
   preview: TenantProvisioningPlanPreview | null;
   previewState: TenantRegistrationLoadState;
   previewError: NormalizedApiError | null;
@@ -60,6 +63,7 @@ function evidenceLabel(value: string) {
 }
 
 export function TenantApplicationsStep({
+  headingRef,
   candidates,
   selections,
   state,
@@ -67,6 +71,7 @@ export function TenantApplicationsStep({
   selectedLines,
   billingCycle,
   showSelectionError,
+  selectionError,
   preview,
   previewState,
   previewError,
@@ -79,39 +84,52 @@ export function TenantApplicationsStep({
   const { t } = useI18n();
   const copy = t.tenants.wizard.applicationsStep;
   return (
-    <section className="space-y-5 rounded-xl border border-border bg-white p-5 shadow-2xs dark:border-border dark:bg-ink-900">
-      <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between dark:border-border">
+    <section className="space-y-5 rounded-lg border border-border bg-card p-5">
+      <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Package className="size-4 text-warn-600 dark:text-warn-400" />
+          <h2
+            ref={headingRef}
+            tabIndex={-1}
+            className="flex items-center gap-2 rounded-sm text-base font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <Package aria-hidden="true" className="size-4 text-primary" />
             {copy.stepHeading}
-          </h3>
+          </h2>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
             {copy.stepDescription}
           </p>
         </div>
-        <label className="min-w-44 text-xs font-semibold text-foreground">
-          <span className="mb-1.5 block">
-            {copy.billingCycleLabel}
-          </span>
-          <Select
-            value={billingCycle}
-            onValueChange={(value) => onBillingCycleChange(value as TenantBillingCycle)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="MONTHLY">{copy.monthlyOption}</SelectItem>
-              <SelectItem value="ANNUAL">{copy.annualOption}</SelectItem>
-            </SelectContent>
-          </Select>
-        </label>
+        <Field id="tenant-billing-cycle" label={copy.billingCycleLabel} className="min-w-44">
+          {(field) => (
+            <Select
+              name="billingCycle"
+              value={billingCycle}
+              onValueChange={(value) =>
+                onBillingCycleChange(value as TenantBillingCycle)
+              }
+            >
+              <SelectTrigger id={field.id} aria-describedby={field["aria-describedby"]}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MONTHLY">{copy.monthlyOption}</SelectItem>
+                <SelectItem value="ANNUAL">{copy.annualOption}</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
       </header>
+
+      <div
+        id="tenant-applications-selection"
+        tabIndex={-1}
+        aria-describedby={showSelectionError ? "tenant-applications-selection-error" : undefined}
+        className="space-y-5 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
 
       {state === "loading" ? (
         <StateCard
-          icon={<Loader2 className="size-4 animate-spin" />}
+          icon={<Loader2 className="size-4 animate-spin motion-reduce:animate-none" />}
           tone="neutral"
           title={copy.loadingCatalogueTitle}
             description={copy.loadingCatalogueDesc}
@@ -156,15 +174,16 @@ export function TenantApplicationsStep({
             return (
               <article
                 key={candidate.applicationId}
-                className={`rounded-lg border p-4 transition-colors ${
+                className={`rounded-lg border-s-4 p-4 transition-colors motion-reduce:transition-none ${
                   selection
-                    ? "border-brand-400 bg-brand-50/60 dark:border-brand-700 dark:bg-brand-950/30"
-                    : "border-border bg-ink-100/70 dark:bg-ink-1000/30"
+                    ? "border-primary bg-selected text-selected-foreground"
+                    : "border-border bg-muted/50"
                 }`}
               >
                 <div className="flex items-start gap-3">
                   <Checkbox
                     id={`tenant-application-${candidate.key}`}
+                    name={`applications.${candidate.key}.selected`}
                     checked={Boolean(selection)}
                     disabled={!candidate.selectionAllowed}
                     onCheckedChange={(checked) =>
@@ -182,14 +201,14 @@ export function TenantApplicationsStep({
                       }`}
                     >
                       <span className="truncate">{candidate.name}</span>
-                      <span className="rounded-full bg-ink-200 px-2 py-0.5 font-mono text-2xs uppercase text-foreground dark:bg-ink-800 dark:text-muted-foreground">
+                      <span className="rounded-sm bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
                         {candidate.key}
                       </span>
                     </label>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       {candidate.description ?? copy.noDescriptionFallback}
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-1.5 text-2xs font-semibold uppercase tracking-wide">
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold">
                       <Badge tone="neutral">{candidate.commercialMode}</Badge>
                       {candidate.selectionAllowed ? (
                         <Badge tone="brand">
@@ -203,7 +222,7 @@ export function TenantApplicationsStep({
                 </div>
 
                 {!candidate.selectionAllowed ? (
-                  <div className="mt-3 rounded-xl border border-warn-200 bg-warn-50 p-3 text-xs text-warn-800 dark:border-warn-900 dark:bg-warn-950/40 dark:text-warn-300">
+                  <div className="mt-3 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground">
                     {unavailableReasons.length > 0 ? (
                       <ul className="list-inside list-disc space-y-1">
                         {unavailableReasons.map((reason) => (
@@ -218,15 +237,20 @@ export function TenantApplicationsStep({
 
                 {selection ? (
                   <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_9rem]">
-                    <label className="text-xs font-semibold text-foreground">
-                      <span className="mb-1.5 block">{copy.tierLabel}</span>
+                    <Field
+                      id={`tenant-application-${candidate.key}-tier`}
+                      label={copy.tierLabel}
+                      required
+                    >
+                      {(field) => (
                       <Select
+                        name={`applications.${candidate.key}.tierId`}
                         value={selection.tierId}
                         onValueChange={(value) =>
                           onUpdateSelection(candidate.key, { tierId: value })
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id={field.id}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -237,10 +261,17 @@ export function TenantApplicationsStep({
                           ))}
                         </SelectContent>
                       </Select>
-                    </label>
-                    <label className="text-xs font-semibold text-foreground">
-                      <span className="mb-1.5 block">{copy.seatsLabel}</span>
+                      )}
+                    </Field>
+                    <Field
+                      id={`tenant-application-${candidate.key}-seats`}
+                      label={copy.seatsLabel}
+                      required
+                    >
+                      {(field) => (
                       <Input
+                        {...field}
+                        name={`applications.${candidate.key}.seats`}
                         type="number"
                         min={1}
                         max={100000}
@@ -252,7 +283,8 @@ export function TenantApplicationsStep({
                           })
                         }
                       />
-                    </label>
+                      )}
+                    </Field>
                   </div>
                 ) : null}
               </article>
@@ -262,20 +294,25 @@ export function TenantApplicationsStep({
       ) : null}
 
       {showSelectionError && selectedLines.length === 0 ? (
-        <p className="flex items-center gap-2 text-xs font-semibold text-danger-600 dark:text-danger-400" role="alert">
-          <AlertCircle className="size-4" />
-          {copy.selectionRequiredError}
+        <p
+          id="tenant-applications-selection-error"
+          className="flex items-center gap-2 text-xs font-semibold text-destructive-subtle-foreground"
+          role="alert"
+        >
+          <AlertCircle aria-hidden="true" className="size-4" />
+          {selectionError ?? copy.selectionRequiredError}
         </p>
       ) : null}
+      </div>
 
-      <section aria-labelledby="provisioning-preview-title" className="overflow-hidden rounded-xl border border-border">
-        <header className="flex items-start gap-3 bg-ink-1000 px-4 py-3 text-white">
-          <Route className="mt-0.5 size-4 text-brand-400" />
+      <section aria-labelledby="provisioning-preview-title" className="overflow-hidden rounded-lg border border-border">
+        <header className="flex items-start gap-3 bg-info-subtle px-4 py-3 text-info-subtle-foreground">
+          <Route aria-hidden="true" className="mt-0.5 size-4" />
           <div>
             <h4 id="provisioning-preview-title" className="text-xs font-semibold">
               {copy.previewTitle}
             </h4>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs opacity-80">
               {copy.previewDesc}
             </p>
           </div>
@@ -288,7 +325,7 @@ export function TenantApplicationsStep({
           ) : null}
           {previewState === "loading" ? (
             <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
-              <Loader2 className="size-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
               {copy.previewLoading}
             </p>
           ) : null}
@@ -310,25 +347,25 @@ export function TenantApplicationsStep({
           {previewState === "ready" && preview ? (
             <div className="space-y-4">
               <dl className="grid gap-3 text-xs sm:grid-cols-3">
-                <div className="rounded-xl bg-ink-100 p-3 dark:bg-ink-800/60">
+                <div className="rounded-lg bg-muted p-3">
                   <dt className="text-muted-foreground">{copy.selectedApplicationsLabel}</dt>
                   <dd className="mt-1 font-mono font-semibold">{preview.selectedApplicationKeys.join(", ")}</dd>
                 </div>
-                <div className="rounded-xl bg-ink-100 p-3 dark:bg-ink-800/60">
+                <div className="rounded-lg bg-muted p-3">
                   <dt className="text-muted-foreground">{copy.derivedComponentsLabel}</dt>
                   <dd className="mt-1 font-semibold">{preview.components.length}</dd>
                 </div>
-                <div className="rounded-xl bg-ink-100 p-3 dark:bg-ink-800/60">
+                <div className="rounded-lg bg-muted p-3">
                   <dt className="text-muted-foreground">{copy.executionStepsLabel}</dt>
                   <dd className="mt-1 font-semibold">{preview.steps.length}</dd>
                 </div>
               </dl>
               <div className="grid gap-2 sm:grid-cols-2">
                 {preview.components.map((component) => (
-                  <div key={component.componentId} className="rounded-xl border border-border p-3 text-xs dark:border-border">
+                  <div key={component.componentId} className="rounded-lg border border-border p-3 text-xs">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-mono font-semibold text-foreground">{component.componentKey}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-2xs font-semibold tracking-wide ${component.selectionSource === "FOUNDATION" ? "bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-300" : "bg-ink-200 text-foreground dark:bg-ink-800 dark:text-muted-foreground"}`}>
+                      <span className={`rounded-sm px-2 py-0.5 text-xs font-semibold ${component.selectionSource === "FOUNDATION" ? "bg-info-subtle text-info-subtle-foreground" : "bg-muted text-muted-foreground"}`}>
                         {component.selectionSource}
                       </span>
                     </div>
@@ -359,8 +396,8 @@ function StateCard({
   description: string;
 }) {
   const classes = tone === "neutral"
-    ? "border-border bg-ink-100 text-foreground dark:bg-ink-800/40"
-    : "border-warn-200 bg-warn-50 text-warn-800 dark:border-warn-900 dark:bg-warn-950/40 dark:text-warn-300";
+    ? "border-border bg-muted text-foreground"
+    : "border-warning/30 bg-warning-subtle text-warning-subtle-foreground";
   return (
     <div className={`flex items-start gap-3 rounded-lg border p-4 ${classes}`} role={tone === "neutral" ? "status" : "alert"}>
       <span className="mt-0.5 shrink-0">{icon}</span>

@@ -15,39 +15,75 @@
 /* =========================================================================
    Design-system tokens (docs/design-system/tokens.md)
 
-   Nothing in the app references any of the names below yet, so adding them
-   is a zero-visual-change commit — see docs/design-system/migration.md
-   Phase 3. Tailwind's own default palette (slate, blue, indigo, …) is left
-   completely untouched here: it already reproduces today's look with zero
-   code from us, and stays that way until the Phase 6 theme flip
-   deliberately overrides those same built-in family variables so every
-   existing bg-slate-900 / text-blue-400 class repaints without a single
-   .tsx edit.
+   These are the authoritative semantic roles used by the migrated portal.
+   Legacy Tailwind family aliases remain below as a compatibility safety net
+   for third-party/generated markup; the design census prevents production
+   call sites from reintroducing direct palette dependencies.
    ========================================================================= */
 
 @theme {
-  /* Brand — emerald, hue 158->168, anchored at 400 = #34d399 (src/app/icon.svg). */
-  --color-brand-50: oklch(0.976 0.019 158);
-  --color-brand-100: oklch(0.95 0.04 158);
-  --color-brand-200: oklch(0.904 0.076 159);
-  --color-brand-300: oklch(0.848 0.114 160);
-  --color-brand-400: oklch(0.783 0.155 163);
-  --color-brand-500: oklch(0.712 0.15 165);
-  --color-brand-600: oklch(0.616 0.131 166);
-  --color-brand-700: oklch(0.495 0.105 166);
-  --color-brand-800: oklch(0.415 0.086 167);
-  --color-brand-900: oklch(0.352 0.07 168);
-  --color-brand-950: oklch(0.235 0.048 168);
+  /* Action — cobalt interaction and information. This family must never
+     encode success or health. The 500–800 steps match the approved design
+     references in docs/design-system/design-update.md. */
+  --color-action-50: oklch(0.97048 0.014182 254.604);
+  --color-action-100: oklch(0.931918 0.031591 255.585);
+  --color-action-200: oklch(0.882 0.059 254.128);
+  --color-action-300: oklch(0.809 0.099 251.813);
+  --color-action-400: oklch(0.707 0.156 254.624);
+  --color-action-500: oklch(0.54615 0.215208 262.881);
+  --color-action-600: oklch(0.488198 0.217165 264.376);
+  --color-action-700: oklch(0.424445 0.180869 265.638);
+  --color-action-800: oklch(0.379059 0.137761 265.522);
+  --color-action-900: oklch(0.321 0.101 266.2);
+  --color-action-950: oklch(0.245 0.098 267.1);
+
+  /* Success — healthy, completed, connected, and verified states only.
+     `brand` remains a transitional alias to this green family so existing
+     status call sites stay green while action styling migrates to cobalt. */
+  --color-success-50: oklch(0.981926 0.01806 155.826);
+  --color-success-100: oklch(0.962 0.044 156.743);
+  --color-success-200: oklch(0.925 0.084 155.995);
+  --color-success-300: oklch(0.871 0.15 154.449);
+  --color-success-400: oklch(0.783 0.155 163);
+  --color-success-500: oklch(0.723 0.191 149.579);
+  --color-success-600: oklch(0.627 0.17 149.214);
+  --color-success-700: oklch(0.527 0.137 150.069);
+  --color-success-800: oklch(0.447925 0.118 151.328);
+  --color-success-900: oklch(0.393 0.095 152.535);
+  --color-success-950: oklch(0.266 0.072 152.934);
+
+  --color-brand-50: var(--color-success-50);
+  --color-brand-100: var(--color-success-100);
+  --color-brand-200: var(--color-success-200);
+  --color-brand-300: var(--color-success-300);
+  --color-brand-400: var(--color-success-400);
+  --color-brand-500: var(--color-success-500);
+  --color-brand-600: var(--color-success-600);
+  --color-brand-700: var(--color-success-700);
+  --color-brand-800: var(--color-success-800);
+  --color-brand-900: var(--color-success-900);
+  --color-brand-950: var(--color-success-950);
+
+  /* Cold-blue light surface ramp. Dark surfaces continue to use the existing
+     high ink steps; the low ink aliases below repaint legacy neutral classes
+     without assigning status meaning to the surface family. */
+  --color-surface-25: oklch(0.992 0.006 240);
+  --color-surface-50: oklch(0.978 0.012 240);
+  --color-surface-100: oklch(0.955 0.02 240);
+  --color-surface-selected: oklch(0.932953 0.032255 258.369);
+  --color-surface-200: oklch(0.91 0.03 240);
+  --color-surface-300: oklch(0.84 0.035 240);
+  --color-control-border: oklch(0.656043 0.054999 250.432);
 
   /* Ink — the neutral ramp. Hue 232->245, half the chroma of Tailwind's
      slate and rotated ~25deg cooler: machined steel, not denim. 12 steps
      (an admin table needs a zebra-row step above 50 and a dark-canvas step
      below 950 that Tailwind's 11-step families don't have). */
-  --color-ink-25: oklch(0.992 0.002 232);
-  --color-ink-50: oklch(0.984 0.003 232);
-  --color-ink-100: oklch(0.966 0.005 232);
-  --color-ink-200: oklch(0.925 0.009 233);
-  --color-ink-300: oklch(0.868 0.014 234);
+  --color-ink-25: var(--color-surface-25);
+  --color-ink-50: var(--color-surface-50);
+  --color-ink-100: var(--color-surface-100);
+  --color-ink-200: var(--color-surface-200);
+  --color-ink-300: var(--color-surface-300);
   --color-ink-400: oklch(0.715 0.021 235);
   --color-ink-500: oklch(0.588 0.024 236);
   --color-ink-600: oklch(0.487 0.024 237);
@@ -67,10 +103,10 @@
   --color-danger-400: oklch(0.716 0.152 28);
   --color-danger-500: oklch(0.637 0.194 27);
   --color-danger-600: oklch(0.567 0.203 27);
-  --color-danger-700: oklch(0.487 0.176 27);
+  --color-danger-700: oklch(0.487 0.192 27);
   --color-danger-800: oklch(0.41 0.144 27);
   --color-danger-900: oklch(0.352 0.118 26);
-  --color-danger-950: oklch(0.232 0.08 26);
+  --color-danger-950: oklch(0.232 0.098 26);
 
   /* Warn — amber, hue 92->44. Large hue torsion is deliberate: amber has to
      drift toward orange as it darkens or the low steps read as olive. */
@@ -82,9 +118,9 @@
   --color-warn-500: oklch(0.752 0.156 74);
   --color-warn-600: oklch(0.66 0.148 62);
   --color-warn-700: oklch(0.545 0.13 52);
-  --color-warn-800: oklch(0.455 0.106 48);
+  --color-warn-800: oklch(0.455 0.12 48);
   --color-warn-900: oklch(0.39 0.086 46);
-  --color-warn-950: oklch(0.255 0.058 44);
+  --color-warn-950: oklch(0.255 0.078 44);
 }
 
 /* Semantic roles — light values. Named to match shadcn's registry exactly
@@ -93,48 +129,103 @@
    neutral hover fill, not brand — it stays ink here on purpose. Brand as an
    accent lives only in --primary and --ring. */
 :root {
-  --background: var(--color-ink-50);
-  --foreground: var(--color-ink-900);
+  --background: var(--color-surface-50);
+  --foreground: oklch(0.256528 0.058664 258.037);
 
   --card: white;
-  --card-foreground: var(--color-ink-900);
+  --card-foreground: var(--foreground);
   --popover: white;
-  --popover-foreground: var(--color-ink-900);
+  --popover-foreground: var(--foreground);
 
-  /* Fill role: #34d399 is a dark-mode accent, not a light-mode fill (white
-     text on it is ~1.9:1). A dark label on the bright emerald fill is the
-     accessible choice in both themes and keeps the literal logo color on
-     screen — see docs/design-system/tokens.md contrast table. */
-  --primary: var(--color-brand-500);
-  --primary-foreground: var(--color-ink-950);
+  --primary: var(--color-action-600);
+  --primary-foreground: white;
 
-  --secondary: var(--color-ink-100);
-  --secondary-foreground: var(--color-ink-900);
+  --secondary: var(--color-surface-100);
+  --secondary-foreground: var(--foreground);
 
-  --muted: var(--color-ink-100);
-  --muted-foreground: var(--color-ink-600);
+  --muted: var(--color-surface-100);
+  --muted-foreground: oklch(0.518211 0.050915 249.823);
 
-  --accent: var(--color-ink-100);
-  --accent-foreground: var(--color-ink-900);
+  --accent: var(--color-surface-100);
+  --accent-foreground: var(--foreground);
+
+  --selected: var(--color-surface-selected);
+  --selected-foreground: var(--color-action-800);
+
+  /* Subtle fills are the 100 step, not the 50. The 50 steps carry C
+     0.014-0.019, which on a 20px status pill is indistinguishable from
+     white — and *-subtle is the single most-used colored surface in the
+     app (268 call sites vs 35 for the full-strength fills), so it decides
+     whether the portal reads as colored at all. The 100 step is 2.1-2.4x
+     the chroma and every pair stays AA against its -700/-800 label
+     (success 6.49, warn 6.69, danger 5.77, info 8.49). */
+  --info: var(--color-action-700);
+  --info-foreground: white;
+  --info-subtle: var(--color-action-100);
+  --info-subtle-foreground: var(--color-action-800);
+  /* `*-vivid` is the non-text accent: status dots, indicator marks — things
+     a text label already names, so they answer to the 3:1 graphics bar
+     instead of 4.5:1 and can sit far brighter than the -700/-800 steps the
+     filled roles need. Those dark steps are what made every badge read as
+     grey-green rather than green. success-600 is 3.00:1 on its own subtle
+     tint at C 0.170, against C 0.118 for the -800 step it replaces. */
+  --info-vivid: var(--color-action-500);
+
+  --success: var(--color-success-800);
+  --success-foreground: white;
+  --success-subtle: var(--color-success-100);
+  --success-subtle-foreground: var(--color-success-800);
+  --success-vivid: var(--color-success-600);
+
+  --warning: var(--color-warn-800);
+  --warning-foreground: white;
+  --warning-subtle: var(--color-warn-100);
+  --warning-subtle-foreground: var(--color-warn-800);
+  --warning-vivid: var(--color-warn-600);
 
   /* danger-700, not -600: -600 fails contrast (~3.4:1) with white text. */
   --destructive: var(--color-danger-700);
   --destructive-foreground: white;
+  --destructive-subtle: var(--color-danger-100);
+  --destructive-subtle-foreground: var(--color-danger-700);
+  --destructive-vivid: var(--color-danger-500);
 
-  --border: var(--color-ink-200);
-  --input: var(--color-ink-200);
-  --ring: var(--color-brand-500);
+  --border: var(--color-surface-200);
+  --input: var(--color-control-border);
+  --ring: var(--color-action-500);
 
-  /* Chart series placeholder palette. Phase 22 restored the dashboard
-     charts but each one encodes its own chart-specific categorical
-     colors rather than drawing from a generic 5-slot palette — see
-     docs/design-system/tokens.md. These stay defined, themed, for the
-     next chart that does want a generic series palette. */
-  --chart-1: var(--color-brand-500);
-  --chart-2: var(--color-ink-500);
-  --chart-3: var(--color-warn-500);
-  --chart-4: var(--color-danger-500);
-  --chart-5: var(--color-brand-800);
+  /* Chart roles are semantic first. Qualitative slots are reserved for
+     unrelated categories and are always paired with labels or patterns. */
+  /* Marks sit just above WCAG's 3:1 floor for non-text graphics (the axis,
+     which is text, keeps 4.5:1 — ChartPalette.test.ts enforces both). They
+     were -600/-700 ramp steps at L 0.49-0.55, which on a white card read
+     dark and muddy rather than as data.
+
+     Two constraints shape these. Lightness is where chroma lives, since
+     sRGB's ceiling peaks near L 0.6-0.7, so brightening buys saturation
+     too. But a categorical palette also has to stay *level*: a series that
+     is darker than its neighbours reads as more important before the data
+     says anything. So every slot is held inside L 0.625-0.681 and takes the
+     chroma available there, rather than each chasing its own maximum — hue
+     does the separating. Explicit values, not ramp aliases, because no
+     single step lands on the floor. */
+  --chart-action: oklch(0.625 0.189 264.376);
+  --chart-success: oklch(0.645 0.168 150.069);
+  --chart-warning: oklch(0.679 0.165 52);
+  --chart-danger: oklch(0.625 0.241 27);
+  --chart-qualitative-1: oklch(0.625 0.189 264.376);
+  --chart-qualitative-2: oklch(0.633 0.105 186.391);
+  --chart-qualitative-3: oklch(0.625 0.231 301.924);
+  --chart-qualitative-4: oklch(0.681 0.173 48.998);
+  --chart-qualitative-5: oklch(0.625 0.236 16.935);
+  --chart-qualitative-6: oklch(0.651 0.168 130.933);
+  --chart-grid: var(--color-surface-200);
+  --chart-axis: var(--color-ink-600);
+  --chart-1: var(--chart-action);
+  --chart-2: var(--chart-success);
+  --chart-3: var(--chart-warning);
+  --chart-4: var(--chart-danger);
+  --chart-5: var(--chart-qualitative-3);
 
   /* Elevation (docs/design-system/geometry-and-density.md "Elevation"):
      shadow means "floating above the document," nothing else — cards use
@@ -150,14 +241,16 @@
 
   /* Sidebar (Phase 14) is bg-sidebar in BOTH themes — unlike the navbar it
      replaces, which is permanently dark. */
-  --sidebar: white;
-  --sidebar-foreground: var(--color-ink-900);
-  --sidebar-primary: var(--color-brand-500);
-  --sidebar-primary-foreground: var(--color-ink-950);
-  --sidebar-accent: var(--color-ink-100);
-  --sidebar-accent-foreground: var(--color-ink-900);
-  --sidebar-border: var(--color-ink-200);
-  --sidebar-ring: var(--color-brand-500);
+  --sidebar: var(--color-surface-25);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--color-action-600);
+  --sidebar-primary-foreground: white;
+  --sidebar-accent: var(--color-surface-100);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-selected: var(--color-surface-selected);
+  --sidebar-selected-foreground: var(--color-action-800);
+  --sidebar-border: var(--color-surface-200);
+  --sidebar-ring: var(--color-action-500);
 }
 
 /* Control height scale (docs/design-system/geometry-and-density.md) —
@@ -173,9 +266,44 @@
   --size-control-xl: 2.5rem; /* 40px */
 }
 
-/* Semantic roles — dark overrides. Matches the ratio table in
-   docs/design-system/tokens.md: brand-400 fill (9.8:1 with ink-950 text),
-   brand-300 for text/links (11.8:1), ink-600/400 muted-foreground floor. */
+/* Real pointer targets for dense controls. `ds-hit-area` increases the
+   control box itself; `ds-hit-target` keeps compact checkbox/radio visuals
+   while its generated box remains part of the originating control's hit
+   testing area. The expanded target activates only for coarse pointers. */
+.ds-hit-area {
+  min-block-size: 1.5rem;
+  min-inline-size: 1.5rem;
+}
+
+.ds-hit-target {
+  position: relative;
+}
+
+.ds-hit-target::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  left: 50%;
+  min-block-size: 1.5rem;
+  min-inline-size: 1.5rem;
+  transform: translate(-50%, -50%);
+}
+
+@media (pointer: coarse) {
+  .ds-hit-area {
+    min-block-size: 2.75rem;
+    min-inline-size: 2.75rem;
+  }
+
+  .ds-hit-target::after {
+    min-block-size: 2.75rem;
+    min-inline-size: 2.75rem;
+  }
+}
+
+/* Semantic roles — dark overrides. Interactive fills use dark ink labels so
+   the same bright role remains AA when consumed as standalone text. Control
+   boundaries retain at least 3:1 against the dark card surface. */
 .dark {
   --background: var(--color-ink-1000);
   --foreground: var(--color-ink-100);
@@ -185,8 +313,12 @@
   --popover: var(--color-ink-900);
   --popover-foreground: var(--color-ink-100);
 
-  --primary: var(--color-brand-400);
-  --primary-foreground: var(--color-ink-950);
+  /* Bright action text and fills share one role in the component API. The
+     darker action-500 step was AA as a fill with white, but only 3.66:1 when
+     consumed as text on --card. action-400 + ink-1000 is 7.24:1 on --card
+     and 7.68:1 as a filled-control pair. */
+  --primary: var(--color-action-400);
+  --primary-foreground: var(--color-ink-1000);
 
   --secondary: var(--color-ink-800);
   --secondary-foreground: var(--color-ink-100);
@@ -197,18 +329,61 @@
   --accent: var(--color-ink-800);
   --accent-foreground: var(--color-ink-100);
 
-  --destructive: var(--color-danger-700);
-  --destructive-foreground: white;
+  --selected: var(--color-action-950);
+  --selected-foreground: var(--color-action-200);
 
-  --border: var(--color-ink-800);
-  --input: var(--color-ink-800);
-  --ring: var(--color-brand-400);
+  --info: var(--color-action-400);
+  --info-foreground: var(--color-ink-1000);
+  --info-subtle: var(--color-action-950);
+  --info-subtle-foreground: var(--color-action-200);
+  --info-vivid: var(--color-action-400);
 
-  --chart-1: var(--color-brand-400);
-  --chart-2: var(--color-ink-400);
-  --chart-3: var(--color-warn-400);
-  --chart-4: var(--color-danger-400);
-  --chart-5: var(--color-brand-300);
+  --success: var(--color-success-300);
+  --success-foreground: var(--color-ink-1000);
+  --success-subtle: var(--color-success-950);
+  --success-subtle-foreground: var(--color-success-200);
+  --success-vivid: var(--color-success-400);
+
+  --warning: var(--color-warn-300);
+  --warning-foreground: var(--color-ink-1000);
+  --warning-subtle: var(--color-warn-950);
+  --warning-subtle-foreground: var(--color-warn-200);
+  --warning-vivid: var(--color-warn-400);
+
+  /* The destructive role is also used for standalone error text/icons.
+     danger-400, not danger-300: at L 0.812 the red ceiling is only C 0.107,
+     so the 300 step could not be anything but pale — it spent its budget on
+     10.16:1 contrast when AA needs 4.5. The 400 step carries C 0.152 (+55%)
+     and still clears 7.04:1 on --card and 7.47:1 with its ink-1000 label. */
+  --destructive: var(--color-danger-400);
+  --destructive-foreground: var(--color-ink-1000);
+  --destructive-subtle: var(--color-danger-950);
+  --destructive-subtle-foreground: var(--color-danger-200);
+  --destructive-vivid: var(--color-danger-400);
+
+  /* 3.04:1 against --card: preserves a restrained dark boundary while
+     keeping form controls and required separators perceivable. */
+  --border: oklch(0.49 0.024 237);
+  --input: oklch(0.49 0.024 237);
+  --ring: var(--color-action-400);
+
+  --chart-action: var(--color-action-400);
+  --chart-success: var(--color-success-400);
+  --chart-warning: var(--color-warn-400);
+  --chart-danger: var(--color-danger-400);
+  --chart-qualitative-1: oklch(0.71374 0.143381 254.624);
+  --chart-qualitative-2: oklch(0.78452 0.132529 181.912);
+  --chart-qualitative-3: oklch(0.721685 0.176688 305.504);
+  --chart-qualitative-4: oklch(0.836861 0.164422 84.429);
+  --chart-qualitative-5: oklch(0.719186 0.168984 13.428);
+  --chart-qualitative-6: oklch(0.849315 0.20734 128.85);
+  --chart-grid: var(--color-ink-800);
+  --chart-axis: var(--color-ink-400);
+  --chart-1: var(--chart-action);
+  --chart-2: var(--chart-success);
+  --chart-3: var(--chart-warning);
+  --chart-4: var(--chart-danger);
+  --chart-5: var(--chart-qualitative-3);
 
   /* Dark mode substitutes a top inset hairline for shadow rather than a
      darker shadow — a box-shadow reads poorly against an already-dark
@@ -218,12 +393,14 @@
 
   --sidebar: var(--color-ink-950);
   --sidebar-foreground: var(--color-ink-100);
-  --sidebar-primary: var(--color-brand-400);
-  --sidebar-primary-foreground: var(--color-ink-950);
+  --sidebar-primary: var(--color-action-500);
+  --sidebar-primary-foreground: white;
   --sidebar-accent: var(--color-ink-800);
   --sidebar-accent-foreground: var(--color-ink-100);
+  --sidebar-selected: var(--color-action-950);
+  --sidebar-selected-foreground: var(--color-action-200);
   --sidebar-border: var(--color-ink-800);
-  --sidebar-ring: var(--color-brand-400);
+  --sidebar-ring: var(--color-action-400);
 }
 
 /* Bridges the semantic :root/.dark custom properties above into Tailwind
@@ -246,8 +423,28 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-selected: var(--selected);
+  --color-selected-foreground: var(--selected-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-vivid: var(--info-vivid);
+  --color-info-subtle-foreground: var(--info-subtle-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-vivid: var(--success-vivid);
+  --color-success-subtle-foreground: var(--success-subtle-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-vivid: var(--warning-vivid);
+  --color-warning-subtle-foreground: var(--warning-subtle-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-destructive-vivid: var(--destructive-vivid);
+  --color-destructive-subtle-foreground: var(--destructive-subtle-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -256,6 +453,18 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-chart-action: var(--chart-action);
+  --color-chart-success: var(--chart-success);
+  --color-chart-warning: var(--chart-warning);
+  --color-chart-danger: var(--chart-danger);
+  --color-chart-qualitative-1: var(--chart-qualitative-1);
+  --color-chart-qualitative-2: var(--chart-qualitative-2);
+  --color-chart-qualitative-3: var(--chart-qualitative-3);
+  --color-chart-qualitative-4: var(--chart-qualitative-4);
+  --color-chart-qualitative-5: var(--chart-qualitative-5);
+  --color-chart-qualitative-6: var(--chart-qualitative-6);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-axis: var(--chart-axis);
   --shadow-pop: var(--elevation-pop);
   --shadow-overlay: var(--elevation-overlay);
   --color-sidebar: var(--sidebar);
@@ -264,6 +473,8 @@
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-selected: var(--sidebar-selected);
+  --color-sidebar-selected-foreground: var(--sidebar-selected-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
@@ -274,17 +485,13 @@
 }
 
 /* =========================================================================
-   THE THEME FLIP (docs/design-system/migration.md Phase 6)
+   LEGACY PALETTE COMPATIBILITY (docs/design-system/migration.md)
 
-   Everything below overrides Tailwind's OWN built-in default palette/type/
-   weight/radius theme variables directly. Because @theme merges over
-   Tailwind's defaults (last declaration of the same --custom-property wins),
-   every existing bg-slate-900 / text-blue-400 / font-black / rounded-2xl
-   class already used across 9,000+ call sites in .tsx files repaints with
-   ZERO file edits — this is the one-file reskin. The old family names stay
-   fully functional on purpose: Phase 7's codemods rename call sites to the
-   semantic tokens above at their own pace, and only once nothing references
-   a family name does Phase 25 delete its override here.
+   Everything below overrides Tailwind's built-in palette/type/weight/radius
+   variables directly. Production TS/TSX now uses semantic roles and the
+   census reports zero direct-ramp call sites. These aliases remain so a
+   generated or third-party fragment cannot silently fall back to a warm or
+   inconsistent palette; removing them is a separate compatibility decision.
 
    Rule: every default Tailwind color family collapses to one of four roles.
      brand  (success/healthy) <- emerald, green
@@ -577,8 +784,8 @@
    declared explicitly anyway so the scale is self-documenting in one place
    rather than "correct by coincidence". */
 @theme {
-  --text-2xs: 0.75rem; /* 12px — Latin uppercase micro-labels only */
-  --text-2xs--line-height: 1rem; /* 16px */
+  --text-2xs: 0.8125rem; /* 13px — compatibility alias; migrate to text-xs */
+  --text-2xs--line-height: 1.125rem; /* 18px */
   --text-2xs--letter-spacing: 0.06em;
 
   --text-xs: 0.8125rem; /* 13px — the workhorse: table cells, badges, meta */

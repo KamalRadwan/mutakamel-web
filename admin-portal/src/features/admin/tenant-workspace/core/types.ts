@@ -207,6 +207,7 @@ export type TenantMutationName =
   | "reprovision"
   | "cancel-provisioning"
   | "soft-delete"
+  | "restore"
   | "destroy";
 
 export type TenantFqdnMutationName =
@@ -226,6 +227,7 @@ export interface TenantCorePermissions {
   canSuspendOrActivate: boolean;
   canReprovisionOrCancel: boolean;
   canSoftDelete: boolean;
+  canRestore: boolean;
   canDestroy: boolean;
   canValidateFqdn: boolean;
   canManageFqdns: boolean;

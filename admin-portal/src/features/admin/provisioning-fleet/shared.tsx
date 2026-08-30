@@ -10,9 +10,10 @@ import {
   RefreshCw,
   ShieldAlert,
 } from "lucide-react";
-import { type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import {
+  Badge,
   Button,
   Card,
   CodeRef,
@@ -125,9 +126,9 @@ export function FleetStatePanel({
         className="p-6 text-center"
       >
         {loading ? (
-          <Loader2 className="mx-auto size-7 animate-spin text-muted-foreground" aria-hidden="true" />
+          <Loader2 className="mx-auto size-7 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden="true" />
         ) : (
-          <AlertTriangle className="mx-auto size-7 text-warn-600 dark:text-warn-400" aria-hidden="true" />
+          <AlertTriangle className="mx-auto size-7 text-warning-subtle-foreground" aria-hidden="true" />
         )}
         <p className="mt-3 text-sm font-semibold text-foreground">{label}</p>
         {error ? <FleetProblem error={error} /> : null}
@@ -172,6 +173,12 @@ export function FleetCommandNotice<T>({
   onClear: () => void;
   successAction?: ReactNode;
 }) {
+  const noticeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (view.state !== "IDLE" && view.state !== "PENDING" && view.state !== "SUCCESS") {
+      noticeRef.current?.focus();
+    }
+  }, [view.state]);
   if (view.state === "IDLE" || view.state === "PENDING") return null;
   const success = view.state === "SUCCESS";
   const text = success
@@ -190,12 +197,14 @@ export function FleetCommandNotice<T>({
   const correlation = readResultMeta(view.result)?.correlationId;
   return (
     <div
+      ref={noticeRef}
       role={success ? "status" : "alert"}
+      tabIndex={success ? undefined : -1}
       className={`rounded-lg border p-4 text-sm ${
         success
-          ? "border-brand-300 bg-brand-50 text-brand-950 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-100"
-          : "border-warn-300 bg-warn-50 text-warn-950 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-100"
-      }`}
+          ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+          : "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
+      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
     >
       <div className="flex items-start gap-2">
         {success ? (
@@ -238,9 +247,11 @@ export function FleetCommandNotice<T>({
 export function FleetMeta({
   result,
   copy,
+  lang,
 }: {
   result: Pick<FleetResult<unknown>, "correlationId" | "timestamp">;
   copy: ProvisioningFleetCopy;
+  lang: "ar" | "en";
 }) {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
@@ -248,7 +259,7 @@ export function FleetMeta({
         {copy.correlation}: <CodeRef value={result.correlationId} />
       </span>
       <span>
-        {copy.responseAt}: {formatInstant(result.timestamp)}
+        {copy.responseAt}: {formatInstant(result.timestamp, lang)}
       </span>
     </div>
   );
@@ -266,7 +277,7 @@ export function FleetFieldError({
   if (!code) return null;
   const message = copy.validation[code as keyof typeof copy.validation] ?? copy.validationFailed;
   return (
-    <span id={id} role="alert" className="text-xs font-semibold text-danger-600 dark:text-danger-400">
+    <span id={id} role="alert" className="text-xs font-semibold text-destructive-subtle-foreground">
       {message}
     </span>
   );
@@ -283,7 +294,7 @@ export function FleetDatum({
 }) {
   return (
     <Card className="min-w-0 p-3">
-      <dt className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</dt>
       <dd
         dir={mono ? "ltr" : undefined}
         className={`mt-1 break-all text-sm font-semibold text-foreground ${mono ? "text-start font-mono text-xs" : ""}`}
@@ -294,11 +305,31 @@ export function FleetDatum({
   );
 }
 
-export function formatInstant(value: string | null): string {
+export function FleetStatusBadge({
+  status,
+  label,
+}: {
+  status: string;
+  label: string;
+}) {
+  const tone = status === "SUCCEEDED" || status === "ACTIVE" || status === "READY" || status === "ATTESTED" || status === "ELIGIBLE"
+    ? "success"
+    : status === "FAILED" || status === "INELIGIBLE" || status === "INCOMPATIBLE"
+      ? "danger"
+      : status === "RUNNING" || status === "DISPATCHED"
+        ? "info"
+        : status === "PAUSED" || status === "CANCEL_REQUESTED" || status === "PENDING" || status === "READY_FOR_ATTESTATION"
+          ? "warn"
+          : "neutral";
+  return <Badge tone={tone}>{label}</Badge>;
+}
+
+export function formatInstant(value: string | null, lang: "ar" | "en"): string {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
     dateStyle: "medium",
     timeStyle: "medium",
+    timeZone: "UTC",
   }).format(new Date(value));
 }
 

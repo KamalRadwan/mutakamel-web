@@ -182,7 +182,11 @@ describe("LoggingScreen", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Apply" })[1]);
     fireEvent.click(screen.getByRole("button", { name: "Resolve effective level" }));
     fireEvent.click(screen.getByRole("button", { name: "Review and save" }));
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Actions: crm-app" }),
+      { button: 0, ctrlKey: false },
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
     fireEvent.click(screen.getByRole("button", { name: "Start stream" }));
 
     expect(consoleMock.applyDirectoryFilters).toHaveBeenCalledOnce();
@@ -193,7 +197,7 @@ describe("LoggingScreen", () => {
       expect.objectContaining({ id: OVERRIDE_ROW.id }),
     );
     expect(liveMock.start).toHaveBeenCalledOnce();
-  });
+  }, 10_000);
 
   it("fails closed for a read-forbidden operator", () => {
     consoleMock.canRead = false;

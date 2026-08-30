@@ -113,6 +113,22 @@ export function getDashboardGroupDescription(
     : GROUP_COPY[key].descriptionEn;
 }
 
+/**
+ * Every group this actor may open, in contract order.
+ *
+ * This drives the tab bar, so it reads `authorizedGroups` alone. A response
+ * scoped with `?groups=` carries only the groups it loaded, and keying the
+ * tabs off the present group objects made the rest of the tabs vanish —
+ * and with them any way to reach the data.
+ */
+export function getAuthorizedDashboardGroupKeys(
+  data: DashboardResponse,
+): DashboardGroupKey[] {
+  const authorized = new Set(data.authorizedGroups);
+  return DASHBOARD_GROUP_KEYS.filter((key) => authorized.has(key));
+}
+
+/** Authorized groups whose data is present in this response. */
 export function getAuthorizedDashboardGroups(
   data: DashboardResponse,
 ): Array<[DashboardGroupKey, DashboardGroup]> {
@@ -128,6 +144,84 @@ export function humanizeDashboardField(value: string): string {
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+const DASHBOARD_FIELD_LABELS_AR: Readonly<Record<string, string>> = {
+  total: "الإجمالي",
+  count: "العدد",
+  current: "الحالي",
+  maximum: "الحد الأقصى",
+  available: "المتاح",
+  active: "النشط",
+  pending: "قيد الانتظار",
+  failed: "الفاشل",
+  succeeded: "الناجح",
+  utilization: "معدل الاستخدام",
+  ratio: "النسبة",
+  amount: "المبلغ",
+  amountUsd: "المبلغ بالدولار الأمريكي",
+  currentTenants: "المستأجرون الحاليون",
+  maxTenants: "الحد الأقصى للمستأجرين",
+  availableCapacity: "السعة المتاحة",
+  totalTenants: "إجمالي المستأجرين",
+  totalDomains: "إجمالي النطاقات",
+  verifiedDomains: "النطاقات المتحقق منها",
+  invalidDomains: "النطاقات غير الصالحة",
+  collectedRatio: "نسبة التحصيل",
+  monthlyRecurringRevenue: "الإيراد الشهري المتكرر",
+  annualRecurringRevenue: "الإيراد السنوي المتكرر",
+
+  // Failure taxonomy. Every report used to count "failures" its own way, so
+  // these read identically on every tab. Exactly one of them — أخطاء تطبيق
+  // غير مُعالَجة — means the platform itself is at fault; the rest say it
+  // refused correctly, or that something outside it failed.
+  unhandledApplicationErrors: "أخطاء تطبيق غير مُعالَجة",
+  unresolvedFailures: "أعطال لم تتعافَ",
+  applicationFailures: "أعطال في كود المنصة",
+  applicationFailureRatio: "نسبة أعطال المنصة",
+  recentApplicationFailures: "أعطال المنصة الحديثة",
+  dependencyFailures: "أعطال في خدمات خارجية",
+  clientRefusals: "طلبات مرفوضة بشكل صحيح",
+  capacityRefusals: "رفض لحماية السعة",
+  indeterminateOutcomes: "نتائج غير مؤكدة",
+  awaitingTriage: "بانتظار التصنيف",
+  syntheticFailures: "أعطال من سكربتات واختبارات",
+  failedRequests: "طلبات فاشلة",
+  failedEvents: "أحداث فاشلة",
+  failureRatio: "نسبة الفشل",
+  classificationDrift: "انحراف التصنيف المُجمَّد",
+  incompleteGatewayCommands: "أوامر بوابة غير مكتملة",
+  currentIncompleteGatewayCommands: "أوامر بوابة غير مكتملة حالياً",
+  missingCorrelation: "معرّف ارتباط مفقود",
+  missingOperation: "معرّف عملية مفقود",
+  events: "الأحداث",
+
+  byFaultDomain: "حسب نطاق العطل",
+  byCodeQuality: "حسب جودة كود الخطأ",
+  APPLICATION: "عطل في المنصة",
+  DEPENDENCY: "عطل في خدمة خارجية",
+  CAPACITY: "حماية السعة",
+  CLIENT: "رفض صحيح",
+  INDETERMINATE: "نتيجة غير مؤكدة",
+  UNCLASSIFIED: "بانتظار التصنيف",
+  DESIGNED: "كود خطأ مقصود",
+  GENERIC: "كود عام",
+  LEAKED: "خطأ غير مُغلَّف",
+};
+
+export interface DashboardFieldLabel {
+  label: string;
+  /** Unknown wire keys stay verbatim and isolated instead of receiving an invented translation. */
+  dir?: "ltr";
+}
+
+export function getDashboardFieldLabel(
+  value: string,
+  lang: DashboardLanguage,
+): DashboardFieldLabel {
+  if (lang === "en") return { label: humanizeDashboardField(value) };
+  const localized = DASHBOARD_FIELD_LABELS_AR[value];
+  return localized ? { label: localized } : { label: value, dir: "ltr" };
 }
 
 export function isUnavailableProjection(

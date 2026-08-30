@@ -50,7 +50,7 @@ export default function CatalogueAuditPage() {
       key: "action",
       headerEn: "Action",
       headerAr: "الإجراء",
-      cell: (event) => <span className="font-mono text-xs font-semibold text-brand-700 dark:text-brand-400">{event.action}</span>,
+      cell: (event) => <span className="font-mono text-xs font-semibold text-info">{event.action}</span>,
     },
     {
       key: "entityType",
@@ -97,7 +97,7 @@ export default function CatalogueAuditPage() {
         action={
           canRead && (
             <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={isLoading}>
-              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`size-4 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
               {text.refresh}
             </Button>
           )
@@ -153,7 +153,7 @@ function StateCard({ children, loading = false }: { children: React.ReactNode; l
   return (
     <Card>
       <CardContent role={loading ? "status" : "alert"} className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-        {loading ? <RefreshCw className="size-4 animate-spin" /> : null}
+        {loading ? <RefreshCw className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
         {children}
       </CardContent>
     </Card>

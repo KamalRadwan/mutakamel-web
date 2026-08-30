@@ -66,7 +66,7 @@ export function AuthSessionsPanel() {
               variant="outline"
               onClick={() => setIsLogoutAllOpen(true)}
               disabled={isLoading || isBusy}
-              className="border-danger-200 text-danger-600 hover:bg-danger-50 dark:border-danger-900 dark:text-danger-400 dark:hover:bg-danger-950/40"
+              className="border-destructive/40 text-destructive hover:bg-destructive-subtle"
             >
               <LogOut className="size-4" />
               {copy.logoutAllButton}
@@ -79,20 +79,20 @@ export function AuthSessionsPanel() {
               className="w-9 p-0"
               aria-label={copy.refresh}
             >
-              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`size-4 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
             </Button>
           </div>
         </div>
 
         {error && (
-          <p role="alert" className="text-xs font-medium text-danger-600 dark:text-danger-400">
+          <p role="alert" className="text-xs font-medium text-destructive">
             {copy.error}
           </p>
         )}
 
         {isLoading ? (
           <div role="status" className="flex items-center justify-center p-8 text-muted-foreground">
-            <Loader2 className="size-5 animate-spin" />
+            <Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
             <span className="sr-only">{copy.loading}</span>
           </div>
         ) : (
@@ -133,7 +133,7 @@ export function AuthSessionsPanel() {
                     onClick={() => setPendingSession(session)}
                     disabled={isBusy}
                     loading={revokingId === session.id}
-                    className="border-danger-200 text-danger-600 hover:bg-danger-50 dark:border-danger-900 dark:text-danger-400 dark:hover:bg-danger-950/40"
+                    className="border-destructive/40 text-destructive hover:bg-destructive-subtle"
                   >
                     {revokingId !== session.id && <ShieldOff className="size-4" />}
                     {session.current ? copy.endCurrent : copy.revoke}

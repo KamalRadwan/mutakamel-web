@@ -47,15 +47,6 @@ export function userPayload(
         branchId: BRANCH_ID,
       },
     ],
-    webphone: {
-      enabled: true,
-      extension: "1001",
-      sipUsername: "1001",
-      displayName: "Mona Ali",
-      outboundCallerId: "+201000000000",
-      transport: "wss",
-      passwordConfigured: true,
-    },
     lastLoginAt: NOW,
     lockedUntil: null,
     createdAt: NOW,
@@ -77,7 +68,6 @@ export const summaryFixture: TenantUserSummary = {
   deactivated: 1,
   deleted: 1,
   owners: 1,
-  webphoneEnabled: 2,
   locked: 0,
 };
 

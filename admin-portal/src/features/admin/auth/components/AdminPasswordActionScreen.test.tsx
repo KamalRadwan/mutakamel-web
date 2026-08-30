@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminPasswordActionScreen } from "./AdminPasswordActionScreen";
 
@@ -9,14 +9,21 @@ const auth = vi.hoisted(() => ({
   resetPassword: vi.fn(),
 }));
 
+const i18n = vi.hoisted(() => ({ lang: "en" as "en" | "ar" }));
+
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => auth,
 }));
 
 vi.mock("@/i18n/I18nContext", async () => {
   const { en } = await import("@/i18n/dictionaries/en");
+  const { ar } = await import("@/i18n/dictionaries/ar");
   return {
-    useI18n: () => ({ lang: "en", dir: "ltr", t: en }),
+    useI18n: () => ({
+      lang: i18n.lang,
+      dir: i18n.lang === "ar" ? "rtl" : "ltr",
+      t: i18n.lang === "ar" ? ar : en,
+    }),
   };
 });
 
@@ -30,6 +37,7 @@ vi.mock("@/components/layout/ThemeToggle", () => ({
 
 describe("public admin password actions", () => {
   beforeEach(() => {
+    i18n.lang = "en";
     auth.acceptInvite.mockReset().mockResolvedValue(undefined);
     auth.resetPassword.mockReset().mockResolvedValue(undefined);
   });
@@ -103,5 +111,25 @@ describe("public admin password actions", () => {
     expect(screen.getByRole("link", { name: "Back to sign in" }))
       .toHaveAttribute("href", "/login");
     expect(auth.resetPassword).not.toHaveBeenCalled();
+  });
+
+  it("announces localized password-rule outcomes independently of color and icons", async () => {
+    i18n.lang = "ar";
+    window.history.replaceState(
+      {},
+      "",
+      "/admin/reset-password#token=qrstuvwxyzabcdef",
+    );
+    render(<AdminPasswordActionScreen mode="resetPassword" />);
+
+    const rules = await screen.findByRole("group", { name: "متطلبات كلمة المرور" });
+    expect(within(rules).getAllByText("غير مستوفى")).toHaveLength(5);
+
+    fireEvent.change(screen.getByLabelText("كلمة المرور الجديدة"), {
+      target: { value: "StrongPassword1!" },
+    });
+
+    expect(within(rules).getAllByText("مستوفى")).toHaveLength(5);
+    expect(within(rules).queryByText("غير مستوفى")).not.toBeInTheDocument();
   });
 });

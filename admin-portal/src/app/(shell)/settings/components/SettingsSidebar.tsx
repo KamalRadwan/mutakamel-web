@@ -9,7 +9,7 @@ export function SettingsSidebar() {
 
   return (
     <div className="space-y-3">
-      <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">
         <Settings className="h-4.5 w-4.5 text-muted-foreground" aria-hidden="true" />
         {t.settings.pageTitle}
       </h2>

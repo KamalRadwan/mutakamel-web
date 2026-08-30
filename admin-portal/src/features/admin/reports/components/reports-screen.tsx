@@ -27,7 +27,6 @@ import {
   StatCard,
   StatusBadge,
   DataTable,
-  Progress,
   Card,
   CardContent,
   Field,
@@ -216,7 +215,7 @@ export function ReportsScreen() {
         >
           <TabsList
             aria-label={copy.title}
-            className="h-auto flex-wrap gap-1 border-b-0 bg-ink-100 p-1.5 dark:bg-ink-900/60"
+            className="h-auto w-full flex-wrap justify-start gap-1 bg-muted p-1.5"
           >
             {REPORT_KINDS.map((kind) => {
               const Icon = TAB_ICON[kind];
@@ -224,7 +223,7 @@ export function ReportsScreen() {
                 <TabsTrigger
                   key={kind}
                   value={kind}
-                  className="h-9 gap-2 rounded-md px-3 data-[state=active]:bg-card data-[state=active]:text-brand-700 data-[state=active]:shadow-sm dark:data-[state=active]:text-brand-400 after:hidden"
+                  className="gap-2 px-3"
                 >
                   <Icon className="size-4 shrink-0" aria-hidden="true" />
                   {tabLabel(kind, copy)}
@@ -244,7 +243,7 @@ export function ReportsScreen() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
                       <Filter
-                        className="size-4 text-brand-600 dark:text-brand-400"
+                        className="size-4 text-primary"
                         aria-hidden="true"
                       />
                       {copy.filters}
@@ -257,7 +256,7 @@ export function ReportsScreen() {
                       disabled={report.isRefreshing}
                     >
                       <RefreshCw
-                        className={`size-3.5 ${report.isRefreshing ? "animate-spin" : ""}`}
+                        className={`size-3.5 ${report.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`}
                         aria-hidden="true"
                       />
                       {copy.refresh}
@@ -270,6 +269,7 @@ export function ReportsScreen() {
                     errors={report.validationErrors}
                     update={report.updateFilter}
                     copy={copy}
+                    lang={lang}
                   />
 
                   {report.activeReport !== "SERVERS" ? (
@@ -292,13 +292,13 @@ export function ReportsScreen() {
               </CardContent>
             </Card>
 
-            <div className="relative">
+            <div className="relative" aria-busy={report.isRefreshing || undefined}>
               {report.isRefreshing ? (
                 <p
                   role="status"
-                  className="absolute end-3 top-3 z-10 inline-flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-sm dark:text-brand-300"
+                  className="absolute end-3 top-3 z-10 inline-flex items-center gap-2 rounded-md border border-info/30 bg-info-subtle px-3 py-1.5 text-sm font-semibold text-info-subtle-foreground"
                 >
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                  <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                   {copy.refreshing}
                 </p>
               ) : null}
@@ -319,6 +319,7 @@ function ReportFilters({
   errors,
   update,
   copy,
+  lang,
 }: {
   kind: ReportKind;
   draft: ReportFilterDraft;
@@ -328,6 +329,7 @@ function ReportFilters({
     value: ReportFilterDraft[K],
   ) => void;
   copy: Copy;
+  lang: "ar" | "en";
 }) {
   if (kind === "SERVERS") {
     return (
@@ -385,7 +387,7 @@ function ReportFilters({
                   )
                 }
               >
-                <SelectTrigger id={fp.id}>
+                <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -432,7 +434,7 @@ function ReportFilters({
               <SelectContent>
                 {[10, 20, 25, 50, 100].map((limit) => (
                   <SelectItem key={limit} value={String(limit)}>
-                    {limit}
+                    {formatInteger(limit, lang)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -474,7 +476,7 @@ function ReportBody({
         correlationId={report.error?.correlationId}
         correlationLabel={copy.correlation}
         action={
-          <Button type="button" variant="primary" onClick={report.refresh}>
+          <Button type="button" variant="outline" onClick={report.refresh}>
             <RefreshCw className="size-4" aria-hidden="true" />
             {copy.retry}
           </Button>
@@ -491,7 +493,7 @@ function ReportBody({
         correlationId={report.error?.correlationId}
         correlationLabel={copy.correlation}
         action={
-          <Button type="button" variant="primary" onClick={report.refresh}>
+          <Button type="button" variant="outline" onClick={report.refresh}>
             <RefreshCw className="size-4" aria-hidden="true" />
             {copy.retry}
           </Button>
@@ -524,6 +526,7 @@ function ReportBody({
         data={report.data}
         copy={copy}
         lang={lang}
+        isRefreshing={report.isRefreshing}
         previousTenantPage={report.previousTenantPage}
         nextTenantPage={report.nextTenantPage}
       />
@@ -536,12 +539,14 @@ function ReportView({
   data,
   copy,
   lang,
+  isRefreshing,
   previousTenantPage,
   nextTenantPage,
 }: {
   data: ReportData;
   copy: Copy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
   previousTenantPage: () => void;
   nextTenantPage: () => void;
 }) {
@@ -554,17 +559,18 @@ function ReportView({
           data={data.snapshot.data}
           copy={copy}
           lang={lang}
+          isRefreshing={isRefreshing}
           previous={previousTenantPage}
           next={nextTenantPage}
         />
       );
     case "SERVERS":
-      return <ServersView data={data.snapshot.data} copy={copy} lang={lang} />;
+      return <ServersView data={data.snapshot.data} copy={copy} lang={lang} isRefreshing={isRefreshing} />;
     case "BILLING":
-      return <BillingView data={data.snapshot.data} copy={copy} lang={lang} />;
+      return <BillingView data={data.snapshot.data} copy={copy} lang={lang} isRefreshing={isRefreshing} />;
     case "PROVISIONING":
       return (
-        <ProvisioningView data={data.snapshot.data} copy={copy} lang={lang} />
+        <ProvisioningView data={data.snapshot.data} copy={copy} lang={lang} isRefreshing={isRefreshing} />
       );
   }
 }
@@ -642,12 +648,14 @@ function TenantView({
   data,
   copy,
   lang,
+  isRefreshing,
   previous,
   next,
 }: {
   data: TenantReportPage;
   copy: Copy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
   previous: () => void;
   next: () => void;
 }) {
@@ -659,7 +667,7 @@ function TenantView({
       cell: (row) => (
         <Link
           href={`/tenants/${encodeURIComponent(row.id)}`}
-          className="font-semibold text-brand-700 hover:underline dark:text-brand-400"
+          className="font-semibold text-action hover:underline"
         >
           {row.name}
         </Link>
@@ -687,7 +695,7 @@ function TenantView({
       headerEn: copy.allowedUsers,
       headerAr: copy.allowedUsers,
       cell: (row) => (
-        <span className="font-mono font-semibold">
+        <span className="font-mono">
           {row.allowedUsers === null
             ? copy.unknown
             : formatInteger(row.allowedUsers, lang)}
@@ -708,8 +716,11 @@ function TenantView({
 
   return (
     <DataTable
+      labelEn={COPY.en.tenants}
+      labelAr={COPY.ar.tenants}
       columns={columns}
       data={data.items}
+      isRefreshing={isRefreshing}
       getRowId={(row) => row.id}
       pagination={{
         page: data.page,
@@ -727,10 +738,12 @@ function ServersView({
   data,
   copy,
   lang,
+  isRefreshing,
 }: {
   data: ServersReport;
   copy: Copy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
 }) {
   const columns: ColumnDef<ServerReportRow>[] = [
     {
@@ -740,7 +753,7 @@ function ServersView({
       cell: (row) => (
         <Link
           href={`/database-servers/${encodeURIComponent(row.id)}`}
-          className="font-semibold text-brand-700 hover:underline dark:text-brand-400"
+          className="font-semibold text-action hover:underline"
         >
           {row.name}
         </Link>
@@ -769,7 +782,7 @@ function ServersView({
       headerEn: copy.capacity,
       headerAr: copy.capacity,
       cell: (row) => (
-        <span className="font-mono font-semibold">
+        <span className="font-mono">
           {formatInteger(row.currentTenants, lang)} /{" "}
           {formatInteger(row.maxTenants, lang)}
         </span>
@@ -781,13 +794,8 @@ function ServersView({
       headerAr: copy.utilization,
       cell: (row) => (
         <div className="flex min-w-32 items-center gap-3">
-          <Progress
-            value={row.utilization * 100}
-            tone={row.utilization >= 1 ? "failed" : "succeeded"}
-            className="w-24"
-            aria-label={`${copy.utilization}: ${formatPercent(row.utilization, lang)}`}
-          />
-          <span className="font-mono font-semibold">
+          <CapacityBar value={row.utilization * 100} />
+          <span className="font-mono">
             {formatPercent(row.utilization, lang)}
           </span>
         </div>
@@ -797,8 +805,11 @@ function ServersView({
 
   return (
     <DataTable
+      labelEn={COPY.en.servers}
+      labelAr={COPY.ar.servers}
       columns={columns}
       data={data.items}
+      isRefreshing={isRefreshing}
       getRowId={(row) => row.id}
       pagination={{
         page: 1,
@@ -816,10 +827,12 @@ function BillingView({
   data,
   copy,
   lang,
+  isRefreshing,
 }: {
   data: BillingReport;
   copy: Copy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
 }) {
   const columns: ColumnDef<BillingReportBucket>[] = [
     {
@@ -833,7 +846,7 @@ function BillingView({
       headerEn: copy.count,
       headerAr: copy.count,
       cell: (row) => (
-        <span className="font-mono font-semibold">
+        <span className="font-mono">
           {formatInteger(row.count, lang)}
         </span>
       ),
@@ -843,7 +856,7 @@ function BillingView({
       headerEn: copy.total,
       headerAr: copy.total,
       cell: (row) => (
-        <span className="font-mono font-semibold">
+        <span className="font-mono">
           {formatDecimalString(row.total)}
         </span>
       ),
@@ -854,8 +867,11 @@ function BillingView({
     <div className="space-y-3">
       <h2 className="text-sm font-semibold">{copy.invoiceBuckets}</h2>
       <DataTable
+        labelEn={COPY.en.billing}
+        labelAr={COPY.ar.billing}
         columns={columns}
         data={data.buckets}
+        isRefreshing={isRefreshing}
         getRowId={(row) => row.status}
         pagination={{
           page: 1,
@@ -874,10 +890,12 @@ function ProvisioningView({
   data,
   copy,
   lang,
+  isRefreshing,
 }: {
   data: ProvisioningReport;
   copy: Copy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
 }) {
   const columns: ColumnDef<ProvisioningReportRow>[] = [
     {
@@ -887,7 +905,7 @@ function ProvisioningView({
       cell: (row) => (
         <Link
           href={`/tenants/${encodeURIComponent(row.id)}`}
-          className="font-semibold text-brand-700 hover:underline dark:text-brand-400"
+          className="font-semibold text-action hover:underline"
         >
           {row.name}
         </Link>
@@ -922,8 +940,11 @@ function ProvisioningView({
         />
       </StatGrid>
       <DataTable
+        labelEn={COPY.en.provisioning}
+        labelAr={COPY.ar.provisioning}
         columns={columns}
         data={data.items}
+        isRefreshing={isRefreshing}
         getRowId={(row) => row.id}
         pagination={{
           page: 1,
@@ -950,7 +971,7 @@ function ReportCard({
   return (
     <Card className="p-4">
       <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-        <span className="text-brand-600 dark:text-brand-400">{icon}</span>
+        <span className="text-primary">{icon}</span>
         {title}
       </h2>
       <div className="mt-3 space-y-3">{children}</div>
@@ -968,8 +989,8 @@ function Metric({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-lg bg-muted px-3 py-2">
-      <span className="block text-xs font-semibold text-muted-foreground">
+    <div className="rounded-md bg-muted px-3 py-2">
+      <span className="block text-sm font-semibold text-muted-foreground">
         {label}
       </span>
       <strong
@@ -978,6 +999,21 @@ function Metric({
       >
         {value}
       </strong>
+    </div>
+  );
+}
+
+function CapacityBar({ value }: { value: number }) {
+  const boundedValue = Math.max(0, Math.min(100, value));
+  return (
+    <div
+      aria-hidden="true"
+      className="h-1.5 w-24 overflow-hidden rounded-full bg-muted"
+    >
+      <span
+        className="block h-full rounded-full bg-muted-foreground"
+        style={{ inlineSize: `${boundedValue}%` }}
+      />
     </div>
   );
 }
@@ -991,16 +1027,17 @@ function SnapshotFooter({
   copy: Copy;
   lang: "ar" | "en";
 }) {
-  const asOf =
-    data.kind === "TENANTS"
-      ? data.snapshot.responseTimestamp
-      : data.snapshot.data.asOf;
+  const asOf = data.kind === "TENANTS" ? null : data.snapshot.data.asOf;
   return (
-    <footer className="grid gap-2 rounded-lg border border-border bg-card px-4 py-3 text-xs text-muted-foreground sm:grid-cols-3">
-      <p>
-        <strong className="text-foreground">{copy.responseAsOf}:</strong>{" "}
-        {formatDateTime(asOf, lang)}
-      </p>
+    <footer
+      className={`grid gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground ${asOf ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+    >
+      {asOf ? (
+        <p>
+          <strong className="text-foreground">{copy.responseAsOf}:</strong>{" "}
+          {formatDateTime(asOf, lang)}
+        </p>
+      ) : null}
       <p>
         <strong className="text-foreground">{copy.responseAt}:</strong>{" "}
         {formatDateTime(data.snapshot.responseTimestamp, lang)}
@@ -1042,17 +1079,17 @@ function StatePanel({
             : BarChart3;
   const tone =
     kind === "error"
-      ? "border-danger-200 bg-danger-50 text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-100"
+      ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
       : kind === "forbidden" || kind === "unavailable"
-        ? "border-warn-200 bg-warn-50 text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/40 dark:text-warn-100"
+        ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
         : "border-border bg-card text-muted-foreground";
   return (
     <section
-      role={kind === "error" || kind === "forbidden" ? "alert" : "status"}
-      className={`flex min-h-56 flex-col items-center justify-center rounded-xl border p-6 text-center shadow-sm ${tone}`}
+      role={kind === "loading" || kind === "empty" ? "status" : "alert"}
+      className={`flex min-h-56 flex-col items-center justify-center rounded-lg border p-6 text-center ${tone}`}
     >
       <Icon
-        className={`mb-3 size-9 opacity-70 ${kind === "loading" ? "animate-spin" : ""}`}
+        className={`mb-3 size-9 opacity-70 ${kind === "loading" ? "animate-spin motion-reduce:animate-none" : ""}`}
         aria-hidden="true"
       />
       <h2 className="text-base font-semibold">{title}</h2>
@@ -1060,7 +1097,7 @@ function StatePanel({
         <p className="mt-2 max-w-2xl text-sm leading-6 opacity-80">{detail}</p>
       ) : null}
       {correlationId ? (
-        <p className="mt-2 max-w-full text-xs">
+        <p className="mt-2 max-w-full text-sm">
           <strong>{correlationLabel}:</strong>{" "}
           <code dir="ltr" className="select-all break-all">
             {correlationId}

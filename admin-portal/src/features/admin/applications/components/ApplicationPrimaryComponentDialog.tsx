@@ -1,6 +1,7 @@
 "use client";
 
-import { Boxes, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Boxes, RefreshCw, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, Field, Textarea, Button } from "@/design-system";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
@@ -46,6 +47,11 @@ export function ApplicationPrimaryComponentDialog({
     onConfirm,
     onClearCommandError,
   });
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (validationError) reasonRef.current?.focus();
+  }, [validationError]);
 
   if (!isOpen) return null;
   const identity = deriveTechnicalIdentityPreview(applicationKey);
@@ -63,15 +69,15 @@ export function ApplicationPrimaryComponentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-sm">
-            <Boxes className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+            <Boxes className="size-4 text-primary" aria-hidden="true" />
             {isAdoption
               ? t.applications.technicalProvisioning.adoptionTitle
               : t.applications.technicalProvisioning.bindingTitle}
           </DialogTitle>
-          <p className="font-mono text-2xs font-semibold uppercase tracking-[0.2em] text-brand-700 dark:text-brand-400">
+          <p className="text-xs font-semibold text-primary">
             {isAdoption
               ? t.applications.technicalProvisioning.adoptionEyebrow
               : t.applications.technicalProvisioning.bindingEyebrow}
@@ -83,9 +89,9 @@ export function ApplicationPrimaryComponentDialog({
           </p>
         </DialogHeader>
 
-        <form onSubmit={submit} className="space-y-5">
-          <div className="rounded-xl border border-brand-500/30 bg-brand-500/5 p-4 dark:bg-brand-500/10">
-            <div className="flex items-center gap-2 text-xs font-semibold text-brand-800 dark:text-brand-200">
+        <form onSubmit={submit} noValidate className="space-y-5">
+          <div className="rounded-md border border-info/30 bg-info-subtle p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-info-subtle-foreground">
               <ShieldCheck className="size-4" aria-hidden="true" />
               {t.applications.technicalProvisioning.authoritativeMapping}
             </div>
@@ -104,17 +110,23 @@ export function ApplicationPrimaryComponentDialog({
                 value={identity.primaryComponentKey}
               />
             </dl>
-            <p className="mt-3 text-xs leading-relaxed text-brand-700 dark:text-brand-300">
+            <p className="mt-3 text-xs leading-relaxed text-info-subtle-foreground">
               {t.applications.technicalProvisioning.safeBoundary}
             </p>
           </div>
 
-          <Field label={t.applications.technicalProvisioning.changeReason} required>
+          <Field
+            label={t.applications.technicalProvisioning.changeReason}
+            required
+            error={validationError ?? undefined}
+          >
             {(fp) => (
               <Textarea
                 {...fp}
+                ref={reasonRef}
                 autoFocus
                 required
+                invalid={Boolean(validationError)}
                 maxLength={256}
                 rows={3}
                 value={reason}
@@ -128,11 +140,11 @@ export function ApplicationPrimaryComponentDialog({
             {t.applications.technicalProvisioning.revisionLabel}: {technicalDefinitionRevision}
           </p>
 
-          {(validationError || commandError) && (
-            <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2.5 text-xs text-danger-800 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-200">
-              <p>{validationError || commandMessage}</p>
+          {commandError && (
+            <div role="alert" className="rounded-md border border-destructive bg-destructive-subtle px-3 py-2.5 text-xs text-destructive-subtle-foreground">
+              <p>{commandMessage}</p>
               {commandError?.correlationId && (
-                <p className="mt-1 font-mono text-xs opacity-75">
+                <p className="mt-1 font-mono text-xs opacity-75" dir="ltr">
                   {t.applications.technicalProvisioning.correlationId}: {commandError.correlationId}
                 </p>
               )}
@@ -149,14 +161,12 @@ export function ApplicationPrimaryComponentDialog({
                 variant="outline"
                 disabled={isSubmitting}
                 onClick={() => void onRetryExactIntent().then((completed) => completed && onClose())}
-                className="border-warn-300 bg-warn-50 text-warn-900 hover:bg-warn-100 dark:border-warn-800 dark:bg-warn-950/30 dark:text-warn-200"
               >
                 <RefreshCw className="size-3.5" aria-hidden="true" />
                 {t.applications.technicalProvisioning.retryExactIntent}
               </Button>
             )}
-            <Button type="submit" variant="primary" disabled={isSubmitting || isRecoverable}>
-              {isSubmitting && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+            <Button type="submit" variant="primary" loading={isSubmitting} disabled={isRecoverable}>
               {isSubmitting
                 ? isAdoption
                   ? t.applications.technicalProvisioning.adopting
@@ -175,7 +185,7 @@ export function ApplicationPrimaryComponentDialog({
 function Mapping({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="font-semibold text-brand-700 dark:text-brand-300">{label}</dt>
+      <dt className="font-semibold text-info-subtle-foreground">{label}</dt>
       <dd className="mt-1 break-all font-mono font-semibold text-foreground" dir="ltr">
         {value}
       </dd>

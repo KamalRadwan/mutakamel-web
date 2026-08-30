@@ -1,9 +1,17 @@
 # Storage Server Screens and Dialogs
 
+Status: **[Verified current-source behavior; approved cross-cutting target applies]**
+
 Last source verification: **2026-08-05**
 
 This specification complements the authoritative
 [Storage Servers API contract](../api/storage-servers.md).
+
+The cold-blue update does not change Storage Server transport or safety
+semantics. Presentation must also follow
+[Operational UX](../design-system/operational-ux.md),
+[Data experiences](../design-system/data-experiences.md), and
+[Accessibility, responsive behavior, and localization](../design-system/accessibility-responsive-and-localization.md).
 
 ## Route ownership
 

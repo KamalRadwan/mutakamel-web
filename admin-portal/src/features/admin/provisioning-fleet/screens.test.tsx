@@ -79,6 +79,9 @@ describe("provisioning fleet screens", () => {
 
     expect(screen.getAllByText(PREVIEW_ID).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Tenant evidence" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Fleet preview tenant evidence" }),
+    ).toHaveAttribute("tabindex", "0");
     fireEvent.click(screen.getByRole("button", { name: "Launch rollout" }));
     expect(screen.getByRole("alertdialog", {
       name: "Launch this critical rollout?",
@@ -99,6 +102,10 @@ describe("provisioning fleet screens", () => {
     const view = rolloutView();
     rolloutMock.mockReturnValue(view);
     render(<FleetRolloutScreen rolloutId={ROLLOUT_ID} />);
+
+    expect(
+      screen.getByRole("region", { name: "Fleet rollout tenant evidence" }),
+    ).toHaveAttribute("tabindex", "0");
 
     fireEvent.change(screen.getByLabelText("Stable reason code"), {
       target: { value: "OPS.MAINTENANCE" },

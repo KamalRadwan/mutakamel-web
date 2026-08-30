@@ -4,7 +4,7 @@ import { useState } from "react";
 import { KeyRound, Loader2 } from "lucide-react";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { useToast } from "@/components/ui/ToastContext";
-import { PageHeader } from "@/design-system";
+import { Button, PageHeader, Switch } from "@/design-system";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
 import { useStorageRuntimeSettings } from "./hooks/useStorageRuntimeSettings";
 
@@ -170,14 +170,14 @@ export default function StorageRuntimeSettingsPage() {
             {!state.canUpdateCritical ? (
               <p
                 role="note"
-                className="rounded-xl border border-border bg-ink-100 p-3 text-sm text-foreground dark:border-border dark:bg-ink-800 dark:text-foreground"
+                className="rounded-lg border border-border bg-muted p-3 text-sm text-foreground"
               >
                 {copy.readOnly}
               </p>
             ) : null}
 
-            <section className="grid gap-4 rounded-xl border border-border bg-white p-5 dark:border-border dark:bg-ink-900">
-              <label className="flex min-h-16 items-center justify-between gap-4 rounded-xl border border-border bg-ink-100 px-4 dark:border-border dark:bg-ink-1000">
+            <section className="grid gap-4 rounded-lg border border-border bg-card p-5">
+              <label htmlFor="storage-runtime-enabled" className="flex min-h-16 cursor-pointer items-center justify-between gap-4 rounded-lg border border-input bg-muted px-4">
                 <span>
                   <strong className="block text-sm">{copy.switchLabel}</strong>
                   <span
@@ -187,9 +187,8 @@ export default function StorageRuntimeSettingsPage() {
                     {copy.switchHelp}
                   </span>
                 </span>
-                <input
-                  type="checkbox"
-                  role="switch"
+                <Switch
+                  id="storage-runtime-enabled"
                   aria-label={copy.switchLabel}
                   aria-describedby="storage-runtime-enable-help"
                   checked={config.enabled}
@@ -199,27 +198,26 @@ export default function StorageRuntimeSettingsPage() {
                     (!config.enabled &&
                       (!config.configured || !config.brokerConfigured))
                   }
-                  onChange={(event) => void changeEnabled(event.target.checked)}
-                  className="size-5 shrink-0 accent-brand-600 disabled:cursor-not-allowed"
+                  onCheckedChange={(enabled) => void changeEnabled(enabled)}
                 />
               </label>
 
               {!config.configured ? (
-                <p role="note" className="text-xs font-semibold text-warn-700 dark:text-warn-300">
+                <p role="note" className="rounded-md bg-warning-subtle px-3 py-2 text-xs font-semibold text-warning-subtle-foreground">
                   {copy.enableBlocked}
                 </p>
               ) : null}
 
               {!config.brokerConfigured ? (
-                <p role="note" className="text-xs font-semibold text-warn-700 dark:text-warn-300">
+                <p role="note" className="rounded-md bg-warning-subtle px-3 py-2 text-xs font-semibold text-warning-subtle-foreground">
                   {copy.brokerBlocked}
                 </p>
               ) : null}
 
-              <div className="flex flex-col justify-between gap-4 rounded-xl border border-border p-4 dark:border-border sm:flex-row sm:items-center">
+              <div className="flex flex-col justify-between gap-4 rounded-lg border border-border p-4 sm:flex-row sm:items-center">
                 <div>
                   <h2 className="flex items-center gap-2 text-sm font-semibold">
-                    <KeyRound className="size-4 text-warn-600" aria-hidden="true" />
+                    <KeyRound className="size-4 text-warning" aria-hidden="true" />
                     {copy.keyTitle}
                   </h2>
                   <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
@@ -227,19 +225,20 @@ export default function StorageRuntimeSettingsPage() {
                   </p>
                 </div>
                 {state.canUpdateCritical ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => setConfirmationOpen(true)}
                     disabled={pending}
-                    className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-warn-600 px-4 text-xs font-semibold text-white hover:bg-warn-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="shrink-0 border-warning/40 text-warning"
                   >
                     {keyMutationPending ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                     ) : (
                       <KeyRound className="size-4" aria-hidden="true" />
                     )}
                     {config.configured ? copy.rotate : copy.generate}
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             </section>
@@ -292,7 +291,7 @@ function StorageRuntimeEvidence({
     <section
       role="region"
       aria-label={copy.statusRegion}
-      className="rounded-xl border border-border bg-white p-4 dark:border-border dark:bg-ink-900"
+      className="rounded-lg border border-border bg-card p-4"
     >
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <EvidenceItem
@@ -322,7 +321,7 @@ function StorageRuntimeEvidence({
 
 function EvidenceItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-ink-100 p-3 dark:bg-ink-800">
+    <div className="rounded-lg bg-muted p-3">
       <dt className="text-xs font-semibold text-muted-foreground">
         {label}
       </dt>
@@ -344,10 +343,10 @@ function MutationNotice({
   return (
     <p
       role={succeeded ? "status" : "alert"}
-      className={`rounded-xl border p-3 text-sm font-semibold ${
+      className={`rounded-lg border p-3 text-sm font-semibold ${
         succeeded
-          ? "border-brand-300 bg-brand-50 text-brand-950 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-100"
-          : "border-danger-300 bg-danger-50 text-danger-950 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-100"
+          ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+          : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
       }`}
     >
       {succeeded

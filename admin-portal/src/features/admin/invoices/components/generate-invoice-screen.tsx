@@ -48,8 +48,8 @@ function GenerateForm({ generator, copy }: { generator: ReturnType<typeof useGen
     <Card className="mx-auto w-full max-w-4xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-600 text-white">
-            <FilePlus2 className="size-4" />
+          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-info-subtle text-info-subtle-foreground">
+            <FilePlus2 className="size-4" aria-hidden="true" />
           </span>
           {copy.generationTitle}
         </CardTitle>
@@ -72,7 +72,7 @@ function GenerateForm({ generator, copy }: { generator: ReturnType<typeof useGen
             <Field label={copy.purpose}>
               {(fp) => (
                 <Select value={generator.draft.purpose} onValueChange={(value) => generator.updateDraft("purpose", value as GenerateInvoiceDraft["purpose"])}>
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -159,7 +159,7 @@ function GeneratedInvoice({ generator, copy, lang }: { generator: ReturnType<typ
   if (!created) return null;
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3">
-      <section role="status" className="rounded-xl border border-brand-200 bg-brand-500/5 p-6 text-brand-950 shadow-sm dark:border-brand-800/60 dark:bg-brand-950/20 dark:text-brand-100">
+      <section role="status" aria-live="polite" className="rounded-lg border border-success/30 bg-success-subtle p-6 text-success-subtle-foreground">
         <h1 className="text-xl font-semibold">{copy.generated}</h1>
         <p className="mt-1 text-sm">{copy.generatedHelp}</p>
         <dl className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -186,8 +186,8 @@ function GeneratedInvoice({ generator, copy, lang }: { generator: ReturnType<typ
 
 function Evidence({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-xl bg-card/70 px-3 py-2">
-      <dt className="text-xs font-semibold opacity-70">{label}</dt>
+    <div className="rounded-md bg-card px-3 py-2">
+      <dt className="text-sm font-semibold opacity-70">{label}</dt>
       <dd dir={mono ? "ltr" : undefined} className={`mt-1 text-base font-semibold ${mono ? "font-mono text-start" : ""}`}>
         {value}
       </dd>

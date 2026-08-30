@@ -27,7 +27,7 @@ export function CreateReleaseDraftScreen() {
         <ReleaseStatePanel kind="forbidden" title={copy.forbiddenManage} detail={copy.managePermission} copy={copy} />
       ) : creator.created ? (
         <section className="space-y-3">
-          <Card className="border-brand-300 bg-brand-50 p-6 text-brand-950 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-100">
+          <Card className="border-success/30 bg-success-subtle p-6 text-success-subtle-foreground">
             <div role="status">
               <h1 className="text-xl font-semibold">{copy.created}</h1>
               <code dir="ltr" className="mt-3 block break-all text-start text-sm">{creator.created.data.draftId}</code>

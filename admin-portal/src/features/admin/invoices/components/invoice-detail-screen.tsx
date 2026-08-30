@@ -16,6 +16,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  Label,
   StatusBadge,
   type ColumnDef,
 } from "@/design-system";
@@ -43,12 +44,14 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
 
   return (
     <InvoicePageFrame dir={dir}>
-      <Link href="/invoices" className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-brand-700 dark:hover:text-brand-400">
-        {dir === "rtl" ? <ArrowRight className="size-4" aria-hidden="true" /> : <ArrowLeft className="size-4" aria-hidden="true" />}
-        {copy.backToInvoices}
-      </Link>
+      <Button variant="link" size="sm" asChild className="w-fit px-0">
+        <Link href="/invoices">
+          {dir === "rtl" ? <ArrowRight className="size-4" aria-hidden="true" /> : <ArrowLeft className="size-4" aria-hidden="true" />}
+          {copy.backToInvoices}
+        </Link>
+      </Button>
       <InvoiceDetailBody detail={detail} copy={copy} lang={lang} />
-      {detail.dialog === "EDIT" ? <EditInvoiceDialog detail={detail} copy={copy} /> : null}
+      {detail.dialog === "EDIT" ? <EditInvoiceDialog detail={detail} copy={copy} lang={lang} /> : null}
       {detail.dialog === "ISSUE" ? <CriticalInvoiceDialog kind="ISSUE" detail={detail} copy={copy} /> : null}
       {detail.dialog === "VOID" ? <CriticalInvoiceDialog kind="VOID" detail={detail} copy={copy} /> : null}
     </InvoicePageFrame>
@@ -97,14 +100,14 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 dir="ltr" className="font-mono text-xl font-semibold text-start sm:text-2xl">{invoice.number}</h1>
-              <StatusBadge status={invoice.status} />
+              <StatusBadge status={invoice.status} enumType="invoice" />
             </div>
-            <code dir="ltr" className="mt-2 block break-all text-start text-xs text-muted-foreground">{invoice.id}</code>
-            <p className="mt-2 font-mono text-xs font-semibold text-brand-700 dark:text-brand-400">{invoice.purpose}</p>
+            <code dir="ltr" className="mt-2 block break-all text-start text-sm text-muted-foreground">{invoice.id}</code>
+            <p dir="ltr" className="mt-2 text-start font-mono text-sm font-semibold text-muted-foreground">{invoice.purpose}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={detail.refresh} disabled={detail.isRefreshing}>
-              <RefreshCw className={`size-4 ${detail.isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+              <RefreshCw className={`size-4 ${detail.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
               {copy.refresh}
             </Button>
             {detail.canEdit ? (
@@ -128,7 +131,7 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
           </div>
         </div>
         {invoice.status === "DRAFT" && invoice.purpose !== "MANUAL" ? (
-          <p className="mt-3 rounded-lg bg-warn-500/10 px-3 py-2 text-sm text-warn-900 dark:bg-warn-500/15 dark:text-warn-100">
+          <p className="mt-3 rounded-lg border border-warning/30 bg-warning-subtle px-3 py-2 text-sm text-warning-subtle-foreground">
             {copy.systemDraftLocked}
           </p>
         ) : null}
@@ -161,7 +164,7 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
       </div>
 
       {detail.canRecordOfflinePayment ? (
-        <Card className="border-brand-500/30 bg-brand-500/5 px-4 py-3 text-foreground dark:bg-brand-500/10">
+        <Card className="border-info/30 bg-info-subtle px-4 py-3 text-info-subtle-foreground">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-semibold">{copy.offlinePayment}</h2>
@@ -180,8 +183,11 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
       <Card>
         <h2 className="px-4 py-3 text-base font-semibold">{copy.invoiceLines}</h2>
         <DataTable
+          labelEn={INVOICE_COPY.en.invoiceLines}
+          labelAr={INVOICE_COPY.ar.invoiceLines}
           columns={lineColumns}
           data={invoice.lines ?? []}
+          isRefreshing={detail.isRefreshing}
           getRowId={(line) => line.id}
           pagination={{
             page: 1,
@@ -210,15 +216,15 @@ function EvidenceCard({ title, children }: { title: string; children: ReactNode 
 
 function Evidence({ label, value, mono, link }: { label: string; value: string; mono?: boolean; link?: string }) {
   const output = link ? (
-    <Link href={link} className="text-brand-700 hover:underline dark:text-brand-400">
+    <Link href={link} className="text-action hover:underline">
       {value}
     </Link>
   ) : (
     value
   );
   return (
-    <div className="rounded-lg bg-muted px-3 py-2">
-      <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
+    <div className="rounded-md bg-muted px-3 py-2">
+      <dt className="text-sm font-semibold text-muted-foreground">{label}</dt>
       <dd dir={mono ? "ltr" : undefined} className={`mt-1 break-all text-sm font-semibold ${mono ? "font-mono text-start" : ""}`}>
         {output}
       </dd>
@@ -226,7 +232,7 @@ function Evidence({ label, value, mono, link }: { label: string; value: string; 
   );
 }
 
-function EditInvoiceDialog({ detail, copy }: { detail: ReturnType<typeof useInvoiceDetail>; copy: InvoiceCopy }) {
+function EditInvoiceDialog({ detail, copy, lang }: { detail: ReturnType<typeof useInvoiceDetail>; copy: InvoiceCopy; lang: "ar" | "en" }) {
   const pending = detail.mutation.phase === "PENDING";
   return (
     <DetailDialog title={copy.editDraft} onClose={detail.closeDialog}>
@@ -236,7 +242,7 @@ function EditInvoiceDialog({ detail, copy }: { detail: ReturnType<typeof useInvo
         <div className="space-y-3">
           {detail.editDraft.lines.map((line, index) => (
             <fieldset key={line.clientId} className="rounded-lg border border-border p-3">
-              <legend className="px-1 text-xs font-semibold">{copy.invoiceLines} {index + 1}</legend>
+              <legend className="px-1 text-sm font-semibold">{copy.invoiceLines} {formatInvoiceInteger(index + 1, lang)}</legend>
               <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(140px,1fr)_minmax(160px,1fr)_44px]">
                 <EditTextInput
                   label={copy.description}
@@ -268,10 +274,10 @@ function EditInvoiceDialog({ detail, copy }: { detail: ReturnType<typeof useInvo
                   variant="outline"
                   size="sm"
                   className="mt-5 justify-center px-0"
-                  aria-label={`${copy.removeLine} ${index + 1}`}
+                  aria-label={`${copy.removeLine} ${formatInvoiceInteger(index + 1, lang)}`}
                   onClick={() => detail.removeEditLine(line.clientId)}
                 >
-                  <Trash2 className="size-4 text-danger-600 dark:text-danger-400" aria-hidden="true" />
+                  <Trash2 className="size-4 text-destructive" aria-hidden="true" />
                 </Button>
               </div>
             </fieldset>
@@ -293,6 +299,8 @@ function CriticalInvoiceDialog({ kind, detail, copy }: { kind: "ISSUE" | "VOID";
   const update = kind === "ISSUE" ? detail.updateIssueDraft : detail.updateVoidDraft;
   const execute = kind === "ISSUE" ? detail.issueInvoice : detail.voidInvoice;
   const pending = detail.mutation.phase === "PENDING";
+  const confirmationId = `${kind.toLowerCase()}-invoice-confirmation`;
+  const confirmationErrorId = `${kind.toLowerCase()}-confirmed-error`;
   return (
     <DetailDialog title={kind === "ISSUE" ? copy.issueTitle : copy.voidTitle} onClose={detail.closeDialog}>
       <form onSubmit={(event) => { event.preventDefault(); void execute(); }} className="space-y-4">
@@ -312,16 +320,18 @@ function CriticalInvoiceDialog({ kind, detail, copy }: { kind: "ISSUE" | "VOID";
             />
           )}
         </Field>
-        <label className="flex items-start gap-3 rounded-lg border border-warn-200 bg-warn-50 p-3 text-sm font-semibold text-warn-950 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-100">
+        <Label htmlFor={confirmationId} className="flex min-h-11 items-start gap-3 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
           <Checkbox
+            id={confirmationId}
             className="mt-1"
             checked={draft.confirmed}
             aria-invalid={Boolean(detail.validationErrors.confirmed)}
+            aria-describedby={detail.validationErrors.confirmed ? confirmationErrorId : undefined}
             onCheckedChange={(checked) => update("confirmed", checked === true)}
           />
           <span>{kind === "ISSUE" ? copy.issueConfirmation : copy.voidConfirmation}</span>
-        </label>
-        <InvoiceFieldError id={`${kind.toLowerCase()}-confirmed-error`} code={detail.validationErrors.confirmed} copy={copy} />
+        </Label>
+        <InvoiceFieldError id={confirmationErrorId} code={detail.validationErrors.confirmed} copy={copy} />
         <DialogActions copy={copy} pending={pending} onCancel={detail.closeDialog} submitLabel={kind === "ISSUE" ? copy.confirmIssue : copy.confirmVoid} danger={kind === "VOID"} />
       </form>
     </DetailDialog>
@@ -348,7 +358,7 @@ function DialogActions({ copy, pending, onCancel, submitLabel, danger }: { copy:
         {copy.cancel}
       </Button>
       <Button type="submit" variant={danger ? "destructive" : "primary"} disabled={pending}>
-        {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+        {pending ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
         {submitLabel}
       </Button>
     </div>
@@ -386,4 +396,10 @@ function EditTextInput({ label, value, onChange, error, copy, dir, inputMode }: 
       )}
     </Field>
   );
+}
+
+function formatInvoiceInteger(value: number, lang: "ar" | "en"): string {
+  return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
 }

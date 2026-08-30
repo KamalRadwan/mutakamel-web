@@ -40,7 +40,6 @@ import {
   type TenantUserSummary,
   type TenantUserView,
   type UpdateTenantUserInput,
-  type UpdateTenantUserWebphoneInput,
 } from "./types";
 
 export interface UseTenantAccessOptions {
@@ -130,10 +129,6 @@ export function useTenantAccess({
       canResetPassword: adminCanAll(
         admin,
         TENANT_ACCESS_PERMISSION_SETS.resetPassword,
-      ),
-      canManageWebphone: adminCanAll(
-        admin,
-        TENANT_ACCESS_PERMISSION_SETS.manageWebphone,
       ),
       canSuspend: adminCanAll(admin, TENANT_ACCESS_PERMISSION_SETS.suspend),
       canAssignRoles: adminCanAll(
@@ -559,23 +554,6 @@ export function useTenantAccess({
     [execute, permissions.canResetPassword, refreshAfterWrite, tenantId],
   );
 
-  const updateWebphone = useCallback(
-    async (target: TenantUserView, input: UpdateTenantUserWebphoneInput) => {
-      assertUserState(!isDeletedTenantUser(target), "TENANT_USER_IS_DELETED");
-      const webphone = await execute(
-        "webphone",
-        target,
-        permissions.canManageWebphone,
-        input,
-        (key) => tenantAccessApi.updateWebphone(tenantId, target.id, input, key),
-      );
-      const updated = { ...target, webphone };
-      await refreshAfterWrite(updated);
-      return webphone;
-    },
-    [execute, permissions.canManageWebphone, refreshAfterWrite, tenantId],
-  );
-
   const suspendUser = useCallback(
     async (target: TenantUserView) => {
       assertUserState(
@@ -731,7 +709,6 @@ export function useTenantAccess({
     resetPassword,
     resendInvite,
     changePassword,
-    updateWebphone,
     suspendUser,
     activateUser,
     replaceRoles,

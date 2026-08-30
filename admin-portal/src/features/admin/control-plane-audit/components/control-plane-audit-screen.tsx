@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import {
   Activity,
   Braces,
+  ChevronDown,
   Clock3,
   Database,
   Filter,
@@ -28,10 +29,14 @@ import {
   Button,
   StatusBadge,
   Pagination,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
 } from "@/design-system";
 import { formatAuditValue } from "../lib/control-plane-audit-utils";
 import { useControlPlaneAudit } from "../hooks/use-control-plane-audit";
 import { useAuditEventDetail } from "../hooks/use-audit-event-detail";
+import { CodeQualityBadge, FaultDomainBadge } from "./fault-domain-badge";
 import {
   CONTROL_PLANE_AUDIT_ACTOR_TYPES,
   CONTROL_PLANE_AUDIT_OUTCOMES,
@@ -147,17 +152,17 @@ export function ControlPlaneAuditScreen() {
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="neutral">
-              {audit.data?.total ?? 0} {copy.events}
+              {formatInteger(audit.data?.total ?? 0, lang)} {copy.events}
             </Badge>
             <Badge tone="neutral">
-              {audit.activeFilterCount} {copy.activeFilters}
+              {formatInteger(audit.activeFilterCount, lang)} {copy.activeFilters}
             </Badge>
           </div>
         }
       />
 
       {audit.isAuthLoading ? (
-        <StatusPanel icon={<Loader2 className="size-7 animate-spin" />} title={copy.loading} />
+        <StatusPanel icon={<Loader2 className="size-7 animate-spin motion-reduce:animate-none" />} title={copy.loading} />
       ) : audit.canRead ? (
         <>
           <AuditFilters copy={copy} audit={audit} lang={lang} />
@@ -188,10 +193,10 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <Filter className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+          <Filter className="size-4 text-primary" aria-hidden="true" />
           {copy.filters}
         </h2>
-        <div className="inline-flex rounded-lg border border-border bg-muted p-1">
+        <div className="inline-flex rounded-md border border-input bg-muted p-1">
           {(
             [
               ["ALL_EVENTS", copy.allEvents],
@@ -303,13 +308,13 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
           <Field label={copy.pageSize}>
             {(fp) => (
               <Select value={String(audit.limit)} onValueChange={(value) => audit.setLimit(Number(value))}>
-                <SelectTrigger id={fp.id}>
+                <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {[25, 50, 100].map((value) => (
                     <SelectItem key={value} value={String(value)}>
-                      {value}
+                      {formatInteger(value, lang)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -319,7 +324,7 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
         </div>
 
         {audit.validationErrors.dateRange ? (
-          <p role="alert" className="text-xs font-semibold text-danger-600 dark:text-danger-400">
+          <p role="alert" className="text-sm font-semibold text-destructive-subtle-foreground">
             {localizeValidationError(audit.validationErrors.dateRange, lang)}
           </p>
         ) : null}
@@ -336,7 +341,7 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
             disabled={audit.requestState === "IDLE"}
           >
             <RefreshCw
-              className={`size-3.5 ${audit.isRefreshing ? "animate-spin" : ""}`}
+              className={`size-3.5 ${audit.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`}
               aria-hidden="true"
             />
             {copy.refresh}
@@ -364,7 +369,7 @@ function AuditResults({
     return <StatusPanel icon={<Database className="size-7" />} title={copy.chooseEntity} />;
   }
   if (audit.requestState === "LOADING") {
-    return <StatusPanel icon={<Loader2 className="size-7 animate-spin" />} title={copy.loading} />;
+    return <StatusPanel icon={<Loader2 className="size-7 animate-spin motion-reduce:animate-none" />} title={copy.loading} />;
   }
   if (audit.requestState === "FORBIDDEN") {
     return <StatusPanel icon={<ShieldAlert className="size-7" />} title={copy.forbidden} detail={copy.permission} tone="warning" />;
@@ -381,7 +386,7 @@ function AuditResults({
         detail={detail}
         tone="danger"
         action={
-          <Button type="button" variant="destructive" onClick={audit.refresh}>
+          <Button type="button" variant="outline" onClick={audit.refresh}>
             {copy.retry}
           </Button>
         }
@@ -393,14 +398,14 @@ function AuditResults({
   }
 
   return (
-    <Card>
+    <section aria-labelledby="audit-results-title" className="space-y-3">
       <div className="flex items-center justify-between border-b border-border p-4">
-        <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <Activity className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+        <h2 id="audit-results-title" className="flex items-center gap-2 text-sm font-semibold">
+          <Activity className="size-4 text-primary" aria-hidden="true" />
           {audit.mode === "ENTITY_HISTORY" ? copy.entityHistory : copy.allEvents}
         </h2>
         {audit.isRefreshing ? (
-          <Loader2 className="size-4 animate-spin text-brand-600 dark:text-brand-400" aria-label={copy.loading} />
+          <Loader2 className="size-4 animate-spin text-primary motion-reduce:animate-none" aria-label={copy.loading} />
         ) : null}
       </div>
       <div className="space-y-3 p-3 sm:p-4">
@@ -415,7 +420,7 @@ function AuditResults({
         totalPages={Math.max(1, audit.data.totalPages)}
         onPageChange={audit.setPage}
       />
-    </Card>
+    </section>
   );
 }
 
@@ -431,45 +436,61 @@ function AuditEventCard({
   const detail = useAuditEventDetail(event.id);
 
   return (
-    <article className="rounded-lg border border-border bg-muted p-4">
+    <article className="rounded-lg border border-border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={event.outcome} />
-            <strong className="break-all font-mono text-xs text-brand-700 dark:text-brand-400">
+            {/*
+              A failure row says which kind of failure it is before anyone
+              opens it. Scanning thousands of identical FAILURE badges, an
+              operator could not tell an expired session from a crash; the
+              domain is the one word that separates them.
+            */}
+            {event.faultDomain ? (
+              <FaultDomainBadge domain={event.faultDomain} lang={lang} />
+            ) : null}
+            {event.codeQuality ? (
+              <CodeQualityBadge quality={event.codeQuality} lang={lang} />
+            ) : null}
+            <strong dir="ltr" className="break-all font-mono text-sm text-action">
               {event.action}
             </strong>
           </div>
-          <p className="mt-2 break-all text-xs text-muted-foreground">
+          <p className="mt-2 break-all text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{copy.entity}:</span> {event.entityType}
-            {event.entityId ? ` / ${event.entityId}` : ""}
+            {event.entityId ? <> / <bdi dir="ltr">{event.entityId}</bdi></> : null}
           </p>
         </div>
-        <time dateTime={event.occurredAt} className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+        <time dateTime={event.occurredAt} className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
           <Clock3 className="size-3.5" aria-hidden="true" />
-          {new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en", {
+          {new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
             dateStyle: "medium",
             timeStyle: "medium",
+            timeZone: "UTC",
           }).format(new Date(event.occurredAt))}
         </time>
       </div>
 
-      <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 lg:grid-cols-3">
         <EvidenceDatum icon={<UserRound className="size-3.5" />} label={copy.actor} value={event.actorLabel || event.actorId || copy.systemActor} />
         <EvidenceDatum icon={<Activity className="size-3.5" />} label={copy.source} value={`${event.sourceApp} / ${event.sourceType}`} />
         <EvidenceDatum icon={<Braces className="size-3.5" />} label={copy.correlationId} value={event.correlationId || copy.notRecorded} mono />
       </div>
 
-      <details
-        className="mt-3 rounded-lg border border-border bg-card"
-        onToggle={(toggleEvent) => {
-          if (toggleEvent.currentTarget.open) detail.load();
+      <Collapsible
+        className="mt-3 rounded-md border border-border bg-muted"
+        onOpenChange={(open) => {
+          if (open) detail.load();
         }}
       >
-        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-brand-700 marker:text-brand-500 dark:text-brand-400">
-          {copy.evidence}
-        </summary>
-        <div className="space-y-3 border-t border-border p-3">
+        <CollapsibleTrigger asChild>
+          <Button type="button" variant="ghost" className="group w-full justify-between rounded-none px-3 text-action" aria-label={`${copy.evidence}: ${event.action}`}>
+            {copy.evidence}
+            <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3 border-t border-border p-3">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <EvidenceDatum label="eventId" value={event.id} mono />
             <EvidenceDatum label="operationId" value={event.operationId || copy.notRecorded} mono />
@@ -481,19 +502,19 @@ function AuditEventCard({
             <EvidenceDatum label="schemaVersion" value={String(event.schemaVersion)} mono />
           </div>
           {event.reason ? (
-            <div className="rounded-lg border border-warn-200 bg-warn-50 p-3 text-xs text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-100">
+            <div className="rounded-md border border-warning bg-warning-subtle p-3 text-sm text-warning-subtle-foreground">
               <strong>{copy.reason}:</strong> {event.reason}
             </div>
           ) : null}
           {detail.status === "LOADING" || detail.status === "IDLE" ? (
-            <div className="flex items-center gap-2 rounded-lg border border-border p-4 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+            <div className="flex items-center gap-2 rounded-md border border-border p-4 text-sm text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
               {copy.loading}
             </div>
           ) : detail.status === "UNAVAILABLE" ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-danger-200 bg-danger-50 p-3 text-xs text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-100">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground">
               <span>{detail.error?.message || copy.unavailable}</span>
-              <Button type="button" size="sm" variant="destructive" onClick={detail.retry}>
+              <Button type="button" size="sm" variant="outline" onClick={detail.retry}>
                 {copy.retry}
               </Button>
             </div>
@@ -505,12 +526,12 @@ function AuditEventCard({
               <AuditJson title={copy.metadata} value={detail.data?.metadata ?? null} empty={copy.noSnapshot} />
             </div>
           )}
-          <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-            <p><strong className="text-foreground">IP:</strong> {event.ip || copy.notRecorded}</p>
-            <p className="break-all"><strong className="text-foreground">User-Agent:</strong> {event.userAgent || copy.notRecorded}</p>
+          <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+            <p><strong className="text-foreground">IP:</strong> <span dir="ltr">{event.ip || copy.notRecorded}</span></p>
+            <p className="break-all"><strong className="text-foreground">User-Agent:</strong> <span dir="ltr">{event.userAgent || copy.notRecorded}</span></p>
           </div>
-        </div>
-      </details>
+        </CollapsibleContent>
+      </Collapsible>
     </article>
   );
 }
@@ -527,11 +548,11 @@ function EvidenceDatum({
   mono?: boolean;
 }) {
   return (
-    <p className="flex min-w-0 items-start gap-1.5 rounded-lg bg-card px-2.5 py-2">
+    <p className="flex min-w-0 items-start gap-1.5 rounded-md bg-muted px-2.5 py-2">
       {icon ? <span className="mt-0.5 shrink-0 text-muted-foreground">{icon}</span> : null}
       <span className="min-w-0">
         <strong className="text-foreground">{label}:</strong>{" "}
-        <span className={`break-all ${mono ? "font-mono" : ""}`}>{value}</span>
+        <span dir={mono ? "ltr" : undefined} className={`break-all ${mono ? "font-mono" : ""}`}>{value}</span>
       </span>
     </p>
   );
@@ -540,15 +561,21 @@ function EvidenceDatum({
 function AuditJson({ title, value, empty }: { title: string; value: unknown; empty: string }) {
   const hasValue = value !== null && value !== undefined && (!Array.isArray(value) || value.length > 0);
   return (
-    <section className="min-w-0 overflow-hidden rounded-lg border border-border">
-      <h3 className="border-b border-border bg-muted px-3 py-2 text-xs font-semibold">{title}</h3>
+    <section className="min-w-0 overflow-hidden rounded-md border border-border">
+      <h3 className="border-b border-border bg-muted px-3 py-2 text-sm font-semibold">{title}</h3>
       {hasValue ? (
-        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all p-3 text-xs leading-5 text-foreground">{formatAuditValue(value)}</pre>
+        <pre tabIndex={0} aria-label={title} className="max-h-72 overflow-auto whitespace-pre-wrap break-all p-3 text-sm leading-5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">{formatAuditValue(value)}</pre>
       ) : (
-        <p className="p-3 text-xs text-muted-foreground">{empty}</p>
+        <p className="p-3 text-sm text-muted-foreground">{empty}</p>
       )}
     </section>
   );
+}
+
+function formatInteger(value: number, lang: "ar" | "en"): string {
+  return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function AuditInput({
@@ -606,7 +633,7 @@ function AuditSelect({
     <Field label={label}>
       {(fp) => (
         <Select value={value || "ANY"} onValueChange={(next) => onChange(next === "ANY" ? "" : next)}>
-          <SelectTrigger id={fp.id}>
+          <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -637,15 +664,15 @@ function StatusPanel({
   action?: ReactNode;
 }) {
   const colors = tone === "danger"
-    ? "border-danger-200 bg-danger-50 text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-100"
+    ? "border-destructive bg-destructive-subtle text-destructive-subtle-foreground"
     : tone === "warning"
-      ? "border-warn-200 bg-warn-50 text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/40 dark:text-warn-100"
+      ? "border-warning bg-warning-subtle text-warning-subtle-foreground"
       : "border-border bg-card text-muted-foreground";
   return (
-    <section className={`flex min-h-52 flex-col items-center justify-center rounded-xl border p-6 text-center ${colors}`}>
+    <section role={tone === "neutral" ? "status" : "alert"} className={`flex min-h-52 flex-col items-center justify-center rounded-lg border p-6 text-center ${colors}`}>
       <span className="mb-3 opacity-70">{icon}</span>
       <h2 className="text-sm font-semibold">{title}</h2>
-      {detail ? <p className="mt-1 max-w-2xl break-all text-xs opacity-80">{detail}</p> : null}
+      {detail ? <p className="mt-1 max-w-2xl break-all text-sm opacity-80">{detail}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </section>
   );

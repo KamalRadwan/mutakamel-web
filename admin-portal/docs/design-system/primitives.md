@@ -1,8 +1,8 @@
 # Primitives
 
-Status: **[Verified]**
+Status: **[Verified inventory; target conformance requirements added]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-29**
 
 Owner: **Admin Portal**
 
@@ -10,17 +10,24 @@ Source: `src/design-system/primitives/*.tsx` (26 files). All are exported
 from the `@/design-system` barrel — feature code imports from there, never
 by reaching into `src/design-system/primitives/Button` directly (AGENTS.md).
 
-Every primitive here composes `focusRing` and/or `controlSize` from
-`src/design-system/lib/variants.ts`, so a visible keyboard-focus ring and the
-24/28/32/36/40px control-height scale are consistent for free — see
-[geometry-and-density.md](geometry-and-density.md). All are built on Radix UI
-primitives except where noted, so focus trapping, `Esc`-to-close, roving
-tabindex, and ARIA wiring come from Radix rather than being hand-rolled.
+Primitives may compose `focusRing`, `controlSize`, and Radix behavior, but those
+dependencies do not make every consumer accessible “for free.” Each primitive
+still owns its accessible name, localized built-in text, target area, disabled
+explanation, loading announcement, reduced-motion behavior, and focus-return
+contract. Current source has gaps in several of these areas.
+
+See [Geometry and density](geometry-and-density.md#hit-areas-current-gap-and-target)
+and
+[Accessibility, responsive behavior, and localization](accessibility-responsive-and-localization.md).
 
 ## Button
 
-`variant`: `primary` (brand fill, `ink-950` label — the one-per-page action),
-`secondary` (default), `outline`, `ghost`, `destructive`, `link`. `size`:
+Current `variant`: `primary` uses the transitional emerald brand fill. The
+approved target maps it to cobalt `action` with a white label after `action`
+and `success` are separated.
+
+Variants are `primary`, `secondary` (default), `outline`, `ghost`,
+`destructive`, and `link`. `size`:
 `xs`/`sm`/`md`/`lg`/`xl`. `loading` renders a spinning `Loader2` before the
 label with `aria-busy`. `asChild` (Radix `Slot`) lets a `Button`-styled
 element render as something else — e.g. a `next/link` `<Link>` — without an
@@ -43,13 +50,16 @@ option.
 
 Constraint-critical: generates a stable `useId()`-based `htmlFor`, wires
 `aria-describedby` to hint/error text, and sets `aria-invalid`. A `Field`
-error must stay inline and must never become a toast — see
-[toast-contract.md](toast-contract.md).
+error stays inline and never becomes toast-only. Multi-field submission
+recovery is a form-level target rather than `Field` behavior: one invalid field
+receives focus; multiple invalid fields render and focus a summary linked to
+each field.
 
 ## Badge
 
-`tone`: `brand`, `danger`, `warn`, `neutral` — the same four color roles as
-everywhere else in the app, not a fifth. No "info"/"blue" tone exists.
+Current `tone` values are `brand`, `danger`, `warn`, and `neutral`. The target
+renames healthy `brand` usage to `success` and adds an `action`/`info` treatment
+that may not be used as a success state.
 
 ## Dialog / AlertDialog / Sheet
 
@@ -57,17 +67,24 @@ everywhere else in the app, not a fifth. No "info"/"blue" tone exists.
 (default `true`) added in Phase 14 so `CommandPalette` can suppress the
 default close button. `AlertDialog` wraps Radix `AlertDialog` and absorbed
 the pre-migration `useAccessibleDialog.ts` hook's job (focus trap, scroll
-lock, `Esc`) — that hook is scheduled for deletion once nothing references
-it (Phase 25). `Sheet` also wraps Radix `Dialog` (not a separate primitive)
+lock, `Esc`). That former helper has been deleted. `Sheet` also wraps Radix
+`Dialog` (not a separate primitive)
 with a `side` prop that is **logical** (`"start"` / `"end"`), not
 `"left"`/`"right"` — it mirrors correctly under `dir="rtl"` without a
 consumer having to branch on direction.
 
+Target requirement: built-in close names are localized. Initial focus, Escape
+behavior, focus return, scroll locking, and reduced-motion behavior are verified
+in both directions. Incoming calls or other urgent modal interactions use
+alert-dialog semantics rather than a visually floating `<aside>`.
+
 ## Table
 
 Bare `<table>`/`<thead>`/`<tbody>`/`<tr>` wrappers with design-system
-classNames — no Radix dependency (native table semantics are already
-correct). Consumed by `DataTable` (see [patterns.md](patterns.md)), not
+classNames and no Radix dependency. Native table semantics are the foundation,
+but they do not automatically provide a name, focusable scroll region,
+sortable-button behavior, selection labels, or responsive overflow.
+Consumed by `DataTable` (see [patterns.md](patterns.md)), not
 meant to be reached for directly by feature code for a new table.
 
 ## Everything else
@@ -104,7 +121,7 @@ meant to be reached for directly by feature code for a new table.
 ## Not yet built
 
 The original plan called for a `Combobox` (command+popover, absorbing
-`CountrySelect.tsx`'s 250-country search). It does not exist yet —
-`CountrySelect.tsx` remains a separate, non-design-system component. Treat
-any reference to a design-system `Combobox` elsewhere as aspirational until
-it lands.
+`CountrySelect.tsx`'s 250-country search). It does not exist yet.
+`CountrySelect.tsx` remains a separate component and does not currently provide
+a complete listbox/option, arrow-key, Escape, typeahead, or focus-return model.
+This is an accessibility-critical roadmap item, not optional polish.

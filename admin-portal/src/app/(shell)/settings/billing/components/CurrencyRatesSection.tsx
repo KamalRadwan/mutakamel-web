@@ -162,7 +162,7 @@ export function CurrencyRatesSection() {
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border p-5">
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-brand-500/10 p-2.5 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+          <div className="rounded-lg bg-info-subtle p-2.5 text-info-subtle-foreground">
             <Coins className="size-5" aria-hidden="true" />
           </div>
           <div>
@@ -177,7 +177,7 @@ export function CurrencyRatesSection() {
 
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={fetchRates} disabled={isLoading} title={copy.refresh}>
-            <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+            <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
             {copy.refresh}
           </Button>
 
@@ -212,7 +212,7 @@ export function CurrencyRatesSection() {
       </div>
 
       <div className="flex items-center gap-2 border-b border-border bg-muted px-5 py-3 text-xs text-muted-foreground">
-        <DollarSign className="size-4 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+        <DollarSign className="size-4 shrink-0 text-info" aria-hidden="true" />
         <span>
           <strong className="font-semibold text-foreground">{copy.baseCurrencyLabel}</strong>{" "}
           {copy.baseCurrencyNote}&nbsp;
@@ -224,7 +224,7 @@ export function CurrencyRatesSection() {
 
       <div className="p-5">
         {error && (
-          <div role="alert" className="mb-4 rounded-lg border border-danger-200 bg-danger-50 p-3 text-xs text-danger-700 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-300">
+          <div role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground">
             {error}
           </div>
         )}
@@ -308,7 +308,7 @@ export function CurrencyRatesSection() {
                 {copy.cancel}
               </Button>
               <Button type="submit" variant="primary" disabled={isSaving}>
-                {isSaving && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+                {isSaving && <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
                 {copy.save}
               </Button>
             </div>
@@ -334,7 +334,7 @@ export function CurrencyRatesSection() {
               className="resize-none font-mono"
             />
             {batchError && (
-              <p role="alert" className="rounded-lg border border-danger-200 bg-danger-50 p-3 text-xs text-danger-700 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-300">
+              <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground">
                 {batchError}
               </p>
             )}
@@ -343,7 +343,7 @@ export function CurrencyRatesSection() {
                 {copy.cancel}
               </Button>
               <Button type="submit" variant="primary" disabled={isSaving}>
-                {isSaving && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+                {isSaving && <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
                 {copy.saveBatch}
               </Button>
             </div>

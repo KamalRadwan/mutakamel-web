@@ -69,7 +69,7 @@ export function DashboardTabsNav({
     <Tabs
       value={activeTab}
       onValueChange={(value) => onTabChange(value as DashboardTabKey)}
-      className="sticky top-[61px] z-10 rounded-lg border border-border bg-card px-2 shadow-xs"
+      className="sticky top-[61px] z-10 rounded-lg border border-border bg-card px-2"
     >
       <TabsList
         className="h-auto w-full justify-start gap-1.5 overflow-x-auto border-b-0 py-2 scrollbar-none"
@@ -78,7 +78,7 @@ export function DashboardTabsNav({
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
-            <TabsTrigger key={tab.key} value={tab.key} className="h-9 shrink-0 gap-2 rounded-md px-3 py-1.5 after:hidden data-[state=active]:bg-ink-100 dark:data-[state=active]:bg-ink-800">
+            <TabsTrigger key={tab.key} value={tab.key} className="h-9 shrink-0 gap-2 rounded-md px-3 py-1.5 after:hidden data-[state=active]:bg-selected">
               <Icon className="size-4" aria-hidden="true" />
               <span>{tab.label}</span>
             </TabsTrigger>

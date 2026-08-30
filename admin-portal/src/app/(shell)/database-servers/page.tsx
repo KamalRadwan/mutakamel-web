@@ -21,6 +21,7 @@ import {
   FilterBar,
   DataTable,
   Button,
+  ErrorState,
   StatusBadge,
   type ColumnDef,
 } from "@/design-system";
@@ -72,6 +73,7 @@ function DatabaseServersContent() {
     summaryMetrics,
     isLoading,
     error,
+    fetchServers,
     meta,
     serverPendingDelete,
     deletingServerId,
@@ -101,7 +103,7 @@ function DatabaseServersContent() {
         srv.deletedAt ? (
           <span className="font-semibold text-muted-foreground">{srv.name}</span>
         ) : (
-          <Link href={`/database-servers/${srv.id}`} className="font-semibold text-foreground hover:text-brand-700 hover:underline dark:hover:text-brand-400">
+          <Link href={`/database-servers/${srv.id}`} className="font-semibold text-primary underline-offset-4 hover:underline">
             {srv.name}
           </Link>
         ),
@@ -111,7 +113,7 @@ function DatabaseServersContent() {
       headerEn: "Host & Port",
       headerAr: "المضيف والمنفذ",
       cell: (srv) => (
-        <span className="rounded-md bg-ink-100 px-2.5 py-1 font-mono text-xs font-semibold text-foreground dark:bg-ink-800">
+        <span className="rounded-md bg-muted px-2.5 py-1 font-mono text-xs font-semibold text-foreground">
           {srv.host}:{srv.port}
         </span>
       ),
@@ -132,9 +134,17 @@ function DatabaseServersContent() {
       headerAr: "سعة المستأجرين",
       cell: (srv) => (
         <div className="flex items-center gap-2">
-          <div className="h-2 w-24 overflow-hidden rounded-full bg-ink-200 dark:bg-ink-800">
+          <div
+            role="progressbar"
+            aria-label={lang === "ar" ? `سعة ${srv.name}` : `${srv.name} capacity`}
+            aria-valuemin={0}
+            aria-valuemax={srv.maxTenants}
+            aria-valuenow={srv.currentTenants}
+            aria-valuetext={`${srv.currentTenants} / ${srv.maxTenants}`}
+            className="h-2 w-24 overflow-hidden rounded-full bg-muted"
+          >
             <div
-              className="h-full rounded-full bg-brand-500"
+              className="h-full rounded-full bg-info transition-[width] motion-reduce:transition-none"
               style={{ width: `${Math.min(100, (srv.currentTenants / Math.max(1, srv.maxTenants)) * 100)}%` }}
             />
           </div>
@@ -167,12 +177,12 @@ function DatabaseServersContent() {
       cell: (srv) =>
         canDestroy && canDestroyDatabaseServer(srv) ? (
           <Button type="button" variant="destructive" size="sm" onClick={() => openDestroy(srv)} disabled={destroyingServerId === srv.id}>
-            <ShieldAlert className="size-3.5" />
+            <ShieldAlert className="size-3.5" aria-hidden="true" />
             {copy.destroy}
           </Button>
         ) : canDelete && canSoftDeleteDatabaseServer(srv) ? (
           <Button type="button" variant="outline" size="sm" onClick={() => openSoftDelete(srv)} disabled={deletingServerId === srv.id}>
-            <Trash2 className="size-3.5" />
+            <Trash2 className="size-3.5" aria-hidden="true" />
             {copy.deleteButton}
           </Button>
         ) : (
@@ -195,7 +205,7 @@ function DatabaseServersContent() {
         }
       />
 
-      <StatGrid>
+      <StatGrid className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label={copy.statTotalHosts} value={summaryMetrics.totalServers} icon={Server} />
         <StatCard label={copy.statActiveNodes} value={summaryMetrics.activeServers} icon={Server} />
         <StatCard label={copy.statDraining} value={summaryMetrics.drainingServers} icon={Server} />
@@ -206,11 +216,16 @@ function DatabaseServersContent() {
         <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center">
           <div className="flex-1">
             <FilterBar
+              labelEn="Database server filters"
+              labelAr="عوامل تصفية خوادم قواعد البيانات"
+              ariaControls="database-server-results"
               fields={[
-                { key: "search", type: "search", placeholderEn: "Search by name or host...", placeholderAr: "ابحث بالاسم أو المضيف..." },
+                { key: "search", type: "search", labelEn: "Search", labelAr: "بحث", placeholderEn: "Search by name or host...", placeholderAr: "ابحث بالاسم أو المضيف..." },
                 {
                   key: "deletion",
                   type: "select",
+                  labelEn: "Record set",
+                  labelAr: "مجموعة السجلات",
                   placeholderEn: "Current servers",
                   placeholderAr: "الخوادم الحالية",
                   options: [
@@ -221,6 +236,8 @@ function DatabaseServersContent() {
                 {
                   key: "status",
                   type: "select",
+                  labelEn: "Status",
+                  labelAr: "الحالة",
                   placeholderEn: "All Statuses",
                   placeholderAr: "كل الحالات",
                   options: [
@@ -240,19 +257,34 @@ function DatabaseServersContent() {
               }}
             />
           </div>
-          <CountrySelect value={countryFilter} onChange={(isoCode) => setCountryFilter(isoCode)} allowAll allLabel={copy.allCountries} />
+          <div className="min-w-48 space-y-1.5">
+            <label htmlFor="database-country-filter" className="text-xs font-medium text-foreground">
+              {copy.countryFilterLabel}
+            </label>
+            <CountrySelect
+              id="database-country-filter"
+              label={copy.countryFilterLabel}
+              value={countryFilter}
+              onChange={(isoCode) => setCountryFilter(isoCode)}
+              allowAll
+              allLabel={copy.allCountries}
+            />
+          </div>
         </div>
-        <DataTable
-          columns={columns}
-          data={servers}
-          isLoading={isLoading}
-          getRowId={(srv) => srv.id}
-          pagination={{ page, limit: 20, totalItems: meta.total, totalPages: meta.totalPages, onPageChange: (p) => setPage(() => p) }}
-          emptyState={{
-            titleEn: error ? error : "No database servers found",
-            titleAr: error ? error : "لا توجد خوادم قواعد بيانات",
-          }}
-        />
+        <div id="database-server-results">
+          {error && !isLoading ? (
+            <ErrorState title={error} onRetry={() => void fetchServers()} />
+          ) : (
+            <DataTable
+              columns={columns}
+              data={servers}
+              isLoading={isLoading}
+              getRowId={(srv) => srv.id}
+              pagination={{ page, limit: 20, totalItems: meta.total, totalPages: meta.totalPages, onPageChange: (p) => setPage(() => p) }}
+              emptyState={{ titleEn: "No database servers found", titleAr: "لا توجد خوادم قواعد بيانات" }}
+            />
+          )}
+        </div>
       </div>
 
       <DestructiveActionModal
@@ -295,12 +327,12 @@ function DatabaseServersBoundary({
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="grid place-items-center py-16">
       <section
         role={loading ? "status" : undefined}
-        className="flex max-w-xl flex-col items-center rounded-xl border border-border bg-card p-8 text-center"
+        className="flex max-w-xl flex-col items-center rounded-lg border border-border bg-card p-8 text-center"
       >
         {loading ? (
-          <Server className="size-8 animate-pulse text-brand-500" />
+          <Server className="size-8 animate-pulse text-info motion-reduce:animate-none" aria-hidden="true" />
         ) : (
-          <ShieldAlert className="size-8 text-warn-500" />
+          <ShieldAlert className="size-8 text-warning" aria-hidden="true" />
         )}
         <h1 className="mt-3 font-semibold text-foreground">{message}</h1>
       </section>

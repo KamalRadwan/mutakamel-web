@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { CheckCircle2, Clock3, HardDrive, Plus, RefreshCw } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -13,6 +14,7 @@ import {
   Button,
   StatusBadge,
   ErrorState,
+  CodeRef,
   DegradedBanner,
   type ColumnDef,
 } from "@/design-system";
@@ -23,14 +25,19 @@ export function StorageServersScreen() {
   const { lang, t } = useI18n();
   const copy = t.storageServersList;
   const view = useStorageServers();
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
   const activeOnPage = view.servers.filter((server) => server.status === "ACTIVE").length;
   const freshOnPage = view.servers.filter((server) => server.connectionEvidenceFresh).length;
 
+  useEffect(() => {
+    if (view.error) errorSummaryRef.current?.focus();
+  }, [view.error]);
+
   if (view.isAuthLoading) {
     return (
-      <div className="grid min-h-80 place-items-center text-sm font-semibold text-muted-foreground">
+      <div role="status" className="grid min-h-80 place-items-center text-sm font-semibold text-muted-foreground">
         <span className="flex items-center gap-2">
-          <RefreshCw className="size-5 animate-spin" />
+          <RefreshCw className="size-5 animate-spin text-info motion-reduce:animate-none" aria-hidden="true" />
           {copy.checkingPermissions}
         </span>
       </div>
@@ -60,11 +67,11 @@ export function StorageServersScreen() {
       headerAr: "الخادم",
       cell: (server) => (
         <div>
-          <Link href={`/storage-servers/${server.id}`} className="font-semibold text-brand-700 hover:underline dark:text-brand-400">
+          <Link href={`/storage-servers/${server.id}`} className="inline-flex min-h-(--size-hit) items-center rounded-sm font-semibold text-info underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-(--size-hit-coarse)">
             {server.name}
           </Link>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">{server.code}</p>
-          {server.isPlatformDefault && <Badge tone="brand" className="mt-1.5">{copy.platformDefaultBadge}</Badge>}
+          <p dir="ltr" className="mt-1 font-mono text-xs text-muted-foreground">{server.code}</p>
+          {server.isPlatformDefault && <Badge tone="info" className="mt-1.5">{copy.platformDefaultBadge}</Badge>}
         </div>
       ),
     },
@@ -74,7 +81,7 @@ export function StorageServersScreen() {
       headerAr: "الموقع",
       cell: (server) => (
         <div>
-          <p className="max-w-xs truncate font-mono text-xs" title={server.endpoint}>{server.endpoint}</p>
+          <p dir="ltr" className="max-w-xs truncate font-mono text-xs" title={server.endpoint}>{server.endpoint}</p>
           <p className="mt-1 text-xs text-muted-foreground">{server.region} · {server.bucketName}</p>
         </div>
       ),
@@ -83,7 +90,7 @@ export function StorageServersScreen() {
       key: "tenants",
       headerEn: "Tenants",
       headerAr: "المستأجرون",
-      cell: (server) => <span className="font-mono font-semibold">{server.assignedTenants} / {server.maxTenants ?? "∞"}</span>,
+      cell: (server) => <span className="font-semibold tabular-nums"><bdi>{formatStorageNumber(server.assignedTenants, lang)}</bdi> / <bdi>{server.maxTenants === null ? "∞" : formatStorageNumber(server.maxTenants, lang)}</bdi></span>,
     },
     {
       key: "evidence",
@@ -91,12 +98,10 @@ export function StorageServersScreen() {
       headerAr: "دليل الاتصال",
       cell: (server) => (
         <div>
-          <p className={`font-semibold ${evidenceTone(server)}`}>{evidenceLabel(server, copy)}</p>
+          <Badge tone={evidenceBadgeTone(server)}>{evidenceLabel(server, copy)}</Badge>
           <p className="mt-1 text-xs text-muted-foreground">{formatDate(server.lastConnectionTestedAt, lang, copy)}</p>
           {server.lastConnectionTestErrorCode && (
-            <code className="mt-1 block max-w-xs truncate text-xs" title={server.lastConnectionTestErrorCode}>
-              {server.lastConnectionTestErrorCode}
-            </code>
+            <CodeRef value={server.lastConnectionTestErrorCode} className="mt-1 max-w-xs" />
           )}
         </div>
       ),
@@ -118,7 +123,7 @@ export function StorageServersScreen() {
           view.canCreate && (
             <Button variant="primary" asChild>
               <Link href="/storage-servers/new">
-                <Plus className="size-4" />
+                <Plus className="size-4" aria-hidden="true" />
                 {copy.registerServerButton}
               </Link>
             </Button>
@@ -126,43 +131,59 @@ export function StorageServersScreen() {
         }
       />
 
-      <StatGrid className="sm:grid-cols-3">
-        <StatCard label={copy.statTotalResults} value={view.total} icon={HardDrive} />
-        <StatCard label={copy.statActiveOnPage} value={activeOnPage} icon={CheckCircle2} />
-        <StatCard label={copy.statFreshEvidenceOnPage} value={freshOnPage} icon={Clock3} />
+      <StatGrid className="grid-cols-1 sm:grid-cols-3">
+        <StatCard label={copy.statTotalResults} value={formatStorageNumber(view.total, lang)} icon={HardDrive} />
+        <StatCard label={copy.statActiveOnPage} value={formatStorageNumber(activeOnPage, lang)} icon={CheckCircle2} />
+        <StatCard label={copy.statFreshEvidenceOnPage} value={formatStorageNumber(freshOnPage, lang)} icon={Clock3} />
       </StatGrid>
 
       {view.error && (
-        <DegradedBanner>
-          <p className="font-medium">{copy.loadErrorTitle}</p>
-          <p>{view.error.message}</p>
-          <Button type="button" variant="ghost" size="sm" className="mt-1 -ms-2" onClick={() => void view.refresh()}>
-            {copy.retryButton}
-          </Button>
-        </DegradedBanner>
+        <div ref={errorSummaryRef} tabIndex={-1} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <DegradedBanner>
+            <p className="font-medium">{copy.loadErrorTitle}</p>
+            <p>{view.error.message}</p>
+            {(view.error.errorCode || view.error.correlationId) && (
+              <div className="flex flex-wrap gap-1.5">
+                {view.error.errorCode && <CodeRef value={view.error.errorCode} />}
+                {view.error.correlationId && <CodeRef value={view.error.correlationId} />}
+              </div>
+            )}
+            <Button type="button" variant="ghost" size="sm" className="mt-1 -ms-2" onClick={() => void view.refresh()}>
+              {copy.retryButton}
+            </Button>
+          </DegradedBanner>
+        </div>
       )}
 
-      <div className="rounded-lg border border-border bg-card">
-        <div className="flex items-center gap-3 border-b border-border p-4">
+      <div className="space-y-3">
+        <div className="flex flex-col items-stretch gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-end">
           <div className="flex-1">
             <FilterBar
+              labelEn="Storage server filters"
+              labelAr="عوامل تصفية خوادم التخزين"
+              ariaControls="storage-server-results"
               fields={[
-                { key: "search", type: "search", placeholderEn: "Name, code, or endpoint", placeholderAr: "الاسم أو الرمز أو نقطة النهاية" },
+                { key: "search", type: "search", labelEn: "Search", labelAr: "بحث", placeholderEn: "Name, code, or endpoint", placeholderAr: "الاسم أو الرمز أو نقطة النهاية" },
                 {
                   key: "status",
                   type: "select",
+                  labelEn: "Lifecycle status",
+                  labelAr: "حالة دورة الحياة",
                   placeholderEn: "All statuses",
                   placeholderAr: "كل الحالات",
                   options: [
                     { value: "ALL", labelEn: "All statuses", labelAr: "كل الحالات" },
                     { value: "ACTIVE", labelEn: "ACTIVE", labelAr: "ACTIVE" },
                     { value: "DRAFT", labelEn: "DRAFT", labelAr: "DRAFT" },
+                    { value: "DRAINING", labelEn: "DRAINING", labelAr: "DRAINING" },
                     { value: "OFFLINE", labelEn: "OFFLINE", labelAr: "OFFLINE" },
                   ],
                 },
                 {
                   key: "sort",
                   type: "select",
+                  labelEn: "Sort order",
+                  labelAr: "ترتيب النتائج",
                   placeholderEn: "Sort",
                   placeholderAr: "الترتيب",
                   options: [
@@ -186,34 +207,41 @@ export function StorageServersScreen() {
               }}
             />
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => void view.refresh()} disabled={view.isLoading}>
-            <RefreshCw className={`size-3.5 ${view.isLoading ? "animate-spin" : ""}`} />
+          <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void view.refresh()} loading={view.isLoading}>
+            {!view.isLoading && <RefreshCw className="size-3.5" aria-hidden="true" />}
             {copy.refreshButton}
           </Button>
         </div>
-        <DataTable
-          columns={columns}
-          data={view.servers}
-          isLoading={view.isLoading}
-          getRowId={(server) => server.id}
-          pagination={{
-            page: view.page,
-            limit: 20,
-            totalItems: view.total,
-            totalPages: view.totalPages,
-            onPageChange: (p) => view.setPage(p),
-          }}
-          emptyState={{ titleEn: "No matching storage servers.", titleAr: "لا توجد نتائج مطابقة." }}
-        />
+        <div id="storage-server-results">
+          <DataTable
+            labelEn="Storage servers"
+            labelAr="خوادم التخزين"
+            columns={columns}
+            data={view.servers}
+            isLoading={view.isLoading && view.servers.length === 0}
+            isRefreshing={view.isLoading && view.servers.length > 0}
+            getRowId={(server) => server.id}
+            getRowLabel={(server) => server.name}
+            responsiveMode="record-cards"
+            pagination={{
+              page: view.page,
+              limit: 20,
+              totalItems: view.total,
+              totalPages: view.totalPages,
+              onPageChange: (p) => view.setPage(p),
+            }}
+            emptyState={{ titleEn: "No matching storage servers.", titleAr: "لا توجد نتائج مطابقة." }}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-function evidenceTone(server: StorageServerView): string {
-  if (server.connectionEvidenceFresh && server.lastConnectionTestStatus === "PASSED") return "text-brand-700 dark:text-brand-400";
-  if (server.lastConnectionTestStatus === "FAILED") return "text-danger-700 dark:text-danger-400";
-  return "text-warn-700 dark:text-warn-400";
+function evidenceBadgeTone(server: StorageServerView): "success" | "danger" | "warn" {
+  if (server.connectionEvidenceFresh && server.lastConnectionTestStatus === "PASSED") return "success";
+  if (server.lastConnectionTestStatus === "FAILED") return "danger";
+  return "warn";
 }
 
 type StorageServersListCopy = typeof import("@/i18n/dictionaries/en").en.storageServersList;
@@ -230,7 +258,7 @@ function formatDate(value: string | null, lang: "ar" | "en", copy: StorageServer
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat(lang === "ar" ? "ar-EG-u-nu-latn" : "en-US", {
+    : new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
         year: "numeric",
         month: "short",
         day: "2-digit",
@@ -239,4 +267,13 @@ function formatDate(value: string | null, lang: "ar" | "en", copy: StorageServer
         timeZone: "UTC",
         timeZoneName: "short",
       }).format(date);
+}
+
+const storageNumberFormatters = {
+  en: new Intl.NumberFormat("en-US"),
+  ar: new Intl.NumberFormat("ar-EG"),
+} as const;
+
+function formatStorageNumber(value: number, lang: "ar" | "en") {
+  return storageNumberFormatters[lang].format(value);
 }

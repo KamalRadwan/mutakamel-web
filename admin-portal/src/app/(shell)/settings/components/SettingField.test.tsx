@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { SettingField } from "./SettingField";
+import type { SettingFieldData } from "../hooks/useSettings";
 
 const toastError = vi.fn();
 vi.mock("@/components/ui/ToastContext", () => ({
@@ -88,4 +89,57 @@ describe("SettingField", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry exact" }));
     expect(onRetryExact).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ["boolean", "switch", true],
+    ["string", "textbox", "locked"],
+    ["number", "spinbutton", 7],
+    ["enum", "combobox", "locked"],
+  ] as const)(
+    "associates the read-only reason with the disabled %s control",
+    (inputType, role, value) => {
+      const key = `test.${inputType}`;
+      const setting: SettingFieldData = {
+        key,
+        value,
+        description: "Locked setting",
+        descriptionI18n: { en: "Locked setting", ar: "إعداد مقفل" },
+        isDefault: false,
+        readOnly: true,
+        permissionLocked: true,
+        uiMeta: {
+          key,
+          titleEn: "Locked setting",
+          titleAr: "إعداد مقفل",
+          inputType,
+          defaultValue: value,
+          descEn: "Locked setting",
+          descAr: "إعداد مقفل",
+          options: inputType === "enum"
+            ? [{ value: "locked", label: "Locked", labelAr: "مقفل" }]
+            : undefined,
+        },
+      };
+
+      const { unmount } = render(
+        <SettingField
+          lang="en"
+          setting={setting}
+          onUpdate={vi.fn()}
+          onReload={vi.fn()}
+          onRetryExact={vi.fn()}
+        />,
+      );
+
+      const control = screen.getByRole(role);
+      expect(control).toBeDisabled();
+      const describedBy = control.getAttribute("aria-describedby")?.split(" ") ?? [];
+      expect(describedBy).toHaveLength(2);
+      expect(document.getElementById(describedBy[0])).toHaveTextContent("Locked setting");
+      expect(document.getElementById(describedBy[1])).toHaveTextContent(
+        "Editing requires both admin.settings.update and admin.settings.critical.",
+      );
+      unmount();
+    },
+  );
 });

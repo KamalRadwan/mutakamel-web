@@ -15,6 +15,7 @@ import {
   type ColumnDef,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { localeForLanguage } from "@/i18n/locale";
 import { useRoles } from "./hooks/useRoles";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { CreateRoleModal } from "./components/CreateRoleModal";
@@ -63,7 +64,7 @@ export default function RolesDirectoryPage() {
       headerAr: t.roles.roleName,
       cell: (role) => (
         <div>
-          <Link href={`/roles/${role.id}`} className="font-semibold text-brand-700 hover:underline dark:text-brand-400">
+          <Link href={`/roles/${role.id}`} className="font-semibold text-primary hover:underline">
             {role.name}
           </Link>
           {role.description && (
@@ -91,7 +92,7 @@ export default function RolesDirectoryPage() {
       headerEn: t.roles.createdAt,
       headerAr: t.roles.createdAt,
       cell: (role) =>
-        new Date(role.createdAt).toLocaleDateString(lang === "ar" ? "ar-EG-u-nu-latn" : "en-US", {
+        new Date(role.createdAt).toLocaleDateString(localeForLanguage(lang), {
           year: "numeric",
           month: "short",
           day: "numeric",
@@ -107,19 +108,21 @@ export default function RolesDirectoryPage() {
           <Link
             href={`/roles/${role.id}`}
             title={canUpdate ? t.roles.edit : t.roles.view}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-ink-100 hover:text-foreground dark:hover:bg-ink-800"
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground motion-reduce:transition-none"
           >
             {canUpdate ? <Edit2 className="size-3.5" /> : <Eye className="size-3.5" />}
           </Link>
           {!role.isSystem && canDelete && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => openDeleteModal(role.id)}
-              title={t.roles.delete}
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-950/40 dark:hover:text-danger-400"
+              aria-label={t.roles.delete}
+              className="size-8 p-0 text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
             >
-              <Trash2 className="size-3.5" />
-            </button>
+              <Trash2 className="size-3.5" aria-hidden="true" />
+            </Button>
           )}
         </div>
       ),

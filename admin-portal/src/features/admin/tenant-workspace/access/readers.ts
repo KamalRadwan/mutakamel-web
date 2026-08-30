@@ -11,7 +11,6 @@ import {
   type TenantUserRoleAssignment,
   type TenantUserSummary,
   type TenantUserView,
-  type TenantUserWebphone,
 } from "./types";
 
 const UUID_PATTERN =
@@ -33,10 +32,6 @@ export function readTenantUserSummary(value: unknown): TenantUserSummary {
     deactivated: nonNegativeInteger(summary.deactivated, "INVALID_TENANT_USER_SUMMARY_RESPONSE"),
     deleted: nonNegativeInteger(summary.deleted, "INVALID_TENANT_USER_SUMMARY_RESPONSE"),
     owners: nonNegativeInteger(summary.owners, "INVALID_TENANT_USER_SUMMARY_RESPONSE"),
-    webphoneEnabled: nonNegativeInteger(
-      summary.webphoneEnabled,
-      "INVALID_TENANT_USER_SUMMARY_RESPONSE",
-    ),
     locked: nonNegativeInteger(summary.locked, "INVALID_TENANT_USER_SUMMARY_RESPONSE"),
   };
 }
@@ -71,42 +66,11 @@ export function readTenantUserView(value: unknown): TenantUserView {
       user.roleAssignments,
       "INVALID_TENANT_USER_RESPONSE",
     ).map(readRoleAssignment),
-    webphone: readTenantUserWebphone(user.webphone),
     lastLoginAt: nullableIsoDate(user.lastLoginAt, "INVALID_TENANT_USER_RESPONSE"),
     lockedUntil: nullableIsoDate(user.lockedUntil, "INVALID_TENANT_USER_RESPONSE"),
     createdAt: isoDate(user.createdAt, "INVALID_TENANT_USER_RESPONSE"),
     updatedAt: isoDate(user.updatedAt, "INVALID_TENANT_USER_RESPONSE"),
     deletedAt: nullableIsoDate(user.deletedAt, "INVALID_TENANT_USER_RESPONSE"),
-  };
-}
-
-export function readTenantUserWebphone(value: unknown): TenantUserWebphone {
-  assertNoCredentialMaterial(value, "INVALID_TENANT_USER_WEBPHONE_RESPONSE");
-  const config = object(coreData(value), "INVALID_TENANT_USER_WEBPHONE_RESPONSE");
-  return {
-    enabled: boolean(config.enabled, "INVALID_TENANT_USER_WEBPHONE_RESPONSE"),
-    extension: nullableString(config.extension, "INVALID_TENANT_USER_WEBPHONE_RESPONSE"),
-    sipUsername: nullableString(
-      config.sipUsername,
-      "INVALID_TENANT_USER_WEBPHONE_RESPONSE",
-    ),
-    displayName: nullableString(
-      config.displayName,
-      "INVALID_TENANT_USER_WEBPHONE_RESPONSE",
-    ),
-    outboundCallerId: nullableString(
-      config.outboundCallerId,
-      "INVALID_TENANT_USER_WEBPHONE_RESPONSE",
-    ),
-    transport: oneOf(
-      config.transport,
-      ["ws", "wss"] as const,
-      "INVALID_TENANT_USER_WEBPHONE_RESPONSE",
-    ),
-    passwordConfigured: boolean(
-      config.passwordConfigured,
-      "INVALID_TENANT_USER_WEBPHONE_RESPONSE",
-    ),
   };
 }
 

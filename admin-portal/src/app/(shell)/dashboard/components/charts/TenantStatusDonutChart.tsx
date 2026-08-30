@@ -1,7 +1,9 @@
 "use client";
 
-import { MetricDonutChart, DonutSegment } from "./MetricDonutChart";
-import { DashboardMetricTone } from "@/types/dashboard";
+import { MetricDonutChart, type DonutSegment } from "./MetricDonutChart";
+import type { DashboardMetricTone } from "@/types/dashboard";
+import { STATUS_TONE_COLOR } from "./ChartAccessibility";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface TenantStatusDonutChartProps {
   items: Array<{
@@ -13,39 +15,30 @@ interface TenantStatusDonutChartProps {
     tone: DashboardMetricTone;
   }>;
   total: number;
+  title?: string;
   height?: number;
 }
-
-const toneColorMap: Record<DashboardMetricTone, string> = {
-  green: "#10b981",
-  blue: "#3b82f6",
-  amber: "#f59e0b",
-  red: "#ef4444",
-  purple: "#8b5cf6",
-  cyan: "#06b6d4",
-};
-
-import { useI18n } from "@/i18n/I18nContext";
 
 export function TenantStatusDonutChart({
   items,
   total,
+  title,
   height = 240,
 }: TenantStatusDonutChartProps) {
   const { t } = useI18n();
+  const chartTitle = title ?? t.dashboard.tenantsTab.statusBreakdownTitle;
 
-  if (!items || items.length === 0) return null;
-
-  const donutSegments: DonutSegment[] = items.map((item) => ({
+  const donutSegments: DonutSegment[] = (Array.isArray(items) ? items : []).map((item) => ({
     key: item.key,
     name: item.label,
     value: item.count,
-    color: toneColorMap[item.tone] || "#3b82f6",
+    color: STATUS_TONE_COLOR[item.tone],
   }));
 
   return (
     <MetricDonutChart
       data={donutSegments}
+      title={chartTitle}
       centerValue={total}
       centerLabel={t.dashboard.tenantsTab.totalTenantsLabel}
       height={height}

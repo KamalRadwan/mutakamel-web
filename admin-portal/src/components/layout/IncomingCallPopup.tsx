@@ -1,7 +1,17 @@
 "use client";
 
-import { createPortal } from "react-dom";
+import { useRef, type RefObject } from "react";
 import { PhoneIncoming, PhoneOff, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/design-system";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 
@@ -13,6 +23,7 @@ type IncomingCallPopupProps = {
   onAnswer: () => void;
   onDecline: () => void;
   onClose: () => void;
+  fallbackFocusRef?: RefObject<HTMLButtonElement | null>;
 };
 
 export function IncomingCallPopup({
@@ -23,62 +34,100 @@ export function IncomingCallPopup({
   onAnswer,
   onDecline,
   onClose,
+  fallbackFocusRef,
 }: IncomingCallPopupProps) {
-  if (!open || typeof document === "undefined") return null;
+  const answerRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const copy = (lang === "ar" ? ar : en).incomingCall;
+  const callerName = displayName || phoneNumber || copy.unknownCaller;
 
-  return createPortal(
-    <aside
-      className="fixed top-4 start-1/2 z-[80] grid w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 gap-3 rounded-xl border border-ink-700/80 bg-ink-950/95 p-3.5 text-ink-50 shadow-2xl"
-      aria-label={copy.ariaLabel}
-      aria-live="assertive"
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
     >
-      <button
-        className="absolute top-2 end-2 grid size-8 place-items-center rounded-lg text-ink-400 transition-colors hover:bg-ink-800 hover:text-ink-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
-        type="button"
-        aria-label={copy.dismiss}
-        onClick={onClose}
+      <AlertDialogContent
+        className="max-w-sm p-4 sm:p-5"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          if (document.activeElement instanceof HTMLElement) {
+            returnFocusRef.current = document.activeElement;
+          }
+          answerRef.current?.focus({ preventScroll: true });
+        }}
+        onCloseAutoFocus={(event) => {
+          // This controlled alert has no Radix Trigger, so it owns the return
+          // target explicitly instead of letting focus fall back to <body>.
+          event.preventDefault();
+          const previousTarget = returnFocusRef.current;
+          const focusTarget =
+            previousTarget && previousTarget !== document.body && previousTarget.isConnected
+              ? previousTarget
+              : fallbackFocusRef?.current;
+          focusTarget?.focus({ preventScroll: true });
+          returnFocusRef.current = null;
+        }}
+        onEscapeKeyDown={(event) => {
+          // Escape follows the documented dismiss policy: hide the alert while
+          // leaving the waiting call available in the expanded phone surface.
+          event.preventDefault();
+          onClose();
+        }}
       >
-        <X className="size-4" aria-hidden="true" />
-      </button>
-
-      <div className="flex min-w-0 items-center gap-3 pe-9">
-        <span className="relative grid size-10 shrink-0 place-items-center rounded-xl bg-brand-500 text-ink-950 shadow-lg shadow-brand-500/25">
-          <PhoneIncoming className="relative z-10 size-5" aria-hidden="true" />
-          <span className="absolute inset-0 animate-ping rounded-xl bg-brand-400 opacity-30 motion-reduce:animate-none" />
-        </span>
-        <span className="min-w-0">
-          <small className="block text-xs font-semibold tracking-wide text-brand-400">
-            {copy.label}
-          </small>
-          <strong className="block truncate text-sm font-semibold">
-            {displayName || phoneNumber || copy.unknownCaller}
-          </strong>
-          {displayName ? (
-            <span className="block truncate font-mono text-xs text-ink-300">{phoneNumber}</span>
-          ) : null}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 border-t border-ink-800 pt-3">
-        <button
-          type="button"
-          className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 text-xs font-semibold text-ink-950 transition-colors hover:bg-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
-          onClick={onAnswer}
+        <AlertDialogCancel
+          aria-label={copy.dismiss}
+          className="absolute end-3 top-3 size-8 p-0"
         >
-          <PhoneIncoming className="size-4" aria-hidden="true" />
-          {copy.answer}
-        </button>
-        <button
-          type="button"
-          className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-danger-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-danger-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-400"
-          onClick={onDecline}
-        >
-          <PhoneOff className="size-4" aria-hidden="true" />
-          {copy.decline}
-        </button>
-      </div>
-    </aside>,
-    document.body,
+          <X className="size-4" aria-hidden="true" />
+        </AlertDialogCancel>
+
+        <AlertDialogHeader className="mb-0">
+          <div className="flex min-w-0 items-center gap-3 pe-9">
+            <span className="relative grid size-11 shrink-0 place-items-center rounded-lg bg-info-subtle text-info-subtle-foreground">
+              <PhoneIncoming className="relative z-10 size-5" aria-hidden="true" />
+              <span
+                className="absolute inset-0 animate-ping rounded-lg bg-info opacity-20 motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            </span>
+
+            <span className="min-w-0 text-start">
+              <AlertDialogTitle
+                className={`text-xs font-semibold uppercase text-info-subtle-foreground ${
+                  lang === "ar" ? "tracking-normal" : "tracking-wide"
+                }`}
+              >
+                {copy.label}
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <span className="mt-1 block text-foreground">
+                  <strong className="block truncate text-base font-semibold">
+                    {displayName ? callerName : <bdi dir="ltr">{callerName}</bdi>}
+                  </strong>
+                  {displayName ? (
+                    <bdi dir="ltr" className="block truncate font-mono text-xs text-muted-foreground">
+                      {phoneNumber}
+                    </bdi>
+                  ) : null}
+                </span>
+              </AlertDialogDescription>
+            </span>
+          </div>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter className="mt-5 grid grid-cols-2 gap-2 border-t border-border pt-4">
+          <AlertDialogAction ref={answerRef} onClick={onAnswer} className="gap-2">
+            <PhoneIncoming className="size-4" aria-hidden="true" />
+            {copy.answer}
+          </AlertDialogAction>
+          <AlertDialogAction destructive onClick={onDecline} className="gap-2">
+            <PhoneOff className="size-4" aria-hidden="true" />
+            {copy.decline}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

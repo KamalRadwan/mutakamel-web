@@ -63,22 +63,26 @@ export function TenantStorageMigrationPanel() {
         <p className="text-xs leading-5 text-muted-foreground">
           {t.storageMigration.panelDescription}
         </p>
-        <form onSubmit={submit} className="flex items-end gap-2">
-          <div className="flex-1">
-            <Field label={t.storageMigration.migrationIdLabel} error={validationError ?? undefined}>
+        <form onSubmit={submit} className="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="min-w-0">
+            <Field id="tenant-storage-migration-id" label={t.storageMigration.migrationIdLabel} error={validationError ?? undefined}>
               {(fp) => (
                 <Input
                   {...fp}
+                  name="migrationId"
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    if (validationError) setValidationError(null);
+                  }}
                   placeholder="019f0000-0000-7000-8000-000000000000"
                   className="font-mono"
                 />
               )}
             </Field>
           </div>
-          <Button type="submit" variant="outline" disabled={view.isLoading}>
-            <Search className="size-4" />
+          <Button type="submit" variant="outline" loading={view.isLoading}>
+            <Search className="size-4" aria-hidden="true" />
             {t.storageMigration.lookupButton}
           </Button>
         </form>
@@ -102,14 +106,14 @@ function MigrationStatusView({
 }) {
   const { t, lang } = useI18n();
   return (
-    <div className="space-y-4 rounded-md border border-border p-4">
+    <div className="space-y-4 rounded-md border border-border p-4" aria-busy={isPolling || undefined}>
       <div className="flex items-center justify-between gap-3">
         <StatusBadge status={migration.status} />
         {isPolling && (
-          <Badge tone="neutral">{t.storageMigration.autoRefreshingBadge}</Badge>
+          <Badge tone="info" role="status" aria-live="polite">{t.storageMigration.autoRefreshingBadge}</Badge>
         )}
       </div>
-      <OperationTimeline steps={migrationSteps(migration.status, lang, t)} />
+      <OperationTimeline steps={migrationSteps(migration.status, lang, t)} lang={lang} />
       <dl className="grid gap-3 text-xs sm:grid-cols-2">
         <DatumRow label={t.storageMigration.sourceServerLabel} value={migration.sourceStorageServerId} mono />
         <DatumRow label={t.storageMigration.targetServerLabel} value={migration.targetStorageServerId} mono />
@@ -162,9 +166,9 @@ function migrationSteps(
 
 function DatumRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div className="grid min-w-0 gap-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className={mono ? "break-all text-end font-mono font-semibold text-foreground" : "text-end font-semibold text-foreground"}>{value}</dd>
+      <dd className={mono ? "break-all font-mono font-semibold text-foreground sm:text-end" : "font-semibold text-foreground sm:text-end"}>{value}</dd>
     </div>
   );
 }

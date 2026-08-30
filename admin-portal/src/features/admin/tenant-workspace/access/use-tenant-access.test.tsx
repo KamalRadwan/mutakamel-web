@@ -18,7 +18,6 @@ const mocks = vi.hoisted(() => ({
   resetPassword: vi.fn(),
   resendInvite: vi.fn(),
   changePassword: vi.fn(),
-  updateWebphone: vi.fn(),
   suspendUser: vi.fn(),
   activateUser: vi.fn(),
   replaceRoles: vi.fn(),
@@ -55,7 +54,6 @@ vi.mock("./api", async () => {
       resetPassword: mocks.resetPassword,
       resendInvite: mocks.resendInvite,
       changePassword: mocks.changePassword,
-      updateWebphone: mocks.updateWebphone,
       suspendUser: mocks.suspendUser,
       activateUser: mocks.activateUser,
       replaceRoles: mocks.replaceRoles,
@@ -112,7 +110,6 @@ describe("useTenantAccess", () => {
     mocks.resetPassword.mockResolvedValue({ userId: USER_ID, delivery: "QUEUED" });
     mocks.resendInvite.mockResolvedValue({ userId: USER_ID, delivery: "QUEUED" });
     mocks.changePassword.mockResolvedValue(userFixture());
-    mocks.updateWebphone.mockResolvedValue(userFixture().webphone);
     mocks.suspendUser.mockResolvedValue(userFixture({ status: "SUSPENDED" }));
     mocks.activateUser.mockResolvedValue(userFixture({ status: "ACTIVE" }));
     mocks.replaceRoles.mockResolvedValue(userFixture());
@@ -353,7 +350,7 @@ describe("useTenantAccess", () => {
     expect(mocks.inviteUser.mock.calls[1]?.[2]).toBe(COMMAND_ID_2);
   });
 
-  it("protects owner identity/access/lifecycle but permits the dedicated WebPhone route", async () => {
+  it("protects owner identity, access, and lifecycle", async () => {
     const owner = userFixture({ id: "019ff251-1000-7000-8000-000000000002", isTenantOwner: true });
     const { result } = renderHook(() =>
       useTenantAccess({ tenantId: TENANT_ID, tenantStatus: "ACTIVE" }),
@@ -367,11 +364,6 @@ describe("useTenantAccess", () => {
     expect(mocks.updateUser).not.toHaveBeenCalled();
     expect(mocks.suspendUser).not.toHaveBeenCalled();
     expect(mocks.replaceRoles).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await result.current.updateWebphone(owner, { enabled: false });
-    });
-    expect(mocks.updateWebphone).toHaveBeenCalledTimes(1);
   });
 
   it("enforces lifecycle predicates before transport", async () => {

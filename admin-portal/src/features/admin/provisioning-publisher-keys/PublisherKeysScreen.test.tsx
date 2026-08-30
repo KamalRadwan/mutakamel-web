@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PublisherKeysScreen } from "./PublisherKeysScreen";
 import type { PublisherKeysView } from "./usePublisherKeys";
@@ -107,9 +107,14 @@ describe("PublisherKeysScreen", () => {
     expect(screen.getByRole("heading", { name: "Publisher-key detail" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Create an actor-bound challenge/u })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Register the verified public key/u })).toBeTruthy();
+    const directoryRegion = screen.getByRole("region", { name: "Trusted-key directory" });
+    expect(directoryRegion).toHaveAttribute("tabindex", "0");
+    const selectedInspect = screen.getByRole("button", { name: "Inspect" });
+    expect(selectedInspect).toHaveAttribute("aria-pressed", "true");
+    expect(selectedInspect.querySelector("svg")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+    fireEvent.click(selectedInspect);
     fireEvent.click(screen.getByRole("button", { name: "Create challenge" }));
     fireEvent.click(screen.getByRole("button", { name: "Review registration" }));
     fireEvent.click(screen.getByRole("button", { name: "Review revocation" }));
@@ -119,6 +124,30 @@ describe("PublisherKeysScreen", () => {
     expect(view.requestChallenge).toHaveBeenCalledOnce();
     expect(view.requestRegister).toHaveBeenCalledOnce();
     expect(view.requestRevoke).toHaveBeenCalledOnce();
+  });
+
+  it("keeps directory evidence mounted and marks the named region busy during refresh", () => {
+    const view = makeView();
+    view.directory.isRefreshing = true;
+    viewBox.current = view;
+    render(<PublisherKeysScreen />);
+
+    const region = screen.getByRole("region", { name: "Trusted-key directory" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByText(ACTIVE_KEY.keyId).length).toBeGreaterThan(0);
+  });
+
+  it("moves focus to persistent mutation failures", async () => {
+    const view = makeView();
+    view.mutation = {
+      ...view.mutation,
+      state: "FORBIDDEN",
+    };
+    viewBox.current = view;
+    render(<PublisherKeysScreen />);
+
+    const alert = screen.getByRole("alert");
+    await waitFor(() => expect(alert).toHaveFocus());
   });
 
   it("keeps directory and challenge permissions independent", () => {

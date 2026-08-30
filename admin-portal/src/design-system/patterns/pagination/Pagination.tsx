@@ -2,7 +2,9 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatLocaleNumber } from "@/i18n/locale";
 import { Button } from "../../primitives/Button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../primitives/Select";
 import type { DataTablePaginationProps } from "../data-table/types";
 
 const LIMIT_OPTIONS = [10, 20, 50, 100];
@@ -23,46 +25,54 @@ export function Pagination({
 }: DataTablePaginationProps) {
   const { lang } = useI18n();
 
-  if (totalPages <= 1 && !onLimitChange) return null;
-
-  const hasPrev = page > 1;
-  const hasNext = page < totalPages;
-  const rangeStart = totalItems === 0 ? 0 : (page - 1) * limit + 1;
-  const rangeEnd = Math.min(page * limit, totalItems);
+  const safeTotalPages = Math.max(1, totalPages);
+  const safePage = Math.min(Math.max(1, page), safeTotalPages);
+  const hasPrev = safePage > 1;
+  const hasNext = safePage < safeTotalPages;
+  const rangeStart = totalItems === 0 ? 0 : (safePage - 1) * limit + 1;
+  const rangeEnd = Math.min(safePage * limit, totalItems);
+  const number = (value: number) => formatLocaleNumber(lang, value);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-4 text-xs">
+    <nav
+      aria-label={lang === "ar" ? "ترقيم صفحات الجدول" : "Table pagination"}
+      className="flex flex-col items-stretch justify-between gap-3 border-t border-border bg-card p-4 text-xs sm:flex-row sm:items-center"
+    >
       <span className="font-medium text-muted-foreground">
         {lang === "ar"
-          ? `عرض ${rangeStart}–${rangeEnd} من ${totalItems} · الصفحة ${page} من ${totalPages}`
-          : `Showing ${rangeStart}–${rangeEnd} of ${totalItems} · Page ${page} of ${totalPages}`}
+          ? `عرض ${number(rangeStart)}–${number(rangeEnd)} من ${number(totalItems)} · الصفحة ${number(safePage)} من ${number(safeTotalPages)}`
+          : `Showing ${number(rangeStart)}–${number(rangeEnd)} of ${number(totalItems)} · Page ${number(safePage)} of ${number(safeTotalPages)}`}
       </span>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
         {onLimitChange && (
-          <label className="flex items-center gap-1.5 text-muted-foreground">
+          <label className="flex items-center justify-between gap-2 text-muted-foreground sm:justify-start">
             {lang === "ar" ? "لكل صفحة" : "Per page"}
-            <select
-              value={limit}
-              onChange={(e) => onLimitChange(Number(e.target.value))}
-              className="h-(--size-control-sm) rounded-md border border-border bg-card px-1.5 text-xs text-foreground"
-            >
+            <Select value={String(limit)} onValueChange={(value) => onLimitChange(Number(value))}>
+              <SelectTrigger
+                aria-label={lang === "ar" ? "عدد الصفوف في كل صفحة" : "Rows per page"}
+                className="h-(--size-control-sm) w-auto min-w-20 px-2 text-xs"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
               {LIMIT_OPTIONS.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
+                <SelectItem key={n} value={String(n)}>
+                  {number(n)}
+                </SelectItem>
               ))}
-            </select>
+              </SelectContent>
+            </Select>
           </label>
         )}
 
-        <div className="flex gap-1.5">
+        <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
             disabled={!hasPrev}
-            onClick={() => onPageChange(page - 1)}
+            onClick={() => onPageChange(safePage - 1)}
             aria-label={lang === "ar" ? "الصفحة السابقة" : "Previous page"}
           >
             {lang === "ar" ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
@@ -73,7 +83,7 @@ export function Pagination({
             variant="outline"
             size="sm"
             disabled={!hasNext}
-            onClick={() => onPageChange(page + 1)}
+            onClick={() => onPageChange(safePage + 1)}
             aria-label={lang === "ar" ? "الصفحة التالية" : "Next page"}
           >
             {lang === "ar" ? "التالي" : "Next"}
@@ -81,6 +91,6 @@ export function Pagination({
           </Button>
         </div>
       </div>
-    </div>
+    </nav>
   );
 }

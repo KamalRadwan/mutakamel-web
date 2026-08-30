@@ -8,7 +8,10 @@ const { languageMock, hookMock } = vi.hoisted(() => ({
   hookMock: vi.fn(),
 }));
 
-vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => languageMock }));
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => languageMock,
+  useOptionalI18n: () => null,
+}));
 vi.mock("./useProvisioningGovernance", () => ({
   useProvisioningGovernance: hookMock,
 }));
@@ -123,6 +126,9 @@ describe("ProvisioningGovernanceScreen", () => {
     expect(screen.getByLabelText("Sort field")).toBeInTheDocument();
     expect(screen.getByLabelText("Sort direction")).toBeInTheDocument();
     expect(screen.getByLabelText("Rows per page")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Component catalogue" }),
+    ).toHaveAttribute("tabindex", "0");
     expect(
       screen.getByRole("link", { name: /Fleet rollouts/i }),
     ).toHaveAttribute("href", "/provisioning/fleet");

@@ -58,11 +58,11 @@ function AuthorizedAuthInvalidationReplayPanel() {
     <>
       <section
         aria-busy={isPending}
-        className="space-y-5 rounded-xl border border-warn-200 bg-white p-5 shadow-2xs dark:border-warn-900/70 dark:bg-ink-900"
+        className="space-y-5 rounded-lg border border-warning/30 bg-card p-5"
       >
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <ShieldAlert className="size-4 text-warn-600 dark:text-warn-400" />
+            <ShieldAlert className="size-4 text-warning" aria-hidden="true" />
             {copy.title}
           </h2>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -70,7 +70,7 @@ function AuthorizedAuthInvalidationReplayPanel() {
           </p>
         </div>
 
-        <div className="flex gap-3 rounded-xl border border-warn-200 bg-warn-50 p-3 text-warn-900 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-200">
+        <div className="flex gap-3 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-warning-subtle-foreground">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div>
             <p className="text-xs font-semibold">{copy.warningTitle}</p>
@@ -180,7 +180,7 @@ function AuthorizedAuthInvalidationReplayPanel() {
           </Field>
 
           {replay.validationErrors.workflow ? (
-            <p role="alert" className="rounded-xl border border-warn-200 bg-warn-50 p-3 text-xs font-semibold text-warn-800 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-200">
+            <p role="alert" className="rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs font-semibold text-warning-subtle-foreground">
               {copy.validation[replay.validationErrors.workflow]}
             </p>
           ) : null}
@@ -217,7 +217,7 @@ function AuthorizedAuthInvalidationReplayPanel() {
           <div
             role="status"
             aria-live="polite"
-            className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-brand-900 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-200"
+            className="rounded-lg border border-success/30 bg-success-subtle p-4 text-success-subtle-foreground"
           >
             <p className="flex items-center gap-2 text-xs font-semibold">
               <CheckCircle2 className="size-4" />
@@ -255,7 +255,7 @@ function AuthorizedAuthInvalidationReplayPanel() {
           ) : (
             <div
               role="alert"
-              className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger-900 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-200"
+              className="rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-destructive-subtle-foreground"
             >
               <p className="text-xs font-semibold">{copy.failure.title}</p>
               <p className="mt-1 text-xs leading-5">

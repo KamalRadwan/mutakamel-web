@@ -16,6 +16,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: pushMock }) }));
 vi.mock("@/components/ui/ToastContext", () => ({ useToast: () => toastMock }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
 vi.mock("@/i18n/I18nContext", () => ({
+  useOptionalI18n: () => null,
   useI18n: () => ({
     lang: "en",
     t: {

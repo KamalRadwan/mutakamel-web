@@ -1,20 +1,24 @@
+"use client";
+
 import type { LucideIcon } from "lucide-react";
+import { useI18n } from "@/i18n/I18nContext";
+import { formatLocaleNumber } from "@/i18n/locale";
 import { cn } from "../../lib/cn";
 
 export type StatTone = "brand" | "warn" | "danger" | "neutral";
 
 const TONE_ICON: Record<StatTone, string> = {
-  brand: "bg-brand-500/15 border border-brand-500/30 text-brand-600 dark:text-brand-400",
-  warn: "bg-warn-500/15 border border-warn-500/30 text-warn-600 dark:text-warn-400",
-  danger: "bg-danger-500/15 border border-danger-500/30 text-danger-600 dark:text-danger-400",
-  neutral: "bg-ink-500/15 border border-ink-500/30 text-muted-foreground",
+  brand: "border border-success/30 bg-success-subtle text-success",
+  warn: "border border-warning/30 bg-warning-subtle text-warning",
+  danger: "border border-destructive/30 bg-destructive-subtle text-destructive",
+  neutral: "border border-border bg-muted text-muted-foreground",
 };
 
 const TONE_TOP_BORDER: Record<StatTone, string> = {
-  brand: "border-t-2 border-t-brand-500",
-  warn: "border-t-2 border-t-warn-500",
-  danger: "border-t-2 border-t-danger-500",
-  neutral: "border-t-2 border-t-ink-400",
+  brand: "border-t-2 border-t-success",
+  warn: "border-t-2 border-t-warning",
+  danger: "border-t-2 border-t-destructive",
+  neutral: "border-t-2 border-t-border",
 };
 
 export function StatGrid({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -39,6 +43,9 @@ export function StatCard({
   tone?: StatTone;
   className?: string;
 }) {
+  const { lang } = useI18n();
+  const displayValue = typeof value === "number" ? formatLocaleNumber(lang, value) : value;
+
   return (
     <div
       className={cn(
@@ -48,7 +55,7 @@ export function StatCard({
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="max-w-[150px] truncate text-2xs font-semibold uppercase tracking-wide text-muted-foreground" title={label}>
+        <span className="min-w-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
           {label}
         </span>
         {Icon && (
@@ -62,8 +69,8 @@ export function StatCard({
           </span>
         )}
       </div>
-      <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{value}</p>
-      {description && <p className="mt-1 truncate text-xs text-muted-foreground">{description}</p>}
+      <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{displayValue}</p>
+      {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
     </div>
   );
 }

@@ -15,6 +15,18 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard",
 }));
 
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({
+    t: {
+      common: {
+        sessionChecking: "جاري التحقق من الجلسة...",
+        sessionUnavailable: "تعذر التحقق من الجلسة حاليًا. لم يتم تسجيل خروجك.",
+        retry: "إعادة المحاولة",
+      },
+    },
+  }),
+}));
+
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
   get length() { return this.values.size; }

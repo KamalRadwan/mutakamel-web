@@ -1,8 +1,8 @@
 # Patterns
 
-Status: **[Verified]**
+Status: **[Verified inventory; approved target contracts linked]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-29**
 
 Owner: **Admin Portal**
 
@@ -14,6 +14,14 @@ header — and, unlike a primitive, usually carries real product behavior
 Where a written functional spec exists under `docs/components/`, that spec
 is the authoritative contract the pattern implements — this page only maps
 spec to implementation and adds what the spec doesn't cover.
+
+All patterns also follow:
+
+- [Operational UX](operational-ux.md) for states, feedback, permissions, and
+  recovery;
+- [Data experiences](data-experiences.md) for filters, tables, and charts;
+- [Accessibility, responsive behavior, and localization](accessibility-responsive-and-localization.md)
+  for interaction-quality requirements.
 
 | Pattern | Implementation | Spec |
 | --- | --- | --- |
@@ -52,14 +60,19 @@ keeping its discriminated-union permission API byte-identical and only
 restyling the fallback. AGENTS.md: *"403 is not an empty state"* — a gate
 renders a distinct, labeled in-body state, never `EmptyState`.
 
-## Not written up as separate specs
+## Cross-cutting target contracts
 
 `PageHeader`, `Pagination`, `EmptyState`, `ErrorState`, `DegradedBanner`,
-`StatCard`/`StatGrid`, and `CodeRef` don't have a `docs/components/*.md`
-functional spec — they're small enough that the component source and its
-props are the spec. If one of these grows non-obvious constraints (the way
-`AmbiguousOutcomePanel` and `PermissionGate` did), it earns a spec at that
-point rather than pre-emptively.
+`StatCard`/`StatGrid`, and `CodeRef` do not yet have individual
+`docs/components/*.md` files. Their source props describe the implementation
+API, but no longer count as the complete UX specification: focus, live status,
+refresh preservation, responsive behavior, and localization are governed by
+the cross-cutting target contracts above.
+
+`AmbiguousOutcomePanel`, `PermissionGate`, `ErrorState`, and `DegradedBanner`
+are constraint-critical operational patterns. Their route composition must
+preserve authoritative evidence and must not be replaced with generic toast or
+empty-state behavior.
 
 ## Composing patterns from primitives, not the other way around
 

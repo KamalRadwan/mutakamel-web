@@ -53,8 +53,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   const canCreateCatalogue = adminCanAll(user, ["admin.catalog.manage"]);
   const canMutateCatalogue = adminCanAll(user, ["admin.catalog.manage", "admin.catalog.critical"]);
 
-  if (detail.isLoading) return <PageFrame><div role="status" className="flex min-h-96 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-5 animate-spin" aria-hidden="true" />{t.applications.detail.loading}</div></PageFrame>;
-  if (detail.error || !detail.application) return <PageFrame><div role="alert" className="mx-auto mt-16 max-w-lg rounded-xl border border-danger-200 bg-danger-50 p-6 text-center text-sm text-danger-700 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-300"><p>{detail.error || t.applications.detail.notFound}</p><Button type="button" variant="destructive" className="mt-4" onClick={() => void detail.fetchApplication()}>{t.applications.detail.retry}</Button></div></PageFrame>;
+  if (detail.isLoading) return <PageFrame><div role="status" className="flex min-h-96 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />{t.applications.detail.loading}</div></PageFrame>;
+  if (detail.error || !detail.application) return <PageFrame><div role="alert" className="mx-auto mt-16 max-w-lg rounded-lg border border-destructive/30 bg-destructive-subtle p-6 text-center text-sm text-destructive-subtle-foreground"><p>{detail.error || t.applications.detail.notFound}</p><Button type="button" variant="destructive" className="mt-4" onClick={() => void detail.fetchApplication()}>{t.applications.detail.retry}</Button></div></PageFrame>;
 
   const application = detail.application;
   const activationReadiness = getActivationReadinessState(
@@ -113,10 +113,13 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
         description={application.description || t.applications.detail.noDescription}
         status={
           <div className="flex flex-wrap items-center gap-2">
-            <span className="grid size-8 place-items-center rounded-lg bg-brand-500/10 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+            <span className="grid size-8 place-items-center rounded-lg bg-info-subtle text-info-subtle-foreground">
               <AppWindow className="size-4" aria-hidden="true" />
             </span>
-            <StatusBadge status={application.lifecycleStatus} />
+            <StatusBadge
+              status={application.lifecycleStatus}
+              enumType="application"
+            />
             <code dir="ltr" className="rounded bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">{application.key}</code>
           </div>
         }
@@ -169,12 +172,12 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
 
       <section className="grid gap-5 lg:grid-cols-[1fr_1.25fr]">
         <Card className="p-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Shield className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />{t.applications.detail.databasePolicy}</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Shield className="size-4 text-info" aria-hidden="true" />{t.applications.detail.databasePolicy}</h2>
           <dl className="mt-4 grid grid-cols-2 gap-4 text-xs"><Item label={t.applications.detail.newServers} value={application.databasePolicy.enableOnNewServers ? t.applications.detail.enabled : t.applications.detail.disabled} /><Item label={t.applications.detail.rotation} value={application.databasePolicy.rotationEnabled ? t.applications.detail.enabled : t.applications.detail.disabled} /><Item label={t.applications.detail.interval} value={`${application.databasePolicy.rotationIntervalHours} ${t.applications.detail.hours}`} /><Item label={t.applications.detail.maintenance} value={`${application.databasePolicy.maintenanceWindowStartUtc}:00 UTC · ${application.databasePolicy.maintenanceWindowHours}h`} /><Item label={t.applications.detail.policyRevision} value={application.databasePolicy.policyRevision} /><Item label={t.applications.detail.catalogueRevision} value={application.catalogueRevision} /></dl>
         </Card>
         <Card className="p-5">
-          <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><FileCheck className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />{t.applications.detail.safeManifests}</h2><Button type="button" variant="ghost" size="sm" onClick={() => void detail.fetchManifests()}>{t.applications.detail.retry}</Button></div>
-          {detail.isManifestLoading ? <div role="status" className="mt-4 text-xs text-muted-foreground">{t.applications.detail.loadingManifests}</div> : detail.manifestError ? <div role="alert" className="mt-4 rounded-lg border border-warn-200 bg-warn-50 p-3 text-xs text-warn-800 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-300">{detail.manifestError}</div> : !detail.manifests.length ? <div className="mt-4 rounded-lg border border-dashed border-border p-5 text-center text-xs text-muted-foreground">{t.applications.detail.noManifests}</div> : <div className="mt-4 space-y-2">{detail.manifests.map((manifest) => <div key={manifest.id} className="grid gap-2 rounded-lg border border-border p-3 text-xs sm:grid-cols-[1fr_auto]"><div dir="ltr"><div className="font-mono font-semibold text-foreground">{manifest.contractPackage}@{manifest.contractVersion}</div><div className="mt-1 truncate font-mono text-xs text-muted-foreground" title={manifest.checksum}>{manifest.checksum}</div></div><div className="text-end"><span className={`rounded-full px-2 py-1 text-2xs font-semibold ${manifest.active ? "bg-brand-500/10 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400" : "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-400"}`}>{manifest.active ? t.applications.detail.active : t.applications.detail.historical} · v{manifest.version}</span><time className="mt-2 block text-xs text-muted-foreground">{new Date(manifest.publishedAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</time></div></div>)}</div>}
+          <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><FileCheck className="size-4 text-info" aria-hidden="true" />{t.applications.detail.safeManifests}</h2><Button type="button" variant="ghost" size="sm" onClick={() => void detail.fetchManifests()}>{t.applications.detail.retry}</Button></div>
+          {detail.isManifestLoading ? <div role="status" className="mt-4 text-xs text-muted-foreground">{t.applications.detail.loadingManifests}</div> : detail.manifestError ? <div role="alert" className="mt-4 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground">{detail.manifestError}</div> : !detail.manifests.length ? <div className="mt-4 rounded-lg border border-dashed border-border p-5 text-center text-xs text-muted-foreground">{t.applications.detail.noManifests}</div> : <div className="mt-4 space-y-2">{detail.manifests.map((manifest) => <div key={manifest.id} className="grid gap-2 rounded-lg border border-border p-3 text-xs sm:grid-cols-[1fr_auto]"><div dir="ltr"><div className="font-mono font-semibold text-foreground">{manifest.contractPackage}@{manifest.contractVersion}</div><div className="mt-1 truncate font-mono text-xs text-muted-foreground" title={manifest.checksum}>{manifest.checksum}</div></div><div className="text-end"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${manifest.active ? "bg-success-subtle text-success-subtle-foreground" : "bg-muted text-muted-foreground"}`}>{manifest.active ? t.applications.detail.active : t.applications.detail.historical} · v{manifest.version}</span><time className="mt-2 block text-xs text-muted-foreground">{new Date(manifest.publishedAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</time></div></div>)}</div>}
         </Card>
       </section>
 
@@ -218,8 +221,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
 }
 
 function PageFrame({ children }: { children: React.ReactNode }) { return <div className="w-full space-y-6">{children}</div>; }
-function Fact({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) { return <Card className="p-4"><div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div><div className={`mt-2 truncate text-sm font-semibold text-foreground ${mono ? "font-mono" : ""}`} title={value}>{value}</div></Card>; }
-function Item({ label, value }: { label: string; value: string }) { return <div><dt className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt><dd className="mt-1 font-mono font-semibold text-foreground">{value}</dd></div>; }
+function Fact({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) { return <Card className="p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</div><div className={`mt-2 truncate text-sm font-semibold text-foreground ${mono ? "font-mono" : ""}`} title={value}>{value}</div></Card>; }
+function Item({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</dt><dd className="mt-1 font-mono font-semibold text-foreground">{value}</dd></div>; }
 
 function ApplicationServerCoverage({ summary, lang }: { summary: ApplicationServerSummaryView; lang: "ar" | "en" }) {
   const copy = lang === "ar"
@@ -238,10 +241,10 @@ function ApplicationServerCoverage({ summary, lang }: { summary: ApplicationServ
       : copy.notRequired;
   return <Card className="p-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Database className={`size-4 ${needsAttention ? "text-warn-600 dark:text-warn-400" : "text-brand-600 dark:text-brand-400"}`} aria-hidden="true" />{copy.title}</h2>
-      <span className={`rounded-full px-2.5 py-1 text-2xs font-semibold ${needsAttention ? "bg-warn-500/10 text-warn-800 dark:bg-warn-500/15 dark:text-warn-300" : "bg-brand-500/10 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400"}`}>{status}</span>
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Database className={`size-4 ${needsAttention ? "text-warning" : "text-success"}`} aria-hidden="true" />{copy.title}</h2>
+      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${needsAttention ? "bg-warning-subtle text-warning-subtle-foreground" : "bg-success-subtle text-success-subtle-foreground"}`}>{status}</span>
     </div>
-    <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={coverage} className="mt-4 h-2 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800"><div className="h-full rounded-full bg-brand-500" style={{ width: `${coverage}%` }} /></div>
+    <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={coverage} className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-success" style={{ width: `${coverage}%` }} /></div>
     <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
       <CoverageMetric label={copy.eligible} value={summary.eligible} />
       <CoverageMetric label={copy.ready} value={summary.ready} />
@@ -252,5 +255,5 @@ function ApplicationServerCoverage({ summary, lang }: { summary: ApplicationServ
 }
 
 function CoverageMetric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-lg bg-muted p-3"><div className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div><div className="mt-1 font-mono text-lg font-semibold text-foreground">{value}</div></div>;
+  return <div className="rounded-lg bg-muted p-3"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</div><div className="mt-1 font-mono text-lg font-semibold text-foreground">{value}</div></div>;
 }

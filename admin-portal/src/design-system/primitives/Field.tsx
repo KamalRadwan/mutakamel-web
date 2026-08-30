@@ -11,7 +11,9 @@ export interface FieldRenderProps {
 }
 
 export interface FieldProps {
+  id?: string;
   label: string;
+  labelAction?: React.ReactNode;
   hint?: string;
   /**
    * Validation error text. Always renders inline, associated via
@@ -25,30 +27,32 @@ export interface FieldProps {
   children: (fieldProps: FieldRenderProps) => React.ReactNode;
 }
 
-export function Field({ label, hint, error, required, className, children }: FieldProps) {
-  const id = useId();
-  const hintId = hint ? `${id}-hint` : undefined;
-  const errorId = error ? `${id}-error` : undefined;
+export function Field({ id, label, labelAction, hint, error, required, className, children }: FieldProps) {
+  const generatedId = useId();
+  const fieldId = id ?? generatedId;
+  const hintId = hint ? `${fieldId}-hint` : undefined;
+  const errorId = error ? `${fieldId}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
 
   return (
     <div className={className ? `space-y-1.5 ${className}` : "space-y-1.5"}>
-      <Label htmlFor={id}>
-        {label}
-        {required && (
-          <span className="ms-0.5 text-danger-600 dark:text-danger-400" aria-hidden="true">
-            *
-          </span>
-        )}
-      </Label>
-      {children({ id, "aria-describedby": describedBy, "aria-invalid": !!error, required })}
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <Label htmlFor={fieldId}>
+          {label}
+          {required && (
+            <span className="ms-0.5 text-destructive before:content-['*']" aria-hidden="true" />
+          )}
+        </Label>
+        {labelAction}
+      </div>
+      {children({ id: fieldId, "aria-describedby": describedBy, "aria-invalid": !!error, required })}
       {hint && !error && (
         <p id={hintId} className="text-xs text-muted-foreground">
           {hint}
         </p>
       )}
       {error && (
-        <p id={errorId} role="alert" className="text-xs text-danger-600 dark:text-danger-400">
+        <p id={errorId} role="alert" className="text-xs text-destructive-subtle-foreground">
           {error}
         </p>
       )}

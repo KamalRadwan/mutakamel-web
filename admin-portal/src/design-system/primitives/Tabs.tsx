@@ -3,7 +3,7 @@
 import { forwardRef } from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn } from "../lib/cn";
-import { focusRing } from "../lib/variants";
+import { focusRing, hitArea } from "../lib/variants";
 
 export const Tabs = TabsPrimitive.Root;
 
@@ -13,7 +13,7 @@ export const TabsList = forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
-    className={cn("inline-flex h-(--size-control-md) items-center gap-1 border-b border-border", className)}
+    className={cn("inline-flex min-h-(--size-control-md) items-center gap-1 border-b border-border", className)}
     {...props}
   />
 ));
@@ -26,12 +26,13 @@ export const TabsTrigger = forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "relative inline-flex h-full items-center px-1 text-sm font-medium text-muted-foreground transition-colors",
+      "relative inline-flex h-(--size-control-md) items-center px-1 text-sm font-medium text-muted-foreground transition-colors motion-reduce:transition-none",
       "hover:text-foreground",
       "data-[state=active]:text-foreground",
       "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-transparent",
-      "data-[state=active]:after:bg-brand-500",
+      "data-[state=active]:after:bg-primary",
       focusRing,
+      hitArea,
       className,
     )}
     {...props}

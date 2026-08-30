@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArchiveRestore, CheckCircle2, Play, RefreshCw } from "lucide-react";
 import { RestoreRunStatus, type RestoreRun } from "../types";
 import { BackupDialog } from "../components/BackupDialog";
@@ -30,47 +30,47 @@ import {
 } from "@/design-system";
 
 export function BackupRestoresScreen() {
-  const { lang, t } = useI18n();
+  const { dir, lang, t } = useI18n();
   const copy = t.backup.restoresScreen;
   const view = useBackupRestores();
-  const [handledArtifactRequest, setHandledArtifactRequest] = useState<string | undefined>();
   const [tenantId, setTenantId] = useState("");
   const [status, setStatus] = useState<RestoreRunStatus | "">("");
-  const [startOpen, setStartOpen] = useState(false);
-  const [artifactId, setArtifactId] = useState("");
-  const [targetDatabaseName, setTargetDatabaseName] = useState("");
-  const [reason, setReason] = useState("");
+  const requestedArtifact = view.artifacts.find((artifact) => artifact.id === view.requestedArtifactId);
+  const startSourceKey = `${view.requestedArtifactId}|${requestedArtifact?.id ?? ""}`;
+  const requestedStartDraft = {
+    sourceKey: startSourceKey,
+    open: Boolean(requestedArtifact),
+    artifactId: requestedArtifact?.id ?? "",
+    targetDatabaseName: "",
+    reason: "",
+  };
+  const [startDraft, setStartDraft] = useState(requestedStartDraft);
+  const currentStartDraft = startDraft.sourceKey === startSourceKey ? startDraft : requestedStartDraft;
+  const { open: startOpen, artifactId, targetDatabaseName, reason } = currentStartDraft;
+  const updateStartDraft = (next: Partial<Omit<typeof currentStartDraft, "sourceKey">>) => {
+    setStartDraft({ ...currentStartDraft, ...next, sourceKey: startSourceKey });
+  };
   const [promotingRun, setPromotingRun] = useState<RestoreRun | null>(null);
   const [promotionReason, setPromotionReason] = useState("");
   const [confirmationText, setConfirmationText] = useState("");
-
-  if (!view.isLoading && handledArtifactRequest !== view.requestedArtifactId) {
-    setHandledArtifactRequest(view.requestedArtifactId);
-    setStartOpen(false);
-    setArtifactId("");
-    setTargetDatabaseName("");
-    setReason("");
-
-    const requestedArtifact = view.artifacts.find((artifact) => artifact.id === view.requestedArtifactId);
-    if (requestedArtifact) {
-      setArtifactId(requestedArtifact.id);
-      setStartOpen(true);
-    }
-  }
+  const serverNameById = useMemo(
+    () => new Map(view.servers.map((server) => [server.id, server.name])),
+    [view.servers],
+  );
 
   const openStart = () => {
-    const requestedArtifact = view.artifacts.find((artifact) => artifact.id === view.requestedArtifactId);
-    setArtifactId(
-      view.pendingStartAttempt?.resource.kind === "BACKUP_ARTIFACT"
+    setStartDraft({
+      sourceKey: startSourceKey,
+      open: true,
+      artifactId: view.pendingStartAttempt?.resource.kind === "BACKUP_ARTIFACT"
         ? view.pendingStartAttempt.resource.id
         : requestedArtifact?.id ?? view.artifacts[0]?.id ?? "",
-    );
-    setTargetDatabaseName("");
-    setReason("");
-    setStartOpen(true);
+      targetDatabaseName: "",
+      reason: "",
+    });
   };
 
-  const targetValid = !targetDatabaseName || /^[A-Za-z_][A-Za-z0-9_]{0,62}$/.test(targetDatabaseName);
+  const targetValid = !targetDatabaseName || targetDatabaseNamePattern.test(targetDatabaseName);
   const tenantValid = !tenantId || uuidPattern.test(tenantId);
 
   const columns: ColumnDef<RestoreRun>[] = [
@@ -80,26 +80,26 @@ export function BackupRestoresScreen() {
       headerAr: "الاستعادة",
       cell: (restore) => (
         <div className="flex gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-brand-500/10 text-brand-700 dark:text-brand-400">
-            <ArchiveRestore className="size-4" />
+          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-info-subtle text-info-subtle-foreground">
+            <ArchiveRestore className="size-4" aria-hidden="true" />
           </span>
           <div>
-            <p className="font-mono font-semibold" title={restore.id}>{shortBackupId(restore.id)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{view.servers.find((s) => s.id === restore.databaseServerId)?.name ?? shortBackupId(restore.databaseServerId)}</p>
+            <p dir="ltr" className="font-mono font-semibold" title={restore.id}>{shortBackupId(restore.id)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{serverNameById.get(restore.databaseServerId) ?? <span dir="ltr" className="font-mono">{shortBackupId(restore.databaseServerId)}</span>}</p>
           </div>
         </div>
       ),
     },
-    { key: "source", headerEn: "Source", headerAr: "المصدر", cell: (restore) => <span className="font-mono font-semibold">{restore.sourceDatabaseName}</span> },
-    { key: "target", headerEn: "Target", headerAr: "الهدف", cell: (restore) => <span className="font-mono font-semibold">{restore.targetDatabaseName}</span> },
+    { key: "source", headerEn: "Source", headerAr: "المصدر", cell: (restore) => <span dir="ltr" className="font-mono font-semibold">{restore.sourceDatabaseName}</span> },
+    { key: "target", headerEn: "Target", headerAr: "الهدف", cell: (restore) => <span dir="ltr" className="font-mono font-semibold">{restore.targetDatabaseName}</span> },
     {
       key: "verification",
       headerEn: "Verification",
       headerAr: "الدليل",
       cell: (restore) =>
         restore.hasVerification ? (
-          <span className="inline-flex items-center gap-2 text-brand-700 dark:text-brand-400">
-            <CheckCircle2 className="size-4" />
+          <span className="inline-flex items-center gap-2 text-info">
+            <CheckCircle2 className="size-4" aria-hidden="true" />
             {copy.evidenceRecorded}
           </span>
         ) : (
@@ -114,7 +114,7 @@ export function BackupRestoresScreen() {
       cell: (restore) => (
         <div>
           <StatusBadge status={restore.status} />
-          {restore.hasFailure && <p className="mt-2 max-w-xs text-xs text-danger-600 dark:text-danger-400">{t.backup.artifactsScreen.failureRetainedNote}</p>}
+          {restore.hasFailure && <p className="mt-2 max-w-xs text-xs text-destructive">{t.backup.artifactsScreen.failureRetainedNote}</p>}
         </div>
       ),
     },
@@ -126,20 +126,27 @@ export function BackupRestoresScreen() {
       cell: (restore) => {
         const anotherPromotionIsPending = Boolean(view.pendingPromotionAttempt && view.pendingPromotionAttempt.resource.id !== restore.id);
         return view.canRestore && restore.status === RestoreRunStatus.VERIFIED ? (
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={() => {
-              setPromotingRun(restore);
-              setPromotionReason("");
-              setConfirmationText("");
-            }}
-            disabled={Boolean(view.activeAction) || anotherPromotionIsPending}
-            title={anotherPromotionIsPending ? copy.resolvePreviousPromotionTitle : undefined}
-          >
-            {copy.promoteAction}
-          </Button>
+          <div className="max-w-xs text-end">
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                setPromotingRun(restore);
+                setPromotionReason("");
+                setConfirmationText("");
+              }}
+              disabled={Boolean(view.activeAction) || anotherPromotionIsPending}
+              aria-describedby={anotherPromotionIsPending ? `promotion-blocked-${restore.id}` : undefined}
+            >
+              {copy.promoteAction}
+            </Button>
+            {anotherPromotionIsPending && (
+              <p id={`promotion-blocked-${restore.id}`} className="mt-2 text-xs text-warning-subtle-foreground">
+                {copy.resolvePreviousPromotionTitle}
+              </p>
+            )}
+          </div>
         ) : (
           <span className="text-muted-foreground">—</span>
         );
@@ -156,7 +163,7 @@ export function BackupRestoresScreen() {
         actions={
           view.canRestore && (
             <Button type="button" variant="primary" onClick={openStart} disabled={view.artifacts.length === 0 || Boolean(view.activeAction)}>
-              <Play className="size-4" />
+              <Play className="size-4" aria-hidden="true" />
               {copy.startRestoreTestAction}
             </Button>
           )
@@ -174,11 +181,11 @@ export function BackupRestoresScreen() {
       <Card>
         <CardContent className="grid gap-4 p-5 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
           <Field label={copy.tenantIdLabel} error={!tenantValid ? copy.tenantIdError : undefined}>
-            {(fp) => <Input {...fp} value={tenantId} onChange={(e) => setTenantId(e.target.value.trim())} placeholder="UUIDv7" />}
+            {(fp) => <Input {...fp} dir="ltr" value={tenantId} onChange={(e) => setTenantId(e.target.value.trim())} placeholder="UUIDv7" />}
           </Field>
           <Field label={copy.statusLabel}>
             {(fp) => (
-              <Select value={status} onValueChange={(v) => setStatus(v as RestoreRunStatus | "")}>
+              <Select value={status} onValueChange={(v) => setStatus(v as RestoreRunStatus | "")} dir={dir}>
                 <SelectTrigger {...fp}>
                   <SelectValue placeholder={copy.allStatusesPlaceholder} />
                 </SelectTrigger>
@@ -193,14 +200,14 @@ export function BackupRestoresScreen() {
           <Button type="button" variant="primary" disabled={!tenantValid} onClick={() => view.setQuery(tenantId, status)}>
             {copy.applyButton}
           </Button>
-          <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={view.isLoading}>
-            <RefreshCw className={`size-4 ${view.isLoading ? "animate-spin" : ""}`} />
+          <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
+            {!view.isLoading && <RefreshCw className="size-4" aria-hidden="true" />}
             {copy.refreshButton}
           </Button>
         </CardContent>
       </Card>
 
-      {view.error && <BackupErrorBanner error={view.error} />}
+      {view.error && !startOpen && !promotingRun && <BackupErrorBanner error={view.error} />}
       {view.enrichmentWarning && (
         <DegradedBanner>
           <p className="font-medium">{t.backup.artifactsScreen.degradedTitle}</p>
@@ -208,22 +215,27 @@ export function BackupRestoresScreen() {
         </DegradedBanner>
       )}
 
-      {view.error ? null : view.restores.length === 0 && !view.isLoading ? (
+      {view.error && view.restores.length === 0 ? null : view.restores.length === 0 && !view.isLoading ? (
         <BackupStatePanel
           kind="empty"
           title={copy.emptyTitle}
           description={view.artifacts.length === 0 ? copy.emptyNoArtifacts : copy.emptyStartHint}
         />
       ) : (
-        <div className="rounded-lg border border-border bg-card">
+        <div className="space-y-3">
           <DataTable
+            labelEn="Restore verification runs"
+            labelAr="عمليات التحقق من الاستعادة"
             columns={columns}
             data={view.restores}
-            isLoading={view.isLoading}
+            isLoading={view.isLoading && view.restores.length === 0}
+            isRefreshing={view.isLoading && view.restores.length > 0}
             getRowId={(restore) => restore.id}
+            getRowLabel={(restore) => `${lang === "ar" ? "استعادة" : "Restore"} ${shortBackupId(restore.id)}`}
+            responsiveMode="record-cards"
             pagination={{ page: 1, limit: view.restores.length || 1, totalItems: view.restores.length, totalPages: 1, onPageChange: () => {} }}
           />
-          <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+          <p className="rounded-md border border-border bg-muted px-4 py-3 text-xs text-muted-foreground">
             {copy.verificationNote}
           </p>
         </div>
@@ -235,28 +247,29 @@ export function BackupRestoresScreen() {
         description={copy.startDialogDescription}
         confirmLabel={copy.confirmStartTest}
         onClose={() => {
-          if (!view.activeAction) setStartOpen(false);
+          if (!view.activeAction) updateStartDraft({ open: false });
         }}
         onConfirm={() =>
           void view
             .startRestore({ artifactId, ...(targetDatabaseName ? { targetDatabaseName } : {}), reason: reason.trim() })
             .then((run) => {
-              if (run) setStartOpen(false);
+              if (run) updateStartDraft({ open: false });
             })
             .catch(() => undefined)
         }
         isSubmitting={view.activeAction === "start"}
         confirmDisabled={!artifactId || !reason.trim() || reason.length > 500 || !targetValid}
+        error={view.error ?? view.retryableCommandError}
       >
-        <Field label={copy.completedArtifactLabel}>
+        <Field label={copy.completedArtifactLabel} required>
           {(fp) => (
-            <Select value={artifactId} onValueChange={setArtifactId}>
+            <Select value={artifactId} onValueChange={(value) => updateStartDraft({ artifactId: value })} dir={dir}>
               <SelectTrigger {...fp}>
                 <SelectValue placeholder={copy.selectArtifactPlaceholder} />
               </SelectTrigger>
               <SelectContent>
                 {view.artifacts.map((artifact) => (
-                  <SelectItem key={artifact.id} value={artifact.id}>{artifact.databaseName} · {shortBackupId(artifact.id)}</SelectItem>
+                  <SelectItem key={artifact.id} value={artifact.id}>{artifact.databaseName} · <span dir="ltr" className="font-mono">{shortBackupId(artifact.id)}</span></SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -266,10 +279,10 @@ export function BackupRestoresScreen() {
           label={copy.targetDbNameLabel}
           error={!targetValid ? copy.targetDbNameError : undefined}
         >
-          {(fp) => <Input {...fp} value={targetDatabaseName} onChange={(e) => setTargetDatabaseName(e.target.value)} maxLength={63} placeholder="restore_tenant_..." />}
+          {(fp) => <Input {...fp} dir="ltr" value={targetDatabaseName} onChange={(e) => updateStartDraft({ targetDatabaseName: e.target.value })} maxLength={63} placeholder="restore_tenant_..." />}
         </Field>
-        <Field label={copy.auditReasonLabel}>
-          {(fp) => <Textarea {...fp} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={4} />}
+        <Field label={copy.auditReasonLabel} required>
+          {(fp) => <Textarea {...fp} value={reason} onChange={(e) => updateStartDraft({ reason: e.target.value })} maxLength={500} rows={4} />}
         </Field>
       </BackupDialog>
 
@@ -293,16 +306,17 @@ export function BackupRestoresScreen() {
         isSubmitting={promotingRun ? view.activeAction === `promote:${promotingRun.id}` : false}
         confirmDisabled={!promotingRun || promotionReason.trim().length === 0 || promotionReason.length > 500 || confirmationText !== promotingRun.targetDatabaseName}
         destructive
+        error={view.error ?? view.retryableCommandError}
       >
-        <div className="rounded-md border border-danger-200 bg-danger-50 p-4 text-sm text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/30 dark:text-danger-200">
-          <p className="font-semibold">{promotingRun?.targetDatabaseName}</p>
+        <div className="rounded-md border border-destructive/30 bg-destructive-subtle p-4 text-sm text-destructive-subtle-foreground">
+          <p dir="ltr" className="font-mono font-semibold">{promotingRun?.targetDatabaseName}</p>
           <p className="mt-1 text-xs">{copy.verifiedOnlyNote}</p>
         </div>
-        <Field label={copy.promotionReasonLabel}>
+        <Field label={copy.promotionReasonLabel} required>
           {(fp) => <Textarea {...fp} value={promotionReason} onChange={(e) => setPromotionReason(e.target.value)} maxLength={500} rows={3} />}
         </Field>
-        <Field label={copy.targetConfirmationLabel}>
-          {(fp) => <Input {...fp} value={confirmationText} onChange={(e) => setConfirmationText(e.target.value)} maxLength={63} />}
+        <Field label={copy.targetConfirmationLabel} required>
+          {(fp) => <Input {...fp} dir="ltr" value={confirmationText} onChange={(e) => setConfirmationText(e.target.value)} maxLength={63} />}
         </Field>
       </BackupDialog>
     </div>
@@ -310,3 +324,4 @@ export function BackupRestoresScreen() {
 }
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const targetDatabaseNamePattern = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;

@@ -37,6 +37,7 @@ describe("tenant route permission model", () => {
       lifecycle: ["admin.tenants.suspend", "admin.tenants.critical"],
       provisioning: ["admin.tenants.reprovision", "admin.tenants.critical"],
       softDelete: ["admin.tenants.delete", "admin.tenants.critical"],
+      restore: ["admin.tenants.restore", "admin.tenants.critical"],
       destroy: ["admin.tenants.destroy", "admin.tenants.critical"],
       manageFqdns: [
         "admin.tenants.manage_fqdns",
@@ -50,12 +51,14 @@ describe("tenant route permission model", () => {
     allowed.add("admin.tenants.reprovision");
     allowed.add("admin.tenants.delete");
     allowed.add("admin.tenants.destroy");
+    allowed.add("admin.tenants.restore");
     allowed.add("admin.tenants.manage_fqdns");
     const withoutCritical = readTenantCorePermissions({} as never);
     expect(withoutCritical).toMatchObject({
       canSuspendOrActivate: false,
       canReprovisionOrCancel: false,
       canSoftDelete: false,
+      canRestore: false,
       canDestroy: false,
       canManageFqdns: false,
     });

@@ -63,9 +63,17 @@ Every completion report must state each level independently:
 | Build-validated | Production frontend build completed |
 | Live authenticated | A real authorized browser/API session exercised the flow |
 | Deployment-verified | The released version is running in its target environment |
+| Design-target approved | A future-state visual/interaction contract was reviewed; it does not prove implementation |
+| UI runtime verified | Representative workflows were exercised for theme, direction, viewport, and interaction state |
+| Accessibility smoke-tested | Keyboard, focus, names, announcements, zoom, contrast, and screen-reader smoke checks were recorded |
+| Responsive verified | Required widths and coarse-pointer behavior were exercised without hidden or obscured capability |
 
 Never use source, tests, or a build as proof of live authentication or
 deployment.
+
+Likewise, do not use lint, a static RTL utility guard, screenshots, or an
+approved design target as proof of keyboard, assistive-technology, responsive,
+or authenticated-runtime conformance.
 
 ## Required API evidence
 
@@ -106,3 +114,8 @@ routes. Domain guides add DTO and behavior context.
 - Current frontend status is truthful.
 - No mock is presented as live data.
 - All local documentation links resolve and the generated inventory is current.
+
+For a design-system or UI-quality change, definition of done additionally
+requires the applicable target contract, current-source divergence, bilingual
+and theme behavior, focus/keyboard behavior, responsive widths, operational
+states, and evidence level to be recorded independently.

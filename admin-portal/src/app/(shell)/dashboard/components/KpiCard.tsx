@@ -20,6 +20,10 @@ import { DashboardMetric } from "@/types/dashboard";
 import { useI18n } from "@/i18n/I18nContext";
 import { StatCard, type StatTone } from "@/design-system";
 import { formatDashboardMetric, metricToneToRole } from "../utils/formatters";
+import {
+  resolveMetricDescription,
+  resolveMetricLabel,
+} from "../utils/dashboard-copy";
 
 interface KpiCardProps {
   card: DashboardMetric;
@@ -47,16 +51,16 @@ function getCardIcon(key: string, label: string): LucideIcon {
 }
 
 export function KpiCard({ card, currencyCode = "USD" }: KpiCardProps) {
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
   const formattedValue = formatDashboardMetric(card, currencyCode, lang);
   const tone: StatTone = metricToneToRole(card.tone);
   const icon = getCardIcon(card.key, card.label);
 
   return (
     <StatCard
-      label={card.label}
+      label={resolveMetricLabel(card, lang, t)}
       value={formattedValue}
-      description={card.description}
+      description={resolveMetricDescription(card, lang, t)}
       icon={icon}
       tone={tone}
     />

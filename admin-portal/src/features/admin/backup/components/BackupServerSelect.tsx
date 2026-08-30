@@ -1,4 +1,5 @@
 import { Field, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
 import type { BackupDatabaseServerOption } from "../types";
 
 interface BackupServerSelectProps {
@@ -8,6 +9,7 @@ interface BackupServerSelectProps {
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  required?: boolean;
 }
 
 export function BackupServerSelect({
@@ -17,11 +19,13 @@ export function BackupServerSelect({
   onChange,
   disabled,
   placeholder = "Select a database server",
+  required = false,
 }: BackupServerSelectProps) {
+  const { dir } = useI18n();
   return (
-    <Field label={label}>
+    <Field label={label} required={required}>
       {(fieldProps) => (
-        <Select value={value} onValueChange={onChange} disabled={disabled}>
+        <Select value={value} onValueChange={onChange} disabled={disabled} dir={dir}>
           <SelectTrigger {...fieldProps}>
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>

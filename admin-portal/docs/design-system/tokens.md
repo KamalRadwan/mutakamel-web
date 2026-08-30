@@ -1,16 +1,25 @@
 # Tokens
 
-Status: **[Verified]**
+Status: **[Verified current source; approved target differs]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-29**
 
 Owner: **Admin Portal**
 
 Source: `src/app/globals.css`.
 
-## The four roles
+## Approved target
 
-Every color in the app is one of four roles. There is no fifth hue.
+[Cold-Blue Design Update](design-update.md#semantic-color-architecture) is the
+normative target for new work. It separates cobalt `action` from emerald
+`success` and introduces explicit cold-blue surface roles. The four-role model
+below documents current source only; do not recolor the combined `brand` ramp
+blue in place.
+
+## Current four roles
+
+Current source routes color through four roles. This is the migration baseline,
+not the final semantic contract.
 
 | Role | Meaning | Ramp name |
 | --- | --- | --- |
@@ -24,15 +33,29 @@ because a dense admin table needs a zebra-row step above 50 and a
 dark-canvas step below 950 that Tailwind's stock 11-step families don't
 have).
 
-### Killing "in progress = blue"
+### "In progress" is cobalt + motion
 
-Before this migration, blue carried `PROVISIONING` / `RUNNING` / `TRIAL` /
-`PARTIALLY_PAID` — a fifth de facto hue with no name. It is not reintroduced.
-An in-progress state is **neutral + motion**: `ink` tint, a pulsing dot,
-`border-dashed`. Motion communicates state without needing a hue, and it
-survives colorblindness in a way a 5th color never would — `StatusBadge`
-always renders a text label anyway, so the color is reinforcement, not the
-only signal.
+Before the cold-blue migration, blue carried `PROVISIONING` / `RUNNING` /
+`TRIAL` / `PARTIALLY_PAID` as a fifth de facto hue with no name, and was
+removed for that reason: an in-progress state became **neutral + motion**
+(`ink` tint, pulsing dot, `border-dashed`).
+
+The `progress` tone is now the `info` role — cobalt — and keeps the pulse and
+the dashed border. What changed is that blue is no longer nameless: `action`
+owns interaction *and information*, and work in flight is informational, so
+this sits inside that law rather than beside it. The original objection was
+that a 5th hue would not survive colorblindness; that does not carry here,
+because the hue is additive. `StatusBadge` always renders a text label, the
+dashed border is a structural difference no other tone uses, and the pulse is
+still there — colour is the fourth signal, not the only one.
+
+The practical reason for the change: 18 statuses resolve to `progress`, and
+with them neutral the most common states in the product (`RUNNING`,
+`PROVISIONING`, `PENDING`, `QUEUED`, `TRIAL`) were grey, so an operator
+scanning a table had no colour to read.
+
+Under reduced motion, the pulse stops. The label, the cobalt tint, and the
+static dashed/shape treatment remain sufficient to distinguish the state.
 
 ## The theme flip
 
@@ -52,11 +75,82 @@ ink    (everything else) <- slate, gray, zinc, neutral, stone, lime, teal,
                              fuchsia, pink
 ```
 
-The old family names stay functional on purpose — new code should reach for
-the semantic tokens (`bg-card`, `text-danger-600`) or the four role names
-directly (`bg-brand-500`), not `bg-emerald-500`, but nothing breaks if it
-doesn't. Once nothing references a family name, Phase 25 deletes its
-override.
+The old family names stay functional as migration aliases. New work follows the
+approved target and reaches for semantic tokens (`bg-card`, `bg-primary`,
+`text-success`, `border-input`) rather than direct family or ramp steps.
+Direct `brand-*`/`ink-*` usage in theme-sensitive components is a migration
+target because it prevents complete semantic repainting.
+
+## Chroma headroom
+
+Saturation in this palette is bounded by lightness, not by choice: sRGB's
+chroma ceiling collapses at both ends of the lightness axis. Measured against
+that ceiling, the ramp steps consumed as status colour were already spending
+83–97% of what is physically available, so "make it more saturated" is mostly
+not a lever. Where the colour still read as weak, the cause was the
+*lightness* of the step selected for the role.
+
+**Fail, in the default dark theme.** `--destructive` was `danger-300` at
+L 0.812, where the red ceiling is only C 0.107 — the step could not be
+anything but pale. It also spent its budget on 10.16:1 contrast when AA needs
+4.5. It is now `danger-400`: C 0.152 (+55%) at 7.04:1 on `card`.
+
+**Chart series, dark.** The dark chart roles all pointed at 300 steps —
+pastels with a 1.53× chroma spread (0.098–0.150), so series read as unequal
+before any data did. They now point at 400 steps: chroma 0.152–0.156, a
+**1.03×** spread, every mark still above 7:1 on `card`.
+
+**Chart series, light.** These were `-600`/`-700` steps at L 0.49–0.55, and
+the six qualitative slots were all L 0.45–0.56 — dark and muddy against a
+white card. Two things held them there. The palette was one; the other was
+`ChartPalette.test.ts`, which held *marks* to 4.5:1. That is a text floor.
+WCAG 1.4.11 asks 3:1 of non-text content, and a chart mark is non-text — so
+the guard now holds marks to 3:1 and `--chart-axis`, which is text, to 4.5:1
+in its own assertion.
+
+At that floor every slot moves into **L 0.625–0.681**, with chroma
+0.105–0.241. Lightness is also where chroma lives, since sRGB's ceiling peaks
+near L 0.6–0.7, so the move buys saturation as well as brightness.
+
+The band is deliberately narrow. A categorical palette has to stay *level*: a
+series darker than its neighbours reads as more important before the data says
+anything, so each slot takes the chroma available at its held lightness rather
+than chasing its own maximum, and hue does the separating. Minimum OKLab
+separation is 0.140 across the qualitative slots (floor 0.100) and 0.127
+across the semantic marks (floor 0.080).
+
+Explicit values rather than ramp aliases, because no single step lands on the
+floor; the cost is that they no longer track the ramp if it is retuned.
+
+**Status dots** paint from the `*-vivid` roles, not the filled `--success` /
+`--warning` / `--destructive` roles. The filled roles resolve to `-700`/`-800`
+steps, which they need for AA against white but which render a dot dark and
+desaturated — the reason badges read as grey-green rather than green. Because
+`StatusBadge` always renders its text label, the dot is reinforcement rather
+than the sole carrier of meaning, so it answers to 3:1 and can sit on the mid
+steps: `success-600` is C 0.170 against C 0.118 for `success-800`, and gives
+exactly 3.00:1 on its own subtle tint.
+
+**Status solids.** `success-800`, `warn-800`, and `danger-700` — the steps
+rendered as filled status backgrounds — were lifted to 94–97% of their
+ceiling. All three stay above 7:1 against their white labels.
+
+**Subtle fills** are the 100 step, not the 50. `*-subtle` is the most-used
+colored surface in the portal (268 call sites against 35 for the
+full-strength fills), so it alone decides whether the UI reads as coloured;
+the 50 steps carry C 0.014–0.019, indistinguishable from white on a 20px
+pill. Every 100-step pair stays AA against its `-700`/`-800` label: success
+6.49:1, warning 6.69:1, danger 5.77:1, info 8.49:1.
+
+Two values were silently outside sRGB and browser-clamped; they are now
+pinned at their true ceiling, which changes the source but not the render:
+`action-400` (C 0.165 → 0.156) and `action-300` (C 0.105 → 0.099).
+
+Known floor: light `chart-qualitative-2` (teal, C 0.086) sits at 95% of its
+ceiling. Teal and green are intrinsically the weakest region of sRGB at mid
+lightness — that series cannot match the purple or blue slots without moving
+its lightness away from the rest of the set, which would cost more in series
+equality than it gains in vividness.
 
 ## Semantic roles
 
@@ -76,44 +170,47 @@ AI-generated "everything glows the accent color" look this migration removed.
 | `--background` | `ink-50` | `ink-1000` |
 | `--foreground` | `ink-900` | `ink-100` |
 | `--card` / `--popover` | `white` / `white` | `ink-950` / `ink-900` |
-| `--primary` | `brand-500` | `brand-400` |
-| `--primary-foreground` | `ink-950` | `ink-950` |
-| `--secondary` | `ink-100` | `ink-800` |
-| `--muted-foreground` | `ink-600` | `ink-400` |
-| `--accent` | `ink-100` | `ink-800` |
-| `--destructive` | `danger-700` | `danger-700` |
-| `--border` / `--input` | `ink-200` | `ink-800` |
-| `--ring` | `brand-500` | `brand-400` |
+| `--primary` | `action-600` | `action-400` |
+| `--primary-foreground` | `white` | `ink-1000` |
+| `--secondary` | `surface-100` | `ink-800` |
+| `--muted-foreground` | calibrated cold ink | `ink-400` |
+| `--accent` | `surface-100` | `ink-800` |
+| `--destructive` | `danger-700` | `danger-300` |
+| `--border` / `--input` | `surface-200` / `control-border` | calibrated cold boundary |
+| `--ring` | `action-500` | `action-400` |
 | `--chart-1..5` | brand-500 / ink-500 / warn-500 / danger-500 / brand-800 | brand-400 / ink-400 / warn-400 / danger-400 / brand-300 |
-| `--sidebar` | `white` | `ink-950` |
+| `--sidebar` | `surface-25` | `ink-950` |
 
-`--chart-1..5` remain a placeholder qualitative palette — Phase 22 (dashboard
-chart restoration) did not end up routing any wired chart through them, since
+`--chart-1..5` remain a placeholder **status** palette, not a qualitative
+categorical palette. Phase 22 (dashboard chart restoration) did not end up
+routing any wired chart through them, since
 each restored chart encodes categorical, chart-specific data-series meaning
 in its own hex values rather than a generic 5-slot palette (see
 [migration.md](migration.md#phase-22)). The tokens stay defined and correctly
 themed for the next component that does want a generic series palette.
 
-## Why `#34d399` is a dark-mode accent, not a light-mode fill
+## Dual-use semantic contrast
 
-White text on `brand-500` is roughly 1.9:1 contrast — nowhere near
-accessible. Three distinct roles solve this instead of one flat "primary"
-value:
+`--primary` and `--destructive` are consumed both as filled-control
+backgrounds and as standalone text/icon colors, so each dark-mode value must
+clear AA in both contexts. The deterministic source-token guard in
+`src/design-system/theme-contrast.test.ts` locks the current pairs to these
+ratios:
 
-| Role | Light | Dark | Ratio |
-| --- | --- | --- | --- |
-| Fill (`--primary`) | `brand-500` + `ink-950` label | `brand-400` + `ink-950` label | 7.9:1 / 9.8:1 |
-| Text/link | `brand-700` | `brand-300` | 4.6:1 / 11.8:1 |
-| Ring | `brand-500` | `brand-400` | ≥3:1 |
+| Dark role | Pair | Ratio |
+| --- | --- | --- |
+| Primary text | `action-400` on `card` | 7.24:1 |
+| Primary fill | `ink-1000` on `action-400` | 7.68:1 |
+| Destructive text | `danger-400` on `card` | 7.04:1 |
+| Destructive fill | `ink-1000` on `danger-400` | 7.47:1 |
+| Control boundary | calibrated `border` / `input` against `card` | 3.04:1 |
+| Focus ring | `action-400` against `card` | 7.24:1 |
 
-A **dark label on the bright emerald fill in both themes** is the opposite
-of shadcn's default (white-on-primary) and is the accessible choice here —
-it also keeps the literal logo color on screen instead of darkening it.
-`--muted-foreground` is `ink-600` / `ink-400`, not the more obvious `ink-500`,
-because `ink-500` fails at 3.1:1. `--destructive` is `danger-700` in both
-themes, not `danger-600`, which fails at ~3.4:1 with white text. Amber is
-never a filled button for the same reason — no step in the `warn` ramp clears
-AA against both a white and a dark label at button-fill size.
+The test converts the source OKLCH tokens to linear sRGB and fails below
+4.5:1 for ordinary text pairs or 3:1 for component boundaries. Browser gamut
+mapping, transparency, and composited states still require runtime visual
+conformance evidence. Amber remains unavailable as a default filled button;
+warning controls must use the documented semantic foreground/background pair.
 
 ## Control-height and gradient/blur tokens
 
@@ -123,9 +220,10 @@ AA against both a white and a dark label at button-fill size.
 
 The gradient budget is 3 total in the whole app (brand mark, sticky-header
 fade, `Skeleton`'s shimmer keyframe); the blur budget is 1 (the modal scrim).
-`node scripts/design/census.mjs --check` fails the build if either grows
-without an explicit baseline update, which is why Phase 22's recovered chart
-tooltip had its `backdrop-blur-md` removed rather than kept.
+`node scripts/design/census.mjs --check` currently reports differences but
+does not exit nonzero and excludes `src/design-system`; it is diagnostic, not
+a build gate, until Phase 0 of the
+[design-update roadmap](design-update-roadmap.md#phase-0--make-drift-visible).
 
 ## Elevation tokens: `--shadow-pop` / `--shadow-overlay`
 

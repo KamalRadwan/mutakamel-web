@@ -2,8 +2,9 @@
 
 import { forwardRef } from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
-import { Check, ChevronRight, Circle } from "lucide-react";
+import { Check, ChevronRight, Circle, Minus } from "lucide-react";
 import { cn } from "../lib/cn";
+import { hitArea } from "../lib/variants";
 
 export const DropdownMenu = DropdownMenuPrimitive.Root;
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
@@ -20,7 +21,8 @@ export const DropdownMenuContent = forwardRef<
       sideOffset={sideOffset}
       className={cn(
         "z-50 min-w-[10rem] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-pop",
-        "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out",
+        "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out motion-reduce:animate-none",
+        "motion-reduce:animate-none",
         className,
       )}
       {...props}
@@ -36,10 +38,11 @@ export const DropdownMenuItem = forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors",
-      "focus:bg-ink-100 dark:focus:bg-ink-800",
+      "flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors motion-reduce:transition-none",
+      "focus:bg-accent focus:text-accent-foreground",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      destructive && "text-danger-700 focus:bg-danger-50 dark:text-danger-400 dark:focus:bg-danger-950/40",
+      destructive && "text-destructive focus:bg-destructive/10 focus:text-destructive",
+      hitArea,
       className,
     )}
     {...props}
@@ -55,16 +58,18 @@ export const DropdownMenuCheckboxItem = forwardRef<
     ref={ref}
     checked={checked}
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none transition-colors",
-      "focus:bg-ink-100 dark:focus:bg-ink-800",
+      "group relative flex cursor-pointer select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none transition-colors motion-reduce:transition-none",
+      "focus:bg-accent focus:text-accent-foreground",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      hitArea,
       className,
     )}
     {...props}
   >
     <span className="absolute start-2 flex size-3.5 items-center justify-center">
       <DropdownMenuPrimitive.ItemIndicator>
-        <Check className="size-3.5 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+        <Check className="size-3.5 text-primary group-data-[state=indeterminate]:hidden" aria-hidden="true" />
+        <Minus className="hidden size-3.5 text-primary group-data-[state=indeterminate]:block" aria-hidden="true" />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}
@@ -79,16 +84,17 @@ export const DropdownMenuRadioItem = forwardRef<
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none transition-colors",
-      "focus:bg-ink-100 dark:focus:bg-ink-800",
+      "relative flex cursor-pointer select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none transition-colors motion-reduce:transition-none",
+      "focus:bg-accent focus:text-accent-foreground",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      hitArea,
       className,
     )}
     {...props}
   >
     <span className="absolute start-2 flex size-3.5 items-center justify-center">
       <DropdownMenuPrimitive.ItemIndicator>
-        <Circle className="size-2 fill-current" aria-hidden="true" />
+        <Circle className="size-2 fill-primary text-primary" aria-hidden="true" />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}
@@ -102,7 +108,7 @@ export const DropdownMenuLabel = forwardRef<
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
     ref={ref}
-    className={cn("px-2 py-1.5 text-2xs font-semibold uppercase tracking-wide text-muted-foreground", className)}
+    className={cn("px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal", className)}
     {...props}
   />
 ));
@@ -124,8 +130,9 @@ export const DropdownMenuSubTrigger = forwardRef<
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
-      "flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors",
-      "focus:bg-ink-100 data-[state=open]:bg-ink-100 dark:focus:bg-ink-800 dark:data-[state=open]:bg-ink-800",
+      "flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors motion-reduce:transition-none",
+      "focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+      hitArea,
       className,
     )}
     {...props}

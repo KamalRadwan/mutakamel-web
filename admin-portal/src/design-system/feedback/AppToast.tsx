@@ -1,5 +1,6 @@
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { cn } from "../lib/cn";
+import { Button } from "../primitives/Button";
 
 export type ToastType = "success" | "error" | "info" | "warning";
 
@@ -11,26 +12,24 @@ export interface AppToastProps {
   onDismiss: () => void;
 }
 
-// Four tones, not five: "info" is deliberately neutral (ink), not a fifth
-// hue — brand stays reserved for success, matching the "no fifth hue"
-// status-treatment rule elsewhere in the design system
-// (docs/design-system/tokens.md).
+// Status colors use semantic roles; cobalt remains action/information and
+// emerald remains success.
 const TONE_CLASSES: Record<ToastType, { surface: string; icon: string }> = {
   success: {
-    surface: "border-brand-200 bg-brand-50/95 text-brand-900 dark:border-brand-800/80 dark:bg-brand-950/90 dark:text-brand-100",
-    icon: "text-brand-600 dark:text-brand-400",
+    surface: "border-success/30 bg-success-subtle text-success-subtle-foreground",
+    icon: "text-success",
   },
   error: {
-    surface: "border-danger-200 bg-danger-50/95 text-danger-900 dark:border-danger-800/80 dark:bg-danger-950/90 dark:text-danger-100",
-    icon: "text-danger-600 dark:text-danger-400",
+    surface: "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground",
+    icon: "text-destructive",
   },
   warning: {
-    surface: "border-warn-200 bg-warn-50/95 text-warn-900 dark:border-warn-800/80 dark:bg-warn-950/90 dark:text-warn-100",
-    icon: "text-warn-600 dark:text-warn-400",
+    surface: "border-warning/30 bg-warning-subtle text-warning-subtle-foreground",
+    icon: "text-warning",
   },
   info: {
-    surface: "border-ink-200 bg-ink-50/95 text-ink-900 dark:border-ink-700/80 dark:bg-ink-900/90 dark:text-ink-100",
-    icon: "text-ink-600 dark:text-ink-400",
+    surface: "border-info/30 bg-info-subtle text-info-subtle-foreground",
+    icon: "text-info",
   },
 };
 
@@ -49,7 +48,7 @@ export function AppToast({ type, title, message, dismissLabel, onDismiss }: AppT
     <div
       role={type === "error" ? "alert" : "status"}
       className={cn(
-        "pointer-events-auto flex w-[calc(100vw-2rem)] max-w-sm items-start gap-3 rounded-lg border p-4 shadow-pop backdrop-blur-md",
+        "pointer-events-auto flex w-[calc(100vw-2rem)] max-w-sm items-start gap-3 rounded-lg border p-4 shadow-pop",
         tone.surface,
       )}
     >
@@ -64,14 +63,16 @@ export function AppToast({ type, title, message, dismissLabel, onDismiss }: AppT
         )}
       </div>
 
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
         onClick={onDismiss}
         aria-label={dismissLabel}
-        className="relative grid shrink-0 size-11 -m-2 place-items-center rounded-lg opacity-60 transition-opacity hover:opacity-100"
+        className="-m-2 size-11 shrink-0 p-0 opacity-60 transition-opacity hover:opacity-100 motion-reduce:transition-none"
       >
         <X className="size-3.5" aria-hidden="true" />
-      </button>
+      </Button>
     </div>
   );
 }

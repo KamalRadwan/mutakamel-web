@@ -24,11 +24,11 @@ export function UnavailableDashboardPanel({
 
   return (
     <section
-      className={`min-h-52 rounded-lg border border-dashed border-border bg-ink-100/70 p-5 dark:bg-ink-900/40 ${className}`}
+      className={`min-h-52 rounded-lg border border-dashed border-border bg-muted/70 p-5 ${className}`}
       aria-label={title}
     >
       <div className="flex h-full min-h-40 flex-col items-center justify-center gap-3 text-center">
-        <span className="rounded-lg bg-ink-200/70 p-2 text-muted-foreground dark:bg-ink-800">
+        <span className="rounded-lg bg-muted p-2 text-muted-foreground">
           <DatabaseZap className="size-5" aria-hidden="true" />
         </span>
         <div className="max-w-sm space-y-1">
@@ -42,7 +42,7 @@ export function UnavailableDashboardPanel({
           </p>
         </div>
         {dataset?.reasonCode && (
-          <code className="rounded-md bg-ink-200/80 px-2 py-1 text-xs text-muted-foreground dark:bg-ink-800">
+          <code className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
             {dataset.reasonCode}
           </code>
         )}

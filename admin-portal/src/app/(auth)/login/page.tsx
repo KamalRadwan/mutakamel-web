@@ -1,7 +1,18 @@
 "use client";
 
-import { ShieldCheck, Mail, Lock, Eye, EyeOff, Loader2, KeyRound } from "lucide-react";
-import { Card, Field, Input, Checkbox, Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@/design-system";
+import { Eye, EyeOff, KeyRound, Lock, Mail, ShieldCheck } from "lucide-react";
+import { AuthShell } from "@/components/auth/AuthShell";
+import {
+  Button,
+  Checkbox,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Field,
+  Input,
+} from "@/design-system";
 import { useLogin } from "./hooks/useLogin";
 
 export default function LoginPage() {
@@ -14,6 +25,16 @@ export default function LoginPage() {
     rememberMe,
     showPassword,
     isSubmitting,
+    error,
+    fieldErrors,
+    forgotFieldError,
+    forgotError,
+    emailInputRef,
+    passwordInputRef,
+    errorSummaryRef,
+    submissionErrorRef,
+    forgotEmailInputRef,
+    forgotErrorRef,
     isForgotModalOpen,
     setIsForgotModalOpen,
     toggleShowPassword,
@@ -22,118 +43,196 @@ export default function LoginPage() {
     handleForgotPassword,
   } = useLogin();
 
+  const invalidFieldCount = Number(Boolean(fieldErrors.email)) + Number(Boolean(fieldErrors.password));
+  const showValidationSummary = invalidFieldCount > 1;
+  const passwordToggleLabel = showPassword
+    ? t.authActions.common.hidePassword
+    : t.authActions.common.showPassword;
+
   return (
-    <div className="relative flex min-h-screen flex-col justify-between overflow-hidden bg-canvas p-4 text-foreground sm:p-6">
-      <div className="w-full max-w-md mx-auto my-auto py-8 z-10">
-        <Card className="space-y-6 p-6 shadow-2xl sm:p-8">
-          <div className="space-y-2 text-center">
-            <div className="mb-2 inline-flex size-12 items-center justify-center rounded-xl bg-brand-500 text-ink-950">
-              <ShieldCheck className="size-6" aria-hidden="true" />
-            </div>
-            <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">{t.login.title}</h1>
-            <p className="text-xs leading-relaxed text-muted-foreground">{t.login.subtitle}</p>
+    <AuthShell
+      footer={<p>{t.login.footerNote} · {t.common.portalName}</p>}
+      cardClassName="space-y-6"
+    >
+      <div className="space-y-2 text-center">
+        <div className="mb-2 inline-flex size-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <ShieldCheck className="size-6" aria-hidden="true" />
+        </div>
+        <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+          {t.login.title}
+        </h1>
+        <p className="text-xs leading-relaxed text-muted-foreground">{t.login.subtitle}</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {showValidationSummary ? (
+          <div
+            ref={errorSummaryRef}
+            role="alert"
+            tabIndex={-1}
+            className="rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2.5 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <p className="font-semibold">{t.login.validationSummaryTitle}</p>
+            <ul className="mt-1 list-disc space-y-0.5 ps-5">
+              {fieldErrors.email ? (
+                <li><a className="underline underline-offset-2" href="#login-email">{fieldErrors.email}</a></li>
+              ) : null}
+              {fieldErrors.password ? (
+                <li><a className="underline underline-offset-2" href="#login-password">{fieldErrors.password}</a></li>
+              ) : null}
+            </ul>
           </div>
+        ) : null}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label={t.login.emailLabel}>
-              {(fp) => (
-                <div className="relative">
-                  <Mail className="absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                  <Input
-                    {...fp}
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    required
-                    className="ps-10"
-                  />
-                </div>
-              )}
-            </Field>
+        {error ? (
+          <div
+            ref={submissionErrorRef}
+            role="alert"
+            tabIndex={-1}
+            className="rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2.5 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {error}
+          </div>
+        ) : null}
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="block text-start text-xs font-semibold text-foreground">{t.login.passwordLabel}</label>
-                <button
-                  type="button"
-                  onClick={() => setIsForgotModalOpen(true)}
-                  className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-400"
-                >
-                  {t.login.forgotPassword}
-                </button>
-              </div>
-              <div className="relative">
-                <Lock className="absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  className="ps-10 pe-10"
-                />
-                <button
-                  type="button"
-                  onClick={toggleShowPassword}
-                  className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  title={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
-                </button>
-              </div>
+        <Field id="login-email" label={t.login.emailLabel} error={fieldErrors.email} required>
+          {(fieldProps) => (
+            <div className="relative">
+              <Mail className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                {...fieldProps}
+                ref={emailInputRef}
+                name="email"
+                type="email"
+                inputMode="email"
+                autoComplete="username"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="ps-10"
+              />
             </div>
+          )}
+        </Field>
 
-            <label className="flex cursor-pointer select-none items-center gap-2 pt-1">
-              <Checkbox checked={rememberMe} onCheckedChange={toggleRememberMe} />
-              <span className="text-xs font-medium text-muted-foreground">{t.login.rememberMe}</span>
-            </label>
-
-            <Button type="submit" variant="primary" disabled={isSubmitting} className="mt-2 w-full justify-center">
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  <span>{t.login.submitting}</span>
-                </>
-              ) : (
-                <span>{t.login.submitButton}</span>
-              )}
+        <Field
+          id="login-password"
+          label={t.login.passwordLabel}
+          error={fieldErrors.password}
+          required
+          labelAction={(
+            <Button
+              type="button"
+              variant="link"
+              size="xs"
+              onClick={() => setIsForgotModalOpen(true)}
+              className="h-auto min-h-0 px-0 text-xs"
+            >
+              {t.login.forgotPassword}
             </Button>
-          </form>
-        </Card>
-      </div>
+          )}
+        >
+          {(fieldProps) => (
+            <div className="relative">
+              <Lock className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                {...fieldProps}
+                ref={passwordInputRef}
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="ps-10 pe-11"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={toggleShowPassword}
+                aria-label={passwordToggleLabel}
+                aria-pressed={showPassword}
+                title={passwordToggleLabel}
+                className="absolute end-1 top-1/2 size-7 -translate-y-1/2 p-0 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword
+                  ? <EyeOff className="size-4" aria-hidden="true" />
+                  : <Eye className="size-4" aria-hidden="true" />}
+              </Button>
+            </div>
+          )}
+        </Field>
 
-      <div className="z-10 w-full text-center text-xs text-muted-foreground">
-        <p>{t.login.footerNote} · {t.common.portalName}</p>
-      </div>
+        <div className="flex items-center gap-2 pt-1">
+          <Checkbox
+            id="remember-session"
+            checked={rememberMe}
+            onCheckedChange={toggleRememberMe}
+          />
+          <label htmlFor="remember-session" className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
+            {t.login.rememberMe}
+          </label>
+        </div>
+
+        <Button
+          type="submit"
+          variant="primary"
+          loading={isSubmitting}
+          className="mt-2 w-full justify-center"
+        >
+          {isSubmitting ? t.login.submitting : t.login.submitButton}
+        </Button>
+      </form>
 
       <Dialog open={isForgotModalOpen} onOpenChange={setIsForgotModalOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-brand-500/10 p-2.5 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+              <div className="rounded-lg bg-info-subtle p-2.5 text-info-subtle-foreground">
                 <KeyRound className="size-5" aria-hidden="true" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <DialogTitle className="text-sm">{t.login.forgotPassword}</DialogTitle>
-                <p className="text-xs text-muted-foreground">{t.login.forgotModalDescription}</p>
+                <DialogDescription className="text-xs">{t.login.forgotModalDescription}</DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
-          <form onSubmit={handleForgotPassword} className="space-y-3">
-            <Field label={t.login.emailLabel}>
-              {(fp) => <Input {...fp} type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />}
+          <form onSubmit={handleForgotPassword} className="space-y-3" noValidate>
+            {forgotError ? (
+              <div
+                ref={forgotErrorRef}
+                role="alert"
+                tabIndex={-1}
+                className="rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2.5 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {forgotError}
+              </div>
+            ) : null}
+            <Field id="forgot-email" label={t.login.emailLabel} error={forgotFieldError ?? undefined} required>
+              {(fieldProps) => (
+                <Input
+                  {...fieldProps}
+                  ref={forgotEmailInputRef}
+                  name="email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              )}
             </Field>
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setIsForgotModalOpen(false)}>
                 {t.login.cancel}
               </Button>
-              <Button type="submit" variant="primary" size="sm">
+              <Button type="submit" variant="primary" size="sm" loading={isSubmitting}>
                 {t.login.sendResetLink}
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </AuthShell>
   );
 }

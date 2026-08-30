@@ -4,7 +4,8 @@ import { forwardRef } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "../lib/cn";
-import { focusRing } from "../lib/variants";
+import { focusRing, hitArea } from "../lib/variants";
+import { useOptionalI18n } from "@/i18n/I18nContext";
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -17,8 +18,9 @@ export const DialogOverlay = forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-ink-950/40 backdrop-blur-[2px]",
-      "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out",
+      "fixed inset-0 z-50 bg-foreground/40 dark:bg-background/40",
+      "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out motion-reduce:animate-none",
+      "motion-reduce:animate-none",
       className,
     )}
     {...props}
@@ -28,35 +30,45 @@ DialogOverlay.displayName = "DialogOverlay";
 
 export const DialogContent = forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { showCloseButton?: boolean }
->(({ className, children, showCloseButton = true, ...props }, ref) => (
-  <DialogPrimitive.Portal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed start-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rtl:translate-x-1/2",
-        "rounded-xl border border-border bg-card p-6 text-card-foreground shadow-overlay",
-        "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-      {showCloseButton && (
-        <DialogPrimitive.Close
-          className={cn(
-            "absolute end-4 top-4 rounded-md opacity-60 transition-opacity hover:opacity-100",
-            focusRing,
-          )}
-        >
-          <X className="size-4" aria-hidden="true" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      )}
-    </DialogPrimitive.Content>
-  </DialogPrimitive.Portal>
-));
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    showCloseButton?: boolean;
+    closeLabel?: string;
+  }
+>(({ className, children, showCloseButton = true, closeLabel, ...props }, ref) => {
+  const i18n = useOptionalI18n();
+  const resolvedCloseLabel = closeLabel ?? i18n?.t.common.close ?? "Close";
+
+  return (
+    <DialogPrimitive.Portal>
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          "fixed start-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rtl:translate-x-1/2",
+          "rounded-lg border border-border bg-card p-6 text-card-foreground shadow-overlay",
+          "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95 motion-reduce:animate-none",
+          "motion-reduce:animate-none",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+        {showCloseButton && (
+          <DialogPrimitive.Close
+            aria-label={resolvedCloseLabel}
+            className={cn(
+              "absolute end-4 top-4 inline-flex items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100 motion-reduce:transition-none",
+              focusRing,
+              hitArea,
+            )}
+          >
+            <X className="size-4" aria-hidden="true" />
+          </DialogPrimitive.Close>
+        )}
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  );
+});
 DialogContent.displayName = "DialogContent";
 
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { useI18n } from "@/i18n/I18nContext";
 import { cn } from "../../lib/cn";
+import { Button } from "../../primitives/Button";
 
 /**
  * One component owns dir="ltr" + mono + select-all + copy for every
@@ -11,6 +13,7 @@ import { cn } from "../../lib/cn";
  */
 export function CodeRef({ value, className }: { value: string; className?: string }) {
   const [copied, setCopied] = useState(false);
+  const { lang } = useI18n();
 
   const copy = () => {
     void navigator.clipboard?.writeText(value).then(() => {
@@ -20,22 +23,29 @@ export function CodeRef({ value, className }: { value: string; className?: strin
   };
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="xs"
       onClick={copy}
       dir="ltr"
+      aria-label={
+        copied
+          ? lang === "ar" ? "تم نسخ المرجع" : "Reference copied"
+          : lang === "ar" ? `نسخ المرجع ${value}` : `Copy reference ${value}`
+      }
       className={cn(
-        "inline-flex max-w-full items-center gap-1 rounded-sm bg-ink-100 px-1.5 py-0.5 font-mono text-2xs text-ink-700 transition-colors hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700",
+        "h-auto max-w-full gap-1 whitespace-normal rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground hover:bg-accent",
         className,
       )}
       title={value}
     >
       <span className="select-all truncate">{value}</span>
       {copied ? (
-        <Check className="size-3 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+        <Check className="size-3 shrink-0 text-success" aria-hidden="true" />
       ) : (
         <Copy className="size-3 shrink-0 opacity-60" aria-hidden="true" />
       )}
-    </button>
+    </Button>
   );
 }

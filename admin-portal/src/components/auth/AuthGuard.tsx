@@ -4,8 +4,11 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { isPendingAuthState, useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const { authState, isAuthenticated, isLoading, retryBootstrap } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -29,26 +32,26 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (!isPublicAuthPage && isPendingAuthentication) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground gap-3 select-none">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
-        <span className="text-xs font-mono text-muted-foreground">جاري التحقق من الجلسة...</span>
+      <div role="status" className="flex min-h-dvh select-none flex-col items-center justify-center gap-3 bg-background text-foreground">
+        <Loader2 className="size-8 animate-spin text-info motion-reduce:animate-none" aria-hidden="true" />
+        <span className="text-xs text-muted-foreground">{t.common.sessionChecking}</span>
       </div>
     );
   }
 
   if (!isPublicAuthPage && authState === "DEGRADED" && !isAuthenticated) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground gap-4 p-6 text-center">
+      <div role="alert" className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6 text-center text-foreground">
         <p className="text-sm text-muted-foreground">
-          تعذر التحقق من الجلسة حاليًا. لم يتم تسجيل خروجك.
+          {t.common.sessionUnavailable}
         </p>
-        <button
+        <Button
           type="button"
           onClick={() => void retryBootstrap()}
-          className="rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-ink-950 hover:bg-brand-600 dark:bg-brand-400 dark:hover:bg-brand-500"
+          variant="primary"
         >
-          إعادة المحاولة
-        </button>
+          {t.common.retry}
+        </Button>
       </div>
     );
   }

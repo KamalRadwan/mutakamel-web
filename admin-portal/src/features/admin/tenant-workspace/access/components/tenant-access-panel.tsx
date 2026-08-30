@@ -3,21 +3,28 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
   Card,
+  Badge,
   Button,
+  Field,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   DataTable,
   Skeleton,
   useToast,
   type ColumnDef,
 } from "@/design-system";
 import type { TenantStatus } from "../../core/types";
+import { localeForLanguage } from "@/i18n/locale";
 import { tenantAccessCopy, type TenantAccessLocale } from "../copy";
 import {
   ConfirmationDialog,
   PasswordDialog,
   RolesDialog,
   TenantUserEditorDialog,
-  WebphoneDialog,
   type ConfirmationAction,
 } from "./tenant-access-dialogs";
 import { useTenantAccess } from "../use-tenant-access";
@@ -34,13 +41,11 @@ type DialogState =
   | { kind: "invite" }
   | { kind: "edit"; user: TenantUserView }
   | { kind: "password"; user: TenantUserView }
-  | { kind: "webphone"; user: TenantUserView }
   | { kind: "roles"; user: TenantUserView }
   | { kind: "confirm"; action: ConfirmationAction; user: TenantUserView }
   | null;
 
-const selectClass =
-  "h-9 min-w-0 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/20";
+const EMPTY_SELECT_VALUE = "__all__";
 
 export function TenantAccessPanel({
   tenantId,
@@ -112,9 +117,9 @@ export function TenantAccessPanel({
           <p className="font-semibold text-foreground">
             {tenantUser.firstName} {tenantUser.lastName}
             {tenantUser.isTenantOwner ? (
-              <span className="ms-2 rounded-full bg-brand-500/10 px-2 py-0.5 text-xs text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+              <Badge tone="info" className="ms-2 normal-case tracking-normal">
                 {copy.owner}
-              </span>
+              </Badge>
             ) : null}
           </p>
           <p className="text-xs text-muted-foreground">{tenantUser.email}</p>
@@ -175,7 +180,12 @@ export function TenantAccessPanel({
   ];
 
   return (
-    <section dir={locale === "ar" ? "rtl" : "ltr"} className="space-y-4" aria-labelledby="tenant-access-title">
+    <section
+      dir={locale === "ar" ? "rtl" : "ltr"}
+      className="space-y-4"
+      aria-labelledby="tenant-access-title"
+      aria-busy={directory.status === "loading" || undefined}
+    >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="tenant-access-title" className="text-lg font-semibold text-foreground">{copy.title}</h2>
@@ -185,6 +195,7 @@ export function TenantAccessPanel({
           <Button type="button" variant="primary" onClick={() => setDialog({ kind: "invite" })}>{copy.invite}</Button>
         ) : null}
       </header>
+      {directory.status === "loading" ? <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{copy.loading}</p> : null}
 
       {directory.status === "unavailable" ? (
         <>
@@ -206,54 +217,70 @@ export function TenantAccessPanel({
         <>
           <SummaryCards controller={controller} locale={locale} />
           <Card>
-            <form onSubmit={applyFilters} className="grid gap-2 p-3 lg:grid-cols-4 xl:grid-cols-8">
-              <Input
-                className="lg:col-span-2"
-                type="search"
-                maxLength={200}
-                placeholder={copy.search}
-                value={q}
-                onChange={(event) => setQ(event.target.value)}
+            <form onSubmit={applyFilters} className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+              <Field id="tenant-user-search" label={copy.search} className="lg:col-span-2">
+                {(field) => (
+                  <Input
+                    {...field}
+                    name="q"
+                    type="search"
+                    maxLength={200}
+                    placeholder={copy.search}
+                    value={q}
+                    onChange={(event) => setQ(event.target.value)}
+                  />
+                )}
+              </Field>
+              <FilterSelect
+                id="tenant-user-status"
+                label={copy.status}
+                value={status}
+                placeholder={copy.allStatuses}
+                onValueChange={(value) => setStatus(value as TenantUserStatus | "")}
+                options={[
+                  ["INVITED", copy.invited],
+                  ["ACTIVE", copy.active],
+                  ["SUSPENDED", copy.suspended],
+                  ["DEACTIVATED", copy.deactivated],
+                ]}
               />
-              <select aria-label={copy.status} className={selectClass} value={status} onChange={(event) => setStatus(event.target.value as TenantUserStatus | "")}>
-                <option value="">{copy.allStatuses}</option>
-                <option value="INVITED">{copy.invited}</option><option value="ACTIVE">{copy.active}</option><option value="SUSPENDED">{copy.suspended}</option><option value="DEACTIVATED">{copy.deactivated}</option>
-              </select>
-              <select aria-label={copy.allRows} className={selectClass} value={visibility} onChange={(event) => setVisibility(event.target.value as TenantUserVisibility)}>
-                <option value="ACTIVE">{copy.activeRows}</option><option value="DELETED">{copy.deletedRows}</option><option value="ALL">{copy.allRows}</option>
-              </select>
+              <FilterSelect
+                id="tenant-user-visibility"
+                label={copy.allRows}
+                value={visibility}
+                onValueChange={(value) => setVisibility(value as TenantUserVisibility)}
+                options={[["ACTIVE", copy.activeRows], ["DELETED", copy.deletedRows], ["ALL", copy.allRows]]}
+              />
               {controller.permissions.canReadRoles ? (
-                <select aria-label={copy.roles} className={selectClass} value={role} onChange={(event) => setRole(event.target.value)}><option value="">{copy.allRoles}</option>{controller.roles.data?.items.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select>
-              ) : <span />}
-              <select
-                className={selectClass}
-                aria-label={copy.branch}
+                <FilterSelect id="tenant-user-role" label={copy.roles} value={role} placeholder={copy.allRoles} onValueChange={setRole} options={(controller.roles.data?.items ?? []).map((option) => [option.id, option.name] as const)} />
+              ) : null}
+              <FilterSelect
+                id="tenant-user-branch"
+                label={copy.branch}
                 value={branchId}
-                onChange={(event) => {
-                  const next = event.target.value;
+                placeholder={copy.allBranches}
+                onValueChange={(next) => {
                   setBranchId(next);
                   setDepartmentId("");
                   setTeamId("");
                   if (next) void controller.loadDepartments({ branchId: next, page: 1, limit: 100 });
                 }}
-              >
-                <option value="">{copy.allBranches}</option>{controller.branches.data?.items.map((branch) => <option key={branch.id} value={branch.id}>{branch.company.name} · {branch.name}</option>)}
-              </select>
-              <select
-                className={selectClass}
-                aria-label={copy.department}
+                options={(controller.branches.data?.items ?? []).map((branch) => [branch.id, `${branch.company.name} · ${branch.name}`] as const)}
+              />
+              <FilterSelect
+                id="tenant-user-department"
+                label={copy.department}
                 disabled={!branchId}
                 value={departmentId}
-                onChange={(event) => {
-                  const next = event.target.value;
+                placeholder={copy.allDepartments}
+                onValueChange={(next) => {
                   setDepartmentId(next);
                   setTeamId("");
                   if (next) void controller.loadTeams({ departmentId: next, page: 1, limit: 100 });
                 }}
-              >
-                <option value="">{copy.allDepartments}</option>{controller.departments.data?.items.map((department) => <option key={department.id} value={department.id}>{department.code} · {department.name}</option>)}
-              </select>
-              <select aria-label={copy.team} className={selectClass} disabled={!departmentId} value={teamId} onChange={(event) => setTeamId(event.target.value)}><option value="">{copy.allTeams}</option>{controller.teams.data?.items.map((team) => <option key={team.id} value={team.id}>{team.code} · {team.name}</option>)}</select>
+                options={(controller.departments.data?.items ?? []).map((department) => [department.id, `${department.code} · ${department.name}`] as const)}
+              />
+              <FilterSelect id="tenant-user-team" label={copy.team} disabled={!departmentId} value={teamId} placeholder={copy.allTeams} onValueChange={setTeamId} options={(controller.teams.data?.items ?? []).map((team) => [team.id, `${team.code} · ${team.name}`] as const)} />
               <div className="flex gap-2 lg:col-span-4 xl:col-span-8">
                 <Button type="submit" variant="secondary">{copy.apply}</Button>
                 <Button type="button" variant="outline" onClick={clearFilters}>{copy.clear}</Button>
@@ -288,7 +315,6 @@ export function TenantAccessPanel({
       {dialog?.kind === "invite" ? <TenantUserEditorDialog controller={controller} copy={copy} locale={locale} mode="invite" onClose={() => setDialog(null)} onSuccess={success} /> : null}
       {dialog?.kind === "edit" ? <TenantUserEditorDialog controller={controller} copy={copy} locale={locale} mode="edit" user={dialog.user} onClose={() => setDialog(null)} onSuccess={success} /> : null}
       {dialog?.kind === "password" ? <PasswordDialog controller={controller} copy={copy} locale={locale} user={dialog.user} onClose={() => setDialog(null)} onSuccess={success} /> : null}
-      {dialog?.kind === "webphone" ? <WebphoneDialog controller={controller} copy={copy} locale={locale} user={dialog.user} onClose={() => setDialog(null)} onSuccess={success} /> : null}
       {dialog?.kind === "roles" ? <RolesDialog controller={controller} copy={copy} locale={locale} user={dialog.user} onClose={() => setDialog(null)} onSuccess={success} /> : null}
       {dialog?.kind === "confirm" ? <ConfirmationDialog controller={controller} copy={copy} locale={locale} user={dialog.user} action={dialog.action} onClose={() => setDialog(null)} onSuccess={success} /> : null}
     </section>
@@ -298,17 +324,17 @@ export function TenantAccessPanel({
 function SummaryCards({ controller, locale }: { controller: ReturnType<typeof useTenantAccess>; locale: TenantAccessLocale }) {
   const copy = tenantAccessCopy(locale);
   const summary = controller.summary.data;
-  if (!summary) return controller.summary.status === "loading" ? <Skeleton className="h-20 rounded-xl" /> : null;
-  const cards = [[copy.total, summary.total], [copy.active, summary.active], [copy.invited, summary.invited], [copy.suspended, summary.suspended], [copy.deleted, summary.deleted], [copy.webphone, summary.webphoneEnabled], [copy.locked, summary.locked]] as const;
+  if (!summary) return controller.summary.status === "loading" ? <Skeleton className="h-20 rounded-lg" /> : null;
+  const cards = [[copy.total, summary.total], [copy.active, summary.active], [copy.invited, summary.invited], [copy.suspended, summary.suspended], [copy.deleted, summary.deleted], [copy.locked, summary.locked]] as const;
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+    <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
       {cards.map(([label, value]) => (
-        <div key={label} className="rounded-xl border border-border bg-card px-3 py-2">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-          <p className="mt-0.5 text-xl font-semibold text-foreground">{value}</p>
-        </div>
+        <Card key={label} className="px-3 py-2">
+          <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
+          <dd className="mt-0.5 text-xl font-semibold text-foreground">{value}</dd>
+        </Card>
       ))}
-    </div>
+    </dl>
   );
 }
 
@@ -344,16 +370,15 @@ function UserDetailCard({ controller, locale, openDialog }: { controller: Return
         </div>
         <div>
           <dt className="font-semibold text-foreground">{copy.lastLogin}</dt>
-          <dd>{user.lastLoginAt ? new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(user.lastLoginAt)) : copy.never}</dd>
+          <dd>{user.lastLoginAt ? new Intl.DateTimeFormat(localeForLanguage(locale), { dateStyle: "medium", timeStyle: "short" }).format(new Date(user.lastLoginAt)) : copy.never}</dd>
         </div>
       </dl>
-      {protectedOwner ? <p className="mt-3 rounded-lg bg-warn-500/10 px-3 py-2 text-xs text-warn-800 dark:bg-warn-500/15 dark:text-warn-300">{copy.protectedOwner}</p> : null}
+      {protectedOwner ? <p className="mt-3 rounded-lg bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-foreground">{copy.protectedOwner}</p> : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {controller.permissions.canUpdate && !protectedOwner && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "edit", user })}>{copy.edit}</Button> : null}
         {controller.permissions.canResetPassword && user.status === "ACTIVE" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "reset-password", user })}>{copy.resetPassword}</Button> : null}
         {controller.permissions.canInvite && user.status === "INVITED" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "resend-invite", user })}>{copy.resendInvite}</Button> : null}
         {controller.permissions.canResetPassword && !protectedOwner && (user.status === "ACTIVE" || user.status === "SUSPENDED") && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "password", user })}>{copy.changePassword}</Button> : null}
-        {controller.permissions.canManageWebphone && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "webphone", user })}>{copy.configureWebphone}</Button> : null}
         {controller.permissions.canAssignRoles && !protectedOwner && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "roles", user })}>{copy.manageRoles}</Button> : null}
         {controller.permissions.canSuspend && !protectedOwner && user.status === "ACTIVE" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "suspend", user })}>{copy.suspend}</Button> : null}
         {controller.permissions.canSuspend && !protectedOwner && user.status === "SUSPENDED" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "activate", user })}>{copy.activate}</Button> : null}
@@ -367,25 +392,60 @@ function UserDetailCard({ controller, locale, openDialog }: { controller: Return
 function StatusBadge({ user, locale }: { user: TenantUserView; locale: TenantAccessLocale }) {
   const copy = tenantAccessCopy(locale);
   const label = user.deletedAt ? copy.deleted : ({ INVITED: copy.invited, ACTIVE: copy.active, SUSPENDED: copy.suspended, DEACTIVATED: copy.deactivated } as const)[user.status];
-  const tone = user.deletedAt
-    ? "bg-danger-500/10 text-danger-700 dark:bg-danger-500/15 dark:text-danger-300"
-    : user.status === "ACTIVE"
-      ? "bg-brand-500/10 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
-      : user.status === "SUSPENDED"
-        ? "bg-warn-500/10 text-warn-800 dark:bg-warn-500/15 dark:text-warn-300"
-        : "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-400";
-  return <span className={`inline-flex rounded-full px-2 py-1 text-2xs font-semibold ${tone}`}>{label}</span>;
+  const tone = user.deletedAt ? "danger" : user.status === "ACTIVE" ? "success" : user.status === "SUSPENDED" ? "warn" : "neutral";
+  return <Badge tone={tone}>{label}</Badge>;
 }
 
 function GateCard({ tone, message, action }: { tone: "warning" | "danger"; message: string; action?: ReactNode }) {
-  const toneClass =
-    tone === "warning"
-      ? "border-warn-200 bg-warn-50 text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-100"
-      : "border-danger-200 bg-danger-50 text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-100";
+  const toneClass = tone === "warning"
+    ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
+    : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground";
   return (
-    <div className={`flex min-h-28 flex-col items-center justify-center gap-3 rounded-xl border p-5 text-center text-sm ${toneClass}`}>
+    <div className={`flex min-h-28 flex-col items-center justify-center gap-3 rounded-lg border p-5 text-center text-sm ${toneClass}`}>
       <p>{message}</p>
       {action}
+    </div>
+  );
+}
+
+function FilterSelect({
+  id,
+  label,
+  value,
+  placeholder,
+  disabled,
+  onValueChange,
+  options,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  placeholder?: string;
+  disabled?: boolean;
+  onValueChange: (value: string) => void;
+  options: ReadonlyArray<readonly [string, string]>;
+}) {
+  const normalized = value || EMPTY_SELECT_VALUE;
+  const labelId = `${id}-label`;
+  return (
+    <div className="space-y-1.5">
+      <span id={labelId} className="text-sm font-medium text-foreground">{label}</span>
+      <Select
+        name={id}
+        value={normalized}
+        onValueChange={(next) => onValueChange(next === EMPTY_SELECT_VALUE ? "" : next)}
+        disabled={disabled}
+      >
+        <SelectTrigger id={id} aria-labelledby={labelId}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {placeholder ? <SelectItem value={EMPTY_SELECT_VALUE}>{placeholder}</SelectItem> : null}
+          {options.map(([optionValue, optionLabel]) => (
+            <SelectItem key={optionValue} value={optionValue}>{optionLabel}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

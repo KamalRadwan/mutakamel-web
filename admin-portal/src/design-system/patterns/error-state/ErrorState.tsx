@@ -31,7 +31,7 @@ export function ErrorState({
       role="alert"
       className={cn("flex flex-col items-center justify-center gap-2 px-6 py-12 text-center", className)}
     >
-      <AlertTriangle className="mb-1 size-8 text-danger-500 dark:text-danger-400" aria-hidden="true" />
+      <AlertTriangle className="mb-1 size-8 text-destructive" aria-hidden="true" />
       <p className="text-sm font-medium text-foreground">{heading}</p>
       {error?.message && <p className="max-w-sm text-sm text-muted-foreground">{error.message}</p>}
       {(error?.errorCode || error?.correlationId) && (

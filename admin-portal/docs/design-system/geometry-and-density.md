@@ -1,8 +1,8 @@
 # Geometry & Density
 
-Status: **[Verified]**
+Status: **[Verified current source; approved target gaps recorded]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-29**
 
 Owner: **Admin Portal**
 
@@ -63,27 +63,44 @@ export const controlSize = cva("", {
 });
 ```
 
-Controls below the 40px touch-target floor get a **hit-area expansion**
-instead of a bigger box — `variants.ts`'s `hitArea` fragment adds an
-absolutely-positioned, inset-negative pseudo-element rather than growing the
-visible control, matching the pattern `ToastContext.tsx` already used ad hoc
-before this migration.
+### Hit areas: current gap and target
+
+Current `variants.ts` has no `hitArea` fragment. The previous claim that every
+compact control already receives an invisible expansion was incorrect.
+Checkboxes, switches, icon controls, and default buttons therefore need a real
+interaction-area pass.
+
+The approved target separates visual density from interaction size:
+
+- a bare web target is at least 24×24px with adequate separation;
+- a touch or coarse-pointer target is at least 44×44px;
+- a compact desktop control may keep a 32–36px visible box only when its actual
+  hit area satisfies the target without overlapping adjacent controls;
+- mobile text inputs use a rendered text size that does not trigger unwanted
+  browser zoom.
+
+See
+[Accessibility, responsive behavior, and localization](accessibility-responsive-and-localization.md#target-sizes-and-density).
 
 ## Row density
 
-`DataTable` rows are a fixed 44px (`px-4 py-2.5`, `text-sm`) — see
+`DataTable` rows are currently a fixed 44px (`px-4 py-2.5`, `text-sm`) — see
 `src/design-system/patterns/data-table/DataTable.tsx`. A per-operator compact
 density toggle (a `--size-row-compact` token persisted to
 `localStorage["ds_density"]`) was in the original plan for this migration but
-was not built; there is exactly one row height today, not a toggle. Treat any
-reference to a density preference elsewhere as aspirational until this lands.
+was not built; there is exactly one row height today, not a toggle.
+
+The target keeps compact desktop rows while making coarse-pointer actions
+comfortable. Responsive layouts reduce simultaneous columns before shrinking
+type or hit areas.
 
 ## Elevation
 
 Surfaces separate by **border + background step**. A shadow means "floating
-above the document" — nothing else. Three shadows exist in the whole app:
-`pop`, `overlay`, `sticky`. **Zero shadow on cards** — `surface.ts`'s
-`base` level is `bg-card` + `border-border`, no shadow; only `raised`
+above the document" — nothing else. The target permits three semantic shadows:
+`pop`, `overlay`, `sticky`. **Zero shadow on cards** — the `surface` fragment
+in `src/design-system/lib/variants.ts` uses `bg-card` + `border-border` at its
+`base` level with no shadow; only `raised`
 (popovers, dropdowns) carries `shadow-pop`. Dark mode substitutes a top
 inset hairline for shadow rather than a darker shadow, since shadows read
 poorly against an already-dark canvas.
@@ -98,18 +115,19 @@ forward:
   `Skeleton`'s shimmer sweep keyframe.
 - **Blur: 1 total** — the modal scrim.
 
-`node scripts/design/census.mjs --check` fails a phase's verification gate
-if either count grows without an explicit, reasoned baseline update. This is
-why Phase 22's recovered `ChartTooltip.tsx` had its `backdrop-blur-md`
-removed during that phase's cleanup (it was recovered code from before this
-migration existed, and reintroducing it would have silently spent the app's
-one blur budget slot on a chart tooltip instead of the modal scrim it's
-reserved for) rather than kept because "it looked fine."
+Current source still contains blur/shadow exceptions that do not match this
+budget. In addition, `census.mjs --check` reports drift but currently exits
+zero and excludes `src/design-system`. The budget becomes enforceable only
+after Phase 0 of the
+[design-update roadmap](design-update-roadmap.md#phase-0--make-drift-visible).
 
-## The one-primary-fill rule
+## The one-primary-action rule
 
-At most **one** filled `variant="primary"` button per page, placed in
-`PageHeader`. Everything else is `outline` or `ghost`. This is a layout rule
-as much as a color rule — it is what keeps a bright emerald legible as *the*
-action on a dense, 44-row table instead of competing with a row of equally
-loud buttons for attention.
+At most **one** filled primary action appears per visible decision surface: a
+page, dialog, drawer, or independently actionable panel. Page-level creation
+or administration belongs in `PageHeader`; modal confirmation belongs in the
+modal. Secondary and row-level actions use outline, ghost, or an overflow menu.
+
+This is a hierarchy rule, not a literal “one primary in the entire route DOM”
+rule. A closed dialog's action does not compete with the page; an open dialog
+becomes the active decision context.

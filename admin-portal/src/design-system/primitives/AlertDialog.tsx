@@ -16,8 +16,9 @@ export const AlertDialogOverlay = forwardRef<
   <AlertDialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-ink-950/40 backdrop-blur-[2px]",
-      "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out",
+      "fixed inset-0 z-50 bg-foreground/40 dark:bg-background/40",
+      "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out motion-reduce:animate-none",
+      "motion-reduce:animate-none",
       className,
     )}
     {...props}
@@ -35,8 +36,9 @@ export const AlertDialogContent = forwardRef<
       ref={ref}
       className={cn(
         "fixed start-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rtl:translate-x-1/2",
-        "rounded-xl border border-border bg-card p-6 text-card-foreground shadow-overlay",
-        "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95",
+        "rounded-lg border border-border bg-card p-6 text-card-foreground shadow-overlay",
+        "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95 motion-reduce:animate-none",
+        "motion-reduce:animate-none",
         className,
       )}
       {...props}

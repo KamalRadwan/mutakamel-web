@@ -1023,6 +1023,10 @@ function writeVolumePreference(key: string, value: number) {
 
 function createAudioLevelMeter(stream: MediaStream, onLevel: (level: number) => void) {
   if (typeof window === 'undefined') return () => undefined;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    onLevel(0);
+    return () => onLevel(0);
+  }
 
   const AudioContextCtor = window.AudioContext ?? (window as WebAudioWindow).webkitAudioContext;
   if (!AudioContextCtor) return () => onLevel(0);
@@ -1136,11 +1140,11 @@ function formatDuration(totalSeconds: number) {
   return formatWebphoneDuration(totalSeconds);
 }
 
-export function formatWebphoneLogTime(value?: string | null) {
+export function formatWebphoneLogTime(value?: string | null, locale?: string) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString([], {
+  return date.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
   });

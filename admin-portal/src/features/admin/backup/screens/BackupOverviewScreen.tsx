@@ -7,17 +7,18 @@ import { BackupErrorBanner } from "../components/BackupErrorBanner";
 import { BackupServerSelect } from "../components/BackupServerSelect";
 import { BackupStatePanel } from "../components/BackupStatePanel";
 import { useBackupOverview } from "../hooks/useBackupOverview";
-import { formatBackupDate } from "../lib/backup-format";
+import { formatBackupDate, formatBackupNumber } from "../lib/backup-format";
 import { useI18n } from "@/i18n/I18nContext";
 import { StatGrid, StatCard, Card, CardHeader, CardTitle, CardContent, Button, OperationTimeline, StatusBadge, type OperationTimelineStep } from "@/design-system";
 
 export function BackupOverviewScreen() {
   const { lang, t } = useI18n();
   const copy = t.backup.overviewScreen;
+  const locale = lang === "ar" ? "ar-EG" : "en-US";
   const view = useBackupOverview();
   const accessUnavailable = Boolean(view.databaseAccessError);
 
-  if (view.isLoading) {
+  if (view.isLoading && !view.hasWorkerData) {
     return (
       <BackupStatePanel
         kind="loading"
@@ -27,7 +28,7 @@ export function BackupOverviewScreen() {
     );
   }
 
-  if (view.error) {
+  if (view.error && !view.hasWorkerData) {
     return (
       <BackupStatePanel
         kind="error"
@@ -73,14 +74,14 @@ export function BackupOverviewScreen() {
     {
       label: copy.chain.latestBackupLabel,
       detail: view.selectedData.latestRun
-        ? `${view.selectedData.latestRun.status.replaceAll("_", " ")} · ${formatBackupDate(view.selectedData.latestRun.startedAt, lang === "ar" ? "ar-EG" : "en-US")}`
+        ? `${view.selectedData.latestRun.status.replaceAll("_", " ")} · ${formatBackupDate(view.selectedData.latestRun.startedAt, locale)}`
         : copy.chain.noRunEvidence,
       state: view.selectedData.latestRun?.status === "COMPLETED" ? "done" : view.selectedData.latestRun ? "warning" : "pending",
     },
     {
       label: copy.chain.restoreVerificationLabel,
       detail: view.selectedData.latestRestore
-        ? `${view.selectedData.latestRestore.status} · ${formatBackupDate(view.selectedData.latestRestore.startedAt, lang === "ar" ? "ar-EG" : "en-US")}`
+        ? `${view.selectedData.latestRestore.status} · ${formatBackupDate(view.selectedData.latestRestore.startedAt, locale)}`
         : copy.chain.noRestoreEvidence,
       state:
         view.selectedData.latestRestore?.status === "VERIFIED" || view.selectedData.latestRestore?.status === "PROMOTED"
@@ -98,20 +99,21 @@ export function BackupOverviewScreen() {
         title={copy.title}
         description={copy.description}
         actions={
-          <Button type="button" variant="outline" onClick={() => void view.refresh()}>
-            <RefreshCw className="size-4" />
+          <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
+            {!view.isLoading && <RefreshCw className="size-4" aria-hidden="true" />}
             {copy.refreshButton}
           </Button>
         }
       />
 
+      {view.error && <BackupErrorBanner error={view.error} />}
       {view.databaseAccessError && <BackupErrorBanner error={view.databaseAccessError} />}
 
-      <StatGrid>
-        <StatCard label={copy.statEnabledPolicies} value={view.metrics.enabledPolicies} icon={CalendarClock} />
-        <StatCard label={copy.statActiveRuns} value={view.metrics.activeRuns} icon={DatabaseBackup} />
-        <StatCard label={copy.statCompletedArtifacts} value={view.metrics.completedArtifacts} icon={FileCheck2} />
-        <StatCard label={copy.statVerifiedRestores} value={view.metrics.verifiedRestores} icon={ArchiveRestore} />
+      <StatGrid className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label={copy.statEnabledPolicies} value={formatBackupNumber(view.metrics.enabledPolicies, locale)} icon={CalendarClock} />
+        <StatCard label={copy.statActiveRuns} value={formatBackupNumber(view.metrics.activeRuns, locale)} icon={DatabaseBackup} />
+        <StatCard label={copy.statCompletedArtifacts} value={formatBackupNumber(view.metrics.completedArtifacts, locale)} icon={FileCheck2} />
+        <StatCard label={copy.statVerifiedRestores} value={formatBackupNumber(view.metrics.verifiedRestores, locale)} icon={ArchiveRestore} />
       </StatGrid>
       <p className="text-xs text-muted-foreground">
         {copy.boundedSnapshotNote}
@@ -159,6 +161,7 @@ export function BackupOverviewScreen() {
       ) : view.canReadDatabaseAccess ? (
         <OperationTimeline
           steps={chain}
+          lang={lang}
           title={copy.protectionChainTitle}
           description={copy.protectionChainDescription}
         />
@@ -166,18 +169,18 @@ export function BackupOverviewScreen() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex-col items-start justify-between gap-2 space-y-0 sm:flex-row sm:items-center">
             <CardTitle className="text-base">{copy.latestRunTitle}</CardTitle>
-            <Link href="/backup/runs" className="text-sm font-semibold text-brand-700 hover:underline dark:text-brand-400">
-              {copy.viewAllLink}
-            </Link>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/backup/runs">{copy.viewAllLink}</Link>
+            </Button>
           </CardHeader>
           <CardContent>
             {view.selectedData.latestRun ? (
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <p className="font-mono text-sm font-semibold">{view.selectedData.latestRun.id}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{formatBackupDate(view.selectedData.latestRun.startedAt, lang === "ar" ? "ar-EG" : "en-US")}</p>
+                  <p dir="ltr" className="break-all font-mono text-sm font-semibold">{view.selectedData.latestRun.id}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{formatBackupDate(view.selectedData.latestRun.startedAt, locale)}</p>
                 </div>
                 <StatusBadge status={view.selectedData.latestRun.status} />
               </div>
@@ -188,18 +191,18 @@ export function BackupOverviewScreen() {
         </Card>
 
         <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardHeader className="flex-col items-start justify-between gap-2 space-y-0 sm:flex-row sm:items-center">
             <CardTitle className="text-base">{copy.latestRestoreTitle}</CardTitle>
-            <Link href="/backup/restores" className="text-sm font-semibold text-brand-700 hover:underline dark:text-brand-400">
-              {copy.viewAllLink}
-            </Link>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/backup/restores">{copy.viewAllLink}</Link>
+            </Button>
           </CardHeader>
           <CardContent>
             {view.selectedData.latestRestore ? (
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <p className="font-mono text-sm font-semibold">{view.selectedData.latestRestore.id}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{formatBackupDate(view.selectedData.latestRestore.startedAt, lang === "ar" ? "ar-EG" : "en-US")}</p>
+                  <p dir="ltr" className="break-all font-mono text-sm font-semibold">{view.selectedData.latestRestore.id}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{formatBackupDate(view.selectedData.latestRestore.startedAt, locale)}</p>
                 </div>
                 <StatusBadge status={view.selectedData.latestRestore.status} />
               </div>

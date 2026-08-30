@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -65,20 +65,20 @@ export function PublisherKeysScreen() {
         status={
           view.permissions.canRead && view.directory.data ? (
             <div className="flex items-center gap-1.5">
-              <Badge tone="brand">{copy.activeCount}: {active}</Badge>
+              <Badge tone="success">{copy.activeCount}: {active}</Badge>
               <Badge tone="neutral">{copy.revokedCount}: {revoked}</Badge>
             </div>
           ) : undefined
         }
       />
 
-      <Card className="border-warn-300 bg-warn-50 p-4 text-warn-950 dark:border-warn-900 dark:bg-warn-950/25 dark:text-warn-100">
+      <Card className="border-warning/30 bg-warning-subtle p-4 text-warning-subtle-foreground">
         <div className="flex items-start gap-3">
           <ShieldAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
           <div>
             <h2 className="font-semibold">{copy.securityTitle}</h2>
             <p className="mt-1 text-sm leading-6">{copy.securityBody}</p>
-            <p className="mt-2 text-xs font-semibold uppercase tracking-wide">
+            <p className="mt-2 text-xs font-semibold uppercase tracking-wide rtl:normal-case rtl:tracking-normal">
               {copy.noPrivateKey}
             </p>
           </div>
@@ -131,6 +131,9 @@ function DirectoryPanel({
           onClick={() => view.selectKey(row.publisherKeyId)}
           aria-pressed={view.selectedId === row.publisherKeyId}
         >
+          {view.selectedId === row.publisherKeyId ? (
+            <CheckCircle2 className="size-4" aria-hidden="true" />
+          ) : null}
           {copy.select}
         </Button>
       ),
@@ -201,14 +204,17 @@ function DirectoryPanel({
             {resource.state === "STALE" ? (
               <StateNotice tone="warning" title={copy.stale} error={resource.error} copy={copy} />
             ) : null}
-            <Card className="mt-3">
+            <div className="mt-3">
               <DataTable
+                labelEn={COPY.en.directory}
+                labelAr={COPY.ar.directory}
                 columns={columns}
                 data={resource.data ?? []}
+                isRefreshing={resource.isRefreshing}
                 getRowId={(row) => row.publisherKeyId}
                 pagination={{ page: 1, limit: (resource.data ?? []).length || 1, totalItems: (resource.data ?? []).length, totalPages: 1, onPageChange: () => undefined }}
               />
-            </Card>
+            </div>
             <EvidenceLine resource={resource} copy={copy} />
           </>
         )}
@@ -418,8 +424,8 @@ function ChallengePanel({
           </form>
         )}
         {result ? (
-          <div className="mt-4 space-y-3 rounded-lg border border-brand-300 bg-brand-50 p-4 dark:border-brand-900 dark:bg-brand-950/20">
-            <h3 className="flex items-center gap-2 font-semibold text-brand-900 dark:text-brand-100">
+          <div className="mt-4 space-y-3 rounded-lg border border-info/30 bg-info-subtle p-4 text-info-subtle-foreground">
+            <h3 className="flex items-center gap-2 font-semibold">
               <CheckCircle2 className="size-4" aria-hidden="true" />
               {copy.challengeReady}
             </h3>
@@ -428,8 +434,8 @@ function ChallengePanel({
             <Detail label={copy.digest}><CodeValue>{result.data.signingDigest}</CodeValue></Detail>
             <Detail label={copy.fingerprint}><CodeValue>{result.data.publicKeyFingerprint}</CodeValue></Detail>
             <Detail label={copy.expiresAt}>{result.data.expiresAt}</Detail>
-            <p className="text-xs font-semibold leading-5 text-brand-800 dark:text-brand-200">{copy.encoding}</p>
-            <p className="text-xs text-brand-800 dark:text-brand-300">
+            <p className="text-xs font-semibold leading-5">{copy.encoding}</p>
+            <p className="text-xs">
               {copy.correlation}: <CodeValue>{result.correlationId}</CodeValue>
             </p>
           </div>
@@ -506,6 +512,18 @@ function MutationFeedback({
   copy: PublisherKeyCopy;
 }) {
   const mutation = view.mutation;
+  const noticeRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (
+      mutation.state !== "IDLE" &&
+      mutation.state !== "PENDING" &&
+      mutation.state !== "SUCCESS" &&
+      mutation.state !== "CONFIRMING_REGISTER" &&
+      mutation.state !== "CONFIRMING_REVOKE"
+    ) {
+      noticeRef.current?.focus();
+    }
+  }, [mutation.state]);
   if (
     mutation.state === "IDLE" ||
     mutation.state === "CONFIRMING_REGISTER" ||
@@ -537,7 +555,13 @@ function MutationFeedback({
           : "danger";
   return (
     <Card className={toneClasses(tone)}>
-      <section aria-live="polite" className="p-4">
+      <section
+        ref={noticeRef}
+        role={mutation.state === "SUCCESS" || mutation.state === "PENDING" ? "status" : "alert"}
+        aria-live="polite"
+        tabIndex={mutation.state === "SUCCESS" ? undefined : -1}
+        className="p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="font-semibold">{title}</h2>
@@ -660,9 +684,13 @@ function StateNotice({
   copy?: PublisherKeyCopy;
 }) {
   return (
-    <div className={`mt-3 rounded-lg border p-4 text-sm ${toneClasses(tone)}`}>
+    <div
+      role={loading || tone === "neutral" ? "status" : "alert"}
+      aria-busy={loading || undefined}
+      className={`mt-3 rounded-lg border p-4 text-sm ${toneClasses(tone)}`}
+    >
       <div className="flex items-start gap-2">
-        {loading ? <Loader2 className="mt-0.5 size-4 animate-spin" aria-hidden="true" /> : <AlertTriangle className="mt-0.5 size-4" aria-hidden="true" />}
+        {loading ? <Loader2 className="mt-0.5 size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <AlertTriangle className="mt-0.5 size-4" aria-hidden="true" />}
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{title}</p>
           {body ? <p className="mt-1 text-xs leading-5">{body}</p> : null}
@@ -722,7 +750,7 @@ function TextField({
 
 function PermissionNote({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-lg border border-warn-300 bg-warn-50 px-3 py-2 text-xs font-semibold text-warn-900 dark:border-warn-900 dark:bg-warn-950/25 dark:text-warn-200">
+    <p className="rounded-lg border border-warning/30 bg-warning-subtle px-3 py-2 text-xs font-semibold text-warning-subtle-foreground">
       {children}
     </p>
   );
@@ -731,7 +759,7 @@ function PermissionNote({ children }: { children: ReactNode }) {
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</p>
       <div className="mt-1 break-words text-sm font-semibold text-foreground">{children}</div>
     </div>
   );
@@ -747,7 +775,9 @@ function EvidenceLine({
   return resource.correlationId ? (
     <p className="mt-3 text-xs text-muted-foreground">
       {copy.correlation}: <CodeValue>{resource.correlationId}</CodeValue>
-      {resource.timestamp ? ` · ${resource.timestamp}` : ""}
+      {resource.timestamp ? (
+        <> · <time dir="ltr" dateTime={resource.timestamp}>{resource.timestamp}</time></>
+      ) : null}
     </p>
   ) : null;
 }
@@ -760,14 +790,14 @@ function StatusBadge({
   copy: PublisherKeyCopy;
 }) {
   return (
-    <Badge tone={status === "ACTIVE" ? "brand" : "neutral"}>
+    <Badge tone={status === "ACTIVE" ? "success" : "danger"}>
       {status === "ACTIVE" ? copy.active : copy.revoked}
     </Badge>
   );
 }
 
 function CodeValue({ children }: { children: ReactNode }) {
-  return <code dir="ltr" className="break-all font-mono text-[0.9em]">{children}</code>;
+  return <code dir="ltr" className="break-all font-mono text-xs">{children}</code>;
 }
 
 function fieldErrorOrNull(
@@ -800,10 +830,10 @@ function toneClasses(
   tone: "neutral" | "warning" | "danger" | "success",
 ): string {
   return {
-    neutral: "border-border bg-ink-100 text-foreground dark:bg-ink-900",
-    warning: "border-warn-300 bg-warn-50 text-warn-950 dark:border-warn-900 dark:bg-warn-950/25 dark:text-warn-100",
-    danger: "border-danger-300 bg-danger-50 text-danger-950 dark:border-danger-900 dark:bg-danger-950/25 dark:text-danger-100",
-    success: "border-brand-300 bg-brand-50 text-brand-950 dark:border-brand-900 dark:bg-brand-950/25 dark:text-brand-100",
+    neutral: "border-border bg-muted text-foreground",
+    warning: "border-warning/30 bg-warning-subtle text-warning-subtle-foreground",
+    danger: "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground",
+    success: "border-success/30 bg-success-subtle text-success-subtle-foreground",
   }[tone];
 }
 
@@ -812,7 +842,7 @@ function shortHash(value: string): string {
 }
 
 function formatDate(value: string, lang: "en" | "ar"): string {
-  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB", {
+  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: "UTC",

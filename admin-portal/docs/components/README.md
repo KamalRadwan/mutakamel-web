@@ -2,7 +2,7 @@
 
 Status: **Target component behavior; not runtime integration evidence**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-29**
 
 The API guides and
 [frontend capability matrix](../audit/frontend-capability-matrix.md) determine
@@ -27,7 +27,20 @@ pattern inventory, including the patterns below that have no written spec.
 
 ## Design rules
 
-- Use logical Tailwind direction utilities so RTL and LTR layouts mirror.
-- Keep dense operational screens readable, responsive, and keyboard accessible.
+- Use [Cold-Blue Design Update](../design-system/design-update.md) for visual
+  semantics and component hierarchy.
+- Use [Operational UX](../design-system/operational-ux.md) for loading,
+  refreshing, stale, partial, forbidden, failed, and ambiguous states.
+- Use [Data experiences](../design-system/data-experiences.md) for FilterBar,
+  DataTable, selection, bulk action, and chart behavior.
+- Use
+  [Accessibility, responsive behavior, and localization](../design-system/accessibility-responsive-and-localization.md)
+  for testable keyboard, focus, target-size, bilingual, and viewport rules.
+- Use logical Tailwind direction utilities, then runtime-test physical component
+  props and transforms that static RTL guards cannot interpret.
 - Export strict TypeScript props and event contracts.
 - Keep transient state local and synchronize shareable filters with the URL.
+
+Component specifications describe approved target behavior unless they
+explicitly state `[Verified]`. A target spec is not evidence that its source,
+runtime, or deployment already conforms.

@@ -20,7 +20,6 @@ export function useUserDropdown() {
     roleName: user?.role?.name || t.common.superAdminRole,
   };
 
-  const toggleOpen = () => setIsOpen((prev) => !prev);
   const close = () => setIsOpen(false);
 
   const handleLogout = async () => {
@@ -40,7 +39,7 @@ export function useUserDropdown() {
     currentAdmin,
     canViewRoles,
     canViewSettings,
-    toggleOpen,
+    setIsOpen,
     close,
     handleLogout,
   };

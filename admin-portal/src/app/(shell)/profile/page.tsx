@@ -8,11 +8,10 @@ import {
   Globe,
   SunMoon,
   LayoutGrid,
-  CheckCircle2,
   RefreshCw,
   ShieldAlert,
 } from "lucide-react";
-import { Card, Button } from "@/design-system";
+import { Button, Card, RadioGroup, RadioGroupItem } from "@/design-system";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 import { useMyProfile } from "./hooks/useMyProfile";
@@ -41,8 +40,8 @@ export default function MyProfilePage() {
   if (isLoading) {
     return (
       <div dir={isAr ? "rtl" : "ltr"} className="grid place-items-center py-16">
-        <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-          <Loader2 className="size-5 animate-spin text-brand-600 dark:text-brand-400" aria-hidden="true" />
+        <span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground" role="status">
+          <Loader2 className="size-5 animate-spin text-primary motion-reduce:animate-none" aria-hidden="true" />
           {t.loadingPreferences}
         </span>
       </div>
@@ -56,9 +55,9 @@ export default function MyProfilePage() {
       <div dir={isAr ? "rtl" : "ltr"} className="grid place-items-center py-16">
         <Card role={forbidden ? undefined : "alert"} className="w-full max-w-xl p-6 text-center">
           {forbidden ? (
-            <ShieldAlert className="mx-auto size-8 text-warn-600 dark:text-warn-400" aria-hidden="true" />
+            <ShieldAlert className="mx-auto size-8 text-warning" aria-hidden="true" />
           ) : (
-            <AlertTriangle className="mx-auto size-8 text-danger-600 dark:text-danger-400" aria-hidden="true" />
+            <AlertTriangle className="mx-auto size-8 text-destructive" aria-hidden="true" />
           )}
           <h1 className="mt-3 text-lg font-semibold text-foreground">
             {forbidden
@@ -92,9 +91,9 @@ export default function MyProfilePage() {
 
   return (
     <div dir={isAr ? "rtl" : "ltr"} className="w-full space-y-6">
-      <Card className="flex items-center justify-between p-5">
+      <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
         <div className="flex items-center gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-500/10 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-info-subtle text-info-subtle-foreground">
             <Sliders className="size-5" aria-hidden="true" />
           </div>
           <div>
@@ -108,13 +107,13 @@ export default function MyProfilePage() {
         </div>
 
         <Button type="button" variant="primary" disabled={!hasChanges || isSaving} onClick={saveProfile}>
-          {isSaving ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Save className="size-4" aria-hidden="true" />}
+          {isSaving ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Save className="size-4" aria-hidden="true" />}
           <span>{t.savePreferencesButton}</span>
         </Button>
       </Card>
 
       {saveError ? (
-        <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-xs text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-100">
+        <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground">
           <p className="font-semibold">{t.changesNotSavedTitle}</p>
           <p className="mt-1 font-mono">
             {saveError.errorCode}
@@ -124,73 +123,91 @@ export default function MyProfilePage() {
       ) : null}
 
       <Card className="space-y-6 p-6">
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            <SunMoon className="size-4 text-warn-600 dark:text-warn-400" aria-hidden="true" />
+        <fieldset className="space-y-2">
+          <legend className="flex items-center gap-2 text-xs font-semibold text-foreground">
+            <SunMoon className="size-4 text-warning" aria-hidden="true" />
             <span>{t.colorThemeLabel}</span>
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <OptionButton label={t.darkModeOption} selected={themeKey === "dark"} onClick={() => setThemeKey("dark")} />
-            <OptionButton label={t.lightModeOption} selected={themeKey === "light"} onClick={() => setThemeKey("light")} />
-          </div>
-        </div>
+          </legend>
+          <RadioGroup
+            value={themeKey}
+            onValueChange={setThemeKey}
+            aria-label={t.colorThemeLabel}
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+          >
+            <OptionRadio id="profile-theme-dark" value="dark" label={t.darkModeOption} selected={themeKey === "dark"} />
+            <OptionRadio id="profile-theme-light" value="light" label={t.lightModeOption} selected={themeKey === "light"} />
+          </RadioGroup>
+        </fieldset>
 
-        <div className="space-y-2 border-t border-border pt-4">
-          <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            <Globe className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+        <fieldset className="space-y-2 border-t border-border pt-4">
+          <legend className="flex items-center gap-2 text-xs font-semibold text-foreground">
+            <Globe className="size-4 text-info" aria-hidden="true" />
             <span>{t.preferredLanguageLabel}</span>
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <OptionButton label="English (LTR)" selected={language === "en"} onClick={() => setLanguage("en")} />
-            <OptionButton label="العربية (RTL)" selected={language === "ar"} onClick={() => setLanguage("ar")} />
-          </div>
-        </div>
+          </legend>
+          <RadioGroup
+            value={language}
+            onValueChange={setLanguage}
+            aria-label={t.preferredLanguageLabel}
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+          >
+            <OptionRadio id="profile-language-en" value="en" label="English (LTR)" selected={language === "en"} />
+            <OptionRadio id="profile-language-ar" value="ar" label="العربية (RTL)" selected={language === "ar"} />
+          </RadioGroup>
+        </fieldset>
 
-        <div className="space-y-2 border-t border-border pt-4">
-          <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            <LayoutGrid className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+        <fieldset className="space-y-2 border-t border-border pt-4">
+          <legend className="flex items-center gap-2 text-xs font-semibold text-foreground">
+            <LayoutGrid className="size-4 text-info" aria-hidden="true" />
             <span>{t.tableDensityLabel}</span>
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            {["compact", "comfortable", "spacious"].map((density) => (
-              <OptionButton
-                key={density}
-                label={density}
-                capitalize
-                selected={tableDensity === density}
-                onClick={() => setTableDensity(density)}
+          </legend>
+          <RadioGroup
+            value={tableDensity}
+            onValueChange={setTableDensity}
+            aria-label={t.tableDensityLabel}
+            className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+          >
+            {[
+              { value: "compact", label: t.compactDensityOption },
+              { value: "comfortable", label: t.comfortableDensityOption },
+              { value: "spacious", label: t.spaciousDensityOption },
+            ].map((option) => (
+              <OptionRadio
+                key={option.value}
+                id={`profile-density-${option.value}`}
+                value={option.value}
+                label={option.label}
+                selected={tableDensity === option.value}
               />
             ))}
-          </div>
-        </div>
+          </RadioGroup>
+        </fieldset>
       </Card>
     </div>
   );
 }
 
-function OptionButton({
+function OptionRadio({
+  id,
+  value,
   label,
   selected,
-  onClick,
-  capitalize = false,
 }: {
+  id: string;
+  value: string;
   label: string;
   selected: boolean;
-  onClick: () => void;
-  capitalize?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center justify-between rounded-xl border p-3 text-xs font-semibold transition-colors ${capitalize ? "capitalize" : ""} ${
+    <label
+      htmlFor={id}
+      className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border p-3 text-xs font-semibold transition-colors motion-reduce:transition-none ${
         selected
-          ? "border-brand-500 bg-brand-500/10 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400"
-          : "border-border text-muted-foreground"
+          ? "border-primary bg-selected text-selected-foreground"
+          : "border-input bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground"
       }`}
     >
+      <RadioGroupItem id={id} value={value} />
       <span>{label}</span>
-      {selected && <CheckCircle2 className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />}
-    </button>
+    </label>
   );
 }

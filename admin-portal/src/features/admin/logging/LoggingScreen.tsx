@@ -9,6 +9,7 @@ import {
   Filter,
   Gauge,
   Loader2,
+  MoreHorizontal,
   Radio,
   RefreshCw,
   RotateCcw,
@@ -33,6 +34,10 @@ import {
   Button,
   Badge,
   DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   ConfirmActionModal,
   AmbiguousOutcomePanel,
   useToast,
@@ -117,7 +122,7 @@ function DirectoryPanel({
         return (
           <div>
             <p className="font-semibold text-foreground">{row.scope}</p>
-            <Badge tone={expired ? "neutral" : "brand"} className="mt-1">
+            <Badge tone={expired ? "neutral" : "success"} className="mt-1">
               {expired ? copy.expired : copy.active}
             </Badge>
           </div>
@@ -134,7 +139,7 @@ function DirectoryPanel({
           {row.tenantId ? (
             <Link
               href={`/tenants/${row.tenantId}`}
-              className="mt-1 block max-w-56 break-all font-mono text-xs text-brand-700 hover:underline dark:text-brand-400"
+              className="mt-1 block max-w-56 break-all font-mono text-sm text-action hover:underline"
             >
               {row.tenantId}
             </Link>
@@ -177,18 +182,25 @@ function DirectoryPanel({
       headerAr: copy.actions,
       cell: (row) =>
         view.canUpdate ? (
-          <div className="flex gap-1">
-            <Button type="button" variant="outline" size="sm" onClick={() => view.editOverride(row)}>
-              <Edit3 className="size-3.5" aria-hidden="true" />
-              {copy.edit}
-            </Button>
-            <Button type="button" variant="destructive" size="sm" onClick={() => view.requestDelete(row)}>
-              <Trash2 className="size-3.5" aria-hidden="true" />
-              {copy.remove}
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" aria-label={`${copy.actions}: ${row.appName || copy.global}`}>
+                <MoreHorizontal className="size-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => view.editOverride(row)}>
+                <Edit3 className="size-4" aria-hidden="true" />
+                {copy.edit}
+              </DropdownMenuItem>
+              <DropdownMenuItem destructive onSelect={() => view.requestDelete(row)}>
+                <Trash2 className="size-4" aria-hidden="true" />
+                {copy.remove}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
-          <span className="text-xs text-muted-foreground">{copy.readOnlyEditor}</span>
+          <span className="text-sm text-muted-foreground">{copy.readOnlyEditor}</span>
         ),
     },
   ];
@@ -201,9 +213,9 @@ function DirectoryPanel({
         help={copy.directoryHelp}
         action={
           rows ? (
-            <div className="flex gap-2 text-xs font-semibold">
-              <Metric label={copy.rowsOnPage} value={rows.length} />
-              <Metric label={copy.activeOnPage} value={view.activeCount} />
+            <div className="flex gap-2 text-sm font-semibold">
+              <Metric label={copy.rowsOnPage} value={rows.length} lang={lang} />
+              <Metric label={copy.activeOnPage} value={view.activeCount} lang={lang} />
             </div>
           ) : null
         }
@@ -259,7 +271,7 @@ function DirectoryPanel({
             label: String(limit),
           }))}
         />
-        <label className="flex min-h-10 items-center gap-2 self-end rounded-lg border border-border px-3 text-xs font-semibold">
+        <label className="flex min-h-11 items-center gap-2 self-end rounded-md border border-input px-3 text-sm font-semibold">
           <Checkbox
             checked={view.directoryDraft.includeExpired}
             onCheckedChange={(checked) =>
@@ -275,7 +287,7 @@ function DirectoryPanel({
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={view.refreshDirectory}>
             <RefreshCw
-              className={`size-3.5 ${view.directory.isRefreshing ? "animate-spin" : ""}`}
+              className={`size-3.5 ${view.directory.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`}
               aria-hidden="true"
             />
             {copy.refresh}
@@ -293,8 +305,11 @@ function DirectoryPanel({
           {rows.length ? (
             <div className="mt-4">
               <DataTable
+                labelEn={LOGGING_COPY.en.directory}
+                labelAr={LOGGING_COPY.ar.directory}
                 columns={columns}
                 data={rows}
+                isRefreshing={view.directory.isRefreshing}
                 getRowId={(row) => row.id}
                 pagination={{
                   page: 1,
@@ -304,9 +319,9 @@ function DirectoryPanel({
                   onPageChange: () => {},
                 }}
               />
-              <footer className="mt-3 flex items-center justify-between gap-3 text-xs">
+              <footer className="mt-3 flex items-center justify-between gap-3 text-sm">
                 <span className="font-semibold text-muted-foreground">
-                  {copy.page} {view.directoryPage}
+                  {copy.page} {formatInteger(view.directoryPage, lang)}
                 </span>
                 <div className="flex gap-2">
                   <Button
@@ -441,7 +456,7 @@ function OverrideEditor({ view, copy }: { view: ConsoleView; copy: LoggingCopy }
           disabled={!view.canUpdate || busy}
         />
         {!view.canUpdate ? (
-          <p className="rounded-lg bg-warn-500/10 p-3 text-xs font-semibold text-warn-800 dark:bg-warn-500/15 dark:text-warn-300">
+          <p className="rounded-md border border-warning bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
             {copy.readOnlyEditor} {copy.updatePermission}
           </p>
         ) : null}
@@ -452,7 +467,7 @@ function OverrideEditor({ view, copy }: { view: ConsoleView; copy: LoggingCopy }
           className="justify-center"
         >
           {busy ? (
-            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+            <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
           ) : (
             <Save className="size-3.5" aria-hidden="true" />
           )}
@@ -502,14 +517,14 @@ function EffectiveInspector({ view, copy }: { view: ConsoleView; copy: LoggingCo
         </Button>
       </form>
       {view.effective.state === "LOADING" ? (
-        <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> {copy.loading}
+        <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> {copy.loading}
         </p>
       ) : view.effective.data ? (
-        <div className="mt-4 rounded-lg border border-brand-500/30 bg-brand-500/5 p-4 dark:bg-brand-500/10">
+        <div className="mt-4 rounded-md border border-info/30 bg-info-subtle p-4">
           <div className="flex items-center justify-between gap-3">
             <LevelPill level={view.effective.data.level} />
-            <span className="font-mono text-xs font-semibold">
+            <span className="font-mono text-sm font-semibold">
               {copy.source}: {view.effective.data.source === "FALLBACK" ? copy.fallback : view.effective.data.source}
             </span>
           </div>
@@ -560,7 +575,7 @@ function HistoryPanel({
           <p className="font-semibold text-foreground">
             {row.scope} · {row.appName ?? copy.global}
           </p>
-          {row.tenantId ? <p className="mt-1 break-all font-mono text-xs">{row.tenantId}</p> : null}
+          {row.tenantId ? <p dir="ltr" className="mt-1 break-all text-start font-mono text-sm">{row.tenantId}</p> : null}
         </div>
       ),
     },
@@ -581,7 +596,7 @@ function HistoryPanel({
       headerEn: copy.actor,
       headerAr: copy.actor,
       cell: (row) => (
-        <span className="block max-w-52 break-all font-mono text-2xs">{row.actorId ?? copy.notRecorded}</span>
+        <span dir="ltr" className="block max-w-52 break-all text-start font-mono text-sm">{row.actorId ?? copy.notRecorded}</span>
       ),
     },
     {
@@ -692,8 +707,11 @@ function HistoryPanel({
           {rows.length ? (
             <div className="mt-4">
               <DataTable
+                labelEn={LOGGING_COPY.en.history}
+                labelAr={LOGGING_COPY.ar.history}
                 columns={columns}
                 data={rows}
+                isRefreshing={view.history.isRefreshing}
                 getRowId={(row) => row.id}
                 pagination={{
                   page: 1,
@@ -741,7 +759,7 @@ function LivePanel({
         help={copy.liveHelp}
         action={<LiveStatus state={live.connectionState} copy={copy} />}
       />
-      <div className="mt-3 rounded-lg border border-brand-500/30 bg-brand-500/5 p-3 text-xs leading-5 text-foreground dark:bg-brand-500/10">
+      <div className="mt-3 rounded-md border border-info/30 bg-info-subtle p-3 text-sm leading-5 text-info-subtle-foreground">
         <ShieldAlert className="me-2 inline size-4" aria-hidden="true" />
         {copy.privacy}
       </div>
@@ -778,7 +796,7 @@ function LivePanel({
           />
         </div>
       ) : (
-        <p className="mt-4 rounded-lg bg-warn-500/10 p-3 text-xs font-semibold text-warn-800 dark:bg-warn-500/15 dark:text-warn-300">
+        <p className="mt-4 rounded-md border border-warning bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
           {copy.forbidden} {copy.livePermission}
         </p>
       )}
@@ -805,26 +823,26 @@ function LivePanel({
             </Button>
           ) : null}
           {live.reconnectAttempt ? (
-            <span className="self-center text-xs text-muted-foreground">
-              {copy.reconnectAttempt}: {live.reconnectAttempt}
+            <span className="self-center text-sm text-muted-foreground">
+              {copy.reconnectAttempt}: {formatInteger(live.reconnectAttempt, lang)}
             </span>
           ) : null}
           {live.lastActivityAt ? (
-            <span className="self-center text-xs text-muted-foreground">
+            <span className="self-center text-sm text-muted-foreground">
               {copy.receivedAt}: {formatDate(live.lastActivityAt, lang, true)}
             </span>
           ) : null}
         </div>
       ) : null}
       {live.controlError ? (
-        <p role="alert" className="mt-3 rounded-lg bg-danger-50 p-3 text-xs text-danger-800 dark:bg-danger-950/40 dark:text-danger-200">
+        <p role="alert" className="mt-3 rounded-md border border-destructive bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground">
           {live.controlError.message} · {copy.errorCode}: {live.controlError.code}
         </p>
       ) : null}
       {live.rows.length ? (
         <LiveRowsTable rows={live.rows} copy={copy} lang={lang} />
       ) : (
-        <p className="mt-4 text-center text-xs text-muted-foreground">
+        <p className="mt-4 text-center text-sm text-muted-foreground">
           {liveStateText(live.connectionState, copy)}
         </p>
       )}
@@ -833,31 +851,62 @@ function LivePanel({
 }
 
 function LiveRowsTable({ rows, copy, lang }: { rows: RuntimeLogRow[]; copy: LoggingCopy; lang: "ar" | "en" }) {
+  const columns: ColumnDef<RuntimeLogRow>[] = [
+    {
+      key: "timestamp",
+      headerEn: copy.timestamp,
+      headerAr: copy.timestamp,
+      cell: (row) => <span className="whitespace-nowrap">{formatDate(row.timestamp, lang, true)}</span>,
+    },
+    {
+      key: "level",
+      headerEn: copy.level,
+      headerAr: copy.level,
+      cell: (row) => <LevelPill level={row.level} />,
+    },
+    {
+      key: "service",
+      headerEn: copy.service,
+      headerAr: copy.service,
+      cell: (row) => <code dir="ltr" className="font-mono text-sm">{row.serviceName}</code>,
+    },
+    {
+      key: "tenantId",
+      headerEn: copy.tenantId,
+      headerAr: copy.tenantId,
+      cell: (row) => <code dir="ltr" className="block max-w-48 break-all text-start font-mono text-sm">{row.tenantId ?? copy.notRecorded}</code>,
+    },
+    {
+      key: "message",
+      headerEn: copy.message,
+      headerAr: copy.message,
+      cell: (row) => <span className="block max-w-xl whitespace-pre-wrap break-words">{row.message ?? copy.notRecorded}</span>,
+    },
+    {
+      key: "correlation",
+      headerEn: copy.correlation,
+      headerAr: copy.correlation,
+      cell: (row) => <code dir="ltr" className="block max-w-48 break-all text-start font-mono text-sm">{row.correlationId ?? copy.notRecorded}</code>,
+    },
+  ];
+
   return (
-    <div className="mt-4 max-h-[520px] overflow-auto rounded-lg border border-border">
-      <table className="w-full min-w-[920px] text-xs">
-        <thead className="sticky top-0 bg-muted text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-          <tr>
-            {[copy.timestamp, copy.level, copy.service, copy.tenantId, copy.message, copy.correlation].map(
-              (label) => (
-                <th key={label} className="px-3 py-2.5 text-start" scope="col">{label}</th>
-              ),
-            )}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border font-mono">
-          {rows.map((row) => (
-            <tr key={row.sequence} className="align-top">
-              <td className="px-3 py-3">{formatDate(row.timestamp, lang, true)}</td>
-              <td className="px-3 py-3"><LevelPill level={row.level} /></td>
-              <td className="px-3 py-3">{row.serviceName}</td>
-              <td className="px-3 py-3 max-w-48 break-all text-2xs">{row.tenantId ?? copy.notRecorded}</td>
-              <td className="px-3 py-3 max-w-xl whitespace-pre-wrap break-words font-sans">{row.message ?? copy.notRecorded}</td>
-              <td className="px-3 py-3 max-w-48 break-all text-2xs">{row.correlationId ?? copy.notRecorded}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="mt-4 max-h-[520px] overflow-y-auto">
+      <DataTable
+        labelEn={LOGGING_COPY.en.live}
+        labelAr={LOGGING_COPY.ar.live}
+        columns={columns}
+        data={rows}
+        getRowId={(row) => String(row.sequence)}
+        responsiveMode="horizontal-scroll"
+        pagination={{
+          page: 1,
+          limit: Math.max(rows.length, 1),
+          totalItems: rows.length,
+          totalPages: 1,
+          onPageChange: () => {},
+        }}
+      />
     </div>
   );
 }
@@ -877,7 +926,7 @@ function MutationFeedback({ view, copy }: { view: ConsoleView; copy: LoggingCopy
   if (view.mutationState === "STALE") {
     return (
       <AmbiguousOutcomePanel
-        className="fixed bottom-4 end-4 z-40 w-[min(440px,calc(100vw-2rem))] shadow-2xl"
+        className="fixed bottom-4 end-4 z-40 w-[min(440px,calc(100vw-2rem))] shadow-pop"
         message={copy.unknownOutcome}
         correlationId={view.mutationCorrelationId ?? undefined}
         onRetryExact={view.retryIntent ? view.retryExactMutation : undefined}
@@ -899,23 +948,23 @@ function MutationFeedback({ view, copy }: { view: ConsoleView; copy: LoggingCopy
   return (
     <aside
       role="alert"
-      className="fixed bottom-4 end-4 z-40 w-[min(440px,calc(100vw-2rem))] rounded-xl border border-warn-300 bg-warn-50 p-4 text-warn-950 shadow-2xl dark:border-warn-800/60 dark:bg-warn-950/60 dark:text-warn-100"
+      className="fixed bottom-4 end-4 z-40 w-[min(440px,calc(100vw-2rem))] rounded-lg border border-warning bg-warning-subtle p-4 text-warning-subtle-foreground shadow-pop"
     >
       <div className="flex items-start gap-3">
         {busy ? (
-          <Loader2 className="mt-0.5 size-5 animate-spin" aria-hidden="true" />
+          <Loader2 className="mt-0.5 size-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
         ) : (
           <AlertTriangle className="mt-0.5 size-5" aria-hidden="true" />
         )}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">{titles[view.mutationState]}</p>
           {view.mutationError ? (
-            <p className="mt-2 break-all text-xs">
+            <p className="mt-2 break-all text-sm">
               {view.mutationError.message} · {copy.errorCode}: {view.mutationError.errorCode}
             </p>
           ) : null}
           {view.mutationCorrelationId ? (
-            <p className="mt-2 break-all font-mono text-xs">
+            <p className="mt-2 break-all font-mono text-sm">
               {copy.correlation}: {view.mutationCorrelationId}
             </p>
           ) : null}
@@ -969,7 +1018,7 @@ function ResourceStatePanel<T>({
   empty: string;
   retry: () => void;
 }) {
-  if (resource.state === "LOADING") return <StatePanel icon={<Loader2 className="size-6 animate-spin" />} title={copy.loading} />;
+  if (resource.state === "LOADING") return <StatePanel icon={<Loader2 className="size-6 animate-spin motion-reduce:animate-none" />} title={copy.loading} />;
   if (resource.state === "FORBIDDEN") return <StatePanel icon={<ShieldAlert className="size-6" />} title={copy.forbidden} detail={copy.readPermission} tone="warning" />;
   const title = resource.state === "EMPTY" ? empty : resource.state === "UNAVAILABLE" ? copy.unavailable : resource.state === "STALE" ? copy.stale : copy.error;
   return (
@@ -992,7 +1041,7 @@ function ResourceStatePanel<T>({
 function ResourceNotice<T>({ resource, copy }: { resource: ResourceView<T>; copy: LoggingCopy }) {
   if (resource.state !== "STALE" && !(resource.state === "LOADING" && resource.data)) return null;
   return (
-    <p role="status" className="mt-3 rounded-lg bg-warn-500/10 p-3 text-xs font-semibold text-warn-800 dark:bg-warn-500/15 dark:text-warn-300">
+    <p role="status" className="mt-3 rounded-md border border-warning bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
       {resource.state === "STALE" ? copy.stale : copy.loading} {errorDetail(resource, copy)}
     </p>
   );
@@ -1001,8 +1050,9 @@ function ResourceNotice<T>({ resource, copy }: { resource: ResourceView<T>; copy
 function Correlation<T>({ resource, copy, lang = "en" }: { resource: ResourceView<T>; copy: LoggingCopy; lang?: "ar" | "en" }) {
   if (!resource.correlationId) return null;
   return (
-    <p className="mt-3 break-all font-mono text-xs text-muted-foreground">
-      {copy.correlation}: {resource.correlationId}
+    <p className="mt-3 break-all text-sm text-muted-foreground">
+      <strong className="font-semibold text-foreground">{copy.correlation}:</strong>{" "}
+      <code dir="ltr" className="select-all font-mono">{resource.correlationId}</code>
       {resource.timestamp ? ` · ${copy.responseAt}: ${formatDate(resource.timestamp, lang, true)}` : ""}
     </p>
   );
@@ -1016,13 +1066,15 @@ function LiveStatus({ state, copy }: { state: LiveView["connectionState"]; copy:
   const live = state === "LIVE";
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-2xs font-semibold ${
+      role="status"
+      aria-live="polite"
+      className={`inline-flex items-center gap-2 rounded-sm px-2.5 py-1 text-sm font-semibold ${
         live
-          ? "bg-brand-500/10 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
-          : "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-400"
+          ? "bg-success-subtle text-success-subtle-foreground"
+          : "bg-muted text-muted-foreground"
       }`}
     >
-      <span className={`size-2 rounded-full ${live ? "animate-pulse bg-brand-500" : "bg-ink-400"}`} />
+      <span className={`size-2 rounded-full ${live ? "animate-pulse bg-success motion-reduce:animate-none" : "bg-muted-foreground"}`} aria-hidden="true" />
       {liveStateText(state, copy)}
     </span>
   );
@@ -1045,13 +1097,13 @@ function liveStateText(state: LiveView["connectionState"], copy: LoggingCopy): s
 function LevelPill({ level }: { level: string }) {
   const tone =
     level === "fatal" || level === "error"
-      ? "bg-danger-500/10 text-danger-700 dark:bg-danger-500/15 dark:text-danger-300"
+      ? "danger"
       : level === "warn"
-        ? "bg-warn-500/10 text-warn-800 dark:bg-warn-500/15 dark:text-warn-300"
+        ? "warn"
         : level === "info"
-          ? "bg-brand-500/10 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
-          : "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-400";
-  return <span className={`inline-flex rounded-full px-2 py-1 font-mono text-2xs font-semibold ${tone}`}>{level}</span>;
+          ? "info"
+          : "neutral";
+  return <Badge tone={tone} className="font-mono normal-case tracking-normal">{level}</Badge>;
 }
 
 function PanelHeading({ icon, title, help, action }: { icon: ReactNode; title: string; help: string; action?: ReactNode }) {
@@ -1059,10 +1111,10 @@ function PanelHeading({ icon, title, help, action }: { icon: ReactNode; title: s
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <span className="text-brand-600 dark:text-brand-400">{icon}</span>
+          <span className="text-primary">{icon}</span>
           {title}
         </h2>
-        <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">{help}</p>
+        <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">{help}</p>
       </div>
       {action}
     </div>
@@ -1093,7 +1145,7 @@ function SelectField({
           onValueChange={(next) => onChange(next === "__ANY__" ? "" : next)}
           disabled={disabled}
         >
-          <SelectTrigger id={fp.id}>
+          <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1146,17 +1198,17 @@ function TextField({
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value, lang }: { label: string; value: number; lang: "ar" | "en" }) {
   return (
-    <span className="rounded-lg bg-muted px-2 py-1">
-      {label}: <span className="font-mono">{value}</span>
+    <span className="rounded-md bg-muted px-2 py-1">
+      {label}: <span className="font-mono">{formatInteger(value, lang)}</span>
     </span>
   );
 }
 
 function InlineEmpty({ text }: { text: string }) {
   return (
-    <p className="mt-4 rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+    <p className="mt-4 rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
       {text}
     </p>
   );
@@ -1165,15 +1217,15 @@ function InlineEmpty({ text }: { text: string }) {
 function StatePanel({ icon, title, detail, tone = "neutral", action }: { icon: ReactNode; title: string; detail?: string; tone?: "neutral" | "warning" | "danger"; action?: ReactNode }) {
   const colors =
     tone === "danger"
-      ? "border-danger-200 bg-danger-50 text-danger-900 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-100"
+      ? "border-destructive bg-destructive-subtle text-destructive-subtle-foreground"
       : tone === "warning"
-        ? "border-warn-200 bg-warn-50 text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/40 dark:text-warn-100"
+        ? "border-warning bg-warning-subtle text-warning-subtle-foreground"
         : "border-border bg-card text-muted-foreground";
   return (
-    <section className={`mt-4 flex min-h-36 flex-col items-center justify-center rounded-xl border p-5 text-center ${colors}`}>
+    <section role={tone === "neutral" ? "status" : "alert"} className={`mt-4 flex min-h-36 flex-col items-center justify-center rounded-lg border p-5 text-center ${colors}`}>
       <span className="mb-2 opacity-75">{icon}</span>
       <h3 className="text-sm font-semibold">{title}</h3>
-      {detail ? <p className="mt-2 max-w-3xl break-all text-xs opacity-85">{detail}</p> : null}
+      {detail ? <p className="mt-2 max-w-3xl break-all text-sm opacity-85">{detail}</p> : null}
       {action ? <div className="mt-3">{action}</div> : null}
     </section>
   );
@@ -1181,4 +1233,10 @@ function StatePanel({ icon, title, detail, tone = "neutral", action }: { icon: R
 
 function formatDate(value: string, lang: "ar" | "en", time = false): string {
   return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", { year: "numeric", month: "short", day: "2-digit", ...(time ? { hour: "2-digit", minute: "2-digit", second: "2-digit" } : {}), timeZone: "UTC" }).format(new Date(value));
+}
+
+function formatInteger(value: number, lang: "ar" | "en"): string {
+  return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
 }

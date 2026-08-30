@@ -1,7 +1,7 @@
 # Admin Portal Navigation and Permission Mapping
 
 Last verified against current frontend routes and Core/Worker Gateway contracts
-on **2026-08-26**.
+on **2026-08-29**.
 
 Frontend page paths and API paths are separate namespaces. Navigation uses
 paths such as `/tenants`; requests use `/api/admin/core/v1/tenants`.
@@ -11,7 +11,13 @@ component structure, the full 15-section × 54-route table, and how the
 permission-filtered navigation is actually built (`nav-config.ts` +
 `useNavTree.ts`), see
 [design-system/shell-and-navigation.md](../design-system/shell-and-navigation.md)
-— the table below is a condensed summary of the same source.
+— the table below is a condensed route-family summary.
+
+Route existence is not the same as direct sidebar or command-palette
+reachability. Current `NAV_SECTIONS` contains top-level entries; many subroutes
+and dynamic detail/create routes below exist without being individual command
+search results. The approved target is one nested route tree shared by sidebar,
+mobile navigation, breadcrumbs, SubNav, and command search.
 
 ## Current sidebar navigation
 
@@ -41,9 +47,9 @@ mapping itself is unchanged by that replacement:
 Notifications are exposed through both the topbar and `/notifications`;
 topbar access and each action are permission filtered.
 
-The same permission-filtered destinations render in the desktop sidebar and
-the responsive mobile sheet (`MobileNav`, `Sheet side="start"`). A parent
-renders only when at least one child is visible. Direct
+The same top-level permission-filtered destinations render in the desktop
+sidebar and responsive mobile sheet (`MobileNav`, `Sheet side="start"`). A
+parent renders only when at least one child is visible. Direct
 page guards and backend authorization remain authoritative; hidden navigation
 is not an authorization boundary.
 

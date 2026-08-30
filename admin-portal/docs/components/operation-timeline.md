@@ -1,49 +1,65 @@
-# Component Specification: `OperationTimeline` (DAG & Progress Visualizer)
+# Component Specification: `OperationTimeline`
 
-Visualizes complex multi-step background operations, tenant provisioning DAGs, step execution states, progress bars, and real-time event updates.
+Status: **[Approved target; current implementation is presentation-only]**
 
----
+Last source verification: **2026-08-29**
 
-## 📍 Use Cases Across Admin Portal
+## Purpose and authority
 
-- **Tenant Provisioning Detail** (`/admin/tenants/:id/operations/:operationId`)
-- **Operation Timeline Drawer** (Opened from Tenant Operations list)
-- **Provisioning Health Report** (`/admin/reports/provisioning`)
+`OperationTimeline` presents an ordered sequence of operation steps. The current
+shared component accepts `steps`, `title`, and `description`; it does not own
+operation fetching, permissions, retry, cancel, or progress reconciliation.
 
----
+The [Tenant operations API contract](../api/tenant-operations.md) is
+authoritative for wire statuses, permission combinations, retry/cancel
+availability, polling, and terminal behavior. This component must not copy a
+partial permission or enum list.
 
-## ⚙️ Component API
+## Target composition
 
-```typescript
-export interface OperationStep {
-  id: string;
-  kind: TenantOperationStepKindEnum;
-  status: TenantOperationStepStatusEnum; // PENDING, RUNNING, SUCCEEDED, FAILED, SKIPPED
-  message?: string;
-  startedAt?: string;
-  completedAt?: string;
-}
+- Route/container owns operation identity, freshness, polling, and actions.
+- Timeline receives localized, already-authorized presentation steps.
+- Retry and cancel render outside or in a composable action slot governed by the
+  domain contract and [Operational UX](../design-system/operational-ux.md).
+- Operation, correlation, and idempotency evidence uses the shared copyable code
+  treatment.
 
-export interface OperationTimelineProps {
-  operationId: string;
-  tenantId: string;
-  status: TenantOperationStatusEnum;
-  progress: {
-    totalSteps: number;
-    completedSteps: number;
-    failedSteps: number;
-    percent: number;
-  };
-  steps: OperationStep[];
-  onRetry?: () => void;
-  onCancel?: () => void;
-}
-```
+## Step presentation
 
----
+Each step communicates:
 
-## 🎨 Layout Features
+- localized name and optional description;
+- semantic status label;
+- start/end timestamp with explicit timezone;
+- safe progress or evidence text when available;
+- failure/recovery relationship when the domain exposes it.
 
-1. **Top Progress Bar**: Smooth percentage progress bar colored blue when running, green when succeeded, red when failed.
-2. **Step List (DAG)**: Chronological list showing Step Kind (DATABASE, SCHEMA, SYSTEM_SEED, IDENTITY, etc.) with animated spinners for `RUNNING` steps.
-3. **Actions Bar**: Action buttons for `Retry Operation` (requires `admin.tenants.reprovision`) and `Cancel Operation`.
+Success uses emerald; warning uses amber; failure uses red; pending/running uses
+neutral structure plus text and optional motion. Color and motion are never the
+only status signals. Under reduced motion, running indicators become static but
+remain labelled.
+
+## State and freshness
+
+- Initial loading reserves the sequence layout.
+- Polling keeps existing steps mounted and announces only meaningful status
+  changes.
+- Disconnected/stale polling shows the last authoritative update.
+- Partial failure keeps completed and safe evidence visible.
+- Terminal failure identifies the failed step and valid recovery route.
+- Conflict and cancellation are not collapsed into generic failure.
+
+## Accessibility and responsive behavior
+
+- The step sequence uses list semantics.
+- Current step/status is expressed in text and programmatic state.
+- Expandable evidence is keyboard operable with focus return.
+- Narrow screens stack timestamps/evidence without shrinking type below the
+  bilingual floor.
+- The timeline itself does not create competing live regions for every step.
+
+## Current documentation correction
+
+Previous versions documented nonexistent `operationId`, progress, retry, and
+cancel props on the shared component and used stale `/admin/...` page routes.
+Those claims are superseded by this source-aligned boundary.

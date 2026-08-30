@@ -9,6 +9,7 @@ const { hookMock } = vi.hoisted(() => ({
   hookMock: {
     copy: null as unknown as ReturnType<typeof getNotificationsCopy>,
     dir: "ltr" as "ltr" | "rtl",
+    locale: "en",
     canRead: true,
     canManage: true,
     isOpen: true,
@@ -19,7 +20,7 @@ const { hookMock } = vi.hoisted(() => ({
     actionState: "IDLE",
     actionError: null as NormalizedApiError | null,
     isPending: false,
-    toggleOpen: vi.fn(),
+    setOpen: vi.fn(),
     close: vi.fn(),
     markAllRead: vi.fn(),
     markRead: vi.fn(),
@@ -37,6 +38,7 @@ describe("NotificationDropdown", () => {
   beforeEach(() => {
     hookMock.copy = getNotificationsCopy("en");
     hookMock.dir = "ltr";
+    hookMock.locale = "en";
     hookMock.canRead = true;
     hookMock.canManage = true;
     hookMock.isOpen = true;
@@ -47,7 +49,7 @@ describe("NotificationDropdown", () => {
     hookMock.actionState = "IDLE";
     hookMock.actionError = null;
     hookMock.isPending = false;
-    hookMock.toggleOpen.mockReset();
+    hookMock.setOpen.mockReset();
     hookMock.close.mockReset();
     hookMock.markAllRead.mockReset();
     hookMock.markRead.mockReset();

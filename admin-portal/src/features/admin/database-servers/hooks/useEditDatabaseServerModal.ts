@@ -43,6 +43,7 @@ export function useEditDatabaseServerModal({
   const [sslConfig, setSslConfig] = useState<DatabaseServerSslConfigDto>({});
   const [removeSslConfig, setRemoveSslConfig] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleSslModeChange = (nextMode: DatabaseServerSslMode) => {
     setSslMode(nextMode);
@@ -63,10 +64,11 @@ export function useEditDatabaseServerModal({
       removeStoredConfig: removeSslConfig,
     });
     if (sslErrors.length > 0) {
-      toast.error(copy.invalidSslTitle, sslErrors[0]);
+      setFormError(`${copy.invalidSslTitle}: ${sslErrors[0]}`);
       return;
     }
 
+    setFormError(null);
     setIsSubmitting(true);
 
     const replacementSslConfig = compactDatabaseSslConfig(sslConfig);
@@ -97,7 +99,7 @@ export function useEditDatabaseServerModal({
       onClose();
     } catch (err) {
       const normalized = normalizeApiError(err);
-      toast.error(copy.failureTitle, normalized.message);
+      setFormError(`${copy.failureTitle}: ${normalized.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -123,6 +125,7 @@ export function useEditDatabaseServerModal({
     removeSslConfig,
     setRemoveSslConfig,
     isSubmitting,
+    formError,
     handleSslModeChange,
     handleSubmit,
   };

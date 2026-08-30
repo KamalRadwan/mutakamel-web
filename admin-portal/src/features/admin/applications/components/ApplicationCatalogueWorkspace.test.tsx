@@ -9,8 +9,10 @@ const replaceGrants = vi.hoisted(() => vi.fn());
 vi.mock("../hooks/useApplicationCatalogue", () => ({
   useApplicationCatalogue: useApplicationCatalogueMock,
 }));
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({ lang: "en", dir: "ltr" }),
+}));
 vi.mock("./CatalogueResourceDialog", () => ({ CatalogueResourceDialog: () => null }));
-vi.mock("@/components/shared/DestructiveActionModal", () => ({ DestructiveActionModal: () => null }));
 
 import { ApplicationCatalogueWorkspace } from "./ApplicationCatalogueWorkspace";
 
@@ -47,8 +49,8 @@ describe("ApplicationCatalogueWorkspace entitlement defaults", () => {
   it("adds the finite email limits when the CRM outbound email grant is checked", async () => {
     renderWorkspace();
 
-    fireEvent.click(screen.getByRole("button", { name: "Entitlements" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Outbound email/i }));
+    const checkbox = await activateEntitlements();
+    fireEvent.click(checkbox);
 
     expect(screen.getByLabelText("Outbound email configuration JSON")).toHaveValue(defaultConfig);
 
@@ -61,11 +63,10 @@ describe("ApplicationCatalogueWorkspace entitlement defaults", () => {
     }));
   });
 
-  it("preserves a custom email policy when the grant is unchecked and checked again", () => {
+  it("preserves a custom email policy when the grant is unchecked and checked again", async () => {
     renderWorkspace();
 
-    fireEvent.click(screen.getByRole("button", { name: "Entitlements" }));
-    const checkbox = screen.getByRole("checkbox", { name: /Outbound email/i });
+    const checkbox = await activateEntitlements();
     fireEvent.click(checkbox);
 
     const config = screen.getByLabelText("Outbound email configuration JSON");
@@ -74,6 +75,22 @@ describe("ApplicationCatalogueWorkspace entitlement defaults", () => {
     fireEvent.click(checkbox);
 
     expect(config).toHaveValue(customConfig);
+  });
+
+  it("keeps grant validation visible and moves focus to the error", async () => {
+    renderWorkspace();
+
+    const checkbox = await activateEntitlements();
+    fireEvent.click(checkbox);
+    fireEvent.change(screen.getByLabelText("Outbound email configuration JSON"), {
+      target: { value: '{"dailyQuota":1000}' },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Replace complete entitlement set" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("requires exactly dailyQuota and rateLimitPerMin");
+    await waitFor(() => expect(alert).toHaveFocus());
+    expect(replaceGrants).not.toHaveBeenCalled();
   });
 });
 
@@ -87,4 +104,12 @@ function renderWorkspace() {
       canMutate
     />,
   );
+}
+
+async function activateEntitlements() {
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Entitlements" }), {
+    button: 0,
+    ctrlKey: false,
+  });
+  return screen.findByRole("checkbox", { name: /Outbound email/i });
 }

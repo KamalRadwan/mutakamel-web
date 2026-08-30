@@ -13,6 +13,7 @@ import {
   AlertDialogCancel,
 } from "../../primitives/AlertDialog";
 import { Checkbox } from "../../primitives/Checkbox";
+import { Input } from "../../primitives/Input";
 import { focusRing } from "../../lib/variants";
 import { cn } from "../../lib/cn";
 
@@ -23,9 +24,9 @@ const VARIANT_ICON: Record<"danger" | "warning" | "info", LucideIcon> = {
 };
 
 const VARIANT_ICON_CLASS: Record<"danger" | "warning" | "info", string> = {
-  danger: "text-danger-600 dark:text-danger-400",
-  warning: "text-warn-600 dark:text-warn-400",
-  info: "text-brand-600 dark:text-brand-400",
+  danger: "text-destructive",
+  warning: "text-warning",
+  info: "text-info",
 };
 
 /**
@@ -85,8 +86,10 @@ export function ConfirmActionModal({
     if (isOpen) queueMicrotask(() => setTypedInput(""));
   }, [isOpen]);
 
-  const isConfirmed =
-    !requiredConfirmationText || typedInput.trim().toLowerCase() === requiredConfirmationText.trim().toLowerCase();
+  // High-impact confirmation is deliberately byte-for-byte exact. Trimming or
+  // case folding would contradict the visible instruction and can turn a
+  // mistyped resource identifier into an accepted destructive intent.
+  const isConfirmed = !requiredConfirmationText || typedInput === requiredConfirmationText;
   const Icon = icon ?? VARIANT_ICON[variant];
 
   return (
@@ -96,14 +99,14 @@ export function ConfirmActionModal({
           disabled={isLoading}
           aria-label={lang === "ar" ? "إغلاق" : "Close"}
           className={cn(
-            "absolute end-4 top-4 h-auto w-auto rounded-md border-0 bg-transparent p-1.5 text-muted-foreground opacity-60 transition-opacity hover:bg-ink-100 hover:opacity-100 dark:hover:bg-ink-800",
+            "absolute end-4 top-4 h-auto w-auto rounded-md border-0 bg-transparent p-1.5 text-muted-foreground opacity-60 transition-opacity hover:bg-accent hover:opacity-100 motion-reduce:transition-none",
             focusRing,
           )}
         >
           <X className="size-4" aria-hidden="true" />
         </AlertDialogCancel>
         <div className="mb-4 flex items-center gap-3 border-b border-border pb-3">
-          <div className="rounded-md bg-ink-100 p-2 dark:bg-ink-800">
+          <div className="rounded-md bg-muted p-2">
             <Icon className={iconClassName ?? `size-5 ${VARIANT_ICON_CLASS[variant]}`} aria-hidden="true" />
           </div>
           <div>
@@ -118,7 +121,7 @@ export function ConfirmActionModal({
 
         {requiredConfirmationText && (
           <div className="space-y-2">
-            <div className="rounded-md border border-warn-200 bg-warn-50 p-3 text-xs text-warn-800 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-300">
+            <div className="rounded-md border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground">
               <span>
                 {lang === "ar" ? "للتأكيد، يرجى كتابة الاسم بالضبط:" : "To confirm, please type the exact name:"}
               </span>
@@ -126,7 +129,7 @@ export function ConfirmActionModal({
                 {requiredConfirmationText}
               </div>
             </div>
-            <input
+            <Input
               id={inputId}
               type="text"
               value={typedInput}
@@ -134,13 +137,13 @@ export function ConfirmActionModal({
               placeholder={requiredConfirmationText}
               aria-label={lang === "ar" ? "اكتب الاسم بالضبط للتأكيد" : "Type the exact name to confirm"}
               autoFocus
-              className="h-(--size-control-lg) w-full rounded-md border border-border bg-card px-3 font-mono text-xs text-foreground outline-none focus-visible:border-danger-500 focus-visible:ring-2 focus-visible:ring-danger-500"
+              className="font-mono text-xs"
             />
           </div>
         )}
 
         {extraToggle && (
-          <label className="mt-3 flex cursor-pointer select-none items-center gap-2 text-xs font-semibold text-danger-700 dark:text-danger-400">
+          <label className="mt-3 flex cursor-pointer select-none items-center gap-2 text-xs font-semibold text-destructive">
             <Checkbox checked={extraToggle.checked} onCheckedChange={(c) => extraToggle.onChange(c === true)} />
             {extraToggle.label}
           </label>

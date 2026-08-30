@@ -12,8 +12,8 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
       role="presentation"
       aria-hidden="true"
       className={cn(
-        "relative overflow-hidden rounded-md bg-ink-100 dark:bg-ink-800",
-        "before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.6s_infinite] before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent motion-reduce:before:animate-none dark:before:via-white/10",
+        "relative overflow-hidden rounded-md bg-muted",
+        "before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.6s_infinite] before:bg-gradient-to-r before:from-transparent before:via-primary-foreground/40 before:to-transparent motion-reduce:before:animate-none dark:before:via-primary-foreground/10",
         className,
       )}
       {...props}

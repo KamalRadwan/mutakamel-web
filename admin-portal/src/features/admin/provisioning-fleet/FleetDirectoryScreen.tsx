@@ -6,7 +6,6 @@ import { Plus, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -14,6 +13,8 @@ import {
   ConfirmActionModal,
   Field,
   Input,
+  RadioGroup,
+  RadioGroupItem,
   Select,
   SelectContent,
   SelectItem,
@@ -38,6 +39,7 @@ import {
   FleetMeta,
   FleetPageFrame,
   FleetStatePanel,
+  FleetStatusBadge,
   RefreshButton,
   formatInstant,
 } from "./shared";
@@ -109,7 +111,7 @@ export function FleetDirectoryScreen() {
             onRetry={view.refresh}
           />
           {view.rollouts.state === "EMPTY" ? (
-            <p className="rounded-lg bg-ink-100 p-5 text-center text-sm text-muted-foreground dark:bg-ink-900">
+            <p className="rounded-lg bg-muted p-5 text-center text-sm text-muted-foreground">
               {copy.emptyRollouts}
             </p>
           ) : null}
@@ -124,7 +126,7 @@ export function FleetDirectoryScreen() {
                     {rollout.rolloutId}
                   </code>
                 </div>
-                <Badge tone="neutral">{copy.rolloutStatus[rollout.status]}</Badge>
+                <FleetStatusBadge status={rollout.status} label={copy.rolloutStatus[rollout.status]} />
               </div>
               <dl className="mt-4 grid gap-2 sm:grid-cols-4">
                 <FleetDatum label={copy.total} value={rollout.totalCount} />
@@ -133,7 +135,7 @@ export function FleetDirectoryScreen() {
                 <FleetDatum label={copy.revision} value={rollout.revision} />
               </dl>
               <div className="mt-4 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                <span>{formatInstant(rollout.createdAt)}</span>
+                <span>{formatInstant(rollout.createdAt, lang)}</span>
                 <Button asChild variant="primary" size="sm">
                   <Link href={`/provisioning/fleet/rollouts/${rollout.rolloutId}`}>
                     {copy.open}
@@ -143,7 +145,7 @@ export function FleetDirectoryScreen() {
             </Card>
           ))}
           {view.rollouts.data ? (
-            <FleetMeta result={view.rollouts.data} copy={copy} />
+            <FleetMeta result={view.rollouts.data} copy={copy} lang={lang} />
           ) : null}
         </Card>
 
@@ -180,7 +182,7 @@ export function FleetDirectoryScreen() {
         {view.authLoading ? (
           <FleetStatePanel state="LOADING" error={null} copy={copy} />
         ) : !view.permissions.canCreatePreview ? (
-          <p role="note" className="mt-4 rounded-lg border border-warn-300 bg-warn-50 p-4 text-sm font-semibold text-warn-900 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-100">
+          <p role="note" className="mt-4 rounded-lg border border-warning/30 bg-warning-subtle p-4 text-sm font-semibold text-warning-subtle-foreground">
             {copy.forbiddenPreviewCreate}
           </p>
         ) : (
@@ -223,10 +225,24 @@ export function FleetDirectoryScreen() {
 
               <fieldset className="space-y-4 rounded-lg border border-border p-4">
                 <legend className="px-2 text-sm font-semibold text-foreground">{copy.selection}</legend>
-                <div className="flex flex-wrap gap-4">
-                  <RadioField id="fleet-explicit" label={copy.explicitSelection} checked={!draft.broadSelection} onChange={() => setDraft((current) => ({ ...current, broadSelection: false, allEligibleTenantsAcknowledged: false }))} />
-                  <RadioField id="fleet-broad" label={copy.broadSelection} checked={draft.broadSelection} onChange={() => setDraft((current) => ({ ...current, broadSelection: true, tenantIdsText: "" }))} />
-                </div>
+                <RadioGroup
+                  value={draft.broadSelection ? "broad" : "explicit"}
+                  onValueChange={(value) =>
+                    setDraft((current) =>
+                      value === "broad"
+                        ? { ...current, broadSelection: true, tenantIdsText: "" }
+                        : {
+                            ...current,
+                            broadSelection: false,
+                            allEligibleTenantsAcknowledged: false,
+                          },
+                    )
+                  }
+                  className="flex flex-wrap gap-4"
+                >
+                  <RadioField id="fleet-explicit" value="explicit" label={copy.explicitSelection} />
+                  <RadioField id="fleet-broad" value="broad" label={copy.broadSelection} />
+                </RadioGroup>
                 {draft.broadSelection ? (
                   <CheckField id="fleet-broad-ack" label={copy.broadAcknowledge} checked={draft.allEligibleTenantsAcknowledged} error={errors.allEligibleTenantsAcknowledged} copy={copy} onChange={(allEligibleTenantsAcknowledged) => setDraft((current) => ({ ...current, allEligibleTenantsAcknowledged }))} />
                 ) : (
@@ -326,7 +342,7 @@ function TargetEditor({
       <p className="text-xs text-muted-foreground">{copy.currentFenceHint}</p>
       <FleetFieldError id="fleet-targets-error" code={errors.targets} copy={copy} />
       {draft.targets.map((target, index) => (
-        <Card key={index} className="space-y-3 bg-ink-100 p-4 dark:bg-ink-900">
+        <Card key={index} className="space-y-3 bg-muted p-4">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-foreground">{copy.targetNumber} {index + 1}</h3>
             <Button
@@ -385,10 +401,10 @@ function CheckField({ id, label, checked, error, copy, onChange }: { id: string;
   );
 }
 
-function RadioField({ id, label, checked, onChange }: { id: string; label: string; checked: boolean; onChange: () => void }) {
+function RadioField({ id, label, value }: { id: string; label: string; value: string }) {
   return (
     <label htmlFor={id} className="flex items-center gap-2 text-sm font-semibold text-foreground">
-      <input id={id} name="fleet-selection-mode" type="radio" checked={checked} onChange={onChange} className="size-4 accent-brand-600" />
+      <RadioGroupItem id={id} value={value} />
       <span>{label}</span>
     </label>
   );

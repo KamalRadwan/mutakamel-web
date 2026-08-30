@@ -475,6 +475,25 @@ export function useTenantCoreWorkspace(
     tenantId,
   ]);
 
+  const restore = useCallback(async () => {
+    requirePermission(permissions.canRestore, "TENANT_RESTORE_FORBIDDEN");
+    const current = assertCurrentTenant();
+    requireState(current.status === "DELETED", "TENANT_RESTORE_NOT_ALLOWED");
+    const updated = await runWrite(
+      "restore",
+      { action: "tenant.restore", tenantId },
+      (key) => tenantCoreApi.restore(tenantId, key),
+    );
+    applyTenant(updated, true);
+    return updated;
+  }, [
+    applyTenant,
+    assertCurrentTenant,
+    permissions.canRestore,
+    runWrite,
+    tenantId,
+  ]);
+
   const destroy = useCallback(
     async (destroySubscriptions = false) => {
       requirePermission(permissions.canDestroy, "TENANT_DESTROY_FORBIDDEN");
@@ -541,6 +560,7 @@ export function useTenantCoreWorkspace(
     reprovision,
     cancelProvisioning,
     softDelete,
+    restore,
     destroy,
   };
 }

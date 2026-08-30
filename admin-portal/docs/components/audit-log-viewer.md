@@ -1,128 +1,73 @@
-# Component Specification: `AuditLogViewer` (History & Audit Logs)
+# Component Specification: `AuditLogViewer`
 
-Status: **[Verified]**
+Status: **[Approved target; component not built]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-08-29**
 
-The `AuditLogViewer` component provides a unified, reusable timeline and table view for inspecting audit logs, entity change history, and system event logs across the Admin Portal.
+## Purpose and boundaries
 
----
+`AuditLogViewer` is a future shared presentation for immutable audit evidence,
+entity history, and operational event history. Current audit screens use
+domain-specific rendering; there is no reusable `AuditLogViewer` implementation
+or public import today.
 
-## 📍 Use Cases Across Admin Portal
+Domain guides remain authoritative for endpoint existence, permissions,
+redaction, item shape, pagination, and retention. Do not infer a history
+endpoint from this component target. Relevant contracts include:
 
-| Module / Page | Backend Endpoint | Log Item Structure |
-|:---|:---|:---|
-| **Database Server Audit** | `GET /api/admin/core/v1/database-servers/:id/history` | Success envelope whose `data` is a direct array of field changes (`field`, `label`, `previousValue`, `newValue`), exact action (`CREATE`, `UPDATE`, `ACTIVATE`, `DRAIN`, `OFFLINE`, `DELETE`), and `actorId` |
-| **Storage Server Audit** | `GET /api/admin/core/v1/storage-servers/:id/history` | Success envelope whose `data` is `{ items, total }`; each item has exact action, revision triplet, `changes[]` with `previousValue`/`nextValue`, `actorId`, optional `correlationId`, and `createdAt` |
-| **System SMTP Audit** | `GET /api/admin/core/v1/system-settings/email/audit` | SMTP configuration modifications, testing logs |
-| **Logging Level Overrides** | `GET /api/admin/core/v1/logging/level-overrides/history` | Scope change, level adjustment (`previousLevel`, `level`), `reason`, `actorId` |
-| **Tenant Operations Timeline** | `GET /api/admin/core/v1/tenants/:tenantId/operations/:operationId/timeline` | Operation step messages, status transitions, phase updates |
-| **Control-plane audit** | `GET /api/admin/core/v1/audit` | Immutable cross-domain evidence; see [Control-plane audit](../api/control-plane-audit.md) |
+- [Control-plane audit](../api/control-plane-audit.md)
+- [Database Servers](../api/database-servers.md)
+- [System settings](../api/system-settings.md)
+- [Logging](../api/logging.md)
+- [Tenant operations](../api/tenant-operations.md)
 
----
+## Target modes
 
-## 🎨 Layout Modes
+1. **Table:** dense comparison of time, action, actor, entity, evidence, and
+   correlation references.
+2. **Timeline:** chronological detail for a bounded resource or operation.
+3. **Diff:** field-level previous/next comparison where the domain projection
+   safely exposes it.
 
-The component supports 2 display modes via the `variant` prop:
+Modes share filters, freshness, pagination, accessible names, and evidence
+formatting. They do not expose raw payloads merely because the backend stores
+them.
 
-1. **`timeline` (Default)**: Vertical activity stream with icon badges, timestamps, actor labels, and collapsible JSON / diff details. Ideal for detail drawers and operation progress panels.
-2. **`table`**: Dense table layout with sortable columns (`Date`, `Action / Event`, `Actor`, `Entity`, `Changes / Payload`). Ideal for dedicated audit pages.
+## State contract
 
----
+- Initial loading reserves the viewer layout.
+- Background refresh preserves evidence, filters, pagination, expansion, and
+  focus.
+- Empty and filtered-empty are distinct.
+- Forbidden is not empty.
+- Partial or stale evidence remains visible with a persistent qualifier and last
+  authoritative update.
+- Load failure retains safe prior evidence and provides retry.
 
-## ⚙️ Component API (Props Interface)
+## Evidence presentation
 
-```typescript
-export interface AuditLogItem {
-  id: string;
-  timestamp: string; // ISO date string
-  action: string;    // e.g. 'UPDATE', 'CREATE', 'SUSPEND', 'LIFECYCLE'
-  actionTone?: 'blue' | 'green' | 'amber' | 'red' | 'neutral';
-  actor?: {
-    id: string | null;
-    name?: string;
-    email?: string;
-    type?: 'ADMIN' | 'TENANT_USER' | 'SYSTEM';
-  };
-  entity?: {
-    type: string;    // e.g. 'DatabaseServer', 'Tenant', 'SystemSetting'
-    id: string;
-    name?: string;
-  };
-  changes?: Array<{
-    field: string;
-    label: string;
-    previousValue: unknown;
-    newValue: unknown;
-  }>;
-  message?: string;
-  payload?: Record<string, unknown>;
-}
+- Timestamps use explicit locale and timezone.
+- IDs, emails, IPs, correlation IDs, and operation IDs are direction-isolated
+  and copyable.
+- Previous/next values use semantic removal/addition treatment plus text or icon;
+  never red/green alone.
+- Sensitive or redacted values show an explicit redaction label, not blank text.
+- Actor and source labels distinguish human, system, and unavailable identity
+  without inventing names.
+- Expandable details are keyboard operable and preserve focus.
 
-export interface AuditLogViewerProps {
-  items: AuditLogItem[];
-  isLoading?: boolean;
-  variant?: 'timeline' | 'table';
-  emptyMessageEn?: string;
-  emptyMessageAr?: string;
-  /** Optional pagination handle */
-  pagination?: {
-    page: number;
-    limit: number;
-    totalItems: number;
-    onPageChange: (page: number) => void;
-  };
-  /** Optional filter controls */
-  onFilterChange?: (filters: { action?: string; search?: string; from?: string; to?: string }) => void;
-}
-```
+## Accessibility and responsive behavior
 
----
+- Table mode follows the shared [DataTable contract](data-table.md).
+- Timeline markers are decorative when each event has a visible status/action
+  label.
+- Narrow layouts prioritize time, action, entity, and result; additional
+  evidence moves into labelled disclosure rather than disappearing.
+- Horizontal comparison regions are named and focusable.
+- Live updates use one concise status rather than announcing every new row.
 
-## 🌍 Bilingual (RTL/LTR) Features
+## Implementation gate
 
-- **Timeline Border**: Uses `border-s-2 border-slate-200 dark:border-slate-800` (RTL mirrors line to right side).
-- **Badges & Margins**: Uses `ms-3`, `me-2`, `start-0` to maintain perfect alignment in Arabic and English.
-- **Diff Display**: Green badge for `newValue` addition, red strikethrough/badge for `previousValue` removal.
-
----
-
-## 💻 Usage Example
-
-```tsx
-import { AuditLogViewer } from '@/components/shared/AuditLogViewer';
-
-export function DatabaseServerAuditPanel({ serverId }: { serverId: string }) {
-  const { data, isLoading } = useGetDatabaseServerHistoryQuery({ id: serverId });
-
-  const items: AuditLogItem[] = (data?.data ?? []).map((entry) => ({
-    id: entry.id,
-    timestamp: entry.createdAt,
-    action: entry.action,
-    actor: { id: entry.actorId },
-    entity: {
-      type: 'DatabaseServer',
-      id: entry.databaseServerId,
-      name: entry.serverName,
-    },
-    changes: entry.changes,
-  }));
-
-  return (
-    <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-        سجل التغييرات (Audit History)
-      </h3>
-      <AuditLogViewer
-        items={items}
-        isLoading={isLoading}
-        variant="timeline"
-      />
-    </div>
-  );
-}
-```
-
-Database-server history uses `createdAt`, not `timestamp`, and supplies only
-`actorId`; resolve an actor label separately if the product requires one. The
-adapter above intentionally does not invent an actor name or email.
+Before building this component, reverify every proposed domain source. The
+previous documentation incorrectly claimed a Storage Server history endpoint
+and a reusable implementation that do not exist in current source.

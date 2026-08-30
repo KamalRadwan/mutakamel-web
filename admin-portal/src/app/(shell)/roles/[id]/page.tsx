@@ -70,7 +70,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
     return (
       <div className="grid place-items-center py-16">
         <div className="flex items-center gap-3 text-muted-foreground">
-          <Sparkles className="size-5 animate-spin text-brand-500" />
+          <Sparkles className="size-5 animate-spin text-info motion-reduce:animate-none" aria-hidden="true" />
           <span>{t.roles.loadingDetail}</span>
         </div>
       </div>
@@ -132,9 +132,9 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
       />
 
       {isSuperAdmin && (
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-warn-200 bg-warn-50 p-4 dark:border-warn-800/60 dark:bg-warn-950/30">
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-warning/30 bg-warning-subtle p-4 text-warning-subtle-foreground">
           <div className="flex items-center gap-3">
-            <div className="rounded-md bg-warn-500 p-2.5 text-ink-950 shrink-0">
+            <div className="shrink-0 rounded-md bg-warning p-2.5 text-warning-foreground">
               <Zap className="size-5" aria-hidden="true" />
             </div>
             <div>
@@ -146,14 +146,14 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               </p>
             </div>
           </div>
-          <span className="hidden shrink-0 rounded-md bg-warn-500 px-3 py-1 text-xs font-semibold text-ink-950 sm:inline-flex">
+          <span className="hidden shrink-0 rounded-md bg-warning px-3 py-1 text-xs font-semibold text-warning-foreground sm:inline-flex">
             {catalogueLength} / {catalogueLength} {t.roles.grantedSuffix}
           </span>
         </div>
       )}
 
       {isSystem && !isSuperAdmin && (
-        <div className="flex gap-3 rounded-lg border border-border bg-ink-50 p-4 text-foreground dark:bg-ink-900/40">
+        <div className="flex gap-3 rounded-lg border border-border bg-muted/40 p-4 text-foreground">
           <Info className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <div className="text-xs">
             <h4 className="mb-1 font-semibold">{t.roles.protectedSystemTitle}</h4>
@@ -167,7 +167,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
-            <ShieldAlert className="size-4 text-brand-500" aria-hidden="true" />
+            <ShieldAlert className="size-4 text-info" aria-hidden="true" />
             {t.roles.generalInfoTitle}
           </CardTitle>
         </CardHeader>
@@ -229,7 +229,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-4 space-y-0">
           <div>
             <CardTitle className="flex items-center gap-2 text-sm">
-              <ShieldCheck className="size-4 text-brand-500" aria-hidden="true" />
+              <ShieldCheck className="size-4 text-info" aria-hidden="true" />
               {t.roles.permissionsMatrixTitle}
             </CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -255,7 +255,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
 
         {isCatalogueLoading && (
           <div className="flex items-center gap-2 border-b border-border p-4 text-xs text-muted-foreground">
-            <Sparkles className="size-3.5 animate-spin" />
+            <Sparkles className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
             {t.roles.loadingCatalogue}
           </div>
         )}
@@ -291,22 +291,24 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
 
             return (
               <div key={groupName} className="space-y-3 p-4">
-                <div className="flex items-center justify-between rounded-md border border-border bg-ink-50 p-3 dark:bg-ink-900/40">
+                <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 p-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="size-2 shrink-0 rounded-full bg-brand-500" />
+                    <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
                     <h3 className="text-xs font-semibold text-foreground">{groupName}</h3>
                     <Badge tone="neutral">
                       {checkedCount} / {perms.length}
                     </Badge>
                   </div>
                   {!permissionsReadOnly && (
-                    <button
+                    <Button
                       type="button"
+                      variant="link"
+                      size="sm"
                       onClick={() => toggleGroup(groupName, !isAllChecked)}
-                      className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-400"
+                      className="h-auto px-1.5 py-1 text-xs font-semibold"
                     >
                       {isAllChecked ? t.roles.deselectAll : t.roles.selectAll}
-                    </button>
+                    </Button>
                   )}
                 </div>
 
@@ -317,11 +319,11 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                     return (
                       <label
                         key={p.id}
-                        className={`flex items-start justify-between gap-2 rounded-md border p-3 transition-colors ${
+                        className={`flex items-start justify-between gap-2 rounded-md border p-3 transition-colors motion-reduce:transition-none ${
                           isChecked
-                            ? "border-brand-300 bg-brand-500/5 dark:border-brand-700/60"
+                            ? "border-primary/40 bg-selected"
                             : "border-border bg-card"
-                        } ${!permissionsReadOnly ? "cursor-pointer hover:border-brand-400" : "opacity-90"}`}
+                        } ${!permissionsReadOnly ? "cursor-pointer hover:border-primary/50" : "opacity-90"}`}
                       >
                         <span className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-foreground">
                           {getPermissionName(p, lang as "ar" | "en")}

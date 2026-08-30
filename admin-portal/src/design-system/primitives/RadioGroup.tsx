@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { Circle } from "lucide-react";
 import { cn } from "../lib/cn";
-import { focusRing } from "../lib/variants";
+import { focusRing, hitTarget } from "../lib/variants";
 
 export const RadioGroup = forwardRef<
   React.ComponentRef<typeof RadioGroupPrimitive.Root>,
@@ -21,16 +21,17 @@ export const RadioGroupItem = forwardRef<
   <RadioGroupPrimitive.Item
     ref={ref}
     className={cn(
-      "aspect-square size-4 shrink-0 rounded-full border border-border bg-card transition-colors",
-      "data-[state=checked]:border-brand-500",
+      "aspect-square size-4 shrink-0 rounded-full border border-input bg-card transition-colors motion-reduce:transition-none",
+      "data-[state=checked]:border-primary",
       "disabled:cursor-not-allowed disabled:opacity-50",
       focusRing,
+      hitTarget,
       className,
     )}
     {...props}
   >
     <RadioGroupPrimitive.Indicator className="flex items-center justify-center">
-      <Circle className="size-2 fill-brand-500 text-brand-500" aria-hidden="true" />
+      <Circle className="size-2 fill-primary text-primary" aria-hidden="true" />
     </RadioGroupPrimitive.Indicator>
   </RadioGroupPrimitive.Item>
 ));

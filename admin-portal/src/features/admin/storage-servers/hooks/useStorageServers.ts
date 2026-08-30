@@ -93,7 +93,6 @@ export function useStorageServers() {
         return;
       }
       setError(normalizeApiError(caught));
-      setServers([]);
     } finally {
       if (generation === requestGeneration.current) setIsLoading(false);
     }

@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "generatedAt": "2026-08-27T18:29:03.949Z",
+    "generatedAt": "2026-08-30T18:08:52.020Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "67034e343dff+dirty",
-    "backendRevision": "3cbfe3e8ddd7+dirty",
+    "frontendRevision": "684f503f0279+dirty",
+    "backendRevision": "989ee35f6578+dirty",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
   },
   "counts": {
-    "total": 252,
+    "total": 247,
     "byMethod": {
-      "GET": 101,
+      "GET": 98,
       "POST": 106,
       "DELETE": 16,
-      "PATCH": 26,
+      "PATCH": 24,
       "PUT": 3
     },
     "byRouteClass": {
-      "AUTHENTICATED": 89,
-      "WRITE_SENSITIVE": 136,
+      "AUTHENTICATED": 86,
+      "WRITE_SENSITIVE": 134,
       "PUBLIC": 6,
       "READ_HEAVY": 21
     },
@@ -46,12 +46,12 @@
       "tenant-fqdns": 1,
       "tenants": 54,
       "wallets": 6,
-      "users": 15
+      "users": 10
     }
   },
   "sourceHashes": {
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "c6be913b7892dd919771a31a0a0c3f77952a95e940b2ef5f8aa798aa7c1bd66a",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "2669f7b959da1f8f8294e407f9fb4a1449a086b2efdd9de8ecf73f87df4cffe0"
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "ba3041ec935c4efcf9f07b4ac12048ebacadaec2475c4d8d6fe1278b4c13e136",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
   },
   "routes": [
     {
@@ -3216,6 +3216,24 @@
     },
     {
       "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/tenants/:id/restore",
+      "upstreamPath": "/api/v1/admin/tenants/:id/restore",
+      "routeKey": "core.admin.tenants.restore",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.tenants.restore",
+        "admin.tenants.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
       "canonicalPath": "/api/admin/core/v1/tenants/:id/suspend",
       "upstreamPath": "/api/v1/admin/tenants/:id/suspend",
       "routeKey": "core.admin.tenants.suspend",
@@ -3437,24 +3455,6 @@
       "idempotencyMode": "WRITE_SENSITIVE",
       "requiredPermissions": [
         "admin.tenant_users.suspend",
-        "admin.tenant_users.critical"
-      ],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": "NEVER",
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "PATCH",
-      "canonicalPath": "/api/admin/core/v1/tenants/:id/users/:userId/webphone",
-      "upstreamPath": "/api/v1/admin/tenants/:id/users/:userId/webphone",
-      "routeKey": "core.admin.tenants.users.webphone.update",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": "WRITE_SENSITIVE",
-      "requiredPermissions": [
-        "admin.tenant_users.manage_webphone",
         "admin.tenant_users.critical"
       ],
       "requiredPermissionsMode": "ALL",
@@ -4271,41 +4271,6 @@
     },
     {
       "method": "GET",
-      "canonicalPath": "/api/admin/core/v1/users/:id/webphone",
-      "upstreamPath": "/api/v1/admin/users/:id/webphone",
-      "routeKey": "core.admin.users.webphone.get",
-      "routeClass": "AUTHENTICATED",
-      "idempotent": true,
-      "idempotencyMode": null,
-      "requiredPermissions": [
-        "admin.users.read"
-      ],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": null,
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "PATCH",
-      "canonicalPath": "/api/admin/core/v1/users/:id/webphone",
-      "upstreamPath": "/api/v1/admin/users/:id/webphone",
-      "routeKey": "core.admin.users.webphone.update",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
-      "requiredPermissions": [
-        "admin.users.update",
-        "admin.users.critical"
-      ],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": null,
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "GET",
       "canonicalPath": "/api/admin/core/v1/users/me/profile",
       "upstreamPath": "/api/v1/admin/users/me/profile",
       "routeKey": "core.admin.users.profile.get",
@@ -4326,51 +4291,6 @@
       "routeKey": "core.admin.users.profile.update",
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": true,
-      "idempotencyMode": null,
-      "requiredPermissions": [],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": null,
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "GET",
-      "canonicalPath": "/api/admin/core/v1/users/me/webphone",
-      "upstreamPath": "/api/v1/admin/users/me/webphone",
-      "routeKey": "core.admin.users.webphone.me",
-      "routeClass": "AUTHENTICATED",
-      "idempotent": true,
-      "idempotencyMode": null,
-      "requiredPermissions": [],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": null,
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "GET",
-      "canonicalPath": "/api/admin/core/v1/users/me/webphone/call-logs",
-      "upstreamPath": "/api/v1/admin/users/me/webphone/call-logs",
-      "routeKey": "core.admin.users.webphone.call-logs.list",
-      "routeClass": "AUTHENTICATED",
-      "idempotent": true,
-      "idempotencyMode": null,
-      "requiredPermissions": [],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": null,
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "POST",
-      "canonicalPath": "/api/admin/core/v1/users/me/webphone/call-logs",
-      "upstreamPath": "/api/v1/admin/users/me/webphone/call-logs",
-      "routeKey": "core.admin.users.webphone.call-logs.create",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
       "idempotencyMode": null,
       "requiredPermissions": [],
       "requiredPermissionsMode": "ALL",

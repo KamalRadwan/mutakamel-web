@@ -3,7 +3,6 @@
 import { useState, type FormEvent } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
-  Badge,
   Button,
   Card,
   ConfirmActionModal,
@@ -29,6 +28,7 @@ import {
   FleetMeta,
   FleetPageFrame,
   FleetStatePanel,
+  FleetStatusBadge,
   RefreshButton,
   formatInstant,
 } from "./shared";
@@ -162,20 +162,20 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
 
       {rollout ? (
         <>
-          <RolloutSummary rollout={rollout} copy={copy} />
+          <RolloutSummary rollout={rollout} copy={copy} lang={lang} />
           {view.rollout.data ? (
             <Card className="p-5">
-              <FleetMeta result={view.rollout.data} copy={copy} />
+              <FleetMeta result={view.rollout.data} copy={copy} lang={lang} />
             </Card>
           ) : null}
 
-          <Card className="space-y-4 border-warn-300 p-5 dark:border-warn-900">
+          <Card className="space-y-4 border-warning/30 p-5">
             <header>
               <h2 className="text-xl font-semibold text-foreground">{copy.lifecycleControls}</h2>
               <p className="mt-1 text-xs text-muted-foreground">{copy.reasonHint}</p>
             </header>
             {!view.permissions.canManage ? (
-              <p role="note" className="rounded-lg border border-warn-300 bg-warn-50 p-4 text-sm font-semibold text-warn-900 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-100">
+              <p role="note" className="rounded-lg border border-warning/30 bg-warning-subtle p-4 text-sm font-semibold text-warning-subtle-foreground">
                 {copy.forbiddenManage}
               </p>
             ) : (
@@ -218,7 +218,7 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
             )}
           </Card>
 
-          <RolloutTenants view={view} copy={copy} />
+          <RolloutTenants view={view} copy={copy} lang={lang} />
         </>
       ) : null}
 
@@ -237,6 +237,7 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
             <ReportDetail
               report={report}
               copy={copy}
+              lang={lang}
               copied={copied}
               onCopy={() => {
                 if (!report.payloadBase64) return;
@@ -246,15 +247,15 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
                 });
               }}
             />
-            {view.report.data ? <FleetMeta result={view.report.data} copy={copy} /> : null}
+            {view.report.data ? <FleetMeta result={view.report.data} copy={copy} lang={lang} /> : null}
 
             {report.status === "READY_FOR_ATTESTATION" ? (
               !view.permissions.canAttest ? (
-                <p role="note" className="rounded-lg border border-warn-300 bg-warn-50 p-4 text-sm font-semibold text-warn-900 dark:border-warn-900 dark:bg-warn-950/30 dark:text-warn-100">
+                <p role="note" className="rounded-lg border border-warning/30 bg-warning-subtle p-4 text-sm font-semibold text-warning-subtle-foreground">
                   {copy.forbiddenAttest}
                 </p>
               ) : (
-                <Card className="border-danger-300 bg-danger-50/40 dark:border-danger-900 dark:bg-danger-950/10">
+                <Card className="border-destructive/30 bg-destructive-subtle">
                   <form aria-label={copy.attestation} onSubmit={prepareAttestation} noValidate>
                     <div className="space-y-4 p-4">
                       <header>
@@ -304,7 +305,7 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
   );
 }
 
-function RolloutSummary({ rollout, copy }: { rollout: FleetRollout; copy: ReturnType<typeof getProvisioningFleetCopy> }) {
+function RolloutSummary({ rollout, copy, lang }: { rollout: FleetRollout; copy: ReturnType<typeof getProvisioningFleetCopy>; lang: "ar" | "en" }) {
   const progress = rollout.totalCount
     ? Math.min(100, Math.round(((rollout.completedCount + rollout.failedCount) / rollout.totalCount) * 100))
     : 0;
@@ -315,7 +316,7 @@ function RolloutSummary({ rollout, copy }: { rollout: FleetRollout; copy: Return
           <h2 className="text-xl font-semibold text-foreground">{copy.rolloutDetail}</h2>
           <code dir="ltr" className="mt-1 block break-all text-start text-xs text-muted-foreground">{rollout.rolloutId}</code>
         </div>
-        <Badge tone="neutral">{copy.rolloutStatus[rollout.status]}</Badge>
+        <FleetStatusBadge status={rollout.status} label={copy.rolloutStatus[rollout.status]} />
       </div>
       <div>
         <div className="mb-1 flex justify-between text-xs font-semibold text-foreground"><span>{copy.progress}</span><span>{progress}%</span></div>
@@ -337,33 +338,33 @@ function RolloutSummary({ rollout, copy }: { rollout: FleetRollout; copy: Return
         <FleetDatum label={copy.targetSelectionDigest} value={rollout.targetSelectionDigest} mono />
         <FleetDatum label={copy.selectionDigest} value={rollout.selectionDigest} mono />
         <FleetDatum label={copy.safeReason} value={rollout.safeReasonCode ?? copy.none} mono />
-        <FleetDatum label={copy.createdAt} value={formatInstant(rollout.createdAt)} />
-        <FleetDatum label={copy.startedAt} value={formatInstant(rollout.startedAt)} />
-        <FleetDatum label={copy.pausedAt} value={formatInstant(rollout.pausedAt)} />
-        <FleetDatum label={copy.completedAt} value={formatInstant(rollout.completedAt)} />
+        <FleetDatum label={copy.createdAt} value={formatInstant(rollout.createdAt, lang)} />
+        <FleetDatum label={copy.startedAt} value={formatInstant(rollout.startedAt, lang)} />
+        <FleetDatum label={copy.pausedAt} value={formatInstant(rollout.pausedAt, lang)} />
+        <FleetDatum label={copy.completedAt} value={formatInstant(rollout.completedAt, lang)} />
       </dl>
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-foreground">{copy.targets}</h3>
         {rollout.targetSelection.length ? rollout.targetSelection.map((target) => (
-          <code key={target.componentKey} dir="ltr" className="block break-all rounded-lg bg-ink-100 p-3 text-start text-xs dark:bg-ink-900">{JSON.stringify(target)}</code>
+          <code key={target.componentKey} dir="ltr" className="block break-all rounded-lg bg-muted p-3 text-start text-xs">{JSON.stringify(target)}</code>
         )) : <p className="text-sm text-muted-foreground">{copy.none}</p>}
       </div>
     </Card>
   );
 }
 
-function RolloutTenants({ view, copy }: { view: ReturnType<typeof useFleetRollout>; copy: ReturnType<typeof getProvisioningFleetCopy> }) {
+function RolloutTenants({ view, copy, lang }: { view: ReturnType<typeof useFleetRollout>; copy: ReturnType<typeof getProvisioningFleetCopy>; lang: "ar" | "en" }) {
   const columns: ColumnDef<FleetRolloutTenant>[] = [
     { key: "tenantId", headerEn: "Tenant", headerAr: "المستأجر", cell: (t) => <span dir="ltr" className="text-start font-mono text-xs">{t.tenantId}</span> },
     { key: "rank", headerEn: copy.rank, headerAr: copy.rank, cell: (t) => t.deterministicRank },
     { key: "batch", headerEn: copy.batch, headerAr: copy.batch, cell: (t) => t.batchNumber },
-    { key: "status", headerEn: copy.currentStatus, headerAr: copy.currentStatus, cell: (t) => <span className="font-semibold">{copy.tenantStatus[t.status]}</span> },
+    { key: "status", headerEn: copy.currentStatus, headerAr: copy.currentStatus, cell: (t) => <FleetStatusBadge status={t.status} label={copy.tenantStatus[t.status]} /> },
     { key: "operationId", headerEn: copy.operationId, headerAr: copy.operationId, cell: (t) => <span dir="ltr" className="text-start font-mono text-xs">{t.operationId ?? copy.none}</span> },
     { key: "eligibilityDigest", headerEn: copy.eligibilityDigest, headerAr: copy.eligibilityDigest, cell: (t) => <span dir="ltr" className="text-start font-mono text-xs">{t.eligibilityDigest}</span> },
     { key: "evidenceDigest", headerEn: copy.evidenceDigest, headerAr: copy.evidenceDigest, cell: (t) => <span dir="ltr" className="text-start font-mono text-xs">{t.evidenceDigest ?? copy.none}</span> },
     { key: "safeReason", headerEn: copy.safeReason, headerAr: copy.safeReason, cell: (t) => <span dir="ltr" className="text-start font-mono text-xs">{t.safeReasonCode ?? copy.none}</span> },
-    { key: "dispatchedAt", headerEn: copy.dispatchedAt, headerAr: copy.dispatchedAt, cell: (t) => <span className="text-xs">{formatInstant(t.dispatchedAt)}</span> },
-    { key: "completedAt", headerEn: copy.completedAt, headerAr: copy.completedAt, cell: (t) => <span className="text-xs">{formatInstant(t.completedAt)}</span> },
+    { key: "dispatchedAt", headerEn: copy.dispatchedAt, headerAr: copy.dispatchedAt, cell: (t) => <span className="text-xs">{formatInstant(t.dispatchedAt, lang)}</span> },
+    { key: "completedAt", headerEn: copy.completedAt, headerAr: copy.completedAt, cell: (t) => <span className="text-xs">{formatInstant(t.completedAt, lang)}</span> },
   ];
   return (
     <Card className="space-y-4 p-5">
@@ -372,44 +373,47 @@ function RolloutTenants({ view, copy }: { view: ReturnType<typeof useFleetRollou
         <span className="text-sm font-semibold text-muted-foreground">{copy.total}: {view.tenants.data?.total ?? 0}</span>
       </header>
       <FleetStatePanel state={view.tenants.state} error={view.tenants.error} copy={copy} invalid={view.routeValid ? copy.contractError : copy.invalidRouteId} onRetry={view.refresh} />
-      {view.tenants.state === "EMPTY" ? <p className="rounded-lg bg-ink-100 p-5 text-center text-sm text-muted-foreground dark:bg-ink-900">{copy.emptyTenants}</p> : null}
+      {view.tenants.state === "EMPTY" ? <p className="rounded-lg bg-muted p-5 text-center text-sm text-muted-foreground">{copy.emptyTenants}</p> : null}
       {view.tenants.data?.items.length ? (
-        <Card>
-          <DataTable
-            columns={columns}
-            data={view.tenants.data.items}
-            getRowId={(row) => row.tenantId}
-            pagination={{
-              page: view.tenants.data.page,
-              limit: view.tenants.data.limit,
-              totalItems: view.tenants.data.total,
-              totalPages: view.tenants.data.totalPages,
-              onPageChange: view.setPage,
-            }}
-          />
-        </Card>
+        <DataTable
+          labelEn="Fleet rollout tenant evidence"
+          labelAr="أدلة مستأجري إطلاق الأسطول"
+          columns={columns}
+          data={view.tenants.data.items}
+          isRefreshing={view.tenants.isRefreshing}
+          getRowId={(row) => row.tenantId}
+          pagination={{
+            page: view.tenants.data.page,
+            limit: view.tenants.data.limit,
+            totalItems: view.tenants.data.total,
+            totalPages: view.tenants.data.totalPages,
+            onPageChange: view.setPage,
+          }}
+        />
       ) : null}
-      {view.tenants.data ? <FleetMeta result={view.tenants.data} copy={copy} /> : null}
+      {view.tenants.data ? <FleetMeta result={view.tenants.data} copy={copy} lang={lang} /> : null}
     </Card>
   );
 }
 
-function ReportDetail({ report, copy, copied, onCopy }: { report: FleetReport; copy: ReturnType<typeof getProvisioningFleetCopy>; copied: boolean; onCopy: () => void }) {
+function ReportDetail({ report, copy, lang, copied, onCopy }: { report: FleetReport; copy: ReturnType<typeof getProvisioningFleetCopy>; lang: "ar" | "en"; copied: boolean; onCopy: () => void }) {
   const statusLabel = report.status === "NOT_READY" ? copy.reportNotReady : report.status === "READY_FOR_ATTESTATION" ? copy.readyForAttestation : copy.attested;
   return (
     <div className="space-y-4">
-      <div className="rounded-lg bg-ink-100 p-4 text-sm font-semibold text-foreground dark:bg-ink-900">{statusLabel}</div>
+      <div className="rounded-lg bg-muted p-4 text-sm font-semibold text-foreground">
+        <FleetStatusBadge status={report.status} label={statusLabel} />
+      </div>
       <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <FleetDatum label={copy.rolloutId} value={report.rolloutId} mono />
         <FleetDatum label={copy.revision} value={report.revision} />
         <FleetDatum label={copy.currentStatus} value={report.status} mono />
-        <FleetDatum label={copy.generatedAt} value={formatInstant(report.generatedAt)} />
+        <FleetDatum label={copy.generatedAt} value={formatInstant(report.generatedAt, lang)} />
         <FleetDatum label={copy.signingDigest} value={report.signingDigest ?? copy.none} mono />
         <FleetDatum label={copy.reportDigest} value={report.reportDigest ?? copy.none} mono />
         <FleetDatum label={copy.publisherKeyId} value={report.publisherKeyId ?? copy.none} mono />
         <FleetDatum label={copy.signatureAlgorithm} value={report.signatureAlgorithm ?? copy.none} mono />
         <FleetDatum label={copy.signatureBase64} value={report.signatureBase64 ?? copy.none} mono />
-        <FleetDatum label={copy.attestedAt} value={formatInstant(report.attestedAt)} />
+        <FleetDatum label={copy.attestedAt} value={formatInstant(report.attestedAt, lang)} />
         <FleetDatum label={copy.attestedByActorRef} value={report.attestedByActorRef ?? copy.none} mono />
       </dl>
       {report.payloadBase64 ? (

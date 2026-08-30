@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
+import { useEffect, useRef, type ReactNode } from "react";
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
+  ArrowDown,
+  ArrowUp,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -17,87 +18,160 @@ import {
   PhoneOff,
   Volume2,
   VolumeX,
-} from 'lucide-react';
-import { useI18n } from '@/i18n/I18nContext';
-import { formatWebphoneLogTime, useWebRTCPhone } from './hooks/useWebRTCPhone';
-import { IncomingCallPopup } from './IncomingCallPopup';
-import type { WebphoneCallLogType, WebphoneConnectionState } from '@mutakamel/webphone';
+} from "lucide-react";
+import {
+  Button,
+  Input,
+  Range,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  cn,
+} from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
+import { formatWebphoneLogTime, useWebRTCPhone } from "./hooks/useWebRTCPhone";
+import { IncomingCallPopup } from "./IncomingCallPopup";
+import type {
+  WebphoneCallLogType,
+  WebphoneCallState,
+  WebphoneConnectionState,
+  WebphoneTab,
+} from "@mutakamel/webphone";
 
 const copy = {
   ar: {
-    phone: 'الهاتف',
-    calls: 'السجل',
-    registered: 'مسجل',
-    connecting: 'جارٍ الاتصال',
-    error: 'خطأ',
-    offline: 'غير متصل',
-    ready: 'جاهز',
-    enterNumber: 'أدخل الرقم...',
-    copyNumber: 'نسخ الرقم',
-    deleteDigit: 'حذف آخر رقم',
-    incoming: 'مكالمة واردة',
-    connected: 'متصل',
-    answer: 'رد',
-    decline: 'رفض',
-    call: 'اتصال',
-    hangup: 'إنهاء',
-    hold: 'تعليق',
-    resume: 'استئناف',
-    mic: 'الميكروفون',
-    speaker: 'السماعة',
-    muteMic: 'كتم الميكروفون',
-    unmuteMic: 'تشغيل الميكروفون',
-    muteSpeaker: 'كتم السماعة',
-    unmuteSpeaker: 'تشغيل السماعة',
-    autoAnswer: 'رد تلقائي',
-    dnd: 'عدم الإزعاج',
-    loading: 'جارٍ تحميل سجل المكالمات',
-    noCalls: 'لا توجد مكالمات مسجلة',
-    unknown: 'غير معروف',
-    showPhone: 'فتح هاتف WebRTC',
-    foldPhone: 'تصغير هاتف WebRTC',
+    webRtcPhone: "هاتف WebRTC",
+    phoneSections: "أقسام الهاتف",
+    phone: "الهاتف",
+    calls: "السجل",
+    registered: "مسجل",
+    connecting: "جارٍ الاتصال",
+    error: "خطأ",
+    offline: "غير متصل",
+    ready: "جاهز",
+    dialNumber: "رقم الهاتف",
+    enterNumber: "أدخل الرقم",
+    dialDigit: "طلب الرقم",
+    copyNumber: "نسخ الرقم",
+    deleteDigit: "حذف آخر رقم",
+    incoming: "مكالمة واردة",
+    calling: "جارٍ طلب المكالمة",
+    connected: "متصل",
+    callEnded: "انتهت المكالمة",
+    callFailed: "تعذر الاتصال",
+    answer: "رد",
+    decline: "رفض",
+    call: "اتصال",
+    hangup: "إنهاء",
+    hold: "تعليق",
+    resume: "استئناف",
+    mic: "الميكروفون",
+    speaker: "السماعة",
+    micVolume: "مستوى صوت الميكروفون",
+    speakerVolume: "مستوى صوت السماعة",
+    muteMic: "كتم الميكروفون",
+    unmuteMic: "تشغيل الميكروفون",
+    muteSpeaker: "كتم السماعة",
+    unmuteSpeaker: "تشغيل السماعة",
+    autoAnswer: "رد تلقائي",
+    dnd: "عدم الإزعاج",
+    loading: "جارٍ تحميل سجل المكالمات",
+    noCalls: "لا توجد مكالمات مسجلة",
+    unknown: "غير معروف",
+    outgoingCall: "مكالمة صادرة",
+    answeredIncomingCall: "مكالمة واردة مجابة",
+    missedIncomingCall: "مكالمة واردة فائتة",
+    showPhone: "فتح هاتف WebRTC",
+    foldPhone: "تصغير هاتف WebRTC",
   },
   en: {
-    phone: 'Phone',
-    calls: 'Call log',
-    registered: 'Registered',
-    connecting: 'Connecting',
-    error: 'Error',
-    offline: 'Offline',
-    ready: 'Ready',
-    enterNumber: 'Enter number...',
-    copyNumber: 'Copy number',
-    deleteDigit: 'Delete last digit',
-    incoming: 'Incoming call',
-    connected: 'Connected',
-    answer: 'Answer',
-    decline: 'Decline',
-    call: 'Call',
-    hangup: 'Hang up',
-    hold: 'Hold',
-    resume: 'Resume',
-    mic: 'Microphone',
-    speaker: 'Speaker',
-    muteMic: 'Mute microphone',
-    unmuteMic: 'Unmute microphone',
-    muteSpeaker: 'Mute speaker',
-    unmuteSpeaker: 'Unmute speaker',
-    autoAnswer: 'Auto answer',
-    dnd: 'Do not disturb',
-    loading: 'Loading call history',
-    noCalls: 'No calls recorded',
-    unknown: 'Unknown',
-    showPhone: 'Open WebRTC phone',
-    foldPhone: 'Collapse WebRTC phone',
+    webRtcPhone: "WebRTC phone",
+    phoneSections: "Phone sections",
+    phone: "Phone",
+    calls: "Call log",
+    registered: "Registered",
+    connecting: "Connecting",
+    error: "Error",
+    offline: "Offline",
+    ready: "Ready",
+    dialNumber: "Phone number",
+    enterNumber: "Enter number",
+    dialDigit: "Dial digit",
+    copyNumber: "Copy number",
+    deleteDigit: "Delete last digit",
+    incoming: "Incoming call",
+    calling: "Calling",
+    connected: "Connected",
+    callEnded: "Call ended",
+    callFailed: "Call failed",
+    answer: "Answer",
+    decline: "Decline",
+    call: "Call",
+    hangup: "Hang up",
+    hold: "Hold",
+    resume: "Resume",
+    mic: "Microphone",
+    speaker: "Speaker",
+    micVolume: "Microphone volume",
+    speakerVolume: "Speaker volume",
+    muteMic: "Mute microphone",
+    unmuteMic: "Unmute microphone",
+    muteSpeaker: "Mute speaker",
+    unmuteSpeaker: "Unmute speaker",
+    autoAnswer: "Auto answer",
+    dnd: "Do not disturb",
+    loading: "Loading call history",
+    noCalls: "No calls recorded",
+    unknown: "Unknown",
+    outgoingCall: "Outgoing call",
+    answeredIncomingCall: "Answered incoming call",
+    missedIncomingCall: "Missed incoming call",
+    showPhone: "Open WebRTC phone",
+    foldPhone: "Collapse WebRTC phone",
   },
 } as const;
 
+type PhoneCopy = (typeof copy)[keyof typeof copy];
+
 export function WebRTCPhoneWidget() {
-  const { lang } = useI18n();
+  const { lang, dir } = useI18n();
   const labels = copy[lang];
   const [phone, remoteAudioRef] = useWebRTCPhone();
+  const dockRef = useRef<HTMLDivElement>(null);
+  const widgetFocusFallbackRef = useRef<HTMLButtonElement>(null);
+  const focusDockControlAfterToggleRef = useRef(false);
+  const phoneExpanded = phone.expanded;
+  const setPhoneExpanded = phone.setExpanded;
+
+  const togglePhoneFromDockControl = (expanded: boolean) => {
+    focusDockControlAfterToggleRef.current = true;
+    setPhoneExpanded(expanded);
+  };
+
+  useEffect(() => {
+    if (!focusDockControlAfterToggleRef.current) return;
+    focusDockControlAfterToggleRef.current = false;
+    widgetFocusFallbackRef.current?.focus({ preventScroll: true });
+  }, [phoneExpanded]);
+
+  useEffect(() => {
+    if (!phoneExpanded) return;
+
+    const collapseBeforePageFocusIsObscured = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (dockRef.current?.contains(target) || target.closest('[role="alertdialog"]')) return;
+      setPhoneExpanded(false);
+    };
+
+    document.addEventListener("focusin", collapseBeforePageFocusIsObscured, true);
+    return () => document.removeEventListener("focusin", collapseBeforePageFocusIsObscured, true);
+  }, [phoneExpanded, setPhoneExpanded]);
 
   if (!phone.shouldRender) return null;
+
+  const connectionLabel = localizedConnectionLabel(phone.connectionState, labels);
 
   return (
     <>
@@ -109,172 +183,265 @@ export function WebRTCPhoneWidget() {
         onAnswer={phone.answerCall}
         onDecline={phone.declineCall}
         onClose={phone.dismissIncomingPopup}
+        fallbackFocusRef={widgetFocusFallbackRef}
       />
 
-      <div className="fixed bottom-0 end-3 z-[70] select-none sm:end-5">
+      <div
+        ref={dockRef}
+        className="fixed z-40 select-none"
+        dir={dir}
+        style={{
+          insetBlockEnd: "max(0.75rem, env(safe-area-inset-bottom, 0px))",
+          insetInlineEnd:
+            dir === "rtl"
+              ? "max(0.75rem, env(safe-area-inset-left, 0px))"
+              : "max(0.75rem, env(safe-area-inset-right, 0px))",
+        }}
+      >
         <audio ref={remoteAudioRef} autoPlay playsInline />
 
         {!phone.expanded ? (
-          <button
+          <Button
+            ref={widgetFocusFallbackRef}
             type="button"
-            className="flex h-8 items-center gap-2 rounded-t-xl border border-b-0 border-ink-700/80 bg-ink-950 px-3 text-start text-ink-50 shadow-2xl transition-colors hover:bg-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
-            aria-label={labels.showPhone}
-            onClick={() => phone.setExpanded(true)}
+            variant="outline"
+            size="xs"
+            className="min-h-(--size-control-md) max-w-[min(17.5rem,calc(100vw-1.5rem))] justify-start gap-2 whitespace-normal rounded-lg px-3 py-1.5 text-start text-card-foreground shadow-pop"
+            aria-label={`${labels.showPhone}: ${connectionLabel}`}
+            onClick={() => togglePhoneFromDockControl(true)}
           >
             <ConnectionDot state={phone.connectionState} />
-            <strong className="truncate text-xs font-semibold">{phone.phoneDisplayName}</strong>
-            <ChevronUp className="size-3.5 shrink-0 text-ink-400" aria-hidden="true" />
-          </button>
+            <span className="min-w-0 flex-1">
+              <strong className="block truncate text-xs font-semibold">{phone.phoneDisplayName}</strong>
+              <span className="block truncate text-xs text-muted-foreground">{connectionLabel}</span>
+            </span>
+            <ChevronUp className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </Button>
         ) : (
           <section
-            className="flex max-h-[calc(100svh-1rem)] w-[min(17.5rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-t-3xl border border-b-0 border-border bg-card shadow-2xl"
-            aria-label={lang === 'ar' ? 'هاتف WebRTC' : 'WebRTC phone'}
+            className="flex w-[min(19rem,calc(100vw-1.5rem))] max-w-full flex-col overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-pop"
+            aria-label={labels.webRtcPhone}
           >
-            <header className="flex h-9 items-center gap-2 border-b border-ink-800 bg-ink-950 px-3 text-ink-50">
+            <header className="flex min-h-(--size-control-xl) items-center gap-2 border-b border-border bg-info-subtle px-3 py-1.5 text-info-subtle-foreground">
               <ConnectionDot state={phone.connectionState} />
-              <strong className="min-w-0 flex-1 truncate text-xs font-semibold">{phone.phoneDisplayName}</strong>
-              <button
+              <span className="min-w-0 flex-1">
+                <strong className="block truncate text-xs font-semibold">{phone.phoneDisplayName}</strong>
+                <span className="block truncate text-xs">{connectionLabel}</span>
+              </span>
+              <Button
+                ref={widgetFocusFallbackRef}
                 type="button"
-                className="grid size-7 place-items-center rounded-lg text-ink-400 transition-colors hover:bg-ink-800 hover:text-ink-50 focus-visible:outline-2 focus-visible:outline-brand-400"
+                variant="ghost"
+                size="md"
+                className="size-8 shrink-0 p-0 text-info-subtle-foreground hover:bg-info/10"
                 aria-label={labels.foldPhone}
-                onClick={() => phone.setExpanded(false)}
+                onClick={() => togglePhoneFromDockControl(false)}
               >
-                <ChevronDown className="size-3.5" aria-hidden="true" />
-              </button>
+                <ChevronDown className="size-4" aria-hidden="true" />
+              </Button>
             </header>
 
-            <div
-              className="grid grid-cols-2 border-b border-border bg-muted p-1"
-              role="tablist"
-              aria-label={lang === 'ar' ? 'أقسام الهاتف' : 'Phone sections'}
+            <Tabs
+              value={phone.activeTab}
+              onValueChange={(value) => phone.setActiveTab(value as WebphoneTab)}
+              dir={dir}
+              activationMode="automatic"
+              className="flex min-h-0 flex-1 flex-col"
             >
-              <TabButton active={phone.activeTab === 'phone'} label={labels.phone} icon={<Phone className="size-3.5" aria-hidden="true" />} onClick={() => phone.setActiveTab('phone')} />
-              <TabButton active={phone.activeTab === 'log'} label={labels.calls} icon={<History className="size-3.5" aria-hidden="true" />} onClick={() => phone.setActiveTab('log')} />
-            </div>
+              <TabsList
+                className="grid w-full grid-cols-2 bg-muted px-1"
+                aria-label={labels.phoneSections}
+              >
+                <TabsTrigger value="phone" className="justify-center gap-1.5 px-2">
+                  <Phone className="size-4" aria-hidden="true" />
+                  {labels.phone}
+                </TabsTrigger>
+                <TabsTrigger value="log" className="justify-center gap-1.5 px-2">
+                  <History className="size-4" aria-hidden="true" />
+                  {labels.calls}
+                </TabsTrigger>
+              </TabsList>
 
-            <div className="h-[24.5rem] overflow-hidden">
-              {phone.activeTab === 'phone' ? (
-                <div className="h-full overflow-y-auto p-2">
+              <div className="h-[min(24.5rem,58svh)] min-h-0 overflow-hidden sm:h-[24.5rem]">
+                <TabsContent value="phone" className="mt-0 h-full overflow-y-auto p-2">
                   {!phone.callBusy ? (
-                    <div className="flex h-9 items-center rounded-xl border border-border bg-muted px-2">
-                      <input
-                        type="text"
-                        inputMode="tel"
-                        value={phone.displayNumber}
-                        onChange={(event) => phone.setDialTarget(event.currentTarget.value)}
-                        placeholder={labels.enterNumber}
-                        className="min-w-0 flex-1 bg-transparent px-1 font-mono text-sm font-semibold text-foreground outline-none placeholder:text-xs placeholder:text-muted-foreground"
-                      />
-                      <button
-                        type="button"
-                        className="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-ink-200 hover:text-foreground disabled:opacity-30 dark:hover:bg-ink-800"
-                        aria-label={labels.deleteDigit}
-                        disabled={!phone.dialTarget}
-                        onClick={phone.deleteLastDigit}
+                    <div>
+                      <label
+                        htmlFor="webphone-dial-number"
+                        className="mb-1 block text-xs font-medium text-foreground"
                       >
-                        <Delete className="size-4" aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        className="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-ink-200 hover:text-brand-600 disabled:opacity-30 dark:hover:bg-ink-800 dark:hover:text-brand-400"
-                        aria-label={labels.copyNumber}
-                        disabled={!phone.displayNumber.trim()}
-                        onClick={phone.copyNumber}
-                      >
-                        <Copy className="size-4" aria-hidden="true" />
-                      </button>
+                        {labels.dialNumber}
+                      </label>
+                      <div className="flex min-h-(--size-control-lg) items-center rounded-lg border border-input bg-card px-1">
+                        <Input
+                          id="webphone-dial-number"
+                          type="text"
+                          inputMode="tel"
+                          autoComplete="off"
+                          value={phone.displayNumber}
+                          onChange={(event) => phone.setDialTarget(event.currentTarget.value)}
+                          placeholder={labels.enterNumber}
+                          className="min-w-0 flex-1 rounded-lg border-0 bg-transparent px-2 font-mono text-base font-semibold text-foreground placeholder:text-xs placeholder:text-muted-foreground sm:text-sm"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="lg"
+                          className="size-9 p-0 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                          aria-label={labels.deleteDigit}
+                          disabled={!phone.dialTarget}
+                          onClick={phone.deleteLastDigit}
+                        >
+                          <Delete className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="lg"
+                          className="size-9 p-0 text-muted-foreground hover:text-info disabled:opacity-30"
+                          aria-label={labels.copyNumber}
+                          disabled={!phone.displayNumber.trim()}
+                          onClick={phone.copyNumber}
+                        >
+                          <Copy className="size-4" aria-hidden="true" />
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <div
-                      className="grid min-h-24 content-center gap-1 rounded-xl border border-brand-500/30 bg-brand-500/5 p-3 text-center dark:bg-brand-500/10"
+                      className="grid min-h-24 content-center gap-1 rounded-lg border border-info/30 bg-info-subtle p-3 text-center"
                       aria-live="polite"
                     >
-                      <span className="flex items-center justify-center gap-2 text-xs font-semibold text-brand-700 dark:text-brand-400">
-                        {phone.incomingCallWaiting ? <PhoneIncoming className="size-4" aria-hidden="true" /> : <PhoneCall className="size-4" aria-hidden="true" />}
-                        {phone.callActive ? labels.connected : phone.status}
+                      <span className="flex items-center justify-center gap-2 text-xs font-semibold text-info-subtle-foreground">
+                        {phone.incomingCallWaiting ? (
+                          <PhoneIncoming className="size-4" aria-hidden="true" />
+                        ) : (
+                          <PhoneCall className="size-4" aria-hidden="true" />
+                        )}
+                        {localizedCallState(phone.callState, labels, phone.status)}
                       </span>
-                      <strong className="truncate text-sm text-foreground">{phone.callPeerName || labels.unknown}</strong>
+                      <strong className="truncate text-sm text-foreground">
+                        {phone.callPeerName || labels.unknown}
+                      </strong>
                       <span className="flex items-center justify-center gap-2 font-mono text-xs text-muted-foreground">
-                        {phone.callPeerNumber}
-                        {phone.timerLabel ? <time className="font-semibold text-brand-600 dark:text-brand-400">{phone.timerLabel}</time> : null}
+                        <bdi dir="ltr">{phone.callPeerNumber}</bdi>
+                        {phone.timerLabel ? (
+                          <time className="font-semibold text-info">{phone.timerLabel}</time>
+                        ) : null}
                       </span>
-                      {phone.mediaNotice ? <small className="text-xs font-semibold text-danger-600 dark:text-danger-400">{phone.mediaNotice}</small> : null}
+                      {phone.mediaNotice ? (
+                        <small className="text-xs font-semibold text-destructive-subtle-foreground">
+                          {phone.mediaNotice}
+                        </small>
+                      ) : null}
                     </div>
                   )}
 
                   {phone.incomingCallWaiting ? (
                     <div className="mt-2 grid grid-cols-2 gap-2">
-                      <ActionButton tone="success" icon={<PhoneIncoming className="size-4" aria-hidden="true" />} label={labels.answer} onClick={phone.answerCall} />
-                      <ActionButton tone="danger" icon={<PhoneOff className="size-4" aria-hidden="true" />} label={labels.decline} onClick={phone.declineCall} />
+                      <ActionButton
+                        tone="primary"
+                        icon={<PhoneIncoming className="size-4" aria-hidden="true" />}
+                        label={labels.answer}
+                        onClick={phone.answerCall}
+                      />
+                      <ActionButton
+                        tone="danger"
+                        icon={<PhoneOff className="size-4" aria-hidden="true" />}
+                        label={labels.decline}
+                        onClick={phone.declineCall}
+                      />
                     </div>
                   ) : null}
 
                   <div className="mt-2 grid grid-cols-3 gap-1">
                     {phone.keypad.map((key) => (
-                      <button
+                      <Button
                         key={key.value}
                         type="button"
-                        className="grid min-h-9 place-content-center rounded-xl border border-border bg-muted text-foreground transition-all hover:border-brand-300 hover:bg-brand-500/5 active:scale-95 dark:hover:border-brand-800 dark:hover:bg-brand-500/10"
+                        variant="outline"
+                        size="lg"
+                        className="h-auto min-h-(--size-control-lg) flex-col gap-0 rounded-lg bg-muted px-2 py-1 text-foreground hover:border-primary/40"
+                        aria-label={`${labels.dialDigit} ${key.value}${key.letters ? `, ${key.letters}` : ""}`}
                         onClick={() => phone.pressDigit(key.value)}
                       >
                         <strong className="font-mono text-sm leading-none">{key.value}</strong>
-                        <small className="mt-1 min-h-2 font-mono text-xs leading-none text-muted-foreground">{key.letters}</small>
-                      </button>
+                        <small className="mt-1 min-h-2 font-mono text-xs leading-none text-muted-foreground">
+                          {key.letters}
+                        </small>
+                      </Button>
                     ))}
                   </div>
 
                   <div className="mt-2 grid grid-cols-2 gap-1.5">
                     {!phone.callBusy ? (
-                      <button
-                        type="button"
-                        className="col-span-2 flex min-h-9 items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 text-xs font-semibold text-ink-950 shadow-lg shadow-brand-600/20 transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-40"
+                      <ActionButton
+                        className="col-span-2"
+                        tone="primary"
+                        icon={<PhoneCall className="size-4" aria-hidden="true" />}
+                        label={labels.call}
                         disabled={!phone.canCall}
                         onClick={() => void phone.makeCall()}
-                      >
-                        <PhoneCall className="size-4" aria-hidden="true" />
-                        {labels.call}
-                      </button>
+                      />
                     ) : null}
                     {phone.callActive ? (
                       <>
                         <ActionButton
-                          tone={phone.held ? 'warning' : 'neutral'}
+                          tone={phone.held ? "warning" : "neutral"}
                           icon={<Pause className="size-4" aria-hidden="true" />}
                           label={phone.held ? labels.resume : labels.hold}
                           onClick={phone.toggleHold}
                         />
-                        <ActionButton tone="danger" icon={<PhoneOff className="size-4" aria-hidden="true" />} label={labels.hangup} onClick={phone.hangupCall} />
+                        <ActionButton
+                          tone="danger"
+                          icon={<PhoneOff className="size-4" aria-hidden="true" />}
+                          label={labels.hangup}
+                          onClick={phone.hangupCall}
+                        />
                       </>
                     ) : null}
                     {phone.callBusy && !phone.callActive && !phone.incomingCallWaiting ? (
-                      <button
-                        type="button"
-                        className="col-span-2 flex min-h-9 items-center justify-center gap-2 rounded-xl bg-danger-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-danger-500"
+                      <ActionButton
+                        className="col-span-2"
+                        tone="danger"
+                        icon={<PhoneOff className="size-4" aria-hidden="true" />}
+                        label={labels.hangup}
                         onClick={phone.hangupCall}
-                      >
-                        <PhoneOff className="size-4" aria-hidden="true" />
-                        {labels.hangup}
-                      </button>
+                      />
                     ) : null}
                   </div>
 
                   <div className="mt-2 grid gap-1.5 border-t border-border pt-2">
                     <AudioControl
                       label={labels.mic}
+                      sliderLabel={labels.micVolume}
                       value={phone.micVolume}
                       level={phone.micLevel}
                       muted={phone.muted}
-                      icon={phone.muted ? <MicOff className="size-4" aria-hidden="true" /> : <Mic className="size-4" aria-hidden="true" />}
+                      icon={
+                        phone.muted ? (
+                          <MicOff className="size-4" aria-hidden="true" />
+                        ) : (
+                          <Mic className="size-4" aria-hidden="true" />
+                        )
+                      }
                       toggleLabel={phone.muted ? labels.unmuteMic : labels.muteMic}
                       onToggle={phone.toggleMute}
                       onChange={phone.setMicVolumeLevel}
                     />
                     <AudioControl
                       label={labels.speaker}
+                      sliderLabel={labels.speakerVolume}
                       value={phone.speakerVolume}
                       level={phone.speakerLevel}
                       muted={phone.speakerMuted}
-                      icon={phone.speakerMuted ? <VolumeX className="size-4" aria-hidden="true" /> : <Volume2 className="size-4" aria-hidden="true" />}
+                      icon={
+                        phone.speakerMuted ? (
+                          <VolumeX className="size-4" aria-hidden="true" />
+                        ) : (
+                          <Volume2 className="size-4" aria-hidden="true" />
+                        )
+                      }
                       toggleLabel={phone.speakerMuted ? labels.unmuteSpeaker : labels.muteSpeaker}
                       onToggle={phone.toggleSpeakerMute}
                       onChange={phone.setSpeakerVolumeLevel}
@@ -282,36 +449,72 @@ export function WebRTCPhoneWidget() {
                   </div>
 
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    <ModeButton active={phone.autoAnswer} label={labels.autoAnswer} shortLabel="AA" onClick={() => phone.setAutoAnswer(!phone.autoAnswer)} />
-                    <ModeButton active={phone.doNotDisturb} label={labels.dnd} shortLabel="DND" onClick={() => phone.setDoNotDisturb(!phone.doNotDisturb)} />
+                    <ModeButton
+                      active={phone.autoAnswer}
+                      label={labels.autoAnswer}
+                      shortLabel="AA"
+                      tone="info"
+                      onClick={() => phone.setAutoAnswer(!phone.autoAnswer)}
+                    />
+                    <ModeButton
+                      active={phone.doNotDisturb}
+                      label={labels.dnd}
+                      shortLabel="DND"
+                      tone="warning"
+                      onClick={() => phone.setDoNotDisturb(!phone.doNotDisturb)}
+                    />
                   </div>
-                </div>
-              ) : (
-                <div className="h-full overflow-y-auto p-2">
+                </TabsContent>
+
+                <TabsContent value="log" className="mt-0 h-full overflow-y-auto p-2">
                   {phone.logsLoading ? <EmptyLog label={labels.loading} /> : null}
-                  {!phone.logsLoading && phone.callLogs.length === 0 ? <EmptyLog label={labels.noCalls} /> : null}
+                  {!phone.logsLoading && phone.callLogs.length === 0 ? (
+                    <EmptyLog label={labels.noCalls} />
+                  ) : null}
                   {!phone.logsLoading && phone.callLogs.length > 0 ? (
                     <div className="grid gap-2">
-                      {phone.callLogs.map((log, index) => (
-                        <article
-                          key={log.id ?? `${log.type}-${log.phoneNumber}-${index}`}
-                          className="grid min-h-10 grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border bg-muted p-1.5"
-                        >
-                          <span className={`grid size-7 place-items-center rounded-lg ${callLogTone(log.type)}`}>
-                            {log.type === 'OUT' ? <ArrowUpRight className="size-4" aria-hidden="true" /> : <ArrowDownLeft className="size-4" aria-hidden="true" />}
-                          </span>
-                          <span className="min-w-0">
-                            <strong className="block truncate text-xs text-foreground">{log.displayName || labels.unknown}</strong>
-                            <small className="block truncate font-mono text-xs text-muted-foreground">{log.phoneNumber}</small>
-                          </span>
-                          <time className="font-mono text-xs text-muted-foreground">{formatWebphoneLogTime(log.createdAt ?? log.startedAt)}</time>
-                        </article>
-                      ))}
+                      {phone.callLogs.map((log, index) => {
+                        const typeLabel = callLogLabel(log.type, labels);
+                        const timestamp = log.createdAt ?? log.startedAt;
+
+                        return (
+                          <article
+                            key={log.id ?? `${log.type}-${log.phoneNumber}-${index}`}
+                            className="grid min-h-10 grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border bg-muted p-1.5"
+                          >
+                            <span
+                              className={cn(
+                                "grid size-7 place-items-center rounded-lg",
+                                callLogTone(log.type),
+                              )}
+                              title={typeLabel}
+                              aria-label={typeLabel}
+                            >
+                              {log.type === "OUT" ? (
+                                <ArrowUp className="size-4" aria-hidden="true" />
+                              ) : (
+                                <ArrowDown className="size-4" aria-hidden="true" />
+                              )}
+                            </span>
+                            <span className="min-w-0">
+                              <strong className="block truncate text-xs text-foreground">
+                                {log.displayName || labels.unknown}
+                              </strong>
+                              <small className="block truncate text-xs text-muted-foreground">
+                                {typeLabel} · <bdi dir="ltr" className="font-mono">{log.phoneNumber}</bdi>
+                              </small>
+                            </span>
+                            <time dateTime={timestamp ?? undefined} className="font-mono text-xs text-muted-foreground">
+                              {formatWebphoneLogTime(timestamp, lang === "ar" ? "ar-EG" : "en-US")}
+                            </time>
+                          </article>
+                        );
+                      })}
                     </div>
                   ) : null}
-                </div>
-              )}
-            </div>
+                </TabsContent>
+              </div>
+            </Tabs>
           </section>
         )}
       </div>
@@ -320,51 +523,72 @@ export function WebRTCPhoneWidget() {
 }
 
 function ConnectionDot({ state }: { state: WebphoneConnectionState }) {
-  const tone = state === 'registered' || state === 'ready' ? 'bg-brand-500' : state === 'connecting' || state === 'loading' ? 'bg-warn-400' : 'bg-danger-500';
+  const tone =
+    state === "registered"
+      ? "bg-success"
+      : state === "ready"
+        ? "bg-info"
+        : state === "connecting" || state === "loading"
+          ? "bg-warning"
+          : state === "error" || state === "offline"
+            ? "bg-destructive"
+            : "bg-muted-foreground";
 
   return (
-    <span className="relative flex size-2.5 shrink-0">
-      {state === 'registered' ? <span className={`absolute inline-flex size-full animate-ping rounded-full opacity-60 motion-reduce:animate-none ${tone}`} /> : null}
-      <span className={`relative inline-flex size-2.5 rounded-full ${tone}`} />
+    <span className="relative flex size-2.5 shrink-0" aria-hidden="true">
+      {state === "registered" ? (
+        <span
+          className={cn(
+            "absolute inline-flex size-full animate-ping rounded-full opacity-50 motion-reduce:animate-none",
+            tone,
+          )}
+        />
+      ) : null}
+      <span className={cn("relative inline-flex size-2.5 rounded-full", tone)} />
     </span>
   );
 }
 
-function TabButton({ active, label, icon, onClick }: { active: boolean; label: string; icon: React.ReactNode; onClick: () => void }) {
+function ActionButton({
+  tone,
+  icon,
+  label,
+  onClick,
+  disabled,
+  className,
+}: {
+  tone: "primary" | "danger" | "warning" | "neutral";
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const variant = tone === "primary" ? "primary" : tone === "danger" ? "destructive" : "secondary";
+  const toneClass = tone === "warning" ? "bg-warning text-warning-foreground hover:bg-warning/90" : undefined;
+
   return (
-    <button
+    <Button
       type="button"
-      role="tab"
-      aria-selected={active}
-      className={`flex h-7 items-center justify-center gap-1.5 rounded-lg text-2xs font-semibold transition-colors ${
-        active ? 'bg-card text-brand-700 shadow-sm dark:text-brand-400' : 'text-muted-foreground hover:text-foreground'
-      }`}
+      variant={variant}
+      size="lg"
+      className={cn(
+        "min-h-(--size-control-lg) rounded-lg px-3 text-xs disabled:opacity-40",
+        toneClass,
+        className,
+      )}
+      disabled={disabled}
       onClick={onClick}
     >
       {icon}
       {label}
-    </button>
-  );
-}
-
-function ActionButton({ tone, icon, label, onClick }: { tone: 'success' | 'danger' | 'warning' | 'neutral'; icon: React.ReactNode; label: string; onClick: () => void }) {
-  const toneClass = {
-    success: 'bg-brand-600 hover:bg-brand-500 text-ink-950',
-    danger: 'bg-danger-600 hover:bg-danger-500 text-white',
-    warning: 'bg-warn-500 hover:bg-warn-400 text-ink-950',
-    neutral: 'border border-border bg-muted text-foreground hover:bg-ink-200 dark:hover:bg-ink-700',
-  }[tone];
-
-  return (
-    <button type="button" className={`flex min-h-9 items-center justify-center gap-2 rounded-xl px-3 text-xs font-semibold transition-colors ${toneClass}`} onClick={onClick}>
-      {icon}
-      {label}
-    </button>
+    </Button>
   );
 }
 
 function AudioControl({
   label,
+  sliderLabel,
   value,
   level,
   muted,
@@ -374,40 +598,53 @@ function AudioControl({
   onChange,
 }: {
   label: string;
+  sliderLabel: string;
   value: number;
   level: number;
   muted: boolean;
-  icon: React.ReactNode;
+  icon: ReactNode;
   toggleLabel: string;
   onToggle: () => void;
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="grid min-h-8 grid-cols-[2rem_4rem_minmax(0,1fr)_2.25rem] items-center gap-1.5">
-      <button
+    <div className="grid min-h-8 grid-cols-[auto_4rem_minmax(0,1fr)_2.25rem] items-center gap-1.5">
+      <Button
         type="button"
-        className={`grid size-8 place-items-center rounded-lg transition-colors ${
-          muted ? 'bg-danger-500/10 text-danger-600 dark:bg-danger-500/15 dark:text-danger-400' : 'bg-brand-500/10 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400'
-        }`}
+        variant="ghost"
+        size="md"
+        className={cn(
+          "size-8 p-0",
+          muted
+            ? "bg-destructive-subtle text-destructive-subtle-foreground"
+            : "bg-info-subtle text-info-subtle-foreground",
+        )}
         aria-label={toggleLabel}
         onClick={onToggle}
       >
         {icon}
-      </button>
+      </Button>
       <span className="truncate text-xs font-semibold text-muted-foreground">{label}</span>
-      <span className="relative grid h-6 items-center">
-        <span className="absolute inset-x-0 h-1 rounded-full bg-ink-200 dark:bg-ink-800" />
-        <span className="absolute start-0 h-1 rounded-full bg-brand-500/70" style={{ width: `${value}%` }} />
-        <span className="absolute start-0 h-1 rounded-full bg-brand-400" style={{ width: `${muted ? 0 : level}%` }} />
-        <input
-          type="range"
+      <span className="relative grid min-h-6 items-center rounded-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background">
+        <span className="pointer-events-none absolute inset-x-0 h-1 rounded-full bg-muted" aria-hidden="true" />
+        <span
+          className="pointer-events-none absolute start-0 h-1 rounded-full bg-info/65"
+          style={{ inlineSize: `${value}%` }}
+          aria-hidden="true"
+        />
+        <span
+          className="pointer-events-none absolute start-0 h-1 rounded-full bg-success motion-reduce:hidden"
+          style={{ inlineSize: `${muted ? 0 : level}%` }}
+          aria-hidden="true"
+        />
+        <Range
           min={0}
           max={100}
           step={5}
           value={value}
           disabled={muted}
-          aria-label={label}
-          className="relative z-10 w-full cursor-pointer opacity-0"
+          aria-label={sliderLabel}
+          className="relative z-10 cursor-pointer opacity-0"
           onChange={(event) => onChange(event.currentTarget.value)}
         />
       </span>
@@ -416,28 +653,49 @@ function AudioControl({
   );
 }
 
-function ModeButton({ active, label, shortLabel, onClick }: { active: boolean; label: string; shortLabel: string; onClick: () => void }) {
+function ModeButton({
+  active,
+  label,
+  shortLabel,
+  tone,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  shortLabel: string;
+  tone: "info" | "warning";
+  onClick: () => void;
+}) {
+  const activeClass =
+    tone === "warning"
+      ? "border-warning/40 bg-warning-subtle text-warning-subtle-foreground"
+      : "border-info/40 bg-info-subtle text-info-subtle-foreground";
+
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       aria-pressed={active}
-      title={label}
-      className={`h-7 rounded-lg border px-2 text-2xs font-semibold transition-colors ${
-        active
-          ? 'border-brand-600 bg-brand-600 text-ink-950'
-          : 'border-border bg-muted text-muted-foreground hover:border-brand-300'
-      }`}
+      aria-label={label}
+      className={cn(
+        "min-h-(--size-control-sm) rounded-lg border px-2 text-xs",
+        active ? activeClass : "border-border bg-muted text-muted-foreground hover:bg-accent hover:text-foreground",
+      )}
       onClick={onClick}
     >
       {shortLabel}
       <span className="ms-1.5 font-semibold opacity-80">{label}</span>
-    </button>
+    </Button>
   );
 }
 
 function EmptyLog({ label }: { label: string }) {
   return (
-    <div className="grid min-h-52 place-items-center rounded-xl border border-dashed border-border text-center text-xs font-semibold text-muted-foreground">
+    <div
+      className="grid min-h-52 place-items-center rounded-lg border border-dashed border-border text-center text-xs font-semibold text-muted-foreground"
+      role="status"
+    >
       <span>
         <History className="mx-auto mb-2 size-5 opacity-60" aria-hidden="true" />
         {label}
@@ -446,12 +704,31 @@ function EmptyLog({ label }: { label: string }) {
   );
 }
 
+function localizedConnectionLabel(state: WebphoneConnectionState, labels: PhoneCopy) {
+  if (state === "registered") return labels.registered;
+  if (state === "connecting" || state === "loading") return labels.connecting;
+  if (state === "error") return labels.error;
+  if (state === "offline") return labels.offline;
+  return labels.ready;
+}
+
+function localizedCallState(state: WebphoneCallState, labels: PhoneCopy, fallback: string) {
+  if (state === "incoming") return labels.incoming;
+  if (state === "active") return labels.connected;
+  if (state === "calling" || state === "ringing") return labels.calling;
+  if (state === "ended") return labels.callEnded;
+  if (state === "failed") return labels.callFailed;
+  return fallback;
+}
+
+function callLogLabel(type: WebphoneCallLogType, labels: PhoneCopy) {
+  if (type === "OUT") return labels.outgoingCall;
+  if (type === "IN_ANS") return labels.answeredIncomingCall;
+  return labels.missedIncomingCall;
+}
+
 function callLogTone(type: WebphoneCallLogType) {
-  if (type === 'OUT') {
-    return 'bg-brand-500/10 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400';
-  }
-  if (type === 'IN_ANS') {
-    return 'bg-brand-500/10 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400';
-  }
-  return 'bg-danger-500/10 text-danger-600 dark:bg-danger-500/15 dark:text-danger-400';
+  if (type === "OUT") return "bg-info-subtle text-info-subtle-foreground";
+  if (type === "IN_ANS") return "bg-success-subtle text-success-subtle-foreground";
+  return "bg-destructive-subtle text-destructive-subtle-foreground";
 }

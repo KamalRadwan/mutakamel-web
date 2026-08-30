@@ -33,6 +33,11 @@ export function useApplicationPrimaryComponentDialog({
     if (!isSubmitting) onClose();
   }, [isSubmitting, onClose]);
 
+  const updateReason = useCallback((value: string) => {
+    setReason(value);
+    setValidationError(null);
+  }, []);
+
   const submit = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
@@ -49,7 +54,7 @@ export function useApplicationPrimaryComponentDialog({
 
   return {
     reason,
-    setReason,
+    setReason: updateReason,
     validationError,
     close,
     submit,

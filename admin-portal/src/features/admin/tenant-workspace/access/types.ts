@@ -45,17 +45,6 @@ export interface TenantUserRoleAssignment {
   branchId: string | null;
 }
 
-/** The server never returns a SIP credential; only passwordConfigured is readable. */
-export interface TenantUserWebphone {
-  enabled: boolean;
-  extension: string | null;
-  sipUsername: string | null;
-  displayName: string | null;
-  outboundCallerId: string | null;
-  transport: "ws" | "wss";
-  passwordConfigured: boolean;
-}
-
 export interface TenantUserView {
   id: string;
   email: string;
@@ -73,7 +62,6 @@ export interface TenantUserView {
   };
   manager: TenantUserManagerRef | null;
   roleAssignments: TenantUserRoleAssignment[];
-  webphone: TenantUserWebphone;
   lastLoginAt: string | null;
   lockedUntil: string | null;
   createdAt: string;
@@ -89,7 +77,6 @@ export interface TenantUserSummary {
   deactivated: number;
   deleted: number;
   owners: number;
-  webphoneEnabled: number;
   locked: number;
 }
 
@@ -197,17 +184,6 @@ export interface ChangeTenantUserPasswordInput {
   passwordConfirmation: string;
 }
 
-export interface UpdateTenantUserWebphoneInput {
-  enabled?: boolean;
-  extension?: string | null;
-  sipUsername?: string | null;
-  /** Write-only. It must never be copied into readable user state. */
-  sipPassword?: string | null;
-  displayName?: string | null;
-  outboundCallerId?: string | null;
-  transport?: "ws" | "wss";
-}
-
 export interface ReplaceTenantUserRolesInput {
   assignments: BranchRoleAssignmentInput[];
 }
@@ -243,7 +219,6 @@ export type TenantAccessCommandName =
   | "reset-password"
   | "resend-invite"
   | "change-password"
-  | "webphone"
   | "suspend"
   | "activate"
   | "roles"
@@ -263,7 +238,6 @@ export interface TenantAccessPermissions {
   canInvite: boolean;
   canUpdate: boolean;
   canResetPassword: boolean;
-  canManageWebphone: boolean;
   canSuspend: boolean;
   canAssignRoles: boolean;
   canDelete: boolean;
@@ -277,10 +251,6 @@ export const TENANT_ACCESS_PERMISSION_SETS = {
   update: ["admin.tenant_users.update"],
   resetPassword: [
     "admin.tenant_users.reset_password",
-    "admin.tenant_users.critical",
-  ],
-  manageWebphone: [
-    "admin.tenant_users.manage_webphone",
     "admin.tenant_users.critical",
   ],
   suspend: ["admin.tenant_users.suspend", "admin.tenant_users.critical"],

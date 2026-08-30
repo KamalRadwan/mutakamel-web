@@ -43,6 +43,7 @@ const requiredFiles = [
   "architecture/permissions-idempotency-and-state.md",
   "audit/frontend-capability-matrix.md",
   "audit/documentation-coverage.md",
+  "audit/ui-quality-matrix.md",
   "generated/admin-core-api-routes.json",
   "generated/admin-core-api-routes.md",
   "design-system/README.md",
@@ -55,6 +56,11 @@ const requiredFiles = [
   "design-system/theming-and-direction.md",
   "design-system/toast-contract.md",
   "design-system/migration.md",
+  "design-system/design-update.md",
+  "design-system/operational-ux.md",
+  "design-system/data-experiences.md",
+  "design-system/accessibility-responsive-and-localization.md",
+  "design-system/design-update-roadmap.md",
 ];
 for (const requiredFile of requiredFiles) {
   if (!existsSync(resolve(docsRoot, requiredFile))) {

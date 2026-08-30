@@ -1,25 +1,23 @@
 "use client";
 
-import type { ReactNode } from "react";
-import {
-  AlertTriangle,
-  CircleAlert,
-  Info,
-} from "lucide-react";
+import { useMemo } from "react";
+import { AlertTriangle, CircleAlert, Info } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/design-system";
 import type {
   DashboardGroup,
   DashboardGroupAlert,
   DashboardGroupKey,
 } from "@/types/dashboard";
-import { KpiCard } from "./KpiCard";
 import { UnavailableDashboardPanel } from "./DashboardDataState";
+import { DashboardVisualCard } from "./visuals/DashboardVisualCard";
+import { GroupExactValues } from "./visuals/GroupExactValues";
 import {
-  getDashboardGroupLabel,
-  humanizeDashboardField,
-  isUnavailableProjection,
-} from "../utils/dashboard-groups";
+  GroupHeadlineStats,
+  selectHeadlineCards,
+} from "./visuals/GroupHeadlineStats";
+import { inferGroupVisuals } from "./visuals/infer-visuals";
+import { getDashboardGroupLabel } from "../utils/dashboard-groups";
+import { resolveAlertMessage } from "../utils/dashboard-copy";
 
 interface DashboardGroupPanelProps {
   groupKey: DashboardGroupKey;
@@ -27,6 +25,12 @@ interface DashboardGroupPanelProps {
   rangeLabel: string;
 }
 
+/**
+ * Alerts, then at most three headline numbers, then charts, then one
+ * collapsed exact-value table. The panel this replaced printed every field
+ * of the response into its own bordered tile — around 150 of them across the
+ * thirteen group tabs, and not one chart.
+ */
 export function DashboardGroupPanel({
   groupKey,
   group,
@@ -34,6 +38,22 @@ export function DashboardGroupPanel({
 }: DashboardGroupPanelProps) {
   const { t, lang } = useI18n();
   const title = getDashboardGroupLabel(groupKey, lang);
+  const inferenceCopy = useMemo(
+    () => ({
+      snapshotLabel: t.dashboard.currentSnapshotTitle,
+      periodLabel: t.dashboard.selectedPeriodTitle,
+    }),
+    [t],
+  );
+
+  // Core-authored visuals win; the client-side inference is the bridge that
+  // keeps a tab charted until its provider emits them.
+  const visuals = useMemo(() => {
+    if (!group.available) return [];
+    return group.visuals?.length
+      ? group.visuals
+      : inferGroupVisuals(group, inferenceCopy);
+  }, [group, inferenceCopy]);
 
   if (!group.available) {
     return (
@@ -43,44 +63,40 @@ export function DashboardGroupPanel({
     );
   }
 
-  return (
-    <div className="space-y-5 animate-in fade-in duration-150">
+  const headline = selectHeadlineCards(group.cards);
 
+  return (
+    <div className="animate-in space-y-5 fade-in duration-150 motion-reduce:animate-none">
       {group.alerts.length > 0 && <ReportAlerts alerts={group.alerts} />}
 
-      {group.cards.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {group.cards.map((card) => (
-            <KpiCard key={card.key} card={card} />
+      <GroupHeadlineStats cards={headline} />
+
+      {visuals.length > 0 ? (
+        <section
+          aria-label={t.dashboard.visuals.chartsAriaLabel}
+          className="grid grid-cols-1 gap-4 xl:grid-cols-2"
+        >
+          {visuals.map((visual) => (
+            <DashboardVisualCard key={visual.key} visual={visual} />
           ))}
-        </div>
+        </section>
+      ) : (
+        <p className="rounded-lg border border-dashed border-border bg-muted p-4 text-xs text-muted-foreground">
+          {t.dashboard.visuals.noVisuals}
+        </p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <ReportObject
-          title={t.dashboard.currentSnapshotTitle}
-          subtitle={t.dashboard.currentStateSubtitle}
-          value={group.snapshot}
-        />
-        <ReportObject
-          title={t.dashboard.selectedPeriodTitle}
-          subtitle={rangeLabel}
-          value={group.period}
-        />
+      <div>
+        <p className="mb-2 px-1 text-xs text-muted-foreground">{rangeLabel}</p>
+        <GroupExactValues group={group} />
       </div>
-
-      <ReportObject
-        title={t.dashboard.breakdownsTitle}
-        subtitle={t.dashboard.breakdownsSubtitle}
-        value={group.breakdowns}
-        wide
-      />
     </div>
   );
 }
 
 function ReportAlerts({ alerts }: { alerts: DashboardGroupAlert[] }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const locale = lang === "ar" ? "ar-EG" : "en-US";
   return (
     <section aria-label={t.dashboard.reportAlertsAriaLabel}>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -95,9 +111,12 @@ function ReportAlerts({ alerts }: { alerts: DashboardGroupAlert[] }) {
               <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <p className="text-xs font-semibold">
-                  {alert.count.toLocaleString()} {t.dashboard.needAttentionSuffix}
+                  {new Intl.NumberFormat(locale).format(alert.count)}{" "}
+                  {t.dashboard.needAttentionSuffix}
                 </p>
-                <p className="mt-0.5 text-xs leading-5 opacity-85">{alert.message}</p>
+                <p className="mt-0.5 text-xs leading-5 opacity-85">
+                  {resolveAlertMessage(alert, lang, t)}
+                </p>
               </div>
             </div>
           );
@@ -107,169 +126,25 @@ function ReportAlerts({ alerts }: { alerts: DashboardGroupAlert[] }) {
   );
 }
 
-function ReportObject({
-  title,
-  subtitle,
-  value,
-  wide = false,
-}: {
-  title: string;
-  subtitle: string;
-  value: Record<string, unknown>;
-  wide?: boolean;
-}) {
-  const entries = Object.entries(value);
-  const { t } = useI18n();
-  return (
-    <Card className={wide ? "xl:col-span-2" : ""}>
-      <CardHeader>
-        <CardTitle className="text-sm">{title}</CardTitle>
-        <CardDescription>{subtitle}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {entries.length === 0 ? (
-          <p className="rounded-md bg-ink-100 p-4 text-xs text-muted-foreground dark:bg-ink-800/50">
-            {t.dashboard.noAdditionalValues}
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {entries.map(([key, entryValue]) => (
-              <ReportValue key={key} fieldKey={key} value={entryValue} />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ReportValue({ fieldKey, value }: { fieldKey: string; value: unknown }) {
-  const { t, lang } = useI18n();
-  const label = humanizeDashboardField(fieldKey);
-
-  if (isUnavailableProjection(value)) {
-    return (
-      <div className="rounded-md border border-dashed border-border bg-ink-100 p-3 dark:bg-ink-800/40">
-        <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-1 text-xs font-semibold text-foreground">
-          {t.dashboard.unavailableLabel}
-        </p>
-        {value.message && <p className="mt-1 text-xs leading-5 text-muted-foreground">{value.message}</p>}
-        {value.reasonCode && <code className="mt-2 inline-block text-xs text-muted-foreground">{value.reasonCode}</code>}
-      </div>
-    );
-  }
-
-  if (Array.isArray(value)) {
-    return (
-      <div className="rounded-md bg-ink-100 p-3 dark:bg-ink-800/40 sm:col-span-2">
-        <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-        {value.length === 0 ? (
-          <p className="text-xs text-muted-foreground">—</p>
-        ) : (
-          <div className="space-y-2">
-            {value.map((item, index) => (
-              <div key={`${fieldKey}-${index}`} className="rounded-md border border-border bg-card p-2 text-xs">
-                {renderScalarOrObject(item, lang, t)}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (isRecord(value)) {
-    return (
-      <div className="rounded-md bg-ink-100 p-3 dark:bg-ink-800/40 sm:col-span-2">
-        <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {Object.entries(value).map(([nestedKey, nestedValue]) => (
-            <div key={nestedKey} className="flex items-start justify-between gap-3 rounded-md border border-border bg-card px-3 py-2">
-              <span className="text-xs text-muted-foreground">{humanizeDashboardField(nestedKey)}</span>
-              <span className="max-w-[60%] text-end text-xs font-semibold tabular-nums text-foreground">
-                {renderScalarOrObject(nestedValue, lang, t)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-md bg-ink-100 p-3 dark:bg-ink-800/40">
-      <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
-        {formatValue(fieldKey, value, lang, t)}
-      </p>
-    </div>
-  );
-}
-
-function renderScalarOrObject(
-  value: unknown,
-  lang: "ar" | "en",
-  t: ReturnType<typeof useI18n>["t"],
-): ReactNode {
-  if (isRecord(value)) {
-    return (
-      <span className="space-y-1">
-        {Object.entries(value).map(([key, item]) => (
-          <span key={key} className="flex justify-between gap-3">
-            <span className="text-muted-foreground">{humanizeDashboardField(key)}</span>
-            <span className="font-semibold tabular-nums text-foreground">
-              {formatValue(key, item, lang, t)}
-            </span>
-          </span>
-        ))}
-      </span>
-    );
-  }
-  return formatValue("value", value, lang, t);
-}
-
-function formatValue(
-  fieldKey: string,
-  value: unknown,
-  lang: "ar" | "en",
-  t: ReturnType<typeof useI18n>["t"],
-): string {
-  if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "boolean") {
-    return value ? t.dashboard.yesLabel : t.dashboard.noLabel;
-  }
-  if (typeof value === "number") {
-    const normalizedKey = fieldKey.toLowerCase();
-    if (
-      value >= 0 &&
-      value <= 1 &&
-      /(ratio|rate|utilization|concentration)/.test(normalizedKey)
-    ) {
-      return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
-        style: "percent",
-        maximumFractionDigits: 1,
-      }).format(value);
-    }
-    return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US").format(value);
-  }
-  if (typeof value === "string" && /usd$/i.test(fieldKey)) return `$${value}`;
-  return String(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function alertStyle(severity: DashboardGroupAlert["severity"]): {
   icon: typeof Info;
   className: string;
 } {
   if (severity === "critical") {
-    return { icon: CircleAlert, className: "border-danger-200 bg-danger-50 text-danger-800 dark:border-danger-900/70 dark:bg-danger-950/30 dark:text-danger-300" };
+    return {
+      icon: CircleAlert,
+      className:
+        "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground",
+    };
   }
   if (severity === "warning") {
-    return { icon: AlertTriangle, className: "border-warn-200 bg-warn-50 text-warn-800 dark:border-warn-900/70 dark:bg-warn-950/30 dark:text-warn-300" };
+    return {
+      icon: AlertTriangle,
+      className: "border-warning/30 bg-warning-subtle text-warning-subtle-foreground",
+    };
   }
-  return { icon: Info, className: "border-border bg-ink-100 text-foreground dark:bg-ink-800/40" };
+  return {
+    icon: Info,
+    className: "border-info/30 bg-info-subtle text-info-subtle-foreground",
+  };
 }

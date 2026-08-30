@@ -3,6 +3,7 @@
 import { Clock, ShieldAlert, Calendar, Copy } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
+import { Badge, Button } from "@/design-system";
 import type { AdminUser } from "../types";
 
 export function UserMetadataCard({ user }: { user: AdminUser }) {
@@ -31,10 +32,10 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
   };
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-2xs overflow-hidden">
-      <div className="p-4 border-b border-border bg-ink-100/50 dark:bg-ink-800/30 flex items-center justify-between">
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border bg-muted p-4">
         <h2 className="text-xs font-semibold text-foreground flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
+          <Calendar className="size-4 text-muted-foreground" aria-hidden="true" />
           <span>{t.users.metadataCardTitle}</span>
         </h2>
       </div>
@@ -43,7 +44,7 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
         <div className="flex items-center justify-between py-1 border-b border-border/50">
           <span className="text-muted-foreground">{t.users.lastLogin}</span>
           <span className="font-mono text-foreground flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+            <Clock className="size-3.5 text-muted-foreground" aria-hidden="true" />
             {formatDate(user.lastLoginAt)}
           </span>
         </div>
@@ -65,26 +66,26 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
         {user.sessionVersion !== undefined && (
           <div className="flex items-center justify-between py-1 border-b border-border/50">
             <span className="text-muted-foreground">{t.users.sessionVersion}</span>
-            <span className="font-mono px-2 py-0.5 rounded bg-ink-100 dark:bg-ink-800 text-foreground font-semibold text-xs">
+            <Badge tone="neutral" className="font-mono normal-case tracking-normal">
               v{user.sessionVersion}
-            </span>
+            </Badge>
           </div>
         )}
 
         {user.failedLoginAttempts !== undefined && user.failedLoginAttempts > 0 && (
           <div className="flex items-center justify-between py-1 border-b border-border/50">
             <span className="text-muted-foreground">{t.users.failedLoginAttempts}</span>
-            <span className="font-mono px-2 py-0.5 rounded bg-danger-50 text-danger-700 dark:bg-danger-950/40 dark:text-danger-400 font-semibold text-xs flex items-center gap-1">
-              <ShieldAlert className="w-3 h-3" />
+            <Badge tone="danger" className="font-mono normal-case tracking-normal">
+              <ShieldAlert className="size-3" aria-hidden="true" />
               {user.failedLoginAttempts}
-            </span>
+            </Badge>
           </div>
         )}
 
         {user.lockedUntil && (
           <div className="flex items-center justify-between py-1 border-b border-border/50">
             <span className="text-muted-foreground">{t.users.lockedUntil}</span>
-            <span className="font-mono text-danger-600 dark:text-danger-400 font-semibold text-xs">
+            <span className="font-mono text-xs font-semibold text-destructive">
               {formatDate(user.lockedUntil)}
             </span>
           </div>
@@ -96,13 +97,16 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
             <span className="font-mono text-xs text-muted-foreground truncate max-w-[140px]">
               {user.id}
             </span>
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
               onClick={copyId}
-              className="p-1 text-muted-foreground hover:text-muted-foreground dark:hover:text-foreground rounded transition-colors cursor-pointer"
-              title={t.users.copyIdTitle}
+              aria-label={t.users.copyIdTitle}
+              className="size-8 p-0 text-muted-foreground"
             >
-              <Copy className="w-3.5 h-3.5" />
-            </button>
+              <Copy className="size-3.5" aria-hidden="true" />
+            </Button>
           </div>
         </div>
       </div>

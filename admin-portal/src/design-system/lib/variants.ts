@@ -10,6 +10,12 @@ import { cva } from "class-variance-authority";
 export const focusRing =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
+/** Actual 24px minimum target, promoted to 44px for coarse pointers. */
+export const hitArea = "ds-hit-area";
+
+/** Invisible target expansion for controls whose visual box must stay small. */
+export const hitTarget = "ds-hit-target";
+
 /**
  * Control height scale — xs/sm/md/lg/xl map to the 24/28/32/36/40px
  * --size-control-* tokens (docs/design-system/geometry-and-density.md).
@@ -30,8 +36,7 @@ export const controlSize = cva("", {
 /**
  * Surface ladder (canvas / surface / surface-raised / surface-sunken) — see
  * §3.5 of the migration plan. Elevation comes from border + background step,
- * never a shadow, except surface-raised which owns the one permitted
- * "floating above the document" shadow.
+ * with only surface-raised owning the permitted floating elevation token.
  */
 export const surface = cva("", {
   variants: {

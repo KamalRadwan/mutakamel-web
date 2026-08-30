@@ -8,12 +8,37 @@ import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/go
 // className has no 700 weight to synthesize (font-synthesis-weight: none in
 // globals.css blocks faking it too).
 
+// Nothing is preloaded, and that is deliberate.
+//
+// A preload is a promise that a file is needed for the first paint. This app
+// cannot make that promise about any of these faces:
+//
+//   - The language lives in localStorage, so the server always renders
+//     lang="ar" and the client corrects it after hydration. Every Arabic
+//     preload the server emits is wasted on an English operator, and the
+//     other way round.
+//   - `latin-ext` carries no glyph this UI draws. It is declared so a tenant
+//     or person named with an accented character still renders in Plex rather
+//     than dropping to a system sans mid-word; measured on the audit screen,
+//     zero characters fall in that range.
+//   - Which weights a screen needs depends on the screen. The audit log draws
+//     51 monospace elements; other screens draw none.
+//
+// Preloading anyway cost a wasted download per face and made the browser warn
+// "preloaded with link preload was not used within a few seconds" on every
+// page load — which is the browser reporting exactly that broken promise.
+// `display: swap` keeps text visible while a face arrives, so the whole cost
+// of dropping the preloads is that a face applies roughly a tenth of a second
+// later.
+//
+// To preload again, the language has to become a cookie first: only then can
+// the server know which script it is about to render.
 export const plexLatin = IBM_Plex_Sans({
   subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600"],
   variable: "--font-plex-latin",
   display: "swap",
-  preload: true,
+  preload: false,
 });
 
 export const plexArabic = IBM_Plex_Sans_Arabic({
@@ -21,7 +46,7 @@ export const plexArabic = IBM_Plex_Sans_Arabic({
   weight: ["400", "500", "600"],
   variable: "--font-plex-arabic",
   display: "swap",
-  preload: true,
+  preload: false,
 });
 
 export const plexMono = IBM_Plex_Mono({

@@ -58,6 +58,30 @@ For each domain module, cover applicable cases:
 22. Public artifact reads stay bounded while internal run purge is exhaustive
     beyond 500 artifacts.
 
+## UI quality baseline
+
+For representative authentication, dashboard, tenant, infrastructure, backup,
+settings, audit/logging, and WebPhone workflows, record applicable checks for:
+
+- English/LTR and Arabic/RTL;
+- light and dark themes;
+- 320, 360, 375, 414, 768, 1024, and 1440px widths;
+- keyboard-only completion and visible, unobscured focus;
+- persistent labels, inline errors, error summaries, and focus recovery;
+- screen-reader smoke testing of landmarks, dialogs, menus, tables, live status,
+  and charts;
+- 200% zoom, 400% reflow where applicable, text resizing, and coarse-pointer
+  target areas;
+- reduced motion;
+- initial loading, refreshing, empty, filtered-empty, stale, partial, forbidden,
+  failed, conflict, in-flight, and ambiguous states;
+- responsive tables, fixed overlays, safe areas, and WebPhone collisions;
+- chart legends, exact-value access, and localized text/table alternatives.
+
+Use the full matrix in
+[Accessibility, responsive behavior, and localization](../design-system/accessibility-responsive-and-localization.md#verification-matrix).
+Passing source commands below does not satisfy this runtime matrix.
+
 ## Validation commands
 
 Run from `C:\mutakamel.ai\frontend\admin-portal`:

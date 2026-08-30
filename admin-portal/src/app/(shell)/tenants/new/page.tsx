@@ -1,20 +1,21 @@
 "use client";
 
 import {
-  Building2,
   ArrowLeft,
   ArrowRight,
+  Building2,
   CheckCircle2,
-  Loader2,
-  User,
-  ShieldCheck,
   Globe,
+  Loader2,
   MapPin,
+  ShieldCheck,
+  User,
 } from "lucide-react";
 import {
   AmbiguousOutcomePanel,
   Button,
   Checkbox,
+  Field,
   Input,
   Select,
   SelectContent,
@@ -23,18 +24,25 @@ import {
   SelectValue,
   Textarea,
 } from "@/design-system";
-import { useRegisterTenant } from "./hooks/useRegisterTenant";
-import { useI18n } from "@/i18n/I18nContext";
-import { TenantApplicationsStep } from "./components/TenantApplicationsStep";
-import { TenantAddressGeocoding } from "./components/TenantAddressGeocoding";
-import { TenantInfrastructureStep } from "./components/TenantInfrastructureStep";
 import { CountrySelect } from "@/components/shared/CountrySelect";
+import { useI18n } from "@/i18n/I18nContext";
+import { TenantAddressGeocoding } from "./components/TenantAddressGeocoding";
+import { TenantApplicationsStep } from "./components/TenantApplicationsStep";
+import { TenantInfrastructureStep } from "./components/TenantInfrastructureStep";
+import { TenantValidationSummary } from "./components/TenantValidationSummary";
+import { TenantWizardProgress } from "./components/TenantWizardProgress";
+import { useRegisterTenant } from "./hooks/useRegisterTenant";
 
 export default function RegisterTenantWizardPage() {
   const {
     t,
     currentStep,
     goToStep,
+    validationErrors,
+    clearValidationError,
+    focusValidationField,
+    stepHeadingRef,
+    validationSummaryRef,
     formData,
     setFormData,
     selectCountry,
@@ -48,7 +56,6 @@ export default function RegisterTenantWizardPage() {
     loadApplicationCandidates,
     toggleApplication,
     updateApplicationSelection,
-    hasValidApplicationSelection,
     databasePlacementOptions,
     databasePlacementState,
     databasePlacementError,
@@ -56,7 +63,6 @@ export default function RegisterTenantWizardPage() {
     showDatabaseSelectionError,
     setShowDatabaseSelectionError,
     loadDatabasePlacementOptions,
-    hasValidDatabaseSelection,
     provisioningPreview,
     provisioningPreviewState,
     provisioningPreviewError,
@@ -68,7 +74,6 @@ export default function RegisterTenantWizardPage() {
     showStorageSelectionError,
     setShowStorageSelectionError,
     loadStoragePlacementOptions,
-    hasValidStorageSelection,
     isSubmitting,
     pendingCreateRecovery,
     isRecoveringCreate,
@@ -87,321 +92,353 @@ export default function RegisterTenantWizardPage() {
   } = useRegisterTenant();
   const { lang } = useI18n();
   const wizardLocked = isSubmitting || pendingCreateRecovery !== null;
+  const labels = t.tenants.wizard.fieldLabels;
+  const placeholders = t.tenants.wizard.placeholders;
+  const wizardSteps = [
+    { number: 1, label: t.tenants.step1 },
+    { number: 2, label: t.tenants.step2 },
+    { number: 3, label: t.tenants.step3 },
+    { number: 4, label: t.tenants.step4 },
+    { number: 5, label: t.tenants.step5 },
+  ] as const;
+
+  const validationError = (fieldId: string) =>
+    validationErrors.find((error) => error.fieldId === fieldId)?.message;
+
+  const updateField = <Key extends keyof typeof formData>(
+    fieldId: string,
+    key: Key,
+    value: (typeof formData)[Key],
+  ) => {
+    setFormData((current) => ({ ...current, [key]: value }));
+    clearValidationError(fieldId);
+  };
+
+  const headingClassName =
+    "flex items-center gap-2 border-b border-border pb-3 text-base font-semibold text-foreground outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
   return (
-    <div className="space-y-6 w-full">
-        {/* Header Title with Back Button */}
-        <div className="flex items-center justify-between bg-card p-5 rounded-xl border border-border shadow-2xs">
-          <div className="flex items-center gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={isSubmitting}
-              aria-label={t.tenants.wizard.backToTenants}
-              className="p-2"
-            >
-              {lang === "ar" ? (
-                <ArrowRight className="w-4 h-4" />
-              ) : (
-                <ArrowLeft className="w-4 h-4" />
-              )}
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-brand-600 dark:text-brand-400" />
-                <span>{t.tenants.wizardTitle}</span>
-              </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {t.tenants.wizardSubtitle}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {pendingCreateRecovery ? (
-          <AmbiguousOutcomePanel
-            idempotencyKey={pendingCreateRecovery.idempotencyKey}
-            message={[
-              t.tenants.wizard.recoveryBannerDesc(pendingCreateRecovery.tenantName),
-              !canReadTenants ? t.tenants.wizard.recoveryPermissionNote : null,
-              createRecoveryError,
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            onRetryExact={
-              canReadTenants
-                ? () => void recoverTenantCreateStatus()
-                : undefined
-            }
-            retrying={isRecoveringCreate}
-          />
-        ) : null}
-
-        {/* Wizard Step Navigation Bar */}
-        <div className="bg-card p-3 rounded-xl border border-border shadow-2xs">
-          <div className="grid grid-cols-5 gap-1 text-center text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => goToStep(1)}
-              disabled={wizardLocked}
-              className={`py-2 px-1 rounded-xl transition-all ${
-                currentStep === 1
-                  ? "bg-brand-500 text-ink-950 dark:bg-brand-400"
-                  : currentStep > 1
-                    ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400"
-                    : "text-muted-foreground"
-              }`}
-            >
-              <span>{t.tenants.step1}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => goToStep(2)}
-              disabled={wizardLocked}
-              className={`py-2 px-1 rounded-xl transition-all ${
-                currentStep === 2
-                  ? "bg-brand-500 text-ink-950 dark:bg-brand-400"
-                  : currentStep > 2
-                    ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400"
-                    : "text-muted-foreground"
-              }`}
-            >
-              <span>{t.tenants.step2}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => goToStep(3)}
-              disabled={wizardLocked}
-              className={`py-2 px-1 rounded-xl transition-all ${
-                currentStep === 3
-                  ? "bg-brand-500 text-ink-950 dark:bg-brand-400"
-                  : currentStep > 3
-                    ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400"
-                    : "text-muted-foreground"
-              }`}
-            >
-              <span>{t.tenants.step3}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => goToStep(4)}
-              disabled={wizardLocked}
-              className={`py-2 px-1 rounded-xl transition-all ${
-                currentStep === 4
-                  ? "bg-brand-500 text-ink-950 dark:bg-brand-400"
-                  : currentStep > 4
-                    ? "bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400"
-                    : "text-muted-foreground"
-              }`}
-            >
-              <span>{t.tenants.step4}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => goToStep(5)}
-              disabled={wizardLocked}
-              className={`py-2 px-1 rounded-xl transition-all ${
-                currentStep === 5
-                  ? "bg-brand-500 text-ink-950 dark:bg-brand-400"
-                  : "text-muted-foreground"
-              }`}
-            >
-              <span>{t.tenants.step5}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Wizard Form Sections */}
-        <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
-          <fieldset
-            disabled={wizardLocked}
-            className="min-w-0 space-y-6 border-0 p-0"
+    <div className="w-full space-y-6">
+      <header className="rounded-lg border border-border bg-card p-5">
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+            disabled={isSubmitting}
+            aria-label={t.tenants.wizard.backToTenants}
           >
-            {/* Step 1: Identity & Geocoding & Address */}
-            {currentStep === 1 && (
-              <div className="bg-card rounded-xl border border-border p-5 space-y-4 shadow-2xs">
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
-                  <Globe className="w-4 h-4 text-brand-600 dark:text-brand-400" />
-                  <span>
-                    {t.tenants.wizard.step1Heading}
-                  </span>
-                </h3>
+            {lang === "ar" ? (
+              <ArrowRight aria-hidden="true" className="size-4" />
+            ) : (
+              <ArrowLeft aria-hidden="true" className="size-4" />
+            )}
+          </Button>
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
+              <Building2 aria-hidden="true" className="size-5 text-primary" />
+              <span>{t.tenants.wizardTitle}</span>
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t.tenants.wizardSubtitle}
+            </p>
+          </div>
+        </div>
+      </header>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground">
-                      {t.tenants.wizard.tenantNameCodeLabel}
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            name: e.target.value
-                              .toLowerCase()
-                              .replace(/[^a-z0-9-]/g, ""),
-                          })
-                        }
-                        placeholder="e.g. acme-retail"
-                        className="flex-1 font-mono"
-                        required
-                        aria-describedby="tenant-name-validation"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleValidateIdentity}
-                        disabled={
-                          isValidatingIdentity ||
-                          !formData.name.trim() ||
-                          !formData.companyName.trim()
-                        }
-                      >
-                        {isValidatingIdentity ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          t.tenants.wizard.checkAvailability
-                        )}
-                      </Button>
-                    </div>
-                    <p
-                      id="tenant-name-validation"
-                      className={`text-2xs ${
-                        identityValidationEvidence?.result.fields.name.available
-                          ? "text-brand-600 dark:text-brand-400"
-                          : "text-danger-600 dark:text-danger-400"
-                      }`}
-                    >
-                      {identityValidationEvidence?.result.fields.name.message ??
-                        ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {t.tenants.wizard.derivedFqdn(
-                        formData.name ? `${formData.name}.mutakamel.ai` : "name.mutakamel.ai",
-                      )}
-                    </p>
-                  </div>
+      {pendingCreateRecovery ? (
+        <AmbiguousOutcomePanel
+          idempotencyKey={pendingCreateRecovery.idempotencyKey}
+          message={[
+            t.tenants.wizard.recoveryBannerDesc(pendingCreateRecovery.tenantName),
+            !canReadTenants ? t.tenants.wizard.recoveryPermissionNote : null,
+            createRecoveryError,
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          onRetryExact={
+            canReadTenants ? () => void recoverTenantCreateStatus() : undefined
+          }
+          retrying={isRecoveringCreate}
+        />
+      ) : null}
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground">
-                      {t.tenants.detailsTab.companyName} *
-                    </label>
-                    <Input
-                      type="text"
-                      value={formData.companyName}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          companyName: e.target.value,
-                        })
-                      }
-                      placeholder="e.g. Acme Retail LLC"
-                      className="w-full"
-                      required
-                      aria-describedby="tenant-company-validation"
-                    />
-                    <p
-                      id="tenant-company-validation"
-                      className={`text-2xs ${
-                        identityValidationEvidence?.result.fields.companyName
-                          .available
-                          ? "text-brand-600 dark:text-brand-400"
-                          : "text-danger-600 dark:text-danger-400"
-                      }`}
-                    >
-                      {identityValidationEvidence?.result.fields.companyName
-                        .message ?? ""}
-                    </p>
-                  </div>
-                </div>
+      <TenantWizardProgress
+        steps={wizardSteps}
+        currentStep={currentStep}
+        navigationLabel={t.tenants.wizard.stepNavigationLabel}
+        currentLabel={t.tenants.wizard.currentStepStatus}
+        completedLabel={t.tenants.wizard.completedStepStatus}
+        disabled={wizardLocked}
+        onStepChange={goToStep}
+      />
 
-                {identityValidationEvidence ? (
-                  <div
-                    role="status"
-                    className={`rounded-xl border px-4 py-3 text-xs ${
-                      hasValidIdentityEvidence
-                        ? "border-brand-200 bg-brand-50 text-brand-900 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-200"
-                        : "border-danger-200 bg-danger-50 text-danger-900 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-200"
-                    }`}
-                  >
-                    {identityValidationEvidence.result.message}
-                  </div>
-                ) : identityValidationError ? (
-                  <div
-                    role="alert"
-                    className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-xs text-danger-900 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-200"
-                  >
-                    <p>{identityValidationError.message}</p>
-                    {identityValidationError.correlationId ? (
-                      <p className="mt-1 font-mono text-xs">
-                        Correlation ID: {identityValidationError.correlationId}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
+      <form onSubmit={handleSubmit} aria-busy={isSubmitting} noValidate>
+        <div className="mb-6">
+          <TenantValidationSummary
+            ref={validationSummaryRef}
+            errors={validationErrors}
+            title={t.tenants.wizard.validationSummaryTitle}
+            description={t.tenants.wizard.validationSummaryDescription}
+            onFieldFocus={focusValidationField}
+          />
+        </div>
 
-                <div className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground">
-                      {t.tenants.detailsTab.industry}
-                    </label>
-                    <Input
-                      type="text"
-                      value={formData.industry}
-                      onChange={(e) =>
-                        setFormData({ ...formData, industry: e.target.value })
-                      }
-                      className="w-full"
-                    />
-                  </div>
+        <fieldset disabled={wizardLocked} className="min-w-0 space-y-6 border-0 p-0">
+          {currentStep === 1 ? (
+            <section className="space-y-5 rounded-lg border border-border bg-card p-5">
+              <h2 ref={stepHeadingRef} tabIndex={-1} className={headingClassName}>
+                <Globe aria-hidden="true" className="size-4 text-primary" />
+                {t.tenants.wizard.step1Heading}
+              </h2>
 
-                  <div className="space-y-1 lg:col-span-2">
-                    <label className="text-xs font-semibold text-foreground">
-                      {t.tenants.wizard.countryLabel}
-                    </label>
-                    <CountrySelect
-                      value={formData.countryIsoCode}
-                      onChange={selectCountry}
-                      disabled={wizardLocked}
-                      placeholder={t.tenants.wizard.chooseCountryPlaceholder}
-                      searchPlaceholder={t.tenants.wizard.searchCountriesPlaceholder}
-                      emptyLabel={t.tenants.wizard.noMatchingCountries}
-                      className="block w-full"
-                    />
-                    {formData.countryName ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  id="tenant-name"
+                  label={labels.tenantName}
+                  required
+                  error={validationError("tenant-name")}
+                >
+                  {(field) => (
+                    <>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Input
+                          {...field}
+                          name="name"
+                          type="text"
+                          value={formData.name}
+                          onChange={(event) =>
+                            updateField(
+                              "tenant-name",
+                              "name",
+                              event.target.value
+                                .toLowerCase()
+                                .replace(/[^a-z0-9-]/g, ""),
+                            )
+                          }
+                          placeholder={placeholders.tenantName}
+                          className="flex-1 font-mono"
+                          aria-describedby={[
+                            field["aria-describedby"],
+                            identityValidationEvidence
+                              ? "tenant-name-identity"
+                              : undefined,
+                            "tenant-derived-fqdn",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleValidateIdentity()}
+                          disabled={
+                            isValidatingIdentity ||
+                            !formData.name.trim() ||
+                            !formData.companyName.trim()
+                          }
+                        >
+                          {isValidatingIdentity ? (
+                            <Loader2
+                              aria-hidden="true"
+                              className="size-4 animate-spin motion-reduce:animate-none"
+                            />
+                          ) : null}
+                          {t.tenants.wizard.checkAvailability}
+                        </Button>
+                      </div>
+                      {identityValidationEvidence ? (
+                        <p
+                          id="tenant-name-identity"
+                          className={`mt-1 text-sm ${
+                            identityValidationEvidence.result.fields.name.available
+                              ? "text-success-subtle-foreground"
+                              : "text-destructive-subtle-foreground"
+                          }`}
+                        >
+                          {identityValidationEvidence.result.fields.name.message}
+                        </p>
+                      ) : null}
                       <p
-                        className="font-mono text-xs text-muted-foreground"
+                        id="tenant-derived-fqdn"
+                        className="mt-1 font-mono text-sm text-muted-foreground"
                         dir="ltr"
                       >
-                        {formData.countryName} · {formData.countryIsoCode}
+                        {t.tenants.wizard.derivedFqdn(
+                          formData.name
+                            ? `${formData.name}.mutakamel.ai`
+                            : "name.mutakamel.ai",
+                        )}
                       </p>
-                    ) : null}
-                  </div>
+                    </>
+                  )}
+                </Field>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground">
-                      {t.tenants.detailsTab.timezone}
-                    </label>
+                <Field
+                  id="tenant-company-name"
+                  label={labels.companyName}
+                  required
+                  error={validationError("tenant-company-name")}
+                >
+                  {(field) => (
+                    <>
+                      <Input
+                        {...field}
+                        name="companyName"
+                        type="text"
+                        value={formData.companyName}
+                        onChange={(event) =>
+                          updateField(
+                            "tenant-company-name",
+                            "companyName",
+                            event.target.value,
+                          )
+                        }
+                        placeholder={placeholders.companyName}
+                        aria-describedby={[
+                          field["aria-describedby"],
+                          identityValidationEvidence
+                            ? "tenant-company-identity"
+                            : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" ") || undefined}
+                      />
+                      {identityValidationEvidence ? (
+                        <p
+                          id="tenant-company-identity"
+                          className={`mt-1 text-sm ${
+                            identityValidationEvidence.result.fields.companyName
+                              .available
+                              ? "text-success-subtle-foreground"
+                              : "text-destructive-subtle-foreground"
+                          }`}
+                        >
+                          {
+                            identityValidationEvidence.result.fields.companyName
+                              .message
+                          }
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </Field>
+              </div>
+
+              {identityValidationEvidence ? (
+                <div
+                  role="status"
+                  className={`rounded-lg border px-4 py-3 text-sm ${
+                    hasValidIdentityEvidence
+                      ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+                      : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
+                  }`}
+                >
+                  {identityValidationEvidence.result.message}
+                </div>
+              ) : identityValidationError ? (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-destructive/30 bg-destructive-subtle px-4 py-3 text-sm text-destructive-subtle-foreground"
+                >
+                  <p>{identityValidationError.message}</p>
+                  {identityValidationError.correlationId ? (
+                    <p className="mt-1 font-mono text-sm">
+                      Correlation ID: {identityValidationError.correlationId}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Field
+                  id="tenant-industry"
+                  label={labels.industry}
+                  required
+                  error={validationError("tenant-industry")}
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      name="industry"
+                      type="text"
+                      value={formData.industry}
+                      onChange={(event) =>
+                        updateField("tenant-industry", "industry", event.target.value)
+                      }
+                    />
+                  )}
+                </Field>
+
+                <Field
+                  id="tenant-country"
+                  label={labels.country}
+                  required
+                  error={validationError("tenant-country")}
+                  className="lg:col-span-2"
+                >
+                  {(field) => (
+                    <>
+                      <CountrySelect
+                        id={field.id}
+                        label={labels.country}
+                        value={formData.countryIsoCode}
+                        onChange={(countryIsoCode) => {
+                          const selected = selectCountry(countryIsoCode);
+                          if (selected) {
+                            clearValidationError("tenant-country");
+                            clearValidationError("tenant-timezone");
+                            clearValidationError("tenant-phone-country-code");
+                          }
+                          return selected;
+                        }}
+                        disabled={wizardLocked}
+                        placeholder={t.tenants.wizard.chooseCountryPlaceholder}
+                        searchPlaceholder={
+                          t.tenants.wizard.searchCountriesPlaceholder
+                        }
+                        emptyLabel={t.tenants.wizard.noMatchingCountries}
+                        aria-describedby={field["aria-describedby"]}
+                        aria-invalid={field["aria-invalid"]}
+                        className="block w-full"
+                      />
+                      <Input
+                        type="hidden"
+                        name="countryIsoCode"
+                        value={formData.countryIsoCode}
+                      />
+                      {formData.countryName ? (
+                        <p className="mt-1 font-mono text-sm text-muted-foreground" dir="ltr">
+                          {formData.countryName} · {formData.countryIsoCode}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </Field>
+
+                <Field
+                  id="tenant-timezone"
+                  label={labels.timezone}
+                  required
+                  error={validationError("tenant-timezone")}
+                >
+                  {(field) => (
                     <Select
+                      name="timezone"
                       value={formData.timezone}
                       onValueChange={(timezone) =>
-                        setFormData({ ...formData, timezone })
+                        updateField("tenant-timezone", "timezone", timezone)
                       }
-                      disabled={
-                        wizardLocked || countryTimezoneOptions.length === 0
-                      }
+                      disabled={wizardLocked || countryTimezoneOptions.length === 0}
+                      required
                     >
-                      <SelectTrigger className="w-full">
-                        <SelectValue
-                          placeholder={t.tenants.wizard.chooseTimezone}
-                        />
+                      <SelectTrigger
+                        id={field.id}
+                        aria-describedby={field["aria-describedby"]}
+                        aria-invalid={field["aria-invalid"]}
+                      >
+                        <SelectValue placeholder={t.tenants.wizard.chooseTimezone} />
                       </SelectTrigger>
                       <SelectContent>
                         {countryTimezoneOptions.map((timezone) => (
@@ -411,444 +448,595 @@ export default function RegisterTenantWizardPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                </div>
+                  )}
+                </Field>
+              </div>
 
-                {/* Address & Tax Information */}
-                <div className="pt-3 space-y-3">
-                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-danger-500" />
-                    <span>{t.tenants.detailsTab.addressSection}</span>
-                  </span>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  id="tenant-phone-country-code"
+                  label={labels.tenantPhoneCountryCode}
+                  required
+                  error={validationError("tenant-phone-country-code")}
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      name="phoneCountryCode"
+                      type="tel"
+                      dir="ltr"
+                      value={formData.phoneCountryCode}
+                      onChange={(event) =>
+                        updateField(
+                          "tenant-phone-country-code",
+                          "phoneCountryCode",
+                          event.target.value,
+                        )
+                      }
+                      placeholder={placeholders.callingCode}
+                    />
+                  )}
+                </Field>
+                <Field
+                  id="tenant-phone"
+                  label={labels.tenantPhone}
+                  labelAction={
+                    <span className="text-xs text-muted-foreground">
+                      {t.tenants.wizard.optionalLabel}
+                    </span>
+                  }
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      name="phone"
+                      type="tel"
+                      dir="ltr"
+                      value={formData.phone}
+                      onChange={(event) =>
+                        updateField("tenant-phone", "phone", event.target.value)
+                      }
+                      placeholder={placeholders.phone}
+                    />
+                  )}
+                </Field>
+              </div>
 
-                  <TenantAddressGeocoding
-                    lang={lang}
-                    disabled={wizardLocked}
-                    onApply={(suggestion) => {
-                      if (!selectCountry(suggestion.countryIsoCode)) return;
-                      setFormData((current) => ({
-                        ...current,
-                        ...(suggestion.street1
-                          ? { street: suggestion.street1 }
-                          : {}),
-                        ...(suggestion.city ? { city: suggestion.city } : {}),
-                        ...(suggestion.state
-                          ? { state: suggestion.state }
-                          : {}),
-                        ...(suggestion.district
-                          ? { district: suggestion.district }
-                          : {}),
-                        ...(suggestion.buildingNo
-                          ? { buildingNo: suggestion.buildingNo }
-                          : {}),
-                        ...(suggestion.postalCode
-                          ? { postalCode: suggestion.postalCode }
-                          : {}),
-                        ...(suggestion.landmark
-                          ? { landmark: suggestion.landmark }
-                          : {}),
-                        ...(suggestion.formattedAddress
-                          ? { formattedAddress: suggestion.formattedAddress }
-                          : {}),
-                      }));
-                    }}
+              <section aria-labelledby="tenant-address-heading" className="space-y-4 pt-2">
+                <h3
+                  id="tenant-address-heading"
+                  className="flex items-center gap-2 text-sm font-semibold text-foreground"
+                >
+                  <MapPin aria-hidden="true" className="size-4 text-info" />
+                  {t.tenants.detailsTab.addressSection}
+                </h3>
+
+                <TenantAddressGeocoding
+                  lang={lang}
+                  disabled={wizardLocked}
+                  onApply={(suggestion) => {
+                    if (!selectCountry(suggestion.countryIsoCode)) return;
+                    clearValidationError("tenant-country");
+                    clearValidationError("tenant-timezone");
+                    clearValidationError("tenant-phone-country-code");
+                    setFormData((current) => ({
+                      ...current,
+                      ...(suggestion.street1 ? { street: suggestion.street1 } : {}),
+                      ...(suggestion.city ? { city: suggestion.city } : {}),
+                      ...(suggestion.state ? { state: suggestion.state } : {}),
+                      ...(suggestion.district ? { district: suggestion.district } : {}),
+                      ...(suggestion.buildingNo
+                        ? { buildingNo: suggestion.buildingNo }
+                        : {}),
+                      ...(suggestion.postalCode
+                        ? { postalCode: suggestion.postalCode }
+                        : {}),
+                      ...(suggestion.landmark ? { landmark: suggestion.landmark } : {}),
+                      ...(suggestion.formattedAddress
+                        ? { formattedAddress: suggestion.formattedAddress }
+                        : {}),
+                    }));
+                  }}
+                />
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <AddressInput
+                    id="tenant-address-street"
+                    name="street"
+                    label={labels.street}
+                    value={formData.street}
+                    maxLength={200}
+                    onChange={(value) => updateField("tenant-address-street", "street", value)}
                   />
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <Input
-                      type="text"
-                      value={formData.street}
-                      onChange={(e) =>
-                        setFormData({ ...formData, street: e.target.value })
-                      }
-                      placeholder={t.tenants.detailsTab.street1}
-                      maxLength={200}
-                    />
-                    <Input
-                      type="text"
-                      value={formData.buildingNo}
-                      onChange={(e) =>
-                        setFormData({ ...formData, buildingNo: e.target.value })
-                      }
-                      placeholder={t.tenants.wizard.buildingNumberPlaceholder}
-                      maxLength={100}
-                    />
-                    <Input
-                      type="text"
-                      value={formData.city}
-                      onChange={(e) =>
-                        setFormData({ ...formData, city: e.target.value })
-                      }
-                      placeholder={t.tenants.detailsTab.city}
-                      maxLength={100}
-                    />
-                    <Input
-                      type="text"
-                      value={formData.state}
-                      onChange={(e) =>
-                        setFormData({ ...formData, state: e.target.value })
-                      }
-                      placeholder={t.tenants.wizard.stateProvincePlaceholder}
-                      maxLength={100}
-                    />
-                    <Input
-                      type="text"
-                      value={formData.district}
-                      onChange={(e) =>
-                        setFormData({ ...formData, district: e.target.value })
-                      }
-                      placeholder={t.tenants.wizard.districtPlaceholder}
-                      maxLength={100}
-                    />
-                    <Input
-                      type="text"
-                      value={formData.postalCode}
-                      onChange={(e) =>
-                        setFormData({ ...formData, postalCode: e.target.value })
-                      }
-                      placeholder={t.tenants.wizard.postalCodePlaceholder}
-                      maxLength={100}
-                    />
-                    <Input
-                      type="text"
-                      value={formData.landmark}
-                      onChange={(e) =>
-                        setFormData({ ...formData, landmark: e.target.value })
-                      }
-                      placeholder={t.tenants.wizard.landmarkPlaceholder}
-                      maxLength={100}
-                    />
-                    <Input
-                      type="text"
-                      value={formData.taxNumber}
-                      onChange={(e) =>
-                        setFormData({ ...formData, taxNumber: e.target.value })
-                      }
-                      placeholder={t.tenants.detailsTab.taxNumber}
-                    />
-                  </div>
-                  <Textarea
-                    value={formData.formattedAddress}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        formattedAddress: e.target.value,
-                      })
+                  <AddressInput
+                    id="tenant-address-building-number"
+                    name="buildingNo"
+                    label={labels.buildingNumber}
+                    value={formData.buildingNo}
+                    maxLength={100}
+                    onChange={(value) =>
+                      updateField("tenant-address-building-number", "buildingNo", value)
                     }
-                    placeholder={t.tenants.wizard.formattedAddressPlaceholder}
-                    maxLength={500}
-                    rows={2}
-                    className="w-full resize-y"
+                  />
+                  <AddressInput
+                    id="tenant-address-city"
+                    name="city"
+                    label={labels.city}
+                    value={formData.city}
+                    maxLength={100}
+                    onChange={(value) => updateField("tenant-address-city", "city", value)}
+                  />
+                  <AddressInput
+                    id="tenant-address-state"
+                    name="state"
+                    label={labels.stateProvince}
+                    value={formData.state}
+                    maxLength={100}
+                    onChange={(value) => updateField("tenant-address-state", "state", value)}
+                  />
+                  <AddressInput
+                    id="tenant-address-district"
+                    name="district"
+                    label={labels.district}
+                    value={formData.district}
+                    maxLength={100}
+                    onChange={(value) =>
+                      updateField("tenant-address-district", "district", value)
+                    }
+                  />
+                  <AddressInput
+                    id="tenant-address-postal-code"
+                    name="postalCode"
+                    label={labels.postalCode}
+                    value={formData.postalCode}
+                    maxLength={100}
+                    onChange={(value) =>
+                      updateField("tenant-address-postal-code", "postalCode", value)
+                    }
+                  />
+                  <AddressInput
+                    id="tenant-address-landmark"
+                    name="landmark"
+                    label={labels.landmark}
+                    value={formData.landmark}
+                    maxLength={100}
+                    onChange={(value) =>
+                      updateField("tenant-address-landmark", "landmark", value)
+                    }
+                  />
+                  <AddressInput
+                    id="tenant-tax-number"
+                    name="taxNumber"
+                    label={labels.taxNumber}
+                    value={formData.taxNumber}
+                    onChange={(value) => updateField("tenant-tax-number", "taxNumber", value)}
+                  />
+                  <AddressInput
+                    id="tenant-commercial-registration-number"
+                    name="commercialRegistrationNumber"
+                    label={labels.commercialRegistrationNumber}
+                    value={formData.commercialRegistrationNumber}
+                    onChange={(value) =>
+                      updateField(
+                        "tenant-commercial-registration-number",
+                        "commercialRegistrationNumber",
+                        value,
+                      )
+                    }
                   />
                 </div>
-              </div>
-            )}
+                <Field id="tenant-formatted-address" label={labels.formattedAddress}>
+                  {(field) => (
+                    <Textarea
+                      {...field}
+                      name="formattedAddress"
+                      value={formData.formattedAddress}
+                      onChange={(event) =>
+                        updateField(
+                          "tenant-formatted-address",
+                          "formattedAddress",
+                          event.target.value,
+                        )
+                      }
+                      maxLength={500}
+                      rows={3}
+                      className="resize-y"
+                    />
+                  )}
+                </Field>
+              </section>
+            </section>
+          ) : null}
 
-            {/* Step 2: Owner Contact Details */}
-            {currentStep === 2 && (
-              <div className="bg-card rounded-xl border border-border p-5 space-y-4 shadow-2xs">
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
-                  <User className="w-4 h-4 text-brand-600 dark:text-brand-400" />
-                  <span>
-                    {t.tenants.wizard.step2Heading}
-                  </span>
-                </h3>
+          {currentStep === 2 ? (
+            <section className="space-y-5 rounded-lg border border-border bg-card p-5">
+              <h2 ref={stepHeadingRef} tabIndex={-1} className={headingClassName}>
+                <User aria-hidden="true" className="size-4 text-primary" />
+                {t.tenants.wizard.step2Heading}
+              </h2>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground">
-                      {t.tenants.wizard.ownerEmailLabel}
-                    </label>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field
+                  id="tenant-owner-email"
+                  label={labels.ownerEmail}
+                  required
+                  error={validationError("tenant-owner-email")}
+                >
+                  {(field) => (
                     <Input
+                      {...field}
+                      name="ownerEmail"
                       type="email"
+                      dir="ltr"
+                      autoComplete="email"
                       value={formData.ownerEmail}
-                      onChange={(e) =>
-                        setFormData({ ...formData, ownerEmail: e.target.value })
+                      onChange={(event) =>
+                        updateField("tenant-owner-email", "ownerEmail", event.target.value)
                       }
-                      placeholder="owner@company.com"
-                      className="w-full"
-                      required
+                      placeholder={placeholders.ownerEmail}
                     />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground">
-                      {t.tenants.wizard.firstNameRequiredLabel}
-                    </label>
+                  )}
+                </Field>
+                <Field
+                  id="tenant-owner-first-name"
+                  label={labels.firstName}
+                  required
+                  error={validationError("tenant-owner-first-name")}
+                >
+                  {(field) => (
                     <Input
+                      {...field}
+                      name="ownerFirstName"
                       type="text"
+                      autoComplete="given-name"
                       value={formData.ownerFirstName}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          ownerFirstName: e.target.value,
-                        })
+                      onChange={(event) =>
+                        updateField(
+                          "tenant-owner-first-name",
+                          "ownerFirstName",
+                          event.target.value,
+                        )
                       }
-                      placeholder="Mona"
-                      className="w-full"
-                      required
+                      placeholder={placeholders.firstName}
                     />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground">
-                      {t.tenants.wizard.lastNameRequiredLabel}
-                    </label>
+                  )}
+                </Field>
+                <Field
+                  id="tenant-owner-last-name"
+                  label={labels.lastName}
+                  required
+                  error={validationError("tenant-owner-last-name")}
+                >
+                  {(field) => (
                     <Input
+                      {...field}
+                      name="ownerLastName"
                       type="text"
+                      autoComplete="family-name"
                       value={formData.ownerLastName}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          ownerLastName: e.target.value,
-                        })
+                      onChange={(event) =>
+                        updateField(
+                          "tenant-owner-last-name",
+                          "ownerLastName",
+                          event.target.value,
+                        )
                       }
-                      placeholder="Ali"
-                      className="w-full"
-                      required
+                      placeholder={placeholders.lastName}
                     />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground">
-                      {t.tenants.wizard.jobTitleLabel}
-                    </label>
-                    <Input
-                      type="text"
-                      value={formData.ownerJobTitle}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          ownerJobTitle: e.target.value,
-                        })
-                      }
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground">
-                      {t.tenants.detailsTab.phone}
-                    </label>
-                    <Input
-                      type="text"
-                      value={formData.ownerPhone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, ownerPhone: e.target.value })
-                      }
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-6 pt-3">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="tenant-send-invitation"
-                      checked={formData.sendInvitation}
-                      onCheckedChange={(checked) =>
-                        setFormData({
-                          ...formData,
-                          sendInvitation: checked === true,
-                        })
-                      }
-                    />
-                    <label
-                      htmlFor="tenant-send-invitation"
-                      className="cursor-pointer select-none text-xs font-semibold text-foreground"
-                    >
-                      {t.tenants.wizard.sendInvitationLabel}
-                    </label>
-                  </div>
-                </div>
+                  )}
+                </Field>
               </div>
-            )}
 
-            {/* Step 3: Applications and authoritative provisioning preview */}
-            {currentStep === 3 && (
-              <TenantApplicationsStep
-                candidates={applicationCandidates}
-                selections={applicationSelections}
-                state={applicationState}
-                error={applicationError}
-                selectedLines={selectedApplicationLines}
-                billingCycle={formData.billingCycle}
-                showSelectionError={showApplicationSelectionError}
-                preview={provisioningPreview}
-                previewState={provisioningPreviewState}
-                previewError={provisioningPreviewError}
-                onRetryCandidates={() => void loadApplicationCandidates()}
-                onRetryPreview={() => void loadProvisioningPreview()}
-                onToggle={toggleApplication}
-                onUpdateSelection={updateApplicationSelection}
-                onBillingCycleChange={(billingCycle) =>
-                  setFormData((current) => ({ ...current, billingCycle }))
-                }
-              />
-            )}
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field
+                  id="tenant-owner-job-title"
+                  label={labels.jobTitle}
+                  required
+                  error={validationError("tenant-owner-job-title")}
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      name="ownerJobTitle"
+                      type="text"
+                      autoComplete="organization-title"
+                      value={formData.ownerJobTitle}
+                      onChange={(event) =>
+                        updateField(
+                          "tenant-owner-job-title",
+                          "ownerJobTitle",
+                          event.target.value,
+                        )
+                      }
+                    />
+                  )}
+                </Field>
+                <Field
+                  id="tenant-owner-phone-country-code"
+                  label={labels.ownerPhoneCountryCode}
+                  required
+                  error={validationError("tenant-owner-phone-country-code")}
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      name="ownerPhoneCountryCode"
+                      type="tel"
+                      dir="ltr"
+                      autoComplete="tel-country-code"
+                      value={formData.ownerPhoneCountryCode}
+                      onChange={(event) =>
+                        updateField(
+                          "tenant-owner-phone-country-code",
+                          "ownerPhoneCountryCode",
+                          event.target.value,
+                        )
+                      }
+                      placeholder={placeholders.callingCode}
+                    />
+                  )}
+                </Field>
+                <Field
+                  id="tenant-owner-phone"
+                  label={labels.ownerPhone}
+                  required
+                  error={validationError("tenant-owner-phone")}
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      name="ownerPhone"
+                      type="tel"
+                      dir="ltr"
+                      autoComplete="tel-national"
+                      value={formData.ownerPhone}
+                      onChange={(event) =>
+                        updateField("tenant-owner-phone", "ownerPhone", event.target.value)
+                      }
+                      placeholder={placeholders.phone}
+                    />
+                  )}
+                </Field>
+              </div>
 
-            {/* Step 4: Application-aware infrastructure placement */}
-            {currentStep === 4 && (
-              <TenantInfrastructureStep
-                databaseOptions={databasePlacementOptions}
-                databaseState={databasePlacementState}
-                databaseError={databasePlacementError}
-                selectedDatabase={selectedDatabasePlacement}
-                selectedDatabaseId={formData.databaseServerId}
-                showDatabaseSelectionError={showDatabaseSelectionError}
-                onDatabaseChange={(databaseServerId) => {
-                  setFormData((current) => ({ ...current, databaseServerId }));
-                  setShowDatabaseSelectionError(false);
-                }}
-                onRetryDatabase={() => void loadDatabasePlacementOptions()}
-                storageOptions={storagePlacementOptions}
-                storageState={storagePlacementState}
-                storageError={storagePlacementError}
-                selectedStorage={selectedStoragePlacement}
-                selectedStorageId={formData.storageServerId}
-                showStorageSelectionError={showStorageSelectionError}
-                onStorageChange={(storageServerId) => {
-                  setFormData((current) => ({ ...current, storageServerId }));
-                  setShowStorageSelectionError(false);
-                }}
-                onRetryStorage={() => void loadStoragePlacementOptions()}
-              />
-            )}
+              <div className="flex min-h-11 items-center gap-3">
+                <Checkbox
+                  id="tenant-send-invitation"
+                  name="sendInvitation"
+                  checked={formData.sendInvitation}
+                  onCheckedChange={(checked) =>
+                    setFormData((current) => ({
+                      ...current,
+                      sendInvitation: checked === true,
+                    }))
+                  }
+                />
+                <label
+                  htmlFor="tenant-send-invitation"
+                  className="cursor-pointer select-none text-sm font-medium text-foreground"
+                >
+                  {t.tenants.wizard.sendInvitationLabel}
+                </label>
+              </div>
+            </section>
+          ) : null}
 
-            {/* Step 5: Final Review & Submit */}
-            {currentStep === 5 && (
-              <div className="bg-card rounded-xl border border-border p-5 space-y-4 shadow-2xs">
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 border-b border-border pb-3">
-                  <ShieldCheck className="w-4 h-4 text-brand-600 dark:text-brand-400" />
-                  <span>
-                    {t.tenants.wizard.step5Heading}
-                  </span>
-                </h3>
+          {currentStep === 3 ? (
+            <TenantApplicationsStep
+              headingRef={stepHeadingRef}
+              candidates={applicationCandidates}
+              selections={applicationSelections}
+              state={applicationState}
+              error={applicationError}
+              selectedLines={selectedApplicationLines}
+              billingCycle={formData.billingCycle}
+              showSelectionError={showApplicationSelectionError}
+              selectionError={validationError("tenant-applications-selection")}
+              preview={provisioningPreview}
+              previewState={provisioningPreviewState}
+              previewError={provisioningPreviewError}
+              onRetryCandidates={() => void loadApplicationCandidates()}
+              onRetryPreview={() => void loadProvisioningPreview()}
+              onToggle={(applicationKey, selected) => {
+                toggleApplication(applicationKey, selected);
+                clearValidationError("tenant-applications-selection");
+              }}
+              onUpdateSelection={updateApplicationSelection}
+              onBillingCycleChange={(billingCycle) =>
+                setFormData((current) => ({ ...current, billingCycle }))
+              }
+            />
+          ) : null}
 
-                <div className="p-4 bg-ink-100 dark:bg-ink-800/50 rounded-xl border border-border space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      {t.tenants.tenantName}:
-                    </span>
-                    <span className="font-semibold font-mono">
-                      {formData.name} ({formData.companyName})
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      {t.tenants.primaryFqdn}:
-                    </span>
-                    <span className="font-semibold font-mono text-brand-700 dark:text-brand-400">
-                      {formData.name}.mutakamel.ai
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      {t.tenants.wizard.primaryOwnerLabel}
-                    </span>
-                    <span className="font-semibold">
-                      {formData.ownerFirstName} {formData.ownerLastName} (
-                      {formData.ownerEmail})
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      {t.tenants.hostingServer}:
-                    </span>
-                    <span className="text-end font-mono font-semibold">
-                      {selectedDatabasePlacement
-                        ? `${selectedDatabasePlacement.name} (${selectedDatabasePlacement.id})`
-                        : t.tenants.wizard.notSelected}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      {t.tenants.wizard.storageServerLabel}
-                    </span>
-                    <span className="font-semibold font-mono text-end">
-                      {selectedStoragePlacement
-                        ? `${selectedStoragePlacement.name} (${selectedStoragePlacement.id})`
-                        : t.tenants.wizard.notSelected}
-                    </span>
-                  </div>
-                  <div className="border-t border-border pt-3 dark:border-border">
-                    <span className="text-muted-foreground">
-                      {t.tenants.wizard.selectedApplicationsLabel}
-                    </span>
-                    <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+          {currentStep === 4 ? (
+            <TenantInfrastructureStep
+              headingRef={stepHeadingRef}
+              databaseOptions={databasePlacementOptions}
+              databaseState={databasePlacementState}
+              databaseError={databasePlacementError}
+              selectedDatabase={selectedDatabasePlacement}
+              selectedDatabaseId={formData.databaseServerId}
+              showDatabaseSelectionError={showDatabaseSelectionError}
+              databaseSelectionError={validationError("tenant-database-server")}
+              onDatabaseChange={(databaseServerId) => {
+                setFormData((current) => ({ ...current, databaseServerId }));
+                setShowDatabaseSelectionError(false);
+                clearValidationError("tenant-database-server");
+              }}
+              onRetryDatabase={() => void loadDatabasePlacementOptions()}
+              storageOptions={storagePlacementOptions}
+              storageState={storagePlacementState}
+              storageError={storagePlacementError}
+              selectedStorage={selectedStoragePlacement}
+              selectedStorageId={formData.storageServerId}
+              showStorageSelectionError={showStorageSelectionError}
+              storageSelectionError={validationError("tenant-storage-server")}
+              onStorageChange={(storageServerId) => {
+                setFormData((current) => ({ ...current, storageServerId }));
+                setShowStorageSelectionError(false);
+                clearValidationError("tenant-storage-server");
+              }}
+              onRetryStorage={() => void loadStoragePlacementOptions()}
+            />
+          ) : null}
+
+          {currentStep === 5 ? (
+            <section className="space-y-5 rounded-lg border border-border bg-card p-5">
+              <h2 ref={stepHeadingRef} tabIndex={-1} className={headingClassName}>
+                <ShieldCheck aria-hidden="true" className="size-4 text-primary" />
+                {t.tenants.wizard.step5Heading}
+              </h2>
+
+              <dl className="divide-y divide-border rounded-lg border border-border bg-muted/50 px-4 text-sm">
+                <ReviewRow
+                  label={t.tenants.tenantName}
+                  value={`${formData.name} (${formData.companyName})`}
+                  mono
+                />
+                <ReviewRow
+                  label={t.tenants.primaryFqdn}
+                  value={`${formData.name}.mutakamel.ai`}
+                  mono
+                />
+                <ReviewRow
+                  label={t.tenants.wizard.primaryOwnerLabel}
+                  value={`${formData.ownerFirstName} ${formData.ownerLastName} (${formData.ownerEmail})`}
+                />
+                <ReviewRow
+                  label={t.tenants.hostingServer}
+                  value={
+                    selectedDatabasePlacement
+                      ? `${selectedDatabasePlacement.name} (${selectedDatabasePlacement.id})`
+                      : t.tenants.wizard.notSelected
+                  }
+                  mono
+                />
+                <ReviewRow
+                  label={t.tenants.wizard.storageServerLabel}
+                  value={
+                    selectedStoragePlacement
+                      ? `${selectedStoragePlacement.name} (${selectedStoragePlacement.id})`
+                      : t.tenants.wizard.notSelected
+                  }
+                  mono
+                />
+                <div className="grid gap-2 py-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
+                  <dt className="text-muted-foreground">
+                    {t.tenants.wizard.selectedApplicationsLabel}
+                  </dt>
+                  <dd>
+                    <ul className="grid gap-2 sm:grid-cols-2">
                       {selectedApplicationLines.map((line) => (
                         <li
                           key={line.applicationId}
-                          className="rounded-lg bg-white px-3 py-2 dark:bg-ink-900"
+                          className="rounded-md border border-border bg-card px-3 py-2"
                         >
-                          <span className="font-semibold">
+                          <span className="font-semibold text-foreground">
                             {line.applicationName}
                           </span>
-                          <span className="ms-2 font-mono text-xs text-muted-foreground">
-                            {line.tierKey} · {line.seats}{" "}
-                            {t.tenants.wizard.seatsSuffix}
+                          <span className="ms-2 font-mono text-sm text-muted-foreground">
+                            {line.tierKey} · {line.seats} {t.tenants.wizard.seatsSuffix}
                           </span>
                         </li>
                       ))}
                     </ul>
-                  </div>
-                  {provisioningPreview ? (
-                    <div className="flex justify-between border-t border-border pt-3 dark:border-border">
-                      <span className="text-muted-foreground">
-                        {t.tenants.wizard.provisioningPlanLabel}
-                      </span>
-                      <span className="text-end font-semibold">
-                        {provisioningPreview.components.length}{" "}
-                        {t.tenants.wizard.componentsSuffix} ·{" "}
-                        {provisioningPreview.steps.length}{" "}
-                        {t.tenants.wizard.stepsSuffix}
-                      </span>
-                    </div>
-                  ) : null}
+                  </dd>
                 </div>
-              </div>
-            )}
+                {provisioningPreview ? (
+                  <ReviewRow
+                    label={t.tenants.wizard.provisioningPlanLabel}
+                    value={`${provisioningPreview.components.length} ${t.tenants.wizard.componentsSuffix} · ${provisioningPreview.steps.length} ${t.tenants.wizard.stepsSuffix}`}
+                  />
+                ) : null}
+              </dl>
+            </section>
+          ) : null}
 
-            {/* Wizard Controls Footer */}
-            <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-border shadow-2xs">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={prevStep}
-                disabled={currentStep === 1}
-              >
-                {t.tenants.wizard.previousStep}
+          <footer className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={prevStep}
+              disabled={currentStep === 1}
+            >
+              {t.tenants.wizard.previousStep}
+            </Button>
+
+            {currentStep < 5 ? (
+              <Button type="button" variant="primary" onClick={nextStep}>
+                {t.tenants.wizard.nextStepLabel}
               </Button>
+            ) : (
+              <Button
+                type="submit"
+                variant="primary"
+                loading={isSubmitting}
+                disabled={wizardLocked}
+              >
+                {!isSubmitting ? (
+                  <CheckCircle2 aria-hidden="true" className="size-4" />
+                ) : null}
+                {t.tenants.wizard.confirmCreation}
+              </Button>
+            )}
+          </footer>
+        </fieldset>
+      </form>
+    </div>
+  );
+}
 
-              {currentStep < 5 ? (
-                <Button type="button" variant="primary" onClick={nextStep}>
-                  {t.tenants.wizard.nextStepLabel}
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  variant="primary"
-                  loading={isSubmitting}
-                  disabled={
-                    isSubmitting ||
-                    !hasValidIdentityEvidence ||
-                    !hasValidApplicationSelection ||
-                    provisioningPreviewState !== "ready" ||
-                    !hasValidDatabaseSelection ||
-                    !hasValidStorageSelection
-                  }
-                >
-                  {!isSubmitting && <CheckCircle2 className="w-4 h-4" />}
-                  <span>
-                    {t.tenants.wizard.confirmCreation}
-                  </span>
-                </Button>
-              )}
-            </div>
-          </fieldset>
-        </form>
+function AddressInput({
+  id,
+  name,
+  label,
+  value,
+  maxLength,
+  onChange,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  value: string;
+  maxLength?: number;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Field id={id} label={label}>
+      {(field) => (
+        <Input
+          {...field}
+          name={name}
+          type="text"
+          value={value}
+          maxLength={maxLength}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
+    </Field>
+  );
+}
+
+function ReviewRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="grid gap-1 py-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-4">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd
+        className={`min-w-0 break-words font-semibold text-foreground sm:text-end ${
+          mono ? "font-mono" : ""
+        }`}
+        dir={mono ? "ltr" : undefined}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

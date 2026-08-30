@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Lock, RotateCw } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { Button, Skeleton } from "@/design-system";
@@ -7,11 +8,22 @@ import { DashboardHeader } from "./components/DashboardHeader";
 import { DashboardTabsNav } from "./components/DashboardTabsNav";
 import { DashboardGroupPanel } from "./components/DashboardGroupPanel";
 import { DashboardGroupsOverview } from "./components/DashboardGroupsOverview";
+import { DashboardRefreshPauseControl } from "./components/DashboardRefreshPauseControl";
+import { preloadDashboardChartGroups } from "./components/DashboardOverviewCharts";
 import { useDashboardData } from "./hooks/useDashboardData";
-import { getAuthorizedDashboardGroups } from "./utils/dashboard-groups";
+import { useDashboardPrint } from "./hooks/useDashboardPrint";
+import { usePrintableDisclosures } from "./hooks/usePrintableDisclosures";
+import { getAuthorizedDashboardGroupKeys } from "./utils/dashboard-groups";
 
 export default function DashboardPage() {
   const { t } = useI18n();
+  const headerRefreshRegionRef = useRef<HTMLDivElement>(null);
+  const dataRefreshRegionRef = useRef<HTMLDivElement>(null);
+  const ownedRefreshRegionRefs = useMemo(
+    () => [headerRefreshRegionRef, dataRefreshRegionRef],
+    [],
+  );
+  const [autoRefreshMenuOpen, setAutoRefreshMenuOpen] = useState(false);
   const {
     activeTab,
     setActiveTab,
@@ -21,6 +33,10 @@ export default function DashboardPage() {
     setCustomRange,
     autoRefreshInterval,
     setAutoRefreshInterval,
+    operatorRefreshPaused,
+    setOperatorRefreshPaused,
+    isAutoRefreshPaused,
+    autoRefreshPauseReasons,
     data,
     isLoading,
     isRefreshing,
@@ -28,13 +44,47 @@ export default function DashboardPage() {
     isRateLimited,
     error,
     handleRefresh,
-  } = useDashboardData();
+    loadAllGroups,
+  } = useDashboardData({
+    ownedRefreshRegionRefs,
+    modalOrMenuOpen: autoRefreshMenuOpen,
+  });
+  // Charts keep their exact values in collapsed disclosures; printing has to
+  // see them.
+  usePrintableDisclosures(dataRefreshRegionRef);
+
+  const dashboardPrint = useDashboardPrint({
+    hasLazyCharts: activeTab === "overview" && Boolean(data),
+    preloadLazyCharts: preloadDashboardChartGroups,
+  });
+
+  // The export is the one reader that needs every group at once; tab
+  // rendering only ever fetches the group on screen.
+  const handlePrintReport = useCallback(async () => {
+    await loadAllGroups();
+    dashboardPrint.requestPrint();
+  }, [dashboardPrint, loadAllGroups]);
+  const { markChartGroupReady, readinessCycle } = dashboardPrint;
+  const markOperationalChartsReady = useCallback(
+    () => {
+      void readinessCycle;
+      markChartGroupReady("operations");
+    },
+    [markChartGroupReady, readinessCycle],
+  );
+  const markBillingChartsReady = useCallback(
+    () => {
+      void readinessCycle;
+      markChartGroupReady("billing");
+    },
+    [markChartGroupReady, readinessCycle],
+  );
 
   if (isForbidden && !data) {
     return (
       <PageShell>
         <section role="alert" className="mx-auto flex min-h-[55vh] max-w-md flex-col items-center justify-center text-center">
-          <div className="flex size-14 items-center justify-center rounded-lg bg-danger-100 text-danger-600 dark:bg-danger-950/40 dark:text-danger-300">
+          <div className="flex size-14 items-center justify-center rounded-lg bg-destructive-subtle text-destructive-subtle-foreground">
             <Lock className="size-7" aria-hidden="true" />
           </div>
           <h1 className="mt-4 text-xl font-semibold text-foreground">
@@ -48,56 +98,82 @@ export default function DashboardPage() {
     );
   }
 
-  const groups = data ? getAuthorizedDashboardGroups(data) : [];
+  // Tabs come from the authorized set; the panel's data may still be in
+  // flight, because switching tabs is what triggers its fetch.
+  const groupKeys = data ? getAuthorizedDashboardGroupKeys(data) : [];
   const activeGroup =
-    activeTab === "overview"
-      ? undefined
-      : groups.find(([key]) => key === activeTab);
+    activeTab === "overview" ? undefined : data?.[activeTab];
 
   return (
     <PageShell>
-      <DashboardHeader
-        isRefreshing={isRefreshing || isLoading}
-        onRefresh={handleRefresh}
-        rangePreset={rangePreset}
-        onRangeChange={setRangePreset}
-        customRange={customRange}
-        onCustomRangeChange={setCustomRange}
-        autoRefreshInterval={autoRefreshInterval}
-        onAutoRefreshChange={setAutoRefreshInterval}
+      <div ref={headerRefreshRegionRef}>
+        <DashboardHeader
+          isRefreshing={isRefreshing || isLoading}
+          onRefresh={handleRefresh}
+          rangePreset={rangePreset}
+          onRangeChange={setRangePreset}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          autoRefreshInterval={autoRefreshInterval}
+          autoRefreshPaused={isAutoRefreshPaused}
+          onAutoRefreshChange={setAutoRefreshInterval}
+          onAutoRefreshMenuOpenChange={setAutoRefreshMenuOpen}
+          onPrintReport={handlePrintReport}
+          isPreparingPrint={dashboardPrint.isPreparingPrint}
+          printFallbackReason={dashboardPrint.printFallbackReason}
+        />
+      </div>
+
+      <DashboardRefreshPauseControl
+        interval={autoRefreshInterval}
+        isPaused={isAutoRefreshPaused}
+        operatorPaused={operatorRefreshPaused}
+        pauseReasons={autoRefreshPauseReasons}
+        onOperatorPausedChange={setOperatorRefreshPaused}
       />
 
-      {error && (
-        <ErrorBanner
-          stale={Boolean(data)}
-          rateLimited={isRateLimited}
-          message={error.response?.data?.message ?? error.response?.data?.detail ?? error.response?.data?.title ?? error.message}
-          code={error.response?.data?.errorCode ?? error.response?.data?.code}
-          correlationId={error.response?.data?.correlationId}
-          onRetry={handleRefresh}
-        />
-      )}
-
-      {isLoading && !data ? (
-        <DashboardSkeleton />
-      ) : data ? (
-        <>
-          <DashboardTabsNav
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            groups={groups.map(([key]) => key)}
+      <div ref={dataRefreshRegionRef} className="space-y-5">
+        {error && (
+          <ErrorBanner
+            stale={Boolean(data)}
+            rateLimited={isRateLimited}
+            message={error.response?.data?.message ?? error.response?.data?.detail ?? error.response?.data?.title ?? error.message}
+            code={error.response?.data?.errorCode ?? error.response?.data?.code}
+            correlationId={error.response?.data?.correlationId}
+            onRetry={handleRefresh}
           />
-          {activeTab === "overview" ? (
-            <DashboardGroupsOverview data={data} onOpenGroup={setActiveTab} />
-          ) : activeGroup ? (
-            <DashboardGroupPanel
-              groupKey={activeGroup[0]}
-              group={activeGroup[1]}
-              rangeLabel={data.range.label}
+        )}
+
+        {isLoading && !data ? (
+          <DashboardSkeleton />
+        ) : data ? (
+          <>
+            <DashboardTabsNav
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              groups={groupKeys}
             />
-          ) : null}
-        </>
-      ) : null}
+            {activeTab === "overview" ? (
+              <DashboardGroupsOverview
+                data={data}
+                onOpenGroup={setActiveTab}
+                forceRenderCharts={dashboardPrint.forceRenderCharts}
+                printChartsReady={dashboardPrint.chartsReady}
+                onOperationalChartsReady={markOperationalChartsReady}
+                onBillingChartsReady={markBillingChartsReady}
+              />
+            ) : activeGroup ? (
+              <DashboardGroupPanel
+                groupKey={activeTab}
+                group={activeGroup}
+                rangeLabel={data.range.label}
+              />
+            ) : (
+              <DashboardGroupSkeleton />
+            )}
+          </>
+        ) : null}
+      </div>
     </PageShell>
   );
 }
@@ -125,7 +201,7 @@ function ErrorBanner({
   return (
     <section
       role="alert"
-      className="flex flex-col gap-3 rounded-lg border border-danger-200 bg-danger-50 p-4 text-danger-800 dark:border-danger-900/70 dark:bg-danger-950/30 dark:text-danger-300 sm:flex-row sm:items-start sm:justify-between"
+      className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-destructive-subtle-foreground sm:flex-row sm:items-start sm:justify-between"
     >
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
@@ -143,11 +219,30 @@ function ErrorBanner({
           )}
         </div>
       </div>
-      <Button type="button" variant="outline" size="sm" onClick={onRetry} className="shrink-0 border-danger-300 dark:border-danger-800">
+      <Button type="button" variant="outline" size="sm" onClick={onRetry} className="shrink-0 border-destructive/40 text-destructive">
         <RotateCw className="size-3.5" aria-hidden="true" />
         {t.dashboard.retryButton}
       </Button>
     </section>
+  );
+}
+
+/** Shown while a tab's own group is still being fetched. */
+function DashboardGroupSkeleton() {
+  const { t } = useI18n();
+  return (
+    <div
+      className="space-y-4"
+      aria-label={t.dashboard.visuals.chartsAriaLabel}
+      aria-busy="true"
+    >
+      <Skeleton className="h-20 w-full" />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-64 w-full" />
+        ))}
+      </div>
+    </div>
   );
 }
 

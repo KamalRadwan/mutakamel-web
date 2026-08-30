@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateDatabaseServerWizard } from "./CreateDatabaseServerWizard";
 
@@ -154,6 +154,7 @@ describe("CreateDatabaseServerWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Test (Optional)" }));
 
     const alert = await screen.findByRole("alert");
+    await waitFor(() => expect(document.activeElement).toBe(alert));
     expect(alert.textContent).toContain(
       "Database registration unavailable: The registration dependency is temporarily unavailable.",
     );

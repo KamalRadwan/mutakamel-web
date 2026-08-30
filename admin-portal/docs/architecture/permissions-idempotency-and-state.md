@@ -71,6 +71,11 @@ Each query owns:
 - replay/in-flight state;
 - terminal asynchronous failure.
 
+The shared presentation and recovery requirements for these states are defined
+in [Operational UX](../design-system/operational-ux.md). Domain guides remain
+authoritative for permission strings, enums, polling cadence, freshness
+thresholds, and terminal behavior.
+
 Tenant tabs load independently. A missing permission or failed nested request
 must not be hidden by `Promise.allSettled`.
 
@@ -87,6 +92,10 @@ formatting. Use `BigInt` only for integer byte-string arithmetic. Do not use
 - For `204`, update local state only after the request succeeds.
 - Refetch after lifecycle/destructive changes where the authoritative
   projection can change.
+
+Use [Operational UX](../design-system/operational-ux.md#mutation-lifecycle) for
+the corresponding visible pending, reconciliation, ambiguous, and result
+surfaces.
 
 ## Source map
 

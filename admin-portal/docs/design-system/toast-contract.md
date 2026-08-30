@@ -1,18 +1,18 @@
 # Toast Contract
 
-Status: **[Verified]**
+Status: **[Verified current API; approved feedback hierarchy added]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-29**
 
 Owner: **Admin Portal**
 
 ## Purpose
 
-The user's requirement was explicit: no success/failure card in the page
-body — use a toaster instead. This document is the seam that keeps that
-rule from silently breaking two things the app depends on: the transport's
-own 403 handling, and the AGENTS.md requirement that ambiguous write
-outcomes persist until an operator resolves them.
+This document defines the toast API and prevents transient notification from
+replacing persistent task recovery. Toast is appropriate for brief confirmation
+or a nonblocking event. Validation, blocked workflows, load failures, degraded
+data, permission states, and ambiguous writes retain contextual in-body
+feedback according to [Operational UX](operational-ux.md#feedback-hierarchy).
 
 ## API
 
@@ -45,23 +45,27 @@ it and renders through the same `AppToast` path `useToast()` uses.
 | Situation | Surface | Why |
 |---|---|---|
 | Successful write | **Toast** | Transient confirmation |
-| Deterministic rejected write (409/422, unambiguous) | **Toast**, via `errorFromApi` | Carries `errorCode` + `correlationId` in the message so the evidence isn't lost |
-| 403 on a write action | **The transport's toast only** | `dispatchForbiddenToast()` already fires on every non-public 403 — a `toast.error(...)` in the same catch block double-fires. The ESLint rule below flags this. |
+| Deterministic non-field command rejection | **Toast** or persistent form/dialog alert, via normalized error | Use a persistent local alert when the operator must act before continuing; preserve `errorCode` + `correlationId` safely |
+| 403 on a write action | **Transport toast + persistent action-context permission feedback when the workflow remains blocked** | `dispatchForbiddenToast()` already fires on every non-public 403, so feature code must not emit a second toast. Persistent context is not a duplicate toast. |
 | Ambiguous/unresolved write outcome | **`AmbiguousOutcomePanel` (Phase 12), in-body, persistent** | AGENTS.md: *"Persist only minimal, non-secret attempt evidence until the operator resolves an ambiguous outcome."* A 4s toast destroys the retry-exact affordance and the idempotency key. |
 | Field validation error | **`Field` inline** (`aria-describedby`) | Must stay a programmatically associated, persistent target for the input |
+| Multi-field validation error | **Focusable error summary + inline `Field` errors** | Focus the summary; it links to every invalid field |
+| Authentication failure | **Persistent form-level error and applicable inline error** | A disappearing toast cannot be the sole explanation for a blocked login |
 | 403 gate on a whole section | **`PermissionGate` (Phase 12), in-body** | AGENTS.md: *"403 is not an empty state."* |
 | Load failure | **`ErrorState` (Phase 12), in-body, with retry** | Needs a retry affordance a toast can't host |
 | Empty result set | **`EmptyState` (Phase 12), in-body** | Not an error |
 | Degraded / partial data | **`DegradedBanner` (Phase 12), in-body** | A persistent condition qualifying the data on screen, not a one-time event |
 
+The broader feedback hierarchy, background-refresh behavior, notification-center
+role, and operational recovery rules live in
+[Operational UX](operational-ux.md#feedback-hierarchy).
+
 ## Enforcement
 
-- `eslint.config.mjs` flags `toast.error(...)` inside a `catch` block that
-  also references `403` or `AUTHORIZATION` in the same block (warn-only
-  today; confirmed live against the codebase, it already found 3 real
-  candidate sites in `/users` — `InviteUserModal.tsx`,
-  `useUserDetail.ts`, `useUsers.ts` — left for review during that route's
-  Phase 16 conversion, not fixed blind here).
+- `eslint.config.mjs` treats the transport-owned-403 double-toast pattern as an
+  error. The selector is intentionally conservative; extract a shared
+  `isForbiddenError()` helper when mutually exclusive branches would otherwise
+  match it rather than disabling the rule.
 - Every primitive/pattern that renders one of the in-body surfaces above
   (Phase 9–13) must not import `useToast` — that pairing is a review smell,
   not currently machine-enforced.
@@ -71,5 +75,9 @@ it and renders through the same `AppToast` path `useToast()` uses.
 `dispatchForbiddenToast()`'s title/message (`"Access Denied"` / `"You do
 not have permission to perform this action."`) are hard-coded English, not
 localized through `useI18n()`. This is pre-existing behavior, not
-introduced by the design-system migration; tracked for the Phase 23
-content/i18n sweep, not fixed here.
+introduced by the design-system migration and remains a target gap.
+
+Toast titles, messages, action names, dismiss controls, and screen-reader
+announcements must be localized. Toasts use one appropriately prioritized live
+region, do not repeatedly announce duplicate transport/UI errors, and pause
+dismissal while hovered or keyboard-focused.

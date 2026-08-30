@@ -1,6 +1,6 @@
 import { Server, Globe, Shield, Clock, HardDrive, Cpu, CheckCircle2 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { Card, StatGrid, StatCard, Progress } from "@/design-system";
+import { Card, StatGrid, StatCard, StatusBadge } from "@/design-system";
 import type { DatabaseServerView } from "../../types";
 
 interface DatabaseServerOverviewTabProps {
@@ -8,7 +8,7 @@ interface DatabaseServerOverviewTabProps {
 }
 
 export function DatabaseServerOverviewTab({ server }: DatabaseServerOverviewTabProps) {
-  const { t } = useI18n();
+  const { lang, t } = useI18n();
   const d = t.databaseServerDetail.overview;
 
   const usageRatio = server.maxTenants > 0 ? Math.min(100, Math.round((server.currentTenants / server.maxTenants) * 100)) : 0;
@@ -27,7 +27,7 @@ export function DatabaseServerOverviewTab({ server }: DatabaseServerOverviewTabP
         <StatCard label={d.maxCapacity} value={server.maxTenants} description={d.maxCapacitySub} icon={HardDrive} />
         <StatCard label={d.currentTenants} value={server.currentTenants} description={d.currentTenantsSub} icon={Cpu} />
         <StatCard label={d.sslSecurityMode} value={server.sslMode.toUpperCase()} description={sslStatus.label} icon={Shield} tone={sslStatus.tone} />
-        <StatCard label={d.connectTimeout} value={`${server.connectTimeoutMs}ms`} description={d.connectTimeoutSub} icon={Clock} />
+        <StatCard label={d.connectTimeout} value={`${server.connectTimeoutMs}ms`} description={lang === "ar" ? "حد محاولة الاتصال" : "Connection attempt limit"} icon={Clock} />
       </StatGrid>
 
       <Card className="p-5">
@@ -40,50 +40,60 @@ export function DatabaseServerOverviewTab({ server }: DatabaseServerOverviewTabP
           </div>
           <span className="font-mono text-lg font-semibold text-foreground">{usageRatio}%</span>
         </div>
-        <Progress value={usageRatio} tone={usageRatio > 90 ? "failed" : "succeeded"} className="h-2.5" />
+        <div
+          role="progressbar"
+          aria-label={d.capacityUtilization}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={usageRatio}
+          aria-valuetext={`${server.currentTenants} / ${server.maxTenants}`}
+          className="h-2.5 overflow-hidden rounded-full bg-muted"
+        >
+          <div className="h-full rounded-full bg-info transition-[width] motion-reduce:transition-none" style={{ width: `${usageRatio}%` }} />
+        </div>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="p-5">
           <h3 className="flex items-center gap-2 border-b border-border pb-3 text-sm font-semibold text-foreground">
-            <Server className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+            <Server className="size-4 text-info" aria-hidden="true" />
             {d.hostInformation}
           </h3>
           <dl className="mt-3 space-y-2.5 text-xs">
-            <div className="flex justify-between border-b border-border py-2">
+            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-2">
               <dt className="font-medium text-muted-foreground">{d.hostAddress}</dt>
               <dd className="font-mono font-semibold text-foreground">{server.host}</dd>
             </div>
-            <div className="flex justify-between border-b border-border py-2">
+            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-2">
               <dt className="font-medium text-muted-foreground">{d.port}</dt>
               <dd className="font-mono font-semibold text-foreground">{server.port}</dd>
             </div>
-            <div className="flex justify-between border-b border-border py-2">
+            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-2">
               <dt className="font-medium text-muted-foreground">{d.countryRegion}</dt>
               <dd className="flex items-center gap-1.5 font-semibold text-foreground">
                 <Globe className="size-3.5 text-muted-foreground" aria-hidden="true" />
                 {server.countryName || server.countryIsoCode}
               </dd>
             </div>
-            <div className="flex justify-between border-b border-border py-2">
+            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-2">
               <dt className="font-medium text-muted-foreground">{d.placementStatus}</dt>
-              <dd className="font-mono font-semibold uppercase text-brand-700 dark:text-brand-400">{server.status}</dd>
+              <dd><StatusBadge status={server.status} enumType="db-server" /></dd>
             </div>
-            <div className="flex justify-between py-2">
+            <div className="flex flex-wrap justify-between gap-2 py-2">
               <dt className="font-medium text-muted-foreground">{d.createdAt}</dt>
-              <dd className="font-mono text-foreground">{new Date(server.createdAt).toLocaleString()}</dd>
+              <dd className="font-mono text-foreground">{new Date(server.createdAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</dd>
             </div>
           </dl>
         </Card>
 
         <Card className="p-5">
           <h3 className="flex items-center gap-2 border-b border-border pb-3 text-sm font-semibold text-foreground">
-            <CheckCircle2 className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+            <CheckCircle2 className="size-4 text-info" aria-hidden="true" />
             {d.connectionParameters}
           </h3>
           <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
             <div className="space-y-2 rounded-lg border border-border bg-muted p-4">
-              <div className="font-mono text-2xs font-semibold uppercase text-brand-700 dark:text-brand-400">
+              <div className="font-mono text-xs font-semibold uppercase text-info-subtle-foreground">
                 {d.driverConfigLabel}
               </div>
               <div className="break-all rounded-lg border border-border bg-card p-2.5 font-mono text-xs text-foreground">

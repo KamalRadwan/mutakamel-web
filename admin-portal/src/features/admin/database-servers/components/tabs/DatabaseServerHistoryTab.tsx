@@ -1,6 +1,6 @@
-import { History, RefreshCw, Loader2 } from "lucide-react";
+import { History, Loader2 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { Card, Button } from "@/design-system";
+import { Badge, Card, EmptyState, ErrorState } from "@/design-system";
 import type { DatabaseServerHistoryView } from "../../types";
 
 interface DatabaseServerHistoryTabProps {
@@ -16,49 +16,43 @@ export function DatabaseServerHistoryTab({
   historyError,
   fetchHistory,
 }: DatabaseServerHistoryTabProps) {
-  const { t } = useI18n();
+  const { lang, t } = useI18n();
   const d = t.databaseServerDetail.history;
 
   return (
     <div className="space-y-6">
       <Card>
         <div className="flex items-center justify-between border-b border-border bg-muted p-5">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground">
-            <span className="rounded-lg bg-brand-500/10 p-1.5 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground rtl:normal-case rtl:tracking-normal">
+            <span className="rounded-lg bg-info-subtle p-1.5 text-info-subtle-foreground">
               <History className="size-4" aria-hidden="true" />
             </span>
             {d.title}
           </h2>
-          <span className="rounded-lg bg-card px-2.5 py-1 font-mono text-xs font-semibold text-foreground">
+          <Badge tone="neutral" className="font-mono">
             {d.totalEntries.replace("{{count}}", String(history.length))}
-          </span>
+          </Badge>
         </div>
 
         <div className="p-6">
           {isHistoryLoading ? (
-            <div className="py-12 text-center text-xs text-muted-foreground">
-              <Loader2 className="me-2 inline size-4 animate-spin" aria-hidden="true" />
+            <div role="status" className="py-12 text-center text-xs text-muted-foreground">
+              <Loader2 className="me-2 inline size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
               {d.loading}
             </div>
           ) : historyError ? (
-            <div className="py-10 text-center text-xs text-danger-600 dark:text-danger-400">
-              <p>{historyError}</p>
-              <Button type="button" variant="destructive" size="sm" className="mt-3" onClick={() => void fetchHistory()}>
-                <RefreshCw className="size-3.5" aria-hidden="true" />
-                {d.retry}
-              </Button>
-            </div>
+            <ErrorState title={historyError} onRetry={() => void fetchHistory()} />
           ) : history.length === 0 ? (
-            <div className="py-12 text-center text-xs font-semibold text-muted-foreground">{d.empty}</div>
+            <EmptyState icon={History} title={d.empty} />
           ) : (
             <div className="space-y-4">
               {history.map((log) => (
                 <div key={log.id} className="border-b border-border pb-4 text-xs last:border-0 last:pb-0">
                   <div className="mb-1.5 flex items-center justify-between font-mono">
-                    <span className="font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">
+                    <span dir="ltr" className="font-semibold uppercase tracking-wide text-info-subtle-foreground">
                       {log.action}
                     </span>
-                    <span className="text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString()}</span>
+                    <span className="text-xs text-muted-foreground">{new Date(log.createdAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</span>
                   </div>
 
                   {log.changes && log.changes.length > 0 && (
@@ -66,11 +60,11 @@ export function DatabaseServerHistoryTab({
                       {log.changes.map((c, i) => (
                         <div key={i} className="flex flex-wrap items-center gap-2 font-mono text-xs">
                           <span className="font-semibold text-muted-foreground">{c.label || c.field}:</span>
-                          <span className="rounded bg-danger-500/10 px-1.5 py-0.5 text-danger-600 line-through dark:bg-danger-500/15 dark:text-danger-400">
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground line-through">
                             {String(c.previousValue ?? "null")}
                           </span>
                           <span className="text-muted-foreground">→</span>
-                          <span className="rounded bg-brand-500/10 px-1.5 py-0.5 font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+                          <span className="rounded bg-info-subtle px-1.5 py-0.5 font-semibold text-info-subtle-foreground">
                             {String(c.newValue ?? "null")}
                           </span>
                         </div>

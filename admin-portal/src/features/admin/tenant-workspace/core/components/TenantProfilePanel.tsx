@@ -1,6 +1,7 @@
 "use client";
 
-import type { FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Badge, Button, Card, Field as FormField, Input } from "@/design-system";
 import type { useTenantCoreWorkspace } from "../hooks/useTenantCoreWorkspace";
 import type { TenantProfileDraft } from "../types";
 import {
@@ -12,6 +13,8 @@ export interface TenantProfilePanelProps {
   locale: TenantWorkspaceLocale;
   workspace: ReturnType<typeof useTenantCoreWorkspace>;
 }
+
+const COUNTRY_ISO_PATTERN = /^[A-Z]{2}$/;
 
 const profileLabels = {
   en: {
@@ -34,6 +37,9 @@ const profileLabels = {
     landmark: "Landmark",
     formattedAddress: "Formatted address",
     placement: "Read-only placement",
+    validationTitle: "Review the required profile fields.",
+    requiredField: "This field is required.",
+    invalidIso: "Use a two-letter country code.",
   },
   ar: {
     companyName: "اسم الشركة",
@@ -55,6 +61,9 @@ const profileLabels = {
     landmark: "علامة مميزة",
     formattedAddress: "العنوان المنسق",
     placement: "التسكين للقراءة فقط",
+    validationTitle: "راجع الحقول المطلوبة في الملف التعريفي.",
+    requiredField: "هذا الحقل مطلوب.",
+    invalidIso: "استخدم رمز دولة مكونًا من حرفين.",
   },
 } as const;
 
@@ -64,104 +73,157 @@ export function TenantProfilePanel({
 }: TenantProfilePanelProps) {
   const text = tenantWorkspaceCopy(locale);
   const labels = profileLabels[locale];
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const [errors, setErrors] = useState<Partial<Record<"companyName" | "countryName" | "countryIsoCode", string>>>({});
   const draft = workspace.profileDraft;
   const tenant = workspace.tenant;
+  useEffect(() => {
+    if (Object.keys(errors).length) errorSummaryRef.current?.focus();
+  }, [errors]);
+
   if (!draft || !tenant) return null;
 
   const disabled =
     !workspace.permissions.canUpdate || workspace.mutation.name !== null;
+
   const update = <Key extends keyof TenantProfileDraft>(
     key: Key,
     value: TenantProfileDraft[Key],
-  ) => workspace.updateProfileDraft({ [key]: value });
+  ) => {
+    workspace.updateProfileDraft({ [key]: value });
+    if (key === "companyName" || key === "countryName" || key === "countryIsoCode") {
+      const requiredKey = key as "companyName" | "countryName" | "countryIsoCode";
+      setErrors((current) => {
+        if (!current[requiredKey]) return current;
+        const next = { ...current };
+        delete next[requiredKey];
+        return next;
+      });
+    }
+  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    const nextErrors: typeof errors = {};
+    if (!draft.companyName.trim()) nextErrors.companyName = labels.requiredField;
+    if (!draft.countryName.trim()) nextErrors.countryName = labels.requiredField;
+    if (!COUNTRY_ISO_PATTERN.test(draft.countryIsoCode.trim())) nextErrors.countryIsoCode = labels.invalidIso;
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      return;
+    }
+    setErrors({});
     void workspace.saveProfile().catch(() => undefined);
   };
 
   return (
-    <section className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-xs dark:border-border dark:bg-ink-900">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3 dark:border-border">
-        <h2 className="text-sm font-semibold text-foreground">
+    <section aria-labelledby="tenant-profile-title">
+    <Card className="space-y-4 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+        <h2 id="tenant-profile-title" className="text-sm font-semibold text-foreground">
           {text.profile}
         </h2>
-        <span className="rounded-full bg-ink-100 px-2 py-1 text-xs font-semibold text-muted-foreground dark:bg-ink-800 dark:text-muted-foreground">
+        <Badge tone="neutral" className="normal-case tracking-normal">
           {labels.placement}: {tenant.databaseServer?.name ?? "—"} ·{" "}
           {tenant.storageServer?.name ?? "—"}
-        </span>
+        </Badge>
       </div>
 
       {workspace.profileStale && (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warn-300 bg-warn-50 p-3 text-xs text-warn-900 dark:border-warn-800 dark:bg-warn-950/40 dark:text-warn-200"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground"
         >
           <span>{text.stale}</span>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => void workspace.reloadStaleProfile()}
-            className="rounded-lg bg-warn-700 px-3 py-1.5 font-semibold text-white"
           >
             {text.reload}
-          </button>
+          </Button>
         </div>
       )}
 
-      <form onSubmit={submit} className="space-y-4">
+      <form noValidate onSubmit={submit} className="space-y-4">
+        {Object.keys(errors).length ? (
+          <div
+            ref={errorSummaryRef}
+            role="alert"
+            tabIndex={-1}
+            className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <p className="font-semibold">{labels.validationTitle}</p>
+            <ul className="mt-2 list-disc space-y-1 ps-5">
+              {Object.entries(errors).map(([key, message]) => (
+                <li key={key}><a className="underline" href={`#tenant-profile-${key}`}>{profileErrorLabel(key, labels)}: {message}</a></li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field
+          <ProfileField
+            id="tenant-profile-companyName"
+            name="companyName"
             label={labels.companyName}
             value={draft.companyName}
             required
+            error={errors.companyName}
             disabled={disabled}
             onChange={(value) => update("companyName", value)}
           />
-          <Field
+          <ProfileField
+            id="tenant-profile-countryName"
+            name="countryName"
             label={labels.countryName}
             value={draft.countryName}
             required
+            error={errors.countryName}
             disabled={disabled}
             onChange={(value) => update("countryName", value)}
           />
-          <Field
+          <ProfileField
+            id="tenant-profile-countryIsoCode"
+            name="countryIsoCode"
             label={labels.countryIsoCode}
             value={draft.countryIsoCode}
             required
+            error={errors.countryIsoCode}
             maxLength={2}
             disabled={disabled}
             onChange={(value) => update("countryIsoCode", value.toUpperCase())}
           />
-          <NullableField
+          <NullableField name="industry"
             label={labels.industry}
             value={draft.industry}
             disabled={disabled}
             onChange={(value) => update("industry", value)}
           />
-          <NullableField
+          <NullableField name="timezone"
             label={labels.timezone}
             value={draft.timezone}
             disabled={disabled}
             onChange={(value) => update("timezone", value)}
           />
-          <NullableField
+          <NullableField name="phoneCountryCode"
             label={labels.phoneCountryCode}
             value={draft.phoneCountryCode}
             disabled={disabled}
             onChange={(value) => update("phoneCountryCode", value)}
           />
-          <NullableField
+          <NullableField name="phone"
             label={labels.phone}
             value={draft.phone}
             disabled={disabled}
             onChange={(value) => update("phone", value)}
           />
-          <NullableField
+          <NullableField name="taxNumber"
             label={labels.taxNumber}
             value={draft.taxNumber}
             disabled={disabled}
             onChange={(value) => update("taxNumber", value)}
           />
-          <NullableField
+          <NullableField name="commercialRegistrationNumber"
             label={labels.commercialRegistrationNumber}
             value={draft.commercialRegistrationNumber}
             disabled={disabled}
@@ -171,19 +233,21 @@ export function TenantProfilePanel({
           />
         </div>
 
-        <div className="rounded-xl border border-border p-3 dark:border-border">
+        <div className="rounded-lg border border-border p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-foreground">
               {text.address}
             </span>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               disabled={disabled || draft.address === null}
               onClick={workspace.clearAddress}
-              className="rounded-lg px-2 py-1 text-xs font-semibold text-danger-600 disabled:opacity-40"
+              className="text-destructive"
             >
               {text.clearAddress}
-            </button>
+            </Button>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(
@@ -199,8 +263,9 @@ export function TenantProfilePanel({
                 "formattedAddress",
               ] as const
             ).map((key) => (
-              <Field
+              <ProfileField
                 key={key}
+                name={`address.${key}`}
                 label={labels[key]}
                 value={draft.address?.[key] ?? ""}
                 disabled={disabled}
@@ -211,48 +276,57 @@ export function TenantProfilePanel({
         </div>
 
         <div className="flex justify-end">
-          <button
+          <Button
             type="submit"
+            variant="primary"
+            loading={workspace.mutation.name === "profile"}
             disabled={disabled || !workspace.profileDirty}
-            className="rounded-lg bg-brand-500 px-4 py-2 text-xs font-semibold text-ink-950 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-400"
           >
-            {workspace.mutation.name === "profile" ? "…" : text.save}
-          </button>
+            {text.save}
+          </Button>
         </div>
       </form>
+    </Card>
     </section>
   );
 }
 
 interface FieldProps {
+  id?: string;
+  name: string;
   label: string;
   value: string;
   disabled: boolean;
   required?: boolean;
   maxLength?: number;
+  error?: string;
   onChange: (value: string) => void;
 }
 
-function Field({
+function ProfileField({
+  id,
+  name,
   label,
   value,
   disabled,
   required,
   maxLength,
+  error,
   onChange,
 }: FieldProps) {
   return (
-    <label className="space-y-1 text-xs font-semibold text-muted-foreground">
-      <span>{label}</span>
-      <input
-        value={value}
-        required={required}
-        maxLength={maxLength}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-border bg-ink-100 px-3 py-2 text-xs font-normal text-foreground outline-hidden focus:border-brand-500 disabled:opacity-60 dark:bg-ink-800"
-      />
-    </label>
+    <FormField id={id} label={label} required={required} error={error}>
+      {(field) => (
+        <Input
+          {...field}
+          name={name}
+          value={value}
+          maxLength={maxLength}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
+    </FormField>
   );
 }
 
@@ -265,10 +339,16 @@ function NullableField({
   onChange: (value: string | null) => void;
 }) {
   return (
-    <Field
+    <ProfileField
       {...props}
       value={value ?? ""}
       onChange={(next) => onChange(next || null)}
     />
   );
+}
+
+function profileErrorLabel(key: string, labels: typeof profileLabels.en | typeof profileLabels.ar): string {
+  if (key === "companyName") return labels.companyName;
+  if (key === "countryName") return labels.countryName;
+  return labels.countryIsoCode;
 }

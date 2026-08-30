@@ -55,6 +55,8 @@ import type {
   TenantIdentityValidationEvidence,
   TenantProvisioningPlanPreview,
 } from "../types";
+import type { TenantWizardValidationError } from "../components/TenantValidationSummary";
+import { isValidEmailAddress } from "@/shared/validation/email";
 
 export function useRegisterTenant() {
   const router = useRouter();
@@ -67,6 +69,14 @@ export function useRegisterTenant() {
   const canConfigureApplications = canCreateTenant;
 
   const [currentStep, setCurrentStep] = useState(1);
+  const [validationErrors, setValidationErrors] = useState<
+    TenantWizardValidationError[]
+  >([]);
+  const [validationFocusRequest, setValidationFocusRequest] = useState(0);
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const validationSummaryRef = useRef<HTMLDivElement>(null);
+  const previousStepRef = useRef(currentStep);
+  const pendingValidationFocusRef = useRef(false);
   const [isValidatingIdentity, setIsValidatingIdentity] = useState(false);
   const [identityValidationEvidence, setIdentityValidationEvidence] =
     useState<TenantIdentityValidationEvidence | null>(null);
@@ -163,7 +173,6 @@ export function useRegisterTenant() {
     databaseServerId: "",
     storageServerId: "",
     billingCycle: "MONTHLY" as TenantBillingCycle,
-    trialDays: 14,
   });
 
   const countryTimezoneOptions = useMemo(
@@ -565,6 +574,167 @@ export function useRegisterTenant() {
       ? identityValidationEvidence
       : null;
 
+  const showValidationErrors = useCallback(
+    (errors: TenantWizardValidationError[], step: number) => {
+      setValidationErrors(errors);
+      pendingValidationFocusRef.current = true;
+      setValidationFocusRequest((request) => request + 1);
+      setCurrentStep(step);
+    },
+    [],
+  );
+
+  const clearValidationError = useCallback((fieldId: string) => {
+    setValidationErrors((current) =>
+      current.filter((error) => error.fieldId !== fieldId),
+    );
+  }, []);
+
+  const focusValidationField = useCallback((fieldId: string) => {
+    const field = document.getElementById(fieldId);
+    if (field instanceof HTMLElement) {
+      field.focus();
+      field.scrollIntoView({ block: "nearest" });
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (pendingValidationFocusRef.current) {
+      pendingValidationFocusRef.current = false;
+      validationSummaryRef.current?.focus();
+    } else if (previousStepRef.current !== currentStep) {
+      stepHeadingRef.current?.focus();
+    }
+    previousStepRef.current = currentStep;
+  }, [currentStep, validationFocusRequest]);
+
+  const requiredError = useCallback(
+    (fieldId: string, label: string, step: number): TenantWizardValidationError => ({
+      fieldId,
+      message: t.tenants.wizard.requiredField(label),
+      step,
+    }),
+    [t.tenants.wizard],
+  );
+
+  const getIdentityValidationErrors = useCallback(() => {
+    const labels = t.tenants.wizard.fieldLabels;
+    const errors: TenantWizardValidationError[] = [];
+    if (!formData.name.trim()) {
+      errors.push(requiredError("tenant-name", labels.tenantName, 1));
+    }
+    if (!formData.companyName.trim()) {
+      errors.push(requiredError("tenant-company-name", labels.companyName, 1));
+    }
+    if (!formData.industry.trim()) {
+      errors.push(requiredError("tenant-industry", labels.industry, 1));
+    }
+    if (!formData.countryIsoCode.trim() || !formData.countryName.trim()) {
+      errors.push(requiredError("tenant-country", labels.country, 1));
+    }
+    if (!formData.timezone.trim()) {
+      errors.push(requiredError("tenant-timezone", labels.timezone, 1));
+    }
+    if (!formData.phoneCountryCode.trim()) {
+      errors.push(
+        requiredError(
+          "tenant-phone-country-code",
+          labels.tenantPhoneCountryCode,
+          1,
+        ),
+      );
+    }
+
+    if (
+      formData.countryIsoCode.trim() &&
+      formData.countryName.trim() &&
+      formData.timezone.trim() &&
+      !isCanonicalCountrySelection(formData)
+    ) {
+      errors.push({
+        fieldId: "tenant-country",
+        message: t.tenants.registerFlow.countryTimezoneRequiredDesc,
+        step: 1,
+      });
+    }
+
+    if (formData.name.trim() && formData.companyName.trim() && !hasValidIdentityEvidence) {
+      const result = currentIdentityValidationEvidence?.result;
+      if (result && !result.valid) {
+        if (!result.fields.name.valid || !result.fields.name.available) {
+          errors.push({
+            fieldId: "tenant-name",
+            message: result.fields.name.message,
+            step: 1,
+          });
+        }
+        if (
+          !result.fields.companyName.valid ||
+          !result.fields.companyName.available
+        ) {
+          errors.push({
+            fieldId: "tenant-company-name",
+            message: result.fields.companyName.message,
+            step: 1,
+          });
+        }
+      } else {
+        errors.push({
+          fieldId: "tenant-name",
+          message: t.tenants.wizard.identityValidationRequired,
+          step: 1,
+        });
+      }
+    }
+
+    return errors.filter(
+      (error, index, all) =>
+        all.findIndex((candidate) => candidate.fieldId === error.fieldId) === index,
+    );
+  }, [
+    currentIdentityValidationEvidence,
+    formData,
+    hasValidIdentityEvidence,
+    requiredError,
+    t.tenants.registerFlow.countryTimezoneRequiredDesc,
+    t.tenants.wizard,
+  ]);
+
+  const getOwnerValidationErrors = useCallback(() => {
+    const labels = t.tenants.wizard.fieldLabels;
+    const requiredOwnerFields = [
+      ["tenant-owner-email", formData.ownerEmail, labels.ownerEmail],
+      ["tenant-owner-first-name", formData.ownerFirstName, labels.firstName],
+      ["tenant-owner-last-name", formData.ownerLastName, labels.lastName],
+      ["tenant-owner-job-title", formData.ownerJobTitle, labels.jobTitle],
+      [
+        "tenant-owner-phone-country-code",
+        formData.ownerPhoneCountryCode,
+        labels.ownerPhoneCountryCode,
+      ],
+      ["tenant-owner-phone", formData.ownerPhone, labels.ownerPhone],
+    ] as const;
+    const errors = requiredOwnerFields
+      .filter(([, value]) => !value.trim())
+      .map(([fieldId, , label]) => requiredError(fieldId, label, 2));
+    if (
+      formData.ownerEmail.trim() &&
+      !isValidEmailAddress(formData.ownerEmail)
+    ) {
+      errors.push({
+        fieldId: "tenant-owner-email",
+        message: t.tenants.wizard.invalidEmail,
+        step: 2,
+      });
+    }
+    return errors;
+  }, [
+    formData,
+    requiredError,
+    t.tenants.wizard.fieldLabels,
+    t.tenants.wizard.invalidEmail,
+  ]);
+
   useEffect(() => {
     if (identityFingerprintRef.current === identityFingerprint) return;
     identityFingerprintRef.current = identityFingerprint;
@@ -604,8 +774,29 @@ export function useRegisterTenant() {
       }
       setIdentityValidationEvidence({ fingerprint, result });
       if (result.valid) {
+        clearValidationError("tenant-name");
+        clearValidationError("tenant-company-name");
         toast.success(t.tenants.registerFlow.identityAvailableTitle, result.message);
       } else {
+        const errors: TenantWizardValidationError[] = [];
+        if (!result.fields.name.valid || !result.fields.name.available) {
+          errors.push({
+            fieldId: "tenant-name",
+            message: result.fields.name.message,
+            step: 1,
+          });
+        }
+        if (
+          !result.fields.companyName.valid ||
+          !result.fields.companyName.available
+        ) {
+          errors.push({
+            fieldId: "tenant-company-name",
+            message: result.fields.companyName.message,
+            step: 1,
+          });
+        }
+        showValidationErrors(errors, 1);
         toast.error(t.tenants.registerFlow.identityUnavailableTitle, result.message);
       }
     } catch (caught) {
@@ -617,6 +808,10 @@ export function useRegisterTenant() {
       }
       const error = normalizeApiError(caught);
       setIdentityValidationError(error);
+      showValidationErrors(
+        [{ fieldId: "tenant-name", message: error.message, step: 1 }],
+        1,
+      );
       toast.error(t.tenants.registerFlow.identityCheckFailedTitle, error.message);
     } finally {
       if (generation === identityRequestGeneration.current) {
@@ -635,53 +830,53 @@ export function useRegisterTenant() {
       );
       return;
     }
-    if (!hasValidIdentityEvidence) {
-      toast.error(
-        t.tenants.registerFlow.identityCheckRequiredTitle,
-        t.tenants.registerFlow.identityCheckRequiredDesc,
-      );
-      setCurrentStep(1);
+    const identityErrors = getIdentityValidationErrors();
+    if (identityErrors.length > 0) {
+      showValidationErrors(identityErrors, 1);
       return;
     }
-    if (
-      !formData.companyName ||
-      !formData.industry ||
-      !formData.name ||
-      !isCanonicalCountrySelection(formData)
-    ) {
-      toast.error(
-        t.tenants.registerFlow.missingFieldsTitle,
-        t.tenants.registerFlow.missingFieldsDesc,
-      );
-      setCurrentStep(1);
-      return;
-    }
-    if (
-      !formData.ownerEmail.trim() ||
-      !formData.ownerFirstName.trim() ||
-      !formData.ownerLastName.trim() ||
-      !formData.ownerPhoneCountryCode.trim() ||
-      !formData.ownerPhone.trim() ||
-      !formData.ownerJobTitle.trim()
-    ) {
-      toast.error(
-        t.tenants.registerFlow.ownerDetailsIncompleteTitle,
-        t.tenants.registerFlow.ownerDetailsIncompleteDesc,
-      );
-      setCurrentStep(2);
+    const ownerErrors = getOwnerValidationErrors();
+    if (ownerErrors.length > 0) {
+      showValidationErrors(ownerErrors, 2);
       return;
     }
     if (!hasValidApplicationSelection || provisioningPreviewState !== "ready") {
       setShowApplicationSelectionError(true);
-      setCurrentStep(3);
+      showValidationErrors(
+        [
+          {
+            fieldId: "tenant-applications-selection",
+            message: t.tenants.wizard.applicationsStep.selectionRequiredError,
+            step: 3,
+          },
+        ],
+        3,
+      );
       return;
     }
     if (!hasValidDatabaseSelection || !hasValidStorageSelection) {
       setShowDatabaseSelectionError(!hasValidDatabaseSelection);
       setShowStorageSelectionError(!hasValidStorageSelection);
-      setCurrentStep(4);
+      const errors: TenantWizardValidationError[] = [];
+      if (!hasValidDatabaseSelection) {
+        errors.push({
+          fieldId: "tenant-database-server",
+          message: t.tenants.wizard.infrastructureStep.selectDatabaseServerError,
+          step: 4,
+        });
+      }
+      if (!hasValidStorageSelection) {
+        errors.push({
+          fieldId: "tenant-storage-server",
+          message: t.tenants.wizard.infrastructureStep.selectStorageServerError,
+          step: 4,
+        });
+      }
+      showValidationErrors(errors, 4);
       return;
     }
+
+    setValidationErrors([]);
 
     const submittedFingerprint = draftFingerprint;
     let commandWasSent = false;
@@ -757,7 +952,8 @@ export function useRegisterTenant() {
         subscription: {
           billingCycle: formData.billingCycle,
           currencyCode: "USD",
-          trialDays: formData.trialDays,
+          // Omitted on purpose: Core applies the tenants.trial_days setting,
+          // so the platform default stays configurable in one place.
           items: selectedApplicationLines.map((line) => ({
             moduleKey: line.applicationKey,
             tierKey: line.tierKey,
@@ -909,20 +1105,19 @@ export function useRegisterTenant() {
   const goToStep = (step: number) => {
     if (isSubmitting || pendingCreateRecovery) return;
     const next = Math.max(1, Math.min(5, step));
-    if (next > 1 && !hasValidIdentityEvidence) {
-      toast.error(
-        t.tenants.registerFlow.identityCheckRequiredTitle,
-        t.tenants.registerFlow.identityCheckRequiredDesc,
-      );
-      setCurrentStep(1);
+    if (next <= currentStep) {
+      setValidationErrors([]);
+      setCurrentStep(next);
       return;
     }
-    if (next > 1 && !isCanonicalCountrySelection(formData)) {
-      toast.error(
-        t.tenants.registerFlow.countryTimezoneRequiredTitle,
-        t.tenants.registerFlow.countryTimezoneRequiredDesc,
-      );
-      setCurrentStep(1);
+    const identityErrors = getIdentityValidationErrors();
+    if (next > 1 && identityErrors.length > 0) {
+      showValidationErrors(identityErrors, 1);
+      return;
+    }
+    const ownerErrors = getOwnerValidationErrors();
+    if (next > 2 && ownerErrors.length > 0) {
+      showValidationErrors(ownerErrors, 2);
       return;
     }
     if (
@@ -930,15 +1125,40 @@ export function useRegisterTenant() {
       (!hasValidApplicationSelection || provisioningPreviewState !== "ready")
     ) {
       setShowApplicationSelectionError(true);
-      setCurrentStep(3);
+      showValidationErrors(
+        [
+          {
+            fieldId: "tenant-applications-selection",
+            message: t.tenants.wizard.applicationsStep.selectionRequiredError,
+            step: 3,
+          },
+        ],
+        3,
+      );
       return;
     }
     if (next > 4 && (!hasValidDatabaseSelection || !hasValidStorageSelection)) {
       setShowDatabaseSelectionError(!hasValidDatabaseSelection);
       setShowStorageSelectionError(!hasValidStorageSelection);
-      setCurrentStep(4);
+      const errors: TenantWizardValidationError[] = [];
+      if (!hasValidDatabaseSelection) {
+        errors.push({
+          fieldId: "tenant-database-server",
+          message: t.tenants.wizard.infrastructureStep.selectDatabaseServerError,
+          step: 4,
+        });
+      }
+      if (!hasValidStorageSelection) {
+        errors.push({
+          fieldId: "tenant-storage-server",
+          message: t.tenants.wizard.infrastructureStep.selectStorageServerError,
+          step: 4,
+        });
+      }
+      showValidationErrors(errors, 4);
       return;
     }
+    setValidationErrors([]);
     setCurrentStep(next);
   };
 
@@ -946,6 +1166,11 @@ export function useRegisterTenant() {
     t,
     currentStep,
     goToStep,
+    validationErrors,
+    clearValidationError,
+    focusValidationField,
+    stepHeadingRef,
+    validationSummaryRef,
     formData,
     setFormData,
     selectCountry,
@@ -998,6 +1223,7 @@ export function useRegisterTenant() {
     nextStep: () => goToStep(currentStep + 1),
     prevStep: () => {
       if (!isSubmitting && !pendingCreateRecovery) {
+        setValidationErrors([]);
         setCurrentStep((step) => Math.max(1, step - 1));
       }
     },

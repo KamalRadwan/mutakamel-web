@@ -25,6 +25,7 @@ export function DatabaseServerHeaderHero({
   const { dir, t } = useI18n();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const d = t.databaseServerDetail;
+  const activationBlocked = server.status !== "ACTIVE" && server.credentialBootstrap.status !== "READY";
 
   return (
     <PageHeader
@@ -40,38 +41,45 @@ export function DatabaseServerHeaderHero({
       status={<StatusBadge status={server.status} enumType="db-server" />}
       description={`${server.host}:${server.port} · ${server.countryName || server.countryIsoCode}`}
       action={
-        <div className="flex flex-wrap items-center gap-2">
-          {canUpdate && (
-            <Button type="button" variant="outline" size="sm" onClick={onEditMetadata}>
-              <Edit2 className="size-3.5" /> {d.editMetadata}
-            </Button>
-          )}
-          {canUpdate && server.status !== "ACTIVE" && (
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={() => onLifecycleAction("activate")}
-              disabled={server.credentialBootstrap.status !== "READY"}
-              title={server.credentialBootstrap.status === "READY" ? d.activateServer : d.readiness.subtitle}
-            >
-              <Play className="size-3.5" /> {d.activateServer}
-            </Button>
-          )}
-          {canUpdate && server.status === "ACTIVE" && (
-            <Button type="button" variant="outline" size="sm" onClick={() => onLifecycleAction("drain")}>
-              <StopCircle className="size-3.5 text-warn-500" /> {d.drainConnections}
-            </Button>
-          )}
-          {canUpdate && server.status !== "OFFLINE" && (
-            <Button type="button" variant="outline" size="sm" onClick={() => onLifecycleAction("offline")}>
-              <PowerOff className="size-3.5" /> {d.takeOffline}
-            </Button>
-          )}
-          {canDelete && (server.status === "OFFLINE" || server.status === "DRAINING") && server.currentTenants === 0 && (
-            <Button type="button" variant="destructive" size="sm" onClick={onDeleteHost}>
-              <Trash2 className="size-3.5" /> {d.deleteHost}
-            </Button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {canUpdate && (
+              <Button type="button" variant="outline" size="sm" onClick={onEditMetadata}>
+                <Edit2 className="size-3.5" aria-hidden="true" /> {d.editMetadata}
+              </Button>
+            )}
+            {canUpdate && server.status !== "ACTIVE" && (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => onLifecycleAction("activate")}
+                disabled={activationBlocked}
+                aria-describedby={activationBlocked ? "database-server-activation-reason" : undefined}
+              >
+                <Play className="size-3.5" aria-hidden="true" /> {d.activateServer}
+              </Button>
+            )}
+            {canUpdate && server.status === "ACTIVE" && (
+              <Button type="button" variant="outline" size="sm" onClick={() => onLifecycleAction("drain")}>
+                <StopCircle className="size-3.5 text-warning" aria-hidden="true" /> {d.drainConnections}
+              </Button>
+            )}
+            {canUpdate && server.status !== "OFFLINE" && (
+              <Button type="button" variant="outline" size="sm" onClick={() => onLifecycleAction("offline")}>
+                <PowerOff className="size-3.5" aria-hidden="true" /> {d.takeOffline}
+              </Button>
+            )}
+            {canDelete && (server.status === "OFFLINE" || server.status === "DRAINING") && server.currentTenants === 0 && (
+              <Button type="button" variant="destructive" size="sm" onClick={onDeleteHost}>
+                <Trash2 className="size-3.5" aria-hidden="true" /> {d.deleteHost}
+              </Button>
+            )}
+          </div>
+          {canUpdate && activationBlocked && (
+            <p id="database-server-activation-reason" className="max-w-xl text-xs text-warning-subtle-foreground">
+              {d.readiness.subtitle}
+            </p>
           )}
         </div>
       }

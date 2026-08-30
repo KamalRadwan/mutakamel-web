@@ -1,15 +1,20 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
+import { Button } from "@/design-system";
 import { useThemeToggle } from "./hooks/useThemeToggle";
 
 export function ThemeToggle() {
   const { isDark, toggleTheme, title } = useThemeToggle();
 
   return (
-    <button
+    <Button
+      type="button"
+      variant="ghost"
+      size="md"
       onClick={toggleTheme}
-      className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-ink-100 hover:text-foreground dark:hover:bg-ink-800"
+      className="size-8 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+      aria-label={title}
       title={title}
     >
       {isDark ? (
@@ -17,6 +22,6 @@ export function ThemeToggle() {
       ) : (
         <Moon className="size-4" aria-hidden="true" />
       )}
-    </button>
+    </Button>
   );
 }

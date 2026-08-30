@@ -8,8 +8,9 @@ import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserDropdown } from "@/components/layout/UserDropdown";
 import { NotificationDropdown } from "@/components/layout/NotificationDropdown";
+import { Button } from "../primitives/Button";
 import { cn } from "../lib/cn";
-import { focusRing } from "../lib/variants";
+import { focusRing, hitArea } from "../lib/variants";
 
 export function Topbar({ onOpenMobileNav, onOpenSearch }: { onOpenMobileNav: () => void; onOpenSearch: () => void }) {
   const { lang, dir } = useI18n();
@@ -17,58 +18,58 @@ export function Topbar({ onOpenMobileNav, onOpenSearch }: { onOpenMobileNav: () 
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
 
   return (
-    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur-sm">
-      <button
+    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
+      <Button
         type="button"
+        variant="ghost"
+        size="md"
         onClick={onOpenMobileNav}
         aria-label={lang === "ar" ? "فتح القائمة الرئيسية" : "Open main navigation"}
-        className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-ink-100 hover:text-foreground dark:hover:bg-ink-800 lg:hidden",
-          focusRing,
-        )}
+        className="size-8 shrink-0 p-0 text-muted-foreground lg:hidden"
       >
         <Menu className="size-4" aria-hidden="true" />
-      </button>
+      </Button>
 
       <nav aria-label={lang === "ar" ? "مسار التنقل" : "Breadcrumb"} className="flex min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground">
-        <Link href={homeHref} className={cn("shrink-0 rounded-md px-1.5 py-1 hover:text-foreground", focusRing)}>
+        <Link href={homeHref} className={cn("shrink-0 rounded-md px-1.5 py-1 hover:bg-accent hover:text-accent-foreground", focusRing, hitArea)}>
           {lang === "ar" ? "الرئيسية" : "Home"}
         </Link>
         {activeItem && (
           <>
             <Chevron className="size-3.5 shrink-0" aria-hidden="true" />
-            <span className="truncate font-medium text-foreground">
+            <span className="truncate font-medium text-foreground" aria-current="page">
               {lang === "ar" ? activeItem.labelKey.ar : activeItem.labelKey.en}
             </span>
           </>
         )}
       </nav>
 
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={onOpenSearch}
-        className={cn(
-          "hidden items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground sm:flex",
-          focusRing,
-        )}
+        aria-label={lang === "ar" ? "فتح البحث السريع" : "Open quick search"}
+        aria-keyshortcuts="Control+K Meta+K"
+        className="hidden gap-2 bg-background text-muted-foreground sm:flex"
       >
         <Search className="size-3.5" aria-hidden="true" />
         <span>{lang === "ar" ? "بحث..." : "Search..."}</span>
-        <kbd className="ms-2 rounded border border-border bg-background px-1 font-mono text-2xs" dir="ltr">
+        <kbd className="ms-2 rounded border border-border bg-card px-1 font-mono text-xs" dir="ltr" aria-hidden="true">
           Ctrl K
         </kbd>
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        variant="ghost"
+        size="md"
         onClick={onOpenSearch}
-        aria-label={lang === "ar" ? "بحث" : "Search"}
-        className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-ink-100 hover:text-foreground dark:hover:bg-ink-800 sm:hidden",
-          focusRing,
-        )}
+        aria-label={lang === "ar" ? "فتح البحث السريع" : "Open quick search"}
+        aria-keyshortcuts="Control+K Meta+K"
+        className="size-8 shrink-0 p-0 text-muted-foreground sm:hidden"
       >
         <Search className="size-4" aria-hidden="true" />
-      </button>
+      </Button>
 
       <div className="flex shrink-0 items-center gap-1">
         <NotificationDropdown />

@@ -3,6 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { FileKey2, LockKeyhole, ShieldCheck, Trash2 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import {
+  Button,
+  Checkbox,
+  Field,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/design-system";
 import type {
   DatabaseServerSslConfigDto,
   DatabaseServerSslMode,
@@ -24,6 +35,7 @@ interface DatabaseSslConfigurationFieldsProps {
 }
 
 type CertificateField = "ca" | "cert" | "key";
+type FileError = { field: CertificateField; message: string };
 
 export function DatabaseSslConfigurationFields({
   idPrefix,
@@ -40,7 +52,7 @@ export function DatabaseSslConfigurationFields({
 }: DatabaseSslConfigurationFieldsProps) {
   const { lang, dir } = useI18n();
   const copy = DATABASE_SSL_COPY[lang];
-  const [fileError, setFileError] = useState("");
+  const [fileError, setFileError] = useState<FileError | null>(null);
   const configRef = useRef(config);
   const caInputRef = useRef<HTMLInputElement>(null);
   const certInputRef = useRef<HTMLInputElement>(null);
@@ -63,7 +75,7 @@ export function DatabaseSslConfigurationFields({
   };
 
   const handleModeChange = (nextMode: DatabaseServerSslMode) => {
-    setFileError("");
+    setFileError(null);
     if (nextMode === "disable") {
       clearNativeInputs();
       onConfigChange({});
@@ -77,7 +89,7 @@ export function DatabaseSslConfigurationFields({
     file: File | undefined,
   ) => {
     if (!file) return;
-    setFileError("");
+    setFileError(null);
     try {
       const value = await readDatabaseSslMaterialFile(file, label);
       onRemoveStoredConfigChange?.(false);
@@ -87,13 +99,15 @@ export function DatabaseSslConfigurationFields({
     } catch (error) {
       const ref = inputRefs[field];
       if (ref.current) ref.current.value = "";
-      setFileError(
-        error instanceof Error && error.message.endsWith(" file is empty.")
-          ? copy.fileEmpty(label)
-          : error instanceof Error && error.message.includes("20,000 character API limit")
-            ? copy.fileTooLarge(label)
-            : copy.unableToRead(label),
-      );
+      setFileError({
+        field,
+        message:
+          error instanceof Error && error.message.endsWith(" file is empty.")
+            ? copy.fileEmpty(label)
+            : error instanceof Error && error.message.includes("20,000 character API limit")
+              ? copy.fileTooLarge(label)
+              : copy.unableToRead(label),
+      });
     }
   };
 
@@ -103,11 +117,12 @@ export function DatabaseSslConfigurationFields({
     if (field === "key") delete next.passphrase;
     if (inputRefs[field].current) inputRefs[field].current.value = "";
     configRef.current = next;
+    if (fileError?.field === field) setFileError(null);
     onConfigChange(next);
   };
 
   const handleRemoveStoredConfig = (remove: boolean) => {
-    setFileError("");
+    setFileError(null);
     if (remove) {
       clearNativeInputs();
       onConfigChange({});
@@ -122,56 +137,53 @@ export function DatabaseSslConfigurationFields({
     accept: string,
     required = false,
   ) => (
-    <div className="rounded-xl border border-border bg-white p-3 dark:border-border dark:bg-ink-900/70">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <label
-            htmlFor={`${idPrefix}-${field}`}
-            className="block text-xs font-semibold text-foreground"
-          >
-            {label}{required ? " *" : ""}
-          </label>
-          <p className="mt-1 text-xs leading-4 text-muted-foreground">
-            {description}
-          </p>
-        </div>
-        {config[field] && (
-          <button
+    <div className="rounded-lg border border-border bg-card p-3">
+      <Field
+        id={`${idPrefix}-${field}`}
+        label={label}
+        hint={description}
+        error={fileError?.field === field ? fileError.message : undefined}
+        required={required}
+        labelAction={config[field] ? (
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={() => clearField(field)}
             disabled={disabled}
-            className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-danger-50 hover:text-danger-600 disabled:opacity-50 dark:hover:bg-danger-950/40"
+            className="size-8 p-0 text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
             aria-label={copy.clearSelected(label)}
           >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+            <Trash2 className="size-4" aria-hidden="true" />
+          </Button>
+        ) : undefined}
+      >
+        {(fieldProps) => (
+          <Input
+            {...fieldProps}
+            ref={inputRefs[field]}
+            type="file"
+            accept={accept}
+            required={required && !hasStoredConfig}
+            disabled={disabled || removeStoredConfig}
+            onChange={(event) => void handleFileChange(field, label, event.target.files?.[0])}
+            className="h-auto min-h-(--size-control-lg) cursor-pointer py-1 text-xs text-muted-foreground file:me-3 file:min-h-8 file:cursor-pointer file:rounded-md file:border-0 file:bg-info-subtle file:px-3 file:text-xs file:font-semibold file:text-info-subtle-foreground"
+          />
         )}
-      </div>
-      <input
-        ref={inputRefs[field]}
-        id={`${idPrefix}-${field}`}
-        type="file"
-        accept={accept}
-        required={required && !hasStoredConfig}
-        disabled={disabled || removeStoredConfig}
-        onChange={(event) =>
-          void handleFileChange(field, label, event.target.files?.[0])
-        }
-        className="mt-3 block w-full cursor-pointer text-xs text-muted-foreground file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-brand-700 hover:file:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-muted-foreground dark:file:bg-brand-950/50 dark:file:text-brand-300"
-      />
+      </Field>
       {config[field] && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-700 dark:text-brand-300">
-          <ShieldCheck className="h-3.5 w-3.5" /> {copy.readyToSend}
+        <p role="status" className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-success-subtle-foreground">
+          <ShieldCheck className="size-3.5" aria-hidden="true" /> {copy.readyToSend}
         </p>
       )}
     </div>
   );
 
   return (
-    <section dir={dir} className="overflow-hidden rounded-lg border border-border bg-ink-100/70 dark:bg-ink-800/40">
+    <section dir={dir} className="overflow-hidden rounded-lg border border-border bg-muted">
       <div className="flex items-start gap-3 border-b border-border p-4">
-        <div className="rounded-lg bg-brand-100 p-2 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
-          <LockKeyhole className="h-4 w-4" />
+        <div className="rounded-lg bg-info-subtle p-2 text-info-subtle-foreground">
+          <LockKeyhole className="size-4" aria-hidden="true" />
         </div>
         <div>
           <h3 className="text-sm font-semibold text-foreground">
@@ -184,69 +196,67 @@ export function DatabaseSslConfigurationFields({
       </div>
 
       <div className="space-y-4 p-4">
-        <label className="block text-xs font-semibold text-foreground">
-          {copy.sslMode}
-          <select
-            value={mode}
-            disabled={disabled}
-            onChange={(event) =>
-              handleModeChange(event.target.value as DatabaseServerSslMode)
-            }
-            className="mt-1.5 w-full rounded-lg border border-border bg-card p-2.5 text-sm font-semibold text-foreground outline-none transition-colors focus:border-brand-500 disabled:opacity-50"
-          >
-            <option value="disable">{copy.disable}</option>
-            <option value="require">{copy.require}</option>
-            <option value="verify-ca">{copy.verifyCa}</option>
-            <option value="verify-full">{copy.verifyFull}</option>
-          </select>
-        </label>
+        <Field id={`${idPrefix}-mode`} label={copy.sslMode} required>
+          {({ required, ...fieldProps }) => (
+            <Select value={mode} onValueChange={(value) => handleModeChange(value as DatabaseServerSslMode)} disabled={disabled} dir={dir}>
+              <SelectTrigger {...fieldProps} aria-required={required}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="disable">{copy.disable}</SelectItem>
+                <SelectItem value="require">{copy.require}</SelectItem>
+                <SelectItem value="verify-ca">{copy.verifyCa}</SelectItem>
+                <SelectItem value="verify-full">{copy.verifyFull}</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
 
-        <p className="rounded-xl bg-ink-100 px-3 py-2 text-xs leading-5 text-muted-foreground dark:bg-ink-900/60 dark:text-muted-foreground">
+        <p className={`rounded-lg px-3 py-2 text-xs leading-5 ${mode === "disable" ? "bg-warning-subtle text-warning-subtle-foreground" : "bg-info-subtle text-info-subtle-foreground"}`}>
           {copy.modeHelp[mode]}
         </p>
 
         {mode !== "disable" && (
           <>
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-white p-3 dark:border-border dark:bg-ink-900/70">
-              <input
-                type="checkbox"
+            <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
+              <Checkbox
+                id={`${idPrefix}-reject-unauthorized`}
                 checked={rejectUnauthorized}
                 disabled={disabled}
-                onChange={(event) => onRejectUnauthorizedChange(event.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-border text-brand-600 focus:ring-brand-500"
+                onCheckedChange={(checked) => onRejectUnauthorizedChange(checked === true)}
+                className="mt-0.5"
               />
-              <span>
-                <span className="block text-xs font-semibold text-foreground">
+              <label htmlFor={`${idPrefix}-reject-unauthorized`} className="cursor-pointer">
+                <span className="block text-sm font-semibold text-foreground">
                   {copy.rejectUnauthorized}
                 </span>
                 <span className="mt-1 block text-xs leading-4 text-muted-foreground">
                   {copy.rejectUnauthorizedHelp}
                 </span>
-              </span>
-            </label>
+              </label>
+            </div>
 
             {hasStoredConfig && (
-              <div className="rounded-xl border border-brand-200 bg-brand-50 p-3 dark:border-brand-900 dark:bg-brand-950/30">
+              <div className="rounded-lg border border-info/30 bg-info-subtle p-3 text-info-subtle-foreground">
                 <div className="flex items-start gap-2">
-                  <FileKey2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-700 dark:text-brand-300" />
+                  <FileKey2 className="mt-0.5 size-4 shrink-0 text-info" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-brand-800 dark:text-brand-200">
+                    <p className="text-xs font-semibold">
                       {copy.storedBundle}
                     </p>
-                    <p className="mt-1 text-xs leading-4 text-brand-700 dark:text-brand-300">
+                    <p className="mt-1 text-xs leading-4">
                       {copy.storedBundleHelp}
                     </p>
                     {onRemoveStoredConfigChange && (
-                      <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-semibold text-danger-700 dark:text-danger-300">
-                        <input
-                          type="checkbox"
+                      <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-destructive-subtle-foreground">
+                        <Checkbox
+                          id={`${idPrefix}-remove-stored`}
                           checked={removeStoredConfig}
                           disabled={disabled}
-                          onChange={(event) => handleRemoveStoredConfig(event.target.checked)}
-                          className="h-4 w-4 rounded border-danger-300 text-danger-600 focus:ring-danger-500"
+                          onCheckedChange={(checked) => handleRemoveStoredConfig(checked === true)}
                         />
-                        {copy.removeStoredBundle}
-                      </label>
+                        <label htmlFor={`${idPrefix}-remove-stored`} className="cursor-pointer">{copy.removeStoredBundle}</label>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -273,42 +283,27 @@ export function DatabaseSslConfigurationFields({
                 copy.clientPrivateKeyHelp,
                 ".pem,.key,application/x-pem-file,text/plain",
               )}
-              <div className="rounded-xl border border-border bg-white p-3 dark:border-border dark:bg-ink-900/70">
-                <label
-                  htmlFor={`${idPrefix}-passphrase`}
-                  className="block text-xs font-semibold text-foreground"
-                >
-                  {copy.privateKeyPassphrase}
-                </label>
-                <p className="mt-1 text-xs leading-4 text-muted-foreground">
-                  {copy.privateKeyPassphraseHelp}
-                </p>
-                <input
-                  id={`${idPrefix}-passphrase`}
-                  type="password"
-                  autoComplete="new-password"
-                  maxLength={1024}
-                  value={config.passphrase ?? ""}
-                  disabled={disabled || removeStoredConfig}
-                  onChange={(event) => {
-                    onRemoveStoredConfigChange?.(false);
-                    const nextConfig = {
-                      ...configRef.current,
-                      passphrase: event.target.value,
-                    };
-                    configRef.current = nextConfig;
-                    onConfigChange(nextConfig);
-                  }}
-                  className="mt-3 w-full rounded-lg border border-border bg-ink-100 p-2 text-xs outline-none focus:border-brand-500 disabled:opacity-50 dark:bg-ink-800"
-                />
+              <div className="rounded-lg border border-border bg-card p-3">
+                <Field id={`${idPrefix}-passphrase`} label={copy.privateKeyPassphrase} hint={copy.privateKeyPassphraseHelp}>
+                  {(fieldProps) => (
+                    <Input
+                      {...fieldProps}
+                      type="password"
+                      autoComplete="new-password"
+                      maxLength={1024}
+                      value={config.passphrase ?? ""}
+                      disabled={disabled || removeStoredConfig}
+                      onChange={(event) => {
+                        onRemoveStoredConfigChange?.(false);
+                        const nextConfig = { ...configRef.current, passphrase: event.target.value };
+                        configRef.current = nextConfig;
+                        onConfigChange(nextConfig);
+                      }}
+                    />
+                  )}
+                </Field>
               </div>
             </div>
-
-            {fileError && (
-              <p role="alert" className="text-xs font-semibold text-danger-700 dark:text-danger-300">
-                {fileError}
-              </p>
-            )}
           </>
         )}
       </div>

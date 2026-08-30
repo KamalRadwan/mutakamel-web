@@ -1,130 +1,175 @@
-// Status vocabulary as data (docs/components/status-badge.md), not a
-// switch statement — makes the full enum matrix reviewable in one place.
-// Collapsed from the old component's 5 hues to 4 roles + a "progress"
-// treatment: "in progress" is neutral + a pulsing dot + a dashed border,
-// not a 5th hue (docs/design-system/tokens.md's no-fifth-hue rule) —
-// motion survives colorblindness and this badge always renders a text
-// label anyway, so hue was never the only signal.
-type StatusTone = "success" | "progress" | "warning" | "danger" | "neutral";
+// Status vocabularies are keyed by their documented API enum. A wire label
+// such as ACTIVE or PENDING has no universal outcome meaning across domains.
+export type StatusEnumType =
+  | "tenant"
+  | "user"
+  | "subscription"
+  | "invoice"
+  | "operation"
+  | "db-server"
+  | "application"
+  | "backup-artifact";
 
-interface ToneStyle {
+export type StatusTone = "success" | "progress" | "warning" | "danger" | "neutral";
+
+export interface ToneStyle {
   bg: string;
   text: string;
   border: string;
   dot: string;
   labelEn: string;
   labelAr: string;
+  known: boolean;
+  rawStatus: string;
 }
 
-const TONE_STYLES: Record<StatusTone, Omit<ToneStyle, "labelEn" | "labelAr">> = {
-  success: {
-    bg: "bg-brand-500/10 dark:bg-brand-500/15",
-    text: "text-brand-700 dark:text-brand-300",
-    border: "border-brand-500/30",
-    dot: "bg-brand-500",
-  },
-  progress: {
-    bg: "bg-ink-100 dark:bg-ink-800",
-    text: "text-ink-700 dark:text-ink-300",
-    border: "border-dashed border-ink-300 dark:border-ink-600",
-    dot: "bg-ink-500 animate-pulse motion-reduce:animate-none",
-  },
-  warning: {
-    bg: "bg-warn-500/10 dark:bg-warn-500/15",
-    text: "text-warn-800 dark:text-warn-300",
-    border: "border-warn-500/30",
-    dot: "bg-warn-500",
-  },
-  danger: {
-    bg: "bg-danger-500/10 dark:bg-danger-500/15",
-    text: "text-danger-700 dark:text-danger-300",
-    border: "border-danger-500/30",
-    dot: "bg-danger-500",
-  },
-  neutral: {
-    bg: "bg-ink-100 dark:bg-ink-800",
-    text: "text-ink-600 dark:text-ink-400",
-    border: "border-ink-200 dark:border-ink-700",
-    dot: "bg-ink-400",
-  },
+const TONE_STYLES: Record<StatusTone, Pick<ToneStyle, "bg" | "text" | "border" | "dot">> = {
+  success: { bg: "bg-success-subtle", text: "text-success-subtle-foreground", border: "border-success/30", dot: "bg-success-vivid" },
+  progress: { bg: "bg-info-subtle", text: "text-info-subtle-foreground", border: "border-dashed border-info/30", dot: "bg-info-vivid animate-pulse motion-reduce:animate-none" },
+  warning: { bg: "bg-warning-subtle", text: "text-warning-subtle-foreground", border: "border-warning/30", dot: "bg-warning-vivid" },
+  danger: { bg: "bg-destructive-subtle", text: "text-destructive-subtle-foreground", border: "border-destructive/30", dot: "bg-destructive-vivid" },
+  neutral: { bg: "bg-muted", text: "text-muted-foreground", border: "border-border", dot: "bg-muted-foreground" },
 };
 
-// key = status.toUpperCase(); value = [tone, labelEn, labelAr]. Extend
-// this table rather than adding a branch elsewhere in the app.
-const STATUS_ENTRIES: Record<string, [StatusTone, string, string]> = {
-  ACTIVE: ["success", "Active", "نشط"],
-  PAID: ["success", "Paid", "مدفوع"],
-  SUCCEEDED: ["success", "Succeeded", "نجح"],
-  // Control-plane audit event outcomes — distinct wire values from the
-  // SUCCEEDED/FAILED operation-status pair above, same tones.
-  SUCCESS: ["success", "Success", "نجاح"],
+type StatusEntry = readonly [StatusTone, string, string];
+type StatusMap = Readonly<Record<string, StatusEntry>>;
 
+const TENANT_STATUSES: StatusMap = {
   PROVISIONING: ["progress", "Provisioning", "جاري التجهيز"],
-  RUNNING: ["progress", "Running", "قيد التشغيل"],
+  PROVISIONING_FAILED: ["danger", "Provisioning failed", "فشل التجهيز"],
+  ACTIVE: ["success", "Active", "نشط"],
+  SUSPENDED: ["warning", "Suspended", "معلق"],
+  DELETED: ["danger", "Deleted", "محذوف"],
+};
+
+const USER_STATUSES: StatusMap = {
+  INVITED: ["progress", "Invited", "تمت دعوته"],
+  ACTIVE: ["success", "Active", "نشط"],
+  SUSPENDED: ["warning", "Suspended", "معلق"],
+  DEACTIVATED: ["danger", "Deactivated", "غير مفعّل"],
+};
+
+const SUBSCRIPTION_STATUSES: StatusMap = {
   TRIAL: ["progress", "Trial", "تجريبي"],
-  PARTIALLY_PAID: ["progress", "Partially Paid", "مدفوع جزئياً"],
-  PENDING_ACTIVATION: ["progress", "Pending Activation", "بانتظار التفعيل"],
-  // Storage credential rotation (STAGED/ACTIVATED) and tenant storage
-  // migration (ACCEPTED/COPYING/COPIED/PLACEMENT_COMMITTED) — every
-  // non-terminal step of both flows is "progress" until their respective
-  // terminal state (REVOKED, COMPLETED).
+  PENDING_ACTIVATION: ["progress", "Pending activation", "بانتظار التفعيل"],
+  ACTIVE: ["success", "Active", "نشط"],
+  PAST_DUE: ["warning", "Past due", "متأخر السداد"],
+  CANCELLED: ["warning", "Cancelled", "ملغى"],
+};
+
+const INVOICE_STATUSES: StatusMap = {
+  DRAFT: ["neutral", "Draft", "مسودة"],
+  ISSUED: ["warning", "Issued", "صادر"],
+  PARTIALLY_PAID: ["progress", "Partially paid", "مدفوع جزئياً"],
+  PAID: ["success", "Paid", "مدفوع"],
+  OVERDUE: ["danger", "Overdue", "متأخر"],
+  VOID: ["warning", "Void", "لاغٍ"],
+};
+
+const OPERATION_STATUSES: StatusMap = {
+  REQUESTED: ["progress", "Requested", "مطلوبة"],
+  PLANNING: ["progress", "Planning", "قيد التخطيط"],
+  QUEUED: ["progress", "Queued", "في قائمة الانتظار"],
+  RUNNING: ["progress", "Running", "قيد التشغيل"],
+  WAITING_RETRY: ["warning", "Waiting to retry", "بانتظار إعادة المحاولة"],
+  CANCEL_REQUESTED: ["warning", "Cancellation requested", "طُلب الإلغاء"],
+  SUCCEEDED: ["success", "Succeeded", "نجح"],
+  FAILED_RETRYABLE: ["warning", "Failed; retry available", "فشل؛ يمكن إعادة المحاولة"],
+  MANUAL_RECOVERY_REQUIRED: ["danger", "Manual recovery required", "يتطلب استرداداً يدوياً"],
+  CANCELLED: ["warning", "Cancelled", "ملغاة"],
+};
+
+const DATABASE_SERVER_STATUSES: StatusMap = {
+  DRAFT: ["neutral", "Draft", "مسودة"],
+  ACTIVE: ["success", "Active", "نشط"],
+  DRAINING: ["warning", "Draining", "قيد الإفراغ"],
+  OFFLINE: ["danger", "Offline", "غير متصل"],
+  PENDING: ["progress", "Pending", "قيد الانتظار"],
+  PROVISIONING: ["progress", "Provisioning", "جاري التجهيز"],
+  READY: ["success", "Ready", "جاهز"],
+  ROTATING: ["progress", "Rotating", "قيد التدوير"],
+  DEFERRED: ["warning", "Deferred", "مؤجل"],
+  RECONCILING: ["progress", "Reconciling", "قيد المطابقة"],
+  DEGRADED: ["warning", "Degraded", "متدهور"],
+  DISABLED: ["danger", "Disabled", "معطّل"],
+  DELETED: ["danger", "Deleted", "محذوف"],
+};
+
+const APPLICATION_STATUSES: StatusMap = {
+  DRAFT: ["neutral", "Draft", "مسودة"],
+  ACTIVE: ["success", "Active", "نشط"],
+  DEPRECATED: ["warning", "Deprecated", "متقادم"],
+  DISABLED: ["danger", "Disabled", "معطّل"],
+};
+
+const BACKUP_ARTIFACT_STATUSES: StatusMap = {
+  PENDING: ["progress", "Pending", "قيد الانتظار"],
+  RUNNING: ["progress", "Running", "قيد التشغيل"],
+  COMPLETED: ["success", "Completed", "مكتمل"],
+  FAILED: ["danger", "Failed", "فشل"],
+  SKIPPED: ["neutral", "Skipped", "تم التخطي"],
+  EXPIRED: ["danger", "Expired", "منتهي الصلاحية"],
+};
+
+const DOMAIN_STATUS_MAPS: Record<StatusEnumType, StatusMap> = {
+  tenant: TENANT_STATUSES,
+  user: USER_STATUSES,
+  subscription: SUBSCRIPTION_STATUSES,
+  invoice: INVOICE_STATUSES,
+  operation: OPERATION_STATUSES,
+  "db-server": DATABASE_SERVER_STATUSES,
+  application: APPLICATION_STATUSES,
+  "backup-artifact": BACKUP_ARTIFACT_STATUSES,
+};
+
+// Compatibility vocabulary for call sites whose backend status family has not
+// yet been added to enumType. Ambiguous lifecycle labels stay neutral here.
+const GENERIC_STATUSES: StatusMap = {
+  ...TENANT_STATUSES,
+  ...USER_STATUSES,
+  ...SUBSCRIPTION_STATUSES,
+  ...INVOICE_STATUSES,
+  ...OPERATION_STATUSES,
+  ...DATABASE_SERVER_STATUSES,
+  ACTIVE: ["success", "Active", "نشط"],
+  PENDING: ["warning", "Pending", "قيد الانتظار"],
+  DUE: ["warning", "Due", "مستحق"],
   STAGED: ["progress", "Staged", "مُعد"],
   ACTIVATED: ["progress", "Activated", "مُفعّل"],
+  SUCCESS: ["success", "Success", "نجاح"],
+  FAILURE: ["danger", "Failure", "فشل"],
+  FAILED: ["danger", "Failed", "فشل"],
+  COMPLETED: ["success", "Completed", "مكتمل"],
+  COMPLETED_WITH_ERRORS: ["warning", "Completed with errors", "مكتمل مع أخطاء"],
+  REVOKED: ["success", "Revoked", "مُبطل"],
+  VERIFIED: ["success", "Verified", "تم التحقق"],
+  PROMOTED: ["success", "Promoted", "تمت الترقية"],
   ACCEPTED: ["progress", "Accepted", "مقبول"],
   COPYING: ["progress", "Copying", "جارٍ النسخ"],
   COPIED: ["progress", "Copied", "تم النسخ"],
-  PLACEMENT_COMMITTED: ["progress", "Placement Committed", "تم اعتماد التوزيع"],
-  // Backup encryption-key rotation actively swapping the active key —
-  // non-terminal, same "progress" treatment as the storage-credential
-  // rotation steps above.
-  ROTATING: ["progress", "Rotating", "قيد التدوير"],
-
-  SUSPENDED: ["warning", "Suspended", "معلق"],
-  ISSUED: ["warning", "Issued", "صادر"],
-  DRAINING: ["warning", "Draining", "قيد الإفراغ"],
-  PENDING: ["warning", "Pending", "قيد الانتظار"],
-  PAST_DUE: ["warning", "Past Due", "متأخر السداد"],
-  // A migration actively unwinding after a failure — not yet the terminal
-  // ROLLED_BACK state, so it reads as an active caution, not a hard danger.
-  ROLLING_BACK: ["warning", "Rolling Back", "جارٍ التراجع"],
-  // Backup job finished but recorded errors along the way — worse than a
-  // clean COMPLETED, not yet a hard FAILED.
-  COMPLETED_WITH_ERRORS: ["warning", "Completed with Errors", "مكتمل مع أخطاء"],
-  DEFERRED: ["warning", "Deferred", "مؤجل"],
-  DUE: ["warning", "Due", "مستحق"],
-
-  FAILED: ["danger", "Failed", "فشل"],
-  FAILURE: ["danger", "Failure", "فشل"],
-  PROVISIONING_FAILED: ["danger", "Provisioning Failed", "فشل التجهيز"],
-  OVERDUE: ["danger", "Overdue", "متأخر"],
-  OFFLINE: ["danger", "Offline", "غير متصل"],
-  ROLLED_BACK: ["danger", "Rolled Back", "تم التراجع"],
+  PLACEMENT_COMMITTED: ["progress", "Placement committed", "تم اعتماد التوزيع"],
+  ROLLING_BACK: ["warning", "Rolling back", "جارٍ التراجع"],
+  ROLLED_BACK: ["danger", "Rolled back", "تم التراجع"],
   EXPIRED: ["danger", "Expired", "منتهي الصلاحية"],
   BLOCKED: ["danger", "Blocked", "محظور"],
-
-  COMPLETED: ["success", "Completed", "مكتمل"],
-  // Terminal state of a credential rotation: the previous key is proven
-  // rejected. Distinct from VOID/CANCELLED below — REVOKED is the
-  // successful end of a rotation, not an abandoned one.
-  REVOKED: ["success", "Revoked", "مُبطل"],
-  // Backup evidence states: a verified restore point, or a snapshot
-  // promoted to become the new primary/active copy.
-  VERIFIED: ["success", "Verified", "تم التحقق"],
-  PROMOTED: ["success", "Promoted", "تمت الترقية"],
-  READY: ["success", "Ready", "جاهز"],
-
-  DELETED: ["neutral", "Deleted", "محذوف"],
-  CANCELLED: ["neutral", "Cancelled", "ملغى"],
-  VOID: ["neutral", "Void", "لاغٍ"],
-  OFF: ["neutral", "Off", "متوقف"],
-  // Invoice lifecycle: an unissued manual draft, editable and not yet
-  // transmitted — same neutral tone as VOID/CANCELLED (not yet "real"),
-  // but a distinct label so operators don't confuse the two.
-  DRAFT: ["neutral", "Draft", "مسودة"],
+  OFF: ["danger", "Off", "متوقف"],
 };
 
-export function resolveStatusTone(status: string): ToneStyle {
-  const entry = STATUS_ENTRIES[status?.toUpperCase()];
-  const [tone, labelEn, labelAr] = entry ?? (["neutral", status, status] as const);
-  return { ...TONE_STYLES[tone], labelEn, labelAr };
+export function resolveStatusTone(status: string, enumType?: StatusEnumType): ToneStyle {
+  const rawStatus = status?.trim() ?? "";
+  const normalized = rawStatus.toUpperCase();
+  const entry = enumType ? DOMAIN_STATUS_MAPS[enumType][normalized] : GENERIC_STATUSES[normalized];
+
+  if (!entry) {
+    return {
+      ...TONE_STYLES.neutral,
+      labelEn: "Unknown status",
+      labelAr: "حالة غير معروفة",
+      known: false,
+      rawStatus: rawStatus || "—",
+    };
+  }
+
+  const [tone, labelEn, labelAr] = entry;
+  return { ...TONE_STYLES[tone], labelEn, labelAr, known: true, rawStatus };
 }

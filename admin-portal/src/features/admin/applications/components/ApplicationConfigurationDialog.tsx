@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   Dialog,
@@ -29,8 +29,9 @@ interface Props {
 }
 
 export function ApplicationConfigurationDialog({ mode, application, isSubmitting, onClose, onUpdateMetadata, onUpdatePolicy }: Props) {
-  const { t } = useI18n();
+  const { lang, t } = useI18n();
   const copy = t.applications.detail.configuration;
+  const validationCopy = configurationValidationCopy(lang);
   const [name, setName] = useState(application.name);
   const [description, setDescription] = useState(application.description ?? "");
   const [commercialMode, setCommercialMode] = useState(application.commercialMode);
@@ -41,7 +42,10 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
   const [windowStart, setWindowStart] = useState(String(application.databasePolicy.maintenanceWindowStartUtc));
   const [windowHours, setWindowHours] = useState(String(application.databasePolicy.maintenanceWindowHours));
   const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const submissionErrorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!mode) return;
@@ -56,7 +60,8 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
       setWindowStart(String(application.databasePolicy.maintenanceWindowStartUtc));
       setWindowHours(String(application.databasePolicy.maintenanceWindowHours));
       setReason("");
-      setError(null);
+      setFieldErrors({});
+      setSubmissionError(null);
     });
   }, [application, mode]);
 
@@ -64,7 +69,25 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setError(null);
+    const nextErrors: Record<string, string> = {};
+    if (mode === "metadata" && !name.trim()) nextErrors["application-name"] = validationCopy.nameRequired;
+    if (mode === "policy") {
+      validateIntegerRange(rotationIntervalHours, 24, 8760, validationCopy.intervalInvalid, "application-rotation-interval", nextErrors);
+      validateIntegerRange(windowStart, 0, 23, validationCopy.startInvalid, "application-window-start", nextErrors);
+      validateIntegerRange(windowHours, 1, 24, validationCopy.windowInvalid, "application-window-hours", nextErrors);
+      if (!reason.trim()) nextErrors["application-policy-reason"] = copy.reasonRequired;
+    }
+    setFieldErrors(nextErrors);
+    setSubmissionError(null);
+    const invalidIds = Object.keys(nextErrors);
+    if (invalidIds.length > 0) {
+      queueMicrotask(() => {
+        if (invalidIds.length === 1) document.getElementById(invalidIds[0])?.focus();
+        else errorSummaryRef.current?.focus();
+      });
+      return;
+    }
+
     try {
       if (mode === "metadata") {
         await onUpdateMetadata({
@@ -75,7 +98,6 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
           catalogueVisibility: visibility,
         });
       } else {
-        if (reason.trim().length < 1) throw new Error(copy.reasonRequired);
         await onUpdatePolicy({
           expectedPolicyRevision: application.databasePolicy.policyRevision,
           enableOnNewServers,
@@ -88,24 +110,42 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
       }
       onClose();
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : copy.failed);
+      setSubmissionError(submissionError instanceof Error ? submissionError.message : copy.failed);
+      queueMicrotask(() => submissionErrorRef.current?.focus());
     }
   };
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-sm">{mode === "metadata" ? copy.metadataTitle : copy.policyTitle}</DialogTitle>
           <p className="text-xs text-muted-foreground">
             {copy.revisionPrefix} {mode === "metadata" ? application.catalogueRevision : application.databasePolicy.policyRevision} {copy.revisionSuffix}
           </p>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
+          {Object.keys(fieldErrors).length > 1 && (
+            <div
+              ref={errorSummaryRef}
+              role="alert"
+              tabIndex={-1}
+              className="rounded-md border border-destructive bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <p className="font-semibold">{validationCopy.summary}</p>
+              <ul className="mt-2 list-disc space-y-1 ps-5">
+                {Object.entries(fieldErrors).map(([id, message]) => (
+                  <li key={id}>
+                    <a className="underline underline-offset-2" href={`#${id}`}>{message}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {mode === "metadata" ? (
             <>
               {application.publicationStatus === "PUBLISHED" && (
-                <div role="note" className="flex gap-3 rounded-lg border border-warn-200 bg-warn-50 p-3 text-warn-900 dark:border-warn-800/60 dark:bg-warn-950/30 dark:text-warn-200">
+                <div role="note" className="flex gap-3 rounded-md border border-warning bg-warning-subtle p-3 text-warning-subtle-foreground">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <div>
                     <p className="text-xs font-semibold">{copy.publicationInvalidationTitle}</p>
@@ -113,8 +153,20 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
                   </div>
                 </div>
               )}
-              <Field label={copy.name}>
-                {(fp) => <Input {...fp} required maxLength={128} value={name} onChange={(event) => setName(event.target.value)} />}
+              <Field id="application-name" label={copy.name} required error={fieldErrors["application-name"]}>
+                {(fp) => (
+                  <Input
+                    {...fp}
+                    required
+                    invalid={Boolean(fieldErrors["application-name"])}
+                    maxLength={128}
+                    value={name}
+                    onChange={(event) => {
+                      setName(event.target.value);
+                      clearFieldError("application-name", setFieldErrors);
+                    }}
+                  />
+                )}
               </Field>
               <Field label={copy.description}>
                 {(fp) => <Textarea {...fp} rows={3} maxLength={512} value={description} onChange={(event) => setDescription(event.target.value)} />}
@@ -123,7 +175,7 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
                 <Field label={copy.commercialMode}>
                   {(fp) => (
                     <Select value={commercialMode} onValueChange={(value) => setCommercialMode(value as ApplicationView["commercialMode"])}>
-                      <SelectTrigger id={fp.id}>
+                      <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -137,7 +189,7 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
                 <Field label={copy.visibility}>
                   {(fp) => (
                     <Select value={visibility} onValueChange={(value) => setVisibility(value as ApplicationView["catalogueVisibility"])}>
-                      <SelectTrigger id={fp.id}>
+                      <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -156,32 +208,36 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
                 <Toggle label={copy.automaticRotation} checked={rotationEnabled} onChange={setRotationEnabled} />
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
-                <Field label={copy.intervalHours}>
-                  {(fp) => <Input {...fp} type="number" min={24} max={8760} value={rotationIntervalHours} onChange={(event) => setRotationIntervalHours(event.target.value)} />}
+                <Field id="application-rotation-interval" label={copy.intervalHours} error={fieldErrors["application-rotation-interval"]}>
+                  {(fp) => <Input {...fp} invalid={Boolean(fieldErrors["application-rotation-interval"])} type="number" min={24} max={8760} value={rotationIntervalHours} onChange={(event) => { setRotationIntervalHours(event.target.value); clearFieldError("application-rotation-interval", setFieldErrors); }} />}
                 </Field>
-                <Field label={copy.utcStartHour}>
-                  {(fp) => <Input {...fp} type="number" min={0} max={23} value={windowStart} onChange={(event) => setWindowStart(event.target.value)} />}
+                <Field id="application-window-start" label={copy.utcStartHour} error={fieldErrors["application-window-start"]}>
+                  {(fp) => <Input {...fp} invalid={Boolean(fieldErrors["application-window-start"])} type="number" min={0} max={23} value={windowStart} onChange={(event) => { setWindowStart(event.target.value); clearFieldError("application-window-start", setFieldErrors); }} />}
                 </Field>
-                <Field label={copy.windowHours}>
-                  {(fp) => <Input {...fp} type="number" min={1} max={24} value={windowHours} onChange={(event) => setWindowHours(event.target.value)} />}
+                <Field id="application-window-hours" label={copy.windowHours} error={fieldErrors["application-window-hours"]}>
+                  {(fp) => <Input {...fp} invalid={Boolean(fieldErrors["application-window-hours"])} type="number" min={1} max={24} value={windowHours} onChange={(event) => { setWindowHours(event.target.value); clearFieldError("application-window-hours", setFieldErrors); }} />}
                 </Field>
               </div>
-              <Field label={copy.changeReason}>
-                {(fp) => <Textarea {...fp} required maxLength={256} rows={2} value={reason} onChange={(event) => setReason(event.target.value)} />}
+              <Field id="application-policy-reason" label={copy.changeReason} required error={fieldErrors["application-policy-reason"]}>
+                {(fp) => <Textarea {...fp} invalid={Boolean(fieldErrors["application-policy-reason"])} required maxLength={256} rows={2} value={reason} onChange={(event) => { setReason(event.target.value); clearFieldError("application-policy-reason", setFieldErrors); }} />}
               </Field>
             </>
           )}
-          {error && (
-            <p role="alert" className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-xs text-danger-700 dark:border-danger-800/60 dark:bg-danger-950/40 dark:text-danger-300">
-              {error}
-            </p>
+          {submissionError && (
+            <div
+              ref={submissionErrorRef}
+              role="alert"
+              tabIndex={-1}
+              className="rounded-md border border-destructive bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {submissionError}
+            </div>
           )}
-          <footer className="flex justify-end gap-2 pt-2">
+          <footer className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" disabled={isSubmitting} onClick={onClose}>
               {t.applications.cancel}
             </Button>
-            <Button type="submit" variant="primary" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+            <Button type="submit" variant="primary" loading={isSubmitting}>
               {copy.save}
             </Button>
           </footer>
@@ -192,10 +248,57 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
 }
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  const id = useId();
   return (
-    <label className="flex items-center gap-3 rounded-lg border border-border px-3 py-3 text-xs font-semibold text-foreground">
-      <Checkbox checked={checked} onCheckedChange={(next) => onChange(next === true)} />
-      {label}
-    </label>
+    <div className="flex min-h-11 items-center gap-3 rounded-md border border-input px-3 py-2 text-xs font-semibold text-foreground">
+      <Checkbox id={id} checked={checked} onCheckedChange={(next) => onChange(next === true)} />
+      <label htmlFor={id} className="cursor-pointer">{label}</label>
+    </div>
   );
+}
+
+function validateIntegerRange(
+  rawValue: string,
+  minimum: number,
+  maximum: number,
+  message: string,
+  fieldId: string,
+  errors: Record<string, string>,
+) {
+  if (!rawValue.trim()) {
+    errors[fieldId] = message;
+    return;
+  }
+  const value = Number(rawValue);
+  if (!Number.isInteger(value) || value < minimum || value > maximum) errors[fieldId] = message;
+}
+
+function clearFieldError(
+  fieldId: string,
+  setErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+) {
+  setErrors((current) => {
+    if (!current[fieldId]) return current;
+    const next = { ...current };
+    delete next[fieldId];
+    return next;
+  });
+}
+
+function configurationValidationCopy(lang: "ar" | "en") {
+  return lang === "ar"
+    ? {
+        summary: "راجع الحقول التالية قبل الحفظ.",
+        nameRequired: "اسم التطبيق مطلوب.",
+        intervalInvalid: "يجب أن تكون فترة التدوير عددًا صحيحًا بين 24 و8760 ساعة.",
+        startInvalid: "يجب أن تكون ساعة البدء بالتوقيت العالمي عددًا صحيحًا بين 0 و23.",
+        windowInvalid: "يجب أن تكون مدة نافذة الصيانة عددًا صحيحًا بين 1 و24 ساعة.",
+      }
+    : {
+        summary: "Review the following fields before saving.",
+        nameRequired: "Application name is required.",
+        intervalInvalid: "Rotation interval must be an integer from 24 to 8,760 hours.",
+        startInvalid: "UTC start hour must be an integer from 0 to 23.",
+        windowInvalid: "Maintenance window must be an integer from 1 to 24 hours.",
+      };
 }

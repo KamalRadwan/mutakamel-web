@@ -210,7 +210,8 @@ export interface TenantCreateCommand {
   subscription: {
     billingCycle: TenantBillingCycle;
     currencyCode: "USD";
-    trialDays: number;
+    /** Omit to let Core apply the `tenants.trial_days` platform setting. */
+    trialDays?: number;
     items: Array<{
       moduleKey: string;
       tierKey: string;

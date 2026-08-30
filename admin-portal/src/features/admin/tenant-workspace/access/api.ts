@@ -8,7 +8,6 @@ import {
   readTenantUserPage,
   readTenantUserSummary,
   readTenantUserView,
-  readTenantUserWebphone,
 } from "./readers";
 import type {
   CatalogueQuery,
@@ -20,7 +19,6 @@ import type {
   TenantUserListQuery,
   TenantUserSummaryQuery,
   UpdateTenantUserInput,
-  UpdateTenantUserWebphoneInput,
 } from "./types";
 
 const BASE_URL = "/api/admin/core/v1/tenants";
@@ -260,20 +258,6 @@ export const tenantAccessApi = {
       writeConfig(idempotencyKey),
     );
     return readTenantUserView(response.data);
-  },
-
-  updateWebphone: async (
-    tenantId: string,
-    userId: string,
-    input: UpdateTenantUserWebphoneInput,
-    idempotencyKey: string,
-  ) => {
-    const response = await axiosClient.patch<unknown>(
-      `${userUrl(tenantId, userId)}/webphone`,
-      input,
-      writeConfig(idempotencyKey),
-    );
-    return readTenantUserWebphone(response.data);
   },
 
   suspendUser: async (tenantId: string, userId: string, idempotencyKey: string) => {

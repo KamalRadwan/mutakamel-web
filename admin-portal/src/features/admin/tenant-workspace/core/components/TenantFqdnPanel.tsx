@@ -1,6 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
+  Button,
+  Card,
+  Field,
+  Input,
+} from "@/design-system";
 import type { useTenantFqdnManagement } from "../hooks/useTenantFqdnManagement";
 import { canPromoteLegacyPrimary } from "../model/readers";
 import type { TenantCorePermissions, TenantView } from "../types";
@@ -26,11 +41,16 @@ export function TenantFqdnPanel({
   const [removeId, setRemoveId] = useState<string | null>(null);
   const busy = fqdn.isPreflighting || fqdn.mutation.name !== null;
   const canMutate = tenant.status === "ACTIVE" && permissions.canManageFqdns;
+  // Every domain mutation in Core requires an ACTIVE tenant, so offering the
+  // form in any other state only produces a 409 the admin cannot act on.
+  const canAttach = tenant.status === "ACTIVE" && permissions.canValidateFqdn;
+  const released = tenant.status === "DELETED";
 
   return (
-    <section className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-xs dark:border-border dark:bg-ink-900">
-      <div className="flex items-center justify-between gap-2 border-b border-border pb-3 dark:border-border">
-        <h2 className="text-sm font-semibold text-foreground">
+    <section aria-labelledby="tenant-domains-title">
+    <Card className="space-y-4 p-4">
+      <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
+        <h2 id="tenant-domains-title" className="text-sm font-semibold text-foreground">
           {text.domains}
         </h2>
         <span className="text-xs font-semibold text-muted-foreground">
@@ -38,33 +58,45 @@ export function TenantFqdnPanel({
         </span>
       </div>
 
-      {permissions.canValidateFqdn && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-          <input
-            value={fqdn.candidate}
-            disabled={busy}
-            placeholder={text.domainPlaceholder}
-            aria-label={text.domainFieldLabel}
-            onChange={(event) => fqdn.setCandidate(event.target.value)}
-            className="rounded-lg border border-border bg-ink-100 px-3 py-2 text-xs font-mono outline-hidden focus:border-brand-500 disabled:opacity-60 dark:bg-ink-800"
-          />
-          <button
+      {released && (
+        <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
+          {text.domainsReleased}
+        </p>
+      )}
+
+      {canAttach && (
+        <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+          <Field id="tenant-fqdn" label={text.domainFieldLabel} error={fqdn.preflightError?.message}>
+            {(field) => (
+              <Input
+                {...field}
+                name="fqdn"
+                value={fqdn.candidate}
+                disabled={busy}
+                placeholder={text.domainPlaceholder}
+                className="font-mono"
+                onChange={(event) => fqdn.setCandidate(event.target.value)}
+              />
+            )}
+          </Field>
+          <Button
             type="button"
+            variant="outline"
             disabled={busy || !fqdn.candidate.trim()}
             onClick={() => void fqdn.preflight().catch(() => undefined)}
-            className="rounded-lg border border-brand-300 px-3 py-2 text-xs font-semibold text-brand-700 disabled:opacity-50 dark:border-brand-800 dark:text-brand-300"
+            loading={fqdn.isPreflighting}
           >
-            {fqdn.isPreflighting ? "…" : text.validate}
-          </button>
+            {text.validate}
+          </Button>
           {permissions.canManageFqdns && (
-            <button
+            <Button
               type="button"
+              variant="primary"
               disabled={busy || !fqdn.canAdd}
               onClick={() => void fqdn.add().catch(() => undefined)}
-              className="rounded-lg bg-brand-500 px-3 py-2 text-xs font-semibold text-ink-950 disabled:opacity-50 dark:bg-brand-400"
             >
               {text.addDomain}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -72,10 +104,10 @@ export function TenantFqdnPanel({
       {fqdn.evidence && (
         <div
           role="status"
-          className={`rounded-xl border p-3 text-xs ${
+          className={`rounded-lg border p-3 text-xs ${
             fqdn.evidence.available
-              ? "border-brand-300 bg-brand-50 text-brand-900 dark:border-brand-900 dark:bg-brand-950/30 dark:text-brand-200"
-              : "border-danger-300 bg-danger-50 text-danger-900 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-200"
+              ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+              : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
           }`}
         >
           <p className="font-semibold">{fqdn.evidence.message}</p>
@@ -87,111 +119,105 @@ export function TenantFqdnPanel({
 
       <InlineError
         locale={locale}
-        error={fqdn.listError ?? fqdn.preflightError ?? fqdn.mutation.error}
+        error={fqdn.listError ?? fqdn.mutation.error}
       />
 
       {fqdn.listError ? (
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => void fqdn.reloadFqdns()}
-          className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold dark:border-border"
         >
           {text.reloadDomains}
-        </button>
+        </Button>
       ) : null}
 
       <div className="space-y-2">
         {fqdn.isLoadingFqdns ? (
           <p
             role="status"
-            className="rounded-xl bg-ink-100 p-4 text-center text-xs text-muted-foreground dark:bg-ink-800/50"
+            className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground"
           >
             {text.loadingDomains}
           </p>
         ) : fqdn.fqdns.length === 0 && !fqdn.listError ? (
-          <p className="rounded-xl bg-ink-100 p-4 text-center text-xs text-muted-foreground dark:bg-ink-800/50">
+          <p className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground">
             {text.noDomains}
           </p>
         ) : null}
         {fqdn.fqdns.map((row) => (
           <div
             key={row.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3 dark:border-border"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
           >
             <div className="min-w-0">
               <p className="truncate font-mono text-xs font-semibold text-foreground">
                 {row.fqdn}
               </p>
               <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
-                <span className="rounded-full bg-ink-100 px-2 py-0.5 dark:bg-ink-800">
+                <Badge tone={row.isPrimary ? "info" : "neutral"} className="normal-case tracking-normal">
                   {row.isPrimary ? text.primary : text.secondary}
-                </span>
-                <span className="rounded-full bg-ink-100 px-2 py-0.5 font-mono dark:bg-ink-800">
+                </Badge>
+                <Badge tone={fqdnValidationTone(row.validationStatus)} className="font-mono">
                   {row.validationStatus}
-                </span>
+                </Badge>
               </div>
             </div>
             {canMutate && !row.isPrimary && (
               <div className="flex gap-2">
                 {canPromoteLegacyPrimary(tenant, row) && (
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     disabled={busy}
                     onClick={() =>
                       void fqdn.promote(row.id).catch(() => undefined)
                     }
-                    className="rounded-lg bg-brand-100 px-2.5 py-1.5 text-xs font-semibold text-brand-800 disabled:opacity-50 dark:bg-brand-950 dark:text-brand-200"
                   >
                     {text.promote}
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   type="button"
+                  variant="destructive"
+                  size="sm"
                   disabled={busy}
                   onClick={() => setRemoveId(row.id)}
-                  className="rounded-lg bg-danger-100 px-2.5 py-1.5 text-xs font-semibold text-danger-800 disabled:opacity-50 dark:bg-danger-950 dark:text-danger-200"
                 >
                   {text.remove}
-                </button>
+                </Button>
               </div>
             )}
           </div>
         ))}
       </div>
 
-      {removeId && (
-        <div
-          role="alertdialog"
-          aria-label={text.remove}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-danger-300 bg-danger-50 p-3 text-xs dark:border-danger-900 dark:bg-danger-950/30"
-        >
-          <span>{text.confirmRemoveDomain}</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                const id = removeId;
-                void fqdn
-                  .remove(id)
-                  .then(() => setRemoveId(null))
-                  .catch(() => undefined);
-              }}
-              className="rounded-lg bg-danger-700 px-3 py-1.5 font-semibold text-white disabled:opacity-50"
-            >
-              {text.confirm}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setRemoveId(null)}
-              className="rounded-lg border border-border px-3 py-1.5 dark:border-border"
-            >
-              {text.cancel}
-            </button>
-          </div>
-        </div>
-      )}
+      <AlertDialog open={removeId !== null} onOpenChange={(open) => !open && setRemoveId(null)}>
+        {removeId ? (
+          <AlertDialogContent dir={locale === "ar" ? "rtl" : "ltr"}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{text.remove}</AlertDialogTitle>
+              <AlertDialogDescription>{text.confirmRemoveDomain}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={busy}>{text.cancel}</AlertDialogCancel>
+              <AlertDialogAction
+                destructive
+                disabled={busy}
+                onClick={(event) => {
+                  event.preventDefault();
+                  const id = removeId;
+                  void fqdn.remove(id).then(() => setRemoveId(null)).catch(() => undefined);
+                }}
+              >
+                {text.confirm}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        ) : null}
+      </AlertDialog>
+    </Card>
     </section>
   );
 }
@@ -203,12 +229,18 @@ function InlineError({
   locale: TenantWorkspaceLocale;
   error: { message: string; correlationId?: string } | null;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) ref.current?.focus();
+  }, [error]);
   if (!error) return null;
   const text = tenantWorkspaceCopy(locale);
   return (
     <div
+      ref={ref}
       role="alert"
-      className="rounded-xl border border-danger-300 bg-danger-50 p-3 text-xs text-danger-900 dark:border-danger-900 dark:bg-danger-950/30 dark:text-danger-200"
+      tabIndex={-1}
+      className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <p>{error.message}</p>
       {error.correlationId && (
@@ -218,4 +250,11 @@ function InlineError({
       )}
     </div>
   );
+}
+
+function fqdnValidationTone(status: string): "success" | "danger" | "warn" | "neutral" {
+  if (status === "VERIFIED") return "success";
+  if (status === "FAILED" || status === "REJECTED") return "danger";
+  if (status === "PENDING") return "warn";
+  return "neutral";
 }

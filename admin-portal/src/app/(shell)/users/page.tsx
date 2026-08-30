@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Users, UserPlus, Mail, CheckCircle2, Clock, ShieldCheck, PhoneCall, Ban, RefreshCw, Trash2 } from "lucide-react";
+import { Users, UserPlus, Mail, CheckCircle2, Clock, ShieldCheck, PhoneCall, Ban, RefreshCw, Trash2, MoreHorizontal } from "lucide-react";
 import {
   PageHeader,
   StatGrid,
@@ -10,6 +10,10 @@ import {
   DataTable,
   Badge,
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   ErrorState,
   type ColumnDef,
 } from "@/design-system";
@@ -78,7 +82,7 @@ export default function UsersDirectoryPage() {
         const rowPermissions = getUserRowPermissions(currentUser, usr.id, usr.status);
         return (
           <Link href={`/users/${usr.id}`} className="flex items-center gap-2 font-semibold hover:underline">
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-ink-200 text-xs font-semibold text-ink-700 dark:bg-ink-700 dark:text-ink-200">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
               {usr.firstName[0]}
             </div>
             <div>
@@ -86,10 +90,10 @@ export default function UsersDirectoryPage() {
                 <span>
                   {usr.firstName} {usr.lastName}
                 </span>
-                {rowPermissions.isSelf && <Badge tone="brand">{t.users.youBadge}</Badge>}
+                {rowPermissions.isSelf && <Badge tone="info">{t.users.youBadge}</Badge>}
               </div>
               <div className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-                <Mail className="size-3" />
+                <Mail className="size-3" aria-hidden="true" />
                 {usr.email}
               </div>
             </div>
@@ -114,8 +118,8 @@ export default function UsersDirectoryPage() {
       cell: (usr) => {
         if (usr.status === "ACTIVE") {
           return (
-            <Badge tone="brand">
-              <CheckCircle2 className="size-3" />
+            <Badge tone="success">
+              <CheckCircle2 className="size-3" aria-hidden="true" />
               {t.users.active}
             </Badge>
           );
@@ -123,14 +127,14 @@ export default function UsersDirectoryPage() {
         if (usr.status === "INVITED") {
           return (
             <Badge tone="warn">
-              <Clock className="size-3" />
+              <Clock className="size-3" aria-hidden="true" />
               {t.users.invited}
             </Badge>
           );
         }
         return (
           <Badge tone={usr.status === "SUSPENDED" ? "danger" : "neutral"}>
-            <Ban className="size-3" />
+            <Ban className="size-3" aria-hidden="true" />
             {usr.status === "SUSPENDED" ? t.users.suspended : t.users.deactivated}
           </Badge>
         );
@@ -142,8 +146,8 @@ export default function UsersDirectoryPage() {
       headerAr: t.users.sipExtension,
       cell: (usr) =>
         usr.webphoneExtension ? (
-          <span className="flex w-fit items-center gap-1 rounded-md bg-ink-100 px-2 py-0.5 font-mono text-xs text-foreground dark:bg-ink-800">
-            <PhoneCall className="size-3 text-brand-500" />
+          <span className="flex w-fit items-center gap-1 rounded-md bg-info-subtle px-2 py-0.5 font-mono text-xs text-info-subtle-foreground">
+            <PhoneCall className="size-3 text-info" aria-hidden="true" />
             Ext {usr.webphoneExtension}
           </span>
         ) : (
@@ -157,41 +161,45 @@ export default function UsersDirectoryPage() {
       align: "end",
       cell: (usr) => {
         const rowPermissions = getUserRowPermissions(currentUser, usr.id, usr.status);
+        const hasActions = rowPermissions.canSuspend || rowPermissions.canActivate || rowPermissions.canDelete;
+        if (!hasActions) return <span aria-hidden="true" className="text-muted-foreground">—</span>;
+
         return (
-          <div className="flex items-center justify-end gap-1">
-            {rowPermissions.canSuspend && (
-              <button
-                type="button"
-                onClick={() => openModal(usr.id, "suspend")}
-                disabled={isActionLoading}
-                title={t.users.suspendAccount}
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-warn-50 hover:text-warn-600 disabled:opacity-50 dark:hover:bg-warn-950/40 dark:hover:text-warn-400"
-              >
-                <Ban className="size-3.5" />
-              </button>
-            )}
-            {rowPermissions.canActivate && (
-              <button
-                type="button"
-                onClick={() => openModal(usr.id, "activate")}
-                disabled={isActionLoading}
-                title={t.users.activateAccount}
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:opacity-50 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
-              >
-                <RefreshCw className="size-3.5" />
-              </button>
-            )}
-            {rowPermissions.canDelete && (
-              <button
-                type="button"
-                onClick={() => openModal(usr.id, "delete")}
-                disabled={isActionLoading}
-                title={t.users.delete}
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-danger-50 hover:text-danger-600 disabled:opacity-50 dark:hover:bg-danger-950/40 dark:hover:text-danger-400"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            )}
+          <div className="flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="md"
+                  disabled={isActionLoading}
+                  aria-label={`${t.users.actions}: ${usr.firstName} ${usr.lastName}`}
+                  className="size-8 p-0"
+                >
+                  <MoreHorizontal className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {rowPermissions.canSuspend && (
+                  <DropdownMenuItem onSelect={() => openModal(usr.id, "suspend")} className="text-warning">
+                    <Ban className="size-4" aria-hidden="true" />
+                    {t.users.suspendAccount}
+                  </DropdownMenuItem>
+                )}
+                {rowPermissions.canActivate && (
+                  <DropdownMenuItem onSelect={() => openModal(usr.id, "activate")}>
+                    <RefreshCw className="size-4 text-success" aria-hidden="true" />
+                    {t.users.activateAccount}
+                  </DropdownMenuItem>
+                )}
+                {rowPermissions.canDelete && (
+                  <DropdownMenuItem destructive onSelect={() => openModal(usr.id, "delete")}>
+                    <Trash2 className="size-4" aria-hidden="true" />
+                    {t.users.delete}
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },

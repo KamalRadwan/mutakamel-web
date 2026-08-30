@@ -98,7 +98,7 @@ function ReleaseBody({ detail, copy, lang }: { detail: ReturnType<typeof useRele
         {release.signatureBase64 ? (
           <Field label={copy.signatureBase64}>
             {(fieldProps) => (
-              <Textarea {...fieldProps} readOnly dir="ltr" rows={4} value={release.signatureBase64 ?? ""} className="bg-ink-950 font-mono text-xs text-ink-100" />
+              <Textarea {...fieldProps} readOnly dir="ltr" rows={4} value={release.signatureBase64 ?? ""} className="bg-muted font-mono text-xs text-foreground" />
             )}
           </Field>
         ) : null}
@@ -116,7 +116,7 @@ function RetireForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDeta
     return <ReleaseStatePanel kind="forbidden" title={copy.commandForbidden} detail="admin.provisioning.releases.retire + admin.provisioning.critical" copy={copy} />;
   }
   return (
-    <Card className="border-danger-300 bg-danger-50 p-5 dark:border-danger-900 dark:bg-danger-950/20">
+    <Card className="border-destructive/30 bg-destructive-subtle p-5">
       <form
         aria-label={copy.retireTitle}
         onSubmit={(event) => {
@@ -144,7 +144,7 @@ function RetireForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDeta
           )}
         </Field>
         <ReleaseFieldError id="retirement-reason-error" code={detail.retireErrors.reasonCode} copy={copy} />
-        <label className="flex items-start gap-3 rounded-lg border border-danger-300 bg-card/60 p-3 text-sm font-semibold text-foreground dark:border-danger-900">
+        <label className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-card/60 p-3 text-sm font-semibold text-foreground">
           <Checkbox
             checked={detail.retireDraft.confirmed}
             onCheckedChange={(next) => detail.updateRetireDraft("confirmed", next === true)}
@@ -173,7 +173,7 @@ function EvidenceCard({ title, children }: { title: string; children: React.Reac
 
 function Evidence({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-lg bg-ink-100 px-3 py-2 dark:bg-ink-900">
+    <div className="rounded-lg bg-muted px-3 py-2">
       <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
       <dd dir={mono ? "ltr" : undefined} className={`mt-1 break-all text-sm font-semibold text-foreground ${mono ? "text-start font-mono" : ""}`}>{value}</dd>
     </div>

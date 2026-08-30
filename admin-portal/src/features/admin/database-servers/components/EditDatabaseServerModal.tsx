@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { DatabaseServerView } from "../types";
 import { Edit2 } from "lucide-react";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/design-system";
 import { DatabaseSslConfigurationFields } from "./DatabaseSslConfigurationFields";
 import { useEditDatabaseServerModal } from "../hooks/useEditDatabaseServerModal";
+import { useI18n } from "@/i18n/I18nContext";
 
 interface EditDatabaseServerModalProps {
   isOpen: boolean;
@@ -44,6 +46,8 @@ function EditDatabaseServerModalContent({
   onClose,
   onSuccess,
 }: Omit<EditDatabaseServerModalProps, "isOpen">) {
+  const { dir } = useI18n();
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const {
     copy,
     name,
@@ -64,28 +68,44 @@ function EditDatabaseServerModalContent({
     removeSslConfig,
     setRemoveSslConfig,
     isSubmitting,
+    formError,
     handleSslModeChange,
     handleSubmit,
   } = useEditDatabaseServerModal({ server, onClose, onSuccess });
 
+  useEffect(() => {
+    if (formError) errorRef.current?.focus();
+  }, [formError]);
+
   return (
     <Dialog open onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent dir={dir} className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader className="flex-row items-center gap-2.5 space-y-0">
-          <span className="rounded-lg bg-brand-50 p-2 text-brand-600 dark:bg-brand-950/50 dark:text-brand-400">
-            <Edit2 className="w-5 h-5" aria-hidden="true" />
+          <span className="rounded-lg bg-info-subtle p-2 text-info-subtle-foreground">
+            <Edit2 className="size-5" aria-hidden="true" />
           </span>
           <DialogTitle className="text-base">{copy.title}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          {formError && (
+            <p
+              ref={errorRef}
+              role="alert"
+              tabIndex={-1}
+              className="rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {formError}
+            </p>
+          )}
+
           <Field label={copy.displayName}>
             {(fieldProps) => (
               <Input {...fieldProps} type="text" required value={name} onChange={(e) => setName(e.target.value)} className="font-semibold" />
             )}
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label={copy.hostAddress}>
               {(fieldProps) => (
                 <Input {...fieldProps} type="text" required value={host} onChange={(e) => setHost(e.target.value)} className="font-mono font-semibold" />
@@ -98,7 +118,7 @@ function EditDatabaseServerModalContent({
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label={copy.maxTenants}>
               {(fieldProps) => (
                 <Input {...fieldProps} type="number" required min={1} value={maxTenants} onChange={(e) => setMaxTenants(Number(e.target.value))} className="font-mono font-semibold" />
@@ -129,8 +149,8 @@ function EditDatabaseServerModalContent({
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               {copy.cancel}
             </Button>
-            <Button type="submit" variant="primary" disabled={isSubmitting}>
-              {isSubmitting ? copy.saving : copy.save}
+            <Button type="submit" variant="primary" loading={isSubmitting}>
+              {copy.save}
             </Button>
           </div>
         </form>
