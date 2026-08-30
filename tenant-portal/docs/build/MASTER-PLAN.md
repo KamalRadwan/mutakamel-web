@@ -270,8 +270,16 @@ copy. "Kanban" must not appear in any user-facing string.
 - **V5 — `BoardCard` has no `role="button"`** while `CardView`'s wrapper does,
   and a small drag fires `onClick`. Click and drag are not disambiguated.
 
-Phase 2 fixes this with one generic `WorkspaceView<T>` contract that all three
-implement, owning pagination, sorting, selection and scroll restoration once.
+Phase 2 fixes this with one generic `WorkspaceViewProps<T>` contract that all
+three implement, owning pagination, sorting, selection and scroll restoration
+once.
+
+**Resolved 2026-08-31.** V1, V2, V3 and V5 are closed; V4 is closed on the two
+surfaces that carry no drag. The table above is the state *before* Phase 2 —
+`docs/design/views.md#the-shared-contract` describes what shipped. What is
+still open: the card view's sort control exists but no data hook accepts a
+sort parameter (2.4), and board-column windowing waits on D9's `react-window`
+decision and a real browser drag (2.8).
 
 ## 0.6 Scope — what "the whole application" means
 
@@ -332,8 +340,8 @@ gate red.
 | Phase | Title | Tasks | Done |
 |---|---|---:|---:|
 | 0 | Design system correction | 34 | 27 |
-| 1 | Design system completion | 50 | 24 |
-| 2 | The three views, properly | 18 | 0 |
+| 1 | Design system completion | 50 | 50 |
+| 2 | The three views, properly | 18 | 16 |
 | 3 | Accessibility, cross-cutting mechanisms | 40 | 1 |
 | 4 | Core · identity and organization | 34 | 2 |
 | 5 | Core · settings and catalogues | 19 | 1 |
@@ -345,7 +353,7 @@ gate red.
 | 11 | Trade · commercial documents | 22 | 0 |
 | 12 | Trade · advanced and analytics | 28 | 0 |
 | 13 | Hardening and release | 27 | 0 |
-| | **Total** | **379** | **56** |
+| | **Total** | **379** | **98** |
 
 ---
 
@@ -434,12 +442,13 @@ everything else stands on. Nothing else starts until this gate is green.
 
 ## Phase 1 — Design system completion
 
-**24 / 50 done.** Builds the components the rest of the plan depends on. Every
+**50 / 50 done.** Builds the components the rest of the plan depends on. Every
 one is generic, prop-driven, bilingual and themed — no entity knowledge.
 
 ### Dependencies
 
-- [ ] **1.1** Add `react-day-picker` + `date-fns` (G14), `cmdk` (G21), `recharts` (G17), `@radix-ui/react-accordion`, `-collapsible`, `-toggle-group`, `-progress`, `-hover-card`, `-context-menu` (G22), `@tanstack/react-virtual` (G19)
+- [x] **1.1** Add `react-day-picker` + `date-fns` (G14), `cmdk` (G21), `recharts` (G17), `@radix-ui/react-accordion`, `-collapsible`, `-toggle-group`, `-progress`, `-hover-card`, `-context-menu` (G22), `@tanstack/react-virtual` (G19). **All installed.** `react-window` is deliberately NOT installed — D9 assigns it to the board only, 2.8 is the task that earns it, and an unused dependency fails `knip`
+  - **1.50 — the shared lockfile.** `tenant-portal` has **no lockfile of its own**: `../pnpm-lock.yaml` and `../pnpm-workspace.yaml` are shared with `admin-portal` and `partner-portal`. This install added 3 direct packages and touched **261 lockfile lines**, so both siblings' next `pnpm install` resolves against it. No shared version moved and neither sibling depends on the three new packages — but the lockfile diff belongs in this change's review, not a later one
 - [x] **1.2** Decide and record: `react-hook-form` + `zodResolver` for forms (G23), or keep hand-rolled. If adopted, `FormDrawer` becomes its host
 
 ### Primitives
@@ -448,7 +457,7 @@ one is generic, prop-driven, bilingual and themed — no entity knowledge.
 - [x] **1.4** `DateRangePicker` — from/to with presets (today, last 7/30/90 days, this month, this quarter)
 - [x] **1.5** `Combobox` — single-select with type-ahead over a large remote list, debounced, with loading and empty states
 - [x] **1.6** `MultiSelect` — chips inside the trigger, overflow collapses to "+N", clear-all
-- [ ] **1.7** `FileUpload` — drag-and-drop plus click, MIME allowlist, size cap, per-file progress, preview for images. Backend caps: branding 2 MB, party image 2 MB, template asset 5 MiB, CRM attachment 26 MiB
+- [x] **1.7** `FileUpload` — drag-and-drop plus click, MIME allowlist, size cap, **no progress bar** (1.45 / D14), preview for images. Backend caps: branding 2 MB, party image 2 MB, template asset 5 MiB, CRM attachment 26 MiB
 - [x] **1.8** `Stepper` — horizontal, numbered, with per-step valid/invalid/current state and RTL ordering
 - [x] **1.9** `Progress` — determinate and indeterminate, with `role="progressbar"` and full ARIA values
 - [x] **1.10** `Accordion` and `Collapsible`
@@ -461,47 +470,47 @@ one is generic, prop-driven, bilingual and themed — no entity knowledge.
 
 ### Patterns
 
-- [ ] **1.17** `FilterBar` gains real filter types (G5): select, multi-select, date range, numeric range, boolean. Chips overflow behind "+N" (audit B12)
-- [ ] **1.18** `DetailHeader` — title, subtitle, status badge, back link, action cluster. Every detail screen in phases 4–12 uses it
-- [ ] **1.19** `DetailSection` — a labelled field group for read-mostly detail bodies
-- [ ] **1.20** `Timeline` — for audit history, stage history, delivery attempts, approval ladders
-- [ ] **1.21** `AttachmentList` — list, upload, download, delete; built on `FileUpload`
-- [ ] **1.22** `CommandPalette` — Ctrl/Cmd+K, navigates the permission-filtered nav tree (G21)
-- [ ] **1.23** `Chart` wrappers — line, bar, area, donut, sparkline. Colours come from the four role ramps only; the categorical sequence is defined once and is colourblind-checked (G17)
-- [ ] **1.24** Every new primitive and pattern gets: both dictionary keys, a `.test.tsx`, an entry in `docs/design/primitives.md` or `patterns.md`, and an export from the barrel
+- [x] **1.17** `FilterBar` gains real filter types (G5): select, multi-select, date range, numeric range, boolean. Every value leaf is a **string**, so the URL round-trip is lossless and a decimal bound is never `Number()`d. Chips overflow behind a **button** opening a popover of still-removable chips (audit B12); the "past two rows" wording is now a count, with the reason recorded in `patterns.md`
+- [x] **1.18** `DetailHeader` — title, subtitle, status badge, back link, action cluster. **Composes `PageHeader`** rather than reimplementing it, which is what settles 1.43. Every detail screen in phases 4–12 uses it
+- [x] **1.19** `DetailSection` — a labelled field group for read-mostly detail bodies. A `<dl>`, not a table; a missing value keeps its label
+- [x] **1.20** `Timeline` — for audit history, stage history, delivery attempts, approval ladders. Never sorts; `tone` is an outcome, never a type (1.44)
+- [x] **1.21** `AttachmentList` — list, upload, download, delete; built on `FileUpload`. Delete reports intent and stops — the caller owns the confirmation, because only it knows whether the record has blockers
+- [x] **1.22** `CommandPalette` — Ctrl/Cmd+K, navigates the permission-filtered nav tree (G21). Generic and dictionary-free; `NavCommandPalette` in the shell feeds it `useNavTree()`. The shortcut listens on `event.code`, not `event.key`, which is what makes it work on an Arabic layout. Styling per 1.40 / D15
+- [x] **1.23** `Chart` wrappers — line, bar, area, donut, sparkline (G17). Superseded in substance by **1.38**, which is the rule that shipped: no invented categorical palette, and no "categorical sequence" at all
+- [x] **1.24** Every new primitive and pattern gets: both dictionary keys, a `.test.tsx`, an entry in `docs/design/primitives.md` or `patterns.md`, and an export from the barrel. 13 new dictionary sections, in exact sync — `ar.ts` is the type source, so a key in one file and not the other is a typecheck failure rather than a runtime blank
 ### State components — added by L2 (build before any screen consumes them)
 
 - [x] **1.25** ★ `ConflictDialog` — the 409/412/428 resolution surface: what you changed, what they changed, reload-and-reapply / overwrite / cancel. Blocking for 5.9, 5.17, 7.13, 7.22 and every editable resource
 - [x] **1.26** ★ `AmbiguousOutcomePanel` — persistent, in-body, carrying the operation, the idempotency key and a retry-exact affordance. Mandated by `patterns.md`; **seven hooks already detect the condition and have nowhere to render it**
 - [x] **1.27** `NotFoundState` — a deleted record reached from a stale link, with a back-to-list action and **no retry button**
-- [ ] **1.28** `OfflineBanner` + `useConnectivity()` — subscribes to the `tenant-realtime:*` events `TenantRealtimeProvider` already dispatches to **zero listeners**. Mounted in `AppShell`
+- [x] **1.28** `OfflineBanner` + `useConnectivity()` — subscribes to the `tenant-realtime:*` events `TenantRealtimeProvider` already dispatches to **zero listeners**. Mounted in `AppShell`. Three states, not one: `offline` / `draining` / `stopped`, with `stopped` terminal and the only one that gets an action. `resync-required` is exposed as a **counter** a screen refetches on, not a banner that would flicker on every reconnect
 - [x] **1.29** ★ `useAccessMode()` + `ReadOnlyGate` — one source of truth for FULL / READ_ONLY / DUNNING / BLOCKED that suppresses every mutating affordance. Consumed by every screen in phases 4–12
 - [x] **1.30** `BulkActionBar` + `BulkConfirmDialog` + `BulkResultPanel` (partial success: "38 of 50 succeeded, here are the 12"). Without these, 2.1's selection and 2.5's checkboxes are dead code
 - [x] **1.31** `ReasonDialog` — promote `TerminalMoveDialog` to a pattern. Consumed by 10.18, 11.5, 11.10, 11.11, 11.14 and the ~30 governance-ladder actions
 - [x] **1.32** `AsyncJobState` — queued / running / succeeded / failed / artifact-expired, with polling. Consumed by 7.17, 11.7, 11.12, 11.15
 - [x] **1.33** `useUnsavedChangesGuard()` — page-level route guard; `FormDrawer` guards drawer close only
 - [x] **1.34** Extend `StatusKind` in `tone-map.ts` with `TenantStatus`, `UserStatus`, `SubscriptionStatus` and `AccessMode`, sourced from the backend enums, never guessed
-- [ ] **1.35** `EditDrawer` — every `FormDrawer` in the app today is **create-only**; ~20 edit drawers in phases 4–12 need one shape
-- [ ] **1.36** `DeletionBlockerDialog` — `ConfirmActionModal` has no slot for a list of blocking children. Required by 4.10
-- [ ] **1.37** `AtomicReplacementConfirm` — a pre-write diff for the full-replacement PUTs in 4.15 and 4.21, the most destructive writes in Core
+- [x] **1.35** `EditDrawer` — every `FormDrawer` in the app today is **create-only**; ~20 edit drawers in phases 4–12 need one shape. Composes `FormDrawer`; adds load / load-failure / deleted-record / revert, and does not fire the dirty guard on a record that never loaded
+- [x] **1.36** `DeletionBlockerDialog` — `ConfirmActionModal` has no slot for a list of blocking children. Required by 4.10. No confirm button and no "delete anyway": the backend already refused, and an action guaranteed to fail is worse than none
+- [x] **1.37** `AtomicReplacementConfirm` — a pre-write diff for the full-replacement PUTs in 4.15 and 4.21, the most destructive writes in Core. Removals gated on an acknowledgement that resets per attempt; the diff matches on **id**, never label
 
 ### Added by L3
 
-- [ ] **1.38** ★ **Rewrite 1.23.** It contradicts `tokens.md`, which forbids inventing a categorical chart palette. Correct rule: status breakdowns use the four roles; qualitative breakdowns use **top-N + Other on a single-hue `brand-200…brand-800` ramp**; `caution` and `negative` are never adjacent fills; recharts mount animation disabled
-- [ ] **1.39** Apply the FilterBar overflow rule to `MultiSelect` — the `+N` collapse is a **button** opening a popover of removable chips, never a static count
-- [ ] **1.40** Decide and record how `react-day-picker` is styled without importing its stylesheet, and how `cmdk`'s `[cmdk-*]` attribute selectors coexist with the no-component-stylesheet rule
-- [ ] **1.41** ★ An **icon system**: a size scale tied to `controlSize`; one RTL mirror mechanism (`rtl:-scale-x-100`) with a lint selector and a census counter; and a canonical icon-per-concept map. Fix the `rtl:rotate-180` outlier
-- [ ] **1.42** ★ A **motion budget extension** covering `Accordion`/`Collapsible` (and the height-transition ban), `Progress` indeterminate plus its reduced-motion carve-out, the new overlays' 120/90 ms pair, and chart mount
-- [ ] **1.43** Reconcile `DetailHeader` (1.18) with `PageHeader` on the one-filled-primary rule — state which owns the primary action
-- [ ] **1.44** State on `Stepper` and `Timeline` that step and event **type never takes a hue**
+- [x] **1.38** ★ **Rewrite 1.23.** It contradicts `tokens.md`, which forbids inventing a categorical chart palette. Correct rule: status breakdowns use the four roles; qualitative breakdowns use **top-N + Other on a single-hue `brand-200…brand-800` ramp**; `caution` and `negative` are never adjacent fills; recharts mount animation disabled
+- [x] **1.39** Apply the FilterBar overflow rule to `MultiSelect` — the `+N` collapse is a **button** opening a popover of removable chips, never a static count. **Already correct when checked**, and covered by three assertions in `MultiSelect.test.tsx`; no code change was needed
+- [x] **1.40** Decide and record how `react-day-picker` is styled without importing its stylesheet, and how `cmdk`'s `[cmdk-*]` attribute selectors coexist with the no-component-stylesheet rule → **DECISIONS D15**. Neither gets a stylesheet; the one `cmdk` part with no `className` prop is reached by a Tailwind arbitrary variant on its parent, which is a utility in the component rather than a rule in `globals.css`
+- [x] **1.41** ★ An **icon system**: a size scale tied to `controlSize`; one RTL mirror mechanism (`rtl:-scale-x-100`) with a lint selector and a census counter; and a canonical icon-per-concept map. Fix the `rtl:rotate-180` outlier
+- [x] **1.42** ★ A **motion budget extension** covering `Accordion`/`Collapsible` (and the height-transition ban), `Progress` indeterminate plus its reduced-motion carve-out, the new overlays' 120/90 ms pair, and chart mount. The height ban is **narrowed, not dropped**: a keyframe over a library-measured height, on a disclosure panel, and nowhere else. No CSS added to `globals.css` — `tw-animate-css` already ships the Radix-driven keyframes
+- [x] **1.43** Reconcile `DetailHeader` (1.18) with `PageHeader` on the one-filled-primary rule — state which owns the primary action. **`PageHeader` owns it, in both shapes**, because `DetailHeader` composes it. A detail screen renders one or the other, never both, so the ceiling holds structurally rather than by review
+- [x] **1.44** State on `Stepper` and `Timeline` that step and event **type never takes a hue** — stated in both components and in `patterns.md`, and asserted in `Timeline.test.tsx`
 ### Added by L5
 
-- [ ] **1.45** ★ Resolve `FileUpload` progress before building it: `fetch` cannot report upload progress, only `XHR` can — and the rule is "`fetch` in exactly one file". Either amend the rule for the upload path, or ship no progress bar. **A fake progress bar violates two rules at once**
-- [ ] **1.46** ★ De-risk 2.8 **before** the dependency choice is locked: prove `@hello-pangea/dnd` + `@tanstack/react-virtual` in a throwaway branch, or switch to `react-window`, which is what the dnd library's virtual mode is actually exercised against. Name the fallback
+- [x] **1.45** ★ Resolve `FileUpload` progress before building it: `fetch` cannot report upload progress, only `XHR` can — and the rule is "`fetch` in exactly one file". Either amend the rule for the upload path, or ship no progress bar. **A fake progress bar violates two rules at once**
+- [x] **1.46** ★ De-risk 2.8 **before** the dependency choice is locked: prove `@hello-pangea/dnd` + `@tanstack/react-virtual` in a throwaway branch, or switch to `react-window`, which is what the dnd library's virtual mode is actually exercised against. Name the fallback
 - [x] **1.47** `Slider` (G22) — listed as missing and then scheduled nowhere
-- [ ] **1.48** Rich-text editor (G20) for `loginHtml` and email templates — identified as missing and scheduled nowhere. 6.15 omits `loginHtml` entirely
-- [ ] **1.49** `DataTable` column resize and reorder (G19) — only the virtualization third of that gap was scheduled
-- [ ] **1.50** Note in 1.1 that `tenant-portal` has **no lockfile of its own** — `../pnpm-lock.yaml` and `../pnpm-workspace.yaml` are shared with `admin-portal` and `partner-portal`. Adding ~10 packages affects two other products
+- [x] **1.48** Rich-text editor (G20) for `loginHtml` and email templates — identified as missing and scheduled nowhere. 6.15 omits `loginHtml` entirely. `contenteditable` + `execCommand`, with an **allowlist sanitizer** on every change and every paste — `loginHtml` renders on the login page before a session exists, so its output is treated as hostile by construction
+- [x] **1.49** `DataTable` column resize and reorder (G19) — only the virtualization third of that gap was scheduled. Reorder is a menu and resize is a focusable ARIA splitter: **drag is never the only path**, the same rule 2.7 exists for. `DataTableHeader.tsx` was split out to keep `DataTable` under the line limit
+- [x] **1.50** Note in 1.1 that `tenant-portal` has **no lockfile of its own** — `../pnpm-lock.yaml` and `../pnpm-workspace.yaml` are shared with `admin-portal` and `partner-portal`. Adding ~10 packages affects two other products. **Recorded on 1.1 above**, with the measured lockfile delta
 
 **Gate:** `pnpm verify` green · every new component rendered in ar/en × light/dark · zero new census regressions. **`knip` is not a meaningful gate for this phase** — `src/design-system/index.ts` is a knip entry point, so every new barrel export is invisible to it by construction.
 
@@ -509,28 +518,28 @@ one is generic, prop-driven, bilingual and themed — no entity knowledge.
 
 ## Phase 2 — The three views, properly
 
-**0 / 18 done.** Fixes V1–V5 from §0.5.
+**16 / 18 done.** Fixes V1, V2, V3 and V5 in full, and V4 on the two surfaces that carry no drag. 2.4 is built but cannot be enabled by any screen yet; 2.8 is blocked on D9's `react-window` decision and a real browser drag.
 
-- [ ] **2.1** Define `WorkspaceViewProps<T>` — one generic contract: `items`, `itemKey`, `isLoading`, `error`, `onRetry`, `emptyState`, `page`, `onPageChange`, `sort`, `onSortChange`, `selection`, `onActivate`, `labels`. All three views implement it (V1)
-- [ ] **2.2** Adapt `TableView` to the shared contract while keeping `DataTable` as its engine
-- [ ] **2.3** Add pagination to `CardView` and `BoardView` via the shared contract (V2)
-- [ ] **2.4** Add sorting to `CardView` — a sort control in the toolbar, since there are no column headers to click
-- [ ] **2.5** Add selection to `CardView` and `BoardView` — a checkbox affordance on the card, driven by the same `SelectionState`
-- [ ] **2.6** Preserve page, sort, filters and selection **across a view switch** (V2). The URL already carries `?view=`; extend it to carry the rest
-- [ ] **2.7** **Add a "Move to…" action on every board card** (V3, audit B3). A `DropdownMenu` listing every permitted target column. This is the WCAG AA fix and the single highest-severity item in the plan
-- [ ] **2.8** Virtualize board columns above 50 cards with `@tanstack/react-virtual` (V4) — the behaviour `SKILL-AUDIT` already claims exists
-- [ ] **2.9** Virtualize `CardView` above 100 items, and `DataTable` above 100 rows
-- [ ] **2.10** Give `BoardCard` `role="button"` and disambiguate click from drag with a movement threshold (V5)
-- [ ] **2.11** Remove the `EmptyState title=""` and `ErrorState title=""` fallbacks (G24). Make the label props required so a blank heading cannot compile
-- [ ] **2.12** Scroll restoration on back-navigation for all three views (audit B15)
-- [ ] **2.13** `aria-sort` on every sortable `DataTable` header (audit B5)
-- [ ] **2.14** Sticky chrome must not obscure the keyboard-focused row (audit B4) — `scroll-margin` on the sticky header and column
-- [ ] **2.15** Update `docs/design/views.md` to describe the real shared contract, and delete the claims that no longer match the code
+- [x] **2.1** Define `WorkspaceViewProps<T>` — one generic contract: `items`, `itemKey`, `isLoading`, `error`, `onRetry`, `emptyState`, `page`, `onPageChange`, `sort`, `onSortChange`, `selection`, `onActivate`, `labels`. All three views implement it (V1)
+- [x] **2.2** Adapt `TableView` to the shared contract while keeping `DataTable` as its engine
+- [x] **2.3** Add pagination to `CardView` and `BoardView` via the shared contract (V2)
+- [/] **2.4** Add sorting to `CardView` — a sort control in the toolbar, since there are no column headers to click. **Built and covered** (`CardViewToolbar`: field `Select` + direction toggle, rendered only when the caller supplies `sortOptions` **and** `onSortChange`). **No screen can enable it yet:** `useLeads` sends no sort parameter at all, `useCustomerProfiles` hardcodes `sortBy=createdAt&sortDir=DESC`, and the opportunity **card** endpoint is cursor-paged with no sort. Wiring it means changing those hooks, which Phase 2 does not own — a control that cannot reorder anything would be simulated success
+- [x] **2.5** Add selection to `CardView` and `BoardView` — a checkbox affordance on the card, driven by the same `SelectionState`
+- [x] **2.6** Preserve page, sort, filters and selection **across a view switch** (V2). The URL already carries `?view=`; extend it to carry the rest
+- [x] **2.7** **Add a "Move to…" action on every board card** (V3, audit B3). A `DropdownMenu` listing every permitted target column. This is the WCAG AA fix and the single highest-severity item in the plan
+- [ ] **2.8** Virtualize board columns above 50 cards (V4) — the behaviour `SKILL-AUDIT` already claims exists. **Deliberately not started.** D9 was split by surface on 2026-08-31: board columns get **`react-window`**, not `@tanstack/react-virtual`, and `react-window` is not installed (an unused dependency fails `knip`; this task earns it). D9 also requires a real 200-card drag in a browser before it closes, and no authenticated session is reachable (D13). Per 2.18 the WCAG AA fix shipped without it. The column body is a plain `overflow-y-auto` element, **not** a Radix `ScrollArea` — see 2.17
+- [x] **2.9** Virtualize `CardView` above 100 items, and `DataTable` above 100 rows
+- [x] **2.10** Give `BoardCard` `role="button"` and disambiguate click from drag with a movement threshold (V5)
+- [x] **2.11** Remove the `EmptyState title=""` and `ErrorState title=""` fallbacks (G24). Make the label props required so a blank heading cannot compile
+- [x] **2.12** Scroll restoration on back-navigation for all three views (audit B15)
+- [x] **2.13** `aria-sort` on every sortable `DataTable` header (audit B5)
+- [x] **2.14** Sticky chrome must not obscure the keyboard-focused row (audit B4) — `scroll-margin` on the sticky header and column
+- [x] **2.15** Update `docs/design/views.md` to describe the real shared contract, and delete the claims that no longer match the code
 ### Added by L3
 
-- [ ] **2.16** ★ Make `CardView` and `BoardCard` compose the `Card` primitive and `focusRing` instead of hand-rolling both; settle **one** radius for a card object; replace both template-literal `className`s with `cn()`. Do this **before** 2.5 adds a checkbox to each, or the duplication doubles
-- [ ] **2.17** State how `@tanstack/react-virtual` composes with the Radix `ScrollArea` viewport that board columns scroll inside — the classic broken-measurement pairing
-- [ ] **2.18** ★ **Ship 2.7 on its own, before 2.8.** It is the plan's highest-severity item (the WCAG AA failure) and it currently shares a gate with the riskiest change in the plan. If virtualization stalls, the accessibility fix must not stall with it
+- [x] **2.16** ★ Make `CardView` and `BoardCard` compose the `Card` primitive and `focusRing` instead of hand-rolling both; settle **one** radius for a card object; replace both template-literal `className`s with `cn()`. Do this **before** 2.5 adds a checkbox to each, or the duplication doubles
+- [x] **2.17** State how `@tanstack/react-virtual` composes with the Radix `ScrollArea` viewport that board columns scroll inside — the classic broken-measurement pairing
+- [x] **2.18** ★ **Ship 2.7 on its own, before 2.8.** It is the plan's highest-severity item (the WCAG AA failure) and it currently shares a gate with the riskiest change in the plan. If virtualization stalls, the accessibility fix must not stall with it
 
 **Gate:** `pnpm verify` green · `/crm/leads`, `/crm/opportunities` and
 `/crm/customer-profiles` exercised in all three views, both languages, both
@@ -650,7 +659,8 @@ on `/login` and one list screen.
 - [ ] **4.34** The 15 routes assigned to no phase: `provisioning` 3, `public` 3, `activity-types` 1, the 8 `auth` routes beyond login/logout/refresh, `catalog` 1, `decisions` 1. Assign or `[-]` each with a reason
 
 **Gate:** `pnpm verify` green · every screen in ar/en × light/dark · a real
-authenticated session exercising invite → accept → role assignment → suspend.
+authenticated session exercising invite → accept → role assignment → suspend ·
+**the eleven-state checklist in [../design/states.md](../design/states.md#per-screen-checklist) passed for every screen**.
 
 ---
 
@@ -679,7 +689,8 @@ authenticated session exercising invite → accept → role assignment → suspe
 - [ ] **5.19** Detail page for `/core/notifications`
 
 **Gate:** `pnpm verify` green · every screen in ar/en × light/dark · a
-deliberate 409 conflict triggered and rendered correctly.
+deliberate 409 conflict triggered and rendered correctly ·
+**the eleven-state checklist in [../design/states.md](../design/states.md#per-screen-checklist) passed for every screen**.
 
 ---
 
@@ -711,7 +722,7 @@ deliberate 409 conflict triggered and rendered correctly.
 - [ ] **6.20** Non-owner 403 in-body for every `TenantOwnerGuard` screen
 - [ ] **6.21** Payment-quote-lapsed and intent-abandoned states
 
-**Gate:** `pnpm verify` green · a full payment flow against a real session · a tenant `primaryColor` applied and contrast re-verified · no numeric coercion of a decimal string. **Not provable by grep** — `+value`, `parseFloat`, `value * 1` and plain arithmetic all coerce and none match `Number(`. Needs a lint rule over decimal-typed values.
+**Gate:** `pnpm verify` green · a full payment flow against a real session · a tenant `primaryColor` applied and contrast re-verified · **the eleven-state checklist in [../design/states.md](../design/states.md#per-screen-checklist) passed for every screen** · no numeric coercion of a decimal string. **Not provable by grep** — `+value`, `parseFloat`, `value * 1` and plain arithmetic all coerce and none match `Number(`. Needs a lint rule over decimal-typed values.
 
 ---
 
@@ -753,7 +764,8 @@ deliberate 409 conflict triggered and rendered correctly.
 
 **Gate:** `pnpm verify` green · a template drafted, validated, published,
 assigned and previewed as PDF end to end · a party created with contacts,
-addresses, roles and an image.
+addresses, roles and an image ·
+**the eleven-state checklist in [../design/states.md](../design/states.md#per-screen-checklist) passed for every screen**.
 
 ---
 
@@ -791,7 +803,8 @@ addresses, roles and an image.
 
 **Gate:** `pnpm verify` green · a lead created, worked through the board,
 converted to a customer and an opportunity, with a note, an attachment and an
-outbound email · every action gated by `capabilities`, not permission strings.
+outbound email · every action gated by `capabilities`, not permission strings ·
+**the eleven-state checklist in [../design/states.md](../design/states.md#per-screen-checklist) passed for every screen**.
 
 ---
 
@@ -816,7 +829,8 @@ outbound email · every action gated by `capabilities`, not permission strings.
 - [ ] **9.15** Dashboard partial-failure — "3 of 9 widgets failed", per widget, without failing the dashboard
 
 **Gate:** `pnpm verify` green · every prebuilt dashboard rendered against real
-data · a custom dashboard built, laid out, shared and drilled into.
+data · a custom dashboard built, laid out, shared and drilled into ·
+**the eleven-state checklist in [../design/states.md](../design/states.md#per-screen-checklist) passed for every screen**.
 
 ---
 
@@ -850,7 +864,8 @@ explicit scope target per handler.
 
 **Gate:** `pnpm verify` green · an item created with company, branch and
 channel profiles · a commercial account created and credit-evaluated · every
-screen correct with a missing entitlement.
+screen correct with a missing entitlement ·
+**the eleven-state checklist in [../design/states.md](../design/states.md#per-screen-checklist) passed for every screen**.
 
 ---
 
@@ -884,7 +899,8 @@ the UI must reflect the real state machine, never guess it.
 
 **Gate:** `pnpm verify` green · a quotation created, revised, sent, accepted,
 converted to a sales order, confirmed, and invoiced, with a PDF at each stage ·
-every total matching the server to the last decimal place.
+every total matching the server to the last decimal place ·
+**the eleven-state checklist in [../design/states.md](../design/states.md#per-screen-checklist) passed for every screen**.
 
 ---
 
@@ -923,7 +939,8 @@ every total matching the server to the last decimal place.
 
 **Gate:** `pnpm verify` green · a policy drafted through the full governance
 ladder to published · an import run end to end · a webhook delivered and
-retried.
+retried ·
+**the eleven-state checklist in [../design/states.md](../design/states.md#per-screen-checklist) passed for every screen**.
 
 ---
 
@@ -1233,6 +1250,48 @@ The plan never separated them, and the three defects that hides:
 
 ---
 
+## Census re-baseline — 2026-08-31
+
+Task 3.30 fixed the census; task 3.17 then re-baselined it. Recording the
+numbers because the *shape* of the change is the finding.
+
+**Every counter the old baseline gated is now zero**, and it banked violations
+before:
+
+| Counter | old baseline | now |
+|---|---:|---:|
+| `colorUtilityTotal` | 19 | **0** |
+| `roundedXlOrAbove` | 4 | **0** |
+| `fontBoldOrHeavier` | 3 | **0** |
+| `handRolledButtons` | 5 | **2** |
+| `languageTernaries` | 19 | **5** |
+
+`languageTernaries` stops at 5, not 0, and that is the honest floor: `I18nContext`
+must branch on language to pick the dictionary and the direction, and
+`localizedName()` contains the syntax by definition. The target was never
+reachable and is now written down as such.
+
+**What the fix made visible is the real story.** The old census could not see
+`src/design-system/` at all, and counted only the 22 Tailwind families — so the
+five role ramps were uncounted everywhere:
+
+| Newly visible | count |
+|---|---:|
+| `roleRampUtilities` in feature code | **82** |
+| `roleRampUtilities` in the design system | **197** |
+| `backdropBlur` in the design system | 3 (budget is 1) |
+| `handRolledTables` in the design system | 3 |
+| `gradients` in the design system | 1 |
+| `rtlMirrorOutliers` | 1 |
+
+None of that is new debt. It is debt the gate was structurally blind to while
+reporting "clean" — which is exactly what task 3.30 existed to end. It is
+banked so the ratchet stops growth; driving it down is follow-on work, and the
+design-system scope needs its own thresholds rather than zero (the `Table`
+primitive must use `<table>`; the modal scrims are a deliberate `backdrop-blur`).
+
+---
+
 ## L5 · Adversarial review — run 2026-08-30
 
 **Method.** Every numeric claim in the plan re-derived from source; every task
@@ -1289,6 +1348,18 @@ against `swagger.examples.ts` and `update-branding.dto.ts`.
 | "At most one filled primary per screen" | 11.5, 11.14, 12.13, 12.14 — document headers with 6–8 lifecycle actions | Needs a stated rule for multi-action headers |
 | "Files under ~300 lines" | **8 files already exceed it**, two by 3× (`axiosClient.ts` 1141, `usePipelineWorkspace.ts` 1021) | No task addressed it |
 | "Every CRM list requires `branchId`" | Phases 8 and 9 never mention it | Covered by S2, needs per-task carry-through |
+
+### One L5 finding that was itself wrong
+
+L5 reported that no `ErrorState title=""` existed and that task 2.11 was
+over-specified. **It did exist, twice** — `BoardView.tsx:93` and
+`CardView.tsx:48` both rendered `<ErrorState title={errorTitle ?? ""}>`. Found
+by the Phase 2 agent while implementing 2.11, and removed along with the
+`EmptyState` pair; `emptyTitle` and `errorTitle` are now required props so a
+blank heading cannot compile.
+
+Recorded because the claim was carried into this document unverified. An
+adversarial layer is still a source to check, not a source to trust.
 
 ### Over-claims struck
 

@@ -306,25 +306,25 @@ capability gate as dragging, and a terminal destination confirms the same way.
 | `CardView` grid | 100 | **Shipped.** Grid rows stretch to a common height; the column count is read back from the laid-out element rather than duplicated in JS |
 | Board column body | 50 | **Not shipped.** See below |
 
-The mechanism is `useVirtualWindow` in `src/design-system/views/` — a
-dependency-free vertical window over a uniform-pitch list, rendering a slice
-plus two spacers sized to the rows it left out. It is honest about not having
-measured anything yet: until a real row pitch and viewport height are
-observed, the window is a safe prefix of `threshold` items, so the first paint
-never renders the whole list and never renders a blank box. A container that
-never lays out — SSR, jsdom, a browser with no `ResizeObserver` — simply stays
-at that prefix.
+The mechanism is `useVirtualWindow` in `src/design-system/views/`, built on
+`@tanstack/react-virtual`. It expresses the window as a **slice plus two
+spacer sizes** rather than absolutely-positioned rows — the one shape a real
+`<tbody>` and a CSS grid can both consume, and what lets the table keep
+`aria-sort`, its sticky header and its sticky columns. The un-measured first
+paint is a safe prefix of `threshold` items, never the whole list and never a
+blank box: the scroll element is only known after the first commit. A
+container that never lays out — SSR, jsdom — simply stays at that prefix.
 
-**The board is deliberately not windowed.**
-[DECISIONS.md](../build/DECISIONS.md#d9--virtualization--assumed-split-by-surface-on-2026-08-31) records D9 as
-*assumed*, with the risk that a virtualized list unmounts the node
-`@hello-pangea/dnd` is dragging. Task 1.46 was to prove
-`@tanstack/react-virtual` composes with it — or switch to `react-window`,
-which is what the dnd library's virtual mode is actually exercised against —
-and that proof does not exist yet. Neither package is installed, and the
-lockfile is shared with `admin-portal` and `partner-portal`, so adding one is
-not a view-layer decision. Windowing the two lists that carry no drag
-interaction takes none of that risk.
+**The board is deliberately not windowed here.**
+[D9](../build/DECISIONS.md#d9--virtualization--assumed-split-by-surface-on-2026-08-31)
+is split by surface: board columns get **`react-window`**, the only pairing
+`@hello-pangea/dnd`'s virtual mode is actually exercised against, and it is
+**deliberately not installed yet** because an unused dependency fails `knip`
+and task 2.8 is what earns it. 2.8 also does not close until a real drag
+across a 200-card column has been performed in a browser, in both directions
+and both languages. Windowing the two surfaces that carry no drag interaction
+takes none of that risk, and — per 2.18 — the WCAG AA fix above does not share
+a gate with any of it.
 
 **How it will compose with the column body when it lands.** The body is a
 plain `overflow-y-auto` element and **not** a Radix `ScrollArea`. That matters:
