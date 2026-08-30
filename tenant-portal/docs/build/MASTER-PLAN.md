@@ -331,12 +331,12 @@ gate red.
 
 | Phase | Title | Tasks | Done |
 |---|---|---:|---:|
-| 0 | Design system correction | 34 | 26 |
-| 1 | Design system completion | 50 | 0 |
+| 0 | Design system correction | 34 | 27 |
+| 1 | Design system completion | 50 | 24 |
 | 2 | The three views, properly | 18 | 0 |
 | 3 | Accessibility, cross-cutting mechanisms | 40 | 1 |
-| 4 | Core · identity and organization | 34 | 0 |
-| 5 | Core · settings and catalogues | 19 | 0 |
+| 4 | Core · identity and organization | 34 | 2 |
+| 5 | Core · settings and catalogues | 19 | 1 |
 | 6 | Core · billing, subscription, branding | 21 | 0 |
 | 7 | Core · directory, templates, audit, activities | 23 | 0 |
 | 8 | CRM · completion | 27 | 1 |
@@ -345,7 +345,7 @@ gate red.
 | 11 | Trade · commercial documents | 22 | 0 |
 | 12 | Trade · advanced and analytics | 28 | 0 |
 | 13 | Hardening and release | 27 | 0 |
-| | **Total** | **379** | **28** |
+| | **Total** | **379** | **56** |
 
 ---
 
@@ -374,7 +374,7 @@ the mechanism.
 
 ## Phase 0 — Design system correction
 
-**26 / 34 done.** Fixes the user-facing complaints and the broken foundations
+**27 / 34 done.** Fixes the user-facing complaints and the broken foundations
 everything else stands on. Nothing else starts until this gate is green.
 
 ### Unblock the environment
@@ -434,30 +434,30 @@ everything else stands on. Nothing else starts until this gate is green.
 
 ## Phase 1 — Design system completion
 
-**0 / 50 done.** Builds the components the rest of the plan depends on. Every
+**24 / 50 done.** Builds the components the rest of the plan depends on. Every
 one is generic, prop-driven, bilingual and themed — no entity knowledge.
 
 ### Dependencies
 
 - [ ] **1.1** Add `react-day-picker` + `date-fns` (G14), `cmdk` (G21), `recharts` (G17), `@radix-ui/react-accordion`, `-collapsible`, `-toggle-group`, `-progress`, `-hover-card`, `-context-menu` (G22), `@tanstack/react-virtual` (G19)
-- [ ] **1.2** Decide and record: `react-hook-form` + `zodResolver` for forms (G23), or keep hand-rolled. If adopted, `FormDrawer` becomes its host
+- [x] **1.2** Decide and record: `react-hook-form` + `zodResolver` for forms (G23), or keep hand-rolled. If adopted, `FormDrawer` becomes its host
 
 ### Primitives
 
-- [ ] **1.3** `DatePicker` — single date, locale-aware via `Intl`, Arabic uses `ar-EG-u-nu-latn` (Western digits), RTL-mirrored, keyboard-navigable
-- [ ] **1.4** `DateRangePicker` — from/to with presets (today, last 7/30/90 days, this month, this quarter)
-- [ ] **1.5** `Combobox` — single-select with type-ahead over a large remote list, debounced, with loading and empty states
-- [ ] **1.6** `MultiSelect` — chips inside the trigger, overflow collapses to "+N", clear-all
+- [x] **1.3** `DatePicker` — single date, locale-aware via `Intl`, Arabic uses `ar-EG-u-nu-latn` (Western digits), RTL-mirrored, keyboard-navigable
+- [x] **1.4** `DateRangePicker` — from/to with presets (today, last 7/30/90 days, this month, this quarter)
+- [x] **1.5** `Combobox` — single-select with type-ahead over a large remote list, debounced, with loading and empty states
+- [x] **1.6** `MultiSelect` — chips inside the trigger, overflow collapses to "+N", clear-all
 - [ ] **1.7** `FileUpload` — drag-and-drop plus click, MIME allowlist, size cap, per-file progress, preview for images. Backend caps: branding 2 MB, party image 2 MB, template asset 5 MiB, CRM attachment 26 MiB
-- [ ] **1.8** `Stepper` — horizontal, numbered, with per-step valid/invalid/current state and RTL ordering
-- [ ] **1.9** `Progress` — determinate and indeterminate, with `role="progressbar"` and full ARIA values
-- [ ] **1.10** `Accordion` and `Collapsible`
-- [ ] **1.11** `ToggleGroup` — and refactor `ViewSwitcher` onto it, since it currently hand-rolls a segmented control on `RadioGroup`
-- [ ] **1.12** `HoverCard` and `ContextMenu`
-- [ ] **1.13** `Textarea` gains the `size` variant it is missing, matching `Input` and `SelectTrigger`
-- [ ] **1.14** `CopyButton` — for the UUIDs, correlation IDs and cursors this product shows constantly. With `aria-live` confirmation
-- [ ] **1.15** `Money` — renders a decimal **string** with `Intl.NumberFormat`, `tabular-nums`, never `Number()`. This is a correctness primitive, not a style one
-- [ ] **1.16** `DateTime` — same discipline for timestamps, explicit locale, `<time dateTime>`
+- [x] **1.8** `Stepper` — horizontal, numbered, with per-step valid/invalid/current state and RTL ordering
+- [x] **1.9** `Progress` — determinate and indeterminate, with `role="progressbar"` and full ARIA values
+- [x] **1.10** `Accordion` and `Collapsible`
+- [x] **1.11** `ToggleGroup` — and refactor `ViewSwitcher` onto it, since it currently hand-rolls a segmented control on `RadioGroup`
+- [x] **1.12** `HoverCard` and `ContextMenu`
+- [x] **1.13** `Textarea` gains the `size` variant it is missing, matching `Input` and `SelectTrigger`
+- [x] **1.14** `CopyButton` — for the UUIDs, correlation IDs and cursors this product shows constantly. With `aria-live` confirmation
+- [x] **1.15** `Money` — renders a decimal **string** with `Intl.NumberFormat`, `tabular-nums`, never `Number()`. This is a correctness primitive, not a style one
+- [x] **1.16** `DateTime` — same discipline for timestamps, explicit locale, `<time dateTime>`
 
 ### Patterns
 
@@ -471,16 +471,16 @@ one is generic, prop-driven, bilingual and themed — no entity knowledge.
 - [ ] **1.24** Every new primitive and pattern gets: both dictionary keys, a `.test.tsx`, an entry in `docs/design/primitives.md` or `patterns.md`, and an export from the barrel
 ### State components — added by L2 (build before any screen consumes them)
 
-- [ ] **1.25** ★ `ConflictDialog` — the 409/412/428 resolution surface: what you changed, what they changed, reload-and-reapply / overwrite / cancel. Blocking for 5.9, 5.17, 7.13, 7.22 and every editable resource
-- [ ] **1.26** ★ `AmbiguousOutcomePanel` — persistent, in-body, carrying the operation, the idempotency key and a retry-exact affordance. Mandated by `patterns.md`; **seven hooks already detect the condition and have nowhere to render it**
-- [ ] **1.27** `NotFoundState` — a deleted record reached from a stale link, with a back-to-list action and **no retry button**
+- [x] **1.25** ★ `ConflictDialog` — the 409/412/428 resolution surface: what you changed, what they changed, reload-and-reapply / overwrite / cancel. Blocking for 5.9, 5.17, 7.13, 7.22 and every editable resource
+- [x] **1.26** ★ `AmbiguousOutcomePanel` — persistent, in-body, carrying the operation, the idempotency key and a retry-exact affordance. Mandated by `patterns.md`; **seven hooks already detect the condition and have nowhere to render it**
+- [x] **1.27** `NotFoundState` — a deleted record reached from a stale link, with a back-to-list action and **no retry button**
 - [ ] **1.28** `OfflineBanner` + `useConnectivity()` — subscribes to the `tenant-realtime:*` events `TenantRealtimeProvider` already dispatches to **zero listeners**. Mounted in `AppShell`
-- [ ] **1.29** ★ `useAccessMode()` + `ReadOnlyGate` — one source of truth for FULL / READ_ONLY / DUNNING / BLOCKED that suppresses every mutating affordance. Consumed by every screen in phases 4–12
-- [ ] **1.30** `BulkActionBar` + `BulkConfirmDialog` + `BulkResultPanel` (partial success: "38 of 50 succeeded, here are the 12"). Without these, 2.1's selection and 2.5's checkboxes are dead code
-- [ ] **1.31** `ReasonDialog` — promote `TerminalMoveDialog` to a pattern. Consumed by 10.18, 11.5, 11.10, 11.11, 11.14 and the ~30 governance-ladder actions
-- [ ] **1.32** `AsyncJobState` — queued / running / succeeded / failed / artifact-expired, with polling. Consumed by 7.17, 11.7, 11.12, 11.15
-- [ ] **1.33** `useUnsavedChangesGuard()` — page-level route guard; `FormDrawer` guards drawer close only
-- [ ] **1.34** Extend `StatusKind` in `tone-map.ts` with `TenantStatus`, `UserStatus`, `SubscriptionStatus` and `AccessMode`, sourced from the backend enums, never guessed
+- [x] **1.29** ★ `useAccessMode()` + `ReadOnlyGate` — one source of truth for FULL / READ_ONLY / DUNNING / BLOCKED that suppresses every mutating affordance. Consumed by every screen in phases 4–12
+- [x] **1.30** `BulkActionBar` + `BulkConfirmDialog` + `BulkResultPanel` (partial success: "38 of 50 succeeded, here are the 12"). Without these, 2.1's selection and 2.5's checkboxes are dead code
+- [x] **1.31** `ReasonDialog` — promote `TerminalMoveDialog` to a pattern. Consumed by 10.18, 11.5, 11.10, 11.11, 11.14 and the ~30 governance-ladder actions
+- [x] **1.32** `AsyncJobState` — queued / running / succeeded / failed / artifact-expired, with polling. Consumed by 7.17, 11.7, 11.12, 11.15
+- [x] **1.33** `useUnsavedChangesGuard()` — page-level route guard; `FormDrawer` guards drawer close only
+- [x] **1.34** Extend `StatusKind` in `tone-map.ts` with `TenantStatus`, `UserStatus`, `SubscriptionStatus` and `AccessMode`, sourced from the backend enums, never guessed
 - [ ] **1.35** `EditDrawer` — every `FormDrawer` in the app today is **create-only**; ~20 edit drawers in phases 4–12 need one shape
 - [ ] **1.36** `DeletionBlockerDialog` — `ConfirmActionModal` has no slot for a list of blocking children. Required by 4.10
 - [ ] **1.37** `AtomicReplacementConfirm` — a pre-write diff for the full-replacement PUTs in 4.15 and 4.21, the most destructive writes in Core
@@ -498,7 +498,7 @@ one is generic, prop-driven, bilingual and themed — no entity knowledge.
 
 - [ ] **1.45** ★ Resolve `FileUpload` progress before building it: `fetch` cannot report upload progress, only `XHR` can — and the rule is "`fetch` in exactly one file". Either amend the rule for the upload path, or ship no progress bar. **A fake progress bar violates two rules at once**
 - [ ] **1.46** ★ De-risk 2.8 **before** the dependency choice is locked: prove `@hello-pangea/dnd` + `@tanstack/react-virtual` in a throwaway branch, or switch to `react-window`, which is what the dnd library's virtual mode is actually exercised against. Name the fallback
-- [ ] **1.47** `Slider` (G22) — listed as missing and then scheduled nowhere
+- [x] **1.47** `Slider` (G22) — listed as missing and then scheduled nowhere
 - [ ] **1.48** Rich-text editor (G20) for `loginHtml` and email templates — identified as missing and scheduled nowhere. 6.15 omits `loginHtml` entirely
 - [ ] **1.49** `DataTable` column resize and reorder (G19) — only the virtualization third of that gap was scheduled
 - [ ] **1.50** Note in 1.1 that `tenant-portal` has **no lockfile of its own** — `../pnpm-lock.yaml` and `../pnpm-workspace.yaml` are shared with `admin-portal` and `partner-portal`. Adding ~10 packages affects two other products
@@ -599,7 +599,7 @@ on `/login` and one list screen.
 
 ## Phase 4 — Core · identity and organization
 
-**0 / 34 done.** **50** Gateway routes — organization 21, users 22, roles 6, permissions 1 — plus the auth completion in 4.1–4.4. Start of the feature build.
+**2 / 34 done.** **50** Gateway routes — organization 21, users 22, roles 6, permissions 1 — plus the auth completion in 4.1–4.4. Start of the feature build.
 
 ### Auth completion
 
@@ -633,10 +633,10 @@ on `/login` and one list screen.
 - [ ] **4.19** `/core/roles/[id]` — the permission editor. `GET /tenant/permissions` supplies the catalogue with localized labels; grouped by domain, max 200 per role
 - [ ] **4.20** Branch-role assignments — `GET/PUT/POST/DELETE /users/:id/assignments`
 - [ ] **4.21** Scope-role assignments — `GET/PUT /users/:userId/scope-role-assignments`. TENANT / COMPANY / BRANCH targets, **PUT is a full atomic replacement**, owner-only
-- [ ] **4.22** Document both grant models in `docs/api/core-users.md` — the legacy branch-role table and the newer scope-role table coexist, and the UI must not imply otherwise
+- [x] **4.22** Document both grant models in `docs/api/core-users.md` — the legacy branch-role table and the newer scope-role table coexist, and the UI must not imply otherwise
 ### The missing auth and tenant pages — added by L2, moved ahead of the feature build
 
-- [ ] **4.23** ★ `not-found.tsx`, `global-error.tsx`, and a per-segment `error.tsx` for `(tenant)/`, `crm/`, `core/`, `trade/`. A single root boundary unmounts `AppShell` on any thrown error. **`TenantHostAdmission` already calls `notFound()` on the hot path**, so the missing file is user-visible today
+- [x] **4.23** ★ `not-found.tsx`, `global-error.tsx`, and a per-segment `error.tsx` for `(tenant)/`, `crm/`, `core/`, `trade/`. A single root boundary unmounts `AppShell` on any thrown error. **`TenantHostAdmission` already calls `notFound()` on the hot path**, so the missing file is user-visible today
 - [ ] **4.24** `/session-expired` carrying the four terminal reasons; make `TenantAuthGuard` pass the reason instead of bouncing silently
 - [ ] **4.25** `/account-suspended` for `SESSION_IDENTITY_INACTIVE` and the DEACTIVATED user
 - [ ] **4.26** ★ Extend `TenantHostStatus` to the full five-value enum and render PROVISIONING, PROVISIONING_FAILED and DELETED distinctly instead of 404-ing them
@@ -656,7 +656,7 @@ authenticated session exercising invite → accept → role assignment → suspe
 
 ## Phase 5 — Core · settings and catalogues
 
-**0 / 19 done.** **33** Gateway routes — workspace-settings 2, currencies 5, taxes 4, numbering 4, email-config 4, notifications 14. Small, high-value CRUD screens; the cleanest place to prove the Phase 0–2 foundations at volume.
+**1 / 19 done.** **33** Gateway routes — workspace-settings 2, currencies 5, taxes 4, numbering 4, email-config 4, notifications 14. Small, high-value CRUD screens; the cleanest place to prove the Phase 0–2 foundations at volume.
 
 - [ ] **5.1** `/core/settings/workspace` — language, timezone, default currency, support toggle. `GET/PUT /workspace-settings`. Handle `TENANT_NOT_READY`
 - [ ] **5.2** `/core/settings/currencies` — list, create, edit, set-default, deactivate. 5 routes. The single-default invariant is server-side; the UI reflects it
@@ -675,7 +675,7 @@ authenticated session exercising invite → accept → role assignment → suspe
 - [ ] **5.15** Add every settings route to `nav-config.ts` with a correct `hasAccess` predicate
 - [ ] **5.16** `SubNav` currently uses the **unfiltered** setup list, so it shows pages the user may lack permission for. Filter it through the same predicate as the sidebar
 - [ ] **5.17** Every `ETag` / `If-Match` screen surfaces a real conflict path: someone else saved, here is what changed, retry
-- [ ] **5.18** Document each screen in `docs/api/core-settings.md` with verified status and date
+- [x] **5.18** Document each screen in `docs/api/core-settings.md` with verified status and date
 - [ ] **5.19** Detail page for `/core/notifications`
 
 **Gate:** `pnpm verify` green · every screen in ar/en × light/dark · a

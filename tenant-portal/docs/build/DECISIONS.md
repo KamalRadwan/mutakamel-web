@@ -244,7 +244,7 @@ typography decision.
 
 ---
 
-## D9 · Virtualization — `assumed`
+## D9 · Virtualization — `assumed`, **split by surface** on 2026-08-31
 
 **Assumed.** `@tanstack/react-virtual`, applied to board columns above 50
 cards, `CardView` above 100 items, and `DataTable` above 100 rows.
@@ -252,6 +252,73 @@ cards, `CardView` above 100 items, and `DataTable` above 100 rows.
 **Risk recorded:** virtualization and `@hello-pangea/dnd` can conflict — a
 virtualized list unmounts the dragged node. This must be proven with a real
 drag across a 200-card column before the task is marked done, not after.
+
+### The de-risk (task 1.46), and what it actually found
+
+Run before the dependency was locked, against
+`@hello-pangea/dnd@18.0.1` as installed.
+
+**What the library requires.** Read from its own source, not its README —
+`src/view/droppable/use-validation.ts` runs a separate `virtual` check set:
+
+- `mode="virtual"` **must** be paired with a `renderClone` function, or the
+  component throws `Must provide a clone render function (renderClone) for
+  virtual lists`.
+- A virtual droppable **must not** render `provided.placeholder`
+  (`Expected virtual list to not have a placeholder`).
+- The clone is portalled out of the list, through `getContainerForClone`,
+  which defaults to `document.body`.
+
+`DroppableMode` is `'standard' | 'virtual'` — the mode exists and is real.
+What the package ships is `/dist` and `/src` only: **`docs/patterns/virtual-lists.md`
+is referenced from the README but is not in the tarball**, so the worked
+examples are not vendored here. Those examples are written against
+`react-window` and `react-virtualized`; nothing in the repository exercises
+`@tanstack/react-virtual`.
+
+**The concrete collision.** Both libraries position an item with `transform`.
+`@tanstack/react-virtual`'s documented pattern is
+`transform: translateY(${item.start}px)` on the item element, and
+`provided.draggableProps.style` sets `transform` on that same element while a
+drag is in flight. Object spread cannot merge two `transform` values — one
+silently wins. It is avoidable (position with `top` instead of `transform`, or
+put the virtualizer's offset on an outer wrapper and the `Draggable` on an
+inner element), but it is a hazard the `react-window` path does not have,
+because `react-window` hands the row renderer a `style` object the consumer is
+expected to merge.
+
+**What could not be proven here, stated plainly.** jsdom has no layout, so
+every box `@hello-pangea/dnd` measures is 0×0 and no sensor can produce a
+meaningful drag. `DECISIONS.md#d13--test-tenant-for-manual-verification--open-needs-the-owner`
+records that a real authenticated session — and therefore the board — is not
+reachable yet, and `src/app/**` is out of bounds for a throwaway harness. **A
+real 200-card drag has not been performed.** What exists is
+`src/design-system/views/board/virtual-dnd.probe.test.tsx`, which proves the
+structural half: the two libraries mount together, a windowed subset renders,
+every mounted `Draggable` carries its **absolute** index rather than its window
+index, no placeholder is emitted, and the `renderClone` invariant is satisfied.
+That is composition, not behaviour.
+
+### Decision
+
+**Split by surface, and name the fallback rather than assume past it.**
+
+| Surface | Library | Why |
+| --- | --- | --- |
+| Board columns (2.8) | **`react-window`** | The only pairing `@hello-pangea/dnd`'s virtual mode is actually exercised against. It hands the row a `style` to merge, so the transform collision does not arise |
+| `DataTable` rows (2.9) | `@tanstack/react-virtual` | It can window inside a real `<tbody>` using spacer rows, with no absolute positioning. `react-window` structurally cannot — it would replace the `<table>`, taking `aria-sort`, the sticky header and the sticky columns with it |
+| `CardView` (2.9) | `@tanstack/react-virtual` | No drag-and-drop; no reason to add a second library |
+
+`@tanstack/react-virtual` is installed now (task 1.1). **`react-window` is
+deliberately not installed yet** — an unused dependency fails `pnpm knip`, and
+2.8 is the task that earns it.
+
+**2.8 does not get marked done until a real drag across a 200-card column has
+been performed in a browser** — mouse and keyboard, both directions, in Arabic
+and English. If `react-window` also fails that, the fallback is 2.18's
+position: ship 2.7 (the Move-to menu, the WCAG AA fix) and leave the columns
+unvirtualized. Virtualization is a performance improvement; the accessibility
+fix is not optional, and they must not share a gate.
 
 ---
 
@@ -338,8 +405,95 @@ components, the three views, and every gate in `pnpm verify`. The manual
 end-to-end script (login → CRM → create lead → convert → three views → Trade)
 is written and waiting in `docs/build/MANUAL-TEST-PLAN.md`.
 
+---
+
+## D14 · `FileUpload` has no progress bar — `assumed`
+
+**Question (task 1.45).** `FileUpload` was specified with "per-file progress".
+`fetch` cannot report upload progress — there is no upstream progress event in
+the Fetch standard, and `ReadableStream` request bodies are a download-side
+feature. Only `XMLHttpRequest` exposes `upload.onprogress`. And `AGENTS.md`
+says: *"`fetch` is called in exactly one file: `src/lib/api/axiosClient.ts`."*
+
+Three options, and only three:
+
+| | Option | Cost |
+|---|---|---|
+| a | Amend the rule; add an `XMLHttpRequest` upload transport | A second transport that must re-implement session refresh on 401, the idempotency key, the correlation id, error normalization and the forbidden-toast. Every one of those is a place the two paths can drift, on the axis where drift is a security bug |
+| b | Ship no progress bar | The 26 MiB CRM attachment gets a "working" state instead of a percentage |
+| c | Animate a bar on a timer | **Banned twice over** — `anti-patterns.md#13-fake-data-and-fake-success`, and it is a fabricated claim about the state of a write |
+
+**Decision: (b).** No progress bar, and no fake one.
+
+`FileUpload` renders the **indeterminate** `Progress` bar while a file is in
+flight. That is honest: `Progress` with a null value omits `aria-valuenow`
+entirely, so it announces as indeterminate rather than as a number nobody
+measured. It says *working*, which is exactly what is known.
+
+**The door is left open, deliberately.** `FileUpload` takes an optional
+`progress` number per file. If a transport ever reports real bytes-transferred,
+the caller passes it and the same bar becomes determinate — no component
+change. **Nothing may pass that prop from a timer.**
+
+**(a) was also not available to this task on ownership grounds**, which is
+worth recording separately: `src/lib/api/**` is outside the scope Phase 1 was
+given, so the rule could not have been amended here even if (a) had won. If
+progress on the 26 MiB attachment later proves to matter, (a) is reopened as
+its own task, against `axiosClient.ts`, with the drift list above as its
+acceptance criteria.
+
+**Reverse it by:** implementing (a) and passing `progress` per file. The
+component does not change.
+
+---
+
+## D15 · Third-party components take no stylesheet — `assumed`
+
+**Question (task 1.40).** Two dependencies ship their own CSS.
+`react-day-picker` has `react-day-picker/style.css`; `cmdk` documents styling
+through `[cmdk-root]`, `[cmdk-item]`, `[cmdk-group-heading]` and friends —
+attribute selectors, which are still selectors. `DESIGN-SYSTEM.md#5--no-stylesheet-of-component-classes`
+says `globals.css` declares tokens and styles nothing, and bans any class
+selector, `@apply`, and `@layer components` in it.
+
+**Decision. Neither library gets a stylesheet, and neither needs one.** Both
+expose a per-part `className`, so every rule they would have shipped is written
+as design-system utilities at the call site.
+
+**`react-day-picker`** — `Calendar.tsx` passes a `classNames` map keyed by the
+library's own `UI` / `DayFlag` / `SelectionState` enums. This is cheap because
+the library's markup is a native `<table>`: the seven-column grid, the RTL
+mirror and the arrow-key roving all come from table layout, not from CSS.
+
+> The trap, recorded because it is silent: `classNames` **merges over** the
+> library's defaults. A key that is not listed keeps an inert `rdp-*` class
+> that matches no rule. Cosmetic keys degrade harmlessly; a key that carries
+> layout renders the calendar unstyled. Verify visually, not by type-checking.
+
+**`cmdk`** — the `[cmdk-*]` attributes are emitted whether or not anything
+selects on them. They are a *convenience* for consumers who want a stylesheet,
+not the library's styling contract: `Command`, `Command.Input`, `Command.List`,
+`Command.Item`, `Command.Group`, `Command.Empty` and `Command.Separator` each
+take a `className`. `CommandPalette.tsx` passes all seven. The attributes stay
+in the DOM, unmatched and inert — the same harmless residue as the `rdp-*`
+names.
+
+One `cmdk` behaviour genuinely cannot be reached from `className` and is worth
+naming: the library hides a filtered-out item with `[cmdk-item][aria-hidden]`
+rather than unmounting it in some configurations. That is handled by leaving
+`shouldFilter` on and letting `cmdk` own the list, rather than by a CSS rule.
+
+**Rejected:** a scoped `<style>` tag inside the component. It is a component
+stylesheet that has learned to hide in a `.tsx` file, and it would put a second
+styling mechanism next to CVA for exactly two components.
+
+**Reverse it by:** nothing short of adopting a third library with a mandatory
+stylesheet — at which point the rule, not the workaround, is what gets
+revisited.
+
 ## Log
 
 | Date | Change |
 |---|---|
 | 2026-08-30 | File created. D1, D2, D4 confirmed by the owner. D3, D5–D11 assumed by recommendation. D12, D13 open. |
+| 2026-08-31 | Phase 1: D14 and D15 added. D9 split by surface after the 1.46 de-risk — board columns move to `react-window`, the two non-dnd surfaces keep `@tanstack/react-virtual`. |

@@ -2,7 +2,7 @@
 
 Status: **Specification**
 
-Written: **2026-08-27**
+Written: **2026-08-27** · Contract section rewritten: **2026-08-31** (Phase 2)
 
 Implementation: `src/design-system/views/`
 
@@ -64,6 +64,81 @@ Consequences that follow from that table:
 - Customer Profiles' columns are a **fixed enum**, so its board never needs a
   catalogue fetch — and its drag-and-drop writes `status`, not a stage id.
 
+## The shared contract
+
+All three views implement one generic interface — `WorkspaceViewProps<T>` in
+`src/design-system/views/types.ts`. Before it existed the "contract" was a
+convention: the three took `cardsByColumn` / `items` / `rows`, `itemKey` /
+`itemKey` / `rowKey` and `onCardClick` / `onItemClick` / `onRowClick`, every
+workspace wired three different prop sets by hand, and switching view silently
+dropped pagination, sorting and selection.
+
+```ts
+interface WorkspaceViewProps<T> {
+  items: T[];                                 // ONE list; the board groups it itself
+  itemKey: (item: T) => string;
+  isLoading: boolean;
+  error?: NormalizedApiError | null;
+  onRetry?: () => void;
+  emptyState?: ReactNode;                     // for a precondition, not for "no results"
+  page?: PageInfo;                            // server pagination
+  onPageChange?: (page: number) => void;
+  sort?: SortState;                           // server sorting
+  onSortChange?: (sort: SortState) => void;
+  selection?: SelectionState;                 // the same SelectionState in all three
+  onActivate?: (item: T) => void;             // open the detail route
+  labels: WorkspaceViewLabels;                // every string, already translated
+  className?: string;
+}
+```
+
+Rules that hold for every implementation:
+
+- A view never fetches, never reads the dictionary, and never knows which
+  entity it renders. Every string arrives in `labels`.
+- Pagination and sorting are **server** state. A view reports the change and
+  renders whatever it is handed next; it never slices or reorders `items`.
+- `labels.emptyTitle` and `labels.errorTitle` are **required**, so a blank
+  heading cannot compile. The `title=""` fallbacks the board and card views
+  carried are gone.
+- `page` / `onPageChange` are optional **only** because not every list is
+  page-numbered: the opportunity board and card endpoints are cursor-paginated
+  and a page control there would be a lie about the data. Supply both or
+  neither.
+
+Two deliberate, **typed** deviations — a view that cannot do something omits
+the prop rather than accepting it and ignoring it:
+
+| View | Type | Why |
+| --- | --- | --- |
+| `BoardView` | `Omit<…, "sort" \| "onSortChange">` | A board's order *is* its grouping axis; there is nothing for a sort control to act on |
+| `CardView` | adds `sortOptions` | With no column headers, the sortable fields have to be named somewhere |
+
+Each view extends `WorkspaceViewLabels` with the strings only it needs:
+`BoardViewLabels` adds `emptyColumn` and `moveTo`; `CardViewLabels` adds
+`sortBy`.
+
+### The card object
+
+`WorkspaceCard` is the one card surface in the product. The board card and the
+card-view card are the same component at two densities — `p-2` and `p-3` — and
+they no longer disagree about anything else:
+
+- One radius: **`rounded-md`**, inherited from the `Card` primitive. The board
+  card used to hand-roll `rounded-sm`.
+- One focus ring: the shared `focusRing` from `lib/variants`, not a
+  hand-written `focus-visible:ring-2`.
+- `cn()` for both, never a template-literal `className`.
+- `role="button"` and the tab stop are set by `WorkspaceCard` itself, **not**
+  inherited from `provided.dragHandleProps` — which is `null` the moment
+  dragging is disabled, which is how board cards lost both for any user
+  without the update capability.
+- Click and drag are disambiguated by a **5px movement threshold**. A small
+  drag used to fire `onClick` mid-gesture.
+- The selection checkbox and the per-card actions render **outside** the
+  activation surface, so no interactive element is nested inside a
+  `role="button"` and neither can start a drag.
+
 ## Shared behavior — identical across all three views
 
 Anything in this list is owned by the workspace, not by a view. A view never
@@ -89,8 +164,13 @@ re-implements one.
 export type WorkspaceView = "board" | "card" | "table";
 ```
 
-- **URL is the source of truth**: `?view=board`. Deep links and refresh must
-  land on the same view.
+- **URL is the source of truth**: `?view=board`, plus `?page=`, `?sort=` and
+  `?dir=`. Deep links and refresh must land on the same view *and the same
+  place in it*. `useWorkspaceState` owns all four; a view switch never resets
+  any of them.
+- **Selection deliberately stays out of the URL.** It is an unbounded set of
+  ids. It lives in `useWorkspaceState`, above the view switch, which is what
+  it has to survive.
 - **Per-screen persistence**: on change, write
   `localStorage["tenant_view_<screen>"]`. On mount with no `?view` parameter,
   restore from storage, else fall back to the screen default.
@@ -108,9 +188,14 @@ your place on every single record you inspect.
 
 - The **table view** scrolls the page; Next's scroll restoration handles it, so
   do not intercept it with a manual `scrollTo(0)` on mount.
-- The **board view** scrolls *inside* its own column container, which browser
-  restoration does not cover. Persist the column scroll offset with the view
-  preference and restore it on mount.
+- The **board view** scrolls *inside* its own row of columns, which browser
+  restoration does not cover. `useScrollRestoration` persists that offset per
+  route in `sessionStorage` and restores it when the container mounts — an
+  offset is a property of this visit, not a durable preference.
+- The **card view** does the same for the container it scrolls inside once it
+  is windowed. Un-windowed, the page scrolls and Next owns it.
+- Restoration is per **column row**, not per column body: a board column's own
+  vertical offset is not persisted today.
 - Never reset scroll on a filter change — that is a new result set, and the top
   is correct there.
 
@@ -159,9 +244,13 @@ properties and let the browser handle it.
 stage carries an outcome — a 2px top border in the mapped role color from
 [tokens.md](tokens.md#status-mapping). Intermediate stages get no color.
 
-**Column body.** Virtualized above 50 cards. Empty column shows a dashed
-`border-border` drop zone with the translated "Drop here" label — never a
-blank space, which reads as broken.
+**Column body.** An empty column shows a dashed `border-border` drop zone with
+the translated "Drop here" label — never blank space, which reads as broken.
+The body is a plain `overflow-y-auto` element, **not** a Radix `ScrollArea`.
+
+<a id="virtualization"></a>
+
+**Virtualization is not shipped here yet.** See the section below.
 
 **Drag and drop** via `@hello-pangea/dnd` (already a dependency, already used).
 
@@ -186,9 +275,17 @@ blank space, which reads as broken.
 every drag operation, in addition to the keyboard path.** The keyboard path
 above satisfies only half of it.
 
-Each board card's overflow menu contains **Move to…**, opening the same stage
-`Select` the detail screen uses and calling the same move mutation. One
+Each board card carries a **Move to…** `DropdownMenu` listing every permitted
+target column, and choosing one calls the same move path a drag does. One
 control, no new endpoint, no new state.
+
+**Shipped**, on all three board screens. `BoardView` builds the menu from its
+own `columns`, minus the column the card is already in, filtered by
+`canMoveTo` — gate that with the same rule that gates dragging, so the two
+paths cannot disagree. A menu move goes through `confirmMove` exactly as a
+drag does, so a terminal destination confirms identically. The opportunities
+board composes `BoardCard` directly and is wired the same way, from the
+pipeline's own stage list.
 
 This is a conformance requirement, not a convenience. A user with a tremor, a
 motor impairment, a trackpad they struggle with, or a switch device cannot
@@ -200,6 +297,44 @@ Applies to all three board screens. The menu item is subject to the same
 capability gate as dragging, and a terminal destination confirms the same way.
 
 **Card content** is per-screen; see the table at the end of this file.
+
+## Virtualization
+
+| List | Threshold | State |
+| --- | --- | --- |
+| `DataTable` rows | 100 | **Shipped.** Rows are uniform by construction at `h-(--size-row)`, so the window is exact |
+| `CardView` grid | 100 | **Shipped.** Grid rows stretch to a common height; the column count is read back from the laid-out element rather than duplicated in JS |
+| Board column body | 50 | **Not shipped.** See below |
+
+The mechanism is `useVirtualWindow` in `src/design-system/views/` — a
+dependency-free vertical window over a uniform-pitch list, rendering a slice
+plus two spacers sized to the rows it left out. It is honest about not having
+measured anything yet: until a real row pitch and viewport height are
+observed, the window is a safe prefix of `threshold` items, so the first paint
+never renders the whole list and never renders a blank box. A container that
+never lays out — SSR, jsdom, a browser with no `ResizeObserver` — simply stays
+at that prefix.
+
+**The board is deliberately not windowed.**
+[DECISIONS.md](../build/DECISIONS.md#d9--virtualization--assumed-split-by-surface-on-2026-08-31) records D9 as
+*assumed*, with the risk that a virtualized list unmounts the node
+`@hello-pangea/dnd` is dragging. Task 1.46 was to prove
+`@tanstack/react-virtual` composes with it — or switch to `react-window`,
+which is what the dnd library's virtual mode is actually exercised against —
+and that proof does not exist yet. Neither package is installed, and the
+lockfile is shared with `admin-portal` and `partner-portal`, so adding one is
+not a view-layer decision. Windowing the two lists that carry no drag
+interaction takes none of that risk.
+
+**How it will compose with the column body when it lands.** The body is a
+plain `overflow-y-auto` element and **not** a Radix `ScrollArea`. That matters:
+`ScrollArea` moves the scroll onto an inner `Viewport` element and wraps the
+content in a `display: table` child, so a virtualizer handed the `Root` (the
+obvious element to reach for) measures a box that never scrolls and computes a
+window of zero rows — the classic broken-measurement pairing. If a board
+column ever gains a `ScrollArea`, the virtualizer's scroll element must be the
+**viewport**, not the root, and the spacer must sit inside the viewport's
+content wrapper. Keeping the plain element avoids the question entirely.
 
 ## Card view
 
@@ -217,25 +352,49 @@ grid gap-3
   2xl:grid-cols-4
 ```
 
-Each card is `surface.base` — border, no shadow — `rounded-md`, `p-3`.
+Each card is the shared `WorkspaceCard` at `density="default"` — border, no
+shadow, `rounded-md`, `p-3`. See [The card object](#the-card-object).
 
-Card view is the **sortable** view: a sort control appears in the toolbar only
-when `view === "card"`, offering the entity's sortable fields. Sort state goes
-in the URL (`sort`, `dir`).
+Card view is the **sortable** view. Its sort control — a field `Select` plus a
+direction toggle — is rendered by `CardView` itself, in a strip above the grid,
+because it exists in exactly one view and putting it in the workspace toolbar
+made every screen re-implement the "only when `view === "card"`" condition.
+It renders only when the caller supplies both `onSortChange` and
+`sortOptions`; a list the server will not sort gets no control rather than a
+dead one. Sort state goes in the URL (`sort`, `dir`).
 
-Same card renderer as the board, at a wider measure. Cards are focusable, and
+Same card renderer as the board, at a wider measure. Cards are focusable and
 `Enter` opens the detail route.
+
+**Windowed above 100 items**, inside its own scroll container. Below that the
+grid renders whole and the page scrolls, exactly as before.
 
 ## Table view
 
 ```
-src/design-system/views/table/TableView.tsx  →  wraps DataTable
+src/design-system/views/table/TableView.tsx  →  adapts DataTable
 ```
 
-Not a hand-rolled `<table>`. It configures `DataTable` — see
-[patterns.md](patterns.md#datatable) — which already owns sticky headers,
-column sizing, row selection, sorting, pagination, keyboard navigation, the
-36px row height, and the zebra row token.
+Not a hand-rolled `<table>`. `TableView` implements the shared contract and
+maps its names onto `DataTable`'s — `items` / `itemKey` / `onActivate` in,
+`rows` / `rowKey` / `onRowClick` out — and changes nothing else. `DataTable`
+stays the engine and keeps owning the sticky header, column sizing, row
+selection, sorting, pagination, keyboard navigation, the row height and the
+zebra row token. See [patterns.md](patterns.md#datatable).
+
+**Screens render `TableView`, not `DataTable`.** Reaching past the adapter is
+what let the three views drift apart in the first place.
+
+Also owned by `DataTable`, and added in Phase 2:
+
+- `aria-sort` on every sortable header — `"ascending"`, `"descending"` or
+  `"none"`, and *absent* on a column that cannot sort. Without it the sort
+  arrow is a purely visual signal.
+- `scroll-margin` sized to the sticky chrome, so tabbing into a row never
+  lands the focus ring behind the sticky header or a sticky column.
+- **Windowed above 100 rows.** The scroll container then owns the vertical
+  scroll, which is also what finally gives the sticky header something to
+  stick to.
 
 - Row height 40px, `text-xs`, weight 400.
 - Sticky header, `bg-card` with a bottom `border-border`.
@@ -337,7 +496,12 @@ Consequences you must design for:
 Required for all three views, not optional polish:
 
 - The switcher is a keyboard-operable radiogroup.
-- Board drag has a working, translated keyboard path.
+- Board drag has a working, translated keyboard path **and** a single-pointer
+  alternative — see [Move to…](#every-card-carries-a-move-to-action--not-optional).
+- Every card is a `role="button"` with a tab stop, whether or not dragging is
+  permitted, and a small drag never fires it.
+- `aria-sort` on every sortable table header.
+- Sticky chrome never obscures the keyboard-focused row.
 - Table rows are navigable; the row action cluster is reachable by keyboard.
 - Cards are focusable and open on `Enter`.
 - View changes announce via `aria-live="polite"` — "Board view, 42 leads".
@@ -360,3 +524,6 @@ A screen's three-view work is complete when all of these hold:
 - [ ] Correct in light and dark
 - [ ] Correct in RTL and LTR
 - [ ] Empty, loading, error and forbidden states covered in all three
+- [ ] All three views wired through `WorkspaceViewProps<T>` — one prop set
+- [ ] Page, sort and selection survive a view switch
+- [ ] Every board card has a working "Move to…" menu

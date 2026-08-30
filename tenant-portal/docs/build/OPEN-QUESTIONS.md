@@ -347,6 +347,74 @@ on a route every session already calls), or exposing a non-owner-readable
 entitlement snapshot route. Either one makes this hook resolve with no other
 edit in the portal.
 
+## Q17 — crm-app's permission grants were only partly applied · **backend defect, blocks all CRM screens**
+
+Found 2026-08-31 by signing in as a real tenant owner and opening `/crm/leads`.
+
+**Every CRM route returns 500.** `crm-app` logs:
+
+```text
+QueryFailedError: permission denied for table tenant_permissions
+  path: /api/v1/crm/lead-stages
+  errorCode: COMMON.GENERIC.INTERNAL_ERROR
+```
+
+`CrmPermissionsGuard` runs on every CRM request and resolves permissions from
+those tables, so **no CRM route can succeed** — this is not leads-specific.
+
+### The manifest is correct. The apply was partial.
+
+The CRM permission manifest is at **version 2**, and it declares exactly the
+relations the guard needs:
+
+```text
+tenant.tenant_users            tenant.tenant_permissions
+tenant.tenant_roles            tenant.tenant_role_permissions
+tenant.tenant_user_branch_roles  tenant.companies   tenant.branches
+```
+
+The binding's `permission_manifest_checksum` is `3fe960ded40e`, which **matches
+manifest v2**, and `status` is **`READY`**.
+
+But in the tenant database, `mutakamel_crm_app` actually holds grants on
+**one** of those relations:
+
+| Relation declared in v2 | Granted in the tenant DB |
+| --- | --- |
+| `tenant_users` | **yes** — SELECT on 14 columns |
+| `tenant_permissions` | **no** |
+| `tenant_roles` | **no** |
+| `tenant_role_permissions` | **no** |
+| `tenant_user_branch_roles` | **no** |
+| `companies` | **no** |
+| `branches` | **no** |
+
+**Both provisioned tenants are identical** — `mersany` and `wallettest02` each
+show the same partial state — so this is systemic, not a per-tenant miss.
+
+### The part that matters beyond CRM
+
+**`status = READY` with a matching checksum is not evidence that the grants
+exist.** The binding reports success for a manifest that was only partly
+applied. Anything that trusts that readiness signal — provisioning gates,
+health checks, the fleet view — is trusting a value that does not reflect the
+database.
+
+> An earlier version of this entry guessed the manifest was missing those
+> tables. That was wrong: the manifest lists them. The grants are what is
+> missing. Recorded because the wrong diagnosis would have sent someone to edit
+> a correct file.
+
+### Consequence for this plan
+
+Manual-test sections **C, D and E** (leads, conversion, opportunities, customer
+profiles, the three views) cannot run against any tenant until this is fixed.
+Core screens are unaffected and were verified working —
+`/core/authentication` renders a live `DataTable` at the correct density.
+
+**Not fixed here.** `AGENTS.md`: never edit backend source to resolve a frontend
+problem. This needs a re-apply of the CRM grants, which is the backend's call.
+
 ## How to add one
 
 Do not delete a resolved entry — the reasoning is the value. Append new

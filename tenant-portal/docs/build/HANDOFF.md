@@ -32,8 +32,48 @@ notifications runtime. Covered by tests. It imports nothing from `app/` or
 you rewrite everything above it safely.
 
 Two narrow permitted changes, listed in
-[../architecture/data-layer.md](../architecture/data-layer.md#permitted-changes).
-Nothing else.
+[../architecture/data-layer.md](../architecture/data-layer.md#permitted-changes),
+plus the third recorded below. Nothing else.
+
+#### Amendment · 2026-08-31 — a third permitted change
+
+**Presentation-only conversion of `src/components/auth/TenantAuthGuard.tsx` and
+`src/components/auth/TenantHostStateBoundary.tsx`.**
+
+The "do not touch" fence exists to protect *behaviour* — auth-generation
+fencing, single-flight refresh, cross-tab session sync, fail-closed host
+admission. It was drawn at directory granularity, and it caught two files that
+contain no such behaviour: they are the **rendered chrome** for states the
+spine computes elsewhere. `TenantAuthGuard`'s only logic is one redirect
+effect; `TenantHostStateBoundary` reads `usePathname()` and a `status` prop it
+is handed.
+
+Leaving them fenced cost more than it protected, and
+[DEFECTS.md#d16](DEFECTS.md#d16--two-auth-screens-were-never-converted) already
+schedules their conversion — the fence and the defect list contradicted each
+other:
+
+- They are **unconditionally hardcoded Arabic with no English path**, on the
+  two surfaces a real outage goes through. An English-speaking operator during
+  a degraded session reads Arabic or nothing.
+- They carry the entire remaining census debt —
+  [D17](DEFECTS.md#d17--the-census-baseline-was-banked-with-violations-in-it) —
+  which is why `eslint.config.mjs` had to exclude `src/components/auth/**`
+  wholesale, blinding the design gates on four files rather than two.
+
+**Scope of the amendment, exactly:**
+
+| Permitted | Not permitted |
+| --- | --- |
+| `className` values, markup structure, imports of `@/design-system` | Any change to the redirect effect's conditions or dependency array |
+| Replacing hardcoded Arabic with `t.*` from both dictionaries | Any change to what `useTenantAuth()` is read for |
+| Adding `role`/`aria-*` and a `<title>`-level heading | Any change to `TenantHostAdmission.tsx` or `TenantPortalRuntime.tsx` |
+
+`TenantHostAdmission.tsx` and `TenantPortalRuntime.tsx` stay fenced in full:
+they *do* carry spine behaviour. The rest of Tier 1 is unchanged.
+
+Recorded because a binding document is not amended by editing the files it
+protects — see MASTER-PLAN task 3.36.
 
 ### Tier 2 — live features. Keep the logic, replace the markup.
 
