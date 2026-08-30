@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-08-28T03:11:36.705Z**
+Generated at: **2026-08-30T18:06:12.280Z**
 
-Frontend revision: `dbd18ccbee94+dirty`
+Frontend revision: `684f503f0279+dirty`
 
-Backend revision: `4308162fb249`
+Backend revision: `989ee35f6578+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -17,10 +17,10 @@ canonical Gateway path mappings.
 
 | App | Routes |
 | --- | ---: |
-| core | 199 |
+| core | 195 |
 | crm | 143 |
 | trade | 231 |
-| **Total** | **573** |
+| **Total** | **569** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -215,7 +215,6 @@ Machine-readable source:
 | core | POST | `/api/tenant/core/v1/users/:id/team-memberships` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.team-memberships.add` |
 | core | PUT | `/api/tenant/core/v1/users/:id/team-memberships` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.team-memberships.set` |
 | core | DELETE | `/api/tenant/core/v1/users/:id/team-memberships/:membershipId` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.team-memberships.delete` |
-| core | PATCH | `/api/tenant/core/v1/users/:id/webphone` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.webphone.update` |
 | core | GET | `/api/tenant/core/v1/users/:userId/assignments` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.assignments.list` |
 | core | POST | `/api/tenant/core/v1/users/:userId/assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.assignments.add` |
 | core | PUT | `/api/tenant/core/v1/users/:userId/assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.assignments.set` |
@@ -227,9 +226,6 @@ Machine-readable source:
 | core | PUT | `/api/tenant/core/v1/users/:userId/scope-role-assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.scope-role-assignments.set` |
 | core | GET | `/api/tenant/core/v1/users/me/profile` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.profile.get` |
 | core | PUT | `/api/tenant/core/v1/users/me/profile` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.profile.update` |
-| core | GET | `/api/tenant/core/v1/users/me/webphone` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.webphone.me.get` |
-| core | GET | `/api/tenant/core/v1/users/me/webphone/call-logs` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.webphone.call-logs.list` |
-| core | POST | `/api/tenant/core/v1/users/me/webphone/call-logs` | TENANT_PORTAL | WRITE_SENSITIVE | no | `core.tenant.users.webphone.call-logs.create` |
 | core | GET | `/api/tenant/core/v1/wallet` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.wallets.list` |
 | core | GET | `/api/tenant/core/v1/wallet/ledger` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.wallets.ledger` |
 | core | GET | `/api/tenant/core/v1/workspace-settings` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.workspace-settings.get` |

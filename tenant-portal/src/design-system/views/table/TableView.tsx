@@ -1,3 +1,5 @@
+"use client";
+
 import { DataTable, type DataTableProps } from "../../patterns/data-table/DataTable";
 
 // Configures DataTable — see docs/design/patterns.md#datatable, which

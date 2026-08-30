@@ -1,3 +1,5 @@
+"use client";
+
 import { useI18n } from "@/i18n/I18nContext";
 import { Badge, type BadgeProps } from "../../primitives/Badge";
 import { resolveStatusRole, type StatusKind } from "./tone-map";

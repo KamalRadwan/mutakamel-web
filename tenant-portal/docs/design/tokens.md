@@ -73,7 +73,7 @@ Two facts worth carrying in your head:
 
 - The brand fill uses **different ramp steps per theme** — a single step cannot
   clear 4.5:1 against both a light and a dark ground.
-- The **focus ring is the tightest value in the system** (3.74 against a 3.0
+- The **focus ring is the tightest value in the system** (3.40 against a 3.0
   bar for non-text). Do not lighten `ink-50` or lower `brand-500`'s chroma
   without re-running the script.
 
@@ -83,14 +83,14 @@ Both rules stand. The reasons first given for them did not survive measurement,
 and are corrected here rather than quietly left in place:
 
 - **`--muted-foreground` is `ink-600`, not `ink-500`.** Correct as stated:
-  `ink-500` measures **4.32** on white, below the 4.5 bar.
+  `ink-500` measures **4.07** on white, below the 4.5 bar.
 - **Destructive is `negative-700`, not `negative-600`.** The original claim was
-  that `negative-600` *fails* contrast. It does not — it measures **5.09** with
-  a white label and would be acceptable. `negative-700` (7.07) is kept as a
+  that `negative-600` *fails* contrast. It does not — it measures **5.03** with
+  a white label and would be acceptable. `negative-700` (7.02) is kept as a
   **margin choice**, not a compliance requirement.
 - **Amber is never a filled button.** The original claim was that no `caution`
   step clears 4.5:1 against both label colors. That is false:
-  `caution-500` with an `ink-950` label measures **8.42**. The rule stands on
+  `caution-500` with an `ink-950` label measures **8.78**. The rule stands on
   **semantic** grounds instead — a filled button reads as *the* action on a
   screen, and "caution" is not an action; a second filled hue also competes
   with the brand fill for the one-primary-per-screen rule in
@@ -242,30 +242,14 @@ a family has zero references, delete its override block.
 
 ## Elevation and control tokens
 
-```css
-:root {
-  --size-control-xs: 1.75rem;  /* 28px */
-  --size-control-sm: 2rem;     /* 32px */
-  --size-control-md: 2.25rem;  /* 36px — default */
-  --size-control-lg: 2.5rem;   /* 40px */
-  --size-control-xl: 2.75rem;  /* 44px */
-
-  --size-row: 2.5rem;          /* 40px — DataTable row */
-
-  --elevation-pop:     0 1px 2px oklch(0.172 0.008 79 / 0.08),
-                       0 2px 6px oklch(0.172 0.008 79 / 0.06);
-  --elevation-overlay: 0 2px 4px oklch(0.172 0.008 79 / 0.10),
-                       0 8px 24px oklch(0.172 0.008 79 / 0.12);
-}
-
-.dark {
-  /* Dark mode substitutes a top inset hairline for shadow — a heavier
-     shadow against an already-dark canvas reads as mud. */
-  --elevation-pop:     inset 0 1px 0 oklch(1 0 0 / 0.06);
-  --elevation-overlay: inset 0 1px 0 oklch(1 0 0 / 0.08),
-                       0 8px 24px oklch(0 0 0 / 0.40);
-}
-```
+> **Superseded.** The control scale that was here specified 28/32/36/40/44px
+> and a warm-hue shadow. Both are wrong: the implemented scale is
+> **24/28/32/36/40px** at `--ui-scale` 1.0 (and 21.6/25.2/28.8/32.4/36px at the
+> shipped 0.9), and the shadow is hue 240, derived from the `ink-950` token via
+> `color-mix()` rather than copied. The live block is in
+> [DESIGN-SYSTEM.md § Sizing & density](DESIGN-SYSTEM.md#3--sizing--density).
+>
+> Removed rather than annotated, because it was copyable CSS.
 
 Both must be bridged into Tailwind through `@theme inline` as `--shadow-pop`
 and `--shadow-overlay`, or the `shadow-pop` / `shadow-overlay` utilities

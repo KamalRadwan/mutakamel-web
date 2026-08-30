@@ -1,3 +1,5 @@
+"use client";
+
 import { forwardRef } from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn } from "../lib/cn";

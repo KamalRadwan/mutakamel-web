@@ -7,6 +7,10 @@
 //
 // Usage: node scripts/design/contrast.mjs
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
 /* ---------- OKLCH -> linear sRGB -> relative luminance ---------- */
 
 function oklchToLinearSrgb(L, C, hDeg) {
@@ -59,36 +63,37 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/* ---------- The palette, mirroring docs/design/DESIGN-SYSTEM.md ---------- */
+/* ---------- The palette, READ FROM the token source of truth ---------- */
 
-const T = {
-  "brand-300": [0.8, 0.097, 258],
-  "brand-400": [0.7, 0.155, 258],
-  "brand-500": [0.606, 0.18, 258],
-  "brand-600": [0.52, 0.18, 258],
-  "brand-700": [0.442, 0.155, 258],
-  "ink-25": [0.992, 0.004, 240],
-  "ink-50": [0.983, 0.006, 240],
-  "ink-100": [0.963, 0.01, 240],
-  "ink-200": [0.923, 0.016, 240],
-  "ink-400": [0.712, 0.028, 240],
-  "ink-500": [0.585, 0.03, 240],
-  "ink-600": [0.482, 0.03, 240],
-  "ink-900": [0.247, 0.023, 240],
-  "ink-950": [0.174, 0.02, 240],
-  "ink-1000": [0.126, 0.017, 240],
-  "positive-300": [0.812, 0.096, 166],
-  "positive-600": [0.565, 0.113, 163],
-  "positive-700": [0.478, 0.094, 162],
-  "caution-100": [0.957, 0.04, 81],
-  "caution-500": [0.755, 0.154, 64],
-  "caution-700": [0.548, 0.128, 58],
-  "negative-100": [0.939, 0.029, 19],
-  "negative-200": [0.886, 0.056, 18],
-  "negative-600": [0.556, 0.208, 15],
-  "negative-700": [0.474, 0.18, 14],
-  white: [1, 0, 0],
-};
+// This used to be a hand-copied table, which meant every palette change had to
+// be made twice and the second copy silently rotted. It now parses
+// src/app/globals.css — the file that declares the tokens — so this gate can
+// never validate a palette the app does not actually ship.
+
+const here = dirname(fileURLToPath(import.meta.url));
+const globalsPath = join(here, "..", "..", "src", "app", "globals.css");
+const css = readFileSync(globalsPath, "utf8");
+
+const RAMP_TOKEN =
+  /--color-(ink|brand|positive|caution|negative)-(\d+):\s*oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/g;
+
+const T = { white: [1, 0, 0] };
+for (const m of css.matchAll(RAMP_TOKEN)) {
+  T[`${m[1]}-${m[2]}`] = [Number(m[3]), Number(m[4]), Number(m[5])];
+}
+
+// A silent parse failure would validate an empty palette and report success,
+// which is worse than a wrong colour. Pin the expected shape.
+const RAMP_STEPS = { ink: 13, brand: 11, positive: 11, caution: 11, negative: 11 };
+for (const [ramp, expected] of Object.entries(RAMP_STEPS)) {
+  const found = Object.keys(T).filter((k) => k.startsWith(`${ramp}-`)).length;
+  if (found !== expected) {
+    process.stderr.write(
+      `Palette parse failed: expected ${expected} ${ramp} steps in globals.css, found ${found}.\n`,
+    );
+    process.exit(1);
+  }
+}
 
 const rgb = Object.fromEntries(
   Object.entries(T).map(([k, v]) => [k, oklchToLinearSrgb(...v)]),
@@ -98,20 +103,32 @@ const rgb = Object.fromEntries(
 
 const CLAIMS = [
   // [label, foreground, background, required ratio, claimed in DESIGN-SYSTEM.md]
-  ["primary fill · light", "white", "brand-600", 4.5, 5.64],
-  ["primary fill · dark", "ink-950", "brand-400", 4.5, 7.04],
-  ["link/text · light", "brand-700", "white", 4.5, 7.87],
-  ["link/text · dark", "brand-300", "ink-1000", 4.5, 10.8],
-  ["muted text · light", "ink-600", "white", 4.5, 6.44],
-  ["muted text · dark", "ink-400", "ink-1000", 4.5, 7.94],
-  ["body text · light", "ink-900", "ink-50", 4.5, 15.34],
-  ["body text · dark", "ink-100", "ink-1000", 4.5, 18.15],
-  ["destructive fill", "white", "negative-700", 4.5, 7.41],
-  ["positive text · light", "positive-700", "white", 4.5, 6.28],
-  ["positive text · dark", "positive-300", "ink-1000", 4.5, 11.71],
-  ["focus ring · light (non-text)", "brand-500", "ink-50", 3.0, 3.74],
-  ["focus ring · dark (non-text)", "brand-400", "ink-1000", 3.0, null],
+  ["primary fill · light", "white", "brand-600", 4.5, 4.79],
+  ["primary fill · dark", "ink-950", "brand-400", 4.5, 7.47],
+  ["link/text · light", "brand-700", "white", 4.5, 6.88],
+  ["link/text · dark", "brand-300", "ink-1000", 4.5, 11.24],
+  ["muted text · light", "ink-600", "white", 4.5, 6.31],
+  ["muted text · dark", "ink-400", "ink-1000", 4.5, 8.07],
+  ["body text · light", "ink-900", "ink-50", 4.5, 15.37],
+  ["body text · dark", "ink-100", "ink-1000", 4.5, 18.31],
+  ["destructive fill", "white", "negative-700", 4.5, 7.02],
+  ["positive text · light", "positive-700", "white", 4.5, 5.78],
+  ["positive text · dark", "positive-300", "ink-1000", 4.5, 12.29],
+  ["focus ring · light (non-text)", "brand-500", "ink-50", 3.0, 3.4],
+  ["focus ring · dark (non-text)", "brand-400", "ink-1000", 3.0, 7.96],
   ["zebra row separation (non-text)", "ink-25", "white", 1.0, null],
+
+  // Badge tones. Badge.tsx renders <tone>-800 on <tone>-100 in light and
+  // <tone>-300 on <tone>-950 in dark, for all four roles — eight pairs this
+  // gate never checked, on the most numerous coloured element in the product.
+  ["badge brand · light", "brand-800", "brand-100", 4.5, 7.9],
+  ["badge positive · light", "positive-800", "positive-100", 4.5, 7.19],
+  ["badge caution · light", "caution-800", "caution-100", 4.5, 6.29],
+  ["badge negative · light", "negative-800", "negative-100", 4.5, 8.07],
+  ["badge brand · dark", "brand-300", "brand-950", 4.5, 9.49],
+  ["badge positive · dark", "positive-300", "positive-950", 4.5, 9.91],
+  ["badge caution · dark", "caution-300", "caution-950", 4.5, 10.45],
+  ["badge negative · dark", "negative-300", "negative-950", 4.5, 9.47],
 ];
 
 // The one genuine contrast-driven exclusion. The docs used to claim two more
@@ -130,10 +147,16 @@ let drift = 0;
 process.stdout.write("\nPALETTE CONTRAST VERIFICATION\n");
 process.stdout.write("(computed from the OKLCH values in docs/design/DESIGN-SYSTEM.md)\n\n");
 
+// An out-of-gamut token is not a warning. The browser clips it, so the colour
+// that ships is not the colour that was measured — which silently invalidates
+// every ratio computed against it.
 const outOfGamut = Object.entries(rgb).filter(([, v]) => !inGamut(v));
 if (outOfGamut.length > 0) {
-  process.stdout.write("OUT OF sRGB GAMUT — these will be clipped by the browser:\n");
-  for (const [name] of outOfGamut) process.stdout.write(`  ${name}\n`);
+  failures += outOfGamut.length;
+  process.stdout.write("OUT OF sRGB GAMUT — the browser will clip these:\n");
+  for (const [name, v] of outOfGamut) {
+    process.stdout.write(`  FAIL  ${name.padEnd(16)} ${toHex(v)}\n`);
+  }
   process.stdout.write("\n");
 }
 

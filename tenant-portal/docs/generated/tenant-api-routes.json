@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generatedAt": "2026-08-28T03:11:36.705Z",
+    "generatedAt": "2026-08-30T18:06:12.280Z",
     "generator": "scripts/docs/generate-route-inventory.mjs",
-    "frontendRevision": "dbd18ccbee94+dirty",
-    "backendRevision": "4308162fb249",
+    "frontendRevision": "684f503f0279+dirty",
+    "backendRevision": "989ee35f6578+dirty",
     "sourcePolicy": "Gateway master ownership and canonicalization rules for master=tenant",
     "canonicalNamespaces": [
       "/api/tenant/core/v1/*",
@@ -13,32 +13,32 @@
     "excludes": "Admin, partner, and direct Worker routes. Core PUBLIC public/files routes are included because tenant master owns them."
   },
   "counts": {
-    "total": 573,
+    "total": 569,
     "byApp": {
-      "core": 199,
+      "core": 195,
       "crm": 143,
       "trade": 231
     },
     "byMethod": {
-      "GET": 217,
-      "POST": 235,
-      "PATCH": 61,
+      "GET": 215,
+      "POST": 234,
+      "PATCH": 60,
       "DELETE": 44,
       "PUT": 16
     },
     "byRouteClass": {
-      "AUTHENTICATED": 209,
-      "WRITE_SENSITIVE": 328,
+      "AUTHENTICATED": 207,
+      "WRITE_SENSITIVE": 326,
       "PUBLIC": 13,
       "READ_HEAVY": 23
     }
   },
   "sourceHashes": {
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "9854b533e118923843dac81c081a28a4ba6d4f2dbe7f9687b18786172ad9c6f9",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "ba3041ec935c4efcf9f07b4ac12048ebacadaec2475c4d8d6fe1278b4c13e136",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts": "6506da8aa1b48f54b4506a89e13a9b722c64161110a3634190bfa76a3b2f0111",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts": "75e277fa597ab6af4b09a1cdfe96a391c8d139543d60cf38f0abd016edba836c",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "d2b37c7d40a975d710be5ad32249b40cc313b183c099bd7dcf52805b010ecd25",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/upstream-app.registry.ts": "ad6fb200dfb68c54e9f5c3f9f4e144d80eb47531e97522fe48cbc9a43755bd6c"
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/upstream-app.registry.ts": "f2d856450e6cfa058dcd062a41ccc32509d85925640c5e70d61186af589869a3"
   },
   "routes": [
     {
@@ -3586,27 +3586,6 @@
     },
     {
       "app": "core",
-      "canonicalPath": "/api/tenant/core/v1/users/:id/webphone",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
-      "version": 1,
-      "routeKey": "core.tenant.users.webphone.update",
-      "method": "PATCH",
-      "pathPattern": "/api/v1/tenant/users/:id/webphone",
-      "service": "core-app",
-      "targetApp": "core",
-      "upstreamPath": "/api/v1/tenant/users/:id/webphone",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": "WRITE_SENSITIVE",
-      "transportRetryMode": "NEVER",
-      "circuitBreakerKey": "core-app.tenant-users",
-      "requiredPermissions": [
-        "users.user.update"
-      ]
-    },
-    {
-      "app": "core",
       "canonicalPath": "/api/tenant/core/v1/users/:userId/assignments",
       "portalUsage": "TENANT_PORTAL",
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
@@ -3819,56 +3798,6 @@
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": true,
       "idempotencyMode": "WRITE_SENSITIVE",
-      "transportRetryMode": "NEVER",
-      "circuitBreakerKey": "core-app.tenant-users"
-    },
-    {
-      "app": "core",
-      "canonicalPath": "/api/tenant/core/v1/users/me/webphone",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
-      "version": 1,
-      "routeKey": "core.tenant.users.webphone.me.get",
-      "method": "GET",
-      "pathPattern": "/api/v1/tenant/users/me/webphone",
-      "service": "core-app",
-      "targetApp": "core",
-      "upstreamPath": "/api/v1/tenant/users/me/webphone",
-      "routeClass": "AUTHENTICATED",
-      "idempotent": true,
-      "circuitBreakerKey": "core-app.tenant-users"
-    },
-    {
-      "app": "core",
-      "canonicalPath": "/api/tenant/core/v1/users/me/webphone/call-logs",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
-      "version": 1,
-      "routeKey": "core.tenant.users.webphone.call-logs.list",
-      "method": "GET",
-      "pathPattern": "/api/v1/tenant/users/me/webphone/call-logs",
-      "service": "core-app",
-      "targetApp": "core",
-      "upstreamPath": "/api/v1/tenant/users/me/webphone/call-logs",
-      "routeClass": "AUTHENTICATED",
-      "idempotent": true,
-      "circuitBreakerKey": "core-app.tenant-users"
-    },
-    {
-      "app": "core",
-      "canonicalPath": "/api/tenant/core/v1/users/me/webphone/call-logs",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
-      "version": 1,
-      "routeKey": "core.tenant.users.webphone.call-logs.create",
-      "method": "POST",
-      "pathPattern": "/api/v1/tenant/users/me/webphone/call-logs",
-      "service": "core-app",
-      "targetApp": "core",
-      "upstreamPath": "/api/v1/tenant/users/me/webphone/call-logs",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
-      "idempotencyMode": "NONE",
       "transportRetryMode": "NEVER",
       "circuitBreakerKey": "core-app.tenant-users"
     },

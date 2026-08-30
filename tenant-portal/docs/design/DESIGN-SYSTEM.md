@@ -53,75 +53,83 @@ Every step verified in-gamut and contrast-checked by
 
 ```css
 @theme {
-  /* INK — cold blue neutral, hue 240. 13 steps: ink-25 is the table zebra row,
-     ink-1000 the dark canvas. Chroma peaks mid-ramp so mid-greys read blue
-     rather than washing out at the ends. */
-  --color-ink-25:   oklch(0.992 0.004 240);  /* #fafdff */
-  --color-ink-50:   oklch(0.983 0.006 240);  /* #f6fafd */
-  --color-ink-100:  oklch(0.963 0.010 240);  /* #edf4f9 */
-  --color-ink-200:  oklch(0.923 0.016 240);  /* #dce7ef */
-  --color-ink-300:  oklch(0.865 0.022 240);  /* #c6d5e0 */
-  --color-ink-400:  oklch(0.712 0.028 240);  /* #93a5b2 */
-  --color-ink-500:  oklch(0.585 0.030 240);  /* #6c7f8c */
-  --color-ink-600:  oklch(0.482 0.030 240);  /* #4f616e */
-  --color-ink-700:  oklch(0.399 0.028 240);  /* #3a4a55 */
-  --color-ink-800:  oklch(0.316 0.026 240);  /* #26343e */
-  --color-ink-900:  oklch(0.247 0.023 240);  /* #17222b */
-  --color-ink-950:  oklch(0.174 0.020 240);  /* #081118 */
-  --color-ink-1000: oklch(0.126 0.017 240);  /* #02070c */
+  /* INK — cold blue neutral, hue 240 (UNCHANGED). 13 steps: ink-25 is the table
+     zebra row, ink-1000 the dark canvas. Chroma raised from 0.030 to 0.050 at the
+     mid ramp so surfaces read cool rather than grey — see
+     docs/build/DECISIONS.md#d1a.
+     Every step verified in-gamut and contrast-checked by scripts/design/contrast.mjs. */
+  --color-ink-25:        oklch(0.993 0.003 240);  /* #fbfdff */
+  --color-ink-50:        oklch(0.985 0.007 240);  /* #f6fbfe */
+  --color-ink-100:       oklch(0.966 0.016 240);  /* #ebf6fe */
+  --color-ink-200:       oklch(0.928 0.026 240);  /* #d8eaf7 */
+  --color-ink-300:       oklch(0.870 0.036 240);  /* #c0d8ea */
+  --color-ink-400:       oklch(0.716 0.046 240);  /* #8aa8be */
+  --color-ink-500:       oklch(0.590 0.050 240);  /* #628298 */
+  --color-ink-600:       oklch(0.486 0.050 240);  /* #456379 */
+  --color-ink-700:       oklch(0.402 0.045 240);  /* #314c5e */
+  --color-ink-800:       oklch(0.318 0.040 240);  /* #1f3545 */
+  --color-ink-900:       oklch(0.248 0.034 240);  /* #112330 */
+  --color-ink-950:       oklch(0.175 0.028 240);  /* #05121c */
+  --color-ink-1000:      oklch(0.127 0.024 240);  /* #01080f */
 
-  /* BRAND — blue, hue 258. Anchored at 600, the light-mode fill. */
-  --color-brand-50:  oklch(0.968 0.014 258);  /* #eff5fe */
-  --color-brand-100: oklch(0.936 0.030 258);  /* #deebfe */
-  --color-brand-200: oklch(0.882 0.056 258);  /* #c2dafe */
-  --color-brand-300: oklch(0.800 0.097 258);  /* #97c0fc */
-  --color-brand-400: oklch(0.700 0.155 258);  /* #5e9efd */
-  --color-brand-500: oklch(0.606 0.180 258);  /* #327feb */
-  --color-brand-600: oklch(0.520 0.180 258);  /* #1364ce */
-  --color-brand-700: oklch(0.442 0.155 258);  /* #0a4ea6 */
-  --color-brand-800: oklch(0.375 0.128 258);  /* #093e83 */
-  --color-brand-900: oklch(0.318 0.102 258);  /* #0a3065 */
-  --color-brand-950: oklch(0.220 0.070 258);  /* #04193a */
+  /* BRAND — cold blue, hue 258 (UNCHANGED). Anchored at 600, the light-mode fill,
+     lifted to L 0.560 so the primary reads bright rather than navy.
+     Every step verified in-gamut and contrast-checked by scripts/design/contrast.mjs. */
+  --color-brand-50:      oklch(0.970 0.014 258);  /* #eff6ff */
+  --color-brand-100:     oklch(0.940 0.028 258);  /* #e0ecfe */
+  --color-brand-200:     oklch(0.888 0.054 258);  /* #c4dcfe */
+  --color-brand-300:     oklch(0.812 0.094 258);  /* #9cc4fe */
+  --color-brand-400:     oklch(0.716 0.147 258);  /* #67a4fe */
+  --color-brand-500:     oklch(0.632 0.196 258);  /* #3085fd */
+  --color-brand-600:     oklch(0.560 0.204 258);  /* #066de9 */
+  --color-brand-700:     oklch(0.474 0.173 258);  /* #0356ba */
+  --color-brand-800:     oklch(0.400 0.146 258);  /* #024394 */
+  --color-brand-900:     oklch(0.336 0.123 258);  /* #013374 */
+  --color-brand-950:     oklch(0.230 0.085 258);  /* #001a44 */
 
-  /* POSITIVE — teal-green, hue 168->160. */
-  --color-positive-50:  oklch(0.972 0.016 168);
-  --color-positive-100: oklch(0.940 0.036 168);
-  --color-positive-200: oklch(0.884 0.066 168);
-  --color-positive-300: oklch(0.812 0.096 166);
-  --color-positive-400: oklch(0.740 0.118 165);
-  --color-positive-500: oklch(0.660 0.125 164);
-  --color-positive-600: oklch(0.565 0.113 163);
-  --color-positive-700: oklch(0.478 0.094 162);
-  --color-positive-800: oklch(0.402 0.077 161);
-  --color-positive-900: oklch(0.340 0.062 160);
-  --color-positive-950: oklch(0.232 0.042 160);
+  /* POSITIVE — teal-green, hue 164. Pinned to one hue across the ramp; the previous
+     168->160 drift bought nothing measurable.
+     Every step verified in-gamut and contrast-checked by scripts/design/contrast.mjs. */
+  --color-positive-50:   oklch(0.974 0.024 164);  /* #e9fcf2 */
+  --color-positive-100:  oklch(0.944 0.056 164);  /* #cbf9e3 */
+  --color-positive-200:  oklch(0.890 0.098 164);  /* #9cf0c9 */
+  --color-positive-300:  oklch(0.822 0.136 164);  /* #61e0ad */
+  --color-positive-400:  oklch(0.750 0.156 164);  /* #19cc93 */
+  --color-positive-500:  oklch(0.680 0.143 164);  /* #0db380 */
+  --color-positive-600:  oklch(0.588 0.123 164);  /* #0c9369 */
+  --color-positive-700:  oklch(0.496 0.104 164);  /* #067452 */
+  --color-positive-800:  oklch(0.414 0.087 164);  /* #035a3e */
+  --color-positive-900:  oklch(0.350 0.074 164);  /* #014630 */
+  --color-positive-950:  oklch(0.238 0.050 164);  /* #012618 */
 
-  /* CAUTION — amber, hue 82->56. The torsion toward orange is physics: without
-     it the dark steps read olive. */
-  --color-caution-50:  oklch(0.981 0.018 82);
-  --color-caution-100: oklch(0.957 0.040 81);
-  --color-caution-200: oklch(0.914 0.076 78);
-  --color-caution-300: oklch(0.863 0.112 74);
-  --color-caution-400: oklch(0.809 0.150 69);
-  --color-caution-500: oklch(0.755 0.154 64);
-  --color-caution-600: oklch(0.663 0.146 60);
-  --color-caution-700: oklch(0.548 0.128 58);
-  --color-caution-800: oklch(0.458 0.104 57);
-  --color-caution-900: oklch(0.392 0.084 56);
-  --color-caution-950: oklch(0.257 0.056 56);
+  /* CAUTION — amber, hue 64. The one warm hue, kept warm on purpose: it is what
+     makes a caution state catch the eye on a cold screen.
+     Every step verified in-gamut and contrast-checked by scripts/design/contrast.mjs. */
+  --color-caution-50:    oklch(0.983 0.011 64);  /* #fff8f2 */
+  --color-caution-100:   oklch(0.960 0.026 64);  /* #ffefe0 */
+  --color-caution-200:   oklch(0.920 0.053 64);  /* #ffdec1 */
+  --color-caution-300:   oklch(0.872 0.088 64);  /* #fec998 */
+  --color-caution-400:   oklch(0.820 0.129 64);  /* #feb165 */
+  --color-caution-500:   oklch(0.770 0.172 64);  /* #fe980d */
+  --color-caution-600:   oklch(0.680 0.152 64);  /* #d88008 */
+  --color-caution-700:   oklch(0.560 0.125 64);  /* #a66205 */
+  --color-caution-800:   oklch(0.468 0.104 64);  /* #824b04 */
+  --color-caution-900:   oklch(0.398 0.089 64);  /* #683b02 */
+  --color-caution-950:   oklch(0.262 0.059 64);  /* #381d00 */
 
-  /* NEGATIVE — crimson, hue 20->13. Cold-compatible; far from amber. */
-  --color-negative-50:  oklch(0.971 0.014 20);
-  --color-negative-100: oklch(0.939 0.029 19);
-  --color-negative-200: oklch(0.886 0.056 18);
-  --color-negative-300: oklch(0.810 0.104 17);
-  --color-negative-400: oklch(0.712 0.160 16);
-  --color-negative-500: oklch(0.630 0.200 15);
-  --color-negative-600: oklch(0.556 0.208 15);
-  --color-negative-700: oklch(0.474 0.180 14);
-  --color-negative-800: oklch(0.400 0.148 14);
-  --color-negative-900: oklch(0.343 0.121 13);
-  --color-negative-950: oklch(0.228 0.082 13);
+  /* NEGATIVE — crimson, hue 15. Cold-compatible and far from amber.
+     Every step verified in-gamut and contrast-checked by scripts/design/contrast.mjs. */
+  --color-negative-50:   oklch(0.973 0.013 15);  /* #fff3f3 */
+  --color-negative-100:  oklch(0.943 0.028 15);  /* #ffe5e6 */
+  --color-negative-200:  oklch(0.892 0.056 15);  /* #fecdcf */
+  --color-negative-300:  oklch(0.820 0.100 15);  /* #fea9af */
+  --color-negative-400:  oklch(0.722 0.172 15);  /* #fe7182 */
+  --color-negative-500:  oklch(0.642 0.240 15);  /* #fc265c */
+  --color-negative-600:  oklch(0.570 0.225 15);  /* #dc094a */
+  --color-negative-700:  oklch(0.488 0.192 15);  /* #b2073b */
+  --color-negative-800:  oklch(0.410 0.162 15);  /* #8d032d */
+  --color-negative-900:  oklch(0.350 0.138 15);  /* #710222 */
+  --color-negative-950:  oklch(0.234 0.093 15);  /* #3f000f */
 }
 ```
 
@@ -153,13 +161,27 @@ blue is how a UI ends up glowing everywhere.
 
 | Pairing | Light | Dark | Bar |
 | --- | ---: | ---: | ---: |
-| Fill — label on `--primary` | **5.64** | **7.04** | 4.5 |
-| Link / text | **7.87** | **10.80** | 4.5 |
-| Muted text | **6.44** | **7.94** | 4.5 |
-| Body text | **15.34** | **18.15** | 4.5 |
-| Focus ring (non-text) | **3.74** | ≥3 | 3.0 |
-| Destructive fill | **7.41** | **7.41** | 4.5 |
-| Positive text | **6.28** | **11.71** | 4.5 |
+| Fill — label on `--primary` | **4.79** | **7.47** | 4.5 |
+| Link / text | **6.88** | **11.24** | 4.5 |
+| Muted text | **6.31** | **8.07** | 4.5 |
+| Body text | **15.37** | **18.31** | 4.5 |
+| Focus ring (non-text) | **3.40** | **7.96** | 3.0 |
+| Destructive fill | **7.02** | **7.02** | 4.5 |
+| Positive text | **5.78** | **12.29** | 4.5 |
+| Badge — brand `800`/`100`, `300`/`950` | **7.90** | **9.49** | 4.5 |
+| Badge — positive | **7.19** | **9.92** | 4.5 |
+| Badge — caution | **6.29** | **10.45** | 4.5 |
+| Badge — negative | **8.07** | **9.47** | 4.5 |
+
+Every number computed by `scripts/design/contrast.mjs`, which now **parses
+`globals.css`** rather than carrying a hand-copied table — a duplicate table is
+what let the old values rot. It also fails the build on any out-of-gamut step,
+because a clipped colour is not the colour that was measured.
+
+The palette is brighter than the one it replaces: chroma is up 9–20 % on the
+chromatic ramps and 67 % on `ink`. Headroom narrows where the fill got brighter
+— the primary fill moved from 5.64 to 4.79 against a 4.5 bar. That is the
+trade, taken deliberately. See `../build/DECISIONS.md#d1--palette-vividness`.
 
 Every number computed, not estimated. The cold palette has **more headroom
 than the warm one it replaces** — the tightest value moved from 3.19 to 3.74.
@@ -260,20 +282,39 @@ never `Number()`.
 
 Tuned for many rows on a 1366×768 laptop.
 
+Every size token multiplies by `--ui-scale`, which ships at **0.9**. The base
+values below are the 1.0 figures; the parenthesised ones are what renders today.
+
 ```css
 :root {
-  --size-control-xs: 1.5rem;    /* 24px — inline table actions */
-  --size-control-sm: 1.75rem;   /* 28px — toolbar, filters */
-  --size-control-md: 2rem;      /* 32px — DEFAULT */
-  --size-control-lg: 2.25rem;   /* 36px — primary action, login */
-  --size-control-xl: 2.5rem;    /* 40px — rare */
+  --ui-scale: 0.9;
 
-  --size-row:      2.25rem;     /* 36px — DataTable row */
-  --size-topbar:   2.75rem;     /* 44px */
-  --size-sidebar:  14.5rem;     /* 232px expanded */
-  --size-rail:     3rem;        /* 48px collapsed */
+  --size-control-xs: calc(1.5rem  * var(--ui-scale));  /* 24px -> 21.6px */
+  --size-control-sm: calc(1.75rem * var(--ui-scale));  /* 28px -> 25.2px */
+  --size-control-md: calc(2rem    * var(--ui-scale));  /* 32px -> 28.8px  DEFAULT */
+  --size-control-lg: calc(2.25rem * var(--ui-scale));  /* 36px -> 32.4px */
+  --size-control-xl: calc(2.5rem  * var(--ui-scale));  /* 40px -> 36px */
+
+  --size-row:     calc(2.25rem * var(--ui-scale));     /* 36px -> 32.4px */
+  --size-topbar:  calc(2.75rem * var(--ui-scale));     /* 44px -> 39.6px */
+  --size-sidebar: calc(14.5rem * var(--ui-scale));     /* 232px -> 208.8px */
+  --size-rail:    calc(3rem    * var(--ui-scale));     /* 48px -> 43.2px */
 }
 ```
+
+**Type is deliberately not in there.** The 13px Latin / 14px Arabic floor is
+absolute, not relative — density comes from tighter spacing and shorter rows,
+never smaller type. **Radius is not in there either**: 2/4/6/8 is a shape
+constant.
+
+**Do not scale this through `html { font-size }`.** It was tried: that selector
+is banned in `globals.css` (see [§5](#5--no-stylesheet-of-component-classes)),
+**and Tailwind v4 strips it silently** — the rule reaches no stylesheet while
+any compensating change to the type tokens still applies, so the interface
+renders *larger*. Every gate stays green. Scale the tokens.
+
+**Consequence:** `hitArea` is 8px, not 6px. A 28.8px control with 6px expansion
+reaches 40.8px, under the 44px floor the helper exists to clear.
 
 ## Stacking order
 
@@ -297,9 +338,17 @@ above the sticky **cell** (or the first column covers the header on horizontal
 scroll), and the **toast** sits above the **overlay** (a confirm dialog's
 result has to be visible over the dialog that triggered it).
 
-**What this buys:** 44px topbar + 36px header + 36px rows on 768px of viewport
-gives **16 rows visible without scrolling**, against 11 at the previous
-40px/48px sizing.
+**What this buys**, measured in the running app at 1366×768 rather than
+derived. Two budgets, because they answer different questions:
+
+| Chrome counted | at 1.0 | at 0.9 |
+| --- | ---: | ---: |
+| Topbar + table header only | 16 rows | 18 rows |
+| **Real screen** — topbar, page gutter, `PageHeader`, `FilterBar`, table header, pager | **14 rows** | **15 rows** |
+
+The first row is the number this document used to quote unqualified, and it
+describes a screen with no filters and no pagination. The second is what a leads
+table actually shows. Quote the budget with the number.
 
 ## Radius — 4 steps, tight
 

@@ -115,7 +115,7 @@ export function DataTable<T>({
           never scrolls sideways. */}
       <div className="overflow-x-auto rounded-md border border-border">
         <Table>
-          <TableHeader className="sticky top-0 z-10">
+          <TableHeader className="sticky top-0 z-(--z-sticky-header)">
             <TableRow className="odd:bg-transparent hover:bg-transparent">
               {selection && (
                 <TableHead className="w-8">
@@ -141,8 +141,8 @@ export function DataTable<T>({
                     style={{ width: column.width }}
                     className={cn(
                       column.align === "end" && "text-end",
-                      column.sticky === "start" && "sticky start-0 z-20 bg-card",
-                      column.sticky === "end" && "sticky end-0 z-20 bg-card",
+                      column.sticky === "start" && "sticky start-0 z-(--z-sticky-header) bg-card",
+                      column.sticky === "end" && "sticky end-0 z-(--z-sticky-header) bg-card",
                     )}
                   >
                     {column.sortable ? (
@@ -196,8 +196,8 @@ export function DataTable<T>({
                       key={column.id}
                       className={cn(
                         (column.numeric || column.align === "end") && "text-end tabular-nums font-mono",
-                        column.sticky === "start" && "sticky start-0 z-10 bg-inherit",
-                        column.sticky === "end" && "sticky end-0 z-10 bg-inherit",
+                        column.sticky === "start" && "sticky start-0 z-(--z-sticky-cell) bg-inherit",
+                        column.sticky === "end" && "sticky end-0 z-(--z-sticky-cell) bg-inherit",
                       )}
                     >
                       {column.cell(row)}

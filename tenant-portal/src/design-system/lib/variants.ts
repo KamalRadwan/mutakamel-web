@@ -19,8 +19,12 @@ export type ControlSizeProps = VariantProps<typeof controlSize>;
 
 // Controls below the 44px touch-target floor get an invisible expanded hit
 // area instead of a bigger visible box — see geometry.md#hit-area-expansion.
+//
+// 8px, not 6px: at --ui-scale 0.9 the default control is 28.8px, and 6px per
+// side reaches only 40.8px — under the floor this exists to clear. 8px gives
+// 44.8px. Re-derive if the scale default moves again.
 export const hitArea =
-  "relative after:absolute after:-inset-1.5 after:content-['']";
+  "relative after:absolute after:-inset-2 after:content-['']";
 
 export const focusRing =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring " +

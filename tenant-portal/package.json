@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 5002",
+    "dev": "next dev -p 5002 --webpack",
     "build": "next build --webpack",
     "start": "next start -p 5002",
     "lint": "eslint",
@@ -17,7 +17,7 @@
     "docs:api-reference:check": "node scripts/docs/generate-api-reference.mjs --check",
     "design:census": "node scripts/design/census.mjs",
     "design:rtl": "node scripts/design/rtl-guard.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run design:rtl && npm run design:census -- --check && npm run design:contrast && npm run test && npm run docs:check && npm run build && npm run knip",
+    "verify": "npm run typecheck && npm run lint && npm run design:rtl && npm run design:census -- --check && npm run design:contrast && npm run test && npm run docs:check && npm run docs:verify-called-routes && npm run build && npm run knip",
     "docs:verify-claims": "node scripts/docs/verify-route-claims.mjs",
     "docs:audit-api": "node scripts/docs/audit-api-coverage.mjs",
     "docs:dto": "node scripts/docs/generate-dto-reference.mjs",

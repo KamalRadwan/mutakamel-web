@@ -7,15 +7,15 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-08-28**
+Last source verification: **2026-08-30**
 
-Generated at: **2026-08-28T03:11:36.705Z**
+Generated at: **2026-08-30T18:06:12.280Z**
 
-Backend revision: `4308162fb249`
+Backend revision: `989ee35f6578+dirty`
 
 Owning app: **core-app**
 
-Routes: **199**
+Routes: **195**
 
 ## What this page is
 
@@ -218,7 +218,6 @@ browser code.
 | POST | `/api/tenant/core/v1/users/:id/team-memberships` | `core.tenant.users.team-memberships.add` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | PUT | `/api/tenant/core/v1/users/:id/team-memberships` | `core.tenant.users.team-memberships.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | DELETE | `/api/tenant/core/v1/users/:id/team-memberships/:membershipId` | `core.tenant.users.team-memberships.delete` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
-| PATCH | `/api/tenant/core/v1/users/:id/webphone` | `core.tenant.users.webphone.update` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/users/:userId/assignments` | `core.tenant.users.assignments.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/users/:userId/assignments` | `core.tenant.users.assignments.add` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | PUT | `/api/tenant/core/v1/users/:userId/assignments` | `core.tenant.users.assignments.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
@@ -230,9 +229,6 @@ browser code.
 | PUT | `/api/tenant/core/v1/users/:userId/scope-role-assignments` | `core.tenant.users.scope-role-assignments.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/users/me/profile` | `core.tenant.users.profile.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | PUT | `/api/tenant/core/v1/users/me/profile` | `core.tenant.users.profile.update` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
-| GET | `/api/tenant/core/v1/users/me/webphone` | `core.tenant.users.webphone.me.get` | AUTHENTICATED | yes | TENANT_PORTAL |
-| GET | `/api/tenant/core/v1/users/me/webphone/call-logs` | `core.tenant.users.webphone.call-logs.list` | AUTHENTICATED | yes | TENANT_PORTAL |
-| POST | `/api/tenant/core/v1/users/me/webphone/call-logs` | `core.tenant.users.webphone.call-logs.create` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/wallet` | `core.tenant.wallets.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/wallet/ledger` | `core.tenant.wallets.ledger` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/workspace-settings` | `core.tenant.workspace-settings.get` | AUTHENTICATED | yes | TENANT_PORTAL |

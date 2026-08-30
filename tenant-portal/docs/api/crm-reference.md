@@ -7,11 +7,11 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-08-28**
+Last source verification: **2026-08-30**
 
-Generated at: **2026-08-28T03:11:36.705Z**
+Generated at: **2026-08-30T18:06:12.280Z**
 
-Backend revision: `4308162fb249`
+Backend revision: `989ee35f6578+dirty`
 
 Owning app: **crm-app**
 

@@ -103,6 +103,11 @@ const eslintConfig = defineConfig([
           message: 'Language ternary around a string — add the key to both dictionaries instead. See docs/design/i18n.md#the-zero-ternary-rule.',
         },
         {
+          selector: "Literal[value=/\bz-(?:0|10|20|30|40|50|\[[0-9]+\])\b/]",
+          message:
+            "Bare z-index — use a token: z-(--z-sticky-cell|--z-sticky-header|--z-topbar|--z-dropdown|--z-overlay|--z-toast). See docs/design/DESIGN-SYSTEM.md#stacking-order.",
+        },
+        {
           selector: "JSXElement > JSXOpeningElement[name.name='button']",
           message: "Hand-rolled <button> — use the design-system Button primitive. See docs/design/patterns.md.",
         },

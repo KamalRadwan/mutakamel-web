@@ -1,3 +1,5 @@
+"use client";
+
 import { Skeleton } from "../../primitives/Skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../primitives/Table";
 import type { ColumnDef } from "./types";

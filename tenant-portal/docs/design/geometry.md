@@ -47,9 +47,15 @@ There is no `rounded-xl` and above in this system. The migration handles the
 ## Control heights and row density
 
 > **The size values that were here are superseded and have been removed.**
-> They specified 36px controls and 40px rows; the implemented density is
-> **32px controls / 36px rows**, which is what fits 16 rows on a 1366×768
-> laptop instead of 11. The exact token block is in
+> They specified 36px controls and 40px rows. The implemented base density is
+> **32px controls / 36px rows**, and `--ui-scale` ships at **0.9**, so what
+> actually renders is **28.8px / 32.4px**.
+>
+> The "16 rows on a 1366×768 laptop" figure counts only the topbar and the
+> table header. On a real screen — page gutter, `PageHeader`, `FilterBar`,
+> table header and pager — it is **14 rows at 1.0 and 15 at 0.9**, measured in
+> the running app on 2026-08-30. Quote the chrome budget with the number. The
+> exact token block is in
 > **[DESIGN-SYSTEM.md § Sizing & density](DESIGN-SYSTEM.md#3--sizing--density)**.
 >
 > Removed rather than annotated because they were copyable CSS — an agent
