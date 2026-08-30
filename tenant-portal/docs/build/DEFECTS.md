@@ -9,6 +9,12 @@ not inferred. Fix them **during** the phase named, not in a cleanup pass.
 
 ## D1 — Forgot-password sends the wrong address
 
+> **STALE — this defect no longer exists.** Verified 2026-08-30 by driving the running app: typed a
+> distinct address into the dialog while the login field held a different one,
+> and captured the wire — the body carried the **dialog's** address. The field
+> is bound. Left here with its original text because the reasoning is the
+> value; do not re-fix it.
+
 **Severity: functional. Users cannot reset their password reliably.**
 
 `src/app/login/page.tsx` renders the reset dialog's email field with no
@@ -331,3 +337,74 @@ Deliberate, do not "fix":
   app owns CSP because it needs a per-request nonce for the theme bootstrap
   script. Full configuration in
   [../architecture/security-headers.md](../architecture/security-headers.md).
+
+---
+
+## D18 — Host admission could never succeed · **fixed 2026-08-30**
+
+**Severity: total outage. Every page 404'd against a real Gateway.**
+
+`fetchTenantHostStatus` sent the tenant's Host header through `fetch`. `host` is
+a **forbidden header name** in the fetch standard, so undici drops it silently.
+The Gateway saw the internal origin's own authority and answered
+`TENANT_HOST_NOT_FOUND`; admission fails closed, so `notFound()` fired on every
+request.
+
+### Why nothing caught it
+
+The unit test asserted `new Headers(init.headers).get("host")` on the init
+object handed to a **mock** fetch. That records what the caller *intended* to
+send, never what the socket carried. It passed throughout.
+
+**Fixed** by moving the probe to `node:http`, where `Host` is settable, and
+adding a test that stands up a real server and asserts the header that arrived.
+
+**The lesson worth keeping:** a header assertion against a mock transport proves
+nothing about the wire.
+
+---
+
+## D19 — A first-time visitor could never reach the login form · **fixed 2026-08-30**
+
+**Severity: total. Nobody who was not already signed in could sign in.**
+
+`GET /auth/me` with no cookie returns `401 COMMON.AUTH.MISSING_BEARER_TOKEN`.
+That code is not in `SESSION_ENDING_AUTH_CODES`, so `isDefinitiveAuthFailure`
+was false, bootstrap fell through to `DEGRADED`, and the app rendered
+"تعذر التحقق من الجلسة حاليًا" with a retry button instead of the login form.
+
+Two independent causes:
+
+1. The transport attempted a **session refresh for a session that never
+   existed** — a 401 with an unrecognised code classifies as `"refresh"` — and
+   threw the refresh's own coordination failure in place of the honest 401.
+2. `bootstrap` had no state for "signed out" as distinct from "inconclusive".
+
+**Fixed:** refresh now requires prior session metadata
+(`request.hadSessionMetadata`), and a missing-credentials 401 resolves to
+`UNAUTHENTICATED`.
+
+---
+
+## D20 — Readex Pro never drew a glyph · **fixed 2026-08-30**
+
+**Severity: the entire typography system was inert.**
+
+`globals.css` declared the font bridge with `@theme inline`. Under Tailwind v4
+`inline` means *substitute this value into utilities and do not emit the custom
+property* — so `--font-sans` did not exist at runtime and
+`body { font-family: var(--font-sans) }` resolved to nothing. Both faces were
+downloaded on every page load and the app rendered in the browser's system
+stack.
+
+Proven by measuring a probe in the running app: forcing `"Readex Pro"` changed
+its width by **18 %** before the fix and **0 %** after.
+
+**Fixed** by having `body` reference `--font-readex` directly. `@theme` alone is
+not enough — Tailwind v4 tree-shakes a theme variable that no generated utility
+uses.
+
+**Consequence:** every typography decision in `docs/design/typography.md` — the
+one-superfamily premise, the Arabic lift, the 13px floor, `font-synthesis-weight`
+— had never actually been exercised. Q4's measurement was taken with the real
+face loaded manually, so its answer stands.
