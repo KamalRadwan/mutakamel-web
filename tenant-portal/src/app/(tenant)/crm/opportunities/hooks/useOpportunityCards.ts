@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import { CUSTOMER_PROFILE_TYPES, type CustomerProfileType } from "../../customer-profiles/hooks/useCustomerProfiles";
 
@@ -126,10 +127,6 @@ export function parseOpportunityCardsResponse(
   };
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
@@ -144,7 +141,11 @@ export function useOpportunityCards(pipelineId: string | null, branchId: string 
   const [pageInfo, setPageInfo] = useState<CardsPageInfo>({ limit: 50, hasMore: false, nextCursor: null });
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The first page's failure, handed to CardView so the error state replaces
+  // the empty state. A failed "load more" is a different thing — it leaves
+  // real cards on screen — and gets its own state below.
+  const [error, setError] = useState<NormalizedApiError | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<NormalizedApiError | null>(null);
   const requestEpochRef = useRef(0);
 
   const fetchCards = useCallback(
@@ -160,6 +161,7 @@ export function useOpportunityCards(pipelineId: string | null, branchId: string 
       requestEpochRef.current = requestEpoch;
       setIsLoading(true);
       setError(null);
+      setLoadMoreError(null);
       try {
         const query = new URLSearchParams({ branchId, limit: "50" });
         const response = await axiosClient.get<unknown>(
@@ -176,7 +178,7 @@ export function useOpportunityCards(pipelineId: string | null, branchId: string 
         setItems([]);
         setTotalCount(0);
         setPageInfo({ limit: 50, hasMore: false, nextCursor: null });
-        setError(errorMessage(caught, "Unable to load opportunity cards."));
+        setError(normalizeApiError(caught));
       } finally {
         if (!signal?.aborted && requestEpoch === requestEpochRef.current) setIsLoading(false);
       }
@@ -196,7 +198,7 @@ export function useOpportunityCards(pipelineId: string | null, branchId: string 
     if (!pipelineId || !branchId || isLoadingMore || !pageInfo.hasMore || !pageInfo.nextCursor) return;
     const requestEpoch = requestEpochRef.current;
     setIsLoadingMore(true);
-    setError(null);
+    setLoadMoreError(null);
     try {
       const query = new URLSearchParams({
         branchId,
@@ -216,11 +218,21 @@ export function useOpportunityCards(pipelineId: string | null, branchId: string 
       setItems((current) => [...current, ...parsed.items]);
       setPageInfo(parsed.pageInfo);
     } catch (caught) {
-      setError(errorMessage(caught, "Unable to load more opportunity cards."));
+      setLoadMoreError(normalizeApiError(caught));
     } finally {
       setIsLoadingMore(false);
     }
   }, [branchId, isLoadingMore, items, pageInfo, pipelineId]);
 
-  return { items, totalCount, hasMore: pageInfo.hasMore, isLoading, isLoadingMore, error, loadMore, reload: fetchCards };
+  return {
+    items,
+    totalCount,
+    hasMore: pageInfo.hasMore,
+    isLoading,
+    isLoadingMore,
+    error,
+    loadMoreError,
+    loadMore,
+    reload: fetchCards,
+  };
 }

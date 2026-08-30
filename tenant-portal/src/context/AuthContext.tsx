@@ -35,6 +35,7 @@ import {
   getAuthErrorCode,
   getAuthErrorStatus,
   isDefinitiveAuthFailure,
+  isMissingCredentialsFailure,
 } from "@/lib/auth/sessionErrors";
 import { startTenantSessionRefreshScheduler } from "@/lib/auth/sessionRefresh";
 
@@ -138,7 +139,14 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       ) {
         return;
       }
-      if (!isInvalidAuthProfile(error) && !isDefinitiveAuthFailure(error)) {
+      // A 401 that says "no credentials were sent" is not a degraded server —
+      // it is a signed-out visitor, and they belong on the login form. Only a
+      // genuinely inconclusive failure earns the degraded retry screen.
+      if (
+        !isInvalidAuthProfile(error) &&
+        !isDefinitiveAuthFailure(error) &&
+        !isMissingCredentialsFailure(error)
+      ) {
         setAuthState("DEGRADED");
         return;
       }

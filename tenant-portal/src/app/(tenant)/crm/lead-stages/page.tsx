@@ -30,6 +30,7 @@ export default function LeadStagesPage() {
     isDeleting,
     settingDefaultId,
     error,
+    loadError,
     canManage,
     searchQuery,
     setSearchQuery,
@@ -156,6 +157,8 @@ export default function LeadStagesPage() {
         searchPlaceholder={t.crm.searchByStageName}
       />
 
+      {/* Write feedback only. A failed LOAD is handed to DataTable below, so
+          its error state replaces the empty state instead of stacking. */}
       {error && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
           <span>{error}</span>
@@ -170,13 +173,14 @@ export default function LeadStagesPage() {
         columns={columns}
         rows={items}
         isLoading={isLoading}
-        error={null}
+        error={loadError}
+        onRetry={() => void fetchStages()}
         page={{ page: 1, limit: Math.max(items.length, 1), total: items.length }}
         onPageChange={() => undefined}
         rowKey={(item) => item.id}
         labels={{
           retry: t.common.retry,
-          errorTitle: "",
+          errorTitle: t.crmLeadStages.loadFailed,
           emptyTitle: t.crmLeadStages.empty,
           selectAll: t.common.actions,
           selectRow: t.common.actions,

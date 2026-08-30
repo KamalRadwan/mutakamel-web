@@ -10,8 +10,12 @@ import {
   CardView,
   type ColumnDef,
   DataTable,
+  DegradedBanner,
+  EmptyState,
+  ErrorState,
   PageHeader,
   Select,
+  Skeleton,
   SelectContent,
   SelectItem,
   SelectTrigger,
@@ -52,6 +56,11 @@ export function OpportunitiesWorkspace() {
     isMutating,
     loadingStageId,
     error,
+    loadError,
+    capabilitiesUnavailable,
+    hasNoPipelines,
+    needsBranchSelection,
+    fetchPipelines,
     canUpdateOpportunity,
     moveCard,
     terminalMove,
@@ -156,6 +165,73 @@ export function OpportunitiesWorkspace() {
     },
   ];
 
+  // Neither a failure nor "no results". A branch was never chosen, or nobody
+  // has configured a pipeline for this tenant yet — the second is what the
+  // hook used to report as "No accessible opportunity pipeline is
+  // configured" in a red banner.
+  function resolvePipelineEmptyState() {
+    if (needsBranchSelection) {
+      return <EmptyState title={t.crmOpportunities.selectBranchFirst} />;
+    }
+    if (hasNoPipelines) {
+      return (
+        <EmptyState
+          title={t.crmOpportunities.noPipelineTitle}
+          description={t.crmOpportunities.noPipelineDescription}
+        />
+      );
+    }
+    return undefined;
+  }
+
+  const pipelineEmptyState = resolvePipelineEmptyState();
+
+  // The board is hand-composed rather than a BoardView, so it has to render
+  // the same four states BoardView owns for the other panes. It previously
+  // rendered nothing at all whenever `board` was null, which is every frame
+  // before the first fetch resolves.
+  function renderBoardPane() {
+    if (loadError) {
+      return (
+        <ErrorState
+          title={t.crmOpportunities.loadFailed}
+          onRetry={() => void fetchPipelines()}
+          retryLabel={t.common.retry}
+        />
+      );
+    }
+    // isMounted gates @hello-pangea/dnd, which cannot render server-side.
+    if (!isMounted || isLoading) {
+      return (
+        <div className="flex gap-2 overflow-x-auto">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={`board-column-skeleton-${index}`} className="h-64 w-70 shrink-0 rounded-md" />
+          ))}
+        </div>
+      );
+    }
+    if (pipelineEmptyState) return pipelineEmptyState;
+    if (!board) return <EmptyState title={t.crmOpportunities.empty} />;
+
+    return (
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="flex h-full gap-2 overflow-x-auto pb-2">
+          {board.stages.map((lane) => (
+            <OpportunityBoardColumn
+              key={lane.stage.id}
+              lane={lane}
+              canUpdate={canUpdateOpportunity}
+              isBusy={isMutating || loadingStageId !== null}
+              onImportanceChange={(cardId, importance) => void updateImportance(cardId, importance)}
+              onLoadMore={() => void loadMoreStage(lane.stage.id)}
+              isLoadingMore={loadingStageId === lane.stage.id}
+            />
+          ))}
+        </div>
+      </DragDropContext>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col gap-4">
       <PageHeader title={t.crmOpportunities.heading} description={t.crmOpportunities.subtitle} />
@@ -184,31 +260,20 @@ export function OpportunitiesWorkspace() {
         />
       </div>
 
-      {(view === "board" ? error : view === "card" ? cards.error : list.error) && (
+      {capabilitiesUnavailable && <DegradedBanner message={t.crmOpportunities.capabilitiesUnavailable} />}
+      {view === "card" && cards.loadMoreError && <DegradedBanner message={t.crmOpportunities.loadMoreFailed} />}
+
+      {/* Write feedback only. Every LOAD failure is handed to the pane below
+          so its error state replaces the empty state — see
+          docs/design/patterns.md#where-a-result-belongs. */}
+      {error && (
         <div role="alert" className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
-          {view === "board" ? error : view === "card" ? cards.error : list.error}
+          {error}
         </div>
       )}
 
       <div className="min-h-0 flex-1">
-        {view === "board" &&
-          (isMounted && board ? (
-            <DragDropContext onDragEnd={onDragEnd}>
-              <div className="flex h-full gap-2 overflow-x-auto pb-2">
-                {board.stages.map((lane) => (
-                  <OpportunityBoardColumn
-                    key={lane.stage.id}
-                    lane={lane}
-                    canUpdate={canUpdateOpportunity}
-                    isBusy={isMutating || loadingStageId !== null}
-                    onImportanceChange={(cardId, importance) => void updateImportance(cardId, importance)}
-                    onLoadMore={() => void loadMoreStage(lane.stage.id)}
-                    isLoadingMore={loadingStageId === lane.stage.id}
-                  />
-                ))}
-              </div>
-            </DragDropContext>
-          ) : null)}
+        {view === "board" && renderBoardPane()}
 
         {view === "card" && (
           <div className="flex h-full flex-col gap-3 overflow-y-auto">
@@ -217,7 +282,11 @@ export function OpportunitiesWorkspace() {
               renderCard={(item) => <OpportunityCardTile item={item} />}
               itemKey={(item) => item.id}
               isLoading={cards.isLoading}
-              error={null}
+              error={cards.error}
+              onRetry={() => void cards.reload()}
+              errorTitle={t.crmOpportunities.loadFailed}
+              retryLabel={t.common.retry}
+              emptyState={pipelineEmptyState ?? <EmptyState title={t.crmOpportunities.empty} />}
             />
             {cards.hasMore && (
               <Button variant="outline" size="sm" className="self-center" onClick={() => void cards.loadMore()} disabled={cards.isLoadingMore}>
@@ -232,15 +301,17 @@ export function OpportunitiesWorkspace() {
             columns={tableColumns}
             rows={list.items}
             isLoading={list.isLoading}
-            error={null}
+            error={list.error}
+            onRetry={() => list.reload()}
             page={list.pageInfo}
             onPageChange={list.setPage}
             sort={list.sort}
             onSortChange={list.setSort}
             rowKey={(item) => item.id}
+            emptyState={pipelineEmptyState}
             labels={{
               retry: t.common.retry,
-              errorTitle: "",
+              errorTitle: t.crmOpportunities.loadFailed,
               emptyTitle: t.crmOpportunities.empty,
               selectAll: t.common.actions,
               selectRow: t.common.actions,

@@ -17,6 +17,38 @@ export const controlSize = cva("", {
 
 export type ControlSizeProps = VariantProps<typeof controlSize>;
 
+// Text-entry controls render at text-base below the sm breakpoint and drop to
+// their dense size from sm: upward — DESIGN-SYSTEM.md#inputs-are-16px-on-mobile.
+// Mobile Safari zooms the viewport whenever a focused input is under 16px.
+//
+// Separate from controlSize on purpose: the rule covers anything that receives
+// typed input and explicitly does NOT cover buttons or labels, which share
+// controlSize.
+export const textEntrySize = cva("text-base", {
+  variants: {
+    size: {
+      xs: "sm:text-xs",
+      sm: "sm:text-xs",
+      md: "sm:text-sm",
+      lg: "sm:text-sm",
+      xl: "sm:text-base",
+    },
+  },
+  defaultVariants: { size: "md" },
+});
+
+// readOnly is not disabled — the value still matters and keeps full text
+// contrast; only the surface says "not editable here". Dimming it to 50% would
+// claim the value does not apply to the user, which is false. See
+// docs/design/primitives.md#readonly-is-not-disabled.
+//
+// The focus-visible ring is deliberately kept: a readOnly input is still
+// focusable and reachable by keyboard, and WCAG 2.4.7 requires a visible
+// indicator on anything that can take focus.
+export const readOnlySurface =
+  "read-only:bg-muted read-only:text-foreground read-only:cursor-default " +
+  "read-only:border-border read-only:placeholder:text-muted-foreground";
+
 // Controls below the 44px touch-target floor get an invisible expanded hit
 // area instead of a bigger visible box — see geometry.md#hit-area-expansion.
 //

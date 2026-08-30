@@ -30,6 +30,13 @@ only when no pattern fits.
 | `Pagination` | `pagination/` | Page controls |
 | `StatCard` | `kpi/` | A single metric tile |
 | `UnavailableState` | `unavailable-state/` | The sealed-route boundary — a capability that is genuinely not built yet |
+| `ConflictDialog` | `conflict-dialog/` | The 409 / 412 / 428 resolution surface |
+| `AmbiguousOutcomePanel` | `ambiguous-outcome/` | A write that may or may not have applied, with its idempotency key |
+| `NotFoundState` | `not-found-state/` | A deleted record reached from a stale link — **no retry** |
+| `ReasonDialog` | `reason-dialog/` | A confirmation that has to collect a reason |
+| `AsyncJobState` | `async-job/` | A 202 job: queued / running / succeeded / failed / artifact-expired |
+| `BulkActionBar` · `BulkConfirmDialog` · `BulkResultPanel` | `bulk-actions/` | Selection count, scoped confirm, and partial success |
+| `ReadOnlyGate` | `access-mode/` | FULL / READ_ONLY / DUNNING / BLOCKED as an in-body boundary |
 
 ## DataTable
 
@@ -233,6 +240,95 @@ key, and a retry-exact affordance that reuses the same key.
 This is why `axiosClient` distinguishes `nonReplayable` from
 `replayAfterRefresh` — see
 [../architecture/data-layer.md](../architecture/data-layer.md).
+
+`AmbiguousOutcomePanel` is that surface. It takes the operation, the
+idempotency key, an optional correlation id, a `onRetry` that **must replay
+the same key**, and an `onDismiss` — the only thing that removes it. The key
+renders `font-mono select-all` so it can be copied in one gesture.
+
+## The state patterns
+
+Seven patterns exist only to render a condition a screen can reach. They
+share three properties: every string arrives as a `labels` prop, none imports
+`useI18n`, and none imports `useToast`.
+
+### ConflictDialog
+
+```ts
+interface ConflictDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: string;
+  yourChanges?: React.ReactNode;      // optional diff slots
+  theirChanges?: React.ReactNode;
+  onReload: () => void;
+  onOverwrite?: () => void;           // OMIT when overwrite is not permitted
+  onCancel: () => void;
+  loading?: boolean;
+  labels: ConflictDialogLabels;
+}
+```
+
+`onOverwrite` is optional on purpose: many resources refuse a forced write,
+and a disabled overwrite button invites the user to keep pressing it. Leave
+it out and the button does not exist.
+
+Escape, the backdrop and the close button all route through `onCancel` — an
+abandoned conflict is never silently different from a declined one — and all
+three are blocked while `loading`.
+
+### NotFoundState
+
+Distinct from `ErrorState`, and the difference is the whole point: the request
+did not fail, it succeeded and the answer was "this is gone". **There is no
+retry button**, because retrying cannot change the answer. It takes a
+`backHref` (rendered as a `Link`) or an `onBack`, and renders neither when the
+caller has nowhere to send the user.
+
+### ReasonDialog
+
+`ConfirmActionModal` has no slot for an input, and `AlertDialog` cannot host
+one. `ReasonDialog` is the promotion of the opportunities `TerminalMoveDialog`
+to a pattern: `reasonRequired` gates the confirm on a non-blank value,
+`maxLength` mirrors the backend column bound, and `destructive` picks the
+confirm variant — the pattern never infers destructiveness from the title.
+
+The typed reason lives in the dialog body, which Radix unmounts with the
+portal, so a reopened dialog starts empty by construction rather than by a
+reset effect.
+
+### AsyncJobState
+
+Five UI states for a `202`. The in-flight affordance is the **pending dot**,
+not a progress bar: the server reports no percentage, and a bar that fills on
+a timer is fabricated success. `AsyncJobStatus` is a UI union, not a wire
+enum — the screen maps its own proven values onto it (Q15 in
+[../build/OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md)).
+
+### The bulk trio
+
+`BulkActionBar` renders nothing at zero selection and carries no `primary`
+variant — the one filled action on a screen belongs to `PageHeader`.
+`BulkConfirmDialog` adds the summary slot `ConfirmActionModal` lacks.
+`BulkResultPanel` renders partial success in-body: *"38 of 50 succeeded"* plus
+every failure with its own reason. A run where **nothing** succeeded renders
+`negative`, not `caution` — softening a total loss into a partial one is a
+lie about the outcome.
+
+### ReadOnlyGate
+
+Takes `mode: AccessMode | null` and renders a notice above the children, or —
+on `BLOCKED`, where the backend refuses reads as well — replaces them.
+
+It does **not** traverse its children to disable controls. A gate that
+silently neuters buttons produces controls that look live and do nothing; a
+screen suppresses its own affordances from `useAccessMode().canMutate`.
+
+`null` means unresolved, and renders children untouched. See Q16 in
+[../build/OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md) for why the browser
+cannot read the mode yet, and why failing open is the correct answer while
+that holds.
 
 ## Toast API
 

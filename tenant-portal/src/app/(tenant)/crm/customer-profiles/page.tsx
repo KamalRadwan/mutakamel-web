@@ -9,6 +9,8 @@ import {
   Button,
   CardView,
   ConfirmActionModal,
+  DegradedBanner,
+  EmptyState,
   FilterBar,
   PageHeader,
   StatusBadge,
@@ -49,12 +51,14 @@ export default function CustomerProfilesPage() {
     searchQuery,
     setSearchQuery,
     isLoading,
-    error,
+    precondition,
+    loadError,
     previousPage,
     nextPage,
     reload,
   } = useCustomerProfiles();
-  const { capabilities } = useCustomerProfilesCapabilities(branchId);
+  const { capabilities, error: capabilitiesError } =
+    useCustomerProfilesCapabilities(branchId);
   const { updateStatus } = useUpdateCustomerProfileStatus();
   const [view, setView] = useWorkspaceView("customerProfiles", "table");
   // Optimistic move overrides layered on top of the read-only paginated
@@ -179,6 +183,11 @@ export default function CustomerProfilesPage() {
     },
   ];
 
+  // No session or no single trusted branch means the request was never
+  // made. That is an empty state next to the control that resolves it, not
+  // an error banner about a failure that did not happen.
+  const preconditionState = precondition ? <EmptyState title={precondition} /> : undefined;
+
   return (
     <div className="flex h-full flex-col gap-4">
       <PageHeader
@@ -213,11 +222,10 @@ export default function CustomerProfilesPage() {
         </div>
       </div>
 
-      {error && (
-        <div role="alert" className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
-          {error}
-        </div>
-      )}
+      {/* A capabilities fetch that FAILED is not the same as a 403, and the
+          hook no longer conflates them — the controls are hidden either way,
+          but only this case is a degradation worth naming. */}
+      {capabilitiesError && <DegradedBanner message={t.crmCustomerProfiles.capabilitiesUnavailable} />}
 
       <div className="min-h-0 flex-1">
         {view === "board" && (
@@ -234,7 +242,11 @@ export default function CustomerProfilesPage() {
             }
             onCardMove={(move) => void handleCardMove(move)}
             isLoading={isLoading}
-            error={null}
+            error={loadError}
+            onRetry={reload}
+            errorTitle={t.crmCustomerProfiles.loadFailed}
+            retryLabel={t.common.retry}
+            emptyState={preconditionState}
             emptyColumnLabel={t.crmCustomerProfiles.empty}
           />
         )}
@@ -244,36 +256,40 @@ export default function CustomerProfilesPage() {
             renderCard={renderCard}
             itemKey={(item) => item.id}
             isLoading={isLoading}
-            error={null}
+            error={loadError}
+            onRetry={reload}
+            errorTitle={t.crmCustomerProfiles.loadFailed}
+            retryLabel={t.common.retry}
+            emptyState={preconditionState ?? <EmptyState title={t.crmCustomerProfiles.empty} />}
           />
         )}
         {view === "table" && (
-          <>
-            <TableView
-              columns={tableColumns}
-              rows={displayItems}
-              isLoading={isLoading}
-              error={null}
-              page={{ page: pagination?.page ?? 1, limit: pagination?.limit ?? 25, total: pagination?.total ?? 0 }}
-              onPageChange={(page) => (page > (pagination?.page ?? 1) ? nextPage() : previousPage())}
-              rowKey={(item) => item.id}
-              labels={{
-                retry: t.common.retry,
-                errorTitle: "",
-                emptyTitle: t.crmCustomerProfiles.empty,
-                selectAll: t.common.actions,
-                selectRow: t.common.actions,
-                sortAscending: t.common.actions,
-                sortDescending: t.common.actions,
-                notSorted: t.common.actions,
-                pagination: {
-                  previous: t.common.previousPage,
-                  next: t.common.nextPage,
-                  summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
-                },
-              }}
-            />
-          </>
+          <TableView
+            columns={tableColumns}
+            rows={displayItems}
+            isLoading={isLoading}
+            error={loadError}
+            onRetry={reload}
+            page={{ page: pagination?.page ?? 1, limit: pagination?.limit ?? 25, total: pagination?.total ?? 0 }}
+            onPageChange={(page) => (page > (pagination?.page ?? 1) ? nextPage() : previousPage())}
+            rowKey={(item) => item.id}
+            emptyState={preconditionState}
+            labels={{
+              retry: t.common.retry,
+              errorTitle: t.crmCustomerProfiles.loadFailed,
+              emptyTitle: t.crmCustomerProfiles.empty,
+              selectAll: t.common.actions,
+              selectRow: t.common.actions,
+              sortAscending: t.common.actions,
+              sortDescending: t.common.actions,
+              notSorted: t.common.actions,
+              pagination: {
+                previous: t.common.previousPage,
+                next: t.common.nextPage,
+                summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+              },
+            }}
+          />
         )}
       </div>
 

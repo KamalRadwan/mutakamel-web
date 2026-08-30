@@ -131,12 +131,6 @@ export default function AcquisitionSourcesPage() {
         searchPlaceholder={t.crmAcquisitionSources.search}
       />
 
-      {queryError && (
-        <div role="alert" className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
-          {queryError}
-        </div>
-      )}
-
       {mutationError && !selectedForDelete && !isCreateOpen ? (
         <p role="alert" className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
           {mutationError}
@@ -147,13 +141,14 @@ export default function AcquisitionSourcesPage() {
         columns={columns}
         rows={items}
         isLoading={isLoading && !hasLoadedItems}
-        error={null}
+        error={queryError}
+        onRetry={() => void reload()}
         page={{ page: 1, limit: Math.max(items.length, 1), total: items.length }}
         onPageChange={() => undefined}
         rowKey={(item) => item.id}
         labels={{
           retry: t.common.retry,
-          errorTitle: "",
+          errorTitle: t.crmAcquisitionSources.loadFailed,
           emptyTitle: t.crmAcquisitionSources.empty,
           selectAll: t.common.actions,
           selectRow: t.common.actions,

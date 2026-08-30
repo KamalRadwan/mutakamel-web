@@ -422,7 +422,7 @@ everything else stands on. Nothing else starts until this gate is green.
 - [x] **0.30** Before 0.18: `DataTable`'s sticky z-indices are **inverted** against the documented ladder — `z-10` header, `z-20` cells. Swap them, do not transcribe the bug
 ### Added by L5
 
-- [ ] **0.31** ★ **Blocking prerequisite of the scale change (Q4).** Open a populated table in **Arabic** and look at `text-xs` in a 32.4 px row. This is the repo's own named "last unverified visual assumption", it was never checked at 36 px, and 0.11 shrinks the row. If Readex Pro's Arabic does not fit, switch to **Zain** — the recorded fallback
+- [x] **0.31** ★ **Blocking prerequisite of the scale change (Q4).** Open a populated table in **Arabic** and look at `text-xs` in a 32.4 px row. This is the repo's own named "last unverified visual assumption", it was never checked at 36 px, and 0.11 shrinks the row. **Resolved: it fits** — 24.4px available ink, 15px for ordinary Arabic, 22.98px for a fully-vocalised worst case (1.42px headroom). Zain not needed. See OPEN-QUESTIONS.md#q4
 - [x] **0.32** Widen `hitArea` from 6 px to 8 px — at 0.9 the default control is 28.8 px and 6 px reached only 40.8 px, under the 44 px floor the helper exists to clear
 - [ ] **0.33** Record the `--ui-scale` breakpoint consequence: content shrinks, `sm:`/`md:` reflow points do not move, so every responsive boundary now fires at a different content density. Check the shell and one dense table at each breakpoint
 - [x] **0.34** Record Q11's reversal in `DECISIONS.md` — the shell tokens 44/232/48 were settled by human decision on 2026-08-28 and this phase changes all three

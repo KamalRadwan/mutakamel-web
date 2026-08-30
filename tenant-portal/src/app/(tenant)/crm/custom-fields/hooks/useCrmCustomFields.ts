@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 
 export const CRM_CUSTOM_FIELDS_PATH = "/api/tenant/crm/v1/custom-fields";
@@ -196,7 +197,9 @@ export function useCrmCustomFields() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The definitions fetch's own failure. Handed to DataTable so the error
+  // state replaces the empty state rather than stacking with it.
+  const [error, setError] = useState<NormalizedApiError | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -207,9 +210,7 @@ export function useCrmCustomFields() {
     } catch (caught) {
       if (isAbortError(caught)) return;
       setDefinitions([]);
-      setError(
-        errorMessage(caught, "Unable to load CRM custom-field definitions."),
-      );
+      setError(normalizeApiError(caught));
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }

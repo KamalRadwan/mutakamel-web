@@ -11,7 +11,8 @@ import {
 const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup")?.items ?? [];
 
 export default function CrmStaticCataloguePage() {
-  const { t, catalogue, groups, searchQuery, setSearchQuery, isLoading, error, reload } = useCrmStaticCatalogue();
+  const { t, catalogue, groups, searchQuery, setSearchQuery, isLoading, loadError, isStale, reload } =
+    useCrmStaticCatalogue();
 
   const columns: ColumnDef<StaticCatalogueGroup>[] = [
     {
@@ -63,7 +64,11 @@ export default function CrmStaticCataloguePage() {
 
       <SubNav items={CRM_SETUP_ITEMS} />
 
-      {catalogue && <DegradedBanner message={t.crmStaticCatalogue.advertisedPolicy} />}
+      {/* The degraded surface is for partial or stale data, and nothing
+          else — see docs/design/patterns.md#where-a-result-belongs. It used
+          to fire on every successful load, which left a real degradation
+          with nowhere to appear. */}
+      {isStale && <DegradedBanner message={t.crmStaticCatalogue.stale} />}
 
       <FilterBar
         filters={[]}
@@ -75,23 +80,22 @@ export default function CrmStaticCataloguePage() {
         searchPlaceholder={t.crmStaticCatalogue.search}
       />
 
-      {error && (
-        <div role="alert" className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
-          {error}
-        </div>
-      )}
+      {/* A permanent caveat about what this catalogue means, not a condition
+          that can clear. It reads as a caption, not a banner. */}
+      <p className="text-xs text-muted-foreground">{t.crmStaticCatalogue.advertisedPolicy}</p>
 
       <DataTable
         columns={columns}
         rows={groups}
         isLoading={isLoading && !catalogue}
-        error={null}
+        error={loadError}
+        onRetry={() => void reload()}
         page={{ page: 1, limit: Math.max(groups.length, 1), total: groups.length }}
         onPageChange={() => undefined}
         rowKey={(item) => item.id}
         labels={{
           retry: t.common.retry,
-          errorTitle: "",
+          errorTitle: t.crmStaticCatalogue.loadFailed,
           emptyTitle: t.crmStaticCatalogue.empty,
           selectAll: t.common.actions,
           selectRow: t.common.actions,

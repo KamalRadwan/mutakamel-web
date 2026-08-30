@@ -416,7 +416,13 @@ async function sendPreparedRequest<T>(
       disposition === "refresh" &&
       !isRetry &&
       !request.skipAuthRefresh &&
-      !request.publicAuthEndpoint
+      !request.publicAuthEndpoint &&
+      // Only refresh when there was a session to refresh. A visitor who has
+      // never signed in also gets a 401, and refreshing on their behalf
+      // replaces the honest "you are signed out" error with whatever the
+      // refresh attempt fails with — a coordination error, which reads as
+      // "the server is degraded" and left the login form unreachable.
+      request.hadSessionMetadata
     ) {
       publishTenantAuthLifecycle("STALE");
       try {

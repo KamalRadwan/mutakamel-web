@@ -9,6 +9,7 @@ import {
 } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 
 export const CUSTOMER_PROFILES_PATH = "/api/tenant/crm/v1/customer-profiles";
@@ -271,7 +272,11 @@ export function useCustomerProfiles() {
   const [page, setPage] = useState(1);
   const [reloadToken, setReloadToken] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // A precondition that stops the request being made at all — no session, or
+  // no single trusted branch. It is not a failure, so it renders as an empty
+  // state rather than a red banner over one.
+  const [precondition, setPrecondition] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
 
   const { branchIds, branchId, selectBranch } =
     useTenantBranchSelection(user);
@@ -288,16 +293,17 @@ export function useCustomerProfiles() {
   const load = useCallback(
     async (signal: AbortSignal) => {
       setIsLoading(true);
-      setError(null);
+      setPrecondition(null);
+      setLoadError(null);
       setResult(null);
 
       if (!userId) {
-        setError(t.crmCustomerProfiles.sessionRequired);
+        setPrecondition(t.crmCustomerProfiles.sessionRequired);
         setIsLoading(false);
         return;
       }
       if (!branchId) {
-        setError(t.crmCustomerProfiles.singleBranchRequired);
+        setPrecondition(t.crmCustomerProfiles.singleBranchRequired);
         setIsLoading(false);
         return;
       }
@@ -322,9 +328,7 @@ export function useCustomerProfiles() {
       } catch (caught) {
         if (isAbortError(caught)) return;
         setResult(null);
-        setError(
-          errorMessage(caught, "Unable to load CRM customer profiles."),
-        );
+        setLoadError(normalizeApiError(caught));
       } finally {
         if (!signal.aborted) setIsLoading(false);
       }
@@ -361,13 +365,15 @@ export function useCustomerProfiles() {
       setSearchQuery("");
       setServerSearch("");
       setPage(1);
-      setError(null);
+      setPrecondition(null);
+      setLoadError(null);
     },
     pagination: result,
     searchQuery,
     setSearchQuery,
     isLoading: isAuthLoading || isLoading,
-    error,
+    precondition,
+    loadError,
     previousPage,
     nextPage,
     reload: () => setReloadToken((current) => current + 1),

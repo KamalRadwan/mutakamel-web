@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import type { OpportunityStatus, StageFlag } from "./pipeline-types";
 
@@ -132,10 +133,6 @@ export function parseOpportunitiesListResponse(
   };
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
@@ -149,7 +146,9 @@ export function useOpportunitiesList(branchId: string | null, pipelineId: string
   const [pageInfo, setPageInfo] = useState<OpportunitiesListPageInfo>({ page: 1, limit: 25, total: 0 });
   const [sort, setSort] = useState<OpportunitiesSort>({ id: "createdAt", direction: "desc" });
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Handed to DataTable so a load failure replaces the empty state rather
+  // than stacking a banner on top of "No matching opportunities".
+  const [error, setError] = useState<NormalizedApiError | null>(null);
   const requestEpochRef = useRef(0);
   const pageRef = useRef(1);
 
@@ -186,7 +185,7 @@ export function useOpportunitiesList(branchId: string | null, pipelineId: string
       } catch (caught) {
         if (isAbortError(caught) || requestEpoch !== requestEpochRef.current) return;
         setItems([]);
-        setError(errorMessage(caught, "Unable to load opportunities."));
+        setError(normalizeApiError(caught));
       } finally {
         if (!signal?.aborted && requestEpoch === requestEpochRef.current) setIsLoading(false);
       }

@@ -11,6 +11,8 @@ import {
   CardView,
   type ColumnDef,
   DataTable,
+  DegradedBanner,
+  EmptyState,
   FilterBar,
   PageHeader,
   resolveStatusRole,
@@ -48,6 +50,8 @@ export default function LeadsPage() {
     isDeleting,
     isMovePending,
     error,
+    loadError,
+    degraded,
     searchQuery,
     setSearchQuery,
     pageInfo,
@@ -192,6 +196,11 @@ export default function LeadsPage() {
     },
   ];
 
+  // A missing branch is a precondition, not a failure: the CRM list route
+  // is a 422 without branchId, so nothing was asked. Say that instead of
+  // rendering "no matching leads" over an unasked question.
+  const branchEmptyState = branchId ? undefined : <EmptyState title={t.crmLeads.selectBranchFirst} />;
+
   return (
     <div className="flex h-full flex-col gap-4">
       <PageHeader
@@ -226,6 +235,12 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      {degraded.stages && <DegradedBanner message={t.crmLeads.stagesUnavailable} />}
+      {degraded.capabilities && <DegradedBanner message={t.crmLeads.capabilitiesUnavailable} />}
+
+      {/* Write feedback only. A failed LOAD is handed to the view below, so
+          the error state replaces the empty state instead of stacking with
+          it — see docs/design/patterns.md#where-a-result-belongs. */}
       {error && (
         <div
           role="alert"
@@ -253,25 +268,41 @@ export default function LeadsPage() {
               void moveLead(move.itemId, move.toColumnId);
             }}
             isLoading={isLoading}
-            error={null}
+            error={loadError}
+            onRetry={() => void fetchLeads()}
+            errorTitle={t.crmLeads.loadFailed}
+            retryLabel={t.common.retry}
+            emptyState={branchEmptyState}
             emptyColumnLabel={t.crmLeads.emptyColumn}
           />
         )}
         {view === "card" && (
-          <CardView items={items} renderCard={renderCard} itemKey={(item) => item.id} isLoading={isLoading} error={null} />
+          <CardView
+            items={items}
+            renderCard={renderCard}
+            itemKey={(item) => item.id}
+            isLoading={isLoading}
+            error={loadError}
+            onRetry={() => void fetchLeads()}
+            errorTitle={t.crmLeads.loadFailed}
+            retryLabel={t.common.retry}
+            emptyState={branchEmptyState ?? <EmptyState title={t.crmLeads.empty} />}
+          />
         )}
         {view === "table" && (
           <DataTable
             columns={tableColumns}
             rows={items}
             isLoading={isLoading}
-            error={null}
+            error={loadError}
+            onRetry={() => void fetchLeads()}
             page={pageInfo}
             onPageChange={(page) => setPage(page)}
             rowKey={(item) => item.id}
+            emptyState={branchEmptyState}
             labels={{
               retry: t.common.retry,
-              errorTitle: "",
+              errorTitle: t.crmLeads.loadFailed,
               emptyTitle: t.crmLeads.empty,
               selectAll: t.common.actions,
               selectRow: t.common.actions,

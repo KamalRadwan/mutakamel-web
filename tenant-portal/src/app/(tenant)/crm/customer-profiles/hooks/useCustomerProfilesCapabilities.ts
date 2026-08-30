@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import { CUSTOMER_PROFILES_PATH } from "./useCustomerProfiles";
 
@@ -51,16 +52,25 @@ function parseCapabilitiesResponse(payload: unknown): CustomerProfilesCapabiliti
 
 const EMPTY_CAPABILITIES: CustomerProfilesCapabilities = { create: null, update: null, delete: null };
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
 export function useCustomerProfilesCapabilities(branchId: string | null) {
   const [capabilities, setCapabilities] = useState<CustomerProfilesCapabilities>(EMPTY_CAPABILITIES);
   const [isLoading, setIsLoading] = useState(false);
+  // Set only when the question could not be ASKED. A 403 is an answer, and
+  // it leaves this null — see the catch below.
+  const [error, setError] = useState<NormalizedApiError | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     if (!branchId || !isUUIDv7(branchId)) {
       setCapabilities(EMPTY_CAPABILITIES);
+      setError(null);
       return;
     }
     setIsLoading(true);
+    setError(null);
     try {
       const query = new URLSearchParams({ branchId }).toString();
       const response = await axiosClient.get<unknown>(`${CUSTOMER_PROFILES_PATH}/capabilities?${query}`, {
@@ -69,10 +79,18 @@ export function useCustomerProfilesCapabilities(branchId: string | null) {
         maxResponseBytes: 50_000,
       });
       setCapabilities(parseCapabilitiesResponse(response.data) ?? EMPTY_CAPABILITIES);
-    } catch {
-      // Advisory only — the backend re-checks every write. A failed
-      // capabilities fetch just means action controls stay hidden.
+    } catch (caught) {
+      // A cancelled request is not an outcome — a newer one is in flight.
+      if (isAbortError(caught)) return;
       setCapabilities(EMPTY_CAPABILITIES);
+      // 403 is a definitive answer: this actor holds no capability in this
+      // branch, and hiding the controls is correct. Anything else — network
+      // blip, 5xx, a payload that failed validation — means the question
+      // never got answered, and reporting that as "no permission" is a lie
+      // the user cannot tell from the real thing. The screen surfaces the
+      // difference; the backend still re-checks every write either way.
+      const normalized = normalizeApiError(caught);
+      setError(normalized.status === 403 ? null : normalized);
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
@@ -86,5 +104,5 @@ export function useCustomerProfilesCapabilities(branchId: string | null) {
     return () => controller.abort();
   }, [load]);
 
-  return { capabilities, isLoading };
+  return { capabilities, isLoading, error };
 }

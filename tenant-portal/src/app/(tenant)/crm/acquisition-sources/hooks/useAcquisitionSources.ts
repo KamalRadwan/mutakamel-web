@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
   ACQUISITION_SOURCES_PATH,
   acquisitionSourcePath,
@@ -26,7 +27,9 @@ export function useAcquisitionSources() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [queryError, setQueryError] = useState<string | null>(null);
+  // The catalogue fetch's own failure. Handed to DataTable so the error
+  // state replaces the empty state rather than stacking with it.
+  const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedForDelete, setSelectedForDelete] =
@@ -45,7 +48,7 @@ export function useAcquisitionSources() {
       return true;
     } catch (error) {
       if (isAbortError(error)) return false;
-      setQueryError(errorMessage(error, "Unable to load acquisition sources."));
+      setQueryError(normalizeApiError(error));
       return false;
     } finally {
       if (!signal?.aborted) setIsLoading(false);

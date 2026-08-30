@@ -7,9 +7,18 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ---------- 1. Font variables, bridged from src/app/fonts.ts ---------- */
+/* ---------- 1. Font variables, bridged from src/app/fonts.ts ----------
+   NOT `@theme inline`. Under Tailwind v4, `inline` means "substitute this
+   value into utilities and do not emit the custom property" — so
+   `--font-sans` did not exist at runtime, `body { font-family: var(--font-sans) }`
+   resolved to nothing, and the app rendered in the browser's system stack.
+   Readex Pro was downloaded on every page load and never drawn a glyph.
 
-@theme inline {
+   Verified in the running app: forcing "Readex Pro" on a probe changed its
+   measured width by 18%, proving the face was available and unused. Every
+   gate was green throughout — nothing in the suite renders a font. */
+
+@theme {
   --font-sans: var(--font-readex), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --font-mono: var(--font-dm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
@@ -592,7 +601,14 @@ html[lang="ar"] {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans);
+  /* Reference the next/font variable directly rather than --font-sans.
+     Tailwind v4 only emits a theme variable that some generated utility
+     actually uses, so --font-sans was tree-shaken away and this line
+     resolved to nothing — the app rendered in the system stack while
+     Readex Pro downloaded on every page load and drew no glyph. The
+     @theme block above still defines font-sans/font-mono so the utilities
+     exist; this line is what puts the face on the page. */
+  font-family: var(--font-readex), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   /* Only 400/500/600 are downloaded — this stops the browser synthesising a
      fake bold for anything heavier that slips through the weight remap
      above. */

@@ -90,12 +90,6 @@ export default function CrmCustomFieldsPage() {
 
       <SubNav items={CRM_SETUP_ITEMS} />
 
-      {error && (
-        <div role="alert" className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
-          {error}
-        </div>
-      )}
-
       {createError && !isCreateOpen ? (
         <div role="alert" className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
           {createError}
@@ -116,13 +110,14 @@ export default function CrmCustomFieldsPage() {
         columns={columns}
         rows={items}
         isLoading={isLoading}
-        error={null}
+        error={error}
+        onRetry={() => void reload()}
         page={{ page: 1, limit: Math.max(items.length, 1), total: items.length }}
         onPageChange={() => undefined}
         rowKey={(item) => item.id}
         labels={{
           retry: t.common.retry,
-          errorTitle: "",
+          errorTitle: t.crmCustomFields.loadFailed,
           emptyTitle: t.crmCustomFields.empty,
           selectAll: t.common.actions,
           selectRow: t.common.actions,

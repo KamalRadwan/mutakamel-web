@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useI18n, type Language } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 
 export const CRM_STATIC_DATA_PATH = "/api/tenant/crm/v1/static-data";
 
@@ -187,7 +188,7 @@ export function useCrmStaticCatalogue() {
   const [catalogue, setCatalogue] = useState<CrmStaticData | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<NormalizedApiError | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
@@ -201,12 +202,10 @@ export function useCrmStaticCatalogue() {
       setCatalogue(parseCrmStaticDataResponse(response.data));
     } catch (caught) {
       if (isAbortError(caught)) return;
-      setCatalogue(null);
-      setError(
-        caught instanceof Error && caught.message
-          ? caught.message
-          : "Unable to load CRM static data.",
-      );
+      // A failed REFRESH keeps the last catalogue that loaded. That is what
+      // makes staleness a real, reachable state on this screen — and what
+      // gives the degraded surface something true to say.
+      setError(normalizeApiError(caught));
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
@@ -241,7 +240,11 @@ export function useCrmStaticCatalogue() {
     searchQuery,
     setSearchQuery,
     isLoading,
-    error,
+    // Nothing loaded at all — the table renders the error state.
+    loadError: catalogue === null ? error : null,
+    // Something loaded, and the newest attempt to refresh it did not. That
+    // is partial/stale data, which is exactly what DegradedBanner is for.
+    isStale: catalogue !== null && error !== null,
     reload: () => load(),
   };
 }

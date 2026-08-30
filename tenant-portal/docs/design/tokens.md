@@ -183,6 +183,36 @@ never the only signal.
 | `CrmReminderStatusEnum` | `SENT` | positive |
 | `CrmReminderStatusEnum` | `CANCELLED` | negative |
 | `CrmReminderStatusEnum` | `PENDING` | caution |
+| `TenantStatusEnum` | `ACTIVE` | positive |
+| `TenantStatusEnum` | `PROVISIONING_FAILED`, `DELETED` | negative |
+| `TenantStatusEnum` | `SUSPENDED` | caution |
+| `TenantStatusEnum` | `PROVISIONING` | ink + motion |
+| `UserStatusEnum` | `ACTIVE` | positive |
+| `UserStatusEnum` | `DEACTIVATED` | negative |
+| `UserStatusEnum` | `SUSPENDED` | caution |
+| `UserStatusEnum` | `INVITED` | ink + motion |
+| `SubscriptionStatusEnum` | `ACTIVE` | positive |
+| `SubscriptionStatusEnum` | `CANCELLED` | negative |
+| `SubscriptionStatusEnum` | `PAST_DUE`, `PENDING_ACTIVATION` | caution |
+| `SubscriptionStatusEnum` | `TRIAL` | ink + motion |
+| `AccessModeEnum` | `FULL` | positive |
+| `AccessModeEnum` | `BLOCKED` | negative |
+| `AccessModeEnum` | `DUNNING`, `READ_ONLY` | caution |
+
+The four Core lifecycles above were transcribed on **2026-08-30** from
+`../backend/mutakamel-apps/core-app/packages/common/src/enums/` —
+`tenant-status.enum.ts`, `user-status.enum.ts`, `subscription-status.enum.ts`
+and `access-mode.enum.ts`. Two findings worth carrying forward:
+
+- **`SubscriptionStatusEnum` has five values, not four.**
+  `PENDING_ACTIVATION` is real and was missing from the lifecycle table in
+  [../build/MASTER-PLAN.md](../build/MASTER-PLAN.md). It takes `caution`
+  because `SubscriptionEnforcementGuard.statusAccessMode` falls it through to
+  `BLOCKED`.
+- The subscription roles follow what the subscription actually **permits**,
+  not how its name reads: `PAST_DUE` is `DUNNING`, `CANCELLED` is
+  `READ_ONLY`, and `TRIAL` is full access while its period is current — hence
+  ink + motion rather than caution.
 
 ### Non-outcome values → never a hue
 

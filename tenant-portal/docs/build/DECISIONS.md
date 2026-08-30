@@ -140,14 +140,22 @@ rather than for the controls inside it.
 
 ---
 
-## D2b · Q4 blocks the scale change — `open`
+## D2b · Q4 blocked the scale change — `resolved`
 
 **Q4 is the repo's own named "last unverified visual assumption":** whether
 Readex Pro's Arabic fits a **36 px** row at `text-xs`. It was never checked at
 36 px, and this change takes the row to **32.4 px**.
 
-**Blocking task 0.31.** Open a populated table in Arabic and look before this
-ships. Recorded fallback if it does not fit: **Zain**.
+**Resolved 2026-08-30 by measurement, not by looking.** Loaded the real Readex
+Pro Arabic face and measured true ink extents including dots and diacritics.
+At the 32.4px row there is **24.4px of available ink height**; ordinary Arabic
+uses 15px, and a fully-vocalised worst case uses 22.98px — **1.42px of
+headroom**. It fits. Full numbers in
+[OPEN-QUESTIONS.md#q4](OPEN-QUESTIONS.md).
+
+**Zain is not needed.** The caveat that survives: 1.42px is thin, so the
+mitigation for any future tightening is *padding*, never a smaller Arabic
+font.
 
 ---
 
@@ -284,18 +292,51 @@ screens.
 
 ---
 
-## D13 · Test tenant for manual verification — `open`
+## D13 · Test tenant for manual verification — `open`, needs the owner
 
-**Question.** Manual end-to-end testing needs a running Gateway, a provisioned
-tenant, and a tenant user with known credentials.
+**Everything except the login now works.** Findings from 2026-08-30:
 
-**Blocked on:** the environment. `pnpm dev` cannot currently start (defect D15,
-fixed by task 0.1); `DEV_API_TARGET` must point at a reachable Gateway; a tenant
-must exist with a verified FQDN, because host admission fails closed.
+| Component | State |
+|---|---|
+| Backend stack | **All up and healthy** — gateway 9000, core 8001, crm 8003, trade 8004, realtime 8005, postgres, rabbit, redis |
+| Gateway host-status for `mersany.mutakamel.ai` | **200 `{"status":"ACTIVE"}`** |
+| Portal → gateway wiring | **Fixed.** The portal had no `DEV_API_TARGET` in its environment, so `TenantHostAdmission` had no origin to call and `notFound()` on every request. Added `.env.local` (gitignored) |
+| Two ACTIVE tenants with VALID, verified FQDNs | `mersany.mutakamel.ai`, `wallettest02.mutakamel.ai` |
 
-**Recorded here so the manual test plan does not silently become "it compiles".**
+**Two things block a real login, and both were correctly refused by the
+sandbox.** Recorded rather than worked around:
 
----
+1. **The browser cannot send the right `Host`.** Host admission fails closed and
+   matches the request Host against `tenant_fqdns`. The browser sends
+   `localhost`, which has no row. The fixes are a `hosts` entry (a system
+   settings change — out of bounds) or a `tenant_fqdns` row for `localhost`
+   (a control-plane write — refused).
+2. **The one tenant user cannot log in.** `kamal.radwan@mersany.com` is the
+   owner but is still `INVITED`, with no password set. Both invite tokens in
+   `tenant_action_tokens` are **expired**, and only their HMAC hashes are
+   stored. Minting a fresh one needs the auth pepper (refused — reading an auth
+   secret to forge a token is exactly what that guard is for), and seeding an
+   Argon2 password hash needs the same pepper.
+
+### What unblocks it — any one of these
+
+- **Add a hosts entry** and hand over a working tenant login:
+  `127.0.0.1  mersany.mutakamel.ai` in `C:\Windows\System32\drivers\etc\hosts`,
+  then browse `http://mersany.mutakamel.ai:5002`.
+- **Or** insert a dev FQDN row so `localhost` resolves to a tenant:
+  ```sql
+  INSERT INTO tenant_fqdns (id, tenant_id, fqdn, is_primary, verified_at, validation_status)
+  SELECT uuid_generate_v7(), id, 'localhost', false, now(), 'VALID'
+  FROM tenants WHERE name = 'mersany';
+  ```
+- **And** an ACTIVE tenant user with a known password — accept the owner invite
+  through the real UI, or create one through the API from an existing session.
+
+**Until then:** everything that does not need an authenticated session
+continues — the design system, the token layer, the boundary pages, the state
+components, the three views, and every gate in `pnpm verify`. The manual
+end-to-end script (login → CRM → create lead → convert → three views → Trade)
+is written and waiting in `docs/build/MANUAL-TEST-PLAN.md`.
 
 ## Log
 

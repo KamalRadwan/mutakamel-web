@@ -47,6 +47,23 @@ export const ar = {
     accessDenied: "تم رفض الوصول",
     accessDeniedMessage: "ليست لديك الصلاحية لتنفيذ هذا الإجراء."
   },
+  // Copy for the Next route boundaries — app/not-found.tsx,
+  // app/global-error.tsx and the per-segment error.tsx files. Each segment
+  // gets its own description because a segment boundary keeps AppShell
+  // mounted, and the copy is what tells the user which part stopped.
+  boundaries: {
+    notFoundTitle: "الصفحة غير موجودة",
+    notFoundDescription: "لا يطابق العنوان الذي فتحته أي شاشة في هذه البوابة. قد يكون الرابط قديمًا أو نُقلت الشاشة إلى مسار آخر.",
+    notFoundBack: "العودة إلى مساحة العمل",
+    appErrorTitle: "تعذّر تحميل البوابة",
+    appErrorDescription: "أوقف خطأ غير متوقع عرض الصفحة قبل اكتمالها. لم يُسجَّل خروجك، وغالبًا ما تكفي إعادة المحاولة.",
+    segmentErrorTitle: "تعذّر عرض هذه الشاشة",
+    workspaceErrorDescription: "توقفت هذه الشاشة أثناء العرض. التنقّل ما زال متاحًا، ويمكنك الانتقال إلى شاشة أخرى ثم العودة.",
+    crmErrorDescription: "توقفت شاشة إدارة العملاء أثناء العرض. بقية شاشات CRM ما زالت متاحة من قائمة التنقّل.",
+    coreErrorDescription: "توقفت شاشة الحساب أثناء العرض. بقية الشاشات ما زالت متاحة من قائمة التنقّل.",
+    tradeErrorDescription: "توقفت شاشة التجارة أثناء العرض. بقية الشاشات ما زالت متاحة من قائمة التنقّل.",
+    retry: "إعادة المحاولة"
+  },
   auth: {
     title: "تسجيل الدخول إلى بوابة المستأجر",
     subtitle: "أدخل بيانات الحساب للوصول إلى لوحة التحكم والعمليات الخاصة بك",
@@ -110,7 +127,8 @@ export const ar = {
     deleteTitle: "حذف مرحلة العميل",
     deleteMessage: (name: string) => `هل تريد حذف مرحلة «${name}»؟ قد يرفض الخادم الحذف إذا كانت مستخدمة.`,
     deleting: "جارٍ الحذف...",
-    empty: "لا توجد مراحل عملاء مطابقة"
+    empty: "لا توجد مراحل عملاء مطابقة",
+    loadFailed: "تعذّر تحميل مراحل العملاء المحتملين."
   },
   crmLeads: {
     title: "العملاء المحتملون",
@@ -133,7 +151,11 @@ export const ar = {
     creating: "جارٍ الإنشاء...",
     deleteTitle: "حذف العميل المحتمل",
     deleteMessage: (name: string) => `هل تريد حذف «${name}»؟ لا يمكن التراجع عن هذا الإجراء.`,
-    deleting: "جارٍ الحذف..."
+    deleting: "جارٍ الحذف...",
+    loadFailed: "تعذّر تحميل العملاء المحتملين.",
+    selectBranchFirst: "اختر فرعًا واحدًا متاحًا لعرض العملاء المحتملين.",
+    stagesUnavailable: "تعذّر تحميل مراحل العملاء المحتملين، لذلك تظهر القائمة دون أعمدة المراحل.",
+    capabilitiesUnavailable: "تعذّر تحميل صلاحيات الإجراءات، لذلك أُخفيت أزرار الإنشاء والتعديل والحذف. البيانات المعروضة كاملة."
   },
   crmOpportunities: {
     heading: "الفرص البيعية",
@@ -170,7 +192,13 @@ export const ar = {
     moveFailed: "تعذّر نقل الفرصة.",
     deleteTitle: "حذف الفرصة",
     deleteMessage: (title: string) => `هل تريد حذف «${title}»؟ لا يمكن التراجع عن هذا الإجراء.`,
-    deleting: "جارٍ الحذف..."
+    deleting: "جارٍ الحذف...",
+    loadFailed: "تعذّر تحميل الفرص البيعية.",
+    selectBranchFirst: "اختر فرعًا واحدًا متاحًا لعرض الفرص البيعية.",
+    noPipelineTitle: "لا يوجد مسار بيعي مهيّأ",
+    noPipelineDescription: "لم يُهيَّأ أي مسار بيعي متاح لهذا الفرع بعد. يهيّئ مسؤول CRM المسار ومراحله قبل تتبّع الفرص.",
+    capabilitiesUnavailable: "تعذّر تحميل صلاحيات الإجراءات، لذلك أُخفيت إجراءات نقل الفرص وتعديلها. اللوحة المعروضة كاملة.",
+    loadMoreFailed: "تعذّر تحميل المزيد من البطاقات. البطاقات المعروضة صحيحة."
   },
   crmAcquisitionSources: {
     subtitle: "إدارة قائمة مصادر الاستقطاب الثنائية اللغة المعتمدة من CRM.",
@@ -185,7 +213,8 @@ export const ar = {
     saving: "جارٍ الحفظ...",
     deleteTitle: "حذف مصدر الاستقطاب",
     deleteMessage: (name: string) => `هل تريد حذف مصدر الاستقطاب «${name}»؟ قد يرفض CRM الحذف إذا كان المصدر مستخدمًا.`,
-    deleting: "جارٍ الحذف..."
+    deleting: "جارٍ الحذف...",
+    loadFailed: "تعذّر تحميل مصادر الاستقطاب."
   },
   crmCustomFields: {
     subtitle: "تعريفات الحقول المخصصة الحالية من CRM. الإنشاء هنا يقتصر على الأنواع التي لا تحتاج قائمة خيارات.",
@@ -197,6 +226,7 @@ export const ar = {
     searchable: "قابل للبحث",
     optionsCount: (count: number) => `${count} خيار`,
     empty: "لا توجد تعريفات مطابقة.",
+    loadFailed: "تعذّر تحميل الحقول المخصصة.",
     addTitle: "إضافة حقل مخصص",
     key: "المفتاح",
     simpleTypesNote: "أنواع الاختيار تحتاج محرر خيارات غير متاح هنا، لذلك لا تُرسل من هذا النموذج.",
@@ -253,6 +283,8 @@ export const ar = {
     entries: "العناصر",
     examples: "قيم حالية",
     empty: "لا توجد مجموعات مطابقة.",
+    loadFailed: "تعذّر تحميل البيانات الثابتة.",
+    stale: "تعرض هذه الشاشة آخر نسخة حُمِّلت بنجاح؛ فشلت آخر محاولة تحديث.",
     advertisedPolicy: "سياسة المرفقات هنا وصفية فقط؛ مسار الرفع وقواعد التخزين هما المرجع الأمني النهائي.",
     kinds: {
       enum: "تعداد",
@@ -288,6 +320,8 @@ export const ar = {
     source: "المصدر",
     view: "عرض",
     empty: "لا توجد ملفات عملاء مطابقة.",
+    loadFailed: "تعذّر تحميل ملفات العملاء.",
+    capabilitiesUnavailable: "تعذّر تحميل صلاحيات الإجراءات، لذلك أُخفيت إجراءات تغيير الحالة. البيانات المعروضة كاملة.",
     confirmBlacklistTitle: "حظر هذا العميل؟",
     confirmBlacklistMessage: "الحظر إجراء نهائي عمليًا — سيفقد العميل إمكانية الوصول فورًا.",
     confirmBlacklistAction: "حظر العميل",

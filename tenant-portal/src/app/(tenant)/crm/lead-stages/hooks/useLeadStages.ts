@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
   buildCreateLeadStageRequest,
   parseLeadStageCatalogueResponse,
@@ -56,6 +57,9 @@ export function useLeadStages() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The catalogue fetch's own failure. Handed to DataTable so the error
+  // state replaces the empty state rather than stacking with it.
+  const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -75,12 +79,13 @@ export function useLeadStages() {
   const fetchStages = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     setError(null);
+    setLoadError(null);
     try {
       setItems(await readCatalogue(signal));
     } catch (caught) {
       if (isAbortError(caught)) return;
       setItems([]);
-      setError(errorMessage(caught, "Unable to load lead stages."));
+      setLoadError(normalizeApiError(caught));
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
@@ -284,6 +289,7 @@ export function useLeadStages() {
     isDeleting,
     settingDefaultId,
     error,
+    loadError,
     createError,
     deleteError,
     canManage,

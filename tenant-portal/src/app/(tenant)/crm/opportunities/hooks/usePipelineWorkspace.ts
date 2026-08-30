@@ -5,7 +5,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
-import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
+import {
+  TenantApiClientError,
+  axiosClient,
+  type AxiosResponse,
+} from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import type {
   OpportunityActionCapability,
@@ -505,6 +510,21 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+// Capabilities decorate the board; they do not constitute it. A rejection or
+// a payload that fails validation degrades to null so the board still
+// renders, read-only.
+function degradableSource<T>(
+  settled: PromiseSettledResult<AxiosResponse<unknown>>,
+  parse: (payload: unknown) => T,
+): T | null {
+  if (settled.status === "rejected") return null;
+  try {
+    return parse(settled.value.data);
+  } catch {
+    return null;
+  }
+}
+
 function isAmbiguousMutationError(error: unknown): boolean {
   return (
     !(error instanceof TenantApiClientError) || error.response.status >= 500
@@ -554,6 +574,14 @@ export function usePipelineWorkspace() {
   const [isMutating, setIsMutating] = useState(false);
   const [loadingStageId, setLoadingStageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The pipeline/board fetch's own failure, kept apart from `error` (write
+  // feedback) so the board pane can render one state instead of a banner
+  // stacked over an empty pane.
+  const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
+  const [capabilitiesUnavailable, setCapabilitiesUnavailable] = useState(false);
+  // Distinguishes "not asked yet" from "asked, and this tenant has none" —
+  // without it the unconfigured-tenant empty state flashes on first paint.
+  const [hasLoadedPipelines, setHasLoadedPipelines] = useState(false);
   const mutationInFlightRef = useRef(false);
   const loadMoreInFlightRef = useRef(false);
   const boardRequestEpochRef = useRef(0);
@@ -587,15 +615,24 @@ export function usePipelineWorkspace() {
         setSelectedPipelineIdState(null);
         setBoard(null);
         setIsLoading(false);
-        setError("Select one accessible branch before loading opportunities.");
+        // Nothing was asked — the CRM board route is a 422 without a branch.
+        // The screen renders the "pick a branch" empty state instead.
+        setLoadError(null);
+        setCapabilitiesUnavailable(false);
+        setHasLoadedPipelines(false);
         return;
       }
       boardRequestEpochRef.current += 1;
       setIsLoading(true);
       setError(null);
+      setLoadError(null);
+      setCapabilitiesUnavailable(false);
       setBoard(null);
       try {
-        const [response, capabilitiesResponse] = await Promise.all([
+        // Two independent sources. Under Promise.all a capabilities 403 also
+        // nulled the pipeline list, so a permission gap on ACTIONS looked
+        // identical to having no pipelines at all.
+        const [pipelinesSettled, capabilitiesSettled] = await Promise.allSettled([
           axiosClient.get<unknown>("/api/tenant/crm/v1/pipelines", {
             signal,
             cache: "no-store",
@@ -610,20 +647,34 @@ export function usePipelineWorkspace() {
             },
           ),
         ]);
-        const available = parsePipelinesResponse(response.data);
-        const nextCapabilities = parseOpportunityCapabilitiesResponse(
-          capabilitiesResponse.data,
-          branchId,
+
+        if (
+          [pipelinesSettled, capabilitiesSettled].some(
+            (settled) =>
+              settled.status === "rejected" && isAbortError(settled.reason),
+          )
+        ) {
+          return;
+        }
+
+        const nextCapabilities = degradableSource(capabilitiesSettled, (payload) =>
+          parseOpportunityCapabilitiesResponse(payload, branchId),
         );
+        setCapabilities(nextCapabilities);
+        setCapabilitiesUnavailable(nextCapabilities === null);
+
+        if (pipelinesSettled.status === "rejected") throw pipelinesSettled.reason;
+        const available = parsePipelinesResponse(pipelinesSettled.value.data);
+        setHasLoadedPipelines(true);
         if (available.length === 0) {
+          // A tenant nobody has configured a pipeline for is not a failure.
+          // It is an empty workspace, and a red banner over it tells the
+          // reader something broke when nothing did.
           setPipelines([]);
-          setCapabilities(nextCapabilities);
           setSelectedPipelineIdState(null);
-          setError("No accessible opportunity pipeline is configured.");
           return;
         }
         setPipelines(available);
-        setCapabilities(nextCapabilities);
         setSelectedPipelineIdState((current) =>
           current && available.some(({ id }) => id === current)
             ? current
@@ -635,7 +686,8 @@ export function usePipelineWorkspace() {
         setCapabilities(null);
         setSelectedPipelineIdState(null);
         setBoard(null);
-        setError(errorMessage(caught, "Unable to load opportunity pipelines."));
+        setHasLoadedPipelines(false);
+        setLoadError(normalizeApiError(caught));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
@@ -650,6 +702,7 @@ export function usePipelineWorkspace() {
       boardRequestEpochRef.current = requestEpoch;
       setIsLoading(true);
       setError(null);
+      setLoadError(null);
       setBoard(null);
       try {
         const response = await axiosClient.get<unknown>(
@@ -679,7 +732,7 @@ export function usePipelineWorkspace() {
         ) {
           return false;
         }
-        setError(errorMessage(caught, "Unable to load the opportunity board."));
+        setLoadError(normalizeApiError(caught));
         return false;
       } finally {
         if (
@@ -1000,6 +1053,9 @@ export function usePipelineWorkspace() {
       setBoard(null);
       setTerminalMove(null);
       setError(null);
+      setLoadError(null);
+      setCapabilitiesUnavailable(false);
+      setHasLoadedPipelines(false);
     },
     selectedPipelineId,
     setSelectedPipelineId,
@@ -1007,6 +1063,11 @@ export function usePipelineWorkspace() {
     isMutating,
     loadingStageId,
     error,
+    loadError,
+    capabilitiesUnavailable,
+    // The tenant has been asked, and the answer was "none configured".
+    hasNoPipelines: hasLoadedPipelines && !isLoading && pipelines.length === 0,
+    needsBranchSelection: branchId === null,
     fetchPipelines,
     fetchBoardData,
     loadMoreStage,

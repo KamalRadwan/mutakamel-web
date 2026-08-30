@@ -49,6 +49,19 @@ export const en: Dictionary = {
     accessDenied: "Access denied",
     accessDeniedMessage: "You do not have permission to perform this action."
   },
+  boundaries: {
+    notFoundTitle: "Page not found",
+    notFoundDescription: "The address you opened does not match any screen in this portal. The link may be out of date, or the screen may have moved.",
+    notFoundBack: "Go to the workspace",
+    appErrorTitle: "The portal could not finish loading",
+    appErrorDescription: "An unexpected error stopped this page before it finished rendering. You have not been signed out, and trying again usually clears it.",
+    segmentErrorTitle: "This screen could not be displayed",
+    workspaceErrorDescription: "This screen stopped while it was rendering. Navigation is still available, so you can move elsewhere and come back.",
+    crmErrorDescription: "The CRM screen stopped while it was rendering. The other CRM screens are still reachable from the navigation.",
+    coreErrorDescription: "The account screen stopped while it was rendering. The other screens are still reachable from the navigation.",
+    tradeErrorDescription: "The trade screen stopped while it was rendering. The other screens are still reachable from the navigation.",
+    retry: "Try again"
+  },
   auth: {
     title: "Sign in to the Tenant Portal",
     subtitle: "Enter your account details to access your dashboard and operations.",
@@ -112,7 +125,8 @@ export const en: Dictionary = {
     deleteTitle: "Delete lead stage",
     deleteMessage: (name: string) => `Delete "${name}"? The server will reject deletion if the stage is in use.`,
     deleting: "Deleting…",
-    empty: "No matching lead stages"
+    empty: "No matching lead stages",
+    loadFailed: "Unable to load lead stages."
   },
   crmLeads: {
     title: "Leads",
@@ -135,7 +149,11 @@ export const en: Dictionary = {
     creating: "Creating…",
     deleteTitle: "Delete lead",
     deleteMessage: (name: string) => `Delete "${name}"? This cannot be undone.`,
-    deleting: "Deleting…"
+    deleting: "Deleting…",
+    loadFailed: "Unable to load leads.",
+    selectBranchFirst: "Select one accessible branch to load leads.",
+    stagesUnavailable: "Lead stages could not be loaded, so the list is shown without stage columns.",
+    capabilitiesUnavailable: "Action permissions could not be loaded, so the create, edit and delete controls are hidden. The list itself is complete."
   },
   crmOpportunities: {
     heading: "Opportunities",
@@ -172,7 +190,13 @@ export const en: Dictionary = {
     moveFailed: "Unable to move the opportunity.",
     deleteTitle: "Delete opportunity",
     deleteMessage: (title: string) => `Delete "${title}"? This cannot be undone.`,
-    deleting: "Deleting…"
+    deleting: "Deleting…",
+    loadFailed: "Unable to load opportunities.",
+    selectBranchFirst: "Select one accessible branch to load opportunities.",
+    noPipelineTitle: "No pipeline is configured",
+    noPipelineDescription: "No accessible opportunity pipeline has been configured for this branch yet. A CRM administrator sets up the pipeline and its stages before opportunities can be tracked.",
+    capabilitiesUnavailable: "Action permissions could not be loaded, so the move and edit controls are hidden. The board itself is complete.",
+    loadMoreFailed: "The next page of cards could not be loaded. The cards already shown are correct."
   },
   crmAcquisitionSources: {
     subtitle: "Manage the bilingual acquisition-source catalogue owned by CRM.",
@@ -187,7 +211,8 @@ export const en: Dictionary = {
     saving: "Saving…",
     deleteTitle: "Delete acquisition source",
     deleteMessage: (name: string) => `Delete "${name}"? CRM will reject deletion when the source is in use.`,
-    deleting: "Deleting…"
+    deleting: "Deleting…",
+    loadFailed: "Unable to load acquisition sources."
   },
   crmCustomFields: {
     subtitle: "Current CRM custom-field definitions. Creation is limited to field types that do not require option configuration.",
@@ -199,6 +224,7 @@ export const en: Dictionary = {
     searchable: "Searchable",
     optionsCount: (count: number) => `${count} option${count === 1 ? "" : "s"}`,
     empty: "No matching definitions.",
+    loadFailed: "Unable to load custom fields.",
     addTitle: "Add custom field",
     key: "Field key",
     simpleTypesNote: "Select fields require an option editor, so this form does not submit them.",
@@ -255,6 +281,8 @@ export const en: Dictionary = {
     entries: "Entries",
     examples: "Current values",
     empty: "No matching catalogue groups.",
+    loadFailed: "Unable to load the static data catalogue.",
+    stale: "This screen is showing the last catalogue that loaded successfully; the most recent refresh failed.",
     advertisedPolicy: "The attachment policy shown here is descriptive; the upload route and storage allowlist remain authoritative.",
     kinds: {
       enum: "Enum",
@@ -286,6 +314,8 @@ export const en: Dictionary = {
     source: "Source",
     view: "View",
     empty: "No matching customer profiles.",
+    loadFailed: "Unable to load customer profiles.",
+    capabilitiesUnavailable: "Action permissions could not be loaded, so the status-change controls are hidden. The list itself is complete.",
     confirmBlacklistTitle: "Blacklist this customer?",
     confirmBlacklistMessage: "Blacklisting is terminal in practice — the customer will lose access immediately.",
     confirmBlacklistAction: "Blacklist customer",

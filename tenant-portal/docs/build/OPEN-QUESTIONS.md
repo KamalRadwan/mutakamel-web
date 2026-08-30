@@ -236,6 +236,117 @@ this. If the backend ever decorates `GET /opportunities` with display names,
 or the app grows a directory-lookup hook for another screen, that is new
 work with its own decision, not a reopening of this one.
 
+## Q4 — Readex Pro's Arabic in a dense row · resolved 2026-08-30 by measurement
+
+The repo's own "last unverified visual assumption": whether Readex Pro's Arabic
+fits a table row at `text-xs`. Never checked at the old 36px row, and
+`--ui-scale: 0.9` takes the row to **32.4px**, so it had to be settled before
+the density change could ship.
+
+**Measured in the running app**, loading the real Readex Pro Arabic subset face
+and measuring true ink extents (`actualBoundingBoxAscent` + `Descent`, which
+include dots and diacritics) rather than the line box:
+
+| | value |
+| --- | ---: |
+| Row height at `--ui-scale` 0.9 | **32.40 px** |
+| Cell padding (`py-1`, top + bottom) | 8 px |
+| **Available ink height** | **24.40 px** |
+| Arabic `text-xs` font-size (with the lift) | 14 px |
+| Line-height | 20 px |
+| Ordinary CRM Arabic — ink height | **15.00 px** (9.40 px headroom) |
+| Fully diacritised worst case — ink height | **22.98 px** (**1.42 px headroom**) |
+
+Test string for the worst case: `مُتَكَامِلٌ — جِهَةُ الاتِّصالِ بِـ ٩٩ عَمِيلًا`
+— every short vowel, a shadda, tanween, a descender and Arabic-Indic digits.
+
+**Resolved: it fits.** Ordinary tenant data — names, statuses, company names —
+sits at 15px ink with 9.4px to spare. Even the pathological fully-vocalised
+string clears, by 1.42px.
+
+**The caveat, recorded rather than hidden:** 1.42px is not much. If a screen
+ever renders fully-vocalised Arabic *and* tightens cell padding below `py-1`,
+diacritics will clip. The mitigation is padding, not font size — the 14px
+Arabic floor stays.
+
+**Zain is not needed.** The recorded fallback stands unused; do not switch
+without re-running this measurement.
+
+---
+
+## Q15 — A 202 async job publishes no status enum the browser can read · open
+
+**Opened 2026-08-30 while building `AsyncJobState` (MASTER-PLAN 1.32).**
+
+The task names five states — queued, running, succeeded, failed,
+artifact-expired — and 1.32's consumers are 7.17 (template PDF preview) and
+11.7 / 11.12 / 11.15 (Trade document render jobs).
+
+**Why it cannot be answered from source.** Nothing in `docs/api/` documents an
+async-job status shape. `docs/api/README.md#async-work` says only *"Poll the
+operation route documented by the command's owner"*, and
+`docs/api/core-notifications.md#async-ownership` repeats that a `202` is not
+completion. Grepping the backend for a tenant-facing job enum finds only
+`TenantOperationStatusEnum`, which belongs to **admin** tenant provisioning
+(`../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/`) and is
+not reachable from this portal. Trade's render routes are in phase 10+ and
+their contracts have not been read yet.
+
+**Done instead.** `AsyncJobStatus` is declared in
+`src/design-system/patterns/async-job/AsyncJobState.tsx` as a **UI state
+union**, labelled as such in the file, with an explicit instruction that the
+consuming screen maps its own proven wire values onto it. No value is claimed
+to be a wire value, none is sent to a server, and none is compared against a
+response inside the pattern.
+
+**Settle with:** the Trade render-job route contract, read at 11.7. If its
+status values differ, the mapping lives in the screen's hook — the pattern
+does not change.
+
+---
+
+## Q16 — Access mode is not readable by a non-owner user · open
+
+**Opened 2026-08-30 while building `useAccessMode()` (MASTER-PLAN 1.29).**
+
+1.29 calls access mode *"one source of truth for FULL / READ_ONLY / DUNNING /
+BLOCKED that suppresses every mutating affordance,"* consumed by every screen
+in phases 4–12. The browser cannot currently obtain it.
+
+**What is proven, 2026-08-30:**
+
+| Source | Carries `accessMode`? |
+| --- | --- |
+| `GET /auth/me` → `TenantMe` in `../backend/mutakamel-apps/core-app/src/tenant/tenant-auth/tenant-auth.service.ts` | **no** — id, email, names, `isTenantOwner`, `status`, accessible branches/companies, permissions, team memberships, `accessScope` |
+| `GET /billing/summary` → `subscription.accessMode` | yes, but `TenantBillingController` is `@UseGuards(TenantGuard, TenantOwnerGuard)` — **owner only**, so every staff user gets 403 |
+| `SubscriptionEnforcementGuard` | enforces it, and answers `403 ACCESS_POLICY_BLOCKED`. That is a rejection **after** the action, not a mode the UI can read before offering one |
+
+The four wire values themselves are not in doubt — `AccessModeEnum` in
+`../backend/mutakamel-apps/core-app/packages/common/src/enums/access-mode.enum.ts`
+is `FULL · DUNNING · READ_ONLY · BLOCKED`, and the guard's own
+`enforceAccessMode` fixes their meaning: BLOCKED refuses reads too, READ_ONLY
+and DUNNING refuse writes, and DUNNING re-opens only routes carrying
+`@AllowedDuringDunning()`.
+
+**Done instead — the mode was not invented.** `src/lib/access-mode.ts` carries
+the four values and the capability rules transcribed from the guard;
+`src/hooks/useAccessMode.ts` returns `mode: null, isResolved: false` with a
+`TODO(access-mode)` naming exactly what is missing; and
+`ReadOnlyGate` takes `AccessMode | null` as a prop so the one screen that
+*does* have the value (owner billing) can use it today.
+
+**The deliberate choice inside that:** an unresolved mode reports **full**
+capability, not restricted. Client checks are advisory and the backend is
+authoritative; failing closed on a value the browser has no way to read would
+seal the entire product for every non-owner user. The cost is that a
+READ_ONLY tenant's staff still see Save buttons that 403 — which is exactly
+today's behaviour, unchanged, rather than a new regression.
+
+**Settle with:** adding `accessMode` to the `TenantMe` projection (one field
+on a route every session already calls), or exposing a non-owner-readable
+entitlement snapshot route. Either one makes this hook resolve with no other
+edit in the portal.
+
 ## How to add one
 
 Do not delete a resolved entry — the reasoning is the value. Append new

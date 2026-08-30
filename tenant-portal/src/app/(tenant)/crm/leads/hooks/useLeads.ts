@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
-import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
+import {
+  TenantApiClientError,
+  axiosClient,
+  type AxiosResponse,
+} from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
   parseLeadStageCatalogueResponse,
@@ -275,6 +280,28 @@ export function parseLeadStagesResponse(payload: unknown): LeadStage[] {
     }));
 }
 
+export interface LeadsDegradation {
+  stages: boolean;
+  capabilities: boolean;
+}
+
+const NO_DEGRADATION: LeadsDegradation = { stages: false, capabilities: false };
+
+// A supporting source that rejected, or whose payload failed validation,
+// degrades to null so the list it decorates still renders. Only the list
+// itself is allowed to fail the screen.
+function degradableSource<T>(
+  settled: PromiseSettledResult<AxiosResponse<unknown>>,
+  parse: (payload: unknown) => T,
+): T | null {
+  if (settled.status === "rejected") return null;
+  try {
+    return parse(settled.value.data);
+  } catch {
+    return null;
+  }
+}
+
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -316,6 +343,11 @@ export function useLeads() {
   const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
   const movingLeadRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The list fetch's own failure, kept apart from `error` (which carries
+  // write feedback). The views take this one, so a load failure REPLACES the
+  // empty state instead of stacking a banner on top of "No matching leads".
+  const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
+  const [degraded, setDegraded] = useState<LeadsDegradation>(NO_DEGRADATION);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState<LeadItem | null>(
     null,
@@ -359,12 +391,17 @@ export function useLeads() {
           hasPrev: false,
         }));
         setIsLoading(false);
-        setError("Select one accessible branch before loading leads.");
+        // Not a failure — nothing was asked yet. The screen renders the
+        // "pick a branch" empty state next to the selector that fixes it.
+        setLoadError(null);
+        setDegraded(NO_DEGRADATION);
         return false;
       }
 
       setIsLoading(true);
       setError(null);
+      setLoadError(null);
+      setDegraded(NO_DEGRADATION);
       try {
         const readPage = (requestedPageNumber: number) => {
           const query = new URLSearchParams({
@@ -383,8 +420,12 @@ export function useLeads() {
             },
           );
         };
-        const [leadsResponse, stagesResponse, capabilitiesResponse] =
-          await Promise.all([
+        // Three independent sources. Under Promise.all a capabilities 403
+        // rejected the whole batch and blanked a list that had loaded
+        // perfectly well; each source now settles on its own and only the
+        // list can fail the screen.
+        const [leadsSettled, stagesSettled, capabilitiesSettled] =
+          await Promise.allSettled([
             readPage(requestedPage),
             axiosClient.get<unknown>("/api/tenant/crm/v1/lead-stages", {
               signal,
@@ -400,7 +441,26 @@ export function useLeads() {
               },
             ),
           ]);
-        let nextPage = parseLeadsResponse(leadsResponse.data, branchId);
+
+        // One aborted source means the whole request was cancelled — a newer
+        // one is already in flight, so nothing here may touch state.
+        if (
+          [leadsSettled, stagesSettled, capabilitiesSettled].some(
+            (settled) =>
+              settled.status === "rejected" && isAbortError(settled.reason),
+          )
+        ) {
+          return false;
+        }
+
+        const nextStages = degradableSource(stagesSettled, parseLeadStagesResponse);
+        const nextCapabilities = degradableSource(capabilitiesSettled, (payload) =>
+          parseLeadCapabilitiesResponse(payload, branchId),
+        );
+
+        if (leadsSettled.status === "rejected") throw leadsSettled.reason;
+
+        let nextPage = parseLeadsResponse(leadsSettled.value.data, branchId);
         if (nextPage.page !== requestedPage) {
           throw new Error("Invalid leads response.");
         }
@@ -420,10 +480,12 @@ export function useLeads() {
         setItems(nextItems);
         changePage(nextPageInfo.page);
         setPageInfo(nextPageInfo);
-        setStages(parseLeadStagesResponse(stagesResponse.data));
-        setCapabilities(
-          parseLeadCapabilitiesResponse(capabilitiesResponse.data, branchId),
-        );
+        setStages(nextStages ?? []);
+        setCapabilities(nextCapabilities);
+        setDegraded({
+          stages: nextStages === null,
+          capabilities: nextCapabilities === null,
+        });
         return true;
       } catch (caught) {
         if (
@@ -442,7 +504,8 @@ export function useLeads() {
           hasNext: false,
           hasPrev: false,
         }));
-        setError(errorMessage(caught, "Unable to load leads."));
+        setDegraded(NO_DEGRADATION);
+        setLoadError(normalizeApiError(caught));
         return false;
       } finally {
         if (
@@ -637,6 +700,8 @@ export function useLeads() {
       setSelectedForDelete(null);
       setIsCreateOpen(false);
       setError(null);
+      setLoadError(null);
+      setDegraded(NO_DEGRADATION);
     },
     canCreate: capabilities?.create !== null && capabilities?.create !== undefined,
     canUpdateLead: (lead: LeadItem) =>
@@ -647,6 +712,8 @@ export function useLeads() {
     isDeleting,
     isMovePending: movingLeadId !== null,
     error,
+    loadError,
+    degraded,
     searchQuery,
     setSearchQuery: changeSearchQuery,
     pageInfo,
