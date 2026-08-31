@@ -1,4 +1,5 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import type { PageResult as SharedPageResult, SortDirection } from "@/types/common";
 import type { TenantStatus } from "../core/types";
 
 export const TENANT_USER_STATUSES = [
@@ -10,7 +11,7 @@ export const TENANT_USER_STATUSES = [
 
 export type TenantUserStatus = (typeof TENANT_USER_STATUSES)[number];
 export type TenantUserVisibility = "ACTIVE" | "DELETED" | "ALL";
-export type TenantUserSortField =
+type TenantUserSortField =
   | "email"
   | "firstName"
   | "lastName"
@@ -18,10 +19,9 @@ export type TenantUserSortField =
   | "status"
   | "lastLoginAt"
   | "createdAt";
-export type SortDirection = "ASC" | "DESC";
-export type TenantUserRoleScope = "TENANT" | "COMPANY" | "BRANCH";
-export type DeliveryState = "QUEUED" | "ALREADY_QUEUED";
-export type TeamMembershipRole = "MEMBER" | "LEAD" | "MANAGER";
+type TenantUserRoleScope = "TENANT" | "COMPANY" | "BRANCH";
+type DeliveryState = "QUEUED" | "ALREADY_QUEUED";
+type TeamMembershipRole = "MEMBER" | "LEAD" | "MANAGER";
 
 export interface TenantUserOrganizationRef {
   id: string;
@@ -45,17 +45,6 @@ export interface TenantUserRoleAssignment {
   branchId: string | null;
 }
 
-/** The server never returns a SIP credential; only passwordConfigured is readable. */
-export interface TenantUserWebphone {
-  enabled: boolean;
-  extension: string | null;
-  sipUsername: string | null;
-  displayName: string | null;
-  outboundCallerId: string | null;
-  transport: "ws" | "wss";
-  passwordConfigured: boolean;
-}
-
 export interface TenantUserView {
   id: string;
   email: string;
@@ -73,7 +62,6 @@ export interface TenantUserView {
   };
   manager: TenantUserManagerRef | null;
   roleAssignments: TenantUserRoleAssignment[];
-  webphone: TenantUserWebphone;
   lastLoginAt: string | null;
   lockedUntil: string | null;
   createdAt: string;
@@ -89,19 +77,10 @@ export interface TenantUserSummary {
   deactivated: number;
   deleted: number;
   owners: number;
-  webphoneEnabled: number;
   locked: number;
 }
 
-export interface PageResult<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
-}
+export type PageResult<T> = SharedPageResult<T>;
 
 export interface TenantUserListQuery {
   page: number;
@@ -166,7 +145,7 @@ export interface BranchRoleAssignmentInput {
   roleId: string;
 }
 
-export interface TeamMembershipInput {
+interface TeamMembershipInput {
   teamId: string;
   role?: TeamMembershipRole;
   isPrimary?: boolean;
@@ -205,17 +184,6 @@ export interface ChangeTenantUserPasswordInput {
   passwordConfirmation: string;
 }
 
-export interface UpdateTenantUserWebphoneInput {
-  enabled?: boolean;
-  extension?: string | null;
-  sipUsername?: string | null;
-  /** Write-only. It must never be copied into readable user state. */
-  sipPassword?: string | null;
-  displayName?: string | null;
-  outboundCallerId?: string | null;
-  transport?: "ws" | "wss";
-}
-
 export interface ReplaceTenantUserRolesInput {
   assignments: BranchRoleAssignmentInput[];
 }
@@ -230,7 +198,7 @@ export interface TenantUserInvitationResult {
   delivery: DeliveryState;
 }
 
-export type TenantAccessResourceStatus =
+type TenantAccessResourceStatus =
   | "idle"
   | "loading"
   | "ready"
@@ -251,7 +219,6 @@ export type TenantAccessCommandName =
   | "reset-password"
   | "resend-invite"
   | "change-password"
-  | "webphone"
   | "suspend"
   | "activate"
   | "roles"
@@ -271,7 +238,6 @@ export interface TenantAccessPermissions {
   canInvite: boolean;
   canUpdate: boolean;
   canResetPassword: boolean;
-  canManageWebphone: boolean;
   canSuspend: boolean;
   canAssignRoles: boolean;
   canDelete: boolean;
@@ -285,10 +251,6 @@ export const TENANT_ACCESS_PERMISSION_SETS = {
   update: ["admin.tenant_users.update"],
   resetPassword: [
     "admin.tenant_users.reset_password",
-    "admin.tenant_users.critical",
-  ],
-  manageWebphone: [
-    "admin.tenant_users.manage_webphone",
     "admin.tenant_users.critical",
   ],
   suspend: ["admin.tenant_users.suspend", "admin.tenant_users.critical"],

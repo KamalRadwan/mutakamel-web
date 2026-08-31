@@ -122,4 +122,45 @@ describe("controlPlaneAuditApi", () => {
       data: { items: [{ id: "only-an-id" }], total: 1, page: 1, limit: 25, totalPages: 1 },
     })).toThrow("INVALID_CONTROL_PLANE_AUDIT_RESPONSE");
   });
+
+  it("list rows omit the before/after/diff/metadata snapshot fields", async () => {
+    getMock.mockResolvedValue({
+      data: {
+        success: true,
+        data: { items: [EVENT], total: 1, page: 1, limit: 25, totalPages: 1 },
+      },
+    });
+
+    const result = await controlPlaneAuditApi.list({ page: 1, limit: 25 });
+
+    expect(result.items[0]).not.toHaveProperty("before");
+    expect(result.items[0]).not.toHaveProperty("after");
+    expect(result.items[0]).not.toHaveProperty("diff");
+    expect(result.items[0]).not.toHaveProperty("metadata");
+  });
+
+  it("fetches full evidence for one event by id", async () => {
+    getMock.mockResolvedValue({ data: { success: true, data: EVENT } });
+
+    const result = await controlPlaneAuditApi.getById(EVENT.id);
+
+    expect(getMock).toHaveBeenCalledWith(
+      `/api/admin/core/v1/audit/${EVENT.id}`,
+      { cache: "no-store" },
+    );
+    expect(result).toMatchObject({
+      id: EVENT.id,
+      before: { status: "ACTIVE" },
+      after: { status: "SUSPENDED" },
+      diff: [{ field: "status", before: "ACTIVE", after: "SUSPENDED" }],
+    });
+  });
+
+  it("fails closed on a malformed detail response", async () => {
+    getMock.mockResolvedValue({ data: { success: true, data: { id: "only-an-id" } } });
+
+    await expect(controlPlaneAuditApi.getById("only-an-id")).rejects.toThrow(
+      "INVALID_CONTROL_PLANE_AUDIT_RESPONSE",
+    );
+  });
 });

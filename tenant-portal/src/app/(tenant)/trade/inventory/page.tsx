@@ -1,111 +1,173 @@
 "use client";
 
-import Link from "next/link";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { TableToolbar } from "@/components/ui/TableToolbar";
-import { Table } from "@/components/ui/Table";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Package } from "lucide-react";
-import { useTradeInventory, InventoryStockItem } from "./hooks/useTradeInventory";
-import { CreateTradeInventoryModal } from "./components/CreateTradeInventoryModal";
-import { DeleteTradeInventoryConfirmModal } from "./components/DeleteTradeInventoryConfirmModal";
+import { PackageSearch, RotateCcw } from "lucide-react";
+import {
+  Button,
+  DegradedBanner,
+  ErrorState,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  PermissionGate,
+  Skeleton,
+  StatCard,
+  SubNav,
+} from "@/design-system";
+import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
+import { formatDecimalString } from "@/lib/format/number";
+import { formatDateTime } from "@/lib/format/date";
+import { TRADE_INVENTORY_NAV_ITEMS } from "./inventory-nav";
+import { INVENTORY_READ_PERMISSION } from "./inventory-contract";
+import { useInventoryAvailability } from "./hooks/useInventoryAvailability";
 
-export default function TradeInventoryPage() {
+export default function InventoryAvailabilityPage() {
   const {
-    items,
-    searchQuery,
-    setSearchQuery,
-    isCreateOpen,
-    setIsCreateOpen,
-    selectedForDelete,
-    setSelectedForDelete,
-    handleCreate,
-    handleDelete,
-  } = useTradeInventory();
+    t,
+    lang,
+    canRead,
+    isScopeResolved,
+    branchIds,
+    branchId,
+    selectBranch,
+    values,
+    result,
+    isLoading,
+    queryError,
+    formError,
+    setValue,
+    reset,
+    lookUp,
+  } = useInventoryAvailability();
 
-  const columns = [
-    {
-      header: "اسم المنتج والـ SKU",
-      cell: (item: InventoryStockItem) => (
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-            <Package className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900 dark:text-slate-100">{item.productName}</p>
-            <p className="text-[11px] font-mono text-slate-400">{item.sku} · {item.warehouseName}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "الكمية المتاحة (OnHand)",
-      cell: (item: InventoryStockItem) => (
-        <span className="font-bold text-slate-900 dark:text-slate-100">{item.quantityOnHand} قطعة</span>
-      ),
-    },
-    {
-      header: "الكمية المحجوزة",
-      cell: (item: InventoryStockItem) => (
-        <span className="font-mono text-xs text-amber-600 font-bold">{item.reservedQuantity} قطعة</span>
-      ),
-    },
-    { header: "سعر الوحدة", accessorKey: "unitPrice" as keyof InventoryStockItem },
-    {
-      header: "حالة المخزون",
-      cell: (item: InventoryStockItem) => (
-        <Badge variant={item.status === "in_stock" ? "success" : item.status === "low_stock" ? "warning" : "danger"}>
-          {item.status === "in_stock" ? "متوفر بكثرة" : item.status === "low_stock" ? "مخزون منخفض" : "نفد المخزون"}
-        </Badge>
-      ),
-    },
-    {
-      header: "الإجراءات",
-      cell: (item: InventoryStockItem) => (
-        <div className="flex items-center gap-1.5">
-          <Link href={`/trade/inventory/${item.id}/general`}>
-            <Button variant="ghost" size="sm">
-              <Eye className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedForDelete(item)}>
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
+  const content = (
+    <div className="flex flex-col gap-4">
       <PageHeader
-        title="إدارة المخزون والتخزين (Trade Inventory & Warehouse Stock)"
-        subtitle="متابعة الكميات الفطرية المتاحة، الحجوزات الآلية وأشرطة الإنذار لنقاط إعادة الطلب"
-        actionLabel="إضافة صنف مخزوني"
-        onAction={() => setIsCreateOpen(true)}
+        title={t.tradeInventory.availabilityTitle}
+        description={t.tradeInventory.availabilitySubtitle}
+        primaryAction={{
+          label: t.tradeInventory.lookUp,
+          onClick: () => void lookUp(),
+          disabled: isLoading || !isScopeResolved,
+          loading: isLoading,
+        }}
+        secondaryActions={
+          <>
+            <TenantBranchSelect
+              branchIds={branchIds}
+              branchId={branchId}
+              onChange={selectBranch}
+              disabled={isLoading}
+            />
+            <Button variant="outline" onClick={reset} disabled={isLoading}>
+              <RotateCcw className="size-4" aria-hidden="true" />
+              {t.tradeInventory.clearLookup}
+            </Button>
+          </>
+        }
       />
 
-      <TableToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        placeholder="ابحث باسم المنتج، الـ SKU، أو المستودع..."
-      />
+      <SubNav items={TRADE_INVENTORY_NAV_ITEMS} />
 
-      <Table columns={columns} data={items} />
+      <DegradedBanner message={t.tradeInventory.availabilityAdvisory} />
 
-      <CreateTradeInventoryModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSubmit={handleCreate}
-      />
+      <div className="grid gap-3 md:grid-cols-3">
+        <Field label={t.tradeInventory.nodeId} required error={formError ?? undefined}>
+          <Input
+            value={values.nodeId}
+            onChange={(event) => setValue("nodeId", event.target.value)}
+            placeholder={t.tradeInventory.uuidPlaceholder}
+          />
+        </Field>
+        <Field label={t.tradeInventory.itemId} required>
+          <Input
+            value={values.itemId}
+            onChange={(event) => setValue("itemId", event.target.value)}
+            placeholder={t.tradeInventory.uuidPlaceholder}
+          />
+        </Field>
+        <Field label={t.tradeInventory.uomId} hint={t.tradeInventory.uomHint}>
+          <Input
+            value={values.uomId}
+            onChange={(event) => setValue("uomId", event.target.value)}
+            placeholder={t.tradeInventory.uuidPlaceholder}
+          />
+        </Field>
+        <Field label={t.tradeInventory.lotKey}>
+          <Input
+            value={values.lotKey}
+            onChange={(event) => setValue("lotKey", event.target.value)}
+          />
+        </Field>
+        <Field label={t.tradeInventory.serialKey}>
+          <Input
+            value={values.serialKey}
+            onChange={(event) => setValue("serialKey", event.target.value)}
+          />
+        </Field>
+      </div>
 
-      <DeleteTradeInventoryConfirmModal
-        isOpen={!!selectedForDelete}
-        item={selectedForDelete}
-        onClose={() => setSelectedForDelete(null)}
-        onConfirm={handleDelete}
-      />
+      {!isScopeResolved ? (
+        <EmptyState
+          icon={PackageSearch}
+          title={t.tradeInventory.selectBranchFirst}
+          description={t.tradeInventory.selectBranchFirstDescription}
+        />
+      ) : isLoading ? (
+        <div className="grid gap-3 md:grid-cols-3">
+          <Skeleton className="h-20" />
+          <Skeleton className="h-20" />
+          <Skeleton className="h-20" />
+        </div>
+      ) : queryError ? (
+        <ErrorState
+          title={t.tradeInventory.availabilityFailed}
+          description={queryError.message}
+          onRetry={() => void lookUp()}
+          retryLabel={t.common.retry}
+        />
+      ) : result ? (
+        <>
+          <div className="grid gap-3 md:grid-cols-3">
+            <StatCard
+              label={t.tradeInventory.onHand}
+              value={formatDecimalString(result.onHandQuantity, lang, {
+                maximumFractionDigits: 8,
+              })}
+            />
+            <StatCard
+              label={t.tradeInventory.reserved}
+              value={formatDecimalString(result.reservedQuantity, lang, {
+                maximumFractionDigits: 8,
+              })}
+            />
+            <StatCard
+              label={t.tradeInventory.available}
+              value={formatDecimalString(result.availableQuantity, lang, {
+                maximumFractionDigits: 8,
+              })}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {t.tradeInventory.asOf} {formatDateTime(result.asOf, lang)}
+          </p>
+        </>
+      ) : (
+        <EmptyState
+          icon={PackageSearch}
+          title={t.tradeInventory.availabilityNotAsked}
+          description={t.tradeInventory.availabilityNotAskedDescription}
+        />
+      )}
     </div>
+  );
+
+  // Route admission is the permission string OR tenant ownership: only
+  // `is_tenant_owner` bypasses `TradePermissionsGuard`, and PermissionGate
+  // cannot see that flag on its own.
+  return canRead ? (
+    content
+  ) : (
+    <PermissionGate require={INVENTORY_READ_PERMISSION}>{content}</PermissionGate>
   );
 }

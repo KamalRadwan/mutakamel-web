@@ -41,9 +41,6 @@ const { languageMock, creatorMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <nav aria-label="Admin navigation">Admin navigation</nav>,
-}));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => languageMock }));
 vi.mock("../hooks/use-create-release-draft", () => ({
   useCreateReleaseDraft: () => creatorMock,
@@ -104,8 +101,12 @@ describe("CreateReleaseDraftScreen", () => {
     const { container } = render(<CreateReleaseDraftScreen />);
 
     expect(container.firstElementChild).toHaveAttribute("dir", "rtl");
-    const componentId = document.getElementById("release-component-id");
-    expect(componentId).not.toBeNull();
+    // Field (design-system) generates its own id via useId() rather than
+    // accepting a caller-supplied fixed one, so this can no longer look up
+    // a hardcoded "release-component-id" - find the control by its Arabic
+    // label instead, the same way the other test in this file already does
+    // for the English render.
+    const componentId = screen.getByLabelText("معرّف المكوّن UUID v7");
     expect(componentId).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("alert")).toBeTruthy();
   });

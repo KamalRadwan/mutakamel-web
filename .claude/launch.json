@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "admin-portal",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "admin-portal", "dev"],
+      "port": 5001
+    },
+    {
+      "name": "tenant-portal",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "tenant-portal", "dev"],
+      "port": 5002
+    }
+  ]
+}

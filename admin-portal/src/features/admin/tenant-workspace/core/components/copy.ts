@@ -17,7 +17,12 @@ const copy = {
     reprovision: "Retry provisioning",
     cancelProvisioning: "Cancel provisioning",
     softDelete: "Soft delete",
+    restore: "Restore tenant",
+    restoreHint:
+      "Restoring returns the tenant as SUSPENDED with its domains re-attached. Its cancelled subscription stays cancelled.",
     destroy: "Destroy permanently",
+    destroyHint:
+      "This removes the tenant record and drops its database. It cannot be undone.",
     destroySubscriptions: "Also purge subscriptions",
     confirm: "Confirm",
     cancel: "Keep tenant",
@@ -34,7 +39,15 @@ const copy = {
     pendingDns: "The domain may be attached as pending while DNS is prepared.",
     clearAddress: "Clear address",
     noDomains: "No domain evidence is available.",
+    domainsReleased:
+      "Domains were released when this tenant was deleted. They stay reserved for it and come back if it is restored.",
     correlation: "Correlation ID",
+    domainFieldLabel: "Domain",
+    reloadDomains: "Reload domains",
+    loadingDomains: "Loading domains…",
+    confirmRemoveDomain: "Confirm removal of this domain?",
+    address: "Address",
+    confirmAction: (label: string) => `Confirm action: ${label}`,
   },
   ar: {
     title: "إدارة المستأجر",
@@ -52,7 +65,12 @@ const copy = {
     reprovision: "إعادة محاولة التجهيز",
     cancelProvisioning: "إلغاء التجهيز",
     softDelete: "حذف قابل للاسترداد",
+    restore: "استعادة المستأجر",
+    restoreHint:
+      "تعيد الاستعادة المستأجر بحالة SUSPENDED مع إعادة ربط نطاقاته. ويظل اشتراكه الملغى ملغيًا.",
     destroy: "حذف نهائي",
+    destroyHint:
+      "يؤدي هذا إلى إزالة سجل المستأجر وحذف قاعدة بياناته، ولا يمكن التراجع عنه.",
     destroySubscriptions: "حذف الاشتراكات أيضًا",
     confirm: "تأكيد",
     cancel: "الإبقاء على المستأجر",
@@ -69,7 +87,15 @@ const copy = {
     pendingDns: "يمكن إرفاق النطاق بحالة معلّقة أثناء إعداد DNS.",
     clearAddress: "مسح العنوان",
     noDomains: "لا تتوفر بيانات نطاقات.",
+    domainsReleased:
+      "تم تحرير النطاقات عند حذف هذا المستأجر. وتبقى محجوزة له وتعود إليه عند استعادته.",
     correlation: "معرّف الارتباط",
+    domainFieldLabel: "النطاق",
+    reloadDomains: "إعادة تحميل النطاقات",
+    loadingDomains: "جارٍ تحميل النطاقات…",
+    confirmRemoveDomain: "تأكيد إزالة هذا النطاق؟",
+    address: "العنوان",
+    confirmAction: (label: string) => `تأكيد الإجراء: ${label}`,
   },
 } as const;
 

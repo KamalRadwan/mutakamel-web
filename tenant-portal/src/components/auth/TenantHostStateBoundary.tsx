@@ -2,8 +2,46 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Button } from "@/design-system";
+import { I18nProvider, useI18n } from "@/i18n/I18nContext";
 import type { TenantHostStatus } from "@/shared/tenancy/tenant-host-admission.server";
 
+// This boundary sits ABOVE the app's own I18nProvider — TenantHostAdmission
+// wraps TenantPortalRuntime, not the other way round — so its chrome brings
+// its own provider rather than reordering the runtime tree. I18nProvider
+// holds no state of its own (it reads the useLanguage external store), so
+// the nesting on the /login path costs nothing and both instances always
+// agree on the language.
+function SuspendedBanner() {
+  const { t } = useI18n();
+  return (
+    <div
+      role="status"
+      className="fixed inset-x-4 top-16 z-(--z-topbar) mx-auto max-w-md rounded-md border border-caution-200 bg-caution-100 px-4 py-3 text-center text-xs font-medium text-caution-800 shadow-pop dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300"
+    >
+      {t.hostState.suspendedBanner}
+    </div>
+  );
+}
+
+function SuspendedScreen() {
+  const { t } = useI18n();
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
+      <div className="flex max-w-prose flex-col items-center gap-3 rounded-md border border-border bg-card p-8 text-center">
+        <h1 className="text-lg font-semibold text-foreground">{t.hostState.suspendedTitle}</h1>
+        <p className="text-sm text-muted-foreground">{t.hostState.suspendedDescription}</p>
+        <Button asChild variant="primary" size="sm">
+          <Link href="/login">{t.hostState.goToLogin}</Link>
+        </Button>
+      </div>
+    </main>
+  );
+}
+
+// Presentation-only conversion of a Tier-1 file, permitted by the 2026-08-31
+// amendment in docs/build/HANDOFF.md. The admission decision itself is
+// unchanged and still lives in TenantHostAdmission.
 export function TenantHostStateBoundary({
   children,
   status,
@@ -18,32 +56,17 @@ export function TenantHostStateBoundary({
   if (pathname === "/login") {
     return (
       <>
-        <div
-          role="status"
-          className="fixed inset-x-4 top-16 z-50 mx-auto max-w-md rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-center text-xs font-semibold text-amber-950 shadow-lg dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-        >
-          خدمات المؤسسة معلّقة مؤقتًا. لا يزال تسجيل الدخول متاحًا لمسؤول المؤسسة.
-        </div>
+        <I18nProvider>
+          <SuspendedBanner />
+        </I18nProvider>
         {children}
       </>
     );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-center text-white">
-      <div className="max-w-md space-y-4 rounded-2xl border border-amber-900/60 bg-slate-900 p-8">
-        <h1 className="text-lg font-bold">خدمات المؤسسة غير متاحة مؤقتًا</h1>
-        <p className="text-sm leading-6 text-slate-300">
-          تم تعليق الوصول إلى صفحات المؤسسة. يمكن لمسؤول المؤسسة متابعة تسجيل الدخول
-          للوصول إلى المسارات المسموح بها قبل المصادقة.
-        </p>
-        <Link
-          href="/login"
-          className="inline-flex rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold hover:bg-blue-700"
-        >
-          الانتقال إلى تسجيل الدخول
-        </Link>
-      </div>
-    </main>
+    <I18nProvider>
+      <SuspendedScreen />
+    </I18nProvider>
   );
 }

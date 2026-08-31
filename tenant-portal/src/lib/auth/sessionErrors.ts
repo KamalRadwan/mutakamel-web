@@ -64,6 +64,30 @@ export function classifyAuthFailure(
   return "none";
 }
 
+/**
+ * Codes that mean "you presented no credentials", as distinct from "your
+ * session ended". A visitor who has never signed in is not in a degraded
+ * state — they are simply signed out, and belong on the login form.
+ *
+ * Without this distinction the bootstrap treated a plain 401 as "cannot verify
+ * the session" and rendered the degraded retry screen, so a first-time visitor
+ * never reached the login form at all. Verified against the running Gateway,
+ * which answers `GET /auth/me` with exactly this code when no cookie is sent.
+ */
+const MISSING_CREDENTIAL_AUTH_CODES = new Set([
+  "COMMON.AUTH.MISSING_BEARER_TOKEN",
+  "MISSING_BEARER_TOKEN",
+]);
+
+export function isMissingCredentialsFailure(error: unknown): boolean {
+  const code = getAuthErrorCode(error);
+  return (
+    getAuthErrorStatus(error) === 401 &&
+    code !== undefined &&
+    MISSING_CREDENTIAL_AUTH_CODES.has(code)
+  );
+}
+
 export function isDefinitiveAuthFailure(error: unknown): boolean {
   const status = getAuthErrorStatus(error);
   return (

@@ -1,23 +1,22 @@
 # Mutakamel Tenant Portal
 
-Standalone Next.js tenant application replacing tenant-facing behavior in
-../backend/mutakamel-apps/mutakamel-web-app.
+Standalone Next.js tenant application. Arabic-first, RTL by default, fixed
+port 5002. One of three portals in the `frontend` pnpm workspace
+(admin 5001, tenant 5002, partner 5003).
 
-Current application status: bootstrap only.
-Documentation verification date: 2026-07-25.
-Visual design documentation: intentionally excluded.
+Documentation rebuilt: 2026-08-27.
 
 ## Read first
 
 - AGENTS.md
-- docs/ai/START_HERE.md
-- docs/DOCUMENTATION_CONTRACT.md
-- docs/ai/SOURCE_OF_TRUTH.md
-- docs/app/replacement-scope.md
-- docs/app/application-architecture.md
+- docs/README.md
+- docs/CONTRACT.md
+- docs/architecture/file-architecture.md
+- docs/design/README.md
+- docs/design/anti-patterns.md
 - docs/api/README.md
-- docs/security/README.md
-- docs/validation/README.md
+
+If you are executing the rebuild: docs/build/HANDOFF.md
 
 ## Browser API namespaces
 
@@ -26,44 +25,51 @@ Visual design documentation: intentionally excluded.
 - Trade: /api/tenant/trade/v1/*
 - Worker: no direct tenant-browser API
 
-The API Gateway is the only browser backend edge. Never call owning services
+API Gateway is the only browser backend edge. Never call owning services
 directly. Never modify ../backend from this project.
 
 ## Source precedence
 
 1. Gateway typed route contracts
 2. Owning controller and global/module guards
-3. DTOs, enums, service/response contracts, entities, and tests
-4. Old-web live clients and tests
-5. Tenant Portal documentation
-6. Mocks and comments, which are not contracts
+3. DTOs, enums, service/response contracts, entities, tests
+4. Installed @mutakamel/* package declarations
+5. Current tenant-portal source and tests
+6. This documentation
+7. Mocks and comments, which are never contracts
 
-## Machine-readable route evidence
+## Current state
 
-- docs/generated/tenant-api-routes.json
-- Generator: scripts/docs/generate-route-inventory.mjs
+573 Gateway tenant routes (core 199, CRM 143, Trade 231).
 
-## AI build references
+Live in the portal: login and session management, CRM leads, customer
+profiles, opportunities/pipelines, and four CRM catalogues. Trade has no
+portal screen. 45 route scaffolds are sealed behind an unavailable boundary
+and are scheduled for deletion.
 
-- docs/ai/PROJECT_INDEX.md
-- docs/ai/SYSTEM_CONTEXT.md
-- docs/ai/IMPLEMENTATION_PLAYBOOK.md
-- docs/ai/FEATURE_TEMPLATE.md
-- docs/ai/CONTRACT_VERIFICATION.md
-- docs/ai/TEST_MATRIX.md
-- docs/ai/KNOWN_GAPS.md
-- docs/ai/GLOSSARY.md
-- docs/ai/DECISIONS.md
+The transport and session layer (src/lib/api, src/lib/auth,
+src/lib/notifications, src/shared/tenancy, src/context) is production-grade
+and tested. Do not rewrite it.
+
+There is no design system yet — docs/design/ specifies one, and
+docs/build/ sequences building it.
+
+## Generated evidence
+
+- docs/generated/tenant-api-routes.json — scripts/docs/generate-route-inventory.mjs
+- docs/api/core-reference.md, crm-reference.md, trade-reference.md —
+  scripts/docs/generate-api-reference.mjs
+
+Never hand-edit generated files.
 
 ## Verification
 
 From tenant-portal:
 
-- npm run docs:routes
-- npm run docs:check
-- npm run lint
-- npm run typecheck
-- npm run build
+- pnpm verify        (typecheck + lint + test + docs:check + design:rtl)
+- pnpm build
+- pnpm design:census -- --check
 
 Do not report a capability live until it exists in tenant-portal, uses the
-server-backed contract, and has proportional tests.
+server-backed contract, works in both languages and both themes, and has
+proportional tests.

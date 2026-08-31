@@ -1,6 +1,6 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 
-export type NotificationProvider = "none" | "firebase";
+type NotificationProvider = "none" | "firebase";
 export type DeviceTokenProvider = "fcm" | "apns" | "web-push";
 
 export interface AdminNotification {

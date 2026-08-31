@@ -1,101 +1,270 @@
 "use client";
 
-import Link from "next/link";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { TableToolbar } from "@/components/ui/TableToolbar";
-import { Table } from "@/components/ui/Table";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Mail } from "lucide-react";
-import { useOutboundEmails, OutboundEmailItem } from "./hooks/useOutboundEmails";
-import { CreateOutboundEmailsModal } from "./components/CreateOutboundEmailsModal";
-import { DeleteOutboundEmailsConfirmModal } from "./components/DeleteOutboundEmailsConfirmModal";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
+import {
+  Badge,
+  Button,
+  DataTable,
+  DateTime,
+  DegradedBanner,
+  FilterBar,
+  PageHeader,
+  PermissionGate,
+  useToast,
+  type ColumnDef,
+} from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
+import { formatTemplate } from "@/lib/format/template";
+import {
+  OUTBOUND_EMAIL_STATUSES,
+  isPendingDelivery,
+  type OutboundEmailListItem,
+  type OutboundEmailStatus,
+} from "./outbound-email-contract";
+import { ComposeEmailDrawer } from "./components/ComposeEmailDrawer";
+import { useOutboundEmailComposer } from "./hooks/useOutboundEmailComposer";
+import { useOutboundEmails } from "./hooks/useOutboundEmails";
+
+const STATUS_TONE: Record<OutboundEmailStatus, "positive" | "negative" | "caution" | "neutral"> = {
+  SENT: "positive",
+  FAILED: "negative",
+  // Queued and dispatching are in-flight, not outcomes — caution reads as
+  // "waiting", which is exactly what they mean.
+  QUEUED: "caution",
+  DISPATCHING: "caution",
+};
 
 export default function OutboundEmailsPage() {
+  const { t } = useI18n();
+  const toast = useToast();
+  const router = useRouter();
   const {
-    t,
     items,
-    searchQuery,
-    setSearchQuery,
-    isCreateOpen,
-    setIsCreateOpen,
-    selectedForDelete,
-    setSelectedForDelete,
-    handleCreate,
-    handleDelete,
+    hasLoaded,
+    hasNext,
+    isLoading,
+    isLoadingMore,
+    queryError,
+    canSend,
+    status,
+    setStatus,
+    loadMore,
+    reload,
   } = useOutboundEmails();
+  const composer = useOutboundEmailComposer();
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [composeError, setComposeError] = useState<string | undefined>(undefined);
 
-  const columns = [
+  const columns: ColumnDef<OutboundEmailListItem>[] = [
     {
-      header: t.crm.futureAndMail,
-      cell: (item: OutboundEmailItem) => (
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-            <Mail className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900 dark:text-slate-100">{item.recipientName}</p>
-            <p className="text-[11px] text-slate-400">{item.recipientEmail}</p>
-          </div>
-        </div>
-      ),
-    },
-    { header: t.crm.messageTitle, accessorKey: "subject" as keyof OutboundEmailItem },
-    { header: t.crm.postingDate, accessorKey: "sentAt" as keyof OutboundEmailItem },
-    {
-      header: t.crm.deliveryStatus,
-      cell: (item: OutboundEmailItem) => (
-        <Badge variant={item.deliveryStatus === "opened" ? "success" : item.deliveryStatus === "delivered" ? "info" : "warning"}>
-          {item.deliveryStatus === "opened" ? t.crm.itHasBeenLightened : item.deliveryStatus === "delivered" ? t.crm.delivered : t.crm.beingSent}
-        </Badge>
+      id: "subject",
+      header: t.crmOutboundEmails.subject,
+      cell: (email) => (
+        <span className="font-medium text-foreground">
+          {email.subjectPreview ?? t.common.noData}
+        </span>
       ),
     },
     {
-      header: t.crm.procedures,
-      cell: (item: OutboundEmailItem) => (
-        <div className="flex items-center gap-1.5">
-          <Link href={`/crm/outbound-emails/${item.id}/general`}>
-            <Button variant="ghost" size="sm">
-              <Eye className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedForDelete(item)}>
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
+      id: "recipient",
+      header: t.crmOutboundEmails.recipient,
+      cell: (email) => (
+        <div className="min-w-0">
+          <p className="truncate text-sm text-foreground">
+            {email.recipient.displayName}
+          </p>
+          {/* Already masked by the server. Rendered exactly as received. */}
+          <p className="truncate font-mono text-2xs text-muted-foreground">
+            {email.recipient.maskedAddress}
+          </p>
         </div>
       ),
+    },
+    {
+      id: "status",
+      header: t.common.status,
+      cell: (email) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge tone={STATUS_TONE[email.status]}>
+            {t.crmOutboundEmails.statusValues[email.status] ?? email.status}
+          </Badge>
+          {isPendingDelivery(email.status) ? (
+            <span className="text-2xs text-muted-foreground">
+              {t.crmOutboundEmails.pendingHint}
+            </span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      id: "requestedAt",
+      header: t.crmOutboundEmails.requestedAt,
+      cell: (email) => <DateTime value={email.requestedAt} />,
     },
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={t.crm.outboundEmailsTracking}
-        subtitle={t.crm.followTheStatusOfOutgoing}
-        actionLabel={t.crm.sendANewMailMessage}
-        onAction={() => setIsCreateOpen(true)}
-      />
+    <PermissionGate require="crm.activities.read" scoped>
+      <div className="flex flex-col gap-4">
+        <PageHeader
+          title={t.crmOutboundEmails.title}
+          description={t.crmOutboundEmails.subtitle}
+          primaryAction={
+            canSend
+              ? {
+                  label: t.crmOutboundEmails.compose,
+                  onClick: () => {
+                    setComposeError(undefined);
+                    setIsComposeOpen(true);
+                  },
+                }
+              : undefined
+          }
+          secondaryActions={
+            <Button
+              variant="outline"
+              onClick={() => void reload()}
+              disabled={isLoading}
+            >
+              <RefreshCw
+                className={`size-4 ${isLoading ? "animate-spin" : ""}`}
+                aria-hidden="true"
+              />
+              {t.common.retry}
+            </Button>
+          }
+        />
 
-      <TableToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        placeholder={t.crm.searchByAddressOrEmail}
-      />
+        {/* The single most important thing on this screen: a row that says
+            QUEUED has been accepted, not delivered. Delivery state arrives
+            from the worker pipeline afterwards, so this list is eventually
+            consistent and refreshing is how it catches up. */}
+        <DegradedBanner message={t.crmOutboundEmails.eventualConsistency} />
 
-      <Table columns={columns} data={items} />
+        <FilterBar
+          filters={[
+            {
+              id: "status",
+              kind: "select",
+              label: t.common.status,
+              placeholder: t.crmOutboundEmails.allStatuses,
+              options: OUTBOUND_EMAIL_STATUSES.map((value) => ({
+                value,
+                label: t.crmOutboundEmails.statusValues[value] ?? value,
+              })),
+            },
+          ]}
+          values={status ? { status: { kind: "select", value: status } } : {}}
+          onChange={(next) => {
+            const value = next.status;
+            setStatus(
+              value && value.kind === "select"
+                ? (value.value as OutboundEmailStatus)
+                : "",
+            );
+          }}
+          onReset={() => setStatus("")}
+          searchValue=""
+          onSearchChange={() => undefined}
+          clearAllLabel={t.common.dismiss}
+        />
 
-      <CreateOutboundEmailsModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSubmit={handleCreate}
-      />
+        {/* Cursor paging, so no page control: this endpoint returns an opaque
+            nextCursor and no total, and a page/limit/total object built from
+            neither would be fabricated. */}
+        <DataTable
+          columns={columns}
+          rows={items}
+          isLoading={isLoading && !hasLoaded}
+          error={queryError}
+          onRetry={() => void reload()}
+          rowKey={(email) => email.outboundEmailId}
+          onRowClick={(email) =>
+            router.push(`/crm/outbound-emails/${email.outboundEmailId}`)
+          }
+          labels={{
+            retry: t.common.retry,
+            errorTitle: t.crmOutboundEmails.loadFailed,
+            emptyTitle: status
+              ? t.crmOutboundEmails.emptyFiltered
+              : t.crmOutboundEmails.empty,
+            selectAll: t.views.selectAll,
+            selectRow: t.views.selectItem,
+            sortAscending: t.views.sortAscending,
+            sortDescending: t.views.sortDescending,
+            notSorted: t.views.notSorted,
+            pagination: {
+              previous: t.common.previousPage,
+              next: t.common.nextPage,
+              summary: (from, to, total) =>
+                formatTemplate(t.common.showingOf, { from, to, total }),
+            },
+          }}
+        />
 
-      <DeleteOutboundEmailsConfirmModal
-        isOpen={!!selectedForDelete}
-        item={selectedForDelete}
-        onClose={() => setSelectedForDelete(null)}
-        onConfirm={handleDelete}
-      />
-    </div>
+        {hasNext ? (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              onClick={loadMore}
+              disabled={isLoadingMore}
+              loading={isLoadingMore}
+            >
+              {t.crmOutboundEmails.loadMore}
+            </Button>
+          </div>
+        ) : null}
+
+        {/* Remounted per opening; the composer is cleared alongside it so a
+            previous record's options and preview cannot survive into the
+            next compose. */}
+        <ComposeEmailDrawer
+          key={isComposeOpen ? "open" : "closed"}
+          open={isComposeOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setComposeError(undefined);
+              composer.reset();
+            }
+            setIsComposeOpen(open);
+          }}
+          composer={composer}
+          error={composeError}
+          onSend={(sourceType, sourceId, recipient, templateVersionId) => {
+            void composer
+              .send(sourceType, sourceId, recipient, templateVersionId)
+              .then((result) => {
+                if (result.accepted) {
+                  setIsComposeOpen(false);
+                  if (result.replayed) {
+                    toast.info(
+                      t.errors.idempotencyReplayedTitle,
+                      t.errors.idempotencyReplayedDescription,
+                    );
+                  } else {
+                    // "Queued", never "sent" — the 202 says accepted for
+                    // delivery and nothing more.
+                    toast.success(
+                      t.crmOutboundEmails.queuedTitle,
+                      t.crmOutboundEmails.queuedDescription,
+                    );
+                  }
+                  void reload();
+                  return;
+                }
+                if (result.error) {
+                  setComposeError(
+                    t.crmOutboundEmails.errors[result.error.code ?? ""] ??
+                      t.crmOutboundEmails.sendFailed,
+                  );
+                  toast.outcomeFromApi(result.error);
+                }
+              });
+          }}
+        />
+      </div>
+    </PermissionGate>
   );
 }

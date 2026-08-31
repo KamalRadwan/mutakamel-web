@@ -3,9 +3,6 @@ import type { Language } from "@/i18n/I18nContext";
 export const LOGGING_COPY = {
   en: {
     title: "Runtime logging",
-    subtitle:
-      "Inspect effective policy, apply temporary scoped verbosity, review append-only history, and open a privacy-bounded live stream.",
-    critical: "Critical operations",
     readPermission: "Required permission: admin.logging.read",
     updatePermission:
       "Required permissions: admin.logging.update + admin.logging.critical",
@@ -128,9 +125,6 @@ export const LOGGING_COPY = {
   },
   ar: {
     title: "سجلات التشغيل",
-    subtitle:
-      "افحص السياسة الفعلية، وطبّق مستوى مؤقتًا ضمن نطاق، وراجع السجل الإلحاقي، وافتح بثًا مباشرًا محدود الخصوصية.",
-    critical: "عمليات حرجة",
     readPermission: "الصلاحية المطلوبة: admin.logging.read",
     updatePermission:
       "الصلاحيات المطلوبة: admin.logging.update + admin.logging.critical",

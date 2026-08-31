@@ -33,6 +33,7 @@ export function useBackupOverview() {
   const canReadDatabaseAccess = adminCan(user, "admin.database_servers.read");
   const serverContext = useBackupServerOptions(canReadDatabaseAccess);
   const [data, setData] = useState<OverviewData>(initialData);
+  const [hasWorkerData, setHasWorkerData] = useState(false);
   const [accessBinding, setAccessBinding] = useState<BackupDatabaseAccessBinding | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -51,6 +52,7 @@ export function useBackupOverview() {
         backupApi.listRestores(),
       ]);
       setData({ policies, runs, artifacts, restores });
+      setHasWorkerData(true);
     } catch (caught) {
       setError(normalizeApiError(caught));
     } finally {
@@ -143,6 +145,7 @@ export function useBackupOverview() {
     canReadDatabaseAccess,
     selectedData,
     metrics,
+    hasWorkerData,
     isLoading,
     error,
     refresh,

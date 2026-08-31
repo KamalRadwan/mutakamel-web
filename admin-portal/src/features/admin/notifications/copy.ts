@@ -1,8 +1,9 @@
+import type { CopyShape } from "@/i18n/copy-shape";
+
 export type NotificationLanguage = "ar" | "en";
 
 const en = {
   title: "Notification center",
-  description: "Review your administrative notifications, delivery preferences, and push-device registration.",
   inbox: "Inbox",
   preferences: "Personal preferences",
   devices: "Push device token",
@@ -63,6 +64,8 @@ const en = {
   deviceId: "Device ID (optional)",
   platform: "Platform (optional)",
   enabled: "Enabled",
+  enabledValue: "Enabled",
+  disabledValue: "Disabled",
   register: "Register or refresh token",
   registering: "Registering…",
   receipt: "Latest safe registration receipt",
@@ -111,13 +114,8 @@ const en = {
   },
 } as const;
 
-type CopyShape<T> = {
-  -readonly [K in keyof T]: T[K] extends string ? string : CopyShape<T[K]>;
-};
-
 const ar: CopyShape<typeof en> = {
   title: "مركز الإشعارات",
-  description: "راجع إشعارات الإدارة وتفضيلات التسليم وتسجيل أجهزة الدفع الخاصة بك.",
   inbox: "صندوق الوارد",
   preferences: "التفضيلات الشخصية",
   devices: "رمز جهاز الدفع",
@@ -178,6 +176,8 @@ const ar: CopyShape<typeof en> = {
   deviceId: "معرّف الجهاز (اختياري)",
   platform: "المنصة (اختياري)",
   enabled: "مفعّل",
+  enabledValue: "مفعّل",
+  disabledValue: "غير مفعّل",
   register: "تسجيل الرمز أو تحديثه",
   registering: "جارٍ التسجيل…",
   receipt: "أحدث إيصال تسجيل آمن",

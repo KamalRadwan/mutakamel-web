@@ -8,7 +8,6 @@ import {
   readTenantUserPage,
   readTenantUserSummary,
   readTenantUserView,
-  readTenantUserWebphone,
 } from "./readers";
 import {
   BRANCH_ID,
@@ -40,17 +39,15 @@ describe("tenant access response readers", () => {
         team: { id: TEAM_ID },
       },
       roleAssignments: [{ roleId: ROLE_ID }],
-      webphone: { passwordConfigured: true },
     });
     expect(parsed).not.toHaveProperty("internalNote");
-    expect(parsed.webphone).not.toHaveProperty("sipPassword");
   });
 
   it.each(["sipPassword", "passwordHash", "inviteToken", "resetToken"])(
     "rejects credential material named %s",
     (name) => {
       const source = userPayload();
-      (source.webphone as Record<string, unknown>)[name] = "secret";
+      (source as Record<string, unknown>)[name] = "secret";
       expect(() => readTenantUserView(source)).toThrow(
         "INVALID_TENANT_USER_RESPONSE",
       );
@@ -67,9 +64,14 @@ describe("tenant access response readers", () => {
   });
 
   it("validates pagination metadata and user rows", () => {
+    const canonical = pageFixture([userPayload()]);
+    const { items, ...meta } = canonical;
     expect(
-      readTenantUserPage({ success: true, data: pageFixture([userPayload()]) }),
+      readTenantUserPage({ success: true, data: items, meta }),
     ).toMatchObject({ total: 1, page: 1, hasPrev: false });
+    expect(() =>
+      readTenantUserPage({ success: true, data: items }),
+    ).toThrow("INVALID_TENANT_USER_LIST_RESPONSE");
     expect(() =>
       readTenantUserPage({ ...pageFixture([]), total: 1, totalPages: 0 }),
     ).toThrow("INVALID_TENANT_USER_LIST_RESPONSE");
@@ -100,29 +102,6 @@ describe("tenant access response readers", () => {
     ).toThrow();
   });
 
-  it("reads only masked WebPhone fields", () => {
-    expect(
-      readTenantUserWebphone({
-        enabled: false,
-        extension: null,
-        sipUsername: null,
-        displayName: null,
-        outboundCallerId: null,
-        transport: "wss",
-        passwordConfigured: false,
-        extra: "discarded",
-      }),
-    ).toEqual({
-      enabled: false,
-      extension: null,
-      sipUsername: null,
-      displayName: null,
-      outboundCallerId: null,
-      transport: "wss",
-      passwordConfigured: false,
-    });
-  });
-
   it("reads each live access catalogue shape", () => {
     expect(readRolePage(pageFixture([roleFixture])).items[0]).toEqual(roleFixture);
     expect(readBranchPage(pageFixture([branchFixture])).items[0]).toEqual(
@@ -143,5 +122,38 @@ describe("tenant access response readers", () => {
     ["isTenantOwner", "false"],
   ])("rejects invalid user field %s", (field, value) => {
     expect(() => readTenantUserView(userPayload({ [field]: value }))).toThrow();
+  });
+
+  /**
+   * Per-user WebPhone was removed from Core: the user projection carries no
+   * `webphone` object and the summary carries no `webphoneEnabled` count.
+   * Requiring either made every reader throw on a real response, so a tenant
+   * with even one user answered "The tenant access data could not be loaded."
+   * These pin the readers to exactly what the server sends.
+   */
+  it("reads a user projection that carries no WebPhone object", () => {
+    const source = userPayload();
+    delete (source as Record<string, unknown>)["webphone"];
+
+    const parsed = readTenantUserView(source);
+
+    expect(parsed.id).toBe(USER_ID);
+    expect(parsed).not.toHaveProperty("webphone");
+  });
+
+  it("reads a live user page rather than rejecting it", () => {
+    const source = userPayload();
+    delete (source as Record<string, unknown>)["webphone"];
+
+    expect(readTenantUserPage(pageFixture([source])).items).toHaveLength(1);
+  });
+
+  it("reads a summary that carries no WebPhone count", () => {
+    const source = { ...summaryFixture } as Record<string, unknown>;
+    delete source["webphoneEnabled"];
+
+    expect(readTenantUserSummary({ success: true, data: source })).toEqual(
+      summaryFixture,
+    );
   });
 });

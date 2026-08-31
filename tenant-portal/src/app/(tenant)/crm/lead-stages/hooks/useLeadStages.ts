@@ -3,38 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
-  buildCreateLeadStageRequest,
   parseLeadStageCatalogueResponse,
-  parseLeadStageResponse,
-  type CreateLeadStageFormData,
   type LeadStageItem,
+  type UpdateLeadStageFormData,
 } from "../lead-stage-contract";
+import { useLeadStageMutations } from "./useLeadStageMutations";
 
-export type { CreateLeadStageFormData, LeadStageItem } from "../lead-stage-contract";
+export type { LeadStageItem } from "../lead-stage-contract";
 
 const CATALOGUE_PATH = "/api/tenant/crm/v1/lead-stages";
-const NON_REPLAYABLE_MUTATION = {
-  nonReplayable: true,
-  skipAutoIdempotency: true,
-  cache: "no-store",
-  maxResponseBytes: 256 * 1024,
-} as const;
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
-
-function isAmbiguousMutationError(error: unknown): boolean {
-  return (
-    !(error instanceof TenantApiClientError) || error.response.status >= 500
-  );
-}
 
 async function readCatalogue(signal?: AbortSignal): Promise<LeadStageItem[]> {
   const response = await axiosClient.get<unknown>(CATALOGUE_PATH, {
@@ -45,6 +25,13 @@ async function readCatalogue(signal?: AbortSignal): Promise<LeadStageItem[]> {
   return parseLeadStageCatalogueResponse(response.data);
 }
 
+/**
+ * The lead-stage catalogue: list, filter and dialog state.
+ *
+ * The four mutations live in `useLeadStageMutations` — the split
+ * docs/architecture/file-architecture.md schedules for whichever phase next
+ * edits this file, which task 8.17 is.
+ */
 export function useLeadStages() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
@@ -52,14 +39,15 @@ export function useLeadStages() {
   const [items, setItems] = useState<LeadStageItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // The catalogue fetch's own failure. Handed to DataTable so the error
+  // state replaces the empty state rather than stacking with it.
+  const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState<LeadStageItem | null>(
+    null,
+  );
+  const [selectedForEdit, setSelectedForEdit] = useState<LeadStageItem | null>(
     null,
   );
 
@@ -75,12 +63,13 @@ export function useLeadStages() {
   const fetchStages = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     setError(null);
+    setLoadError(null);
     try {
       setItems(await readCatalogue(signal));
     } catch (caught) {
       if (isAbortError(caught)) return;
       setItems([]);
-      setError(errorMessage(caught, "Unable to load lead stages."));
+      setLoadError(normalizeApiError(caught));
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
@@ -94,6 +83,14 @@ export function useLeadStages() {
     return () => controller.abort();
   }, [fetchStages]);
 
+  const mutations = useLeadStageMutations({
+    canManage,
+    setItems,
+    reconcile: reconcileCatalogue,
+    notify: setError,
+    onCreated: () => setIsCreateOpen(false),
+  });
+
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
     if (!query) return items;
@@ -104,200 +101,72 @@ export function useLeadStages() {
     );
   }, [items, searchQuery]);
 
-  const openCreate = () => {
-    setCreateError(null);
-    setIsCreateOpen(true);
-  };
-
-  const closeCreate = () => {
-    if (isCreating) return;
-    setCreateError(null);
-    setIsCreateOpen(false);
-  };
-
-  const openDelete = (stage: LeadStageItem) => {
-    setDeleteError(null);
-    setSelectedForDelete(stage);
-  };
-
-  const closeDelete = () => {
-    if (isDeleting) return;
-    setDeleteError(null);
-    setSelectedForDelete(null);
-  };
-
-  const handleCreate = async (
-    form: CreateLeadStageFormData,
-  ): Promise<boolean> => {
-    if (isCreating) return false;
-    if (!canManage) {
-      setCreateError("You do not have permission to manage lead stages.");
-      return false;
-    }
-    let payload: ReturnType<typeof buildCreateLeadStageRequest>;
-    try {
-      payload = buildCreateLeadStageRequest(form);
-    } catch (caught) {
-      setCreateError(errorMessage(caught, "Invalid lead-stage details."));
-      return false;
-    }
-    setIsCreating(true);
-    setCreateError(null);
-    try {
-      const response = await axiosClient.post<unknown>(
-        CATALOGUE_PATH,
-        payload,
-        NON_REPLAYABLE_MUTATION,
-      );
-      try {
-        const created = parseLeadStageResponse(response.data);
-        setItems((current) => {
-          const retained = current
-            .filter(({ id }) => id !== created.id)
-            .map((stage) =>
-              created.isDefault ? { ...stage, isDefault: false } : stage,
-            );
-          return [...retained, created].sort(
-            (left, right) => left.sortOrder - right.sortOrder,
-          );
-        });
-      } catch {
-        const reloaded = await reconcileCatalogue();
-        setError(
-          reloaded
-            ? "The stage was created, but its response was invalid. The catalogue was reloaded."
-            : "The stage was created, but its response was invalid and the catalogue could not be reloaded.",
-        );
-      }
-      setIsCreateOpen(false);
-      return true;
-    } catch (caught) {
-      if (isAmbiguousMutationError(caught)) {
-        const reloaded = await reconcileCatalogue();
-        setIsCreateOpen(false);
-        setError(
-          reloaded
-            ? "The creation result is uncertain. The stage catalogue was refreshed; review it before submitting again."
-            : "The creation result is uncertain and the stage catalogue could not be refreshed. Reload before trying again.",
-        );
-      } else {
-        setCreateError(errorMessage(caught, "Unable to create the lead stage."));
-      }
-      return false;
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!selectedForDelete || isDeleting) return;
-    if (!canManage) {
-      setError("You do not have permission to manage lead stages.");
-      setDeleteError(null);
-      setSelectedForDelete(null);
-      return;
-    }
-    const target = selectedForDelete;
-    setIsDeleting(true);
-    setDeleteError(null);
-    try {
-      await axiosClient.delete(
-        `${CATALOGUE_PATH}/${encodeURIComponent(target.id)}`,
-        NON_REPLAYABLE_MUTATION,
-      );
-      setItems((current) =>
-        current
-          .filter(({ id }) => id !== target.id)
-          .map((stage, index) => ({ ...stage, sortOrder: index + 1 })),
-      );
-      setDeleteError(null);
-      setSelectedForDelete(null);
-    } catch (caught) {
-      if (isAmbiguousMutationError(caught)) {
-        const reloaded = await reconcileCatalogue();
-        setSelectedForDelete(null);
-        setError(
-          reloaded
-            ? "The deletion result is uncertain. The stage catalogue was refreshed; review it before trying again."
-            : "The deletion result is uncertain and the stage catalogue could not be refreshed. Reload before trying again.",
-        );
-      } else {
-        setDeleteError(errorMessage(caught, "Unable to delete the lead stage."));
-      }
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleSetDefault = async (stage: LeadStageItem) => {
-    if (
-      !stage.isActive ||
-      stage.isDefault ||
-      stage.flag === "CONVERTED" ||
-      settingDefaultId
-    ) {
-      return;
-    }
-    if (!canManage) {
-      setError("You do not have permission to manage lead stages.");
-      return;
-    }
-    setSettingDefaultId(stage.id);
-    setError(null);
-    try {
-      const response = await axiosClient.post<unknown>(
-        `${CATALOGUE_PATH}/${encodeURIComponent(stage.id)}/default`,
-        undefined,
-        NON_REPLAYABLE_MUTATION,
-      );
-      try {
-        const updated = parseLeadStageResponse(response.data);
-        setItems((current) =>
-          current.map((candidate) =>
-            candidate.id === updated.id
-              ? { ...updated, isDefault: true }
-              : { ...candidate, isDefault: false },
-          ),
-        );
-      } catch {
-        const reloaded = await reconcileCatalogue();
-        setError(
-          reloaded
-            ? "The default changed, but its response was invalid. The catalogue was reloaded."
-            : "The default changed, but its response was invalid and the catalogue could not be reloaded.",
-        );
-      }
-    } catch (caught) {
-      await reconcileCatalogue();
-      setError(errorMessage(caught, "Unable to set the default lead stage."));
-    } finally {
-      setSettingDefaultId(null);
-    }
-  };
-
   return {
     t,
     lang,
     items: filteredItems,
     isLoading,
-    isCreating,
-    isDeleting,
-    settingDefaultId,
     error,
-    createError,
-    deleteError,
+    loadError,
     canManage,
     searchQuery,
     setSearchQuery,
+    isCreating: mutations.isCreating,
+    isDeleting: mutations.isDeleting,
+    isUpdating: mutations.isUpdating,
+    settingDefaultId: mutations.settingDefaultId,
+    createError: mutations.createError,
+    deleteError: mutations.deleteError,
+    editError: mutations.editError,
     isCreateOpen,
-    openCreate,
-    closeCreate,
+    openCreate: () => {
+      mutations.clearCreateError();
+      setIsCreateOpen(true);
+    },
+    closeCreate: () => {
+      if (mutations.isCreating) return;
+      mutations.clearCreateError();
+      setIsCreateOpen(false);
+    },
     selectedForDelete,
-    openDelete,
-    closeDelete,
-    handleCreate,
-    handleDelete,
-    handleSetDefault,
+    openDelete: (stage: LeadStageItem) => {
+      mutations.clearDeleteError();
+      setSelectedForDelete(stage);
+    },
+    closeDelete: () => {
+      if (mutations.isDeleting) return;
+      mutations.clearDeleteError();
+      setSelectedForDelete(null);
+    },
+    selectedForEdit,
+    openEdit: (stage: LeadStageItem) => {
+      if (!canManage) return;
+      mutations.clearEditError();
+      setSelectedForEdit(stage);
+    },
+    closeEdit: () => {
+      if (mutations.isUpdating) return;
+      mutations.clearEditError();
+      setSelectedForEdit(null);
+    },
+    handleCreate: mutations.create,
+    handleUpdate: async (form: UpdateLeadStageFormData): Promise<boolean> => {
+      const target = selectedForEdit;
+      if (!target) return false;
+      const ok = await mutations.update(target, form);
+      if (ok) setSelectedForEdit(null);
+      return ok;
+    },
+    handleDelete: async () => {
+      const target = selectedForDelete;
+      if (!target) return;
+      if (await mutations.remove(target)) setSelectedForDelete(null);
+    },
+    handleSetDefault: mutations.setDefault,
     fetchStages,
   };
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }

@@ -3,9 +3,6 @@ import type { Language } from "@/i18n/I18nContext";
 export const SUBSCRIPTIONS_COPY = {
   en: {
     title: "Subscriptions",
-    subtitle:
-      "Review every tenant subscription, canonical plan item, seat entitlement, billing period, and cancellation schedule.",
-    readOnly: "Global read model",
     total: "Total subscriptions",
     activeOnPage: "Active on page",
     scheduledOnPage: "Cancellation scheduled",
@@ -69,9 +66,6 @@ export const SUBSCRIPTIONS_COPY = {
   },
   ar: {
     title: "الاشتراكات",
-    subtitle:
-      "راجع اشتراكات جميع المستأجرين وبنود الخطة الأساسية ومقاعد الصلاحية وفترات الفوترة وجدول الإلغاء.",
-    readOnly: "نموذج قراءة شامل",
     total: "إجمالي الاشتراكات",
     activeOnPage: "النشطة في الصفحة",
     scheduledOnPage: "إلغاء مجدول",

@@ -1,6 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
+  Button,
+  Card,
+  Field,
+  Input,
+} from "@/design-system";
 import type { useTenantFqdnManagement } from "../hooks/useTenantFqdnManagement";
 import { canPromoteLegacyPrimary } from "../model/readers";
 import type { TenantCorePermissions, TenantView } from "../types";
@@ -26,45 +41,62 @@ export function TenantFqdnPanel({
   const [removeId, setRemoveId] = useState<string | null>(null);
   const busy = fqdn.isPreflighting || fqdn.mutation.name !== null;
   const canMutate = tenant.status === "ACTIVE" && permissions.canManageFqdns;
+  // Every domain mutation in Core requires an ACTIVE tenant, so offering the
+  // form in any other state only produces a 409 the admin cannot act on.
+  const canAttach = tenant.status === "ACTIVE" && permissions.canValidateFqdn;
+  const released = tenant.status === "DELETED";
 
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+    <section aria-labelledby="tenant-domains-title">
+    <Card className="space-y-4 p-4">
+      <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
+        <h2 id="tenant-domains-title" className="text-sm font-semibold text-foreground">
           {text.domains}
         </h2>
-        <span className="text-[10px] font-semibold text-slate-500">
+        <span className="text-xs font-semibold text-muted-foreground">
           {fqdn.fqdns.length}
         </span>
       </div>
 
-      {permissions.canValidateFqdn && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-          <input
-            value={fqdn.candidate}
-            disabled={busy}
-            placeholder={text.domainPlaceholder}
-            aria-label={locale === "ar" ? "النطاق" : "Domain"}
-            onChange={(event) => fqdn.setCandidate(event.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono outline-hidden focus:border-blue-500 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800"
-          />
-          <button
+      {released && (
+        <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
+          {text.domainsReleased}
+        </p>
+      )}
+
+      {canAttach && (
+        <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+          <Field id="tenant-fqdn" label={text.domainFieldLabel} error={fqdn.preflightError?.message}>
+            {(field) => (
+              <Input
+                {...field}
+                name="fqdn"
+                value={fqdn.candidate}
+                disabled={busy}
+                placeholder={text.domainPlaceholder}
+                className="font-mono"
+                onChange={(event) => fqdn.setCandidate(event.target.value)}
+              />
+            )}
+          </Field>
+          <Button
             type="button"
+            variant="outline"
             disabled={busy || !fqdn.candidate.trim()}
             onClick={() => void fqdn.preflight().catch(() => undefined)}
-            className="rounded-xl border border-blue-300 px-3 py-2 text-xs font-bold text-blue-700 disabled:opacity-50 dark:border-blue-800 dark:text-blue-300"
+            loading={fqdn.isPreflighting}
           >
-            {fqdn.isPreflighting ? "…" : text.validate}
-          </button>
+            {text.validate}
+          </Button>
           {permissions.canManageFqdns && (
-            <button
+            <Button
               type="button"
+              variant="primary"
               disabled={busy || !fqdn.canAdd}
               onClick={() => void fqdn.add().catch(() => undefined)}
-              className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
             >
               {text.addDomain}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -72,10 +104,10 @@ export function TenantFqdnPanel({
       {fqdn.evidence && (
         <div
           role="status"
-          className={`rounded-xl border p-3 text-xs ${
+          className={`rounded-lg border p-3 text-xs ${
             fqdn.evidence.available
-              ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
-              : "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200"
+              ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+              : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
           }`}
         >
           <p className="font-semibold">{fqdn.evidence.message}</p>
@@ -87,115 +119,105 @@ export function TenantFqdnPanel({
 
       <InlineError
         locale={locale}
-        error={fqdn.listError ?? fqdn.preflightError ?? fqdn.mutation.error}
+        error={fqdn.listError ?? fqdn.mutation.error}
       />
 
       {fqdn.listError ? (
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => void fqdn.reloadFqdns()}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold dark:border-slate-700"
         >
-          {locale === "ar" ? "إعادة تحميل النطاقات" : "Reload domains"}
-        </button>
+          {text.reloadDomains}
+        </Button>
       ) : null}
 
       <div className="space-y-2">
         {fqdn.isLoadingFqdns ? (
           <p
             role="status"
-            className="rounded-xl bg-slate-50 p-4 text-center text-xs text-slate-500 dark:bg-slate-800/50"
+            className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground"
           >
-            {locale === "ar" ? "جارٍ تحميل النطاقات…" : "Loading domains…"}
+            {text.loadingDomains}
           </p>
         ) : fqdn.fqdns.length === 0 && !fqdn.listError ? (
-          <p className="rounded-xl bg-slate-50 p-4 text-center text-xs text-slate-500 dark:bg-slate-800/50">
+          <p className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground">
             {text.noDomains}
           </p>
         ) : null}
         {fqdn.fqdns.map((row) => (
           <div
             key={row.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
           >
             <div className="min-w-0">
-              <p className="truncate font-mono text-xs font-bold text-slate-900 dark:text-slate-100">
+              <p className="truncate font-mono text-xs font-semibold text-foreground">
                 {row.fqdn}
               </p>
-              <div className="mt-1 flex flex-wrap gap-1.5 text-[10px]">
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">
+              <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
+                <Badge tone={row.isPrimary ? "info" : "neutral"} className="normal-case tracking-normal">
                   {row.isPrimary ? text.primary : text.secondary}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono dark:bg-slate-800">
+                </Badge>
+                <Badge tone={fqdnValidationTone(row.validationStatus)} className="font-mono">
                   {row.validationStatus}
-                </span>
+                </Badge>
               </div>
             </div>
             {canMutate && !row.isPrimary && (
               <div className="flex gap-2">
                 {canPromoteLegacyPrimary(tenant, row) && (
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     disabled={busy}
                     onClick={() =>
                       void fqdn.promote(row.id).catch(() => undefined)
                     }
-                    className="rounded-lg bg-emerald-100 px-2.5 py-1.5 text-[10px] font-bold text-emerald-800 disabled:opacity-50 dark:bg-emerald-950 dark:text-emerald-200"
                   >
                     {text.promote}
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   type="button"
+                  variant="destructive"
+                  size="sm"
                   disabled={busy}
                   onClick={() => setRemoveId(row.id)}
-                  className="rounded-lg bg-rose-100 px-2.5 py-1.5 text-[10px] font-bold text-rose-800 disabled:opacity-50 dark:bg-rose-950 dark:text-rose-200"
                 >
                   {text.remove}
-                </button>
+                </Button>
               </div>
             )}
           </div>
         ))}
       </div>
 
-      {removeId && (
-        <div
-          role="alertdialog"
-          aria-label={text.remove}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs dark:border-rose-900 dark:bg-rose-950/30"
-        >
-          <span>
-            {locale === "ar"
-              ? "تأكيد إزالة هذا النطاق؟"
-              : "Confirm removal of this domain?"}
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                const id = removeId;
-                void fqdn
-                  .remove(id)
-                  .then(() => setRemoveId(null))
-                  .catch(() => undefined);
-              }}
-              className="rounded-lg bg-rose-700 px-3 py-1.5 font-bold text-white disabled:opacity-50"
-            >
-              {text.confirm}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setRemoveId(null)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 dark:border-slate-700"
-            >
-              {text.cancel}
-            </button>
-          </div>
-        </div>
-      )}
+      <AlertDialog open={removeId !== null} onOpenChange={(open) => !open && setRemoveId(null)}>
+        {removeId ? (
+          <AlertDialogContent dir={locale === "ar" ? "rtl" : "ltr"}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{text.remove}</AlertDialogTitle>
+              <AlertDialogDescription>{text.confirmRemoveDomain}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={busy}>{text.cancel}</AlertDialogCancel>
+              <AlertDialogAction
+                destructive
+                disabled={busy}
+                onClick={(event) => {
+                  event.preventDefault();
+                  const id = removeId;
+                  void fqdn.remove(id).then(() => setRemoveId(null)).catch(() => undefined);
+                }}
+              >
+                {text.confirm}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        ) : null}
+      </AlertDialog>
+    </Card>
     </section>
   );
 }
@@ -207,19 +229,32 @@ function InlineError({
   locale: TenantWorkspaceLocale;
   error: { message: string; correlationId?: string } | null;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) ref.current?.focus();
+  }, [error]);
   if (!error) return null;
   const text = tenantWorkspaceCopy(locale);
   return (
     <div
+      ref={ref}
       role="alert"
-      className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200"
+      tabIndex={-1}
+      className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <p>{error.message}</p>
       {error.correlationId && (
-        <p className="mt-1 font-mono text-[10px]">
+        <p className="mt-1 font-mono text-xs">
           {text.correlation}: {error.correlationId}
         </p>
       )}
     </div>
   );
+}
+
+function fqdnValidationTone(status: string): "success" | "danger" | "warn" | "neutral" {
+  if (status === "VERIFIED") return "success";
+  if (status === "FAILED" || status === "REJECTED") return "danger";
+  if (status === "PENDING") return "warn";
+  return "neutral";
 }

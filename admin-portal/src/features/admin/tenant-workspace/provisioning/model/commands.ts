@@ -149,7 +149,7 @@ export function canonicalProvisioningIntent(value: unknown): string {
   return JSON.stringify(canonicalize(value));
 }
 
-export function assertReasonCode(value: string): void {
+function assertReasonCode(value: string): void {
   if (!SAFE_CODE_PATTERN.test(value)) {
     throw new Error("INVALID_PROVISIONING_REASON_CODE");
   }

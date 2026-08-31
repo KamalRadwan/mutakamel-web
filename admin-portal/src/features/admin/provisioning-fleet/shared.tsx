@@ -9,16 +9,16 @@ import {
   Loader2,
   RefreshCw,
   ShieldAlert,
-  X,
 } from "lucide-react";
-import {
-  useEffect,
-  useId,
-  useRef,
-  type ReactNode,
-} from "react";
-import { Navbar } from "@/components/layout/Navbar";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import {
+  Badge,
+  Button,
+  Card,
+  CodeRef,
+  PageHeader,
+} from "@/design-system";
 import type { ProvisioningFleetCopy } from "./copy";
 import type {
   FleetCommandView,
@@ -34,14 +34,8 @@ export function FleetPageFrame({
   children: ReactNode;
 }) {
   return (
-    <div
-      dir={dir}
-      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"
-    >
-      <Navbar />
-      <main className="mx-auto w-full max-w-[1500px] space-y-5 px-4 py-5 sm:px-6">
-        {children}
-      </main>
+    <div dir={dir} className="mx-auto w-full max-w-[1500px] space-y-5">
+      {children}
     </div>
   );
 }
@@ -53,19 +47,7 @@ export function FleetHero({
   copy: ProvisioningFleetCopy;
   action?: ReactNode;
 }) {
-  return (
-    <header className="relative overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 p-5 text-white shadow-lg">
-      <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">{copy.title}</h1>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-cyan-50/80">
-            {copy.subtitle}
-          </p>
-        </div>
-        {action}
-      </div>
-    </header>
-  );
+  return <PageHeader title={copy.title} description={copy.subtitle} action={action} />;
 }
 
 export function FleetBackLink({
@@ -78,17 +60,16 @@ export function FleetBackLink({
   dir: "ltr" | "rtl";
 }) {
   return (
-    <Link
-      href={href}
-      className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-slate-600 hover:text-cyan-700 dark:text-slate-300"
-    >
-      {dir === "rtl" ? (
-        <ArrowRight className="size-4" aria-hidden="true" />
-      ) : (
-        <ArrowLeft className="size-4" aria-hidden="true" />
-      )}
-      {label}
-    </Link>
+    <Button asChild variant="ghost">
+      <Link href={href}>
+        {dir === "rtl" ? (
+          <ArrowRight className="size-4" aria-hidden="true" />
+        ) : (
+          <ArrowLeft className="size-4" aria-hidden="true" />
+        )}
+        {label}
+      </Link>
+    </Button>
   );
 }
 
@@ -102,18 +83,10 @@ export function RefreshButton({
   pending?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={pending}
-      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-black text-white hover:bg-white/20 disabled:opacity-50"
-    >
-      <RefreshCw
-        className={`size-4 ${pending ? "animate-spin" : ""}`}
-        aria-hidden="true"
-      />
+    <Button type="button" variant="outline" onClick={onClick} loading={pending}>
+      <RefreshCw className="size-4" aria-hidden="true" />
       {copy.refresh}
-    </button>
+    </Button>
   );
 }
 
@@ -140,55 +113,47 @@ export function FleetStatePanel({
       ? (forbidden ?? copy.forbiddenRollouts)
       : state === "NOT_FOUND"
         ? copy.notFound
-      : state === "INVALID"
+        : state === "INVALID"
           ? (invalid ?? copy.contractError)
           : state === "UNAVAILABLE"
             ? copy.unavailable
             : copy.genericError;
   return (
-    <section
-      role={loading ? "status" : "alert"}
-      aria-busy={loading}
-      className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900"
-    >
-      {loading ? (
-        <Loader2 className="mx-auto size-7 animate-spin text-cyan-600" aria-hidden="true" />
-      ) : (
-        <AlertTriangle className="mx-auto size-7 text-amber-600" aria-hidden="true" />
-      )}
-      <p className="mt-3 text-sm font-bold">{label}</p>
-      {error ? <FleetProblem error={error} copy={copy} /> : null}
-      {!loading && onRetry ? (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-4 min-h-10 rounded-xl bg-cyan-700 px-4 text-sm font-black text-white"
-        >
-          {copy.retry}
-        </button>
-      ) : null}
-    </section>
+    <Card>
+      <section
+        role={loading ? "status" : "alert"}
+        aria-busy={loading}
+        className="p-6 text-center"
+      >
+        {loading ? (
+          <Loader2 className="mx-auto size-7 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden="true" />
+        ) : (
+          <AlertTriangle className="mx-auto size-7 text-warning-subtle-foreground" aria-hidden="true" />
+        )}
+        <p className="mt-3 text-sm font-semibold text-foreground">{label}</p>
+        {error ? <FleetProblem error={error} /> : null}
+        {!loading && onRetry ? (
+          <Button type="button" variant="outline" onClick={onRetry} className="mt-4">
+            {copy.retry}
+          </Button>
+        ) : null}
+      </section>
+    </Card>
   );
 }
 
-export function FleetProblem({
+function FleetProblem({
   error,
-  copy,
 }: {
   error: NormalizedApiError;
-  copy: ProvisioningFleetCopy;
 }) {
   return (
-    <div className="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+    <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
       <p>{error.message}</p>
-      <p dir="ltr" className="break-all font-mono">
-        {copy.errorCode}: {error.errorCode}
-      </p>
-      {error.correlationId ? (
-        <p dir="ltr" className="break-all font-mono">
-          {copy.correlation}: {error.correlationId}
-        </p>
-      ) : null}
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        {error.errorCode && <CodeRef value={error.errorCode} />}
+        {error.correlationId && <CodeRef value={error.correlationId} />}
+      </div>
     </div>
   );
 }
@@ -208,6 +173,12 @@ export function FleetCommandNotice<T>({
   onClear: () => void;
   successAction?: ReactNode;
 }) {
+  const noticeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (view.state !== "IDLE" && view.state !== "PENDING" && view.state !== "SUCCESS") {
+      noticeRef.current?.focus();
+    }
+  }, [view.state]);
   if (view.state === "IDLE" || view.state === "PENDING") return null;
   const success = view.state === "SUCCESS";
   const text = success
@@ -226,12 +197,14 @@ export function FleetCommandNotice<T>({
   const correlation = readResultMeta(view.result)?.correlationId;
   return (
     <div
+      ref={noticeRef}
       role={success ? "status" : "alert"}
-      className={`rounded-xl border p-4 text-sm ${
+      tabIndex={success ? undefined : -1}
+      className={`rounded-lg border p-4 text-sm ${
         success
-          ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
-          : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
-      }`}
+          ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+          : "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
+      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
     >
       <div className="flex items-start gap-2">
         {success ? (
@@ -240,38 +213,30 @@ export function FleetCommandNotice<T>({
           <ShieldAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
         )}
         <div className="min-w-0 flex-1">
-          <p className="font-bold">{text}</p>
+          <p className="font-semibold">{text}</p>
           {view.error && view.error.errorCode !== "ADMIN_PERMISSION_REQUIRED" ? (
-            <FleetProblem error={view.error} copy={copy} />
+            <FleetProblem error={view.error} />
           ) : null}
           {view.idempotencyKey ? (
-            <p dir="ltr" className="mt-2 break-all font-mono text-xs">
-              {copy.idempotencyKey}: {view.idempotencyKey}
-            </p>
+            <div className="mt-2">
+              <CodeRef value={view.idempotencyKey} />
+            </div>
           ) : null}
           {correlation ? (
-            <p dir="ltr" className="mt-1 break-all font-mono text-xs">
-              {copy.correlation}: {correlation}
-            </p>
+            <div className="mt-1">
+              <CodeRef value={correlation} />
+            </div>
           ) : null}
           {successAction}
           <div className="mt-3 flex flex-wrap gap-2">
             {view.exactRetryAvailable ? (
-              <button
-                type="button"
-                onClick={onRetryExact}
-                className="min-h-10 rounded-xl bg-amber-800 px-4 text-xs font-black text-white"
-              >
+              <Button type="button" variant="outline" size="sm" onClick={onRetryExact}>
                 {copy.retryExact}
-              </button>
+              </Button>
             ) : null}
-            <button
-              type="button"
-              onClick={onClear}
-              className="min-h-10 rounded-xl border border-current/20 px-4 text-xs font-black"
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={onClear}>
               {copy.clearSuccess}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -282,17 +247,19 @@ export function FleetCommandNotice<T>({
 export function FleetMeta({
   result,
   copy,
+  lang,
 }: {
   result: Pick<FleetResult<unknown>, "correlationId" | "timestamp">;
   copy: ProvisioningFleetCopy;
+  lang: "ar" | "en";
 }) {
   return (
-    <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-200 pt-3 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
-      <span dir="ltr" className="break-all font-mono">
-        {copy.correlation}: {result.correlationId}
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5">
+        {copy.correlation}: <CodeRef value={result.correlationId} />
       </span>
       <span>
-        {copy.responseAt}: {formatInstant(result.timestamp)}
+        {copy.responseAt}: {formatInstant(result.timestamp, lang)}
       </span>
     </div>
   );
@@ -310,163 +277,9 @@ export function FleetFieldError({
   if (!code) return null;
   const message = copy.validation[code as keyof typeof copy.validation] ?? copy.validationFailed;
   return (
-    <span id={id} role="alert" className="text-xs font-bold text-rose-700 dark:text-rose-300">
+    <span id={id} role="alert" className="text-xs font-semibold text-destructive-subtle-foreground">
       {message}
     </span>
-  );
-}
-
-export function FleetPagination({
-  page,
-  totalPages,
-  hasPrev,
-  hasNext,
-  onPage,
-  copy,
-}: {
-  page: number;
-  totalPages: number;
-  hasPrev: boolean;
-  hasNext: boolean;
-  onPage: (page: number) => void;
-  copy: ProvisioningFleetCopy;
-}) {
-  return (
-    <nav aria-label={copy.page} className="flex items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-      <button
-        type="button"
-        disabled={!hasPrev}
-        onClick={() => onPage(page - 1)}
-        className="min-h-10 rounded-xl border border-slate-300 px-4 text-sm font-bold disabled:opacity-40 dark:border-slate-700"
-      >
-        {copy.previous}
-      </button>
-      <span className="text-sm font-bold">
-        {copy.page} {page} {copy.of} {Math.max(1, totalPages)}
-      </span>
-      <button
-        type="button"
-        disabled={!hasNext}
-        onClick={() => onPage(page + 1)}
-        className="min-h-10 rounded-xl border border-slate-300 px-4 text-sm font-bold disabled:opacity-40 dark:border-slate-700"
-      >
-        {copy.next}
-      </button>
-    </nav>
-  );
-}
-
-export function FleetConfirmDialog({
-  open,
-  title,
-  body,
-  target,
-  copy,
-  pending,
-  onClose,
-  onConfirm,
-}: {
-  open: boolean;
-  title: string;
-  body: string;
-  target: string;
-  copy: ProvisioningFleetCopy;
-  pending: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const titleId = useId();
-  const bodyId = useId();
-  useEffect(() => {
-    if (!open) return;
-    const prior = document.activeElement as HTMLElement | null;
-    const frame = window.requestAnimationFrame(() =>
-      dialogRef.current?.querySelector<HTMLButtonElement>("[data-cancel]")?.focus(),
-    );
-    return () => {
-      window.cancelAnimationFrame(frame);
-      prior?.focus();
-    };
-  }, [open]);
-  if (!open) return null;
-  return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !pending) onClose();
-      }}
-    >
-      <div
-        ref={dialogRef}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={bodyId}
-        aria-busy={pending}
-        onKeyDown={(event) => {
-          if (event.key === "Escape" && !pending) {
-            event.preventDefault();
-            onClose();
-            return;
-          }
-          if (event.key !== "Tab" || !dialogRef.current) return;
-          const focusable = Array.from(
-            dialogRef.current.querySelectorAll<HTMLElement>(
-              "button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex='-1'])",
-            ),
-          );
-          if (!focusable.length) return;
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        }}
-        className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 id={titleId} className="text-lg font-black">{title}</h2>
-            <p id={bodyId} className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{body}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={pending}
-            aria-label={copy.close}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </button>
-        </div>
-        <code dir="ltr" className="mt-4 block max-h-40 overflow-auto break-all rounded-xl bg-slate-100 p-3 text-start text-xs dark:bg-slate-950">{target}</code>
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            data-cancel
-            type="button"
-            onClick={onClose}
-            disabled={pending}
-            className="min-h-11 rounded-xl border border-slate-300 px-4 text-sm font-black dark:border-slate-700"
-          >
-            {copy.close}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={pending}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-black text-white disabled:opacity-50"
-          >
-            {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
-            {copy.confirm}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -480,23 +293,43 @@ export function FleetDatum({
   mono?: boolean;
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/50">
-      <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</dt>
+    <Card className="min-w-0 p-3">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</dt>
       <dd
         dir={mono ? "ltr" : undefined}
-        className={`mt-1 break-all text-sm font-bold ${mono ? "text-start font-mono text-xs" : ""}`}
+        className={`mt-1 break-all text-sm font-semibold text-foreground ${mono ? "text-start font-mono text-xs" : ""}`}
       >
         {value}
       </dd>
-    </div>
+    </Card>
   );
 }
 
-export function formatInstant(value: string | null): string {
+export function FleetStatusBadge({
+  status,
+  label,
+}: {
+  status: string;
+  label: string;
+}) {
+  const tone = status === "SUCCEEDED" || status === "ACTIVE" || status === "READY" || status === "ATTESTED" || status === "ELIGIBLE"
+    ? "success"
+    : status === "FAILED" || status === "INELIGIBLE" || status === "INCOMPATIBLE"
+      ? "danger"
+      : status === "RUNNING" || status === "DISPATCHED"
+        ? "info"
+        : status === "PAUSED" || status === "CANCEL_REQUESTED" || status === "PENDING" || status === "READY_FOR_ATTESTATION"
+          ? "warn"
+          : "neutral";
+  return <Badge tone={tone}>{label}</Badge>;
+}
+
+export function formatInstant(value: string | null, lang: "ar" | "en"): string {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", {
     dateStyle: "medium",
     timeStyle: "medium",
+    timeZone: "UTC",
   }).format(new Date(value));
 }
 

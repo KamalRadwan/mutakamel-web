@@ -5,8 +5,6 @@ import Link from "next/link";
 import {
   BarChart3,
   Building2,
-  ChevronLeft,
-  ChevronRight,
   Filter,
   Loader2,
   ReceiptText,
@@ -18,31 +16,53 @@ import {
   Users,
   Workflow,
 } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import { useI18n } from "@/i18n/I18nContext";
+import {
+  PageHeader,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  StatGrid,
+  StatCard,
+  StatusBadge,
+  DataTable,
+  Card,
+  CardContent,
+  Field,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  Button,
+  type ColumnDef,
+} from "@/design-system";
 import { formatDecimalString } from "../lib/report-filters";
 import { useReports } from "../hooks/use-reports";
 import {
   REPORT_KINDS,
   TENANT_REPORT_STATUSES,
   type BillingReport,
+  type BillingReportBucket,
   type OverviewReport,
   type ProvisioningReport,
+  type ProvisioningReportRow,
   type ReportData,
   type ReportFilterDraft,
   type ReportFilterErrors,
   type ReportKind,
   type ReportValidationCode,
+  type ServerReportRow,
   type ServersReport,
   type TenantReportPage,
+  type TenantReportRow,
 } from "../types/reports";
 
 const COPY = {
   en: {
     title: "Administrative reports",
-    subtitle:
-      "Read-only control-plane evidence for tenant, capacity, billing, and provisioning decisions.",
-    readOnly: "Read-only analytics",
     overview: "Overview",
     tenants: "Tenants",
     servers: "Server capacity",
@@ -90,10 +110,6 @@ const COPY = {
     count: "Count",
     total: "Total",
     stuck: "Stuck tenants",
-    previous: "Previous page",
-    next: "Next page",
-    page: "Page",
-    of: "of",
     unknown: "Not recorded",
     allZero: "No tenant status rows were returned.",
     refreshing: "Refreshing report",
@@ -106,9 +122,6 @@ const COPY = {
   },
   ar: {
     title: "التقارير الإدارية",
-    subtitle:
-      "أدلة للقراءة فقط من منصة التحكم لدعم قرارات المستأجرين والسعة والفوترة والتجهيز.",
-    readOnly: "تحليلات للقراءة فقط",
     overview: "نظرة عامة",
     tenants: "المستأجرون",
     servers: "سعة الخوادم",
@@ -156,10 +169,6 @@ const COPY = {
     count: "العدد",
     total: "الإجمالي",
     stuck: "المستأجرون العالقون",
-    previous: "الصفحة السابقة",
-    next: "الصفحة التالية",
-    page: "صفحة",
-    of: "من",
     unknown: "غير مسجل",
     allZero: "لم يُرجع الخادم صفوفًا لحالات المستأجرين.",
     refreshing: "جارٍ تحديث التقرير",
@@ -186,157 +195,118 @@ export function ReportsScreen() {
   const report = useReports();
 
   return (
-    <div
-      dir={lang === "ar" ? "rtl" : "ltr"}
-      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"
-    >
-      <Navbar />
-      <main className="mx-auto w-full max-w-[1440px] space-y-4 px-4 py-5 sm:px-6">
-        <header className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 px-5 py-4 text-white shadow-md">
-          <div className="absolute end-0 top-0 size-48 -translate-y-1/2 translate-x-1/3 rounded-full bg-cyan-400/15 blur-3xl rtl:-translate-x-1/3" />
-          <div className="relative flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-cyan-300/30 bg-cyan-400/15 text-cyan-200">
-                <BarChart3 className="size-5" aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-black tracking-tight sm:text-2xl">
-                    {copy.title}
-                  </h1>
-                  <span className="rounded-md border border-cyan-300/30 bg-cyan-400/10 px-2 py-1 text-xs font-bold text-cyan-100">
-                    {copy.readOnly}
-                  </span>
-                </div>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-cyan-100/80">
-                  {copy.subtitle}
-                </p>
-              </div>
-            </div>
-          </div>
-        </header>
+    <div className="w-full space-y-4">
+      <PageHeader title={copy.title} />
 
-        {!report.canRead ? (
-          <StatePanel
-            kind={report.requestState === "LOADING" ? "loading" : "forbidden"}
-            title={
-              report.requestState === "LOADING" ? copy.loading : copy.forbidden
-            }
-            detail={
-              report.requestState === "LOADING" ? undefined : copy.permission
-            }
-          />
-        ) : (
-          <>
-            <nav
-              role="tablist"
-              aria-label={copy.title}
-              className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-5 dark:border-slate-800 dark:bg-slate-900"
-            >
-              {REPORT_KINDS.map((kind) => {
-                const Icon = TAB_ICON[kind];
-                const selected = report.activeReport === kind;
-                return (
-                  <button
-                    key={kind}
-                    id={`report-tab-${kind.toLowerCase()}`}
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    aria-controls="report-panel"
-                    onClick={() => report.setActiveReport(kind)}
-                    className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
-                      selected
-                        ? "bg-cyan-700 text-white shadow-sm dark:bg-cyan-600"
-                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    <Icon className="size-4" aria-hidden="true" />
-                    <span>{tabLabel(kind, copy)}</span>
-                  </button>
-                );
-              })}
-            </nav>
-
-            <form
-              aria-label={copy.filters}
-              onSubmit={report.submitFilters}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="inline-flex items-center gap-2 text-base font-black">
-                  <Filter className="size-4 text-cyan-600" aria-hidden="true" />
-                  {copy.filters}
-                </h2>
-                <button
-                  type="button"
-                  onClick={report.refresh}
-                  disabled={report.isRefreshing}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-cyan-300 bg-cyan-50 px-3 text-sm font-bold text-cyan-800 transition-colors hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-wait disabled:opacity-60 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200 dark:hover:bg-cyan-950/70"
+      {!report.canRead ? (
+        <StatePanel
+          kind={report.requestState === "LOADING" ? "loading" : "forbidden"}
+          title={
+            report.requestState === "LOADING" ? copy.loading : copy.forbidden
+          }
+          detail={
+            report.requestState === "LOADING" ? undefined : copy.permission
+          }
+        />
+      ) : (
+        <Tabs
+          value={report.activeReport}
+          onValueChange={(value) => report.setActiveReport(value as ReportKind)}
+        >
+          <TabsList
+            aria-label={copy.title}
+            className="h-auto w-full flex-wrap justify-start gap-1 bg-muted p-1.5"
+          >
+            {REPORT_KINDS.map((kind) => {
+              const Icon = TAB_ICON[kind];
+              return (
+                <TabsTrigger
+                  key={kind}
+                  value={kind}
+                  className="gap-2 px-3"
                 >
-                  <RefreshCw
-                    className={`size-4 ${report.isRefreshing ? "animate-spin" : ""}`}
-                    aria-hidden="true"
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  {tabLabel(kind, copy)}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+
+          <TabsContent value={report.activeReport} className="mt-4 space-y-4">
+            <Card>
+              <CardContent>
+                <form
+                  aria-label={copy.filters}
+                  onSubmit={report.submitFilters}
+                  className="space-y-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
+                      <Filter
+                        className="size-4 text-primary"
+                        aria-hidden="true"
+                      />
+                      {copy.filters}
+                    </h2>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={report.refresh}
+                      disabled={report.isRefreshing}
+                    >
+                      <RefreshCw
+                        className={`size-3.5 ${report.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`}
+                        aria-hidden="true"
+                      />
+                      {copy.refresh}
+                    </Button>
+                  </div>
+
+                  <ReportFilters
+                    kind={report.activeReport}
+                    draft={report.draft}
+                    errors={report.validationErrors}
+                    update={report.updateFilter}
+                    copy={copy}
+                    lang={lang}
                   />
-                  {copy.refresh}
-                </button>
-              </div>
 
-              <ReportFilters
-                kind={report.activeReport}
-                draft={report.draft}
-                errors={report.validationErrors}
-                update={report.updateFilter}
-                copy={copy}
-              />
+                  {report.activeReport !== "SERVERS" ? (
+                    <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={report.clearFilters}
+                      >
+                        <RotateCcw className="size-4" aria-hidden="true" />
+                        {copy.clear}
+                      </Button>
+                      <Button type="submit" variant="primary">
+                        <Filter className="size-4" aria-hidden="true" />
+                        {copy.apply}
+                      </Button>
+                    </div>
+                  ) : null}
+                </form>
+              </CardContent>
+            </Card>
 
-              {report.activeReport !== "SERVERS" ? (
-                <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={report.clearFilters}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    <RotateCcw className="size-4" aria-hidden="true" />
-                    {copy.clear}
-                  </button>
-                  <button
-                    type="submit"
-                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-700 px-4 text-sm font-black text-white hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:bg-cyan-600 dark:hover:bg-cyan-500 dark:focus-visible:ring-offset-slate-900"
-                  >
-                    <Filter className="size-4" aria-hidden="true" />
-                    {copy.apply}
-                  </button>
-                </div>
-              ) : null}
-            </form>
-
-            <section
-              id="report-panel"
-              role="tabpanel"
-              aria-labelledby={`report-tab-${report.activeReport.toLowerCase()}`}
-              aria-busy={
-                report.requestState === "LOADING" || report.isRefreshing
-              }
-              className="relative"
-            >
+            <div className="relative" aria-busy={report.isRefreshing || undefined}>
               {report.isRefreshing ? (
                 <p
                   role="status"
-                  className="absolute end-3 top-3 z-10 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/95 px-3 py-1.5 text-xs font-bold text-cyan-800 shadow-sm dark:border-cyan-900 dark:bg-slate-950/95 dark:text-cyan-200"
+                  className="absolute end-3 top-3 z-10 inline-flex items-center gap-2 rounded-md border border-info/30 bg-info-subtle px-3 py-1.5 text-sm font-semibold text-info-subtle-foreground"
                 >
-                  <Loader2
-                    className="size-3.5 animate-spin"
-                    aria-hidden="true"
-                  />
+                  <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                   {copy.refreshing}
                 </p>
               ) : null}
               <ReportBody report={report} copy={copy} lang={lang} />
-            </section>
-          </>
-        )}
-      </main>
+            </div>
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }
@@ -349,6 +319,7 @@ function ReportFilters({
   errors,
   update,
   copy,
+  lang,
 }: {
   kind: ReportKind;
   draft: ReportFilterDraft;
@@ -358,144 +329,120 @@ function ReportFilters({
     value: ReportFilterDraft[K],
   ) => void;
   copy: Copy;
+  lang: "ar" | "en";
 }) {
   if (kind === "SERVERS") {
     return (
-      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-        {copy.noFilters}
-      </p>
+      <p className="text-sm text-muted-foreground">{copy.noFilters}</p>
     );
   }
 
   return (
-    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       {kind === "OVERVIEW" || kind === "BILLING" || kind === "PROVISIONING" ? (
         <>
-          <ReportInput
-            id={`${kind.toLowerCase()}-from`}
-            type="date"
+          <Field
             label={copy.from}
-            value={draft.from}
             error={validationMessage(errors.from, copy)}
-            onChange={(value) => update("from", value)}
-          />
-          <ReportInput
-            id={`${kind.toLowerCase()}-to`}
-            type="date"
+          >
+            {(fp) => (
+              <Input
+                {...fp}
+                type="date"
+                value={draft.from}
+                invalid={Boolean(validationMessage(errors.from, copy))}
+                onChange={(event) => update("from", event.target.value)}
+              />
+            )}
+          </Field>
+          <Field
             label={copy.to}
-            value={draft.to}
             error={validationMessage(errors.to ?? errors.dateRange, copy)}
-            onChange={(value) => update("to", value)}
-          />
+          >
+            {(fp) => (
+              <Input
+                {...fp}
+                type="date"
+                value={draft.to}
+                invalid={Boolean(
+                  validationMessage(errors.to ?? errors.dateRange, copy),
+                )}
+                onChange={(event) => update("to", event.target.value)}
+              />
+            )}
+          </Field>
         </>
       ) : null}
 
       {kind === "TENANTS" ? (
         <>
-          <label className="grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
-            <span>{copy.tenantStatus}</span>
-            <select
-              value={draft.status}
-              onChange={(event) =>
-                update(
-                  "status",
-                  event.target.value as ReportFilterDraft["status"],
-                )
-              }
-              className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-            >
-              <option value="">{copy.anyStatus}</option>
-              {TENANT_REPORT_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status.replaceAll("_", " ")}
-                </option>
-              ))}
-            </select>
-          </label>
-          <ReportInput
-            id="tenant-server-id"
+          <Field label={copy.tenantStatus}>
+            {(fp) => (
+              <Select
+                value={draft.status || "ANY"}
+                onValueChange={(value) =>
+                  update(
+                    "status",
+                    (value === "ANY" ? "" : value) as ReportFilterDraft["status"],
+                  )
+                }
+              >
+                <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ANY">{copy.anyStatus}</SelectItem>
+                  {TENANT_REPORT_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status.replaceAll("_", " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+          <Field
             label={copy.serverId}
-            value={draft.serverId}
             error={validationMessage(errors.serverId, copy)}
-            onChange={(value) => update("serverId", value.trim())}
-            dir="ltr"
-          />
+          >
+            {(fp) => (
+              <Input
+                {...fp}
+                dir="ltr"
+                value={draft.serverId}
+                invalid={Boolean(validationMessage(errors.serverId, copy))}
+                onChange={(event) => update("serverId", event.target.value.trim())}
+              />
+            )}
+          </Field>
         </>
       ) : null}
 
       {kind === "TENANTS" || kind === "PROVISIONING" ? (
-        <label className="grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
-          <span>{copy.limit}</span>
-          <select
-            value={draft.limit}
-            aria-invalid={Boolean(errors.limit)}
-            onChange={(event) => update("limit", event.target.value)}
-            className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-          >
-            {[10, 20, 25, 50, 100].map((limit) => (
-              <option key={limit} value={limit}>
-                {limit}
-              </option>
-            ))}
-          </select>
-          {errors.limit ? (
-            <span
-              role="alert"
-              className="text-xs font-medium text-rose-600 dark:text-rose-300"
+        <Field
+          label={copy.limit}
+          error={validationMessage(errors.limit, copy)}
+        >
+          {(fp) => (
+            <Select
+              value={draft.limit}
+              onValueChange={(value) => update("limit", value)}
             >
-              {validationMessage(errors.limit, copy)}
-            </span>
-          ) : null}
-        </label>
+              <SelectTrigger {...fp}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[10, 20, 25, 50, 100].map((limit) => (
+                  <SelectItem key={limit} value={String(limit)}>
+                    {formatInteger(limit, lang)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
       ) : null}
     </div>
-  );
-}
-
-function ReportInput({
-  id,
-  label,
-  value,
-  onChange,
-  type = "text",
-  error,
-  dir,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: "text" | "date";
-  error?: string;
-  dir?: "ltr";
-}) {
-  const errorId = `${id}-error`;
-  return (
-    <label
-      htmlFor={id}
-      className="grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300"
-    >
-      <span>{label}</span>
-      <input
-        id={id}
-        type={type}
-        dir={dir}
-        value={value}
-        aria-invalid={Boolean(error)}
-        aria-describedby={error ? errorId : undefined}
-        onChange={(event) => onChange(event.target.value)}
-        className={`min-h-10 min-w-0 rounded-xl border bg-white px-3 text-sm font-normal text-slate-950 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 dark:bg-slate-950 dark:text-slate-100 ${error ? "border-rose-500" : "border-slate-300 dark:border-slate-700"}`}
-      />
-      {error ? (
-        <span
-          id={errorId}
-          role="alert"
-          className="text-xs font-medium text-rose-600 dark:text-rose-300"
-        >
-          {error}
-        </span>
-      ) : null}
-    </label>
   );
 }
 
@@ -528,7 +475,12 @@ function ReportBody({
         detail={safeErrorDetail(report.error, copy)}
         correlationId={report.error?.correlationId}
         correlationLabel={copy.correlation}
-        action={<RetryButton onClick={report.refresh} label={copy.retry} />}
+        action={
+          <Button type="button" variant="outline" onClick={report.refresh}>
+            <RefreshCw className="size-4" aria-hidden="true" />
+            {copy.retry}
+          </Button>
+        }
       />
     );
   }
@@ -540,7 +492,12 @@ function ReportBody({
         detail={safeErrorDetail(report.error, copy)}
         correlationId={report.error?.correlationId}
         correlationLabel={copy.correlation}
-        action={<RetryButton onClick={report.refresh} label={copy.retry} />}
+        action={
+          <Button type="button" variant="outline" onClick={report.refresh}>
+            <RefreshCw className="size-4" aria-hidden="true" />
+            {copy.retry}
+          </Button>
+        }
       />
     );
   }
@@ -569,6 +526,7 @@ function ReportBody({
         data={report.data}
         copy={copy}
         lang={lang}
+        isRefreshing={report.isRefreshing}
         previousTenantPage={report.previousTenantPage}
         nextTenantPage={report.nextTenantPage}
       />
@@ -581,12 +539,14 @@ function ReportView({
   data,
   copy,
   lang,
+  isRefreshing,
   previousTenantPage,
   nextTenantPage,
 }: {
   data: ReportData;
   copy: Copy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
   previousTenantPage: () => void;
   nextTenantPage: () => void;
 }) {
@@ -599,17 +559,18 @@ function ReportView({
           data={data.snapshot.data}
           copy={copy}
           lang={lang}
+          isRefreshing={isRefreshing}
           previous={previousTenantPage}
           next={nextTenantPage}
         />
       );
     case "SERVERS":
-      return <ServersView data={data.snapshot.data} copy={copy} lang={lang} />;
+      return <ServersView data={data.snapshot.data} copy={copy} lang={lang} isRefreshing={isRefreshing} />;
     case "BILLING":
-      return <BillingView data={data.snapshot.data} copy={copy} lang={lang} />;
+      return <BillingView data={data.snapshot.data} copy={copy} lang={lang} isRefreshing={isRefreshing} />;
     case "PROVISIONING":
       return (
-        <ProvisioningView data={data.snapshot.data} copy={copy} lang={lang} />
+        <ProvisioningView data={data.snapshot.data} copy={copy} lang={lang} isRefreshing={isRefreshing} />
       );
   }
 }
@@ -633,7 +594,7 @@ function OverviewView({
         icon={<Users className="size-4" />}
       >
         {statuses.length ? (
-          <dl className="divide-y divide-slate-200 dark:divide-slate-800">
+          <dl className="divide-y divide-border">
             {statuses.map(([status, count]) => (
               <div
                 key={status}
@@ -642,14 +603,14 @@ function OverviewView({
                 <dt>
                   <StatusBadge status={status} />
                 </dt>
-                <dd className="font-mono text-lg font-black">
+                <dd className="font-mono text-lg font-semibold">
                   {formatInteger(count, lang)}
                 </dd>
               </div>
             ))}
           </dl>
         ) : (
-          <p className="text-sm text-slate-500">{copy.allZero}</p>
+          <p className="text-sm text-muted-foreground">{copy.allZero}</p>
         )}
       </ReportCard>
       <ReportCard
@@ -687,96 +648,89 @@ function TenantView({
   data,
   copy,
   lang,
+  isRefreshing,
   previous,
   next,
 }: {
   data: TenantReportPage;
   copy: Copy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
   previous: () => void;
   next: () => void;
 }) {
+  const columns: ColumnDef<TenantReportRow>[] = [
+    {
+      key: "tenant",
+      headerEn: copy.tenant,
+      headerAr: copy.tenant,
+      cell: (row) => (
+        <Link
+          href={`/tenants/${encodeURIComponent(row.id)}`}
+          className="font-semibold text-action hover:underline"
+        >
+          {row.name}
+        </Link>
+      ),
+    },
+    {
+      key: "status",
+      headerEn: copy.status,
+      headerAr: copy.status,
+      cell: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: "subscriptionStatus",
+      headerEn: copy.subscriptionStatus,
+      headerAr: copy.subscriptionStatus,
+      cell: (row) =>
+        row.subscriptionStatus ? (
+          <StatusBadge status={row.subscriptionStatus} />
+        ) : (
+          copy.unknown
+        ),
+    },
+    {
+      key: "allowedUsers",
+      headerEn: copy.allowedUsers,
+      headerAr: copy.allowedUsers,
+      cell: (row) => (
+        <span className="font-mono">
+          {row.allowedUsers === null
+            ? copy.unknown
+            : formatInteger(row.allowedUsers, lang)}
+        </span>
+      ),
+    },
+    {
+      key: "createdAt",
+      headerEn: copy.createdAt,
+      headerAr: copy.createdAt,
+      cell: (row) => (
+        <span className="whitespace-nowrap">
+          {formatDateTime(row.createdAt, lang)}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <DataTable
-      caption={copy.tenants}
-      headers={[
-        copy.tenant,
-        copy.status,
-        copy.subscriptionStatus,
-        copy.allowedUsers,
-        copy.createdAt,
-      ]}
-    >
-      {data.items.map((row) => (
-        <tr
-          key={row.id}
-          className="min-h-11 border-t border-slate-200 hover:bg-cyan-50/50 dark:border-slate-800 dark:hover:bg-cyan-950/20"
-        >
-          <td className="px-4 py-3">
-            <Link
-              href={`/tenants/${encodeURIComponent(row.id)}`}
-              className="font-bold text-cyan-700 hover:underline dark:text-cyan-300"
-            >
-              {row.name}
-            </Link>
-          </td>
-          <td className="px-4 py-3">
-            <StatusBadge status={row.status} />
-          </td>
-          <td className="px-4 py-3">
-            {row.subscriptionStatus ? (
-              <StatusBadge status={row.subscriptionStatus} />
-            ) : (
-              copy.unknown
-            )}
-          </td>
-          <td className="px-4 py-3 font-mono font-bold">
-            {row.allowedUsers === null
-              ? copy.unknown
-              : formatInteger(row.allowedUsers, lang)}
-          </td>
-          <td className="px-4 py-3 whitespace-nowrap">
-            {formatDateTime(row.createdAt, lang)}
-          </td>
-        </tr>
-      ))}
-      <tr>
-        <td
-          colSpan={5}
-          className="border-t border-slate-200 px-4 py-3 dark:border-slate-800"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              {copy.page} {formatInteger(data.page, lang)} {copy.of}{" "}
-              {formatInteger(Math.max(data.totalPages, 1), lang)} ·{" "}
-              {formatInteger(data.total, lang)}
-            </span>
-            <div className="flex gap-2">
-              <PageButton
-                label={copy.previous}
-                disabled={!data.hasPrev}
-                onClick={previous}
-                icon={
-                  <ChevronLeft
-                    className={`size-4 ${lang === "ar" ? "rotate-180" : ""}`}
-                  />
-                }
-              />
-              <PageButton
-                label={copy.next}
-                disabled={!data.hasNext}
-                onClick={next}
-                icon={
-                  <ChevronRight
-                    className={`size-4 ${lang === "ar" ? "rotate-180" : ""}`}
-                  />
-                }
-              />
-            </div>
-          </div>
-        </td>
-      </tr>
-    </DataTable>
+      labelEn={COPY.en.tenants}
+      labelAr={COPY.ar.tenants}
+      columns={columns}
+      data={data.items}
+      isRefreshing={isRefreshing}
+      getRowId={(row) => row.id}
+      pagination={{
+        page: data.page,
+        limit: data.limit,
+        totalItems: data.total,
+        totalPages: Math.max(1, data.totalPages),
+        onPageChange: (target) => (target > data.page ? next() : previous()),
+      }}
+      emptyState={{ titleEn: copy.empty, titleAr: copy.empty }}
+    />
   );
 }
 
@@ -784,69 +738,88 @@ function ServersView({
   data,
   copy,
   lang,
+  isRefreshing,
 }: {
   data: ServersReport;
   copy: Copy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
 }) {
+  const columns: ColumnDef<ServerReportRow>[] = [
+    {
+      key: "server",
+      headerEn: copy.server,
+      headerAr: copy.server,
+      cell: (row) => (
+        <Link
+          href={`/database-servers/${encodeURIComponent(row.id)}`}
+          className="font-semibold text-action hover:underline"
+        >
+          {row.name}
+        </Link>
+      ),
+    },
+    {
+      key: "status",
+      headerEn: copy.status,
+      headerAr: copy.status,
+      cell: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: "location",
+      headerEn: copy.location,
+      headerAr: copy.location,
+      cell: (row) => row.countryName ?? row.countryIsoCode ?? row.region ?? copy.unknown,
+    },
+    {
+      key: "engine",
+      headerEn: copy.engine,
+      headerAr: copy.engine,
+      cell: (row) => row.databaseEngine,
+    },
+    {
+      key: "capacity",
+      headerEn: copy.capacity,
+      headerAr: copy.capacity,
+      cell: (row) => (
+        <span className="font-mono">
+          {formatInteger(row.currentTenants, lang)} /{" "}
+          {formatInteger(row.maxTenants, lang)}
+        </span>
+      ),
+    },
+    {
+      key: "utilization",
+      headerEn: copy.utilization,
+      headerAr: copy.utilization,
+      cell: (row) => (
+        <div className="flex min-w-32 items-center gap-3">
+          <CapacityBar value={row.utilization * 100} />
+          <span className="font-mono">
+            {formatPercent(row.utilization, lang)}
+          </span>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <DataTable
-      caption={copy.servers}
-      headers={[
-        copy.server,
-        copy.status,
-        copy.location,
-        copy.engine,
-        copy.capacity,
-        copy.utilization,
-      ]}
-    >
-      {data.items.map((row) => (
-        <tr
-          key={row.id}
-          className="border-t border-slate-200 hover:bg-cyan-50/50 dark:border-slate-800 dark:hover:bg-cyan-950/20"
-        >
-          <td className="px-4 py-3">
-            <Link
-              href={`/database-servers/${encodeURIComponent(row.id)}`}
-              className="font-bold text-cyan-700 hover:underline dark:text-cyan-300"
-            >
-              {row.name}
-            </Link>
-          </td>
-          <td className="px-4 py-3">
-            <StatusBadge status={row.status} />
-          </td>
-          <td className="px-4 py-3">
-            {row.countryName ??
-              row.countryIsoCode ??
-              row.region ??
-              copy.unknown}
-          </td>
-          <td className="px-4 py-3">{row.databaseEngine}</td>
-          <td className="px-4 py-3 font-mono font-bold">
-            {formatInteger(row.currentTenants, lang)} /{" "}
-            {formatInteger(row.maxTenants, lang)}
-          </td>
-          <td className="min-w-44 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <progress
-                className="h-2 w-24 accent-cyan-600"
-                max={Math.max(row.maxTenants, 1)}
-                value={Math.min(
-                  row.currentTenants,
-                  Math.max(row.maxTenants, 1),
-                )}
-                aria-label={`${copy.utilization}: ${formatPercent(row.utilization, lang)}`}
-              />
-              <span className="font-mono font-bold">
-                {formatPercent(row.utilization, lang)}
-              </span>
-            </div>
-          </td>
-        </tr>
-      ))}
-    </DataTable>
+      labelEn={COPY.en.servers}
+      labelAr={COPY.ar.servers}
+      columns={columns}
+      data={data.items}
+      isRefreshing={isRefreshing}
+      getRowId={(row) => row.id}
+      pagination={{
+        page: 1,
+        limit: Math.max(data.items.length, 1),
+        totalItems: data.items.length,
+        totalPages: 1,
+        onPageChange: () => {},
+      }}
+      emptyState={{ titleEn: copy.empty, titleAr: copy.empty }}
+    />
   );
 }
 
@@ -854,36 +827,62 @@ function BillingView({
   data,
   copy,
   lang,
+  isRefreshing,
 }: {
   data: BillingReport;
   copy: Copy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
 }) {
+  const columns: ColumnDef<BillingReportBucket>[] = [
+    {
+      key: "status",
+      headerEn: copy.status,
+      headerAr: copy.status,
+      cell: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: "count",
+      headerEn: copy.count,
+      headerAr: copy.count,
+      cell: (row) => (
+        <span className="font-mono">
+          {formatInteger(row.count, lang)}
+        </span>
+      ),
+    },
+    {
+      key: "total",
+      headerEn: copy.total,
+      headerAr: copy.total,
+      cell: (row) => (
+        <span className="font-mono">
+          {formatDecimalString(row.total)}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="text-base font-black">{copy.invoiceBuckets}</h2>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {data.buckets.map((bucket) => (
-          <article
-            key={bucket.status}
-            className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60"
-          >
-            <StatusBadge status={bucket.status} />
-            <dl className="mt-3 grid grid-cols-2 gap-3">
-              <Metric
-                label={copy.count}
-                value={formatInteger(bucket.count, lang)}
-              />
-              <Metric
-                label={copy.total}
-                value={formatDecimalString(bucket.total)}
-                mono
-              />
-            </dl>
-          </article>
-        ))}
-      </div>
-    </section>
+    <div className="space-y-3">
+      <h2 className="text-sm font-semibold">{copy.invoiceBuckets}</h2>
+      <DataTable
+        labelEn={COPY.en.billing}
+        labelAr={COPY.ar.billing}
+        columns={columns}
+        data={data.buckets}
+        isRefreshing={isRefreshing}
+        getRowId={(row) => row.status}
+        pagination={{
+          page: 1,
+          limit: Math.max(data.buckets.length, 1),
+          totalItems: data.buckets.length,
+          totalPages: 1,
+          onPageChange: () => {},
+        }}
+        emptyState={{ titleEn: copy.empty, titleAr: copy.empty }}
+      />
+    </div>
   );
 }
 
@@ -891,73 +890,71 @@ function ProvisioningView({
   data,
   copy,
   lang,
+  isRefreshing,
 }: {
   data: ProvisioningReport;
   copy: Copy;
   lang: "ar" | "en";
+  isRefreshing: boolean;
 }) {
+  const columns: ColumnDef<ProvisioningReportRow>[] = [
+    {
+      key: "tenant",
+      headerEn: copy.tenant,
+      headerAr: copy.tenant,
+      cell: (row) => (
+        <Link
+          href={`/tenants/${encodeURIComponent(row.id)}`}
+          className="font-semibold text-action hover:underline"
+        >
+          {row.name}
+        </Link>
+      ),
+    },
+    {
+      key: "status",
+      headerEn: copy.status,
+      headerAr: copy.status,
+      cell: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: "createdAt",
+      headerEn: copy.createdAt,
+      headerAr: copy.createdAt,
+      cell: (row) => (
+        <span className="whitespace-nowrap">
+          {formatDateTime(row.createdAt, lang)}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-        <span className="text-sm font-bold">{copy.stuck}</span>
-        <strong className="ms-3 font-mono text-2xl">
-          {formatInteger(data.stuck, lang)}
-        </strong>
-      </div>
+      <StatGrid>
+        <StatCard
+          label={copy.stuck}
+          value={formatInteger(data.stuck, lang)}
+          icon={TriangleAlert}
+          tone={data.stuck > 0 ? "warn" : undefined}
+        />
+      </StatGrid>
       <DataTable
-        caption={copy.provisioning}
-        headers={[copy.tenant, copy.status, copy.createdAt]}
-      >
-        {data.items.map((row) => (
-          <tr
-            key={row.id}
-            className="border-t border-slate-200 hover:bg-amber-50/60 dark:border-slate-800 dark:hover:bg-amber-950/20"
-          >
-            <td className="px-4 py-3">
-              <Link
-                href={`/tenants/${encodeURIComponent(row.id)}`}
-                className="font-bold text-cyan-700 hover:underline dark:text-cyan-300"
-              >
-                {row.name}
-              </Link>
-            </td>
-            <td className="px-4 py-3">
-              <StatusBadge status={row.status} />
-            </td>
-            <td className="px-4 py-3 whitespace-nowrap">
-              {formatDateTime(row.createdAt, lang)}
-            </td>
-          </tr>
-        ))}
-      </DataTable>
-    </div>
-  );
-}
-
-function DataTable({
-  caption,
-  headers,
-  children,
-}: {
-  caption: string;
-  headers: string[];
-  children: ReactNode;
-}) {
-  return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <table className="w-full min-w-[760px] text-start text-sm">
-        <caption className="sr-only">{caption}</caption>
-        <thead className="bg-slate-100 text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          <tr>
-            {headers.map((header) => (
-              <th key={header} scope="col" className="px-4 py-3 text-start">
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
+        labelEn={COPY.en.provisioning}
+        labelAr={COPY.ar.provisioning}
+        columns={columns}
+        data={data.items}
+        isRefreshing={isRefreshing}
+        getRowId={(row) => row.id}
+        pagination={{
+          page: 1,
+          limit: Math.max(data.items.length, 1),
+          totalItems: data.items.length,
+          totalPages: 1,
+          onPageChange: () => {},
+        }}
+        emptyState={{ titleEn: copy.healthyEmpty, titleAr: copy.healthyEmpty }}
+      />
     </div>
   );
 }
@@ -972,13 +969,13 @@ function ReportCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="flex items-center gap-2 text-base font-black text-slate-800 dark:text-slate-100">
-        <span className="text-cyan-600">{icon}</span>
+    <Card className="p-4">
+      <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+        <span className="text-primary">{icon}</span>
         {title}
       </h2>
       <div className="mt-3 space-y-3">{children}</div>
-    </section>
+    </Card>
   );
 }
 
@@ -992,13 +989,13 @@ function Metric({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800/70">
-      <span className="block text-xs font-bold text-slate-500 dark:text-slate-400">
+    <div className="rounded-md bg-muted px-3 py-2">
+      <span className="block text-sm font-semibold text-muted-foreground">
         {label}
       </span>
       <strong
         dir={mono ? "ltr" : undefined}
-        className={`mt-1 block text-lg font-black ${mono ? "font-mono text-start" : ""}`}
+        className={`mt-1 block text-lg font-semibold ${mono ? "font-mono text-start" : ""}`}
       >
         {value}
       </strong>
@@ -1006,26 +1003,18 @@ function Metric({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const tone =
-    status === "ACTIVE" || status === "PAID"
-      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-      : status === "PROVISIONING" ||
-          status === "ISSUED" ||
-          status === "PENDING_ACTIVATION"
-        ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-        : status === "OVERDUE" ||
-            status === "PROVISIONING_FAILED" ||
-            status === "OFFLINE"
-          ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200"
-          : "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200";
+function CapacityBar({ value }: { value: number }) {
+  const boundedValue = Math.max(0, Math.min(100, value));
   return (
-    <span
-      dir="ltr"
-      className={`inline-flex rounded-full px-2.5 py-1 font-mono text-xs font-bold ${tone}`}
+    <div
+      aria-hidden="true"
+      className="h-1.5 w-24 overflow-hidden rounded-full bg-muted"
     >
-      {status}
-    </span>
+      <span
+        className="block h-full rounded-full bg-muted-foreground"
+        style={{ inlineSize: `${boundedValue}%` }}
+      />
+    </div>
   );
 }
 
@@ -1038,28 +1027,23 @@ function SnapshotFooter({
   copy: Copy;
   lang: "ar" | "en";
 }) {
-  const asOf =
-    data.kind === "TENANTS"
-      ? data.snapshot.responseTimestamp
-      : data.snapshot.data.asOf;
+  const asOf = data.kind === "TENANTS" ? null : data.snapshot.data.asOf;
   return (
-    <footer className="grid gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 sm:grid-cols-3 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+    <footer
+      className={`grid gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground ${asOf ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+    >
+      {asOf ? (
+        <p>
+          <strong className="text-foreground">{copy.responseAsOf}:</strong>{" "}
+          {formatDateTime(asOf, lang)}
+        </p>
+      ) : null}
       <p>
-        <strong className="text-slate-700 dark:text-slate-200">
-          {copy.responseAsOf}:
-        </strong>{" "}
-        {formatDateTime(asOf, lang)}
-      </p>
-      <p>
-        <strong className="text-slate-700 dark:text-slate-200">
-          {copy.responseAt}:
-        </strong>{" "}
+        <strong className="text-foreground">{copy.responseAt}:</strong>{" "}
         {formatDateTime(data.snapshot.responseTimestamp, lang)}
       </p>
       <p className="min-w-0">
-        <strong className="text-slate-700 dark:text-slate-200">
-          {copy.correlation}:
-        </strong>{" "}
+        <strong className="text-foreground">{copy.correlation}:</strong>{" "}
         <code dir="ltr" className="ms-1 select-all break-all">
           {data.snapshot.correlationId}
         </code>
@@ -1095,25 +1079,25 @@ function StatePanel({
             : BarChart3;
   const tone =
     kind === "error"
-      ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"
+      ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
       : kind === "forbidden" || kind === "unavailable"
-        ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
-        : "border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200";
+        ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
+        : "border-border bg-card text-muted-foreground";
   return (
     <section
-      role={kind === "error" || kind === "forbidden" ? "alert" : "status"}
-      className={`flex min-h-56 flex-col items-center justify-center rounded-2xl border p-6 text-center shadow-sm ${tone}`}
+      role={kind === "loading" || kind === "empty" ? "status" : "alert"}
+      className={`flex min-h-56 flex-col items-center justify-center rounded-lg border p-6 text-center ${tone}`}
     >
       <Icon
-        className={`mb-3 size-9 opacity-70 ${kind === "loading" ? "animate-spin" : ""}`}
+        className={`mb-3 size-9 opacity-70 ${kind === "loading" ? "animate-spin motion-reduce:animate-none" : ""}`}
         aria-hidden="true"
       />
-      <h2 className="text-base font-black">{title}</h2>
+      <h2 className="text-base font-semibold">{title}</h2>
       {detail ? (
         <p className="mt-2 max-w-2xl text-sm leading-6 opacity-80">{detail}</p>
       ) : null}
       {correlationId ? (
-        <p className="mt-2 max-w-full text-xs">
+        <p className="mt-2 max-w-full text-sm">
           <strong>{correlationLabel}:</strong>{" "}
           <code dir="ltr" className="select-all break-all">
             {correlationId}
@@ -1122,49 +1106,6 @@ function StatePanel({
       ) : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </section>
-  );
-}
-
-function RetryButton({
-  onClick,
-  label,
-}: {
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:bg-white dark:text-slate-950"
-    >
-      <RefreshCw className="size-4" aria-hidden="true" />
-      {label}
-    </button>
-  );
-}
-
-function PageButton({
-  label,
-  disabled,
-  onClick,
-  icon,
-}: {
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
-  icon: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-300 px-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
 

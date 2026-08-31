@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowRight,
+  Ban,
   CheckCircle2,
   Clock3,
   Edit3,
@@ -17,67 +19,110 @@ import {
   ShieldCheck,
   StopCircle,
   Trash2,
-  X,
 } from "lucide-react";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useToast } from "@/components/ui/ToastContext";
 import { useI18n } from "@/i18n/I18nContext";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { useStorageServerDetail } from "../hooks/useStorageServerDetail";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import { isSecureStorageEndpoint, probeFreshnessPercent } from "../lib/storage-server-contract";
+import type {
+  StorageCredentialRotationView,
+  StorageServerView,
+  UpdateStorageServerDto,
+} from "../types";
 import {
-  isSecureStorageEndpoint,
-  probeFreshnessPercent,
-} from "../lib/storage-server-contract";
-import type { StorageServerView, UpdateStorageServerDto } from "../types";
-import { useAccessibleDialog } from "@/shared/hooks/useAccessibleDialog";
+  PageHeader,
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Field,
+  Input,
+  StatusBadge,
+  DegradedBanner,
+  ErrorState as DsErrorState,
+  FormDrawer,
+  CodeRef,
+} from "@/design-system";
+
+type Lang = "ar" | "en";
+interface SafeErrorDetails {
+  message: string;
+  errorCode?: string;
+  correlationId?: string;
+}
+
+function dict(lang: Lang) {
+  return (lang === "ar" ? ar : en).storageServerDetail;
+}
 
 export function StorageServerDetailScreen({ id }: { id: string }) {
-  const { lang } = useI18n();
-  const isArabic = lang === "ar";
+  const { lang, dir, t } = useI18n();
+  const copy = dict(lang);
   const router = useRouter();
   const toast = useToast();
   const view = useStorageServerDetail(id);
-  const [editor, setEditor] = useState<"configuration" | "credentials" | null>(null);
-  const [confirmation, setConfirmation] = useState<"offline" | "delete" | null>(null);
+  const [editor, setEditor] = useState<"configuration" | "credentials" | "safe-rotation" | null>(null);
+  const [confirmation, setConfirmation] = useState<"offline" | "drain" | "delete" | null>(null);
+  const [actionError, setActionError] = useState<SafeErrorDetails | null>(null);
+  const actionErrorRef = useRef<HTMLDivElement>(null);
+  const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
 
   useEffect(() => {
     queueMicrotask(() => {
       setEditor(null);
       setConfirmation(null);
+      setActionError(null);
     });
   }, [id]);
 
-  if (view.isAuthLoading) return <LoadingState isArabic={isArabic} />;
-  if (!view.canRead) return <AccessDenied isArabic={isArabic} />;
-  if (view.isLoading && !view.server) return <LoadingState isArabic={isArabic} />;
-  if (!view.server) return <ErrorState message={view.error} isArabic={isArabic} />;
+  useEffect(() => {
+    if (!actionError) return;
+    const frame = window.requestAnimationFrame(() => actionErrorRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [actionError]);
+
+  if (view.isAuthLoading) return <LoadingState lang={lang} />;
+  if (!view.canRead) return <AccessDenied lang={lang} />;
+  if (view.isLoading && !view.server) return <LoadingState lang={lang} />;
+  if (!view.server) return <NotAvailableState message={view.error} lang={lang} />;
   const server = view.server;
 
   const run = async (action: () => Promise<unknown>, success: string): Promise<boolean> => {
+    setActionError(null);
     try {
       await action();
-      toast.success(isArabic ? "تم تنفيذ الإجراء" : "Action completed", success);
+      toast.success(copy.actionCompletedTitle, success);
       return true;
     } catch (caught) {
-      toast.error(isArabic ? "فشل الإجراء" : "Action failed", readErrorMessage(caught, isArabic ? "تعذر تنفيذ الطلب." : "The request could not be completed."));
+      const details = readErrorDetails(caught, copy.requestFailedFallback);
+      setActionError(details);
+      toast.error(copy.actionFailedTitle, details.message);
       return false;
     }
   };
 
   const runProbe = async () => {
+    setActionError(null);
     try {
       const result = await view.probe();
       if (result.outcome === "PASSED") {
-        toast.success(isArabic ? "نجح اختبار الاتصال" : "Connection test passed", isArabic ? "تم تحديث دليل الاتصال من دون تغيير حالة الخادم." : "Connection evidence was refreshed without changing lifecycle state.");
+        toast.success(copy.connectionTestPassedTitle, copy.connectionTestPassedDescription);
       } else {
         toast.warning(
-          result.outcome === "SKIPPED" ? isArabic ? "تم تجاوز الاختبار" : "Connection test skipped" : isArabic ? "فشل اختبار الاتصال" : "Connection test failed",
-          result.errorCode ?? (isArabic ? "تغيرت مراجعة الإعداد قبل التنفيذ." : "The configuration revision changed before execution."),
+          result.outcome === "SKIPPED" ? copy.connectionTestSkippedTitle : copy.connectionTestFailedTitle,
+          result.errorCode ?? copy.revisionChangedFallback,
         );
       }
     } catch (caught) {
-      toast.error(isArabic ? "تعذر تنفيذ الاختبار" : "Connection test could not run", readErrorMessage(caught, isArabic ? "تعذر تنفيذ الطلب." : "The request could not be completed."));
+      const details = readErrorDetails(caught, copy.requestFailedFallback);
+      setActionError(details);
+      toast.error(copy.connectionTestCouldNotRunTitle, details.message);
     }
   };
 
@@ -86,83 +131,359 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
   const canMakeDefault = server.status === "ACTIVE" && server.connectionEvidenceFresh && !server.isPlatformDefault;
 
   return (
-    <div className="space-y-6">
-      <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-3">
-            <Link href="/storage-servers" aria-label={isArabic ? "العودة" : "Back"} className="grid size-11 shrink-0 place-items-center rounded-xl border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900"><ArrowLeft className={`size-4 ${isArabic ? "rotate-180" : ""}`} /></Link>
-            <div>
-              <div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-black">{server.name}</h1><StatusBadge status={server.status} enumType="db-server" />{server.isPlatformDefault ? <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">{isArabic ? "الافتراضي" : "Platform default"}</span> : null}</div>
-              <p className="mt-2 font-mono text-xs text-slate-500">{server.code} · {server.id}</p>
-            </div>
-          </div>
-
-          {view.canUpdate ? (
+    <div className="w-full space-y-6">
+      <PageHeader
+        breadcrumb={
+          <Button variant="link" size="sm" asChild className="w-fit px-0">
+            <Link href="/storage-servers">
+              <BackIcon className="size-4" aria-hidden="true" />
+              {copy.backLabel}
+            </Link>
+          </Button>
+        }
+        title={server.name}
+        description={`\u2066${server.code} · ${server.id}\u2069`}
+        status={
+          <>
+            <StatusBadge status={server.status} enumType="db-server" />
+            {server.isPlatformDefault && <Badge tone="info">{t.storageServersList.platformDefaultBadge}</Badge>}
+          </>
+        }
+        action={
+          view.canUpdate && (
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => void runProbe()} disabled={view.isMutating} className={secondaryActionClass}><RefreshCw className={`size-4 ${view.isMutating ? "animate-spin" : ""}`} />{isArabic ? "اختبار الاتصال" : "Run connection test"}</button>
-              {["DRAFT", "OFFLINE"].includes(server.status) ? <button type="button" onClick={() => void run(view.activate, isArabic ? "نجح اختبار التفعيل وأصبح الخادم نشطاً." : "Activation test passed and the server is now ACTIVE.")} disabled={view.isMutating} className={primaryActionClass}><Play className="size-4" />{isArabic ? "اختبار وتفعيل" : "Test & activate"}</button> : null}
-              {server.status === "ACTIVE" && !server.isPlatformDefault ? <button type="button" onClick={() => setConfirmation("offline")} disabled={view.isMutating} className={dangerOutlineClass}><StopCircle className="size-4" />{isArabic ? "إيقاف" : "Take offline"}</button> : null}
+              <Button type="button" variant="outline" size="sm" onClick={() => void runProbe()} disabled={view.isMutating}>
+                <RefreshCw className={`size-4 ${view.isMutating ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+                {copy.runConnectionTestButton}
+              </Button>
+              {["DRAFT", "OFFLINE"].includes(server.status) && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void run(view.activate, copy.activationPassedMessage)}
+                  disabled={view.isMutating}
+                >
+                  <Play className="size-4" aria-hidden="true" />
+                  {copy.testAndActivateButton}
+                </Button>
+              )}
+              {server.status === "ACTIVE" && !server.isPlatformDefault && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation("drain")} disabled={view.isMutating}>
+                  <Ban className="size-4" aria-hidden="true" />
+                  {copy.drainButton}
+                </Button>
+              )}
+              {server.status === "ACTIVE" && !server.isPlatformDefault && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation("offline")} disabled={view.isMutating}>
+                  <StopCircle className="size-4" aria-hidden="true" />
+                  {copy.takeOfflineButton}
+                </Button>
+              )}
             </div>
-          ) : null}
-        </div>
-      </header>
+          )
+        }
+      />
 
-      {view.error ? <div role="alert" className="whitespace-pre-line rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">{readErrorMessage(view.error, "")}</div> : null}
-      {view.lastProbe ? <ProbeResultBanner result={view.lastProbe} isArabic={isArabic} /> : null}
+      {view.error && (
+        <DegradedBanner>
+          <p>{view.error.message}</p>
+          {(view.error.errorCode || view.error.correlationId) && (
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {view.error.errorCode && <CodeRef value={view.error.errorCode} />}
+              {view.error.correlationId && <CodeRef value={view.error.correlationId} />}
+            </div>
+          )}
+        </DegradedBanner>
+      )}
+      {actionError && (
+        <div
+          ref={actionErrorRef}
+          role="alert"
+          tabIndex={-1}
+          className="whitespace-pre-line rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <p>{actionError.message}</p>
+          {(actionError.errorCode || actionError.correlationId) && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {actionError.errorCode && <CodeRef value={actionError.errorCode} />}
+              {actionError.correlationId && <CodeRef value={actionError.correlationId} />}
+            </div>
+          )}
+        </div>
+      )}
+      {view.lastProbe && <ProbeResultBanner result={view.lastProbe} lang={lang} />}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.8fr)]">
         <div className="space-y-6">
-          <Panel title={isArabic ? "إعدادات الخادم" : "Server configuration"} icon={<HardDrive className="size-4" />} action={view.canUpdate ? <button type="button" onClick={() => setEditor("configuration")} className={smallButtonClass}><Edit3 className="size-3.5" />{isArabic ? "تعديل" : "Edit"}</button> : undefined}>
+          <Panel
+            title={copy.serverConfigurationTitle}
+            icon={<HardDrive className="size-4" aria-hidden="true" />}
+            action={
+              view.canUpdate && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditor("configuration")}>
+                  <Edit3 className="size-3.5" aria-hidden="true" />
+                  {copy.editButton}
+                </Button>
+              )
+            }
+          >
             <dl className="grid gap-5 sm:grid-cols-2">
-              <Datum label={isArabic ? "نقطة النهاية" : "Endpoint"} value={server.endpoint} mono wide />
-              <Datum label={isArabic ? "المنطقة" : "Region"} value={server.region} mono />
-              <Datum label={isArabic ? "الحاوية" : "Bucket"} value={server.bucketName} mono />
-              <Datum label={isArabic ? "المستأجرون" : "Tenant capacity"} value={`${server.assignedTenants} / ${server.maxTenants ?? "∞"}`} />
-              <Datum label={isArabic ? "مراجعة الإعداد" : "Configuration revision"} value={`v${server.configRevision}`} mono />
+              <Datum label={copy.endpointLabel} value={server.endpoint} mono wide />
+              <Datum label={copy.regionLabel} value={server.region} mono />
+              <Datum label={copy.bucketLabel} value={server.bucketName} mono />
+              <Datum label={copy.tenantCapacityLabel} value={`${formatStorageNumber(server.assignedTenants, lang)} / ${server.maxTenants === null ? "∞" : formatStorageNumber(server.maxTenants, lang)}`} mono />
+              <Datum label={copy.configRevisionLabel} value={`v${formatStorageNumber(server.configRevision, lang)}`} mono />
             </dl>
-            {connectionEditBlocked ? <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">{isArabic ? "يجب إيقاف الخادم قبل تغيير نقطة النهاية أو المنطقة أو الحاوية أو بيانات الاعتماد لأنه يحتوي مستأجرين." : "Take this assigned server OFFLINE before changing its endpoint, region, bucket, or credentials."}</p> : null}
+            {connectionEditBlocked && (
+              <p className="mt-5 rounded-md border border-warning/30 bg-warning-subtle p-3 text-xs leading-5 text-warning-subtle-foreground">
+                {copy.connectionEditBlockedNote}
+              </p>
+            )}
           </Panel>
 
-          <Panel title={isArabic ? "بيانات الاعتماد" : "Credentials"} icon={<KeyRound className="size-4" />} action={view.canUpdate ? <button type="button" onClick={() => setEditor("credentials")} disabled={connectionEditBlocked} className={smallButtonClass}><KeyRound className="size-3.5" />{isArabic ? "تدوير" : "Rotate"}</button> : undefined}>
-            <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
-              <ShieldCheck className="mt-0.5 size-5 shrink-0" />
-              <div><p className="font-bold">{server.credentialsConfigured ? isArabic ? "مشفرة ومهيأة" : "Encrypted and configured" : isArabic ? "غير مهيأة" : "Not configured"}</p><p className="mt-1 text-xs leading-5">{isArabic ? "لا يعيد Core المفاتيح الخام إلى المتصفح. التدوير يستبدلها ويجعل حالة الخادم DRAFT حتى إعادة التفعيل." : "Core never returns raw keys to the browser. Rotation replaces them and moves the server to DRAFT until it is activated again."}</p></div>
+          <Panel
+            title={copy.credentialsTitle}
+            icon={<KeyRound className="size-4" aria-hidden="true" />}
+            action={
+              view.canUpdate &&
+              (connectionEditBlocked ? (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditor("safe-rotation")}>
+                  <ShieldCheck className="size-3.5" aria-hidden="true" />
+                  {copy.safeRotationButton}
+                </Button>
+              ) : (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditor("credentials")}>
+                  <KeyRound className="size-3.5" aria-hidden="true" />
+                  {copy.rotateButton}
+                </Button>
+              ))
+            }
+          >
+            <div className="flex items-start gap-3 rounded-md border border-info/30 bg-info-subtle p-4 text-info-subtle-foreground">
+              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-info" aria-hidden="true" />
+              <div>
+                <p className="font-semibold">
+                  {server.credentialsConfigured ? copy.credentialsConfiguredLabel : copy.credentialsNotConfiguredLabel}
+                </p>
+                <p className="mt-1 text-xs leading-5">
+                  {connectionEditBlocked ? copy.safeRotationRequiredNote : copy.rotationGeneralNote}
+                </p>
+              </div>
             </div>
+            <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+              <DatumRow label={copy.lastRotatedLabel} value={formatDate(server.credentialRotatedAt, lang)} />
+              <DatumRow label={copy.rotationDueLabel} value={formatDate(server.credentialRotationDueAt, lang)} />
+            </dl>
+            {view.currentRotation && (
+              <RotationStatusCard
+                rotation={view.currentRotation}
+                lang={lang}
+                isMutating={view.isMutating}
+                onRevoke={() =>
+                  void run(
+                    () => view.revokeCredentialRotation(view.currentRotation!.id),
+                    copy.oldKeyRejectedMessage,
+                  )
+                }
+              />
+            )}
           </Panel>
         </div>
 
         <div className="space-y-6">
-          <FreshnessPanel server={server} isArabic={isArabic} />
+          <FreshnessPanel server={server} lang={lang} />
 
-          <Panel title={isArabic ? "سياسات التشغيل" : "Operational policies"} icon={<ShieldCheck className="size-4" />}>
+          <Panel title={copy.operationalPoliciesTitle} icon={<ShieldCheck className="size-4" aria-hidden="true" />}>
             <div className="space-y-3">
-              <PolicyRow label={isArabic ? "التوزيع الجديد" : "New placement"} value={server.status === "ACTIVE" && server.connectionEvidenceFresh ? isArabic ? "مسموح" : "Allowed" : isArabic ? "محجوب" : "Blocked"} good={server.status === "ACTIVE" && server.connectionEvidenceFresh} />
-              <PolicyRow label={isArabic ? "التشغيل المعين" : "Assigned runtime"} value={isArabic ? "لا يتغير بفشل الاختبار" : "Unaffected by probe failure"} good />
-              <PolicyRow label={isArabic ? "الاختبار المجدول" : "Scheduled check"} value={isArabic ? "Worker كل 12 ساعة" : "Worker every 12 hours"} good />
+              <PolicyRow label={copy.newPlacementLabel} value={server.status === "ACTIVE" && server.connectionEvidenceFresh ? copy.allowedValue : copy.blockedValue} tone={server.status === "ACTIVE" && server.connectionEvidenceFresh ? "success" : "warning"} />
+              <PolicyRow label={copy.assignedRuntimeLabel} value={copy.unaffectedByProbeValue} tone="info" />
+              <PolicyRow label={copy.scheduledCheckLabel} value={copy.workerEvery12hValue} tone="info" />
             </div>
-            {view.canUpdate && !server.isPlatformDefault ? <button type="button" onClick={() => void run(view.makePlatformDefault, isArabic ? "أصبح الخادم الافتراضي للمنصة." : "The server is now the platform default.")} disabled={!canMakeDefault || view.isMutating} title={!canMakeDefault ? isArabic ? "يتطلب حالة ACTIVE ودليل اتصال حديث." : "Requires ACTIVE state and fresh connection evidence." : undefined} className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-indigo-300 px-4 text-sm font-bold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/40"><ShieldCheck className="size-4" />{isArabic ? "تعيين كافتراضي" : "Make platform default"}</button> : null}
+            {view.canUpdate && !server.isPlatformDefault && (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-5 w-full"
+                onClick={() => void run(view.makePlatformDefault, copy.platformDefaultSuccessMessage)}
+                disabled={!canMakeDefault || view.isMutating}
+                aria-describedby={!canMakeDefault ? "make-default-requirement" : undefined}
+              >
+                <ShieldCheck className="size-4" aria-hidden="true" />
+                {copy.makeDefaultButton}
+              </Button>
+            )}
+            {view.canUpdate && !server.isPlatformDefault && !canMakeDefault && (
+              <p id="make-default-requirement" className="mt-2 text-xs text-warning-subtle-foreground">
+                {copy.makeDefaultRequirementTitle}
+              </p>
+            )}
           </Panel>
 
-          {view.canDelete ? <Panel title={isArabic ? "منطقة خطرة" : "Danger zone"} icon={<Trash2 className="size-4" />}><p className="text-xs leading-5 text-slate-500">{isArabic ? "يمكن حذف خادم DRAFT أو OFFLINE غير افتراضي ومن دون مستأجرين فقط." : "Only an unassigned, non-default DRAFT or OFFLINE server can be deleted."}</p><button type="button" onClick={() => setConfirmation("delete")} disabled={deleteBlocked || view.isMutating} className={`mt-4 w-full ${dangerOutlineClass}`}><Trash2 className="size-4" />{isArabic ? "حذف خادم التخزين" : "Delete storage server"}</button></Panel> : null}
+          {view.canDelete && (
+            <Panel title={copy.dangerZoneTitle} icon={<Trash2 className="size-4" aria-hidden="true" />}>
+              <p className="text-xs leading-5 text-muted-foreground">
+                {copy.deleteRestrictionNote}
+              </p>
+              <Button type="button" variant="destructive" className="mt-4 w-full" onClick={() => setConfirmation("delete")} disabled={deleteBlocked || view.isMutating}>
+                <Trash2 className="size-4" aria-hidden="true" />
+                {copy.deleteServerButton}
+              </Button>
+            </Panel>
+          )}
         </div>
       </div>
 
-      {editor ? <StorageServerEditor key={`${editor}:${server.configRevision}:${server.updatedAt}`} mode={editor} server={server} isArabic={isArabic} connectionEditBlocked={connectionEditBlocked} isSubmitting={view.isMutating} onClose={() => setEditor(null)} onSubmit={async (dto) => { await view.update(dto); setEditor(null); toast.success(isArabic ? "تم الحفظ" : "Saved", isArabic ? "تم تحديث خادم التخزين." : "Storage server was updated."); }} /> : null}
+      {editor && editor !== "safe-rotation" && (
+        <StorageServerEditor
+          key={`${editor}:${server.configRevision}:${server.updatedAt}`}
+          mode={editor}
+          server={server}
+          lang={lang}
+          connectionEditBlocked={connectionEditBlocked}
+          isSubmitting={view.isMutating}
+          onClose={() => setEditor(null)}
+          onSubmit={async (dto) => {
+            await view.update(dto);
+            setEditor(null);
+            toast.success(copy.savedTitle, copy.savedDescription);
+          }}
+        />
+      )}
 
-      <DestructiveActionModal isOpen={confirmation === "offline"} onClose={() => setConfirmation(null)} onConfirm={() => void run(view.offline, isArabic ? "تم إيقاف الخادم؛ لا يغير ذلك بيانات المستأجرين المعينين." : "The server is OFFLINE; assigned tenant data was not changed.").then((succeeded) => { if (succeeded) setConfirmation(null); })} title={isArabic ? "إيقاف خادم التخزين" : "Take storage server offline"} description={isArabic ? "يمنع ذلك التوزيع الجديد ويسمح بصيانة إعداد الاتصال." : "This blocks new placement and permits connection maintenance."} targetName={server.name} actionType="offline" requireNameTyping={false} isSubmitting={view.isMutating} />
-      <DestructiveActionModal isOpen={confirmation === "delete"} onClose={() => setConfirmation(null)} onConfirm={() => void view.remove().then(() => { setConfirmation(null); router.push("/storage-servers"); }).catch((caught) => toast.error(isArabic ? "فشل الحذف" : "Delete failed", readErrorMessage(caught, isArabic ? "تعذر الحذف." : "Delete request failed.")))} title={isArabic ? "حذف خادم التخزين" : "Delete storage server"} description={isArabic ? "حذف منطقي لسجل غير معين. لا يمكن استخدامه للتوزيع." : "Soft-delete this unassigned record so it can no longer be used for placement."} targetName={server.name} actionType="delete" requireNameTyping isSubmitting={view.isMutating} />
+      {editor === "safe-rotation" && (
+        <SafeRotationEditor
+          key={`safe-rotation:${server.configRevision}`}
+          lang={lang}
+          isSubmitting={view.isMutating}
+          onClose={() => setEditor(null)}
+          onSubmit={async (credentials, graceHours) => {
+            await view.rotateCredentials(credentials, graceHours);
+            setEditor(null);
+            toast.success(copy.safeRotationStartedTitle, copy.safeRotationStartedDescription);
+          }}
+        />
+      )}
+
+      <DestructiveActionModal
+        isOpen={confirmation === "drain"}
+        onClose={() => setConfirmation(null)}
+        onConfirm={() =>
+          void run(view.drain, copy.drainSuccessMessage).then(() => setConfirmation(null))
+        }
+        title={copy.drainModalTitle}
+        description={copy.drainModalDescription}
+        targetName={server.name}
+        actionType="drain"
+        requireNameTyping={false}
+        isSubmitting={view.isMutating}
+      />
+      <DestructiveActionModal
+        isOpen={confirmation === "offline"}
+        onClose={() => setConfirmation(null)}
+        onConfirm={() =>
+          void run(view.offline, copy.offlineSuccessMessage).then(() => setConfirmation(null))
+        }
+        title={copy.offlineModalTitle}
+        description={copy.offlineModalDescription}
+        targetName={server.name}
+        actionType="offline"
+        requireNameTyping={false}
+        isSubmitting={view.isMutating}
+      />
+      <DestructiveActionModal
+        isOpen={confirmation === "delete"}
+        onClose={() => setConfirmation(null)}
+        onConfirm={() =>
+          void view
+            .remove()
+            .then(() => {
+              setConfirmation(null);
+              router.push("/storage-servers");
+            })
+            .catch((caught) => {
+              const details = readErrorDetails(caught, copy.deleteFailedFallback);
+              setConfirmation(null);
+              setActionError(details);
+              toast.error(copy.deleteFailedTitle, details.message);
+            })
+        }
+        title={copy.deleteModalTitle}
+        description={copy.deleteModalDescription}
+        targetName={server.name}
+        actionType="delete"
+        requireNameTyping
+        isSubmitting={view.isMutating}
+      />
     </div>
   );
 }
 
-function FreshnessPanel({ server, isArabic }: { server: StorageServerView; isArabic: boolean }) {
+function FreshnessPanel({ server, lang }: { server: StorageServerView; lang: Lang }) {
+  const copy = dict(lang);
   const percent = probeFreshnessPercent(server.lastConnectionTestedAt, server.connectionEvidenceExpiresAt);
+  const roundedPercent = Math.round(percent);
   const passed = server.lastConnectionTestStatus === "PASSED";
-  const color = server.connectionEvidenceFresh && passed ? "bg-emerald-500" : server.lastConnectionTestStatus === "FAILED" ? "bg-rose-500" : "bg-amber-500";
-  return <Panel title={isArabic ? "حداثة دليل الاتصال" : "Connection evidence freshness"} icon={<Clock3 className="size-4" />}><div className="flex items-center justify-between gap-3"><div><p className="font-black">{server.connectionEvidenceFresh && passed ? isArabic ? "حديث" : "Fresh" : server.lastConnectionTestStatus === "FAILED" ? isArabic ? "فشل" : "Failed" : isArabic ? "قديم أو غير مختبر" : "Stale or untested"}</p><p className="mt-1 text-xs text-slate-500">{isArabic ? "نافذة الصلاحية 24 ساعة" : "24-hour validity window"}</p></div><span className={`grid size-10 place-items-center rounded-full text-white ${color}`}>{server.connectionEvidenceFresh && passed ? <CheckCircle2 className="size-5" /> : <AlertCircle className="size-5" />}</span></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" aria-label={isArabic ? "نسبة الوقت المتبقي" : "Remaining freshness window"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)} role="progressbar"><div className={`h-full rounded-full ${color}`} style={{ width: `${percent}%` }} /></div><dl className="mt-4 space-y-3 text-xs"><DatumRow label={isArabic ? "آخر اختبار" : "Last tested"} value={formatDate(server.lastConnectionTestedAt, isArabic)} /><DatumRow label={isArabic ? "انتهاء الدليل" : "Evidence expires"} value={formatDate(server.connectionEvidenceExpiresAt, isArabic)} /><DatumRow label={isArabic ? "موعد الاختبار التلقائي" : "Automatic check due"} value={formatDate(server.nextAutomaticProbeDueAt, isArabic)} />{server.lastConnectionTestErrorCode ? <DatumRow label={isArabic ? "رمز الفشل الآمن" : "Safe failure code"} value={server.lastConnectionTestErrorCode} mono /> : null}</dl></Panel>;
+  const fresh = server.connectionEvidenceFresh && passed;
+  const barTone = fresh ? "bg-success" : server.lastConnectionTestStatus === "FAILED" ? "bg-destructive" : "bg-warning";
+  const badgeTone = fresh
+    ? "bg-success-subtle text-success-subtle-foreground"
+    : server.lastConnectionTestStatus === "FAILED"
+      ? "bg-destructive-subtle text-destructive-subtle-foreground"
+      : "bg-warning-subtle text-warning-subtle-foreground";
+  const evidenceLabel = fresh ? copy.freshLabel : server.lastConnectionTestStatus === "FAILED" ? copy.failedLabel : copy.staleOrUntestedLabel;
+  return (
+    <Panel title={copy.freshnessTitle} icon={<Clock3 className="size-4" aria-hidden="true" />}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-semibold text-foreground">
+            {evidenceLabel}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{copy.validityWindowNote}</p>
+        </div>
+        <span className={`grid size-10 place-items-center rounded-full ${badgeTone}`}>
+          {fresh ? <CheckCircle2 className="size-5" aria-hidden="true" /> : <AlertCircle className="size-5" aria-hidden="true" />}
+        </span>
+      </div>
+      <div
+        className="mt-5 h-2 overflow-hidden rounded-full bg-muted"
+        aria-label={copy.remainingFreshnessAriaLabel}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={roundedPercent}
+        aria-valuetext={`${evidenceLabel} · ${formatStoragePercent(roundedPercent, lang)}`}
+        role="progressbar"
+      >
+        <div className={`h-full rounded-full transition-[width] motion-reduce:transition-none ${barTone}`} style={{ width: `${percent}%` }} />
+      </div>
+      <dl className="mt-4 space-y-3 text-xs">
+        <DatumRow label={copy.lastTestedLabel} value={formatDate(server.lastConnectionTestedAt, lang)} />
+        <DatumRow label={copy.evidenceExpiresLabel} value={formatDate(server.connectionEvidenceExpiresAt, lang)} />
+        <DatumRow label={copy.automaticCheckDueLabel} value={formatDate(server.nextAutomaticProbeDueAt, lang)} />
+        {server.lastConnectionTestErrorCode && <DatumRow label={copy.safeFailureCodeLabel} value={<CodeRef value={server.lastConnectionTestErrorCode} />} />}
+      </dl>
+    </Panel>
+  );
 }
 
-function StorageServerEditor({ mode, server, isArabic, connectionEditBlocked, isSubmitting, onClose, onSubmit }: { mode: "configuration" | "credentials"; server: StorageServerView; isArabic: boolean; connectionEditBlocked: boolean; isSubmitting: boolean; onClose: () => void; onSubmit: (dto: UpdateStorageServerDto) => Promise<void> }) {
+function StorageServerEditor({
+  mode,
+  server,
+  lang,
+  connectionEditBlocked,
+  isSubmitting,
+  onClose,
+  onSubmit,
+}: {
+  mode: "configuration" | "credentials";
+  server: StorageServerView;
+  lang: Lang;
+  connectionEditBlocked: boolean;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onSubmit: (dto: UpdateStorageServerDto) => Promise<void>;
+}) {
+  const copy = dict(lang);
   const [name, setName] = useState(server.name);
   const [endpoint, setEndpoint] = useState(server.endpoint);
   const [region, setRegion] = useState(server.region);
@@ -170,24 +491,24 @@ function StorageServerEditor({ mode, server, isArabic, connectionEditBlocked, is
   const [maxTenants, setMaxTenants] = useState(server.maxTenants?.toString() ?? "");
   const [accessKeyId, setAccessKeyId] = useState("");
   const [secretAccessKey, setSecretAccessKey] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const titleId = useId();
-  const descriptionId = useId();
-  const { dialogRef, onKeyDown, onBackdropMouseDown } = useAccessibleDialog({
-    open: true,
-    onClose,
-    isSubmitting,
-    initialFocusSelector: mode === "credentials" ? 'input:not([type="password"])' : "input",
-  });
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const [error, setError] = useState<SafeErrorDetails | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
     setError(null);
     try {
       if (mode === "credentials") {
         await onSubmit({ credentials: { accessKeyId: accessKeyId.trim(), secretAccessKey } });
         return;
       }
-      if (!connectionEditBlocked && !isSecureStorageEndpoint(endpoint.trim())) throw new Error(isArabic ? "نقطة النهاية يجب أن تكون أصلاً آمناً بصيغة HTTPS فقط." : "Endpoint must be an HTTPS root origin.");
+      if (!connectionEditBlocked && !isSecureStorageEndpoint(endpoint.trim())) {
+        throw new Error(copy.httpsOnlyError);
+      }
       const dto: UpdateStorageServerDto = {};
       const nextName = name.trim();
       const nextMaximum = maxTenants ? Number(maxTenants) : null;
@@ -206,47 +527,370 @@ function StorageServerEditor({ mode, server, isArabic, connectionEditBlocked, is
         return;
       }
       await onSubmit(dto);
-    } catch (caught) { setError(readErrorMessage(caught, isArabic ? "تعذر الحفظ." : "Save failed.")); }
+    } catch (caught) {
+      setError(readErrorDetails(caught, copy.saveFailedFallback));
+    }
   };
 
-  const title = mode === "credentials" ? isArabic ? "تدوير بيانات الاعتماد" : "Rotate credentials" : isArabic ? "تعديل خادم التخزين" : "Edit storage server";
-  const description = mode === "credentials" ? isArabic ? "لا يمكن استرجاع المفاتيح الحالية. أدخل زوجاً جديداً كاملاً." : "Current keys cannot be retrieved. Enter a complete replacement pair." : connectionEditBlocked ? isArabic ? "إعدادات الاتصال مقفلة حتى يصبح الخادم OFFLINE." : "Connection settings are locked until the server is OFFLINE." : isArabic ? "تغيير الاتصال يلغي الدليل الحالي ويعيد الحالة إلى DRAFT." : "Changing connectivity invalidates current evidence and returns the server to DRAFT.";
+  const title = mode === "credentials" ? copy.rotateCredentialsTitle : copy.editServerTitle;
+  const description =
+    mode === "credentials"
+      ? copy.rotateDescription
+      : connectionEditBlocked
+        ? copy.connectionLockedDescription
+        : copy.connectionChangeDescription;
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4" role="presentation" onMouseDown={onBackdropMouseDown}>
-      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} onKeyDown={onKeyDown} className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex items-start justify-between gap-3"><div><h2 id={titleId} className="text-lg font-black">{title}</h2><p id={descriptionId} className="mt-1 text-xs leading-5 text-slate-500">{description}</p></div><button type="button" onClick={onClose} disabled={isSubmitting} aria-label={isArabic ? "إغلاق" : "Close"} className="grid size-11 place-items-center rounded-xl hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-900"><X className="size-4" /></button></div>
-        <form onSubmit={submit} className="mt-5 space-y-4">
-          {error ? <div role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900 dark:bg-rose-950/40 dark:text-rose-100">{error}</div> : null}
-          {mode === "credentials" ? <><EditorField label={isArabic ? "معرف مفتاح الوصول" : "Access key ID"}><input required minLength={3} maxLength={128} autoComplete="off" value={accessKeyId} onChange={(event) => setAccessKeyId(event.target.value)} className={`${inputClass} font-mono`} /></EditorField><EditorField label={isArabic ? "مفتاح الوصول السري" : "Secret access key"}><input required type="password" minLength={16} maxLength={256} autoComplete="new-password" value={secretAccessKey} onChange={(event) => setSecretAccessKey(event.target.value)} className={`${inputClass} font-mono`} /></EditorField></> : <div className="grid gap-4 sm:grid-cols-2"><EditorField label={isArabic ? "الاسم" : "Name"}><input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className={inputClass} /></EditorField><EditorField label={isArabic ? "الحد الأقصى للمستأجرين" : "Maximum tenants"}><input type="number" min={Math.max(1, server.assignedTenants)} max={1_000_000} value={maxTenants} onChange={(event) => setMaxTenants(event.target.value)} className={inputClass} /></EditorField><EditorField wide label={isArabic ? "نقطة النهاية" : "Endpoint"}><input required disabled={connectionEditBlocked} type="url" value={endpoint} onChange={(event) => setEndpoint(event.target.value)} className={`${inputClass} font-mono disabled:opacity-55`} /></EditorField><EditorField label={isArabic ? "المنطقة" : "Region"}><input required disabled={connectionEditBlocked} value={region} onChange={(event) => setRegion(event.target.value)} className={`${inputClass} font-mono disabled:opacity-55`} /></EditorField><EditorField label={isArabic ? "الحاوية" : "Bucket"}><input required disabled={connectionEditBlocked} value={bucketName} onChange={(event) => setBucketName(event.target.value)} className={`${inputClass} font-mono disabled:opacity-55`} /></EditorField></div>}
-          <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={onClose} disabled={isSubmitting} className="min-h-11 rounded-xl px-4 text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-900">{isArabic ? "إلغاء" : "Cancel"}</button><button type="submit" disabled={isSubmitting} className={primaryActionClass}>{isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}{isArabic ? "حفظ" : "Save"}</button></div>
-        </form>
-      </section>
+    <FormDrawer
+      isOpen
+      onClose={onClose}
+      titleEn={title}
+      titleAr={title}
+      subtitleEn={description}
+      subtitleAr={description}
+      isSubmitting={isSubmitting}
+      footerActions={
+        <>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            {(lang === "ar" ? ar : en).common.cancel}
+          </Button>
+          <Button type="submit" form="storage-server-editor-form" variant="primary" loading={isSubmitting}>
+            {copy.saveButton}
+          </Button>
+        </>
+      }
+    >
+      <form id="storage-server-editor-form" onSubmit={submit} className="space-y-4 py-1">
+        {error && (
+          <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <p>{error.message}</p>
+            {(error.errorCode || error.correlationId) && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {error.errorCode && <CodeRef value={error.errorCode} />}
+                {error.correlationId && <CodeRef value={error.correlationId} />}
+              </div>
+            )}
+          </div>
+        )}
+        {mode === "credentials" ? (
+          <>
+            <Field label={copy.accessKeyIdLabel} required>
+              {(fp) => <Input {...fp} dir="ltr" required minLength={3} maxLength={128} autoComplete="off" value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} className="font-mono" />}
+            </Field>
+            <Field label={copy.secretAccessKeyLabel} required>
+              {(fp) => <Input {...fp} dir="ltr" required type="password" minLength={16} maxLength={256} autoComplete="new-password" value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} className="font-mono" />}
+            </Field>
+          </>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={copy.nameLabel} required>
+              {(fp) => <Input {...fp} required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />}
+            </Field>
+            <Field label={copy.maxTenantsLabel}>
+              {(fp) => <Input {...fp} dir="ltr" type="number" min={Math.max(1, server.assignedTenants)} max={1_000_000} value={maxTenants} onChange={(e) => setMaxTenants(e.target.value)} />}
+            </Field>
+            <Field label={copy.endpointLabel} className="sm:col-span-2" required>
+              {(fp) => <Input {...fp} dir="ltr" required disabled={connectionEditBlocked} type="url" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} className="font-mono" />}
+            </Field>
+            <Field label={copy.regionLabel} required>
+              {(fp) => <Input {...fp} dir="ltr" required disabled={connectionEditBlocked} value={region} onChange={(e) => setRegion(e.target.value)} className="font-mono" />}
+            </Field>
+            <Field label={copy.bucketLabel} required>
+              {(fp) => <Input {...fp} dir="ltr" required disabled={connectionEditBlocked} value={bucketName} onChange={(e) => setBucketName(e.target.value)} className="font-mono" />}
+            </Field>
+          </div>
+        )}
+      </form>
+    </FormDrawer>
+  );
+}
+
+function SafeRotationEditor({
+  lang,
+  isSubmitting,
+  onClose,
+  onSubmit,
+}: {
+  lang: Lang;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onSubmit: (credentials: { accessKeyId: string; secretAccessKey: string }, graceHours: number) => Promise<void>;
+}) {
+  const copy = dict(lang);
+  const [accessKeyId, setAccessKeyId] = useState("");
+  const [secretAccessKey, setSecretAccessKey] = useState("");
+  const [graceHours, setGraceHours] = useState("4");
+  const [error, setError] = useState<SafeErrorDetails | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    setError(null);
+    try {
+      const hours = Number(graceHours);
+      if (!Number.isInteger(hours) || hours < 1 || hours > 24) {
+        throw new Error(copy.graceWindowRangeError);
+      }
+      await onSubmit({ accessKeyId: accessKeyId.trim(), secretAccessKey }, hours);
+    } catch (caught) {
+      setError(readErrorDetails(caught, copy.rotationStartFailedFallback));
+    }
+  };
+
+  const title = copy.safeRotationEditorTitle;
+  const description = copy.safeRotationEditorDescription;
+
+  return (
+    <FormDrawer
+      isOpen
+      onClose={onClose}
+      titleEn={title}
+      titleAr={title}
+      subtitleEn={description}
+      subtitleAr={description}
+      isSubmitting={isSubmitting}
+      footerActions={
+        <>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            {(lang === "ar" ? ar : en).common.cancel}
+          </Button>
+          <Button type="submit" form="safe-rotation-form" variant="primary" loading={isSubmitting}>
+            {copy.startRotationButton}
+          </Button>
+        </>
+      }
+    >
+      <form id="safe-rotation-form" onSubmit={submit} className="space-y-4 py-1">
+        {error && (
+          <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <p>{error.message}</p>
+            {(error.errorCode || error.correlationId) && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {error.errorCode && <CodeRef value={error.errorCode} />}
+                {error.correlationId && <CodeRef value={error.correlationId} />}
+              </div>
+            )}
+          </div>
+        )}
+        <Field label={copy.newAccessKeyIdLabel} required>
+          {(fp) => <Input {...fp} dir="ltr" required minLength={3} maxLength={128} autoComplete="off" value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} className="font-mono" />}
+        </Field>
+        <Field label={copy.newSecretAccessKeyLabel} required>
+          {(fp) => <Input {...fp} dir="ltr" required type="password" minLength={16} maxLength={256} autoComplete="new-password" value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} className="font-mono" />}
+        </Field>
+        <Field label={copy.graceWindowLabel} hint={copy.graceWindowHint} required>
+          {(fp) => <Input {...fp} dir="ltr" required type="number" min={1} max={24} value={graceHours} onChange={(e) => setGraceHours(e.target.value)} />}
+        </Field>
+      </form>
+    </FormDrawer>
+  );
+}
+
+function RotationStatusCard({
+  rotation,
+  lang,
+  isMutating,
+  onRevoke,
+}: {
+  rotation: StorageCredentialRotationView;
+  lang: Lang;
+  isMutating: boolean;
+  onRevoke: () => void;
+}) {
+  const copy = dict(lang);
+  const [graceExpired, setGraceExpired] = useState(false);
+  useEffect(() => {
+    const expiresAtIso = rotation.graceExpiresAt;
+    const expiresAt = expiresAtIso ? new Date(expiresAtIso).getTime() : null;
+    // Deferred through setTimeout (even at 0ms) rather than called
+    // synchronously in the effect body, so this never fires during the
+    // commit React is currently processing — including the "already
+    // expired" case, which still waits one macrotask.
+    const remaining = expiresAt !== null ? Math.max(0, expiresAt - Date.now()) : 0;
+    const timer = window.setTimeout(() => {
+      setGraceExpired(expiresAt !== null && Date.now() >= expiresAt);
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [rotation.graceExpiresAt]);
+  const canRevoke = rotation.status === "ACTIVATED" && graceExpired;
+  return (
+    <div className="mt-4 rounded-md border border-border bg-muted/40 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">
+          {copy.currentRotationLabel}
+        </span>
+        <StatusBadge status={rotation.status} />
+      </div>
+      <dl className="mt-3 space-y-2 text-xs">
+        <DatumRow label={copy.graceExpiresLabel} value={formatDate(rotation.graceExpiresAt, lang)} />
+        {rotation.revokedAt && <DatumRow label={copy.revokedAtLabel} value={formatDate(rotation.revokedAt, lang)} />}
+      </dl>
+      {rotation.status === "ACTIVATED" && (
+        <>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            {copy.rotationIdWarning}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3 w-full"
+            onClick={onRevoke}
+            disabled={!canRevoke || isMutating}
+            aria-describedby={!graceExpired ? `rotation-${rotation.id}-wait-reason` : undefined}
+          >
+            <ShieldCheck className="size-4" aria-hidden="true" />
+            {copy.verifyOldKeyButton}
+          </Button>
+          {!graceExpired && (
+            <p id={`rotation-${rotation.id}-wait-reason`} className="mt-2 text-xs text-warning-subtle-foreground">
+              {copy.waitForGraceTitle}
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
-function ProbeResultBanner({ result, isArabic }: { result: { outcome: string; errorCode: string | null; lifecycleStatus: string }; isArabic: boolean }) { const passed = result.outcome === "PASSED"; return <section role="status" className={`rounded-xl border p-4 text-sm ${passed ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100" : "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"}`}><p className="font-bold">{passed ? isArabic ? "نجح اختبار الاتصال" : "Connection test passed" : isArabic ? "فشل اختبار الاتصال" : "Connection test failed"}</p><p className="mt-1 text-xs">{isArabic ? `لم تتغير حالة دورة الحياة: ${result.lifecycleStatus}.` : `Lifecycle state remains ${result.lifecycleStatus}.`}{result.errorCode ? ` · ${result.errorCode}` : ""}</p></section>; }
-function Panel({ title, icon, action, children }: { title: string; icon: ReactNode; action?: ReactNode; children: ReactNode }) { return <section className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"><div className="flex min-h-14 items-center justify-between gap-3 border-b border-slate-200 px-5 dark:border-slate-800"><h2 className="flex items-center gap-2 text-sm font-black"><span className="text-indigo-600 dark:text-indigo-400">{icon}</span>{title}</h2>{action}</div><div className="p-5">{children}</div></section>; }
-function Datum({ label, value, mono, wide }: { label: string; value: string; mono?: boolean; wide?: boolean }) { return <div className={wide ? "sm:col-span-2" : ""}><dt className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</dt><dd className={`mt-2 break-all text-sm font-semibold ${mono ? "font-mono" : ""}`}>{value}</dd></div>; }
-function DatumRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) { return <div className="flex items-start justify-between gap-4"><dt className="text-slate-500">{label}</dt><dd className={`text-end font-semibold ${mono ? "break-all font-mono" : ""}`}>{value}</dd></div>; }
-function PolicyRow({ label, value, good }: { label: string; value: string; good: boolean }) { return <div className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-3 text-xs dark:bg-slate-900"><span className="text-slate-500">{label}</span><span className={`text-end font-bold ${good ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>{value}</span></div>; }
-function EditorField({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) { return <label className={`block ${wide ? "sm:col-span-2" : ""}`}><span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">{label}</span>{children}</label>; }
-function AccessDenied({ isArabic }: { isArabic: boolean }) { return <section className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"><AlertCircle className="mx-auto size-10" /><h1 className="mt-3 text-lg font-black">{isArabic ? "تم رفض الوصول" : "Access denied"}</h1></section>; }
-function LoadingState({ isArabic }: { isArabic: boolean }) { return <div className="grid min-h-80 place-items-center text-sm font-semibold text-slate-500"><span className="flex items-center gap-2"><Loader2 className="size-5 animate-spin" />{isArabic ? "جارٍ تحميل الخادم…" : "Loading storage server…"}</span></div>; }
-function ErrorState({ message, isArabic }: { message: NormalizedApiError | null; isArabic: boolean }) { return <section className="mx-auto max-w-xl rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"><AlertCircle className="mx-auto size-10" /><h1 className="mt-3 text-lg font-black">{isArabic ? "تعذر تحميل الخادم" : "Storage server unavailable"}</h1><p className="mt-2 whitespace-pre-line text-sm">{message ? readErrorMessage(message, "") : null}</p><Link href="/storage-servers" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-white px-4 font-bold text-rose-800">{isArabic ? "العودة" : "Back"}</Link></section>; }
-function formatDate(value: string | null, isArabic: boolean) { if (!value) return isArabic ? "غير متاح" : "Not available"; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(isArabic ? "ar-EG" : "en-US", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" }).format(date); }
+function ProbeResultBanner({ result, lang }: { result: { outcome: string; errorCode: string | null; lifecycleStatus: string }; lang: Lang }) {
+  const copy = dict(lang);
+  const passed = result.outcome === "PASSED";
+  const skipped = result.outcome === "SKIPPED";
+  const surface = passed
+    ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+    : skipped
+      ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
+      : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground";
+  return (
+    <section
+      role={passed ? "status" : "alert"}
+      className={`rounded-lg border p-4 text-sm ${surface}`}
+    >
+      <p className="font-semibold">{passed ? copy.connectionTestPassedTitle : skipped ? copy.connectionTestSkippedTitle : copy.connectionTestFailedTitle}</p>
+      <p className="mt-1 text-xs">
+        {copy.lifecycleUnchangedTemplate(result.lifecycleStatus)}
+        {result.errorCode ? ` · ${result.errorCode}` : ""}
+      </p>
+    </section>
+  );
+}
 
-const inputClass = "min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white";
-const primaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50";
-const secondaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900";
-const dangerOutlineClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-300 px-4 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40";
-const smallButtonClass = "inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-bold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-indigo-300 dark:hover:bg-indigo-950/40";
+function Panel({ title, icon, action, children }: { title: string; icon: ReactNode; action?: ReactNode; children: ReactNode }) {
+  return (
+    <Card>
+      <CardHeader className="flex-col items-start justify-between gap-3 space-y-0 sm:flex-row sm:items-center">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <span className="text-info" aria-hidden="true">{icon}</span>
+          {title}
+        </CardTitle>
+        {action}
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
 
-function readErrorMessage(value: unknown, fallback: string): string {
-  if (typeof value !== "object" || value === null) return fallback;
-  const candidate = value as { message?: unknown; correlationId?: unknown };
-  const message = typeof candidate.message === "string" ? candidate.message : fallback;
-  return typeof candidate.correlationId === "string"
-    ? `${message}\nCorrelation ID: ${candidate.correlationId}`
-    : message;
+function Datum({ label, value, mono, wide }: { label: string; value: string; mono?: boolean; wide?: boolean }) {
+  return (
+    <div className={wide ? "sm:col-span-2" : ""}>
+      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</dt>
+      <dd dir={mono ? "ltr" : undefined} className={`mt-2 break-all text-sm font-semibold text-foreground ${mono ? "font-mono" : ""}`}>{value}</dd>
+    </div>
+  );
+}
+function DatumRow({ label, value, mono }: { label: string; value: ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd dir={mono ? "ltr" : undefined} className={`text-end font-semibold text-foreground ${mono ? "break-all font-mono" : ""}`}>{value}</dd>
+    </div>
+  );
+}
+function PolicyRow({ label, value, tone }: { label: string; value: string; tone: "success" | "warning" | "info" }) {
+  const toneClass = tone === "success"
+    ? "text-success-subtle-foreground"
+    : tone === "warning"
+      ? "text-warning-subtle-foreground"
+      : "text-info-subtle-foreground";
+  return (
+    <div className="flex flex-col items-start justify-between gap-1 rounded-md bg-muted p-3 text-xs sm:flex-row sm:items-center sm:gap-4">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={`text-end font-semibold ${toneClass}`}>{value}</span>
+    </div>
+  );
+}
+function AccessDenied({ lang }: { lang: Lang }) {
+  const copy = (lang === "ar" ? ar : en).storageServersList;
+  return (
+    <div className="mx-auto max-w-xl rounded-lg border border-border bg-card">
+      <DsErrorState
+        title={copy.accessDeniedTitle}
+        error={{ isNormalized: true, httpStatus: 403, errorCode: "ADMIN_PERMISSION_DENIED", errorCategory: "AUTHORIZATION", message: "" }}
+      />
+    </div>
+  );
+}
+function LoadingState({ lang }: { lang: Lang }) {
+  const copy = dict(lang);
+  return (
+    <div className="grid min-h-80 place-items-center text-sm font-semibold text-muted-foreground">
+      <span className="flex items-center gap-2">
+        <Loader2 className="size-5 animate-spin text-info motion-reduce:animate-none" aria-hidden="true" />
+        {copy.loadingServerLabel}
+      </span>
+    </div>
+  );
+}
+function NotAvailableState({ message, lang }: { message: NormalizedApiError | null; lang: Lang }) {
+  const copy = dict(lang);
+  return (
+    <div className="mx-auto max-w-xl rounded-lg border border-border bg-card">
+      <DsErrorState title={copy.unavailableTitle} error={message} />
+      <div className="flex justify-center pb-6">
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/storage-servers">{copy.backLabel}</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+function formatDate(value: string | null, lang: Lang) {
+  const copy = dict(lang);
+  if (!value) return copy.notAvailableValue;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" }).format(date);
+}
+
+function readErrorDetails(value: unknown, fallback: string): SafeErrorDetails {
+  if (typeof value !== "object" || value === null) return { message: fallback };
+  const candidate = value as { message?: unknown; errorCode?: unknown; correlationId?: unknown };
+  return {
+    message: typeof candidate.message === "string" ? candidate.message : fallback,
+    ...(typeof candidate.errorCode === "string" ? { errorCode: candidate.errorCode } : {}),
+    ...(typeof candidate.correlationId === "string" ? { correlationId: candidate.correlationId } : {}),
+  };
+}
+
+const storageNumberFormatters = {
+  en: new Intl.NumberFormat("en-US"),
+  ar: new Intl.NumberFormat("ar-EG"),
+} as const;
+const storagePercentFormatters = {
+  en: new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 0 }),
+  ar: new Intl.NumberFormat("ar-EG", { style: "percent", maximumFractionDigits: 0 }),
+} as const;
+
+function formatStorageNumber(value: number, lang: Lang) {
+  return storageNumberFormatters[lang].format(value);
+}
+
+function formatStoragePercent(value: number, lang: Lang) {
+  return storagePercentFormatters[lang].format(value / 100);
 }

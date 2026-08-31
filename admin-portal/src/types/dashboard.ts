@@ -1,5 +1,5 @@
-export type DashboardMetricKind = "integer" | "money" | "percent" | "ratio";
-export type DashboardRangeGranularity = "day" | "month";
+type DashboardMetricKind = "integer" | "money" | "percent" | "ratio";
+type DashboardRangeGranularity = "day" | "month";
 export type DashboardMetricTone =
   | "amber"
   | "blue"
@@ -27,7 +27,7 @@ export const DASHBOARD_GROUP_KEYS = [
 
 export type DashboardGroupKey = (typeof DASHBOARD_GROUP_KEYS)[number];
 
-export type DashboardGroupPermission =
+type DashboardGroupPermission =
   | "admin.reports.tenants"
   | "admin.reports.domains"
   | "admin.reports.subscriptions"
@@ -59,7 +59,7 @@ export interface DashboardGroupAlert {
   message: string;
 }
 
-export interface DashboardAvailableGroup {
+interface DashboardAvailableGroup {
   key: DashboardGroupKey;
   permission: DashboardGroupPermission;
   available: true;
@@ -69,9 +69,11 @@ export interface DashboardAvailableGroup {
   breakdowns: Record<string, unknown>;
   alerts: DashboardGroupAlert[];
   cards: DashboardMetric[];
+  /** Authored by Core; absent until a provider emits it (see below). */
+  visuals?: DashboardVisual[];
 }
 
-export interface DashboardUnavailableGroup {
+interface DashboardUnavailableGroup {
   key: DashboardGroupKey;
   permission: DashboardGroupPermission;
   available: false;
@@ -89,7 +91,7 @@ export type DashboardGroup =
   | DashboardAvailableGroup
   | DashboardUnavailableGroup;
 
-export type DashboardGroups = Partial<
+type DashboardGroups = Partial<
   Record<DashboardGroupKey, DashboardGroup>
 >;
 
@@ -98,50 +100,41 @@ export type DashboardUnavailableReason =
   | "SOURCE_NOT_CONFIGURED"
   | "TARGET_NOT_CONFIGURED";
 
-export interface DashboardAvailableDataset<T> {
+interface DashboardAvailableDataset<T> {
   available: true;
   data: T;
 }
 
-export interface DashboardUnavailableDataset {
+interface DashboardUnavailableDataset {
   available: false;
   reasonCode: DashboardUnavailableReason;
   message: string;
 }
 
-export type DashboardDataset<T> =
+type DashboardDataset<T> =
   | DashboardAvailableDataset<T>
   | DashboardUnavailableDataset;
 
-export interface DashboardNamedValue {
+interface DashboardNamedValue {
   key: string;
   label: string;
   value: number;
 }
 
-export interface DashboardTimeSeriesPoint {
+interface DashboardTimeSeriesPoint {
   bucket: string;
   label: string;
   value: number;
 }
 
-export interface DashboardDualTimeSeriesPoint {
+interface DashboardDualTimeSeriesPoint {
   bucket: string;
   label: string;
   primary: number;
   secondary: number;
 }
 
-export interface DashboardBreakdownItem {
-  key: string;
-  label: string;
-  value: number;
-  ratio: number; // normalized 0..1, not 0..100
-  tone: DashboardMetricTone;
-  description?: string;
-}
-
-export interface DashboardDatabaseCapacityItem {
+interface DashboardDatabaseCapacityItem {
   id: string;
   name: string;
   metadata: string;
@@ -165,7 +158,14 @@ export interface DashboardRegionItem {
 
 export interface DashboardResponse extends DashboardGroups {
   asOf: string;
+  /** Every group this actor may see, whether or not it was loaded. */
   authorizedGroups: DashboardGroupKey[];
+  /**
+   * The subset actually present in this response (see `?groups=`). Absent
+   * from a Core deployment that predates the parameter, which always
+   * returns every authorized group.
+   */
+  loadedGroups?: DashboardGroupKey[];
   range: {
     from: string;
     to: string;
@@ -173,69 +173,14 @@ export interface DashboardResponse extends DashboardGroups {
     granularity: DashboardRangeGranularity;
   };
 
-  sections: Array<{
-    key: "tenants" | "databaseServers" | "subscriptions" | "invoices" | string;
-    title: string;
-    cards: DashboardMetric[];
-  }>;
-
-  panels: {
-    tenantStatus: {
-      title: string;
-      subtitle: string;
-      items: Array<{
-        key: string;
-        label: string;
-        count: number;
-        description: string;
-        ratio: number; // normalized 0..1
-        tone: DashboardMetricTone;
-      }>;
-    };
-    databaseCapacity: {
-      title: string;
-      subtitle: string;
-      items: DashboardDatabaseCapacityItem[];
-    };
-  };
-
+  /**
+   * Only what no single group can report. Tenant lifecycle, database health,
+   * subscription status, billing summary, and domain health used to live here
+   * too, restating each group's own snapshot — the overview now derives them
+   * from the groups (see utils/overview-sources.ts).
+   */
   overview: {
     kpis: DashboardMetric[];
-    tenantLifecycle: {
-      total: number;
-      current: number;
-      deleted: number;
-      items: DashboardBreakdownItem[];
-      stats: DashboardMetric[];
-    };
-    databaseHealth: {
-      capacity: {
-        current: number;
-        maximum: number;
-        utilization: number; // normalized 0..1
-      };
-      stats: DashboardMetric[];
-    };
-    subscriptionStatus: {
-      total: number;
-      items: DashboardBreakdownItem[];
-      stats: DashboardMetric[];
-    };
-    billingSummary: {
-      totalAmount: number;
-      collectedRatio: number; // normalized 0..1
-      items: DashboardBreakdownItem[];
-    };
-    domainHealth: {
-      totalDomains: number;
-      verifiedDomains: number;
-      fullyVerified: number;
-      invalidDomains: number;
-      countries: number;
-      regions: DashboardRegionItem[];
-      actionRequired: boolean;
-      message: string;
-    };
     tenantBillingGrowth: {
       year: number;
       currencyCode: string; // current backend value: "USD"
@@ -339,3 +284,130 @@ export interface AdminDashboardQuery {
   from?: string;
   to?: string;
 }
+
+/* ------------------------------------------------------------------ *
+ * Visuals contract
+ *
+ * `snapshot`/`period`/`breakdowns` are untyped bags, so the portal can
+ * never tell what a number means or what it should be compared against.
+ * `visuals[]` carries that meaning instead: each entry names the shape it
+ * wants, its unit, and its reference values. Core authors these in the
+ * providers (dashboard-visual.utils.ts); until every group emits them the
+ * portal infers a subset client-side (visuals/infer-visuals.ts).
+ * ------------------------------------------------------------------ */
+
+export type DashboardVisualKind =
+  | "donut"
+  | "bar"
+  | "comparison"
+  | "diverging"
+  | "stacked"
+  | "pareto"
+  | "line"
+  | "area"
+  | "dual-axis"
+  | "gauge"
+  | "bullet"
+  | "funnel"
+  | "waterfall"
+  | "heatmap";
+
+export type DashboardVisualUnit =
+  | "count"
+  | "usd"
+  | "ratio"
+  | "seconds"
+  | "bytes";
+
+export interface DashboardVisualPoint {
+  key: string;
+  label: string;
+  value: number;
+  /** Semantic role for status data; omit so the qualitative ramp is used. */
+  tone?: DashboardMetricTone;
+}
+
+export interface DashboardVisualPair {
+  key: string;
+  label: string;
+  primary: number;
+  secondary: number;
+}
+
+export interface DashboardVisualBulletRow {
+  key: string;
+  label: string;
+  value: number;
+  target?: number;
+  maximum?: number;
+  tone?: DashboardMetricTone;
+}
+
+/** `delta` values may be negative; `start` and `total` are absolute. */
+export interface DashboardVisualWaterfallStep {
+  key: string;
+  label: string;
+  value: number;
+  role: "start" | "delta" | "total";
+}
+
+export interface DashboardVisualHeatRow {
+  key: string;
+  label: string;
+  values: number[];
+}
+
+export interface DashboardVisualBand {
+  upTo: number;
+  tone: "green" | "amber" | "red";
+}
+
+interface DashboardVisualBase {
+  key: string;
+  title: string;
+  subtitle?: string;
+  unit: DashboardVisualUnit;
+  secondaryUnit?: DashboardVisualUnit;
+  /** `primary` spans two grid columns. */
+  emphasis?: "primary" | "secondary";
+  reference?: {
+    target?: number;
+    maximum?: number;
+    bands?: DashboardVisualBand[];
+  };
+}
+
+interface DashboardTwoSeriesData {
+  pairs: DashboardVisualPair[];
+  primaryLabel: string;
+  secondaryLabel: string;
+}
+
+/**
+ * One entry per kind, so `Extract<DashboardVisual, { kind: K }>` narrows to a
+ * single member. Extending `Record<DashboardVisualKind, unknown>` makes a
+ * kind added above a compile error until its payload is defined here.
+ */
+interface DashboardVisualDataByKind extends Record<DashboardVisualKind, unknown> {
+  donut: { categories: DashboardVisualPoint[] };
+  bar: { categories: DashboardVisualPoint[] };
+  pareto: { categories: DashboardVisualPoint[] };
+  funnel: { categories: DashboardVisualPoint[] };
+  comparison: DashboardTwoSeriesData;
+  diverging: DashboardTwoSeriesData;
+  stacked: DashboardTwoSeriesData;
+  "dual-axis": DashboardTwoSeriesData;
+  line: { series: DashboardVisualPoint[] };
+  area: { series: DashboardVisualPoint[] };
+  gauge: { value: number; maximum: number };
+  bullet: { rows: DashboardVisualBulletRow[] };
+  waterfall: { steps: DashboardVisualWaterfallStep[] };
+  heatmap: { columns: string[]; rows: DashboardVisualHeatRow[] };
+}
+
+export type DashboardVisualOf<K extends DashboardVisualKind> =
+  DashboardVisualBase & { kind: K; data: DashboardVisualDataByKind[K] };
+
+export type DashboardVisual = {
+  [K in DashboardVisualKind]: DashboardVisualOf<K>;
+}[DashboardVisualKind];

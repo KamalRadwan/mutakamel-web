@@ -1,12 +1,16 @@
 import { axiosClient } from "@/lib/api/axiosClient";
 import type {
   ControlPlaneAuditDiff,
-  ControlPlaneAuditEvent,
+  ControlPlaneAuditEventDetail,
+  ControlPlaneAuditEventSummary,
   ControlPlaneAuditPage,
   ControlPlaneAuditQuery,
 } from "../types/control-plane-audit";
 import {
   CONTROL_PLANE_AUDIT_ACTOR_TYPES,
+  CONTROL_PLANE_AUDIT_CODE_QUALITIES,
+  CONTROL_PLANE_AUDIT_DISPOSITIONS,
+  CONTROL_PLANE_AUDIT_FAULT_DOMAINS,
   CONTROL_PLANE_AUDIT_OUTCOMES,
 } from "../types/control-plane-audit";
 
@@ -32,6 +36,18 @@ export const controlPlaneAuditApi = {
       { cache: "no-store", ...(signal ? { signal } : {}) },
     );
     return parseControlPlaneAuditPage(response.data);
+  },
+
+  /**
+   * Full evidence for one event, including the before/after snapshots,
+   * diff, and metadata that `list`/`entityHistory` omit to keep pages small.
+   */
+  getById: async (id: string, signal?: AbortSignal) => {
+    const response = await axiosClient.get<unknown>(
+      `${BASE_URL}/${encodeURIComponent(id)}`,
+      { cache: "no-store", ...(signal ? { signal } : {}) },
+    );
+    return parseAuditEventDetailResponse(response.data);
   },
 };
 
@@ -73,7 +89,7 @@ function buildPage(items: unknown[], meta: Record<string, unknown>): ControlPlan
   }
 
   return {
-    items: items.map(parseAuditEvent),
+    items: items.map(parseAuditEventSummary),
     total,
     page,
     limit,
@@ -83,10 +99,27 @@ function buildPage(items: unknown[], meta: Record<string, unknown>): ControlPlan
   };
 }
 
-function parseAuditEvent(value: unknown): ControlPlaneAuditEvent {
+function parseAuditEventSummary(value: unknown): ControlPlaneAuditEventSummary {
   const event = record(value);
   if (!event) return invalidResponse();
+  return parseAuditEventCore(event);
+}
 
+function parseAuditEventDetailResponse(payload: unknown): ControlPlaneAuditEventDetail {
+  const envelope = record(payload);
+  if (!envelope || envelope.success !== true) return invalidResponse();
+  const event = record(envelope.data);
+  if (!event) return invalidResponse();
+  return {
+    ...parseAuditEventCore(event),
+    before: nullableRecord(event.before),
+    after: nullableRecord(event.after),
+    diff: parseDiff(event.diff),
+    metadata: nullableRecord(event.metadata),
+  };
+}
+
+function parseAuditEventCore(event: Record<string, unknown>): ControlPlaneAuditEventSummary {
   const actorType = enumValue(event.actorType, CONTROL_PLANE_AUDIT_ACTOR_TYPES);
   const outcome = enumValue(event.outcome, CONTROL_PLANE_AUDIT_OUTCOMES);
   const schemaVersion = positiveInteger(event.schemaVersion);
@@ -130,14 +163,19 @@ function parseAuditEvent(value: unknown): ControlPlaneAuditEvent {
     correlationId: nullableString(event.correlationId),
     requestId: nullableString(event.requestId),
     idempotencyKey: nullableString(event.idempotencyKey),
-    before: nullableRecord(event.before),
-    after: nullableRecord(event.after),
-    diff: parseDiff(event.diff),
     reason: nullableString(event.reason),
     ip: nullableString(event.ip),
     userAgent: nullableString(event.userAgent),
-    metadata: nullableRecord(event.metadata),
     occurredAt,
+    // Null on a successful event, and null on a failure served by a Core
+    // that predates the classification. An absent field is not an invalid
+    // response, so the row still renders instead of failing the whole page.
+    faultDomain:
+      enumValue(event.faultDomain, CONTROL_PLANE_AUDIT_FAULT_DOMAINS) ?? null,
+    disposition:
+      enumValue(event.disposition, CONTROL_PLANE_AUDIT_DISPOSITIONS) ?? null,
+    codeQuality:
+      enumValue(event.codeQuality, CONTROL_PLANE_AUDIT_CODE_QUALITIES) ?? null,
   };
 }
 

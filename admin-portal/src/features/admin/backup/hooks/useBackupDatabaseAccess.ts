@@ -17,7 +17,7 @@ import {
 
 export function useBackupDatabaseAccess() {
   const { user } = useAuth();
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const canRead = adminCan(user, "admin.database_servers.read");
   const canUpdatePolicy = adminCanAll(user, ADMIN_RBAC_CRITICAL.BACKUP_DB_ROTATION_POLICY_UPDATE);
@@ -99,14 +99,14 @@ export function useBackupDatabaseAccess() {
       if (selectedServerIdRef.current === serverId) {
         setBinding(next);
         setBindingServerId(serverId);
-        toast.success(lang === "ar" ? "تم تحديث سياسة التدوير" : "Rotation policy updated");
+        toast.success(t.backup.access.policyUpdatedTitle);
       }
       return next;
     } catch (caught) {
       const normalized = normalizeApiError(caught);
       if (selectedServerIdRef.current === serverId) {
         setError(normalized);
-        toast.error(lang === "ar" ? "فشل تحديث السياسة" : "Policy update failed", normalized.message);
+        toast.error(t.backup.access.policyUpdateFailedTitle, normalized.message);
       }
       throw normalized;
     } finally {
@@ -134,16 +134,13 @@ export function useBackupDatabaseAccess() {
       resetKey();
       if (selectedServerIdRef.current === serverId) {
         await refreshBinding();
-        toast.success(
-          lang === "ar" ? "تم قبول الأمر" : "Command accepted",
-          lang === "ar" ? "تم تحديث دليل الاعتماد الآمن." : "Secret-free credential evidence was refreshed.",
-        );
+        toast.success(t.backup.access.commandAcceptedTitle, t.backup.access.commandAcceptedDescription);
       }
     } catch (caught) {
       const normalized = normalizeApiError(caught);
       if (selectedServerIdRef.current === serverId) {
         setError(normalized);
-        toast.error(lang === "ar" ? "فشل الأمر" : "Command failed", normalized.message);
+        toast.error(t.backup.access.commandFailedTitle, normalized.message);
       }
       throw normalized;
     } finally {

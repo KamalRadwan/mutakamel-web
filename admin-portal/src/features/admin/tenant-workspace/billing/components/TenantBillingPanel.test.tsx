@@ -17,6 +17,16 @@ import type {
 } from "../types";
 import { TenantBillingPanel } from "./TenantBillingPanel";
 
+// TenantBillingPanel takes `lang` as a prop (its parent, TenantWorkspaceScreen,
+// owns the language state) and never called useI18n() itself — until this
+// panel's tables moved onto the design-system DataTable/Pagination, which do
+// call useI18n() internally for header/label language selection. Every test
+// below renders with lang="en", so this mock just gives DataTable/Pagination
+// the same answer the prop already provides.
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({ lang: "en" as const }),
+}));
+
 const TENANT_ID = "019f0000-0000-7000-8000-000000000001";
 const SUBSCRIPTION_ID = "019f0000-0000-7000-8000-000000000002";
 const ITEM_ID = "019f0000-0000-7000-8000-000000000003";
@@ -318,10 +328,39 @@ function workspaceFixture(
 
 function openPayments(workspace: UseTenantBillingWorkspaceResult) {
   render(<TenantBillingPanel workspace={workspace} lang="en" />);
-  fireEvent.click(screen.getByRole("tab", { name: "Payments" }));
+  activateTab("Payments");
+}
+
+function activateTab(name: string) {
+  const tab = screen.getByRole("tab", { name });
+  fireEvent.mouseDown(tab, { button: 0, ctrlKey: false });
+  fireEvent.click(tab);
 }
 
 describe("TenantBillingPanel safety boundaries", () => {
+  it("keeps current subscription rows and focus available during a background refresh", () => {
+    const workspace = workspaceFixture();
+    const view = render(<TenantBillingPanel workspace={workspace} lang="en" />);
+    const subscriptionTab = screen.getByRole("tab", { name: "Subscription" });
+    subscriptionTab.focus();
+    expect(screen.getByText("CRM")).toBeInTheDocument();
+
+    view.rerender(
+      <TenantBillingPanel
+        workspace={{
+          ...workspace,
+          subscriptionState: "loading",
+          billingSummaryState: "loading",
+        }}
+        lang="en"
+      />,
+    );
+
+    expect(screen.getByText("CRM")).toBeInTheDocument();
+    expect(screen.getByText(/Refreshing billing data/)).toBeInTheDocument();
+    expect(subscriptionTab).toHaveFocus();
+  });
+
   it("keeps an independently authorized invoice summary visible when subscription reads are forbidden", () => {
     const workspace = workspaceFixture({
       permissions: permissionFixture({
@@ -424,7 +463,7 @@ describe("TenantBillingPanel safety boundaries", () => {
     });
 
     render(<TenantBillingPanel workspace={workspace} lang="en" />);
-    fireEvent.click(screen.getByRole("tab", { name: "Wallet" }));
+    activateTab("Wallet");
 
     expect(
       screen.getByText(
@@ -434,6 +473,32 @@ describe("TenantBillingPanel safety boundaries", () => {
     expect(
       screen.queryByRole("button", { name: "Preview adjustment" }),
     ).not.toBeInTheDocument();
+  });
+
+  /**
+   * A JSX string attribute is not a JS string literal: `pattern="\\d"` reaches
+   * the DOM as a backslash followed by `d`, so the field rejected every amount
+   * and the browser cancelled the submit before any request was made — the
+   * wallet simply could not be credited or debited. The pattern has to mirror
+   * PreviewWalletAdjustmentDto.sourceAmount exactly.
+   */
+  it("accepts the amounts the wallet adjustment DTO accepts", () => {
+    const workspace = workspaceFixture({
+      permissions: permissionFixture({ canPreviewWalletAdjustment: true }),
+      wallet: walletFixture("ACTIVE"),
+    });
+
+    render(<TenantBillingPanel workspace={workspace} lang="en" />);
+    activateTab("Wallet");
+
+    const amount = screen.getByLabelText("Source amount");
+    const pattern = new RegExp(amount.getAttribute("pattern") ?? "(?!)", "u");
+    for (const accepted of ["0", "10", "500", "1250.75", "0.0001"]) {
+      expect(pattern.test(accepted)).toBe(true);
+    }
+    for (const rejected of ["", "01", "1.234567", "-5", "abc"]) {
+      expect(pattern.test(rejected)).toBe(false);
+    }
   });
 
   it("uses eligible reconciliation actions and requires provider evidence only for confirmed refunds", () => {
@@ -449,7 +514,7 @@ describe("TenantBillingPanel safety boundaries", () => {
     openPayments(workspace);
 
     const action = screen.getByLabelText("Action");
-    expect(action).toHaveValue("CONFIRM_FAILED");
+    expect(action).toHaveTextContent("CONFIRM_FAILED");
     expect(
       screen.queryByLabelText("Provider outcome reference"),
     ).not.toBeInTheDocument();
@@ -462,7 +527,8 @@ describe("TenantBillingPanel safety boundaries", () => {
     });
     expect(screen.getByRole("button", { name: "Propose" })).toBeEnabled();
 
-    fireEvent.change(action, { target: { value: "CONFIRM_REFUNDED" } });
+    fireEvent.click(action);
+    fireEvent.click(screen.getByRole("option", { name: "CONFIRM_REFUNDED" }));
     const providerReference = screen.getByLabelText(
       "Provider outcome reference",
     );
@@ -562,7 +628,7 @@ describe("TenantBillingPanel safety boundaries", () => {
       screen.getByRole("button", { name: "Apply reviewed change" }),
     ).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Wallet" }));
+    activateTab("Wallet");
     fireEvent.change(screen.getByLabelText("Audit note"), {
       target: { value: "Reviewed manual credit" },
     });

@@ -18,6 +18,7 @@ import {
   ensureAdminCookieSessionFresh,
   getStoredSessionMeta,
   readWebAuthSessionResponse,
+  startAdminVisibleSessionPresenceScheduler,
   storeAdminSessionMetadata,
   synchronizeAdminTabSession,
   shouldHonorSessionEndedEvent,
@@ -105,11 +106,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const proactiveSchedulerRef = useRef<AdminSessionRefreshScheduler | null>(
     null,
   );
+  const visiblePresenceSchedulerRef = useRef<ReturnType<
+    typeof startAdminVisibleSessionPresenceScheduler
+  > | null>(null);
   const mountedRef = useRef(true);
 
-  const stopProactiveRefresh = useCallback(() => {
+  const stopSessionMaintenance = useCallback(() => {
     proactiveSchedulerRef.current?.stop();
     proactiveSchedulerRef.current = null;
+    visiblePresenceSchedulerRef.current?.stop();
+    visiblePresenceSchedulerRef.current = null;
   }, []);
 
   const cancelScheduledBootstrapRetry = useCallback(() => {
@@ -230,7 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     subscribeToAdminAuthEvents((event) => {
       if (event.kind === "session-ended") {
         if (!shouldHonorSessionEndedEvent(event)) return;
-        stopProactiveRefresh();
+        stopSessionMaintenance();
         resetBootstrapRetry();
         clearLocalAuthState();
         setUser(null);
@@ -241,7 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const synchronization = synchronizeAdminTabSession(event);
       if (synchronization.ignored) return;
       if (synchronization.sessionChanged) {
-        stopProactiveRefresh();
+        stopSessionMaintenance();
         resetBootstrapRetry();
         setUser(null);
         setAuthState("STALE");
@@ -249,6 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       proactiveSchedulerRef.current?.reschedule();
+      visiblePresenceSchedulerRef.current?.reschedule();
       if (synchronization.claimsChanged) {
         requestAuthoritativeBootstrap();
       } else if (
@@ -257,17 +264,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ) {
         requestAuthoritativeBootstrap();
       }
-    }), [requestAuthoritativeBootstrap, resetBootstrapRetry, router, stopProactiveRefresh]);
+    }), [requestAuthoritativeBootstrap, resetBootstrapRetry, router, stopSessionMaintenance]);
 
   useEffect(() =>
     subscribeToAdminAuthLifecycle((state) => {
       if (state === "ENDED") {
-        stopProactiveRefresh();
+        stopSessionMaintenance();
         resetBootstrapRetry();
         setUser(null);
         setAuthState("ENDED");
         router.replace("/login");
         return;
+      }
+      if (state === "AUTHENTICATED") {
+        // Auth lifecycle publication follows metadata persistence, so a cold
+        // `/auth/me` bootstrap can re-arm from the newly seeded timing.
+        visiblePresenceSchedulerRef.current?.reschedule();
       }
       if (state === "AUTHENTICATED" && user === null) {
         setAuthState((current) =>
@@ -277,11 +289,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       setAuthState(state);
-    }), [requestAuthoritativeBootstrap, resetBootstrapRetry, router, stopProactiveRefresh, user]);
+    }), [requestAuthoritativeBootstrap, resetBootstrapRetry, router, stopSessionMaintenance, user]);
 
   useEffect(() => {
     if (!user) {
-      stopProactiveRefresh();
+      stopSessionMaintenance();
       return;
     }
 
@@ -291,27 +303,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onTerminal: () => endAdminBrowserSession(),
     });
     proactiveSchedulerRef.current = scheduler;
+    const visiblePresenceScheduler =
+      startAdminVisibleSessionPresenceScheduler();
+    visiblePresenceSchedulerRef.current = visiblePresenceScheduler;
 
-    const wake = () => scheduler.wake();
-    const wakeWhenVisible = () => {
+    const wake = () => {
+      scheduler.wake();
+      visiblePresenceScheduler.wake();
+    };
+    const syncVisibility = () => {
+      visiblePresenceScheduler.syncVisibility();
       if (document.visibilityState !== "hidden") scheduler.wake();
     };
-    document.addEventListener("visibilitychange", wakeWhenVisible);
+    document.addEventListener("visibilitychange", syncVisibility);
     window.addEventListener("pageshow", wake);
     window.addEventListener("focus", wake);
     window.addEventListener("online", wake);
 
     return () => {
       scheduler.stop();
+      visiblePresenceScheduler.stop();
       if (proactiveSchedulerRef.current === scheduler) {
         proactiveSchedulerRef.current = null;
       }
-      document.removeEventListener("visibilitychange", wakeWhenVisible);
+      if (visiblePresenceSchedulerRef.current === visiblePresenceScheduler) {
+        visiblePresenceSchedulerRef.current = null;
+      }
+      document.removeEventListener("visibilitychange", syncVisibility);
       window.removeEventListener("pageshow", wake);
       window.removeEventListener("focus", wake);
       window.removeEventListener("online", wake);
     };
-  }, [stopProactiveRefresh, user]);
+  }, [stopSessionMaintenance, user]);
 
   const login = useCallback(async ({
     email,
@@ -319,7 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     rememberMe = false,
   }: LoginOptions) => {
     let sessionCommitted = false;
-    stopProactiveRefresh();
+    stopSessionMaintenance();
     resetBootstrapRetry();
     setAuthState("BOOTSTRAPPING");
     try {
@@ -408,14 +431,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthState(disposition === "end" ? "ENDED" : "UNAUTHENTICATED");
       throw error;
     }
-  }, [resetBootstrapRetry, router, scheduleBootstrapRetry, stopProactiveRefresh]);
+  }, [resetBootstrapRetry, router, scheduleBootstrapRetry, stopSessionMaintenance]);
 
   const acceptInvite = useCallback(async ({
     token,
     newPassword,
   }: AdminPasswordActionOptions) => {
     let sessionCommitted = false;
-    stopProactiveRefresh();
+    stopSessionMaintenance();
     resetBootstrapRetry();
     setAuthState("BOOTSTRAPPING");
     try {
@@ -504,7 +527,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthState(disposition === "end" ? "ENDED" : "UNAUTHENTICATED");
       throw error;
     }
-  }, [resetBootstrapRetry, router, scheduleBootstrapRetry, stopProactiveRefresh]);
+  }, [resetBootstrapRetry, router, scheduleBootstrapRetry, stopSessionMaintenance]);
 
   const logout = useCallback(async () => {
     const sessionId = getStoredSessionMeta()?.sessionId;
@@ -578,13 +601,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       throw error;
     }
-    stopProactiveRefresh();
+    stopSessionMaintenance();
     clearLocalAuthState();
     publishAdminAuthEvent("session-ended", sessionId, false);
     setUser(null);
     setAuthState("ENDED");
     router.replace("/login");
-  }, [resetBootstrapRetry, router, stopProactiveRefresh, user]);
+  }, [resetBootstrapRetry, router, stopSessionMaintenance, user]);
 
   const logoutAll = useCallback(async () => {
     const sessionId = getStoredSessionMeta()?.sessionId;
@@ -617,13 +640,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthState(disposition === "retain" ? "DEGRADED" : "AUTHENTICATED");
       throw error;
     }
-    stopProactiveRefresh();
+    stopSessionMaintenance();
     clearLocalAuthState();
     publishAdminAuthEvent("session-ended", sessionId, false);
     setUser(null);
     setAuthState("ENDED");
     router.replace("/login");
-  }, [resetBootstrapRetry, router, stopProactiveRefresh]);
+  }, [resetBootstrapRetry, router, stopSessionMaintenance]);
 
   const retryBootstrap = useCallback(
     () => bootstrap(true),

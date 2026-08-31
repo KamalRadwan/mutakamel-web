@@ -70,7 +70,7 @@ export function readReleaseValidationSnapshot(
   });
 }
 
-export function readReleaseDraft(value: unknown): ReleaseDraft {
+function readReleaseDraft(value: unknown): ReleaseDraft {
   const row = requiredRecord(value);
   const status = oneOf(row.status, RELEASE_DRAFT_STATUSES) as ReleaseDraftStatus;
   const publisherKeyId = nullableUuidV7(row.publisherKeyId);
@@ -103,7 +103,7 @@ export function readReleaseDraft(value: unknown): ReleaseDraft {
   };
 }
 
-export function readRelease(value: unknown): ProvisioningRelease {
+function readRelease(value: unknown): ProvisioningRelease {
   const row = requiredRecord(value);
   const status = oneOf(row.status, RELEASE_STATUSES) as ReleaseStatus;
   const publicationSource = oneOf(

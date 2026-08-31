@@ -1,131 +1,149 @@
 # Tenant Portal Documentation
 
-Last documentation verification: **2026-08-10**
+Last full rebuild: **2026-08-27**
 
-This is the source-verified build guide for the standalone `tenant-portal`, the
-current Tenant browser application in the split
-`C:\mutakamel.ai\frontend\{admin-portal,tenant-portal,partner-portal}`
-workspace. Local Tenant ingress targets this application on port `5002`.
+This set is written to one standard: **an agent implementing a feature should
+never have to stop and ask a question.** Every value that a screen needs — a
+color, a font size, a control height, an enum wire value, a permission string,
+a route, a folder name, a dictionary key — is written down somewhere in here as
+an exact value, not as a principle to interpret.
 
-The historically documented consolidated
-`../backend/mutakamel-apps/mutakamel-web-app` workspace is absent from the
-current checkout and is not a live frontend or runtime source. Any retained
-reference to that path must be explicitly labelled as dated historical
-replacement evidence.
+If you find yourself about to ask "which X should I use?", that is a bug in
+this documentation. Record it in [build/OPEN-QUESTIONS.md](build/OPEN-QUESTIONS.md)
+and pick the option most consistent with the surrounding rules.
 
-Documentation describes both backend capability and intended replacement
-coverage. Every page must state whether the new `tenant-portal` implementation
-is live, partial, absent, or only planned.
+## Reading order
 
-## Start here
+Do not skim. These are ordered so that each one assumes the previous.
 
-1. [Documentation contract](DOCUMENTATION_CONTRACT.md)
-2. [Replacement scope](app/replacement-scope.md)
-3. [Capability and route map](app/capability-map.md)
-4. [System context](architecture/system-context.md)
-5. [API and Gateway rules](api/README.md)
-6. [Validation rules](validation/README.md)
-7. [Security model](security/README.md)
-8. [Static data](static-data.md)
-9. [AI start page](ai/START_HERE.md)
-10. [Examples](examples/README.md)
-11. [Audit and coverage](audit/README.md)
-12. [Generated tenant routes](generated/tenant-api-routes.md)
+| # | Read | Why |
+| --- | --- | --- |
+| 1 | [CONTRACT.md](CONTRACT.md) | How to tell truth from prose; source precedence |
+| 2 | [architecture/file-architecture.md](architecture/file-architecture.md) | Where every file goes and what may import what |
+| 3 | [architecture/routing.md](architecture/routing.md) | Route groups, layouts, guards, the release allowlist |
+| 4 | [architecture/data-layer.md](architecture/data-layer.md) | Transport, hooks, response validation, errors |
+| 5 | [design/DESIGN-SYSTEM.md](design/DESIGN-SYSTEM.md) | **The complete design spec** — read in full |
+| 6 | [design/anti-patterns.md](design/anti-patterns.md) | The banned list. Read before writing any markup |
+| 7 | [api/README.md](api/README.md) | Gateway rules, envelopes, idempotency |
+| 8 | The specific `api/*.md` for your feature | Routes, DTOs, permissions, errors |
+| 9 | [build/HANDOFF.md](build/HANDOFF.md) | If you are executing the rebuild |
+| 10 | [build/CRM-AUDIT-REVIEW.md](build/CRM-AUDIT-REVIEW.md) | **What an outside audit found, and which of its claims survived re-checking.** Read it before writing CRM code — it is the verdict on the state of this stack, and it settles ten questions that were otherwise going to be re-litigated |
 
-## Documentation map
+## Map
 
-| Area | Purpose |
+```text
+docs/
+  CONTRACT.md            documentation rules and source precedence
+  architecture/          how the application is put together
+  design/                the design system — tokens through components
+  api/                   backend contracts, by domain
+  reference/             permissions, enum wire values, error codes
+  build/                 the rebuild plan and its handoff
+  generated/             regenerated from backend source; never hand-edit
+```
+
+### architecture/
+
+| File | Contents |
 | --- | --- |
-| `app/` | Replacement boundary, feature ownership, routes, and delivery status |
-| `architecture/` | Runtime boundaries and cross-application flows |
-| `api/` | Core, CRM, and Trade tenant API contracts |
-| `validation/` | Transport, form, query, response, and state validation |
-| `security/` | Threat model, authentication, isolation, and browser rules |
-| `ai/` | Compact context and implementation rules for coding agents |
-| `examples/` | Safe integration and error-handling examples |
-| `audit/` | Route coverage and source-verification evidence |
-| `generated/` | Regenerable inventories; never hand-edit |
+| [file-architecture.md](architecture/file-architecture.md) | Folder tree, naming rules, dependency direction, barrel policy |
+| [routing.md](architecture/routing.md) | Route groups, layouts, host admission, the proxy allowlist |
+| [data-layer.md](architecture/data-layer.md) | `axiosClient`, hook shape, runtime response validation, error normalization |
+| [security-headers.md](architecture/security-headers.md) | Nginx Proxy Manager vs app-owned CSP, and the nonce |
+| [testing.md](architecture/testing.md) | Test kinds, patterns, what to test per phase |
+| [state.md](architecture/state.md) | What state lives where, and what is never client-owned |
 
-## Backend ownership
+### design/
 
-| Backend app | Tenant Portal responsibility |
+| File | Contents |
 | --- | --- |
-| API Gateway | Only browser-facing API edge; canonical paths, JWT checks, transport policy, rate limits, and trusted context |
-| Core | Host admission, tenant auth, identity, organization, RBAC, workspace, billing, notifications, templates, activities, subscriptions, and tenant update projections |
-| CRM | Leads, profiles, opportunities, activities, pipelines, outbound email, attachments, and CRM dashboards |
-| Trade | Catalogue, accounts, pricing, quotations, orders, purchasing, inventory, policy, automation, Control Tower, and Trade dashboards |
-| Worker | Background provisioning, migrations, rendering, email, notifications, and scheduled effects; never called directly by Tenant Portal |
-| Shared packages | Auth, database tenancy, common DTOs, broker contracts, storage, templates, logging, and other cross-cutting primitives |
+| **[DESIGN-SYSTEM.md](design/DESIGN-SYSTEM.md)** | **The complete spec — palette, type, sizing, libraries, per-page UI/UX** |
+| [README.md](design/README.md) | The five laws, and the index |
+| [tokens.md](design/tokens.md) | Four color roles, OKLCH ramps, semantic tokens, both themes |
+| [typography.md](design/typography.md) | Font pairing, 7-step scale, 3-weight policy, Arabic lift |
+| [geometry.md](design/geometry.md) | Radius, spacing, control heights, row density, elevation |
+| [motion.md](design/motion.md) | The animation budget and every permitted keyframe |
+| [primitives.md](design/primitives.md) | Every primitive's exact props and variants |
+| [patterns.md](design/patterns.md) | Every composite pattern's exact props |
+| [views.md](design/views.md) | **The three-view contract** — board, card, table |
+| [detail-screens.md](design/detail-screens.md) | Lead & customer detail, and the conversion flow |
+| [accessibility.md](design/accessibility.md) | The single per-screen a11y checklist |
+| [states.md](design/states.md) | **The eleven-state contract** — every state a data screen renders |
+| [SKILL-AUDIT.md](design/SKILL-AUDIT.md) | ui-ux-pro-max audit — 17 gaps, 5 divergences |
+| [shell.md](design/shell.md) | Sidebar, topbar, navigation map |
+| [theming.md](design/theming.md) | Light/dark, RTL, and the no-flash requirement |
+| [i18n.md](design/i18n.md) | Dictionary structure and the zero-ternary rule |
+| [anti-patterns.md](design/anti-patterns.md) | What must never appear in this codebase |
+| [enforcement.md](design/enforcement.md) | Census, RTL guard, ESLint rules, CI gates |
+
+### api/
+
+| File | Contents |
+| --- | --- |
+| [README.md](api/README.md) | Canonical paths, envelopes, idempotency, pagination |
+| [core-auth.md](api/core-auth.md) | Login, refresh, logout, `/me`, sessions, invite, reset |
+| [core-notifications.md](api/core-notifications.md) | Notification list, read, read-all, realtime |
+| [crm-leads.md](api/crm-leads.md) | Leads, stages, conversion, capabilities |
+| [crm-customer-profiles.md](api/crm-customer-profiles.md) | Profiles, contacts, capabilities |
+| [crm-opportunities.md](api/crm-opportunities.md) | Opportunities, pipelines, stages, board |
+| [crm-catalogues.md](api/crm-catalogues.md) | Lead stages, acquisition sources, custom fields, settings, static data |
+| [core-reference.md](api/core-reference.md) | **Generated** — all 199 Core routes |
+| [crm-reference.md](api/crm-reference.md) | **Generated** — all 143 CRM routes |
+| [trade-reference.md](api/trade-reference.md) | **Generated** — all 231 Trade routes; not yet built |
+
+### reference/
+
+| File | Contents |
+| --- | --- |
+| [permissions.md](reference/permissions.md) | Every permission string and its scope semantics |
+| [enums.md](reference/enums.md) | Every enum's exact case-sensitive wire values |
+| [errors.md](reference/errors.md) | Error handling policy — status, codes, ambiguous outcomes |
+| [dto-fields.md](reference/dto-fields.md) | **Generated** — every request-body field, 46 classes |
+| [error-codes.md](reference/error-codes.md) | **Generated** — 95 error codes with HTTP status |
 
 ## Canonical browser paths
 
 ```text
-/api/tenant/core/v1/*   -> API Gateway -> Core
-/api/tenant/crm/v1/*    -> API Gateway -> CRM
-/api/tenant/trade/v1/*  -> API Gateway -> Trade
+/api/tenant/core/v1/*   ->  API Gateway  ->  core-app
+/api/tenant/crm/v1/*    ->  API Gateway  ->  crm-app
+/api/tenant/trade/v1/*  ->  API Gateway  ->  trade-app
 ```
 
-Controller-relative paths such as `/tenant/auth`, `/crm/leads`, or
-`/trade/quotations` are backend implementation paths. Browser code must not
-call them directly.
+API Gateway is the **only** browser-facing backend edge. Controller-relative
+paths (`/crm/leads`, `/tenant/auth`) are backend implementation detail and must
+never appear in browser code. `worker-app` has no tenant browser API at all —
+its results are read through Core, CRM, or Trade projections.
 
-Public host admission is performed server-side using the Gateway-exposed Core
-host-status contract and the original request host. Unknown or unverified hosts
-must fail before tenant UI renders.
+## Hard rules
 
-## API references
+These are repeated in [AGENTS.md](../AGENTS.md) because they are the ones that
+cause real damage when broken.
 
-### Core
+1. **Never edit anything under `../backend/`.** Read it to verify contracts.
+2. **Port `5002`.** Never run this app on another port.
+3. **Never invent** a DTO field, enum value, permission string, route, or error
+   code. If source does not prove it, it does not exist.
+4. **Never compute** financial, permission, entitlement, or lifecycle truth in
+   the browser. The backend is authoritative; the UI reflects it.
+5. **Preserve exactly**: decimal strings, UUIDs, cursors, ETags, version pins,
+   idempotency keys. Never parse a decimal into a JavaScript number.
+6. **No feature is done** until it is server-backed, bilingual, themed in both
+   light and dark, keyboard-operable, and tested.
 
-- [Authentication](api/auth.md)
-- [Tenant host admission](api/tenant-host.md)
-- [Organization](api/organization.md)
-- [Users and directory](api/users.md)
-- [Roles](api/roles.md)
-- [User modules and seats](api/user-modules.md)
-- [Billing and subscriptions](api/billing.md)
-- [Workspace settings](api/settings.md)
-- [Notifications](api/notifications.md)
-- [Templates](api/templates.md)
-- [Activities](api/activities.md)
+## Verification
 
-Additional Core pages are listed in [API index](api/README.md).
+From `tenant-portal/`:
 
-### CRM
-
-- [CRM index](api/crm/README.md)
-
-### Trade
-
-- [Trade index](api/trade/README.md)
-
-## Cross-cutting references
-
-- [DTO conventions](dtos.md)
-- [RBAC matrix](rbac-matrix.md)
-- [Static data and enums](static-data.md)
-- [Error handling](validation/error-handling.md)
-- [API examples](examples/api-requests.md)
-
-## Source roots
-
-Backend source is read-only for this frontend project. Paths below are relative
-to `C:\mutakamel.ai\frontend`:
-
-```text
-../backend/mutakamel-apps/api-gateway-app
-../backend/mutakamel-apps/core-app
-../backend/mutakamel-apps/crm-app
-../backend/mutakamel-apps/trade-app
-../backend/mutakamel-apps/worker-app
-../backend/mutakamel-apps/shared-libs
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm docs:routes:check
+pnpm design:census -- --check
+pnpm design:rtl
+pnpm build
 ```
 
-Historical only and absent from the current checkout:
-
-```text
-../backend/mutakamel-apps/mutakamel-web-app
-```
-
-When source and prose disagree, follow
-[DOCUMENTATION_CONTRACT.md](DOCUMENTATION_CONTRACT.md) and correct the prose.
+A green run of all seven is the definition of done for a phase. See
+[design/enforcement.md](design/enforcement.md) for what each gate actually
+measures and how to move a baseline honestly.

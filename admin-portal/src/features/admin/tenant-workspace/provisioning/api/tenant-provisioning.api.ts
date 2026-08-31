@@ -1,4 +1,5 @@
 import { axiosClient } from "@/lib/api/axiosClient";
+import { extractCoreData, extractCoreMeta } from "@/shared/api/core-envelope";
 import type { SuccessResponse } from "@/types/common";
 import {
   readManagedProvisioningOperation,
@@ -71,8 +72,8 @@ export const tenantProvisioningApi = {
       { signal },
     );
     return readProvisioningPage(
-      response.data.data,
-      response.data.meta,
+      extractCoreData(response),
+      extractCoreMeta(response),
       readTenantOperationSummary,
       "INVALID_TENANT_OPERATIONS_PAGE_RESPONSE",
     );
@@ -87,7 +88,7 @@ export const tenantProvisioningApi = {
       `${tenantRoot(tenantId)}/operations/${encodeURIComponent(operationId)}`,
       { signal },
     );
-    return readTenantOperationDetail(response.data.data);
+    return readTenantOperationDetail(extractCoreData(response));
   },
 
   async listTimeline(
@@ -102,8 +103,8 @@ export const tenantProvisioningApi = {
       { signal },
     );
     return readProvisioningPage(
-      response.data.data,
-      response.data.meta,
+      extractCoreData(response),
+      extractCoreMeta(response),
       readTenantOperationTimelineEvent,
       "INVALID_TENANT_OPERATION_TIMELINE_PAGE_RESPONSE",
     );
@@ -119,7 +120,7 @@ export const tenantProvisioningApi = {
       {},
       commandConfig(idempotencyKey),
     );
-    return readTenantProvisioningCommandResult(response.data.data);
+    return readTenantProvisioningCommandResult(extractCoreData(response));
   },
 
   async cancelOperation(
@@ -132,7 +133,7 @@ export const tenantProvisioningApi = {
       {},
       commandConfig(idempotencyKey),
     );
-    return readTenantProvisioningCommandResult(response.data.data);
+    return readTenantProvisioningCommandResult(extractCoreData(response));
   },
 
   async listUpdates(
@@ -146,8 +147,8 @@ export const tenantProvisioningApi = {
       { signal },
     );
     return readProvisioningPage(
-      response.data.data,
-      response.data.meta,
+      extractCoreData(response),
+      extractCoreMeta(response),
       readTenantAvailableUpdate,
       "INVALID_TENANT_UPDATES_PAGE_RESPONSE",
     );
@@ -163,7 +164,7 @@ export const tenantProvisioningApi = {
       dto,
       commandConfig(idempotencyKey),
     );
-    return readTenantProvisioningCommandResult(response.data.data);
+    return readTenantProvisioningCommandResult(extractCoreData(response));
   },
 
   async requestPrerequisites(
@@ -176,7 +177,7 @@ export const tenantProvisioningApi = {
       dto,
       commandConfig(idempotencyKey),
     );
-    return readTenantPrerequisiteRequest(response.data.data);
+    return readTenantPrerequisiteRequest(extractCoreData(response));
   },
 
   async listPrerequisiteEvidence(tenantId: string, signal?: AbortSignal) {
@@ -184,10 +185,11 @@ export const tenantProvisioningApi = {
       `${provisioningRoot(tenantId)}/prerequisite-evidence`,
       { signal },
     );
-    if (!Array.isArray(response.data.data)) {
+    const data = extractCoreData(response);
+    if (!Array.isArray(data)) {
       throw new Error("INVALID_TENANT_PREREQUISITE_EVIDENCE_RESPONSE");
     }
-    return response.data.data.map(readTenantPrerequisiteEvidenceRecord);
+    return data.map(readTenantPrerequisiteEvidenceRecord);
   },
 
   async listComponents(
@@ -201,8 +203,8 @@ export const tenantProvisioningApi = {
       { signal },
     );
     return readProvisioningPage(
-      response.data.data,
-      response.data.meta,
+      extractCoreData(response),
+      extractCoreMeta(response),
       readTenantComponentInstallation,
       "INVALID_TENANT_COMPONENTS_PAGE_RESPONSE",
     );
@@ -219,8 +221,8 @@ export const tenantProvisioningApi = {
       { signal },
     );
     return readProvisioningPage(
-      response.data.data,
-      response.data.meta,
+      extractCoreData(response),
+      extractCoreMeta(response),
       readTenantSeedState,
       "INVALID_TENANT_SEEDS_PAGE_RESPONSE",
     );
@@ -236,7 +238,7 @@ export const tenantProvisioningApi = {
       dto,
       commandConfig(idempotencyKey),
     );
-    return readManagedProvisioningOperation(response.data.data);
+    return readManagedProvisioningOperation(extractCoreData(response));
   },
 
   async repair(
@@ -249,7 +251,7 @@ export const tenantProvisioningApi = {
       dto,
       commandConfig(idempotencyKey),
     );
-    return readManagedProvisioningOperation(response.data.data);
+    return readManagedProvisioningOperation(extractCoreData(response));
   },
 
   async decommission(
@@ -262,7 +264,7 @@ export const tenantProvisioningApi = {
       dto,
       commandConfig(idempotencyKey),
     );
-    return readManagedProvisioningOperation(response.data.data);
+    return readManagedProvisioningOperation(extractCoreData(response));
   },
 
   async resolveSeedConflict(
@@ -276,6 +278,6 @@ export const tenantProvisioningApi = {
       dto,
       commandConfig(idempotencyKey),
     );
-    return readSeedConflictResolution(response.data.data);
+    return readSeedConflictResolution(extractCoreData(response));
   },
 };

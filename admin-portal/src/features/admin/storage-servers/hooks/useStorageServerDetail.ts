@@ -11,6 +11,8 @@ import { useIdempotency } from "@/shared/hooks/useIdempotency";
 import { storageServersApi } from "../api/storage-servers.api";
 import { shouldResetStorageServerWriteKey } from "../lib/storage-server-contract";
 import type {
+  RotateStorageCredentialsDto,
+  StorageCredentialRotationView,
   StorageServerProbeResult,
   StorageServerView,
   UpdateStorageServerDto,
@@ -25,6 +27,7 @@ export function useStorageServerDetail(id: string) {
   const [server, setServer] = useState<StorageServerView | null>(null);
   const [loadedServerId, setLoadedServerId] = useState<string | null>(null);
   const [lastProbe, setLastProbe] = useState<StorageServerProbeResult | null>(null);
+  const [currentRotation, setCurrentRotation] = useState<StorageCredentialRotationView | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -72,6 +75,7 @@ export function useStorageServerDetail(id: string) {
       setServer(null);
       setLoadedServerId(null);
       setLastProbe(null);
+      setCurrentRotation(null);
       setError(null);
       setIsLoading(true);
     });
@@ -164,6 +168,55 @@ export function useStorageServerDetail(id: string) {
     return updated;
   }, [assertCurrentServer, canUpdate, id, write]);
 
+  const drain = useCallback(async () => {
+    if (!canUpdate) throw new Error("STORAGE_SERVER_UPDATE_FORBIDDEN");
+    assertCurrentServer();
+    const updated = await write(
+      { action: "drain", id },
+      (key) => storageServersApi.drain(id, key),
+    );
+    if (idRef.current !== id) throw new Error("STORAGE_SERVER_CONTEXT_CHANGED");
+    setServer(updated);
+    return updated;
+  }, [assertCurrentServer, canUpdate, id, write]);
+
+  const rotateCredentials = useCallback(
+    async (credentials: RotateStorageCredentialsDto["credentials"], graceHours?: number) => {
+      if (!canUpdate || !server) throw new Error("STORAGE_SERVER_UPDATE_FORBIDDEN");
+      assertCurrentServer();
+      const expectedConfigRevision = server.configRevision;
+      const result = await write(
+        { action: "rotateCredentials", id, expectedConfigRevision },
+        (key) =>
+          storageServersApi.rotateCredentials(
+            id,
+            { expectedConfigRevision, credentials, graceHours },
+            key,
+          ),
+      );
+      if (idRef.current !== id) throw new Error("STORAGE_SERVER_CONTEXT_CHANGED");
+      setCurrentRotation(result);
+      await refresh();
+      return result;
+    },
+    [assertCurrentServer, canUpdate, id, refresh, server, write],
+  );
+
+  const revokeCredentialRotation = useCallback(
+    async (rotationId: string) => {
+      if (!canUpdate) throw new Error("STORAGE_SERVER_UPDATE_FORBIDDEN");
+      assertCurrentServer();
+      const result = await write(
+        { action: "revokeCredentialRotation", id, rotationId },
+        (key) => storageServersApi.revokeCredentialRotation(id, rotationId, key),
+      );
+      if (idRef.current !== id) throw new Error("STORAGE_SERVER_CONTEXT_CHANGED");
+      setCurrentRotation(result);
+      return result;
+    },
+    [assertCurrentServer, canUpdate, id, write],
+  );
+
   const remove = useCallback(async () => {
     if (!canDelete) throw new Error("STORAGE_SERVER_DELETE_FORBIDDEN");
     assertCurrentServer();
@@ -183,6 +236,7 @@ export function useStorageServerDetail(id: string) {
     server: loadedServerId === id ? server : null,
     loadedServerId,
     lastProbe,
+    currentRotation,
     isLoading,
     isMutating,
     error,
@@ -194,6 +248,9 @@ export function useStorageServerDetail(id: string) {
     activate,
     probe,
     offline,
+    drain,
+    rotateCredentials,
+    revokeCredentialRotation,
     remove,
     makePlatformDefault,
     refresh,

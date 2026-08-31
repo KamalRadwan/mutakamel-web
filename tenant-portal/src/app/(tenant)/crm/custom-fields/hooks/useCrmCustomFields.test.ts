@@ -6,7 +6,7 @@ import {
   normalizeCrmCustomFieldKey,
   parseCrmCustomField,
   parseCrmCustomFieldsResponse,
-} from "./useCrmCustomFields";
+} from "../custom-field-contract";
 
 const definition = {
   id: "0191e9a8-7f51-7b32-8d72-19f9217a41b3",

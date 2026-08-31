@@ -1,6 +1,6 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 
-export const GATEWAY_IDEMPOTENCY_IN_FLIGHT = "GW.IDEM.IN_FLIGHT";
+const GATEWAY_IDEMPOTENCY_IN_FLIGHT = "GW.IDEM.IN_FLIGHT";
 
 /**
  * A definitive client rejection completes the submitted command identity.

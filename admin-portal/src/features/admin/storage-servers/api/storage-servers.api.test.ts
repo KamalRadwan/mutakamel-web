@@ -98,4 +98,66 @@ describe("storage servers API", () => {
     expect(postMock.mock.calls[1]?.[2]).toEqual(expected);
     expect(deleteMock.mock.calls[0]?.[1]).toEqual(expected);
   });
+
+  it("drains an active server with an idempotency key", async () => {
+    const draining = { id: SERVER_ID, status: "DRAINING" };
+    postMock.mockResolvedValue(envelope(draining));
+
+    await expect(storageServersApi.drain(SERVER_ID, COMMAND_ID)).resolves.toEqual(draining);
+
+    expect(postMock).toHaveBeenCalledWith(
+      `/api/admin/core/v1/storage-servers/${SERVER_ID}/drain`,
+      {},
+      { headers: { "x-idempotency-key": COMMAND_ID } },
+    );
+  });
+
+  it("stages a revision-fenced credential rotation and never leaks the secret in the resolved result", async () => {
+    const rotation = {
+      id: "019f0000-0000-7000-8000-000000000030",
+      storageServerId: SERVER_ID,
+      expectedConfigRevision: 4,
+      operationGeneration: "5",
+      nextCredentialsRevision: 5,
+      graceHours: 4,
+      status: "STAGED",
+      stagedAt: "2026-08-26T12:00:00.000Z",
+      activatedAt: null,
+      graceExpiresAt: null,
+      revokedAt: null,
+    };
+    postMock.mockResolvedValue(envelope(rotation));
+
+    const dto = {
+      expectedConfigRevision: 4,
+      credentials: { accessKeyId: "AKIAEXAMPLE", secretAccessKey: "s".repeat(32) },
+      graceHours: 4,
+    };
+    await expect(
+      storageServersApi.rotateCredentials(SERVER_ID, dto, COMMAND_ID),
+    ).resolves.toEqual(rotation);
+
+    expect(postMock).toHaveBeenCalledWith(
+      `/api/admin/core/v1/storage-servers/${SERVER_ID}/credential-rotations`,
+      dto,
+      { headers: { "x-idempotency-key": COMMAND_ID } },
+    );
+    expect(JSON.stringify(rotation)).not.toMatch(/accessKey|secret/i);
+  });
+
+  it("revokes a credential rotation by id with an idempotency key", async () => {
+    const rotationId = "019f0000-0000-7000-8000-000000000030";
+    const revoked = { id: rotationId, status: "REVOKED" };
+    postMock.mockResolvedValue(envelope(revoked));
+
+    await expect(
+      storageServersApi.revokeCredentialRotation(SERVER_ID, rotationId, COMMAND_ID),
+    ).resolves.toEqual(revoked);
+
+    expect(postMock).toHaveBeenCalledWith(
+      `/api/admin/core/v1/storage-servers/${SERVER_ID}/credential-rotations/${rotationId}/revoke`,
+      {},
+      { headers: { "x-idempotency-key": COMMAND_ID } },
+    );
+  });
 });

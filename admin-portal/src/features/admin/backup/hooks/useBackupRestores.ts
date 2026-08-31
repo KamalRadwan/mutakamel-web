@@ -25,7 +25,7 @@ import { shouldRetainBackupCommandKey } from "../lib/backup-format";
 
 export function useBackupRestores() {
   const { user } = useAuth();
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const toast = useToast();
   const searchParams = useSearchParams();
   const canReadServers = adminCan(user, "admin.database_servers.read");
@@ -94,7 +94,6 @@ export function useBackupRestores() {
     if (enrichment.ok) {
       setServers(enrichment.data);
     } else {
-      setServers([]);
       setEnrichmentWarning(enrichment.error);
     }
   }, [canReadServers, query]);
@@ -126,19 +125,11 @@ export function useBackupRestores() {
   ) => {
     if (shouldRetainBackupCommandKey(normalized)) {
       setRetryableCommandError(normalized);
-      toast.warning(
-        lang === "ar" ? "يمكن إعادة محاولة نفس أمر الاستعادة بأمان" : "The same restore command can be retried safely",
-        lang === "ar"
-          ? "يظل مفتاح الأمر ثابتًا حتى يعيد Worker نفس عملية الاستعادة."
-          : "The command key remains stable so Worker returns the same restore run.",
-      );
+      toast.warning(t.backup.restores.retryableTitle, t.backup.restores.retryableDescription);
     } else {
       clearAttempt();
       setError(normalized);
-      toast.error(
-        lang === "ar" ? "فشل أمر الاستعادة" : "Restore command failed",
-        normalized.message,
-      );
+      toast.error(t.backup.restores.commandFailedTitle, normalized.message);
     }
   };
 
@@ -155,10 +146,7 @@ export function useBackupRestores() {
       const run = await backupApi.startRestore(data, key);
       restoreStartCommand.clear();
       await refresh();
-      toast.success(
-        lang === "ar" ? "بدأ اختبار الاستعادة" : "Restore test started",
-        run.id,
-      );
+      toast.success(t.backup.restores.startedTitle, run.id);
       return run;
     } catch (caught) {
       const normalized = normalizeApiError(caught);
@@ -182,10 +170,7 @@ export function useBackupRestores() {
       const run = await backupApi.promoteRestore(runId, data, key);
       restorePromotionCommand.clear();
       await refresh();
-      toast.success(
-        lang === "ar" ? "تمت ترقية الاستعادة" : "Restore promoted",
-        run.id,
-      );
+      toast.success(t.backup.restores.promotedTitle, run.id);
       return run;
     } catch (caught) {
       const normalized = normalizeApiError(caught);

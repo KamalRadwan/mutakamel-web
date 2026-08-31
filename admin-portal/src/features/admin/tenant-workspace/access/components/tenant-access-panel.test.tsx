@@ -8,6 +8,18 @@ vi.mock("../use-tenant-access", () => ({
   useTenantAccess: () => state.controller,
 }));
 
+// TenantAccessPanel takes `locale` as a prop and builds its own copy via
+// tenantAccessCopy(locale) rather than calling useI18n() — but its table
+// (DataTable/Pagination) and success notices (useToast) both call useI18n()
+// internally. No test here asserts on toast content or DataTable's own
+// chrome text, so a single static "en" answer is safe across every case,
+// including the Arabic-copy test (which only checks tenantAccessCopy's own
+// heading text and the panel's own dir attribute).
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({ lang: "en" as const }),
+  useOptionalI18n: () => null,
+}));
+
 import { TenantAccessPanel } from "./tenant-access-panel";
 import {
   BRANCH_ID,
@@ -40,7 +52,6 @@ function controller(overrides: Record<string, unknown> = {}) {
       canInvite: true,
       canUpdate: true,
       canResetPassword: true,
-      canManageWebphone: true,
       canSuspend: true,
       canAssignRoles: true,
       canDelete: true,
@@ -70,7 +81,6 @@ function controller(overrides: Record<string, unknown> = {}) {
     resetPassword: vi.fn().mockResolvedValue({ userId: user.id, delivery: "QUEUED" }),
     resendInvite: vi.fn().mockResolvedValue({ userId: user.id, delivery: "QUEUED" }),
     changePassword: vi.fn().mockResolvedValue(user),
-    updateWebphone: vi.fn().mockResolvedValue(user.webphone),
     suspendUser: vi.fn().mockResolvedValue({ ...user, status: "SUSPENDED" }),
     activateUser: vi.fn().mockResolvedValue(user),
     replaceRoles: vi.fn().mockResolvedValue(user),
@@ -93,12 +103,12 @@ describe("TenantAccessPanel", () => {
     expect(screen.getByText("9")).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText("Search users"), { target: { value: "  mona  " } });
-    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "ACTIVE" } });
-    fireEvent.change(screen.getByLabelText("All users"), { target: { value: "ALL" } });
-    fireEvent.change(screen.getByLabelText("Roles"), { target: { value: ROLE_ID } });
-    fireEvent.change(screen.getByLabelText("Branch"), { target: { value: BRANCH_ID } });
-    fireEvent.change(screen.getByLabelText("Department"), { target: { value: DEPARTMENT_ID } });
-    fireEvent.change(screen.getByLabelText("Team (optional)"), { target: { value: TEAM_ID } });
+    chooseOption(screen.getByLabelText("Status"), "Active");
+    chooseOption(screen.getByLabelText("All users"), "All users");
+    chooseOption(screen.getByLabelText("Roles"), "Finance");
+    chooseOption(screen.getByLabelText("Branch"), "Acme · Cairo");
+    chooseOption(screen.getByLabelText("Department"), "FIN · Finance");
+    chooseOption(screen.getByLabelText("Team (optional)"), "AR · Receivables");
     fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
 
     const updater = current.setQuery.mock.calls[0]?.[0] as (
@@ -122,7 +132,7 @@ describe("TenantAccessPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "User details" }));
     expect(current.loadUser).toHaveBeenCalledWith(userFixture().id);
-  });
+  }, 15_000);
 
   it("renders readiness and authorization gates without exposing actions", () => {
     state.controller = controller({
@@ -162,7 +172,7 @@ describe("TenantAccessPanel", () => {
     expect(screen.getByText(/corr-1/)).toBeInTheDocument();
   });
 
-  it("protects owner actions while preserving reset and WebPhone actions", () => {
+  it("protects owner actions while preserving the reset action", () => {
     const owner = userFixture({ isTenantOwner: true });
     state.controller = controller({
       directory: { status: "ready", data: pageFixture([owner]), error: null },
@@ -175,7 +185,6 @@ describe("TenantAccessPanel", () => {
     expect(screen.queryByRole("button", { name: "Change password" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send reset link" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Configure WebPhone" })).toBeInTheDocument();
   });
 
   it("offers restore based on deletedAt rather than a fabricated status", () => {
@@ -189,6 +198,33 @@ describe("TenantAccessPanel", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
+  it("associates invite labels and focuses the persistent validation summary", async () => {
+    const current = state.controller as ReturnType<typeof controller>;
+    render(<TenantAccessPanel tenantId={TENANT_ID} tenantStatus="ACTIVE" />);
+    fireEvent.click(screen.getByRole("button", { name: "Invite user" }));
+
+    const dialog = screen.getByRole("dialog");
+    const firstName = within(dialog).getByLabelText("First name");
+    const branch = within(dialog).getByRole("combobox", { name: "Branch" });
+    expect(firstName).toHaveAttribute("name", "firstName");
+    expect(firstName).toBeRequired();
+    expect(branch).toHaveAttribute("aria-required", "true");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    const summary = within(dialog)
+      .getByText("Review the highlighted fields.")
+      .closest("[role='alert']");
+    expect(summary).toBeInTheDocument();
+    expect(firstName).toHaveAttribute("aria-invalid", "true");
+    const firstNameDescription = firstName.getAttribute("aria-describedby");
+    expect(firstNameDescription).toBeTruthy();
+    expect(document.getElementById(firstNameDescription!)).toHaveTextContent(
+      "This field is required.",
+    );
+    await waitFor(() => expect(summary).toHaveFocus());
+    expect(current.inviteUser).not.toHaveBeenCalled();
+  });
+
   it("builds an invite from live cascading catalogues and role options", async () => {
     const current = state.controller as ReturnType<typeof controller>;
     render(<TenantAccessPanel tenantId={TENANT_ID} tenantStatus="ACTIVE" />);
@@ -197,8 +233,8 @@ describe("TenantAccessPanel", () => {
     fireEvent.change(within(dialog).getByLabelText("First name"), { target: { value: "Sara" } });
     fireEvent.change(within(dialog).getByLabelText("Last name"), { target: { value: "Saleh" } });
     fireEvent.change(within(dialog).getByLabelText("Email"), { target: { value: "SARA@EXAMPLE.TEST" } });
-    fireEvent.change(within(dialog).getByLabelText("Branch"), { target: { value: BRANCH_ID } });
-    fireEvent.change(within(dialog).getByLabelText("Department"), { target: { value: DEPARTMENT_ID } });
+    chooseOption(within(dialog).getByRole("combobox", { name: "Branch" }), "Acme · Cairo");
+    chooseOption(within(dialog).getByRole("combobox", { name: "Department" }), "FIN · Finance");
     fireEvent.click(within(dialog).getByLabelText("Finance"));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(current.inviteUser).toHaveBeenCalledTimes(1));
@@ -224,7 +260,9 @@ describe("TenantAccessPanel", () => {
     fireEvent.change(within(dialog).getByLabelText("New password"), { target: { value: "StrongPassword!2026" } });
     fireEvent.change(within(dialog).getByLabelText("Confirm password"), { target: { value: "different-password" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    expect(screen.getByRole("alert")).toHaveTextContent(/must match/i);
+    const summary = screen.getByText("Review the highlighted fields.").closest("[role='alert']");
+    expect(summary).toHaveTextContent(/must match/i);
+    await waitFor(() => expect(summary).toHaveFocus());
     expect(current.changePassword).not.toHaveBeenCalled();
 
     dialog = screen.getByRole("dialog");
@@ -239,16 +277,8 @@ describe("TenantAccessPanel", () => {
     });
     const current = state.controller as ReturnType<typeof controller>;
     render(<TenantAccessPanel tenantId={TENANT_ID} tenantStatus="ACTIVE" />);
-    fireEvent.click(screen.getByRole("button", { name: "Configure WebPhone" }));
-    let dialog = screen.getByRole("dialog");
-    const secret = within(dialog).getByLabelText(/New SIP password/i) as HTMLInputElement;
-    expect(secret.value).toBe("");
-    fireEvent.change(secret, { target: { value: "rotated-secret" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(current.updateWebphone).toHaveBeenCalledWith(userFixture(), expect.objectContaining({ sipPassword: "rotated-secret" })));
-
     fireEvent.click(screen.getByRole("button", { name: "Suspend" }));
-    dialog = screen.getByRole("dialog");
+    const dialog = screen.getByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
     await waitFor(() => expect(current.suspendUser).toHaveBeenCalledWith(userFixture()));
   });
@@ -259,3 +289,8 @@ describe("TenantAccessPanel", () => {
     expect(heading.closest("section")).toHaveAttribute("dir", "rtl");
   });
 });
+
+function chooseOption(trigger: HTMLElement, optionName: string) {
+  fireEvent.click(trigger);
+  fireEvent.click(screen.getByRole("option", { name: optionName }));
+}

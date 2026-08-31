@@ -1,33 +1,46 @@
 "use client";
 
-import { RotateCw, Star, Trash2 } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Table } from "@/components/ui/Table";
-import { TableToolbar } from "@/components/ui/TableToolbar";
+import { Pencil, RotateCw, Star, Trash2 } from "lucide-react";
+import {
+  Badge,
+  Button,
+  DataTable,
+  FilterBar,
+  PageHeader,
+  PermissionGate,
+  StatusBadge,
+  SubNav,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  NAV_SECTIONS,
+  type ColumnDef,
+} from "@/design-system";
+import { formatTemplate } from "@/lib/format/template";
 import { CreateLeadStagesModal } from "./components/CreateLeadStagesModal";
 import { DeleteLeadStagesConfirmModal } from "./components/DeleteLeadStagesConfirmModal";
+import { EditLeadStageDrawer } from "./components/EditLeadStageDrawer";
 import { useLeadStages, type LeadStageItem } from "./hooks/useLeadStages";
+
+const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup")?.items ?? [];
 
 export default function LeadStagesPage() {
   const {
     t,
-    lang,
     items,
     isLoading,
-    isCreating,
     isDeleting,
     settingDefaultId,
     error,
-    createError,
-    deleteError,
+    loadError,
     canManage,
     searchQuery,
     setSearchQuery,
     isCreateOpen,
     openCreate,
     closeCreate,
+    isCreating,
+    createError,
     selectedForDelete,
     openDelete,
     closeDelete,
@@ -35,116 +48,110 @@ export default function LeadStagesPage() {
     handleDelete,
     handleSetDefault,
     fetchStages,
+    deleteError,
+    isUpdating,
+    editError,
+    selectedForEdit,
+    openEdit,
+    closeEdit,
+    handleUpdate,
   } = useLeadStages();
-  const copy =
-    lang === "ar"
-      ? {
-          arabicName: "الاسم بالعربية",
-          englishName: "الاسم بالإنجليزية",
-          semantics: "دلالة دورة العميل",
-          order: "الترتيب",
-          state: "الحالة",
-          actions: "الإجراءات",
-          default: "افتراضية",
-          setDefault: "تعيين كافتراضية",
-          retry: "إعادة المحاولة",
-          loading: "جارٍ تحميل مراحل العملاء...",
-          empty: "لا توجد مراحل عملاء مطابقة",
-          delete: "حذف المرحلة",
-        }
-      : {
-          arabicName: "Arabic name",
-          englishName: "English name",
-          semantics: "Lifecycle semantics",
-          order: "Order",
-          state: "Status",
-          actions: "Actions",
-          default: "Default",
-          setDefault: "Set as default",
-          retry: "Retry",
-          loading: "Loading lead stages...",
-          empty: "No matching lead stages",
-          delete: "Delete stage",
-        };
 
-  const columns = [
+  const columns: ColumnDef<LeadStageItem>[] = [
     {
-      header: copy.arabicName,
-      cell: (item: LeadStageItem) => (
-        <span
-          className="font-bold text-slate-900 dark:text-slate-100"
-          dir="rtl"
-        >
+      id: "nameAr",
+      header: t.crmLeadStages.arabicName,
+      cell: (item) => (
+        <span dir="rtl" className="font-medium text-foreground">
           {item.nameAr}
         </span>
       ),
     },
     {
-      header: copy.englishName,
-      cell: (item: LeadStageItem) => <span dir="ltr">{item.nameEn}</span>,
+      id: "nameEn",
+      header: t.crmLeadStages.englishName,
+      cell: (item) => <span dir="ltr">{item.nameEn}</span>,
     },
     {
-      header: copy.semantics,
-      cell: (item: LeadStageItem) => (
+      id: "semantics",
+      header: t.crmLeadStages.semantics,
+      cell: (item) => (
         <div className="flex flex-wrap gap-1.5">
-          <Badge variant="info">{item.flag.replaceAll("_", " ")}</Badge>
-          <Badge variant="neutral">
-            {item.category.replaceAll("_", " ")}
-          </Badge>
+          <StatusBadge value={item.flag} kind="LeadStageFlag" />
+          <StatusBadge value={item.category} kind="StageCategory" />
         </div>
       ),
     },
     {
-      header: copy.order,
-      cell: (item: LeadStageItem) => item.sortOrder,
+      id: "order",
+      header: t.crmLeadStages.order,
+      numeric: true,
+      cell: (item) => item.sortOrder,
     },
     {
-      header: copy.state,
-      cell: (item: LeadStageItem) => (
+      id: "status",
+      header: t.common.status,
+      cell: (item) => (
         <div className="flex flex-wrap gap-1.5">
-          <Badge variant={item.isActive ? "success" : "neutral"}>
+          <Badge tone={item.isActive ? "positive" : "neutral"}>
             {item.isActive ? t.common.active : t.common.inactive}
           </Badge>
-          {item.isDefault && <Badge variant="warning">{copy.default}</Badge>}
+          {item.isDefault && <Badge tone="caution">{t.crmLeadStages.default}</Badge>}
         </div>
       ),
     },
     ...(canManage
       ? [
           {
-            header: copy.actions,
+            id: "actions",
+            header: t.common.actions,
+            align: "end" as const,
+            sticky: "end" as const,
             cell: (item: LeadStageItem) => (
-              <div className="flex items-center gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void handleSetDefault(item)}
-                  disabled={
-                    !item.isActive ||
-                    item.isDefault ||
-                    item.flag === "CONVERTED" ||
-                    settingDefaultId !== null
-                  }
-                  aria-label={`${copy.setDefault}: ${item.nameEn}`}
-                  title={copy.setDefault}
-                >
-                  <Star className="size-4" aria-hidden="true" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => openDelete(item)}
-                  disabled={
-                    item.flag === "NEW" || item.isDefault || isDeleting
-                  }
-                  aria-label={`${copy.delete}: ${item.nameEn}`}
-                  title={copy.delete}
-                >
-                  <Trash2
-                    className="size-4 text-red-500"
-                    aria-hidden="true"
-                  />
-                </Button>
+              <div className="flex items-center justify-end gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEdit(item)}
+                      disabled={isUpdating}
+                      aria-label={`${t.crmLeadStages.editTitle}: ${item.nameEn}`}
+                    >
+                      <Pencil className="size-4" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t.crmLeadStages.editTitle}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleSetDefault(item)}
+                      disabled={!item.isActive || item.isDefault || item.flag === "CONVERTED" || settingDefaultId !== null}
+                      loading={settingDefaultId === item.id}
+                      aria-label={`${t.crmLeadStages.setDefault}: ${item.nameEn}`}
+                    >
+                      <Star className="size-4" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t.crmLeadStages.setDefault}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openDelete(item)}
+                      disabled={item.flag === "NEW" || item.isDefault || isDeleting}
+                      aria-label={`${t.common.delete}: ${item.nameEn}`}
+                    >
+                      <Trash2 className="size-4 text-destructive" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t.common.delete}</TooltipContent>
+                </Tooltip>
               </div>
             ),
           },
@@ -152,66 +159,99 @@ export default function LeadStagesPage() {
       : []),
   ];
 
+  // A CRM route is reachable by direct URL even when the sidebar hides it, so
+  // the 403 is reachable in-body and gets the mandated surface rather than a
+  // load error — AGENTS.md, docs/design/states.md. Permission string and
+  // scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={t.crm.salesFunnelStagesLeadStag}
-        subtitle={t.crm.preparingAndSequencingTheS}
-        actionLabel={canManage ? t.crm.addANewStage : undefined}
-        onAction={canManage ? openCreate : undefined}
-      />
+    <PermissionGate require="crm.lead_stages.read">
+      <div className="flex flex-col gap-4">
+        <PageHeader
+          title={t.crm.salesFunnelStagesLeadStag}
+          description={t.crm.preparingAndSequencingTheS}
+          primaryAction={canManage ? { label: t.crm.addANewStage, onClick: openCreate } : undefined}
+        />
 
-      {error && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
-        >
-          <span>{error}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void fetchStages()}
-          >
-            <RotateCw className="size-4" aria-hidden="true" />
-            {copy.retry}
-          </Button>
-        </div>
-      )}
+        <SubNav items={CRM_SETUP_ITEMS} />
 
-      <TableToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        placeholder={t.crm.searchByStageName}
-      />
+        <FilterBar
+          filters={[]}
+          values={{}}
+          onChange={() => undefined}
+          onReset={() => undefined}
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder={t.crm.searchByStageName}
+        />
 
-      {isLoading ? (
-        <p
-          role="status"
-          className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900"
-        >
-          {copy.loading}
-        </p>
-      ) : (
-        <Table columns={columns} data={items} emptyText={copy.empty} />
-      )}
+        {/* Write feedback only. A failed LOAD is handed to DataTable below, so
+            its error state replaces the empty state instead of stacking. */}
+        {error && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={() => void fetchStages()}>
+              <RotateCw className="size-4" aria-hidden="true" />
+              {t.common.retry}
+            </Button>
+          </div>
+        )}
 
-      <CreateLeadStagesModal
-        key={isCreateOpen ? "open" : "closed"}
-        isOpen={isCreateOpen}
-        isSubmitting={isCreating}
-        error={createError}
-        onClose={closeCreate}
-        onSubmit={handleCreate}
-      />
+        {/* No pagination: this endpoint returns the whole list and declares no
+            page/limit query at all (verified in its controller). The fake
+            single-page object this replaced rendered working-looking controls
+            over data that could never advance —
+            docs/design/states.md#pagination-is-real-or-absent. */}
+        <DataTable
+          columns={columns}
+          rows={items}
+          isLoading={isLoading}
+          error={loadError}
+          onRetry={() => void fetchStages()}
+          rowKey={(item) => item.id}
+          labels={{
+            retry: t.common.retry,
+            errorTitle: t.crmLeadStages.loadFailed,
+            emptyTitle: t.crmLeadStages.empty,
+            selectAll: t.common.actions,
+            selectRow: t.common.actions,
+            sortAscending: t.common.actions,
+            sortDescending: t.common.actions,
+            notSorted: t.common.actions,
+            pagination: {
+              previous: t.common.previousPage,
+              next: t.common.nextPage,
+              summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+            },
+          }}
+        />
 
-      <DeleteLeadStagesConfirmModal
-        isOpen={selectedForDelete !== null}
-        isSubmitting={isDeleting}
-        item={selectedForDelete}
-        error={deleteError}
-        onClose={closeDelete}
-        onConfirm={() => void handleDelete()}
-      />
-    </div>
+        <CreateLeadStagesModal
+          key={isCreateOpen ? "open" : "closed"}
+          isOpen={isCreateOpen}
+          isSubmitting={isCreating}
+          error={createError}
+          onClose={closeCreate}
+          onSubmit={handleCreate}
+        />
+
+        <EditLeadStageDrawer
+          key={selectedForEdit?.id ?? "closed"}
+          stage={selectedForEdit}
+          isSubmitting={isUpdating}
+          error={editError}
+          onClose={closeEdit}
+          onSubmit={handleUpdate}
+        />
+
+        <DeleteLeadStagesConfirmModal
+          isOpen={selectedForDelete !== null}
+          isSubmitting={isDeleting}
+          item={selectedForDelete}
+          error={deleteError}
+          onClose={closeDelete}
+          onConfirm={() => void handleDelete()}
+        />
+      </div>
+    </PermissionGate>
   );
 }

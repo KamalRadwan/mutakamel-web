@@ -3,15 +3,15 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-08-29T12:19:27.818Z**
+Generated at: **2026-08-30T18:08:52.020Z**
 
-Frontend revision: `5783c4436da7+dirty`
+Frontend revision: `684f503f0279+dirty`
 
-Backend revision: `949ca7fedc23`
+Backend revision: `989ee35f6578+dirty`
 
 ## Coverage
 
-This inventory contains **246** browser-visible Core Admin routes.
+This inventory contains **247** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
@@ -21,8 +21,8 @@ feature flags, deployment, or current frontend implementation.
 | AUTHENTICATED | 86 |
 | PUBLIC | 6 |
 | READ_HEAVY | 21 |
-| WRITE_SENSITIVE | 133 |
-| **Total** | **246** |
+| WRITE_SENSITIVE | 134 |
+| **Total** | **247** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -51,7 +51,7 @@ Machine-readable source:
 | subscriptions | 8 |
 | system-settings | 11 |
 | tenant-fqdns | 1 |
-| tenants | 53 |
+| tenants | 54 |
 | users | 10 |
 | wallets | 6 |
 
@@ -242,6 +242,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/tenants/:id/fqdns/:fqdnId/primary` | WRITE_SENSITIVE | yes | ALL | admin.tenants.manage_fqdns + admin.tenants.critical | `core.admin.tenants.fqdns.primary` |
 | POST | `/api/admin/core/v1/tenants/:id/provisioning/cancel` | WRITE_SENSITIVE | yes | ALL | admin.tenants.reprovision + admin.tenants.critical | `core.admin.tenants.provisioning.cancel` |
 | POST | `/api/admin/core/v1/tenants/:id/reprovision` | WRITE_SENSITIVE | yes | ALL | admin.tenants.reprovision + admin.tenants.critical | `core.admin.tenants.reprovision` |
+| POST | `/api/admin/core/v1/tenants/:id/restore` | WRITE_SENSITIVE | yes | ALL | admin.tenants.restore + admin.tenants.critical | `core.admin.tenants.restore` |
 | POST | `/api/admin/core/v1/tenants/:id/suspend` | WRITE_SENSITIVE | yes | ALL | admin.tenants.suspend + admin.tenants.critical | `core.admin.tenants.suspend` |
 | GET | `/api/admin/core/v1/tenants/:id/users` | AUTHENTICATED | yes | ALL | admin.tenant_users.read | `core.admin.tenants.users.list` |
 | POST | `/api/admin/core/v1/tenants/:id/users` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.invite + admin.tenant_users.critical | `core.admin.tenants.users.invite` |

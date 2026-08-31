@@ -3,9 +3,10 @@ export function formatBackupDate(value?: string | null, locale = "en-US"): strin
   if (!value) return fallback;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return fallback;
-  return new Intl.DateTimeFormat(locale, {
+  return new Intl.DateTimeFormat(resolveBackupLocale(locale), {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "UTC",
   }).format(parsed);
 }
 
@@ -22,7 +23,15 @@ export function formatBackupBytes(value?: string | null, locale = "en-US"): stri
     unitIndex += 1;
   }
   const digits = amount >= 10 || unitIndex === 0 ? 0 : 1;
-  return `${amount.toFixed(digits)} ${units[unitIndex]}`;
+  const formattedAmount = new Intl.NumberFormat(resolveBackupLocale(locale), {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(amount);
+  return `${formattedAmount} ${units[unitIndex]}`;
+}
+
+export function formatBackupNumber(value: number, locale = "en-US"): string {
+  return backupNumberFormatters[resolveBackupLocale(locale)].format(value);
 }
 
 export function shortBackupId(value: string): string {
@@ -42,4 +51,13 @@ export function shouldRetainBackupCommandKey(error: {
     isAmbiguousWriteFailure(error.httpStatus) ||
     error.errorCode === "GW.IDEM.IN_FLIGHT"
   );
+}
+
+const backupNumberFormatters = {
+  "en-US": new Intl.NumberFormat("en-US"),
+  "ar-EG": new Intl.NumberFormat("ar-EG"),
+} as const;
+
+function resolveBackupLocale(locale: string): keyof typeof backupNumberFormatters {
+  return locale.toLowerCase().startsWith("ar") ? "ar-EG" : "en-US";
 }

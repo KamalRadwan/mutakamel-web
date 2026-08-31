@@ -15,6 +15,18 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard",
 }));
 
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({
+    t: {
+      common: {
+        sessionChecking: "جاري التحقق من الجلسة...",
+        sessionUnavailable: "تعذر التحقق من الجلسة حاليًا. لم يتم تسجيل خروجك.",
+        retry: "إعادة المحاولة",
+      },
+    },
+  }),
+}));
+
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
   get length() { return this.values.size; }
@@ -131,6 +143,77 @@ describe("AuthProvider server-authoritative bootstrap", () => {
     );
     expect(requestedUrls[0]).toBe("/api/admin/core/v1/auth/me");
     expect(window.sessionStorage.getItem("access_token")).toBeNull();
+  });
+
+  it("starts bounded presence after cold bootstrap and stops it on unmount", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    vi.spyOn(document, "cookie", "get").mockReturnValue(
+      "__Host-mutakamel-admin-csrf=admin-csrf-proof",
+    );
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+
+    const requestedUrls: string[] = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      requestedUrls.push(url);
+      if (url === "/api/admin/core/v1/auth/me") {
+        return jsonResponse(adminMePayload());
+      }
+      if (url === "/api/admin/core/v1/auth/refresh") {
+        return jsonResponse(webAuthResponse("mutakamel-admin-web"));
+      }
+      if (url === "/api/admin/core/v1/auth/presence") {
+        const headers = new Headers(init?.headers);
+        expect(headers.get("x-csrf-token")).toBe("admin-csrf-proof");
+        expect(headers.has("x-auth-user-activity")).toBe(false);
+        return jsonResponse({
+          data: {
+            sessionId: "019f0000-0000-7000-8000-000000000001",
+            sessionExpiresIn: 1_800,
+            idleExpiresAt: "2026-08-26T10:35:00.000Z",
+            absoluteExpiresAt: "2026-08-26T22:00:00.000Z",
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const view = render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText("AUTHENTICATED:admin@example.test")).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(requestedUrls).toContain("/api/admin/core/v1/auth/refresh");
+    expect(requestedUrls).not.toContain(
+      "/api/admin/core/v1/auth/presence",
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+    });
+    expect(requestedUrls.filter((url) =>
+      url === "/api/admin/core/v1/auth/presence"
+    )).toHaveLength(1);
+
+    view.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30 * 60_000);
+    });
+    expect(requestedUrls.filter((url) =>
+      url === "/api/admin/core/v1/auth/presence"
+    )).toHaveLength(1);
   });
 
   it("keeps a cold protected tree pending while an expired /me request refreshes", async () => {

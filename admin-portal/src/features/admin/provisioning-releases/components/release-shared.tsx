@@ -1,8 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { AlertTriangle, Boxes, FileJson2, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
+import { useEffect, useRef, type ReactNode } from "react";
+import { AlertTriangle, FileJson2, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
+import { Badge, Button, Card, PageHeader } from "@/design-system";
 import type {
   CoreSnapshot,
   ReleaseDraftStatus,
@@ -231,46 +231,96 @@ export const RELEASE_COPY = {
 export type ReleaseCopy = (typeof RELEASE_COPY)["en"] | (typeof RELEASE_COPY)["ar"];
 
 export function ReleasePageFrame({ children, dir }: { children: ReactNode; dir: "rtl" | "ltr" }) {
-  return <div dir={dir} className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"><Navbar /><main className="mx-auto w-full max-w-[1600px] space-y-4 px-4 py-5 sm:px-6 lg:px-8">{children}</main></div>;
+  return <div dir={dir} className="mx-auto w-full max-w-[1600px] space-y-4">{children}</div>;
 }
 
 export function ReleaseHero({ copy, action }: { copy: ReleaseCopy; action?: ReactNode }) {
-  return <header className="rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 p-5 text-white shadow-md"><div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-cyan-400/15 text-cyan-200"><Boxes className="size-5" /></span><div><h1 className="text-xl font-black sm:text-2xl">{copy.title}</h1><p className="mt-1 max-w-3xl text-sm leading-6 text-cyan-100/80">{copy.subtitle}</p></div></div>{action}</div></header>;
+  return <PageHeader title={copy.title} description={copy.subtitle} action={action} />;
 }
 
 export function ReleaseStatePanel({ kind, title, detail, correlationId, copy, action }: { kind: "loading" | "empty" | "forbidden" | "notFound" | "unavailable" | "error"; title: string; detail?: string; correlationId?: string; copy: ReleaseCopy; action?: ReactNode }) {
   const Icon = kind === "loading" ? Loader2 : kind === "forbidden" ? ShieldAlert : kind === "error" || kind === "unavailable" ? AlertTriangle : FileJson2;
-  return <section role={kind === "error" || kind === "forbidden" ? "alert" : "status"} className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900"><Icon className={`mb-3 size-9 text-cyan-600 ${kind === "loading" ? "animate-spin" : ""}`} /><h2 className="font-black">{title}</h2>{detail ? <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">{detail}</p> : null}{correlationId ? <p className="mt-2 text-xs"><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{correlationId}</code></p> : null}{action ? <div className="mt-4">{action}</div> : null}</section>;
+  return (
+    <Card>
+      <section role={kind === "error" || kind === "forbidden" ? "alert" : "status"} className="flex min-h-56 flex-col items-center justify-center p-6 text-center">
+        <Icon className={`mb-3 size-9 text-muted-foreground ${kind === "loading" ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+        <h2 className="font-semibold text-foreground">{title}</h2>
+        {detail ? <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{detail}</p> : null}
+        {correlationId ? <p className="mt-2 text-xs"><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{correlationId}</code></p> : null}
+        {action ? <div className="mt-4">{action}</div> : null}
+      </section>
+    </Card>
+  );
 }
 
 export function ReleaseMutationNotice({ mutation, copy }: { mutation: ReleaseMutationState; copy: ReleaseCopy }) {
+  const noticeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (mutation.phase !== "IDLE" && mutation.phase !== "PENDING" && mutation.phase !== "SUCCEEDED") {
+      noticeRef.current?.focus();
+    }
+  }, [mutation.phase]);
   if (mutation.phase === "IDLE" || mutation.phase === "PENDING") return null;
   const message = { SUCCEEDED: copy.commandSucceeded, FORBIDDEN: copy.commandForbidden, CONFLICT: copy.commandConflict, VALIDATION: copy.commandValidation, IN_FLIGHT: copy.commandInFlight, UNAVAILABLE: copy.commandUnavailable, ERROR: copy.commandError }[mutation.phase];
   const danger = mutation.phase === "ERROR" || mutation.phase === "FORBIDDEN";
-  return <div role={danger ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm ${danger ? "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100" : mutation.phase === "SUCCEEDED" ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100" : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"}`}><p className="font-bold">{message}</p>{mutation.error ? <p className="mt-1">{mutation.error.message}</p> : null}{mutation.error?.errorCode ? <code dir="ltr" className="mt-1 block break-all text-xs">{mutation.error.errorCode}</code> : null}{mutation.correlationId ? <p className="mt-1 text-xs"><strong>{copy.correlation}:</strong> <code dir="ltr">{mutation.correlationId}</code></p> : null}</div>;
+  const tone = danger
+    ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
+    : mutation.phase === "SUCCEEDED"
+      ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+      : "border-warning/30 bg-warning-subtle text-warning-subtle-foreground";
+  return (
+    <div
+      ref={noticeRef}
+      role={mutation.phase === "SUCCEEDED" ? "status" : "alert"}
+      tabIndex={mutation.phase === "SUCCEEDED" ? undefined : -1}
+      className={`rounded-lg border px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tone}`}
+    >
+      <p className="font-semibold">{message}</p>
+      {mutation.error ? <p className="mt-1">{mutation.error.message}</p> : null}
+      {mutation.error?.errorCode ? <code dir="ltr" className="mt-1 block break-all text-xs">{mutation.error.errorCode}</code> : null}
+      {mutation.correlationId ? <p className="mt-1 text-xs"><strong>{copy.correlation}:</strong> <code dir="ltr">{mutation.correlationId}</code></p> : null}
+    </div>
+  );
 }
 
 export function ReleaseSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSnapshot<unknown>; copy: ReleaseCopy; lang: "ar" | "en" }) {
-  return <footer className="grid gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 sm:grid-cols-2 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"><p><strong>{copy.responseAt}:</strong> {formatDate(snapshot.responseTimestamp, lang)}</p><p><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{snapshot.correlationId}</code></p></footer>;
+  return (
+    <Card>
+      <footer className="grid gap-2 px-4 py-3 text-xs text-muted-foreground sm:grid-cols-2">
+        <p><strong>{copy.responseAt}:</strong> {formatDate(snapshot.responseTimestamp, lang)}</p>
+        <p><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{snapshot.correlationId}</code></p>
+      </footer>
+    </Card>
+  );
 }
 
 export function StatusBadge({ status }: { status: ReleaseDraftStatus | ReleaseStatus }) {
-  const tone = status === "PUBLISHED" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : status === "VALIDATED" ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-200" : status === "RETIRED" || status === "ABANDONED" ? "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200";
-  return <span dir="ltr" className={`inline-flex rounded-full px-2.5 py-1 font-mono text-xs font-bold ${tone}`}>{status}</span>;
+  const tone = status === "PUBLISHED" ? "success" : status === "RETIRED" || status === "ABANDONED" ? "neutral" : status === "VALIDATED" ? "info" : "warn";
+  return <Badge tone={tone} className="font-mono" dir="ltr">{status}</Badge>;
 }
 
 export function ReleaseFieldError({ id, code, copy }: { id: string; code?: ReleaseValidationCode; copy: ReleaseCopy }) {
   if (!code) return null;
   const message = { INVALID_UUID_V7: copy.invalidUuid, INVALID_VERSION: copy.invalidVersion, INVALID_POSITIVE_INTEGER: copy.invalidInteger, INVALID_BUILD_SHA: copy.invalidBuildSha, INVALID_SCHEMA_TARGET: copy.invalidSchemaTarget, INVALID_SHA256: copy.invalidSha, INVALID_JSON_OBJECT: copy.invalidJson, JSON_TOO_LARGE: copy.jsonTooLarge, SECRET_FIELD_FORBIDDEN: copy.secretForbidden, INVALID_MANIFEST_STRUCTURE: copy.invalidManifest, INVALID_COMPATIBILITY: copy.invalidCompatibility, INVALID_SIGNATURE: copy.invalidSignature, INVALID_REASON_CODE: copy.invalidReason, CONFIRMATION_REQUIRED: copy.confirmationRequired }[code];
-  return <span id={id} role="alert" className="text-xs font-medium text-rose-600 dark:text-rose-300">{message}</span>;
+  return <span id={id} role="alert" className="text-xs font-medium text-destructive-subtle-foreground">{message}</span>;
 }
 
 export function JsonEvidence({ title, value }: { title: string; value: Record<string, unknown> }) {
-  return <section className="min-w-0 rounded-xl border border-slate-200 bg-slate-950 p-3 text-slate-100 dark:border-slate-800"><h3 className="text-xs font-black text-cyan-300">{title}</h3><pre dir="ltr" className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all text-start font-mono text-xs leading-5">{JSON.stringify(value, null, 2)}</pre></section>;
+  return (
+    <section className="min-w-0 rounded-lg border border-border bg-muted p-3 text-foreground">
+      <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
+      <pre dir="ltr" className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all text-start font-mono text-xs leading-5">{JSON.stringify(value, null, 2)}</pre>
+    </section>
+  );
 }
 
 export function RefreshReleaseButton({ label, onClick, pending = false }: { label: string; onClick: () => void; pending?: boolean }) {
-  return <button type="button" onClick={onClick} disabled={pending} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-cyan-300 px-4 text-sm font-bold text-cyan-800 disabled:opacity-50 dark:border-cyan-800 dark:text-cyan-200"><RefreshCw className={`size-4 ${pending ? "animate-spin" : ""}`} />{label}</button>;
+  return (
+    <Button type="button" variant="outline" onClick={onClick} disabled={pending} loading={pending}>
+      <RefreshCw className="size-4" aria-hidden="true" />
+      {label}
+    </Button>
+  );
 }
 
 export function formatDate(value: string | null, lang: "ar" | "en") {

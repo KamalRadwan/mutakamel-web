@@ -12,7 +12,6 @@ const { directoryMock, previewMock, rolloutMock } = vi.hoisted(() => ({
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en", dir: "ltr" }),
 }));
-vi.mock("@/components/layout/Navbar", () => ({ Navbar: () => <nav /> }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("./hooks", () => ({
   useFleetDirectory: directoryMock,
@@ -42,9 +41,13 @@ describe("provisioning fleet screens", () => {
     directoryMock.mockReturnValue(view);
     render(<FleetDirectoryScreen />);
 
-    fireEvent.change(screen.getByLabelText("Operation type"), {
-      target: { value: "DECOMMISSION" },
-    });
+    // Radix Select opens on click (its onClick handler runs handleOpen()
+    // whenever the pointer type wasn't tracked as "mouse", which is always
+    // true for a plain fireEvent.click) and its portaled options render
+    // with role="option" - fireEvent.change against a native <select> no
+    // longer applies now that this field is a design-system Select.
+    fireEvent.click(screen.getByRole("combobox", { name: "Operation type" }));
+    fireEvent.click(screen.getByRole("option", { name: "Decommission component" }));
     fireEvent.change(screen.getByLabelText("Component key"), {
       target: { value: "voice.media" },
     });
@@ -76,6 +79,9 @@ describe("provisioning fleet screens", () => {
 
     expect(screen.getAllByText(PREVIEW_ID).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Tenant evidence" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Fleet preview tenant evidence" }),
+    ).toHaveAttribute("tabindex", "0");
     fireEvent.click(screen.getByRole("button", { name: "Launch rollout" }));
     expect(screen.getByRole("alertdialog", {
       name: "Launch this critical rollout?",
@@ -96,6 +102,10 @@ describe("provisioning fleet screens", () => {
     const view = rolloutView();
     rolloutMock.mockReturnValue(view);
     render(<FleetRolloutScreen rolloutId={ROLLOUT_ID} />);
+
+    expect(
+      screen.getByRole("region", { name: "Fleet rollout tenant evidence" }),
+    ).toHaveAttribute("tabindex", "0");
 
     fireEvent.change(screen.getByLabelText("Stable reason code"), {
       target: { value: "OPS.MAINTENANCE" },

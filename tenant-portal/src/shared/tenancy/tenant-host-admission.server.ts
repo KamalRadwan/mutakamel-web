@@ -1,4 +1,6 @@
 import { isIP } from "node:net";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 
 export type TenantHostStatus = "ACTIVE" | "SUSPENDED";
 
@@ -29,10 +31,63 @@ export function normalizeTenantRequestHost(rawHost: string | null): string | nul
     : null;
 }
 
+/**
+ * Sends the host-status probe with the tenant's Host header actually on the
+ * wire.
+ *
+ * `fetch` cannot do this. `host` is a forbidden header name in the fetch
+ * standard, so undici drops it silently — the Gateway then sees the internal
+ * origin's own authority and answers TENANT_HOST_NOT_FOUND, which fails
+ * admission closed and 404s every page. That was invisible for two reasons:
+ * the unit test asserts the header on the init object it passed to a *mock*
+ * fetch, which records what the caller intended rather than what the network
+ * carried; and `x-forwarded-host` is not a substitute, because the Gateway
+ * only trusts it when its own trust-proxy depth is configured, which it is
+ * not here.
+ *
+ * Shaped like `fetch` so the existing injectable seam and its tests are
+ * unchanged.
+ */
+function sendHostStatusProbe(url: URL, init: RequestInit): Promise<Response> {
+  const send = url.protocol === "https:" ? httpsRequest : httpRequest;
+  const headers = new Headers(init.headers);
+  const hostHeader = headers.get("host");
+
+  return new Promise((resolve, reject) => {
+    const clientRequest = send(
+      {
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port,
+        path: `${url.pathname}${url.search}`,
+        method: "GET",
+        // Node lets us set Host here; the fetch standard does not.
+        headers: { accept: "application/json", ...(hostHeader ? { Host: hostHeader } : {}) },
+        timeout: HOST_STATUS_TIMEOUT_MS,
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => {
+          resolve(
+            new Response(Buffer.concat(chunks), {
+              status: response.statusCode ?? 502,
+            }),
+          );
+        });
+      },
+    );
+
+    clientRequest.on("timeout", () => clientRequest.destroy(new Error("Host status probe timed out")));
+    clientRequest.on("error", reject);
+    clientRequest.end();
+  });
+}
+
 export async function fetchTenantHostStatus(
   host: string,
   gatewayOrigin: string | undefined,
-  fetcher: typeof fetch = fetch,
+  fetcher: typeof fetch = sendHostStatusProbe as unknown as typeof fetch,
 ): Promise<TenantHostStatus | null> {
   const endpoint = hostStatusEndpoint(gatewayOrigin);
   if (!endpoint) return null;

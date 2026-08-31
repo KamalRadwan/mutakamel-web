@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   Boxes,
+  Check,
   CheckCircle2,
   ChevronRight,
   CircleDashed,
@@ -9,22 +10,60 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldCheck,
-  Square,
-  SquareCheckBig,
   Wrench,
+  X,
   XCircle,
 } from "lucide-react";
-import type { ReactNode } from "react";
-import type { TenantProvisioningWorkspaceModel } from "../hooks/useTenantProvisioningWorkspace";
+import { useEffect, useRef, type ReactNode } from "react";
+import { en as enDict } from "@/i18n/dictionaries/en";
+import { ar as arDict } from "@/i18n/dictionaries/ar";
+import { localeForLanguage } from "@/i18n/locale";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Checkbox,
+  EmptyState,
+  Field,
+  Input,
+  Progress,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@/design-system";
+import type {
+  ProvisioningWorkspaceSection,
+  TenantProvisioningWorkspaceModel,
+} from "../hooks/useTenantProvisioningWorkspace";
 import { canResolveSeedConflict } from "../model/readers";
 import type {
   ProvisioningResource,
   SeedConflictDecision,
   TenantOperationStatus,
+  TenantOperationStepStatus,
 } from "../types";
 
 export interface TenantProvisioningWorkspaceViewProps {
   model: TenantProvisioningWorkspaceModel;
+}
+
+function tpCopy(isAr: boolean) {
+  return (isAr ? arDict : enDict).tenantProvisioning;
 }
 
 const SECTIONS = [
@@ -39,89 +78,95 @@ export function TenantProvisioningWorkspaceView({
   model,
 }: TenantProvisioningWorkspaceViewProps) {
   const ar = model.lang === "ar";
+  const copy = tpCopy(ar);
   const { provisioning } = model;
+  const errorRef = useRef<HTMLDivElement>(null);
   const visibleError =
     model.localError ?? provisioning.mutation.error?.errorCode ?? null;
+
+  useEffect(() => {
+    if (visibleError) errorRef.current?.focus();
+  }, [visibleError]);
 
   return (
     <section
       dir={model.dir}
-      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950"
-      aria-label={ar ? "إدارة تجهيز المستأجر" : "Tenant provisioning management"}
+      className="overflow-hidden rounded-lg border border-border bg-card"
+      aria-label={copy.ariaLabel}
+      aria-busy={provisioning.operations.refreshing || undefined}
     >
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div>
           <div className="flex items-center gap-2">
-            <DatabaseZap className="size-5 text-indigo-600 dark:text-indigo-400" />
-            <h2 className="text-base font-bold text-slate-950 dark:text-white">
-              {ar ? "تجهيز المستأجر" : "Tenant provisioning"}
+            <DatabaseZap className="size-5 text-muted-foreground" aria-hidden="true" />
+            <h2 className="text-base font-semibold text-foreground">
+              {copy.title}
             </h2>
             {provisioning.polling && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
-                <RefreshCw className="size-3 animate-spin" />
-                {ar ? "متابعة مباشرة" : "Live polling"}
-              </span>
+              <Badge tone="info" role="status" aria-live="polite">
+                <RefreshCw className="size-3 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                {copy.livePollingBadge}
+              </Badge>
             )}
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {ar
-              ? "العمليات غير متزامنة. لا تُعتبر قاعدة البيانات جاهزة إلا بعد نجاح التفعيل."
-              : "Operations are asynchronous. The tenant database is ready only after activation succeeds."}
+          <p className="mt-1 text-xs text-muted-foreground">
+            {copy.asyncNote}
           </p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => void provisioning.refreshAll()}
           disabled={provisioning.authLoading}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
         >
           <RefreshCw
-            className={`size-3.5 ${
-              provisioning.operations.refreshing ? "animate-spin" : ""
-            }`}
+            className={`size-3.5 ${provisioning.operations.refreshing ? "animate-spin motion-reduce:animate-none" : ""}`}
+            aria-hidden="true"
           />
-          {ar ? "تحديث" : "Refresh"}
-        </button>
+          {copy.refreshButton}
+        </Button>
       </header>
 
-      <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 px-3 py-2 dark:border-slate-800">
-        {SECTIONS.map(([key, Icon, en, arabic]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => model.setSection(key)}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
-              model.section === key
-                ? "bg-indigo-600 text-white"
-                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"
-            }`}
-          >
-            <Icon className="size-3.5" />
-            {ar ? arabic : en}
-          </button>
-        ))}
-      </nav>
+      <Tabs
+        value={model.section}
+        onValueChange={(value) => model.setSection(value as ProvisioningWorkspaceSection)}
+        className="border-b border-border px-3 pt-2"
+      >
+        <TabsList className="h-auto justify-start gap-1.5 overflow-x-auto border-b-0 pb-2 scrollbar-none">
+          {SECTIONS.map(([key, Icon, en, arabic]) => (
+            <TabsTrigger key={key} value={key} className="h-8 shrink-0 gap-1.5 rounded-md px-3 py-1.5 text-xs after:hidden data-[state=active]:bg-selected data-[state=active]:text-selected-foreground">
+              <Icon className="size-3.5" aria-hidden="true" />
+              {ar ? arabic : en}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       {visibleError && (
         <div
+          ref={errorRef}
           role="alert"
-          className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
+          tabIndex={-1}
+          className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground"
         >
           <span>
-            <strong>{ar ? "تعذر تنفيذ الإجراء: " : "Action could not complete: "}</strong>
+            <strong>{copy.actionErrorPrefix}</strong>
             {localizeError(visibleError, ar)}
           </span>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => {
               model.clearLocalError();
               provisioning.clearMutationError();
             }}
-            className="font-bold"
-            aria-label={ar ? "إغلاق الخطأ" : "Dismiss error"}
+            className="h-auto shrink-0 p-1"
+            aria-label={copy.dismissErrorAriaLabel}
           >
-            ×
-          </button>
+            <X className="size-3.5" aria-hidden="true" />
+          </Button>
         </div>
       )}
 
@@ -140,42 +185,45 @@ export function TenantProvisioningWorkspaceView({
 
 function OperationsSection({ model }: TenantProvisioningWorkspaceViewProps) {
   const ar = model.lang === "ar";
+  const copy = tpCopy(ar);
   const { provisioning } = model;
   return (
     <ResourceBoundary resource={provisioning.operations} ar={ar}>
       {provisioning.operations.data.items.length === 0 ? (
-        <EmptyState ar={ar} labelEn="No provisioning operations." labelAr="لا توجد عمليات تجهيز." />
+        <EmptyState icon={CircleDashed} title={copy.noOperationsTitle} />
       ) : (
         <div className="grid gap-4 xl:grid-cols-[19rem_minmax(0,1fr)]">
           <div className="max-h-[44rem] space-y-2 overflow-y-auto pe-1">
             {provisioning.operations.data.items.map((operation) => (
-              <button
+              <Button
                 type="button"
                 key={operation.id}
+                variant="outline"
+                aria-current={provisioning.selectedOperationId === operation.id ? "true" : undefined}
                 onClick={() => provisioning.selectOperation(operation.id)}
-                className={`w-full rounded-xl border p-3 text-start transition ${
+                className={`h-auto w-full justify-start whitespace-normal rounded-lg p-3 text-start ${
                   provisioning.selectedOperationId === operation.id
-                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30"
-                    : "border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700"
+                    ? "border-primary bg-selected text-selected-foreground"
+                    : "border-border"
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-bold text-slate-900 dark:text-white">
+                    <p className="truncate text-xs font-semibold text-foreground">
                       {operationTypeLabel(operation.type, ar)}
                     </p>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      {ar ? "الجيل" : "Generation"} {operation.generation} ·{" "}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {copy.generationLabel} {operation.generation} ·{" "}
                       {formatDate(operation.requestedAt, model.lang)}
                     </p>
                   </div>
                   <StatusBadge status={operation.status} ar={ar} />
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span className="truncate">{operation.currentPhase}</span>
-                  <ChevronRight className="size-3.5 rtl:rotate-180" />
+                  <ChevronRight className="size-3.5 rtl:rotate-180" aria-hidden="true" />
                 </div>
-              </button>
+              </Button>
             ))}
           </div>
           <OperationDetail model={model} />
@@ -187,22 +235,32 @@ function OperationsSection({ model }: TenantProvisioningWorkspaceViewProps) {
 
 function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
   const ar = model.lang === "ar";
+  const copy = tpCopy(ar);
   const { provisioning } = model;
   return (
     <ResourceBoundary resource={provisioning.selectedOperation} ar={ar} compact>
       {!provisioning.selectedOperation.data ? (
-        <EmptyState ar={ar} labelEn="Select an operation." labelAr="اختر عملية." />
+        <EmptyState icon={CircleDashed} title={copy.selectOperationTitle} />
       ) : (
         <div className="space-y-4">
           {(() => {
             const operation = provisioning.selectedOperation.data;
+            const latestOperation = provisioning.operations.data.items.reduce(
+              (latest, candidate) =>
+                candidate.generation > latest.generation ? candidate : latest,
+            );
+            const isLatestOperation = latestOperation.id === operation.id;
+            const isHistoricalOperation =
+              operation.generation < latestOperation.generation;
             const canRetry =
               provisioning.permissions.canRetryOrCancel &&
+              isLatestOperation &&
               ["FAILED_RETRYABLE", "MANUAL_RECOVERY_REQUIRED", "CANCELLED"].includes(
                 operation.status,
               );
             const canCancel =
               provisioning.permissions.canRetryOrCancel &&
+              isLatestOperation &&
               [
                 "REQUESTED",
                 "PLANNING",
@@ -212,61 +270,66 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
               ].includes(operation.status);
             return (
               <>
-                <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                <div className="rounded-lg border border-border p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-bold text-slate-950 dark:text-white">
-                        {operationTypeLabel(operation.type, ar)} · {ar ? "الجيل" : "generation"} {operation.generation}
+                      <h3 className="text-sm font-semibold text-foreground">
+                        {operationTypeLabel(operation.type, ar)} · {copy.generationLabelLower} {operation.generation}
                       </h3>
-                      <p className="mt-1 text-xs text-slate-500">{operation.currentPhase}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{operation.currentPhase}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge status={operation.status} ar={ar} />
                       {canRetry && (
-                        <button
+                        <Button
                           type="button"
+                          variant="primary"
+                          size="sm"
                           onClick={() => void provisioning.retryOperation(operation.id).catch(() => undefined)}
                           disabled={provisioning.mutation.name !== null}
-                          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                         >
-                          {ar ? "إعادة المحاولة" : "Retry"}
-                        </button>
+                          {copy.retryButton}
+                        </Button>
                       )}
                       {canCancel && (
-                        <button
+                        <Button
                           type="button"
+                          variant="destructive"
+                          size="sm"
                           onClick={() => void provisioning.cancelOperation(operation.id).catch(() => undefined)}
                           disabled={provisioning.mutation.name !== null}
-                          className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 disabled:opacity-50 dark:border-rose-800 dark:text-rose-300"
                         >
-                          {ar ? "طلب الإلغاء" : "Request cancel"}
-                        </button>
+                          {copy.requestCancelButton}
+                        </Button>
                       )}
                     </div>
                   </div>
+                  {isHistoricalOperation && (
+                    <div className="mt-3 flex items-start gap-2 rounded-md bg-muted p-2 text-xs text-muted-foreground">
+                      <History className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                      <p>
+                        {copy.historicalOperationNote(operation.generation, latestOperation.generation)}
+                      </p>
+                    </div>
+                  )}
                   <div className="mt-4">
-                    <div className="mb-1 flex justify-between text-[11px] text-slate-500">
-                      <span>{ar ? "التقدم الموزون" : "Weighted progress"}</span>
+                    <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                      <span>{copy.weightedProgressLabel}</span>
                       <span>{operation.progress.percent}%</span>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                      <div
-                        className="h-full rounded-full bg-indigo-600 transition-[width]"
-                        style={{ width: `${operation.progress.percent}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 grid gap-2 text-[11px] text-slate-500 sm:grid-cols-3">
-                      <span>{operation.progress.completedSteps}/{operation.progress.totalSteps} {ar ? "خطوات" : "steps"}</span>
-                      <span>{operation.progress.failedSteps} {ar ? "فشلت" : "failed"}</span>
-                      <span>{ar ? "مراجعة السياسة" : "Policy revision"}: {operation.accessPolicyRevision}</span>
+                    <Progress value={operation.progress.percent} tone={progressTone(operation.status)} />
+                    <div className="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                      <span>{operation.progress.completedSteps}/{operation.progress.totalSteps} {copy.stepsWord}</span>
+                      <span>{operation.progress.failedSteps} {copy.failedWord}</span>
+                      <span>{copy.policyRevisionLabel}: {operation.accessPolicyRevision}</span>
                     </div>
                   </div>
-                  <dl className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
-                    <Evidence label={ar ? "بصمة الخطة" : "Plan digest"} value={shortDigest(operation.planDigest)} />
-                    <Evidence label={ar ? "وقت الطلب" : "Requested"} value={formatDate(operation.requestedAt, model.lang)} />
+                  <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                    <Evidence label={copy.planDigestLabel} value={shortDigest(operation.planDigest)} />
+                    <Evidence label={copy.requestedLabel} value={formatDate(operation.requestedAt, model.lang)} />
                   </dl>
                   {operation.safeError && (operation.safeError.code || operation.safeError.message) && (
-                    <div className="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
+                    <div className="mt-3 rounded-md bg-destructive-subtle p-2 text-xs text-destructive-subtle-foreground">
                       {operation.safeError.code ?? "OPERATION_FAILED"}
                       {operation.safeError.message ? ` — ${operation.safeError.message}` : ""}
                     </div>
@@ -274,50 +337,50 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                 </div>
 
                 <div>
-                  <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                    {ar ? "الخطوات" : "Steps"}
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
+                    {copy.stepsHeading}
                   </h4>
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                    <table className="min-w-full text-start text-xs">
-                      <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900">
-                        <tr>
-                          <Th>{ar ? "الخطوة" : "Step"}</Th>
-                          <Th>{ar ? "النوع" : "Kind"}</Th>
-                          <Th>{ar ? "الحالة" : "Status"}</Th>
-                          <Th>{ar ? "المحاولات" : "Attempts"}</Th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <div className="overflow-x-auto rounded-lg border border-border" role="region" aria-label={copy.stepsHeading} tabIndex={0}>
+                    <Table className="min-w-full text-start text-xs">
+                      <TableHeader className="text-muted-foreground">
+                        <TableRow>
+                          <Th>{copy.stepColumnHeader}</Th>
+                          <Th>{copy.kindColumnHeader}</Th>
+                          <Th>{copy.statusColumnHeader}</Th>
+                          <Th>{copy.attemptsColumnHeader}</Th>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                         {operation.steps.map((step) => (
-                          <tr key={step.id}>
+                          <TableRow key={step.id}>
                             <Td>
-                              <span className="font-semibold text-slate-800 dark:text-slate-100">{step.stepKey}</span>
-                              {step.componentKey && <span className="block text-[10px] text-slate-500">{step.componentKey}</span>}
+                              <span className="font-semibold text-foreground">{step.stepKey}</span>
+                              {step.componentKey && <span className="block text-xs text-muted-foreground">{step.componentKey}</span>}
                             </Td>
                             <Td>{step.kind}</Td>
                             <Td><StepBadge status={step.status} /></Td>
                             <Td>{step.attemptCount}{step.retryable ? " ↻" : ""}</Td>
-                          </tr>
+                          </TableRow>
                         ))}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                    {ar ? "الخط الزمني" : "Timeline"} ({operation.timelineEventCount})
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
+                    {copy.timelineLabel} ({operation.timelineEventCount})
                   </h4>
                   <ResourceBoundary resource={provisioning.timeline} ar={ar} compact>
-                    <ol className="space-y-2 border-s border-slate-200 ps-4 dark:border-slate-800">
+                    <ol className="space-y-2 border-s border-border ps-4">
                       {provisioning.timeline.data.items.map((event) => (
-                        <li key={event.id} className="relative rounded-lg bg-slate-50 p-2 text-xs dark:bg-slate-900/70">
-                          <span className="absolute -start-[1.18rem] top-3 size-2 rounded-full bg-indigo-500" />
+                        <li key={event.id} className="relative rounded-md bg-muted p-2 text-xs">
+                          <span className="absolute -start-[1.18rem] top-3 size-2 rounded-full bg-primary" />
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="font-semibold text-slate-800 dark:text-slate-100">{event.eventType}</span>
-                            <span className="text-[10px] text-slate-500">#{event.sequence} · {formatDate(event.occurredAt, model.lang)}</span>
+                            <span className="font-semibold text-foreground">{event.eventType}</span>
+                            <span className="text-xs text-muted-foreground">#{event.sequence} · {formatDate(event.occurredAt, model.lang)}</span>
                           </div>
-                          {event.message && <p className="mt-1 text-slate-600 dark:text-slate-300">{event.message}</p>}
+                          {event.message && <p className="mt-1 text-muted-foreground">{event.message}</p>}
                         </li>
                       ))}
                     </ol>
@@ -334,57 +397,61 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
 
 function UpdatesSection({ model }: TenantProvisioningWorkspaceViewProps) {
   const ar = model.lang === "ar";
+  const copy = tpCopy(ar);
   const { provisioning } = model;
   return (
     <ResourceBoundary resource={provisioning.updates} ar={ar}>
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">{ar ? "التحديثات المتاحة" : "Available updates"}</h3>
-            <p className="mt-1 text-xs text-slate-500">{ar ? "يُرسل الاختيار ببصمات الإصدار الحالي والهدف كما أعادها الخادم." : "Selections submit the exact current and target release evidence returned by Core."}</p>
+            <h3 className="text-sm font-semibold text-foreground">{copy.availableUpdatesTitle}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{copy.updatesNote}</p>
           </div>
-          <button
+          <Button
             type="button"
+            variant="primary"
+            size="sm"
             onClick={() => void model.applySelectedUpdates()}
             disabled={!provisioning.permissions.canApplyUpdates || !model.selectedUpdateKeys.length || provisioning.mutation.name !== null}
-            className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {ar ? `تطبيق المحدد (${model.selectedUpdateKeys.length})` : `Apply selected (${model.selectedUpdateKeys.length})`}
-          </button>
+            {copy.applySelectedButton(model.selectedUpdateKeys.length)}
+          </Button>
         </div>
         {provisioning.updates.data.items.length === 0 ? (
-          <EmptyState ar={ar} labelEn="No safe updates are currently offered." labelAr="لا توجد تحديثات آمنة متاحة حاليًا." />
+          <EmptyState icon={CircleDashed} title={copy.noUpdatesTitle} />
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
             {provisioning.updates.data.items.map((update) => {
               const checked = model.selectedUpdateKeys.includes(update.componentKey);
               const selectable = !update.updateAlreadyPlanned && update.current.manifestChecksum !== null;
               return (
-                <button
+                <Button
                   type="button"
                   key={update.componentKey}
+                  variant="outline"
+                  aria-pressed={checked}
                   disabled={!selectable}
                   onClick={() => model.toggleUpdate(update.componentKey)}
-                  className={`rounded-xl border p-3 text-start disabled:cursor-not-allowed disabled:opacity-60 ${checked ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30" : "border-slate-200 dark:border-slate-800"}`}
+                  className={`h-auto justify-start whitespace-normal rounded-lg p-3 text-start ${checked ? "border-primary bg-selected text-selected-foreground" : "border-border"}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">{update.componentKey}</p>
-                      <p className="text-[11px] text-slate-500">{update.ownerApp} · {update.installationState}</p>
+                      <p className="text-sm font-semibold text-foreground">{update.componentKey}</p>
+                      <p className="text-xs text-muted-foreground">{update.ownerApp} · {update.installationState}</p>
                     </div>
-                    {checked ? <SquareCheckBig className="size-5 text-indigo-600" /> : <Square className="size-5 text-slate-400" />}
+                    <CheckMark checked={checked} />
                   </div>
                   <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
-                    <Evidence label={ar ? "الحالي" : "Current"} value={update.current.releaseVersion} />
-                    <Evidence label={ar ? "الهدف" : "Target"} value={update.availableRelease.releaseVersion} />
+                    <Evidence label={copy.currentLabel} value={update.current.releaseVersion} />
+                    <Evidence label={copy.targetLabel} value={update.availableRelease.releaseVersion} />
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1 text-[10px]">
-                    <Tag>{update.availableRelease.riskLevel}</Tag>
-                    {update.availableRelease.requiresBackup && <Tag>{ar ? "نسخة احتياطية" : "Backup"}</Tag>}
-                    {update.availableRelease.requiresMaintenance && <Tag>{ar ? "صيانة" : "Maintenance"}</Tag>}
-                    {update.updateAlreadyPlanned && <Tag>{ar ? "مخطط بالفعل" : "Already planned"}</Tag>}
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <Badge tone="neutral">{update.availableRelease.riskLevel}</Badge>
+                    {update.availableRelease.requiresBackup && <Badge tone="neutral">{copy.backupBadge}</Badge>}
+                    {update.availableRelease.requiresMaintenance && <Badge tone="neutral">{copy.maintenanceBadge}</Badge>}
+                    {update.updateAlreadyPlanned && <Badge tone="neutral">{copy.alreadyPlannedBadge}</Badge>}
                   </div>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -396,21 +463,22 @@ function UpdatesSection({ model }: TenantProvisioningWorkspaceViewProps) {
 
 function StateSection({ model }: TenantProvisioningWorkspaceViewProps) {
   const ar = model.lang === "ar";
+  const copy = tpCopy(ar);
   const { provisioning } = model;
   return (
     <div className="space-y-5">
       <ResourceBoundary resource={provisioning.components} ar={ar}>
         <div>
-          <h3 className="mb-2 text-sm font-bold text-slate-900 dark:text-white">{ar ? "المكونات المثبتة" : "Installed components"}</h3>
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-            <table className="min-w-full text-xs">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900"><tr><Th>{ar ? "المكون" : "Component"}</Th><Th>{ar ? "المصدر" : "Source"}</Th><Th>{ar ? "الحالة" : "State"}</Th><Th>{ar ? "المطلوب" : "Desired"}</Th><Th>{ar ? "المطبق" : "Applied"}</Th></tr></thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <h3 className="mb-2 text-sm font-semibold text-foreground">{copy.installedComponentsTitle}</h3>
+          <div className="overflow-x-auto rounded-lg border border-border" role="region" aria-label={copy.installedComponentsTitle} tabIndex={0}>
+            <Table className="min-w-full text-xs">
+              <TableHeader className="text-muted-foreground"><TableRow><Th>{copy.componentColumnHeader}</Th><Th>{copy.sourceColumnHeader}</Th><Th>{copy.stateColumnHeader}</Th><Th>{copy.desiredColumnHeader}</Th><Th>{copy.appliedColumnHeader}</Th></TableRow></TableHeader>
+              <TableBody>
                 {provisioning.components.data.items.map((component) => (
-                  <tr key={component.id}><Td><strong>{component.componentKey}</strong><span className="block text-[10px] text-slate-500">{component.ownerApp}</span></Td><Td>{component.selectionSource}</Td><Td><Tag>{component.state}</Tag></Td><Td>{component.desired.releaseVersion ?? "—"}</Td><Td>{component.applied.releaseVersion ?? "—"}</Td></tr>
+                  <TableRow key={component.id}><Td><strong className="text-foreground">{component.componentKey}</strong><span className="block text-xs text-muted-foreground">{component.ownerApp}</span></Td><Td>{component.selectionSource}</Td><Td><Badge tone="neutral">{component.state}</Badge></Td><Td>{component.desired.releaseVersion ?? "—"}</Td><Td>{component.applied.releaseVersion ?? "—"}</Td></TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       </ResourceBoundary>
@@ -419,38 +487,48 @@ function StateSection({ model }: TenantProvisioningWorkspaceViewProps) {
         <div>
           <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">{ar ? "حالة البذور" : "Seed state"}</h3>
-              <p className="mt-1 text-xs text-slate-500">{ar ? "حل التعارض يتطلب مراجعة صريحة وبصمات حالية." : "Conflict resolution requires an explicit revision and exact checksums."}</p>
+              <h3 className="text-sm font-semibold text-foreground">{copy.seedStateTitle}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">{copy.seedStateNote}</p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <select value={model.conflictDecision} onChange={(event) => model.setConflictDecision(event.target.value as SeedConflictDecision)} className={inputClass}>
-                <option value="KEEP_TENANT_VALUE">KEEP_TENANT_VALUE</option>
-                <option value="APPLY_RELEASE_VALUE_IF_UNMODIFIED">APPLY_RELEASE_VALUE_IF_UNMODIFIED</option>
-                <option value="SKIP_THIS_RELEASE">SKIP_THIS_RELEASE</option>
-              </select>
-              <input value={model.conflictReasonCode} onChange={(event) => model.setConflictReasonCode(event.target.value)} className={inputClass} aria-label={ar ? "رمز سبب حل التعارض" : "Conflict reason code"} />
+            <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-2">
+              <LabeledProvisioningSelect
+                id="seed-conflict-decision"
+                name="conflictDecision"
+                label={copy.conflictDecisionAriaLabel}
+                value={model.conflictDecision}
+                onValueChange={(value) => model.setConflictDecision(value as SeedConflictDecision)}
+                options={[
+                  ["KEEP_TENANT_VALUE", "KEEP_TENANT_VALUE"],
+                  ["APPLY_RELEASE_VALUE_IF_UNMODIFIED", "APPLY_RELEASE_VALUE_IF_UNMODIFIED"],
+                  ["SKIP_THIS_RELEASE", "SKIP_THIS_RELEASE"],
+                ]}
+              />
+              <Field id="seed-conflict-reason" label={copy.conflictReasonCodeAriaLabel}>
+                {(field) => <Input {...field} name="conflictReasonCode" value={model.conflictReasonCode} onChange={(event) => model.setConflictReasonCode(event.target.value)} />}
+              </Field>
             </div>
           </div>
           <div className="space-y-2">
             {provisioning.seeds.data.items.map((seed) => (
-              <div key={seed.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+              <div key={seed.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
                 <div>
-                  <p className="text-xs font-bold text-slate-900 dark:text-white">{seed.componentKey} / {seed.seedKey}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">{seed.policy} · {seed.status}{seed.conflictCode ? ` · ${seed.conflictCode}` : ""}</p>
+                  <p className="text-xs font-semibold text-foreground">{seed.componentKey} / {seed.seedKey}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{seed.policy} · {seed.status}{seed.conflictCode ? ` · ${seed.conflictCode}` : ""}</p>
                 </div>
                 {seed.status === "CONFLICT" && (
                   <div className="text-end">
-                    <button
+                    <Button
                       type="button"
+                      variant="primary"
+                      size="sm"
                       disabled={!provisioning.permissions.canResolveConflicts || !canResolveSeedConflict(seed) || provisioning.mutation.name !== null}
                       onClick={() => void model.resolveConflict(seed)}
-                      className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {ar ? "حل التعارض" : "Resolve conflict"}
-                    </button>
+                      {copy.resolveConflictButton}
+                    </Button>
                     {seed.revision === null && (
-                      <p className="mt-1 max-w-sm text-[10px] text-amber-700 dark:text-amber-300">
-                        {ar ? "معطل بأمان: هذه الاستجابة لم تعرض expectedConflictRevision." : "Fail-closed: this response omitted expectedConflictRevision."}
+                      <p className="mt-1 max-w-sm text-xs text-warning-subtle-foreground">
+                        {copy.failClosedNote}
                       </p>
                     )}
                   </div>
@@ -466,44 +544,54 @@ function StateSection({ model }: TenantProvisioningWorkspaceViewProps) {
 
 function PrerequisitesSection({ model }: TenantProvisioningWorkspaceViewProps) {
   const ar = model.lang === "ar";
+  const copy = tpCopy(ar);
   const { provisioning } = model;
+  const selectedOperation = provisioning.selectedOperation.data;
+  const prerequisitesRequired = (selectedOperation?.prerequisiteCount ?? 0) > 0;
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+      <div className="rounded-lg border border-border p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">{ar ? "طلب متطلبات العملية المحددة" : "Request selected operation prerequisites"}</h3>
-            <p className="mt-1 text-xs text-slate-500">{provisioning.selectedOperation.data ? `${provisioning.selectedOperation.data.type} · ${shortDigest(provisioning.selectedOperation.data.planDigest)}` : (ar ? "اختر عملية من سجل العمليات أولًا." : "Select an operation in history first.")}</p>
+            <h3 className="text-sm font-semibold text-foreground">{copy.requestPrereqTitle}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{selectedOperation ? `${selectedOperation.type} · ${shortDigest(selectedOperation.planDigest)}` : copy.selectOperationFirstText}</p>
+            {selectedOperation && !prerequisitesRequired && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {copy.noPrereqRequiredNote}
+              </p>
+            )}
           </div>
-          <div className="flex gap-2">
-            <input value={model.prerequisiteReasonCode} onChange={(event) => model.setPrerequisiteReasonCode(event.target.value)} className={inputClass} aria-label={ar ? "رمز سبب طلب المتطلبات" : "Prerequisite reason code"} />
-            <button type="button" onClick={() => void model.requestSelectedPrerequisites()} disabled={!provisioning.permissions.canRequestPrerequisites || !provisioning.selectedOperation.data || provisioning.mutation.name !== null} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{ar ? "إرسال الطلب" : "Request"}</button>
+          <div className="grid w-full items-end gap-2 sm:w-auto sm:grid-cols-[minmax(12rem,1fr)_auto]">
+            <Field id="prerequisite-reason" label={copy.prereqReasonAriaLabel}>
+              {(field) => <Input {...field} name="prerequisiteReasonCode" value={model.prerequisiteReasonCode} onChange={(event) => model.setPrerequisiteReasonCode(event.target.value)} />}
+            </Field>
+            <Button type="button" variant="primary" size="sm" onClick={() => void model.requestSelectedPrerequisites()} disabled={!provisioning.permissions.canRequestPrerequisites || !selectedOperation || !prerequisitesRequired || provisioning.mutation.name !== null}>{copy.requestButton}</Button>
           </div>
         </div>
       </div>
 
       <ResourceBoundary resource={provisioning.prerequisites} ar={ar}>
         {provisioning.prerequisites.data.length === 0 ? (
-          <EmptyState ar={ar} labelEn="No prerequisite evidence." labelAr="لا يوجد دليل متطلبات." />
+          <EmptyState icon={CircleDashed} title={copy.noPrereqEvidenceTitle} />
         ) : (
           <div className="space-y-3">
             {provisioning.prerequisites.data.map((request) => (
-              <article key={request.requestId} className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+              <article key={request.requestId} className="rounded-lg border border-border p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div><p className="text-xs font-bold text-slate-900 dark:text-white">{ar ? "طلب" : "Request"} {request.generation}</p><p className="mt-1 text-[10px] text-slate-500">{shortDigest(request.requestDigest)} · {formatDate(request.requestedAt, model.lang)}</p></div>
-                  <Tag>{request.status}</Tag>
+                  <div><p className="text-xs font-semibold text-foreground">{copy.requestLabelInline} {request.generation}</p><p className="mt-1 text-xs text-muted-foreground">{shortDigest(request.requestDigest)} · {formatDate(request.requestedAt, model.lang)}</p></div>
+                  <Badge tone="neutral">{request.status}</Badge>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-1">{request.releasePins.map((pin) => <Tag key={`${request.requestId}-${pin.componentKey}`}>{pin.componentKey}{pin.requiresBackup ? " · backup" : ""}{pin.requiresMaintenance ? " · maintenance" : ""}</Tag>)}</div>
+                <div className="mt-3 flex flex-wrap gap-1">{request.releasePins.map((pin) => <Badge tone="neutral" key={`${request.requestId}-${pin.componentKey}`}>{pin.componentKey}{pin.requiresBackup ? " · backup" : ""}{pin.requiresMaintenance ? " · maintenance" : ""}</Badge>)}</div>
                 {request.maintenanceFence && (
-                  <div className="mt-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                    {ar ? "سياج الصيانة" : "Maintenance fence"}: {request.maintenanceFence.status} · {ar ? "مراجعة" : "revision"} {request.maintenanceFence.accessPolicyRevision}
+                  <div className="mt-3 rounded-md bg-warning-subtle p-2 text-xs text-warning-subtle-foreground">
+                    {copy.maintenanceFenceLabel}: {request.maintenanceFence.status} · {copy.revisionWord} {request.maintenanceFence.accessPolicyRevision}
                   </div>
                 )}
                 {request.evidence.map((evidence) => (
-                  <div key={evidence.evidenceId} className="mt-2 grid gap-2 rounded-lg bg-slate-50 p-2 text-[11px] dark:bg-slate-900 sm:grid-cols-3">
-                    <Evidence label={ar ? "الدليل" : "Evidence"} value={evidence.status} />
-                    <Evidence label={ar ? "البصمة" : "Digest"} value={shortDigest(evidence.evidenceDigest)} />
-                    <Evidence label={ar ? "الحجم" : "Backup bytes"} value={evidence.backupEvidence?.sizeBytes ?? "—"} />
+                  <div key={evidence.evidenceId} className="mt-2 grid gap-2 rounded-md bg-muted p-2 text-xs sm:grid-cols-3">
+                    <Evidence label={copy.evidenceLabel} value={evidence.status} />
+                    <Evidence label={copy.digestLabel} value={shortDigest(evidence.evidenceDigest)} />
+                    <Evidence label={copy.backupBytesLabel} value={evidence.backupEvidence?.sizeBytes ?? "—"} />
                   </div>
                 ))}
               </article>
@@ -517,105 +605,223 @@ function PrerequisitesSection({ model }: TenantProvisioningWorkspaceViewProps) {
 
 function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
   const ar = model.lang === "ar";
+  const copy = tpCopy(ar);
   const { provisioning } = model;
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <CommandCard title={ar ? "إضافة تطبيق" : "Add Application"} description={ar ? "استخدم مراجعة حديثة موثوقة واختيارات إصدار دقيقة؛ الاكتشاف للقراءة فقط وكل تغيير تثبيت صريح." : "Use a fresh authoritative access-policy revision and exact release pins; discovery is read-only and installation changes are explicit."}>
+      <CommandCard title={copy.addApplicationTitle} description={copy.addApplicationDescription}>
         <div className="grid gap-2 sm:grid-cols-2">
-          <Field label={ar ? "مفتاح التطبيق" : "Application key"}><input className={inputClass} value={model.applicationKey} onChange={(event) => model.setApplicationKey(event.target.value)} /></Field>
-          <Field label={ar ? "مراجعة سياسة الوصول" : "Access-policy revision"}><input className={inputClass} inputMode="numeric" value={model.accessPolicyRevision} onChange={(event) => model.setAccessPolicyRevision(event.target.value)} /></Field>
+          <Field label={copy.applicationKeyLabel}>
+            {(fieldProps) => <Input {...fieldProps} name="applicationKey" value={model.applicationKey} onChange={(event) => model.setApplicationKey(event.target.value)} />}
+          </Field>
+          <Field label={copy.accessPolicyRevisionLabel}>
+            {(fieldProps) => <Input {...fieldProps} name="accessPolicyRevision" inputMode="numeric" value={model.accessPolicyRevision} onChange={(event) => model.setAccessPolicyRevision(event.target.value)} />}
+          </Field>
         </div>
-        <Field label={ar ? "رمز السبب" : "Reason code"}><input className={inputClass} value={model.addApplicationReasonCode} onChange={(event) => model.setAddApplicationReasonCode(event.target.value)} /></Field>
+        <Field label={copy.reasonCodeLabel}>
+          {(fieldProps) => <Input {...fieldProps} name="addApplicationReasonCode" value={model.addApplicationReasonCode} onChange={(event) => model.setAddApplicationReasonCode(event.target.value)} />}
+        </Field>
         <div className="space-y-2">
           {model.managedTargets.map((target, index) => (
-            <div key={target.key} className="rounded-lg border border-slate-200 p-2 dark:border-slate-800">
-              <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-slate-500"><span>{ar ? "هدف" : "Target"} {index + 1}</span><button type="button" onClick={() => model.removeManagedTarget(target.key)} className="text-rose-600">{ar ? "إزالة" : "Remove"}</button></div>
+            <div key={target.key} className="rounded-md border border-border p-2">
+              <div className="mb-2 flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                <span>{copy.targetLabelInline(index + 1)}</span>
+                <Button type="button" variant="ghost" size="sm" onClick={() => model.removeManagedTarget(target.key)} className="h-auto p-0 text-destructive hover:bg-transparent">
+                  {copy.removeButton}
+                </Button>
+              </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {(["componentKey", "componentId", "targetReleaseId", "targetReleaseVersion", "targetManifestChecksum"] as const).map((field) => (
-                  <input key={field} className={`${inputClass} ${field === "targetManifestChecksum" ? "sm:col-span-2" : ""}`} placeholder={field} value={target[field]} onChange={(event) => model.updateManagedTarget(target.key, field, event.target.value)} aria-label={field} />
+                  <Field key={field} id={`managed-target-${target.key}-${field}`} label={managedTargetFieldLabel(field, ar)} className={field === "targetManifestChecksum" ? "sm:col-span-2" : undefined}>
+                    {(fieldProps) => (
+                      <Input
+                        {...fieldProps}
+                        name={`targets.${index}.${field}`}
+                        value={target[field]}
+                        onChange={(event) => model.updateManagedTarget(target.key, field, event.target.value)}
+                      />
+                    )}
+                  </Field>
                 ))}
               </div>
             </div>
           ))}
-          <button type="button" onClick={model.addManagedTarget} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">+ {ar ? "إضافة هدف" : "Add target"}</button>
+          <Button type="button" variant="link" size="sm" onClick={model.addManagedTarget} className="h-auto p-0">+ {copy.addTargetButton}</Button>
         </div>
-        <CommandButton disabled={!provisioning.permissions.canAddApplication || provisioning.mutation.name !== null} onClick={() => void model.submitAddApplication()}>{ar ? "إنشاء عملية إضافة" : "Create add operation"}</CommandButton>
+        <Button type="button" variant="primary" size="sm" disabled={!provisioning.permissions.canAddApplication || provisioning.mutation.name !== null} onClick={() => void model.submitAddApplication()}>{copy.createAddOperationButton}</Button>
       </CommandCard>
 
       <div className="space-y-4">
-        <CommandCard title={ar ? "إصلاح مكون" : "Repair component"} description={ar ? "الإصلاح مثبت على الإصدار المطلوب الحالي ولا يقوم بالترقية." : "Repair is pinned to the current desired release; it does not upgrade."}>
-          <Field label={ar ? "المكون" : "Component"}><ComponentSelect model={model} value={model.repairComponentId} onChange={model.setRepairComponentId} /></Field>
-          <Field label={ar ? "رمز السبب" : "Reason code"}><input className={inputClass} value={model.repairReasonCode} onChange={(event) => model.setRepairReasonCode(event.target.value)} /></Field>
-          <CommandButton disabled={!provisioning.permissions.canRepair || provisioning.mutation.name !== null} onClick={() => void model.submitRepair()}>{ar ? "إنشاء عملية إصلاح" : "Create repair"}</CommandButton>
+        <CommandCard title={copy.repairComponentTitle} description={copy.repairDescription}>
+          <ComponentSelect model={model} id="repair-component" name="repairComponentId" label={copy.componentLabel} value={model.repairComponentId} onChange={model.setRepairComponentId} />
+          <Field label={copy.reasonCodeLabel}>
+            {(fieldProps) => <Input {...fieldProps} name="repairReasonCode" value={model.repairReasonCode} onChange={(event) => model.setRepairReasonCode(event.target.value)} />}
+          </Field>
+          <Button type="button" variant="primary" size="sm" disabled={!provisioning.permissions.canRepair || provisioning.mutation.name !== null} onClick={() => void model.submitRepair()}>{copy.createRepairButton}</Button>
         </CommandCard>
 
-        <CommandCard title={ar ? "إيقاف مكون مع الاحتفاظ" : "Retained decommission"} description={ar ? "يتطلب إزالة الاستحقاق وعدم وجود تبعيات نشطة، ويُجبر النسخ الاحتياطي والصيانة." : "Requires removed entitlement and no enabled dependants; backup and maintenance are mandatory."}>
-          <Field label={ar ? "المكون" : "Component"}><ComponentSelect model={model} value={model.decommissionComponentId} onChange={model.setDecommissionComponentId} /></Field>
-          <Field label={ar ? "رمز السبب" : "Reason code"}><input className={inputClass} value={model.decommissionReasonCode} onChange={(event) => model.setDecommissionReasonCode(event.target.value)} /></Field>
-          <label className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300"><input type="checkbox" checked={model.retentionAcknowledged} onChange={(event) => model.setRetentionAcknowledged(event.target.checked)} className="mt-0.5" /><span>{ar ? "أقر أن البيانات ستظل محتفظًا بها وأن المكون سيُعطل فقط." : "I acknowledge that data is retained and the component is disabled rather than erased."}</span></label>
-          <CommandButton danger disabled={!provisioning.permissions.canDecommission || !model.retentionAcknowledged || provisioning.mutation.name !== null} onClick={() => void model.submitDecommission()}>{ar ? "إنشاء عملية إيقاف" : "Create decommission"}</CommandButton>
+        <CommandCard title={copy.retainedDecommissionTitle} description={copy.retainedDecommissionDescription}>
+          <ComponentSelect model={model} id="decommission-component" name="decommissionComponentId" label={copy.componentLabel} value={model.decommissionComponentId} onChange={model.setDecommissionComponentId} />
+          <Field label={copy.reasonCodeLabel}>
+            {(fieldProps) => <Input {...fieldProps} name="decommissionReasonCode" value={model.decommissionReasonCode} onChange={(event) => model.setDecommissionReasonCode(event.target.value)} />}
+          </Field>
+          <label htmlFor="retention-acknowledged" className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground">
+            <Checkbox id="retention-acknowledged" name="retentionAcknowledged" checked={model.retentionAcknowledged} onCheckedChange={(checked) => model.setRetentionAcknowledged(checked === true)} />
+            <span>{copy.retentionAckLabel}</span>
+          </label>
+          <Button type="button" variant="destructive" size="sm" disabled={!provisioning.permissions.canDecommission || !model.retentionAcknowledged || provisioning.mutation.name !== null} onClick={() => void model.submitDecommission()}>{copy.createDecommissionButton}</Button>
         </CommandCard>
       </div>
     </div>
   );
 }
 
-function ComponentSelect({ model, value, onChange }: TenantProvisioningWorkspaceViewProps & { value: string; onChange: (value: string) => void }) {
-  return <select className={inputClass} value={value} onChange={(event) => onChange(event.target.value)}><option value="">—</option>{model.provisioning.components.data.items.map((component) => <option key={component.id} value={component.id}>{component.componentKey} · {component.state}</option>)}</select>;
+function LabeledProvisioningSelect({
+  id,
+  name,
+  label,
+  value,
+  onValueChange,
+  options,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  options: ReadonlyArray<readonly [string, string]>;
+}) {
+  const labelId = `${id}-label`;
+  return (
+    <div className="space-y-1.5">
+      <span id={labelId} className="text-sm font-medium text-foreground">{label}</span>
+      <Select name={name} value={value} onValueChange={onValueChange}>
+        <SelectTrigger id={id} aria-labelledby={labelId}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map(([optionValue, optionLabel]) => (
+            <SelectItem key={optionValue} value={optionValue}>{optionLabel}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function ComponentSelect({ model, value, onChange, id, name, label }: TenantProvisioningWorkspaceViewProps & { value: string; onChange: (value: string) => void; id: string; name: string; label: string }) {
+  const labelId = `${id}-label`;
+  return (
+    <div className="space-y-1.5">
+      <span id={labelId} className="text-sm font-medium text-foreground">{label}</span>
+      <Select name={name} value={value || undefined} onValueChange={onChange}>
+        <SelectTrigger id={id} aria-labelledby={labelId}>
+          <SelectValue placeholder="—" />
+        </SelectTrigger>
+        <SelectContent>
+          {model.provisioning.components.data.items.map((component) => (
+            <SelectItem key={component.id} value={component.id}>{component.componentKey} · {component.state}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+type ManagedTargetField = "componentKey" | "componentId" | "targetReleaseId" | "targetReleaseVersion" | "targetManifestChecksum";
+
+function managedTargetFieldLabel(field: ManagedTargetField, ar: boolean): string {
+  const labels: Record<ManagedTargetField, [string, string]> = {
+    componentKey: ["Component key", "مفتاح المكوّن"],
+    componentId: ["Component ID", "معرّف المكوّن"],
+    targetReleaseId: ["Target release ID", "معرّف الإصدار المستهدف"],
+    targetReleaseVersion: ["Target release version", "نسخة الإصدار المستهدف"],
+    targetManifestChecksum: ["Target manifest checksum", "بصمة بيان الإصدار المستهدف"],
+  };
+  return labels[field][ar ? 1 : 0];
 }
 
 function ResourceBoundary<T>({ resource, ar, compact = false, children }: { resource: ProvisioningResource<T>; ar: boolean; compact?: boolean; children: ReactNode }) {
-  if (resource.status === "loading" || resource.status === "idle") return <div className={`grid place-items-center ${compact ? "min-h-24" : "min-h-48"}`}><span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500"><RefreshCw className="size-4 animate-spin" />{ar ? "جارٍ التحميل…" : "Loading…"}</span></div>;
-  if (resource.status === "forbidden") return <Notice icon={<ShieldCheck className="size-5" />} title={ar ? "صلاحية مطلوبة" : "Permission required"} description={ar ? "هذا المورد مستقل في الصلاحيات ولا يُعرض كقائمة فارغة." : "This independently permissioned resource is not represented as empty."} />;
-  if (resource.status === "error") return <Notice icon={<XCircle className="size-5" />} title={ar ? "المورد غير متاح" : "Resource unavailable"} description={`${resource.error?.errorCode ?? "UNKNOWN_ERROR"}${resource.error?.correlationId ? ` · ${resource.error.correlationId}` : ""}`} />;
+  const copy = tpCopy(ar);
+  if (resource.status === "loading" || resource.status === "idle") return <div className={`grid place-items-center ${compact ? "min-h-24" : "min-h-48"}`}><span className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground"><RefreshCw className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />{copy.loadingLabel}</span></div>;
+  if (resource.status === "forbidden") return <Notice icon={<ShieldCheck className="size-5" />} title={copy.permissionRequiredTitle} description={copy.permissionRequiredDescription} />;
+  if (resource.status === "error") return <Notice icon={<XCircle className="size-5" />} title={copy.resourceUnavailableTitle} description={`${resource.error?.errorCode ?? "UNKNOWN_ERROR"}${resource.error?.correlationId ? ` · ${resource.error.correlationId}` : ""}`} />;
   return <>{children}</>;
 }
 
 function Notice({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
-  return <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-slate-300 p-4 text-center dark:border-slate-700"><div><span className="mx-auto mb-2 grid size-9 place-items-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-900">{icon}</span><p className="text-sm font-bold text-slate-800 dark:text-slate-100">{title}</p><p className="mt-1 text-xs text-slate-500">{description}</p></div></div>;
-}
-
-function EmptyState({ ar, labelEn, labelAr }: { ar: boolean; labelEn: string; labelAr: string }) {
-  return <Notice icon={<CircleDashed className="size-5" />} title={ar ? labelAr : labelEn} description={ar ? "تؤكد الاستجابة الموثوقة عدم وجود سجلات." : "The authoritative response contains no records."} />;
+  return (
+    <div className="flex min-h-28 items-center justify-center rounded-lg border border-dashed border-border p-4 text-center">
+      <div>
+        <span className="mx-auto mb-2 grid size-9 place-items-center rounded-full bg-muted text-muted-foreground">{icon}</span>
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  );
 }
 
 function StatusBadge({ status, ar }: { status: TenantOperationStatus; ar: boolean }) {
-  const colors = status === "SUCCEEDED" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : status === "FAILED_RETRYABLE" || status === "MANUAL_RECOVERY_REQUIRED" ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300" : status === "CANCELLED" ? "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300" : status === "CANCEL_REQUESTED" ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300" : "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300";
-  return <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${colors}`}>{operationStatusLabel(status, ar)}</span>;
+  return <Badge tone={statusTone(status)}>{operationStatusLabel(status, ar)}</Badge>;
 }
 
-function StepBadge({ status }: { status: string }) {
+function statusTone(status: TenantOperationStatus): "success" | "danger" | "warn" | "neutral" {
+  if (status === "SUCCEEDED") return "success";
+  if (status === "FAILED_RETRYABLE" || status === "MANUAL_RECOVERY_REQUIRED") return "danger";
+  if (status === "CANCEL_REQUESTED") return "warn";
+  return "neutral";
+}
+
+function progressTone(status: TenantOperationStatus): "running" | "succeeded" | "failed" {
+  if (status === "SUCCEEDED") return "succeeded";
+  if (status === "FAILED_RETRYABLE" || status === "MANUAL_RECOVERY_REQUIRED") return "failed";
+  return "running";
+}
+
+function StepBadge({ status }: { status: TenantOperationStepStatus }) {
   const Icon = status === "SUCCEEDED" || status === "SKIPPED" ? CheckCircle2 : status === "FAILED" || status === "CONFLICT" ? AlertTriangle : status === "CANCELLED" ? XCircle : CircleDashed;
-  return <span className="inline-flex items-center gap-1"><Icon className="size-3" />{status}</span>;
+  const tone = status === "SUCCEEDED" || status === "SKIPPED" ? "success" : status === "FAILED" || status === "CONFLICT" ? "danger" : "neutral";
+  return <Badge tone={tone}><Icon className="size-3" aria-hidden="true" />{status}</Badge>;
 }
 
 function CommandCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
-  return <article className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-800"><div><h3 className="text-sm font-bold text-slate-900 dark:text-white">{title}</h3><p className="mt-1 text-xs text-slate-500">{description}</p></div>{children}</article>;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">{children}</CardContent>
+    </Card>
+  );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300"><span className="mb-1 block">{label}</span>{children}</label>;
-}
-
-function CommandButton({ danger = false, disabled, onClick, children }: { danger?: boolean; disabled: boolean; onClick: () => void; children: ReactNode }) {
-  return <button type="button" disabled={disabled} onClick={onClick} className={`rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${danger ? "bg-rose-600" : "bg-indigo-600"}`}>{children}</button>;
+/** Decorative selection indicator inside an already-interactive toggle
+ * button — a real Checkbox (a button under the hood) can't nest there. */
+function CheckMark({ checked }: { checked: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`grid size-5 shrink-0 place-items-center rounded-xs border ${
+        checked
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border text-transparent"
+      }`}
+    >
+      <Check className="size-3.5" />
+    </span>
+  );
 }
 
 function Evidence({ label, value }: { label: string; value: string }) {
-  return <div><dt className="text-slate-500">{label}</dt><dd className="truncate font-mono text-slate-800 dark:text-slate-100" title={value}>{value}</dd></div>;
+  return <div><dt className="text-muted-foreground">{label}</dt><dd className="truncate font-mono text-foreground" title={value}>{value}</dd></div>;
 }
 
-function Tag({ children }: { children: ReactNode }) {
-  return <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{children}</span>;
-}
-
-function Th({ children }: { children: ReactNode }) { return <th className="px-3 py-2 text-start font-semibold">{children}</th>; }
-function Td({ children }: { children: ReactNode }) { return <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{children}</td>; }
-
-const inputClass = "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white";
+function Th({ children }: { children: ReactNode }) { return <TableHead className="px-3 py-2">{children}</TableHead>; }
+function Td({ children }: { children: ReactNode }) { return <TableCell className="px-3 py-2 text-muted-foreground">{children}</TableCell>; }
 
 function shortDigest(value: string): string { return `${value.slice(0, 10)}…${value.slice(-6)}`; }
-function formatDate(value: string, locale: string): string { return new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
+function formatDate(value: string, locale: string): string { return new Intl.DateTimeFormat(localeForLanguage(locale === "ar" ? "ar" : "en"), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
 function operationTypeLabel(type: string, ar: boolean): string { const labels: Record<string, [string, string]> = { INITIAL_PROVISION: ["Initial provision", "التجهيز الأولي"], RETRY: ["Retry", "إعادة محاولة"], UPDATE: ["Update", "تحديث"], ADD_APPLICATION: ["Add Application", "إضافة تطبيق"], REPAIR: ["Repair", "إصلاح"], DECOMMISSION: ["Decommission", "إيقاف"] }; return labels[type]?.[ar ? 1 : 0] ?? type; }
 function operationStatusLabel(status: TenantOperationStatus, ar: boolean): string { if (!ar) return status; const labels: Partial<Record<TenantOperationStatus, string>> = { REQUESTED: "مطلوبة", PLANNING: "تخطيط", QUEUED: "بالطابور", RUNNING: "قيد التنفيذ", WAITING_RETRY: "انتظار إعادة", CANCEL_REQUESTED: "طلب إلغاء", SUCCEEDED: "نجحت", FAILED_RETRYABLE: "فشل قابل للإعادة", MANUAL_RECOVERY_REQUIRED: "تدخل يدوي", CANCELLED: "ملغاة" }; return labels[status] ?? status; }
-function localizeError(code: string, ar: boolean): string { const messages: Record<string, [string, string]> = { TENANT_SEED_CONFLICT_REVISION_UNAVAILABLE: ["Core has not exposed the conflict revision; resolution is disabled safely.", "لم تعرض Core مراجعة التعارض؛ تم تعطيل الحل بأمان."], TENANT_UPDATE_SELECTION_REQUIRED: ["Select at least one update.", "اختر تحديثًا واحدًا على الأقل."], TENANT_DECOMMISSION_RETENTION_ACK_REQUIRED: ["Acknowledge retained-data behavior.", "أكد سلوك الاحتفاظ بالبيانات."], INVALID_PROVISIONING_REASON_CODE: ["Use an uppercase safe reason code.", "استخدم رمز سبب آمنًا بأحرف كبيرة."], "GW.IDEM.IN_FLIGHT": ["The exact command is still in flight; retry keeps the same key.", "الأمر نفسه ما زال قيد التنفيذ؛ الإعادة تحتفظ بالمفتاح نفسه."] }; return messages[code]?.[ar ? 1 : 0] ?? code; }
+function localizeError(code: string, ar: boolean): string { const messages: Record<string, [string, string]> = { TENANT_SEED_CONFLICT_REVISION_UNAVAILABLE: ["Core has not exposed the conflict revision; resolution is disabled safely.", "لم تعرض Core مراجعة التعارض؛ تم تعطيل الحل بأمان."], TENANT_UPDATE_SELECTION_REQUIRED: ["Select at least one update.", "اختر تحديثًا واحدًا على الأقل."], TENANT_DECOMMISSION_RETENTION_ACK_REQUIRED: ["Acknowledge retained-data behavior.", "أكد سلوك الاحتفاظ بالبيانات."], TENANT_PROVISIONING_OPERATION_SUPERSEDED: ["This operation was superseded by a newer generation. Refresh the history and select the latest operation.", "حلّ جيل أحدث محل هذه العملية. حدّث السجل واختر أحدث عملية."], INVALID_PROVISIONING_REASON_CODE: ["Use an uppercase safe reason code.", "استخدم رمز سبب آمنًا بأحرف كبيرة."], "GW.IDEM.IN_FLIGHT": ["The exact command is still in flight; retry keeps the same key.", "الأمر نفسه ما زال قيد التنفيذ؛ الإعادة تحتفظ بالمفتاح نفسه."] }; return messages[code]?.[ar ? 1 : 0] ?? code; }

@@ -1,6 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  Checkbox,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Button,
+  Field as FormField,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/design-system";
 import type { TenantAccessController } from "../use-tenant-access";
 import type { TenantAccessCopy, TenantAccessLocale } from "../copy";
 import type {
@@ -8,15 +23,19 @@ import type {
   InviteTenantUserInput,
   TenantUserView,
   UpdateTenantUserInput,
-  UpdateTenantUserWebphoneInput,
 } from "../types";
 
-const inputClass =
-  "h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-100";
-const primaryClass =
-  "inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50";
-const secondaryClass =
-  "inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+const EMPTY_SELECT_VALUE = "__none__";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type TenantUserEditorField =
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "branchId"
+  | "departmentId";
+
+type TenantUserEditorErrors = Partial<Record<TenantUserEditorField, string>>;
 
 interface SharedDialogProps {
   controller: TenantAccessController;
@@ -48,7 +67,7 @@ export function TenantUserEditorDialog({
   const [managerId, setManagerId] = useState(user?.manager?.id ?? "");
   const [partyId, setPartyId] = useState("");
   const [roleIds, setRoleIds] = useState<string[]>([]);
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<TenantUserEditorErrors>({});
   const branches = controller.branches.data?.items ?? [];
   const departments = controller.departments.data?.items ?? [];
   const teams = controller.teams.data?.items ?? [];
@@ -66,15 +85,35 @@ export function TenantUserEditorDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const clearFieldErrors = (...fields: TenantUserEditorField[]) => {
+    setFieldErrors((current) => {
+      if (!fields.some((field) => current[field])) return current;
+      const next = { ...current };
+      fields.forEach((field) => delete next[field]);
+      return next;
+    });
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    setLocalError(null);
+    const nextErrors: TenantUserEditorErrors = {};
+    if (!firstName.trim()) nextErrors.firstName = copy.requiredField;
+    if (!lastName.trim()) nextErrors.lastName = copy.requiredField;
+    if (mode === "invite" && !EMAIL_PATTERN.test(email.trim())) {
+      nextErrors.email = email.trim() ? copy.invalidEmail : copy.requiredField;
+    }
+    if (mode === "invite" ? !selectedBranch : !branchId) {
+      nextErrors.branchId = copy.requiredField;
+    }
+    if (!departmentId) nextErrors.departmentId = copy.requiredField;
+    if (Object.keys(nextErrors).length) {
+      setFieldErrors(nextErrors);
+      return;
+    }
+    setFieldErrors({});
     try {
       if (mode === "invite") {
-        if (!selectedBranch || !departmentId) {
-          setLocalError("Organization placement is required.");
-          return;
-        }
+        if (!selectedBranch) return;
         const input: InviteTenantUserInput = {
           email: email.trim().toLowerCase(),
           firstName: firstName.trim(),
@@ -122,90 +161,69 @@ export function TenantUserEditorDialog({
       onClose={onClose}
       locale={locale}
     >
-      <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
-        <Field label={copy.firstName}>
-          <input className={inputClass} value={firstName} maxLength={80} required onChange={(event) => setFirstName(event.target.value)} />
-        </Field>
-        <Field label={copy.lastName}>
-          <input className={inputClass} value={lastName} maxLength={80} required onChange={(event) => setLastName(event.target.value)} />
-        </Field>
-        <Field label={copy.email} wide>
-          <input className={inputClass} type="email" value={email} maxLength={255} required disabled={mode === "edit"} onChange={(event) => setEmail(event.target.value)} />
-        </Field>
-        <Field label={copy.employeeCode}>
-          <input className={inputClass} value={employeeCode} maxLength={32} onChange={(event) => setEmployeeCode(event.target.value)} />
-        </Field>
-        <Field label={copy.jobTitle}>
-          <input className={inputClass} value={jobTitle} maxLength={120} onChange={(event) => setJobTitle(event.target.value)} />
-        </Field>
-        <Field label={copy.branch}>
-          <select
-            className={inputClass}
-            required
-            value={branchId}
-            onChange={(event) => {
-              const next = event.target.value;
+      <form noValidate onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
+        <DialogInputField id="tenant-user-first-name" name="firstName" label={copy.firstName} value={firstName} maxLength={80} required error={fieldErrors.firstName} onChange={(value) => { setFirstName(value); clearFieldErrors("firstName"); }} />
+        <DialogInputField id="tenant-user-last-name" name="lastName" label={copy.lastName} value={lastName} maxLength={80} required error={fieldErrors.lastName} onChange={(value) => { setLastName(value); clearFieldErrors("lastName"); }} />
+        <DialogInputField id="tenant-user-email" name="email" label={copy.email} wide type="email" value={email} maxLength={255} required disabled={mode === "edit"} error={fieldErrors.email} onChange={(value) => { setEmail(value); clearFieldErrors("email"); }} />
+        <DialogInputField id="tenant-user-employee-code" name="employeeCode" label={copy.employeeCode} value={employeeCode} maxLength={32} onChange={setEmployeeCode} />
+        <DialogInputField id="tenant-user-job-title" name="jobTitle" label={copy.jobTitle} value={jobTitle} maxLength={120} onChange={setJobTitle} />
+        <DialogSelectField
+          id="tenant-user-branch"
+          label={copy.branch}
+          required
+          value={branchId}
+          error={fieldErrors.branchId}
+          onValueChange={(next) => {
               setBranchId(next);
               setDepartmentId("");
               setTeamId("");
               setRoleIds([]);
+              clearFieldErrors("branchId", "departmentId");
               if (next) void controller.loadDepartments({ branchId: next, page: 1, limit: 100 });
             }}
-          >
-            <option value="">—</option>
-            {user && !branches.some((row) => row.id === user.organization.branch.id) ? (
-              <option value={user.organization.branch.id}>{user.organization.branch.name ?? user.organization.branch.id}</option>
-            ) : null}
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.company.name} · {branch.name}</option>)}
-          </select>
-        </Field>
-        <Field label={copy.department}>
-          <select
-            className={inputClass}
-            required
-            disabled={!branchId}
-            value={departmentId}
-            onChange={(event) => {
-              const next = event.target.value;
+          options={[
+            ...(user && !branches.some((row) => row.id === user.organization.branch.id) ? [[user.organization.branch.id, user.organization.branch.name ?? user.organization.branch.id] as const] : []),
+            ...branches.map((branch) => [branch.id, `${branch.company.name} · ${branch.name}`] as const),
+          ]}
+        />
+        <DialogSelectField
+          id="tenant-user-department"
+          label={copy.department}
+          required
+          disabled={!branchId}
+          value={departmentId}
+          error={fieldErrors.departmentId}
+          onValueChange={(next) => {
               setDepartmentId(next);
               setTeamId("");
+              clearFieldErrors("departmentId");
               if (next) void controller.loadTeams({ departmentId: next, page: 1, limit: 100 });
             }}
-          >
-            <option value="">—</option>
-            {user && !departments.some((row) => row.id === user.organization.department.id) ? (
-              <option value={user.organization.department.id}>{user.organization.department.name ?? user.organization.department.id}</option>
-            ) : null}
-            {departments.map((department) => <option key={department.id} value={department.id}>{department.code} · {department.name}</option>)}
-          </select>
-        </Field>
-        <Field label={copy.team}>
-          <select className={inputClass} disabled={!departmentId} value={teamId} onChange={(event) => setTeamId(event.target.value)}>
-            <option value="">—</option>
-            {user?.organization.team && !teams.some((row) => row.id === user.organization.team?.id) ? (
-              <option value={user.organization.team.id}>{user.organization.team.name ?? user.organization.team.id}</option>
-            ) : null}
-            {teams.map((team) => <option key={team.id} value={team.id}>{team.code} · {team.name}</option>)}
-          </select>
-        </Field>
-        <Field label={copy.managerId}>
-          <input className={inputClass} value={managerId} onChange={(event) => setManagerId(event.target.value)} />
-        </Field>
+          options={[
+            ...(user && !departments.some((row) => row.id === user.organization.department.id) ? [[user.organization.department.id, user.organization.department.name ?? user.organization.department.id] as const] : []),
+            ...departments.map((department) => [department.id, `${department.code} · ${department.name}`] as const),
+          ]}
+        />
+        <DialogSelectField id="tenant-user-team" label={copy.team} disabled={!departmentId} value={teamId} onValueChange={setTeamId} options={[
+          ...(user?.organization.team && !teams.some((row) => row.id === user.organization.team?.id) ? [[user.organization.team.id, user.organization.team.name ?? user.organization.team.id] as const] : []),
+          ...teams.map((team) => [team.id, `${team.code} · ${team.name}`] as const),
+        ]} />
+        <DialogInputField id="tenant-user-manager" name="managerId" label={copy.managerId} value={managerId} onChange={setManagerId} />
         {mode === "invite" ? (
-          <Field label={copy.partyId}>
-            <input className={inputClass} value={partyId} onChange={(event) => setPartyId(event.target.value)} />
-          </Field>
+          <DialogInputField id="tenant-user-party" name="partyId" label={copy.partyId} value={partyId} onChange={setPartyId} />
         ) : null}
         {mode === "invite" && controller.permissions.canAssignRoles ? (
-          <fieldset className="sm:col-span-2 rounded-lg border border-slate-200 p-3">
-            <legend className="px-1 text-xs font-semibold text-slate-600">{copy.roles}</legend>
+          <fieldset className="sm:col-span-2 rounded-lg border border-border p-3">
+            <legend className="px-1 text-xs font-semibold text-muted-foreground">{copy.roles}</legend>
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => (
-                <label key={role.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs">
-                  <input
-                    type="checkbox"
+                <label key={role.id} htmlFor={`tenant-user-role-${role.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 py-1 text-xs">
+                  <Checkbox
+                    id={`tenant-user-role-${role.id}`}
+                    name="roleIds"
+                    value={role.id}
                     checked={roleIds.includes(role.id)}
-                    onChange={(event) => setRoleIds((current) => event.target.checked ? [...current, role.id] : current.filter((id) => id !== role.id))}
+                    onCheckedChange={(checked) => setRoleIds((current) => checked === true ? [...current, role.id] : current.filter((id) => id !== role.id))}
                   />
                   {role.name}
                 </label>
@@ -213,10 +231,13 @@ export function TenantUserEditorDialog({
             </div>
           </fieldset>
         ) : null}
-        <DialogError controller={controller} localError={localError} />
+        <DialogError
+          controller={controller}
+          localError={Object.keys(fieldErrors).length ? copy.validationSummary : null}
+        />
         <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-          <button type="button" className={secondaryClass} onClick={onClose}>{copy.cancel}</button>
-          <button type="submit" className={primaryClass} disabled={controller.command.pending}>{copy.save}</button>
+          <Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
+          <Button type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button>
         </div>
       </form>
     </DialogFrame>
@@ -254,65 +275,11 @@ export function PasswordDialog({
   };
   return (
     <DialogFrame title={copy.changePassword} onClose={onClose} locale={locale}>
-      <form onSubmit={submit} className="grid gap-3">
-        <Field label={copy.password}><input className={inputClass} type="password" minLength={12} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
-        <Field label={copy.passwordConfirmation}><input className={inputClass} type="password" minLength={12} maxLength={128} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></Field>
-        <DialogError controller={controller} localError={localError} />
-        <div className="flex justify-end gap-2"><button type="button" className={secondaryClass} onClick={onClose}>{copy.cancel}</button><button type="submit" className={primaryClass} disabled={controller.command.pending}>{copy.save}</button></div>
-      </form>
-    </DialogFrame>
-  );
-}
-
-export function WebphoneDialog({
-  controller,
-  copy,
-  locale,
-  user,
-  onClose,
-  onSuccess,
-}: SharedDialogProps & { user: TenantUserView }) {
-  const current = user.webphone;
-  const [enabled, setEnabled] = useState(current.enabled);
-  const [extension, setExtension] = useState(current.extension ?? "");
-  const [sipUsername, setSipUsername] = useState(current.sipUsername ?? "");
-  const [sipPassword, setSipPassword] = useState("");
-  const [displayName, setDisplayName] = useState(current.displayName ?? "");
-  const [outboundCallerId, setOutboundCallerId] = useState(current.outboundCallerId ?? "");
-  const [transport, setTransport] = useState<"ws" | "wss">(current.transport);
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const input: UpdateTenantUserWebphoneInput = {
-      enabled,
-      extension: extension.trim() || null,
-      sipUsername: sipUsername.trim() || null,
-      displayName: displayName.trim() || null,
-      outboundCallerId: outboundCallerId.trim() || null,
-      transport,
-      ...(sipPassword ? { sipPassword } : {}),
-    };
-    try {
-      await controller.updateWebphone(user, input);
-      setSipPassword("");
-      onSuccess(copy.commandSucceeded);
-      onClose();
-    } catch {
-      // The write-only password remains local only while the dialog is open.
-    }
-  };
-  return (
-    <DialogFrame title={copy.configureWebphone} onClose={onClose} locale={locale}>
-      <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
-        <label className="sm:col-span-2 inline-flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />{copy.enabled}</label>
-        <Field label={copy.extension}><input className={inputClass} value={extension} maxLength={32} onChange={(event) => setExtension(event.target.value)} /></Field>
-        <Field label={copy.sipUsername}><input className={inputClass} value={sipUsername} maxLength={120} onChange={(event) => setSipUsername(event.target.value)} /></Field>
-        <Field label={copy.sipPassword} wide><input className={inputClass} type="password" value={sipPassword} maxLength={255} autoComplete="new-password" onChange={(event) => setSipPassword(event.target.value)} /></Field>
-        <Field label={copy.displayName}><input className={inputClass} value={displayName} maxLength={120} onChange={(event) => setDisplayName(event.target.value)} /></Field>
-        <Field label={copy.outboundCallerId}><input className={inputClass} value={outboundCallerId} maxLength={64} onChange={(event) => setOutboundCallerId(event.target.value)} /></Field>
-        <Field label={copy.transport}><select className={inputClass} value={transport} onChange={(event) => setTransport(event.target.value as "ws" | "wss")}><option value="wss">wss</option><option value="ws">ws</option></select></Field>
-        <p className="self-end pb-2 text-xs text-slate-500">{copy.passwordConfigured}: {current.passwordConfigured ? "✓" : "—"}</p>
-        <DialogError controller={controller} />
-        <div className="sm:col-span-2 flex justify-end gap-2"><button type="button" className={secondaryClass} onClick={onClose}>{copy.cancel}</button><button type="submit" className={primaryClass} disabled={controller.command.pending}>{copy.save}</button></div>
+      <form noValidate onSubmit={submit} className="grid gap-3">
+        <DialogInputField id="tenant-user-password" name="newPassword" label={copy.password} type="password" minLength={12} maxLength={128} required value={password} error={localError ?? undefined} onChange={(value) => { setPassword(value); setLocalError(null); }} />
+        <DialogInputField id="tenant-user-password-confirmation" name="passwordConfirmation" label={copy.passwordConfirmation} type="password" minLength={12} maxLength={128} required value={confirmation} error={localError ?? undefined} onChange={(value) => { setConfirmation(value); setLocalError(null); }} />
+        <DialogError controller={controller} localError={localError} summary={copy.validationSummary} />
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button><Button type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button></div>
       </form>
     </DialogFrame>
   );
@@ -365,23 +332,23 @@ export function RolesDialog({
     <DialogFrame title={copy.manageRoles} onClose={onClose} locale={locale}>
       <form onSubmit={submit} className="grid gap-3">
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-          <select className={inputClass} value={branchId} onChange={(event) => setBranchId(event.target.value)}>
-            {!branches.some((row) => row.id === user.organization.branch.id) ? <option value={user.organization.branch.id}>{user.organization.branch.name ?? user.organization.branch.id}</option> : null}
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.company.name} · {branch.name}</option>)}
-          </select>
-          <select className={inputClass} value={roleId} onChange={(event) => setRoleId(event.target.value)}><option value="">—</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
-          <button type="button" className={secondaryClass} onClick={add}>{copy.addAssignment}</button>
+          <DialogSelectField id="tenant-role-branch" label={copy.branch} value={branchId} onValueChange={setBranchId} options={[
+            ...(!branches.some((row) => row.id === user.organization.branch.id) ? [[user.organization.branch.id, user.organization.branch.name ?? user.organization.branch.id] as const] : []),
+            ...branches.map((branch) => [branch.id, `${branch.company.name} · ${branch.name}`] as const),
+          ]} />
+          <DialogSelectField id="tenant-role-role" label={copy.roles} value={roleId} onValueChange={setRoleId} options={roles.map((role) => [role.id, role.name] as const)} />
+          <div className="flex items-end"><Button type="button" variant="outline" onClick={add}>{copy.addAssignment}</Button></div>
         </div>
-        <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        <div className="divide-y divide-border rounded-lg border border-border">
           {assignments.length ? assignments.map((assignment) => (
             <div key={`${assignment.branchId}:${assignment.roleId}`} className="flex items-center justify-between gap-3 p-2 text-sm">
               <span>{branchNames.get(assignment.branchId) ?? assignment.branchId} · {roleNames.get(assignment.roleId) ?? assignment.roleId}</span>
-              <button type="button" className="text-xs font-semibold text-rose-600" onClick={() => setAssignments((current) => current.filter((entry) => entry.branchId !== assignment.branchId || entry.roleId !== assignment.roleId))}>{copy.remove}</button>
+              <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setAssignments((current) => current.filter((entry) => entry.branchId !== assignment.branchId || entry.roleId !== assignment.roleId))}>{copy.remove}</Button>
             </div>
-          )) : <p className="p-3 text-sm text-slate-500">{copy.noAssignments}</p>}
+          )) : <p className="p-3 text-sm text-muted-foreground">{copy.noAssignments}</p>}
         </div>
         <DialogError controller={controller} />
-        <div className="flex justify-end gap-2"><button type="button" className={secondaryClass} onClick={onClose}>{copy.cancel}</button><button type="submit" className={primaryClass} disabled={controller.command.pending}>{copy.save}</button></div>
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button><Button type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button></div>
       </form>
     </DialogFrame>
   );
@@ -428,10 +395,13 @@ export function ConfirmationDialog({
   };
   return (
     <DialogFrame title={definition[0]} onClose={onClose} locale={locale}>
-      <p className="text-sm leading-6 text-slate-700">{definition[1]}</p>
-      <p className="mt-2 rounded-lg bg-slate-50 p-2 text-sm font-semibold text-slate-900">{user.firstName} {user.lastName} · {user.email}</p>
+      <p className="text-sm leading-6 text-foreground/90">{definition[1]}</p>
+      <p className="mt-2 rounded-lg bg-muted p-2 text-sm font-semibold text-foreground">{user.firstName} {user.lastName} · {user.email}</p>
       <DialogError controller={controller} />
-      <div className="mt-5 flex justify-end gap-2"><button type="button" className={secondaryClass} onClick={onClose}>{copy.cancel}</button><button type="button" className={action === "delete" ? `${primaryClass} !bg-rose-600 hover:!bg-rose-700` : primaryClass} disabled={controller.command.pending} onClick={() => void confirm()}>{copy.confirm}</button></div>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
+        <Button type="button" variant={action === "delete" ? "destructive" : "primary"} disabled={controller.command.pending} onClick={() => void confirm()}>{copy.confirm}</Button>
+      </div>
     </DialogFrame>
   );
 }
@@ -448,22 +418,125 @@ function DialogFrame({
   children: ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby="tenant-access-dialog-title" dir={locale === "ar" ? "rtl" : "ltr"} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
-        <header className="mb-4 flex items-center justify-between gap-3"><h3 id="tenant-access-dialog-title" className="text-lg font-bold text-slate-950">{title}</h3><button type="button" className="grid size-8 place-items-center rounded-full text-xl text-slate-500 hover:bg-slate-100" aria-label="Close" onClick={onClose}>×</button></header>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent dir={locale === "ar" ? "rtl" : "ltr"} className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-lg">{title}</DialogTitle>
+        </DialogHeader>
         {children}
-      </section>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DialogInputField({
+  id,
+  name,
+  label,
+  value,
+  onChange,
+  wide = false,
+  error,
+  ...inputProps
+}: {
+  id: string;
+  name: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  wide?: boolean;
+  error?: string;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "value" | "onChange">) {
+  return (
+    <FormField id={id} label={label} required={inputProps.required} error={error} className={wide ? "sm:col-span-2" : undefined}>
+      {(field) => (
+        <Input
+          {...field}
+          {...inputProps}
+          name={name}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
+    </FormField>
+  );
+}
+
+function DialogSelectField({
+  id,
+  label,
+  value,
+  onValueChange,
+  options,
+  disabled,
+  required,
+  error,
+  wide = false,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  options: ReadonlyArray<readonly [string, string]>;
+  disabled?: boolean;
+  required?: boolean;
+  error?: string;
+  wide?: boolean;
+}) {
+  const labelId = `${id}-label`;
+  const errorId = error ? `${id}-error` : undefined;
+  return (
+    <div className={`space-y-1.5 ${wide ? "sm:col-span-2" : ""}`}>
+      <span id={labelId} className="text-sm font-medium text-foreground">
+        {label}
+        {required ? <span className="ms-0.5 text-destructive" aria-hidden="true">*</span> : null}
+      </span>
+      <Select
+        name={id}
+        value={value || EMPTY_SELECT_VALUE}
+        onValueChange={(next) => onValueChange(next === EMPTY_SELECT_VALUE ? "" : next)}
+        disabled={disabled}
+      >
+        <SelectTrigger
+          id={id}
+          aria-labelledby={labelId}
+          aria-describedby={errorId}
+          aria-invalid={Boolean(error)}
+          aria-required={required || undefined}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={EMPTY_SELECT_VALUE}>—</SelectItem>
+          {options.map(([optionValue, optionLabel]) => (
+            <SelectItem key={optionValue} value={optionValue}>{optionLabel}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {error ? <p id={errorId} role="alert" className="text-xs text-destructive-subtle-foreground">{error}</p> : null}
     </div>
   );
 }
 
-function Field({ label, wide = false, children }: { label: string; wide?: boolean; children: ReactNode }) {
-  return <label className={`grid gap-1 text-xs font-semibold text-slate-600 ${wide ? "sm:col-span-2" : ""}`}><span>{label}</span>{children}</label>;
-}
-
-function DialogError({ controller, localError }: { controller: TenantAccessController; localError?: string | null }) {
+function DialogError({ controller, localError, summary }: { controller: TenantAccessController; localError?: string | null; summary?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
   const message = localError ?? controller.command.error?.message;
-  return message ? <p role="alert" className="sm:col-span-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{message}{controller.command.error?.correlationId ? ` · ${controller.command.error.correlationId}` : ""}</p> : null;
+  useEffect(() => {
+    if (message) ref.current?.focus();
+  }, [message]);
+  return message ? (
+    <div
+      ref={ref}
+      role="alert"
+      tabIndex={-1}
+      className="sm:col-span-2 rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {summary ? <p className="font-semibold">{summary}</p> : null}
+      {message !== summary ? (
+        <p>{message}{controller.command.error?.correlationId ? ` · ${controller.command.error.correlationId}` : ""}</p>
+      ) : null}
+    </div>
+  ) : null;
 }
 
 function changedProfile(

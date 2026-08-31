@@ -4,6 +4,8 @@ import { useIdempotency } from "@/shared/hooks/useIdempotency";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
 import { useToast } from "@/components/ui/ToastContext";
 import { useI18n } from "@/i18n/I18nContext";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { shouldResetDatabaseServerWriteKey } from "../lib/database-server-idempotency";
 import {
   DatabaseServerView,
@@ -14,6 +16,7 @@ import {
 export function useDatabaseServers() {
   const toast = useToast();
   const { lang } = useI18n();
+  const copy = (lang === "ar" ? ar : en).databaseServersList;
   const { getIdempotencyKey, resetKey } = useIdempotency();
 
   const [servers, setServers] = useState<DatabaseServerView[]>([]);
@@ -28,8 +31,7 @@ export function useDatabaseServers() {
 
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [search, setSearchState] = useState("");
   const [statusFilter, setStatusFilter] = useState<DatabaseServerStatus | "ALL">("ALL");
   const [countryFilter, setCountryFilter] = useState<string>("ALL");
   const [deletionFilter, setDeletionFilter] = useState<"CURRENT" | "DELETED">("CURRENT");
@@ -41,7 +43,7 @@ export function useDatabaseServers() {
   const currentQueryIdentity = JSON.stringify({
     page,
     limit,
-    debouncedSearch,
+    search,
     statusFilter,
     countryFilter,
     deletionFilter,
@@ -65,13 +67,12 @@ export function useDatabaseServers() {
 
   };
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [search]);
+  // `search` already arrives debounced from FilterBar (see useFilterBar);
+  // resetting the page here keeps pagination in sync with a new search term.
+  const setSearch = useCallback((value: string) => {
+    setSearchState(value);
+    setPage(1);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -101,7 +102,7 @@ export function useDatabaseServers() {
       const query: DatabaseServerQueryDto = {
         page,
         limit,
-        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+        ...(search ? { search } : {}),
         ...(statusFilter !== "ALL" ? { status: statusFilter } : {}),
         ...(countryFilter !== "ALL" ? { countryIsoCode: countryFilter } : {}),
         ...(deletionFilter === "DELETED" ? { deleted: true } : {}),
@@ -130,11 +131,11 @@ export function useDatabaseServers() {
       }
       const normalized = normalizeApiError(err);
       setError(normalized.message);
-      toast.error("Error", normalized.message);
+      toast.error(copy.genericErrorTitle, normalized.message);
     } finally {
       if (generation === requestGeneration.current) setIsLoading(false);
     }
-  }, [page, limit, debouncedSearch, statusFilter, countryFilter, deletionFilter, toast, currentQueryIdentity]);
+  }, [page, limit, search, statusFilter, countryFilter, deletionFilter, toast, currentQueryIdentity, copy.genericErrorTitle]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -188,12 +189,7 @@ export function useDatabaseServers() {
     try {
       const key = getIdempotencyKey({ action: "delete", databaseServerId: server.id });
       await databaseServersApi.delete(server.id, key);
-      toast.success(
-        lang === "ar" ? "تم حذف الخادم" : "Server deleted",
-        lang === "ar"
-          ? `تم حذف ${server.name} حذفًا منطقيًا.`
-          : `${server.name} was soft deleted.`,
-      );
+      toast.success(copy.serverDeletedTitle, copy.serverDeletedDescription(server.name));
       resetKey();
       setServerPendingDelete(null);
       await fetchServers();
@@ -202,7 +198,7 @@ export function useDatabaseServers() {
       if (shouldResetDatabaseServerWriteKey(normalized)) {
         resetKey();
       }
-      toast.error(lang === "ar" ? "فشل الحذف" : "Delete failed", normalized.message);
+      toast.error(copy.deleteFailedTitle, normalized.message);
       await fetchServers();
       throw normalized;
     } finally {
@@ -228,12 +224,7 @@ export function useDatabaseServers() {
         databaseServerId: server.id,
       });
       await databaseServersApi.destroy(server.id, key);
-      toast.success(
-        lang === "ar" ? "تم إتلاف الخادم" : "Server destroyed",
-        lang === "ar"
-          ? `تم حذف ${server.name} وجميع سجلاته التابعة المسموح بحذفها نهائيًا.`
-          : `${server.name} and its eligible dependent records were permanently removed.`,
-      );
+      toast.success(copy.serverDestroyedTitle, copy.serverDestroyedDescription(server.name));
       resetKey();
       setServerPendingDestroy(null);
       await fetchServers();
@@ -242,10 +233,7 @@ export function useDatabaseServers() {
       if (shouldResetDatabaseServerWriteKey(normalized)) {
         resetKey();
       }
-      toast.error(
-        lang === "ar" ? "فشل الإتلاف" : "Destroy failed",
-        normalized.message,
-      );
+      toast.error(copy.destroyFailedTitle, normalized.message);
       await fetchServers();
     } finally {
       setDestroyingServerId(null);

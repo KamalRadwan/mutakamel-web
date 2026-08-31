@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatBackupBytes,
   formatBackupDate,
+  formatBackupNumber,
   isAmbiguousWriteFailure,
   shouldRetainBackupCommandKey,
   shortBackupId,
@@ -10,6 +11,7 @@ import {
 describe("backup presentation safety helpers", () => {
   it("formats byte counts without exposing storage identifiers", () => {
     expect(formatBackupBytes("1073741824")).toBe("1.0 GB");
+    expect(formatBackupBytes("1073741824", "ar-EG")).toBe("١٫٠ GB");
     expect(formatBackupBytes(null)).toBe("Not available");
     expect(formatBackupBytes("invalid")).toBe("Not available");
   });
@@ -35,6 +37,11 @@ describe("backup presentation safety helpers", () => {
   it("uses explicit unavailable copy for missing or invalid timestamps", () => {
     expect(formatBackupDate(null)).toBe("Not available");
     expect(formatBackupDate("not-a-date")).toBe("Not available");
+  });
+
+  it("formats operational counts with an explicit supported locale", () => {
+    expect(formatBackupNumber(1234, "en-US")).toBe("1,234");
+    expect(formatBackupNumber(1234, "ar-EG")).toBe("١٬٢٣٤");
   });
 
   it("shortens identifiers only for visual display", () => {

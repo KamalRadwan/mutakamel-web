@@ -1,4 +1,5 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import type { PaginationMeta } from "@/types/common";
 
 export type BillingResourceState =
   | "idle"
@@ -7,15 +8,6 @@ export type BillingResourceState =
   | "empty"
   | "forbidden"
   | "error";
-
-export interface PaginationMeta {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
-}
 
 export interface PageView<T> {
   items: T[];
@@ -64,9 +56,9 @@ export type InvoicePurpose =
   | "PRORATION"
   | "MANUAL";
 export type PaymentReconciliationStatus = "PROPOSED" | "APPLIED" | "REJECTED";
-export type AdminAdjustmentReason = "MANUAL_CREDIT" | "MANUAL_DEBIT";
+type AdminAdjustmentReason = "MANUAL_CREDIT" | "MANUAL_DEBIT";
 
-export interface SubscriptionHeaderView {
+interface SubscriptionHeaderView {
   id: string;
   tenantId: string | null;
   allowedUsers: number;
@@ -199,7 +191,7 @@ export interface SubscriptionPlanChangeApplyResult {
   subscriptionTotalUsd: string;
 }
 
-export interface SubscriptionPlanChangeAppliedItemView {
+interface SubscriptionPlanChangeAppliedItemView {
   id: string;
   subscriptionId: string;
   moduleId: string;
@@ -226,7 +218,7 @@ export interface WalletView {
   status: WalletStatus;
 }
 
-export interface WalletInputCurrencyView {
+interface WalletInputCurrencyView {
   currencyCode: string;
   isBaseCurrency: boolean;
 }

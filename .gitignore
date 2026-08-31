@@ -2,6 +2,10 @@
 /node_modules
 /.pnp
 .pnp.js
+/.agents
+/.claude
+.claude
+/.code*
 
 # testing
 /coverage

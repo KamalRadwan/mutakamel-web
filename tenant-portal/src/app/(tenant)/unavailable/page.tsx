@@ -1,4 +1,4 @@
-import { UnavailableCapability } from "@/components/layout/UnavailableCapability";
+import { UnavailableState } from "@/design-system";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 
 const BACK_ROUTES = {
@@ -23,9 +23,9 @@ export default async function UnavailablePage({
           : TENANT_ROUTES.home;
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-[#090d16]">
+    <div className="flex min-h-screen flex-col bg-background">
       <main className="w-full flex-1 p-4">
-        <UnavailableCapability backHref={backHref} />
+        <UnavailableState backHref={backHref} />
       </main>
     </div>
   );

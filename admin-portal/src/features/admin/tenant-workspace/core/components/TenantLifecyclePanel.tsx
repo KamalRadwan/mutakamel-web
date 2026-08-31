@@ -1,6 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+} from "@/design-system";
 import type { useTenantCoreWorkspace } from "../hooks/useTenantCoreWorkspace";
 import {
   tenantWorkspaceCopy,
@@ -13,6 +27,7 @@ type LifecycleAction =
   | "reprovision"
   | "cancel-provisioning"
   | "soft-delete"
+  | "restore"
   | "destroy";
 
 export interface TenantLifecyclePanelProps {
@@ -41,7 +56,12 @@ export function TenantLifecyclePanel({
     reprovision: text.reprovision,
     "cancel-provisioning": text.cancelProvisioning,
     "soft-delete": text.softDelete,
+    restore: text.restore,
     destroy: text.destroy,
+  };
+  const actionHint: Partial<Record<LifecycleAction, string>> = {
+    restore: text.restoreHint,
+    destroy: text.destroyHint,
   };
 
   const confirm = async () => {
@@ -54,6 +74,7 @@ export function TenantLifecyclePanel({
         await workspace.cancelProvisioning();
       }
       if (confirmation === "soft-delete") await workspace.softDelete();
+      if (confirmation === "restore") await workspace.restore();
       if (confirmation === "destroy") {
         await workspace.destroy(destroySubscriptions);
         onDestroyed?.();
@@ -65,18 +86,19 @@ export function TenantLifecyclePanel({
   };
 
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+    <section aria-labelledby="tenant-lifecycle-title">
+    <Card className="space-y-3 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+        <h2 id="tenant-lifecycle-title" className="text-sm font-semibold text-foreground">
           {text.lifecycle}
         </h2>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 font-mono text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        <Badge tone={tenant.status === "ACTIVE" ? "success" : tenant.status === "SUSPENDED" ? "warn" : tenant.status === "PROVISIONING_FAILED" ? "danger" : "neutral"} className="font-mono">
           {tenant.status}
-        </span>
+        </Badge>
       </div>
 
       {tenant.status === "PROVISIONING" && (
-        <p className="rounded-xl bg-blue-50 p-3 text-xs text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+        <p role="status" aria-live="polite" className="rounded-lg bg-info-subtle p-3 text-xs text-info-subtle-foreground">
           {workspace.pollExhausted ? text.pollExhausted : text.polling}
         </p>
       )}
@@ -87,7 +109,7 @@ export function TenantLifecyclePanel({
             <ActionButton
               label={text.suspend}
               disabled={busy}
-              tone="amber"
+              variant="secondary"
               onClick={() => setConfirmation("suspend")}
             />
           )}
@@ -96,7 +118,7 @@ export function TenantLifecyclePanel({
             <ActionButton
               label={text.activate}
               disabled={busy}
-              tone="emerald"
+              variant="primary"
               onClick={() => setConfirmation("activate")}
             />
           )}
@@ -105,7 +127,7 @@ export function TenantLifecyclePanel({
             <ActionButton
               label={text.reprovision}
               disabled={busy}
-              tone="blue"
+              variant="primary"
               onClick={() => setConfirmation("reprovision")}
             />
           )}
@@ -114,7 +136,7 @@ export function TenantLifecyclePanel({
             <ActionButton
               label={text.cancelProvisioning}
               disabled={busy}
-              tone="amber"
+              variant="secondary"
               onClick={() => setConfirmation("cancel-provisioning")}
             />
           )}
@@ -122,63 +144,70 @@ export function TenantLifecyclePanel({
           <ActionButton
             label={text.softDelete}
             disabled={busy}
-            tone="rose"
+            variant="destructive"
             onClick={() => setConfirmation("soft-delete")}
+          />
+        )}
+        {/* Restore is offered before destroy so the reversible action is the
+            first one an admin reaches on a deleted tenant. */}
+        {tenant.status === "DELETED" && workspace.permissions.canRestore && (
+          <ActionButton
+            label={text.restore}
+            disabled={busy}
+            variant="primary"
+            onClick={() => setConfirmation("restore")}
           />
         )}
         {tenant.status === "DELETED" && workspace.permissions.canDestroy && (
           <ActionButton
             label={text.destroy}
             disabled={busy}
-            tone="rose"
+            variant="destructive"
             onClick={() => setConfirmation("destroy")}
           />
         )}
       </div>
 
-      {confirmation && (
-        <div
-          role="alertdialog"
-          aria-label={actionLabel[confirmation]}
-          className="space-y-3 rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs text-rose-950 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"
-        >
-          <p className="font-semibold">
-            {locale === "ar"
-              ? `تأكيد الإجراء: ${actionLabel[confirmation]}`
-              : `Confirm action: ${actionLabel[confirmation]}`}
-          </p>
-          {confirmation === "destroy" && (
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={destroySubscriptions}
-                onChange={(event) =>
-                  setDestroySubscriptions(event.target.checked)
-                }
-              />
-              <span>{text.destroySubscriptions}</span>
-            </label>
-          )}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void confirm()}
-              className="rounded-lg bg-rose-700 px-3 py-1.5 font-bold text-white disabled:opacity-50"
-            >
-              {text.confirm}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setConfirmation(null)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 font-bold dark:border-slate-700"
-            >
-              {text.cancel}
-            </button>
-          </div>
-        </div>
-      )}
+      <AlertDialog open={confirmation !== null} onOpenChange={(open) => !open && setConfirmation(null)}>
+        {confirmation ? (
+          <AlertDialogContent dir={locale === "ar" ? "rtl" : "ltr"}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{actionLabel[confirmation]}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {text.confirmAction(actionLabel[confirmation])}
+                {actionHint[confirmation] ? (
+                  <span className="mt-2 block">{actionHint[confirmation]}</span>
+                ) : null}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {confirmation === "destroy" ? (
+              <label htmlFor="destroy-subscriptions" className="flex min-h-11 items-center gap-3 text-sm text-foreground">
+                <Checkbox
+                  id="destroy-subscriptions"
+                  name="destroySubscriptions"
+                  checked={destroySubscriptions}
+                  onCheckedChange={(checked) => setDestroySubscriptions(checked === true)}
+                />
+                <span>{text.destroySubscriptions}</span>
+              </label>
+            ) : null}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={busy}>{text.cancel}</AlertDialogCancel>
+              <AlertDialogAction
+                destructive={confirmation === "soft-delete" || confirmation === "destroy"}
+                disabled={busy}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void confirm();
+                }}
+              >
+                {text.confirm}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        ) : null}
+      </AlertDialog>
+    </Card>
     </section>
   );
 }
@@ -186,29 +215,23 @@ export function TenantLifecyclePanel({
 function ActionButton({
   label,
   disabled,
-  tone,
+  variant,
   onClick,
 }: {
   label: string;
   disabled: boolean;
-  tone: "amber" | "blue" | "emerald" | "rose";
+  variant: "primary" | "secondary" | "destructive";
   onClick: () => void;
 }) {
-  const tones = {
-    amber: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
-    blue: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200",
-    emerald:
-      "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
-    rose: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
-  } as const;
   return (
-    <button
+    <Button
       type="button"
+      variant={variant}
+      size="sm"
       disabled={disabled}
       onClick={onClick}
-      className={`rounded-xl px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]}`}
     >
       {label}
-    </button>
+    </Button>
   );
 }

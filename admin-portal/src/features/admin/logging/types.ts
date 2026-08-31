@@ -6,7 +6,7 @@ export const LOGGING_APPS = [
   "crm-app",
   "worker-app",
 ] as const;
-export type LoggingApp = (typeof LOGGING_APPS)[number];
+type LoggingApp = (typeof LOGGING_APPS)[number];
 
 export const LOG_LEVELS = [
   "trace",
@@ -28,10 +28,10 @@ export const LOGGING_SCOPES = [
   "TENANT",
   "TENANT_APP",
 ] as const;
-export type LoggingScope = (typeof LOGGING_SCOPES)[number];
+type LoggingScope = (typeof LOGGING_SCOPES)[number];
 
 export const HISTORY_ACTIONS = ["CREATE", "UPDATE", "DELETE"] as const;
-export type LoggingHistoryAction = (typeof HISTORY_ACTIONS)[number];
+type LoggingHistoryAction = (typeof HISTORY_ACTIONS)[number];
 
 export interface LoggingOverride {
   id: string;

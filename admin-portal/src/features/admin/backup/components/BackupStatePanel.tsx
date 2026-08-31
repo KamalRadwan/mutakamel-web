@@ -1,4 +1,6 @@
 import { AlertTriangle, Inbox, Loader2, LockKeyhole } from "lucide-react";
+import { CodeRef } from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
 
 type BackupStateKind = "loading" | "error" | "empty" | "forbidden";
 
@@ -17,36 +19,31 @@ const icons = {
   forbidden: LockKeyhole,
 };
 
-export function BackupStatePanel({
-  kind,
-  title,
-  description,
-  correlationId,
-  action,
-}: BackupStatePanelProps) {
+export function BackupStatePanel({ kind, title, description, correlationId, action }: BackupStatePanelProps) {
+  const { lang } = useI18n();
   const Icon = icons[kind];
+  const iconTone = kind === "error"
+    ? "text-destructive"
+    : kind === "forbidden"
+      ? "text-warning"
+      : kind === "loading"
+        ? "text-info"
+        : "text-muted-foreground";
   return (
     <section
-      role={kind === "error" ? "alert" : "status"}
-      className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-950"
+      role={kind === "loading" ? "status" : kind === "error" || kind === "forbidden" ? "alert" : undefined}
+      className="rounded-lg border border-border bg-card px-6 py-12 text-center"
     >
-      <Icon
-        className={`mx-auto size-7 text-slate-400 ${kind === "loading" ? "animate-spin" : ""}`}
-        aria-hidden="true"
-      />
-      <h2 className="mt-4 text-base font-bold text-slate-900 dark:text-white">
-        {title}
-      </h2>
-      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-        {description}
-      </p>
-      {correlationId ? (
-        <p className="mt-3 text-xs text-slate-500">
-          Correlation ID: <code className="font-mono">{correlationId}</code>
-        </p>
-      ) : null}
-      {action ? <div className="mt-5">{action}</div> : null}
+      <Icon className={`mx-auto size-7 ${iconTone} ${kind === "loading" ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+      <h2 className="mt-4 text-base font-semibold text-foreground">{title}</h2>
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{description}</p>
+      {correlationId && (
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-xs text-muted-foreground">
+          <span>{lang === "ar" ? "معرّف الارتباط:" : "Correlation ID:"}</span>
+          <CodeRef value={correlationId} />
+        </div>
+      )}
+      {action && <div className="mt-5">{action}</div>}
     </section>
   );
 }
-

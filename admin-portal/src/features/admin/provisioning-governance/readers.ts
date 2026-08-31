@@ -20,7 +20,7 @@ const COMPONENT_KEY = /^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_-]*)*$/u;
 const SEED_KEY = /^[a-z][a-z0-9_.-]{1,127}$/u;
 const OWNER_APP = /^[a-z][a-z0-9_-]{0,31}$/u;
 
-export class ProvisioningGovernanceContractError extends Error {
+class ProvisioningGovernanceContractError extends Error {
   constructor() {
     super("INVALID_PROVISIONING_GOVERNANCE_RESPONSE");
     this.name = "ProvisioningGovernanceContractError";

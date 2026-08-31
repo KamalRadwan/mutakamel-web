@@ -2,7 +2,7 @@ import { safeStorage } from "../safeStorage";
 
 export type AdminAuthEventKind = "session-updated" | "session-ended";
 
-export interface AdminAuthEventTimingSnapshot {
+interface AdminAuthEventTimingSnapshot {
   expiresIn: number;
   sessionExpiresIn: number;
   authorizationVersion: number;

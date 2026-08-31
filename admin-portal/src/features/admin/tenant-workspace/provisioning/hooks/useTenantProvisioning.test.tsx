@@ -98,6 +98,11 @@ describe("useTenantProvisioning", () => {
 
     expect(result.current.selectedOperation.data?.progress.percent).toBe(50);
     expect(result.current.polling).toBe(true);
+    expect(apiMock.listOperations).toHaveBeenCalledWith(
+      TENANT_ID,
+      { page: 1, limit: 100, sortBy: "generation", sortDir: "DESC" },
+      expect.any(AbortSignal),
+    );
     expect(apiMock.listUpdates).toHaveBeenCalledWith(
       TENANT_ID,
       expect.objectContaining({ limit: 100 }),

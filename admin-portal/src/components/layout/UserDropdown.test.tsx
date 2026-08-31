@@ -30,6 +30,7 @@ vi.mock("@/i18n/I18nContext", () => ({
         profileAndCurrency: "Profile & Currency",
         permissionsAndRoles: "Permissions & Roles",
         systemSettings: "System Settings",
+        accountMenu: "account menu",
         signOut: "Sign Out",
       },
     },
@@ -47,29 +48,35 @@ describe("UserDropdown permission-filtered destinations", () => {
 
   it("always exposes self-service profile but hides unauthorized admin links", () => {
     render(<UserDropdown />);
-    fireEvent.click(screen.getByRole("button", { name: /Admin Operator/i }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: /Admin Operator/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
 
     expect(
-      screen.getByRole("link", { name: "Profile & Currency" }),
+      screen.getByRole("menuitem", { name: "Profile & Currency" }),
     ).toHaveAttribute("href", "/profile");
     expect(
-      screen.queryByRole("link", { name: "Permissions & Roles" }),
+      screen.queryByRole("menuitem", { name: "Permissions & Roles" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: "System Settings" }),
+      screen.queryByRole("menuitem", { name: "System Settings" }),
     ).not.toBeInTheDocument();
   });
 
   it("shows roles and settings only with their exact read permissions", () => {
     authMock.user.permissions = ["admin.roles.read", "admin.settings.read"];
     render(<UserDropdown />);
-    fireEvent.click(screen.getByRole("button", { name: /Admin Operator/i }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: /Admin Operator/i }), {
+      button: 0,
+      ctrlKey: false,
+    });
 
     expect(
-      screen.getByRole("link", { name: "Permissions & Roles" }),
+      screen.getByRole("menuitem", { name: "Permissions & Roles" }),
     ).toHaveAttribute("href", "/roles");
     expect(
-      screen.getByRole("link", { name: "System Settings" }),
+      screen.getByRole("menuitem", { name: "System Settings" }),
     ).toHaveAttribute("href", "/settings");
   });
 });

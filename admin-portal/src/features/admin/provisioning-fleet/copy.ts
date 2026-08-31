@@ -1,3 +1,5 @@
+import type { CopyShape } from "@/i18n/copy-shape";
+
 export type FleetLanguage = "ar" | "en";
 
 const en = {
@@ -204,10 +206,6 @@ const en = {
     signature: "Enter the exact 88-character Ed25519 Base64 signature.",
   },
 } as const;
-
-type CopyShape<T> = {
-  -readonly [K in keyof T]: T[K] extends string ? string : CopyShape<T[K]>;
-};
 
 const ar: CopyShape<typeof en> = {
   title: "أسطول التهيئة",

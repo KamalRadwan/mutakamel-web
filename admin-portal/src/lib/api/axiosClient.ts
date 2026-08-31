@@ -36,8 +36,12 @@ const ADMIN_AUTH_MUTEX_ENTRY_COOKIE_PREFIX = "mutakamel_admin_mutex_entry_";
 const ADMIN_AUTH_INTENT_KEY = "admin_auth_intent";
 const ADMIN_AUTH_INTENT_COOKIE = "mutakamel_admin_auth_intent";
 const RECENT_USER_ACTIVITY_MS = 60_000;
+export const ADMIN_VISIBLE_PRESENCE_MAX_INTERVAL_MS = 5 * 60_000;
 const ADMIN_ACTIVITY_TOUCH_TIMEOUT_MS = 5_000;
 const ADMIN_ACTIVITY_RETRY_COOLDOWN_MS = 5_000;
+const ADMIN_PRESENCE_CHECKPOINT_TIMEOUT_MS = 5_000;
+const ADMIN_PRESENCE_RETRY_MIN_MS = 5_000;
+const ADMIN_PRESENCE_RETRY_MAX_MS = 30_000;
 const ADMIN_COOKIE_CLEANUP_TIMEOUT_MS = 5_000;
 // Gateway bounds non-streaming auth upstream work to at most 30 seconds.
 // Four times that horizon covers a late browser-delivered response while
@@ -204,6 +208,24 @@ interface AdminActivityTouchState {
   lastSuccessAt: number;
 }
 
+interface AdminPresenceTiming {
+  sessionId: string;
+  sessionExpiresIn: number;
+  idleExpiresAt: string;
+  absoluteExpiresAt: string;
+}
+
+interface AdminPresenceCheckpoint {
+  sessionId: string;
+  requestStartedAt: number;
+  timing: AdminPresenceTiming;
+}
+
+interface AdminPresenceCheckpointOperation {
+  sessionId: string;
+  promise: Promise<AdminPresenceCheckpoint | null>;
+}
+
 interface AdminCookieCleanupOperation {
   generation: string;
   promise: Promise<boolean>;
@@ -233,9 +255,21 @@ export interface AdminTabSessionSynchronization {
   ignored: boolean;
 }
 
+export interface AdminVisibleSessionPresenceScheduler {
+  /** Re-arm from the latest server-issued session timing without touching Core. */
+  reschedule: () => void;
+  /** Reconcile the timer after visibility, focus, page-show, or online changes. */
+  wake: () => void;
+  /** Reconcile the timer after document visibility changes. */
+  syncVisibility: () => void;
+  /** Cancel future presence checkpoints. An in-flight checkpoint may settle. */
+  stop: () => void;
+}
+
 let refreshInFlight: SharedAdminRefreshOperation | null = null;
 let activityTouchInFlight: AdminActivityTouchOperation | null = null;
 let activityTouchState: AdminActivityTouchState | null = null;
+let presenceCheckpointInFlight: AdminPresenceCheckpointOperation | null = null;
 let adminCookieCleanupInFlight: AdminCookieCleanupOperation | null = null;
 let fallbackAdminAuthIntent: AdminAuthIntent | null = null;
 
@@ -966,7 +1000,7 @@ async function runAdminActivityTouch(
     try {
       epoch = await coordinateAdminRefresh(epoch, signal);
     } catch (error) {
-      honorTerminalAdminActivityFailure(error, epoch, sessionId);
+      honorTerminalAdminMaintenanceFailure(error, epoch, sessionId);
       const current = getStoredSessionMeta();
       if (
         !current ||
@@ -1012,7 +1046,7 @@ async function runAdminActivityTouch(
       );
       epoch = advanceAdminRefreshEpoch(epoch, false);
     } catch (error) {
-      honorTerminalAdminActivityFailure(error, epoch, sessionId);
+      honorTerminalAdminMaintenanceFailure(error, epoch, sessionId);
       return;
     }
 
@@ -1030,17 +1064,17 @@ async function runAdminActivityTouch(
         epoch = await coordinateAdminRefresh(epoch, signal);
         continue;
       } catch (refreshError) {
-        honorTerminalAdminActivityFailure(refreshError, epoch, sessionId);
+        honorTerminalAdminMaintenanceFailure(refreshError, epoch, sessionId);
         return;
       }
     }
 
-    honorTerminalAdminActivityFailure(error, epoch, sessionId);
+    honorTerminalAdminMaintenanceFailure(error, epoch, sessionId);
     return;
   }
 }
 
-function honorTerminalAdminActivityFailure(
+function honorTerminalAdminMaintenanceFailure(
   error: unknown,
   epoch: AdminRefreshEpoch | null,
   sessionId: string,
@@ -1073,6 +1107,405 @@ function wasAdminActivityRecentlyCheckpointed(
 function resetAdminActivityState(): void {
   lastUserInteractionAt = 0;
   activityTouchState = null;
+}
+
+function getOrStartAdminPresenceCheckpoint(
+  sessionId: string,
+): Promise<AdminPresenceCheckpoint | null> {
+  if (presenceCheckpointInFlight?.sessionId === sessionId) {
+    return presenceCheckpointInFlight.promise;
+  }
+
+  const controller = new AbortController();
+  const requestStartedAt = Date.now();
+  const task = runAdminPresenceCheckpoint(sessionId, controller.signal).then(
+    (timing): AdminPresenceCheckpoint | null => timing
+      ? { sessionId, requestStartedAt, timing }
+      : null,
+  );
+  const promise = boundAdminPresenceCheckpoint(task, controller);
+  const operation = { sessionId, promise };
+  presenceCheckpointInFlight = operation;
+  const clear = () => {
+    if (presenceCheckpointInFlight === operation) {
+      presenceCheckpointInFlight = null;
+    }
+  };
+  void promise.then(clear, clear);
+  return promise;
+}
+
+async function runAdminPresenceCheckpoint(
+  sessionId: string,
+  signal: AbortSignal,
+): Promise<AdminPresenceTiming | null> {
+  const metadata = getStoredSessionMeta();
+  if (!metadata || metadata.sessionId !== sessionId) return null;
+
+  let epoch: AdminRefreshEpoch | null = {
+    eventId: metadata.authEventId,
+    sessionId,
+  };
+  if (isAdminRefreshDue(metadata)) {
+    try {
+      epoch = await coordinateAdminRefresh(epoch, signal);
+    } catch (error) {
+      honorTerminalAdminMaintenanceFailure(error, epoch, sessionId);
+      const current = getStoredSessionMeta();
+      if (
+        !current ||
+        current.sessionId !== sessionId ||
+        isStoredAccessExpired(current)
+      ) {
+        return null;
+      }
+      try {
+        epoch = advanceAdminRefreshEpoch(epoch, false);
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const csrfToken = readBrowserCookie(ADMIN_CSRF_COOKIE);
+    if (!csrfToken) return null;
+
+    let response: Response;
+    let payload: unknown;
+    try {
+      epoch = advanceAdminRefreshEpoch(epoch, false);
+      assertFallbackAdminAuthIntentCurrent();
+      response = await fetch(
+        `${API_BASE_URL}/api/admin/core/v1/auth/presence`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "x-csrf-token": csrfToken,
+          },
+          credentials: "include",
+          cache: "no-store",
+          signal,
+        },
+      );
+      payload = await readResponsePayloadWithFallbackAdminAuthFence(
+        response,
+        false,
+      );
+      epoch = advanceAdminRefreshEpoch(epoch, false);
+    } catch (error) {
+      honorTerminalAdminMaintenanceFailure(error, epoch, sessionId);
+      return null;
+    }
+
+    if (response.ok) {
+      const timing = readAdminPresenceTiming(payload);
+      return timing?.sessionId === sessionId ? timing : null;
+    }
+
+    const error = normalizeApiError(response, payload);
+    if (
+      attempt === 0 &&
+      classifyAuthFailure(response.status, getAuthErrorCode(error)) === "refresh"
+    ) {
+      try {
+        epoch = await coordinateAdminRefresh(epoch, signal);
+        continue;
+      } catch (refreshError) {
+        honorTerminalAdminMaintenanceFailure(refreshError, epoch, sessionId);
+        return null;
+      }
+    }
+
+    honorTerminalAdminMaintenanceFailure(error, epoch, sessionId);
+    return null;
+  }
+
+  return null;
+}
+
+function readAdminPresenceTiming(payload: unknown): AdminPresenceTiming | null {
+  const root = record(payload);
+  if (!root || containsRawCredential(root)) return null;
+  const target = record(root.data) ?? root;
+  if (
+    typeof target.sessionId !== "string" ||
+    target.sessionId.length === 0 ||
+    !positiveNumber(target.sessionExpiresIn) ||
+    typeof target.idleExpiresAt !== "string" ||
+    typeof target.absoluteExpiresAt !== "string"
+  ) {
+    return null;
+  }
+  const idleDeadline = Date.parse(target.idleExpiresAt);
+  const absoluteDeadline = Date.parse(target.absoluteExpiresAt);
+  if (
+    !Number.isFinite(idleDeadline) ||
+    !Number.isFinite(absoluteDeadline) ||
+    idleDeadline > absoluteDeadline
+  ) {
+    return null;
+  }
+  return {
+    sessionId: target.sessionId,
+    sessionExpiresIn: target.sessionExpiresIn,
+    idleExpiresAt: target.idleExpiresAt,
+    absoluteExpiresAt: target.absoluteExpiresAt,
+  };
+}
+
+function boundAdminPresenceCheckpoint(
+  task: Promise<AdminPresenceCheckpoint | null>,
+  controller: AbortController,
+): Promise<AdminPresenceCheckpoint | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result: AdminPresenceCheckpoint | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      controller.abort(new Error("AUTH_PRESENCE_TIMEOUT"));
+      finish(null);
+    }, ADMIN_PRESENCE_CHECKPOINT_TIMEOUT_MS);
+    void task.then(finish, () => finish(null));
+  });
+}
+
+/**
+ * Keeps an authenticated Admin Portal session present only while this tab is
+ * visible. Presence is a distinct Core contract: it never manufactures the
+ * trusted-human marker or mutates the access-token timing stored in session
+ * metadata. Hidden or closed tabs do not schedule presence work, and Core's
+ * absolute deadline remains authoritative.
+ */
+export function startAdminVisibleSessionPresenceScheduler(): AdminVisibleSessionPresenceScheduler {
+  let stopped = false;
+  let checkpointRunning = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let timerDueAt: number | null = null;
+  let timerSessionId: string | null = null;
+  let absoluteBoundSessionId: string | null = null;
+  let currentSessionId: string | null = null;
+  let failedCheckpointCount = 0;
+  let knownSessionDeadlineAt: number | null = null;
+
+  const clearTimer = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    timerDueAt = null;
+    timerSessionId = null;
+  };
+
+  const isVisible = () =>
+    !stopped &&
+    typeof document !== "undefined" &&
+    document.visibilityState === "visible";
+
+  const adoptSession = (sessionId: string) => {
+    if (currentSessionId === sessionId) return;
+    currentSessionId = sessionId;
+    failedCheckpointCount = 0;
+    absoluteBoundSessionId = null;
+    knownSessionDeadlineAt = null;
+    if (timerSessionId !== null && timerSessionId !== sessionId) {
+      clearTimer();
+    }
+  };
+
+  const recordKnownDeadline = (
+    sessionId: string,
+    sessionExpiresIn: number,
+    anchoredAt: number,
+  ) => {
+    adoptSession(sessionId);
+    if (
+      !Number.isFinite(sessionExpiresIn) ||
+      sessionExpiresIn <= 0 ||
+      !Number.isFinite(anchoredAt)
+    ) {
+      return;
+    }
+    const candidate = anchoredAt + sessionExpiresIn * 1_000;
+    knownSessionDeadlineAt = knownSessionDeadlineAt === null
+      ? candidate
+      : Math.max(knownSessionDeadlineAt, candidate);
+  };
+
+  const armTimer = (
+    sessionId: string,
+    delayMs: number,
+    preserveEarlier = true,
+  ) => {
+    if (!isVisible() || absoluteBoundSessionId === sessionId) return;
+    const dueAt = Date.now() + Math.max(0, delayMs);
+    if (
+      preserveEarlier &&
+      timer !== null &&
+      timerSessionId === sessionId &&
+      timerDueAt !== null &&
+      timerDueAt <= dueAt
+    ) {
+      return;
+    }
+    clearTimer();
+    timerSessionId = sessionId;
+    timerDueAt = dueAt;
+    timer = setTimeout(() => {
+      timer = null;
+      timerDueAt = null;
+      timerSessionId = null;
+      void runCheckpoint();
+    }, Math.max(0, dueAt - Date.now()));
+  };
+
+  const scheduleFromStoredTiming = () => {
+    if (!isVisible()) return;
+    const metadata = getStoredSessionMeta();
+    if (!metadata) {
+      clearTimer();
+      currentSessionId = null;
+      failedCheckpointCount = 0;
+      absoluteBoundSessionId = null;
+      knownSessionDeadlineAt = null;
+      return;
+    }
+    adoptSession(metadata.sessionId);
+    recordKnownDeadline(
+      metadata.sessionId,
+      metadata.sessionExpiresIn,
+      metadata.savedAt,
+    );
+    armTimer(
+      metadata.sessionId,
+      getAdminVisiblePresenceDelayMs(
+        metadata.sessionExpiresIn,
+        metadata.savedAt,
+      ),
+    );
+  };
+
+  const runCheckpoint = async () => {
+    if (!isVisible() || checkpointRunning) return;
+    const sessionId = getStoredSessionMeta()?.sessionId;
+    if (!sessionId || absoluteBoundSessionId === sessionId) return;
+    adoptSession(sessionId);
+
+    checkpointRunning = true;
+    let checkpoint: AdminPresenceCheckpoint | null = null;
+    try {
+      checkpoint = await getOrStartAdminPresenceCheckpoint(sessionId);
+    } catch {
+      // Presence is best effort. Availability failures retain the authenticated
+      // UI and use the bounded retry below.
+    } finally {
+      checkpointRunning = false;
+    }
+
+    if (!isVisible()) return;
+    const current = getStoredSessionMeta();
+    if (!current || current.sessionId !== sessionId) return;
+    if (
+      !checkpoint ||
+      checkpoint.sessionId !== sessionId ||
+      checkpoint.timing.sessionId !== sessionId
+    ) {
+      const retryDelay = Math.min(
+        ADMIN_PRESENCE_RETRY_MAX_MS,
+        Math.max(
+          ADMIN_PRESENCE_RETRY_MIN_MS,
+          getAdminAuthRetryDelayMs(failedCheckpointCount),
+        ),
+      );
+      failedCheckpointCount += 1;
+      const remainingMs = knownSessionDeadlineAt === null
+        ? null
+        : knownSessionDeadlineAt - Date.now();
+      armTimer(
+        sessionId,
+        remainingMs !== null && remainingMs > 0
+          ? Math.min(retryDelay, Math.floor(remainingMs / 2))
+          : retryDelay,
+      );
+      return;
+    }
+
+    failedCheckpointCount = 0;
+    recordKnownDeadline(
+      sessionId,
+      checkpoint.timing.sessionExpiresIn,
+      checkpoint.requestStartedAt,
+    );
+
+    if (
+      checkpoint.timing.idleExpiresAt ===
+        checkpoint.timing.absoluteExpiresAt
+    ) {
+      absoluteBoundSessionId = sessionId;
+      clearTimer();
+      return;
+    }
+
+    armTimer(
+      sessionId,
+      getAdminVisiblePresenceDelayMs(
+        checkpoint.timing.sessionExpiresIn,
+        checkpoint.requestStartedAt,
+      ),
+    );
+  };
+
+  const wake = () => {
+    if (stopped) return;
+    clearTimer();
+    if (!isVisible() || checkpointRunning) return;
+    const sessionId = getStoredSessionMeta()?.sessionId;
+    if (!sessionId || absoluteBoundSessionId === sessionId) return;
+    adoptSession(sessionId);
+    void runCheckpoint();
+  };
+
+  const syncVisibility = () => {
+    if (stopped) return;
+    if (!isVisible()) {
+      clearTimer();
+      return;
+    }
+    wake();
+  };
+
+  // Mounting an authenticated visible tab arms one bounded timer. Visibility
+  // restoration uses `wake` for an immediate server-authoritative checkpoint.
+  scheduleFromStoredTiming();
+
+  return {
+    reschedule: scheduleFromStoredTiming,
+    wake,
+    syncVisibility,
+    stop: () => {
+      stopped = true;
+      clearTimer();
+    },
+  };
+}
+
+export function getAdminVisiblePresenceDelayMs(
+  sessionExpiresIn: number,
+  savedAt = Date.now(),
+  now = Date.now(),
+): number {
+  if (!Number.isFinite(sessionExpiresIn) || sessionExpiresIn <= 0) return 0;
+  const elapsedMs = Number.isFinite(savedAt)
+    ? Math.max(0, now - savedAt)
+    : 0;
+  const remainingMs = Math.max(0, sessionExpiresIn * 1_000 - elapsedMs);
+  return Math.min(
+    ADMIN_VISIBLE_PRESENCE_MAX_INTERVAL_MS,
+    Math.floor(remainingMs / 2),
+  );
 }
 
 function boundAdminActivityTouch(

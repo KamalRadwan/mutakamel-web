@@ -1,43 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { safeStorage } from "@/lib/safeStorage";
+import { useTheme } from "next-themes";
+import { useI18n } from "@/i18n/I18nContext";
 
 export function useThemeToggle() {
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const savedTheme = safeStorage.getItem("theme");
-    return savedTheme
-      ? savedTheme === "dark"
-      : document.documentElement.classList.contains("dark");
-  });
+  const { resolvedTheme, setTheme } = useTheme();
+  const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [isDark]);
+  }, []);
+
+  // Before mount, resolvedTheme is unknown to next-themes on the client —
+  // fall back to the layout's defaultTheme ("dark") so the icon matches
+  // what was actually painted rather than flashing once mounted flips.
+  const isDark = mounted ? resolvedTheme === "dark" : true;
 
   const toggleTheme = () => {
-    const nextDark = !isDark;
-    setIsDark(nextDark);
-    if (nextDark) {
-      document.documentElement.classList.add("dark");
-      safeStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      safeStorage.setItem("theme", "light");
-    }
+    setTheme(isDark ? "light" : "dark");
   };
 
   return {
     isDark,
     mounted,
     toggleTheme,
-    title: isDark ? "Switch to Light Mode" : "Switch to Dark Mode",
+    title: isDark ? t.common.switchToLightMode : t.common.switchToDarkMode,
   };
 }

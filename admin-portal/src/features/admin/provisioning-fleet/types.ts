@@ -1,4 +1,5 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import type { PageResult } from "@/types/common";
 
 export const FLEET_OPERATION_TYPES = [
   "UPDATE",
@@ -29,7 +30,7 @@ export const FLEET_TENANT_STATUSES = [
   "SKIPPED",
   "CANCELLED",
 ] as const;
-export type FleetTenantStatus = (typeof FLEET_TENANT_STATUSES)[number];
+type FleetTenantStatus = (typeof FLEET_TENANT_STATUSES)[number];
 
 export type TenantLifecycleStatus = "ACTIVE" | "SUSPENDED";
 
@@ -143,7 +144,7 @@ export interface FleetRolloutTenant {
   completedAt: string | null;
 }
 
-export type FleetReportStatus =
+type FleetReportStatus =
   | "NOT_READY"
   | "READY_FOR_ATTESTATION"
   | "ATTESTED";
@@ -170,17 +171,10 @@ export interface AttestFleetReportCommand {
   signatureBase64: string;
 }
 
-export interface FleetPage<T> {
-  items: T[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
+export type FleetPage<T> = PageResult<T> & {
   correlationId: string;
   timestamp: string;
-}
+};
 
 export interface FleetResult<T> {
   data: T;

@@ -11,6 +11,7 @@ export const TENANT_PERMISSION_REQUIREMENTS = {
   lifecycle: ["admin.tenants.suspend", "admin.tenants.critical"],
   provisioning: ["admin.tenants.reprovision", "admin.tenants.critical"],
   softDelete: ["admin.tenants.delete", "admin.tenants.critical"],
+  restore: ["admin.tenants.restore", "admin.tenants.critical"],
   destroy: ["admin.tenants.destroy", "admin.tenants.critical"],
   manageFqdns: ["admin.tenants.manage_fqdns", "admin.tenants.critical"],
 } as const;
@@ -32,6 +33,10 @@ export function readTenantCorePermissions(
     canSoftDelete: adminCanAll(
       user,
       TENANT_PERMISSION_REQUIREMENTS.softDelete,
+    ),
+    canRestore: adminCanAll(
+      user,
+      TENANT_PERMISSION_REQUIREMENTS.restore,
     ),
     canDestroy: adminCanAll(
       user,

@@ -1,12 +1,36 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { ShieldAlert } from "lucide-react";
+import {
+  Card,
+  Checkbox,
+  Field,
+  Input,
+  Button,
+  DataTable,
+  EmptyState,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  type ColumnDef,
+} from "@/design-system";
 import type { UseTenantBillingWorkspaceResult } from "../hooks/useTenantBillingWorkspace";
+import { localeForLanguage } from "@/i18n/locale";
 import type {
   BillingCycle,
   PaymentReconciliationAction,
+  PaymentStatusView,
+  SubscriptionItemView,
   SubscriptionPlanChangeOperation,
   WalletAdjustmentDirection,
+  WalletLedgerView,
 } from "../types";
 
 type BillingSection = "subscription" | "wallet" | "payments";
@@ -23,60 +47,51 @@ export function TenantBillingPanel({
   const [section, setSection] = useState<BillingSection>("subscription");
   const rtl = lang === "ar";
   const copy = billingCopy[lang];
+  const refreshing = [
+    workspace.subscriptionState,
+    workspace.walletState,
+    workspace.ledgerState,
+    workspace.paymentsState,
+    workspace.billingSummaryState,
+  ].includes("loading");
   return (
-    <section className="space-y-4" dir={rtl ? "rtl" : "ltr"}>
+    <section className="space-y-4" dir={rtl ? "rtl" : "ltr"} aria-busy={refreshing || undefined}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-950 dark:text-white">
+          <h2 className="text-lg font-semibold text-foreground">
             {copy.title}
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {copy.subtitle}
-          </p>
+          <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => void workspace.refresh()}
-        >
+        <Button type="button" variant="outline" loading={refreshing} onClick={() => void workspace.refresh()}>
           {copy.refresh}
-        </button>
+        </Button>
       </div>
 
-      <div
-        className="flex flex-wrap gap-2"
-        role="tablist"
-        aria-label={copy.title}
-      >
-        {(["subscription", "wallet", "payments"] as const).map((key) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={section === key}
-            className={section === key ? "primary-button" : "secondary-button"}
-            onClick={() => setSection(key)}
-          >
-            {copy.sections[key]}
-          </button>
-        ))}
-      </div>
+      <Tabs value={section} onValueChange={(value) => setSection(value as BillingSection)} className="space-y-4">
+        <TabsList aria-label={copy.title} className="max-w-full overflow-x-auto">
+          {(["subscription", "wallet", "payments"] as const).map((key) => (
+            <TabsTrigger key={key} value={key} className="shrink-0 px-3">
+              {copy.sections[key]}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {refreshing ? <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{copy.refreshing}</p> : null}
 
-      {workspace.mutation.error ? (
-        <ErrorNotice error={workspace.mutation.error} lang={lang} />
-      ) : null}
-      {section === "subscription" ? (
-        <div className="space-y-4">
+        {workspace.mutation.error ? (
+          <ErrorNotice error={workspace.mutation.error} lang={lang} focusOnMount />
+        ) : null}
+        <TabsContent value="subscription" className="mt-0 space-y-4">
           <BillingSummary workspace={workspace} lang={lang} />
           <SubscriptionSection workspace={workspace} lang={lang} />
-        </div>
-      ) : null}
-      {section === "wallet" ? (
+        </TabsContent>
+        <TabsContent value="wallet" className="mt-0">
         <WalletSection workspace={workspace} lang={lang} />
-      ) : null}
-      {section === "payments" ? (
+        </TabsContent>
+        <TabsContent value="payments" className="mt-0">
         <PaymentsSection workspace={workspace} lang={lang} />
-      ) : null}
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
@@ -84,7 +99,7 @@ export function TenantBillingPanel({
 function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
   const copy = billingCopy[lang];
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("MONTHLY");
-  const [trialDays, setTrialDays] = useState("14");
+  const [trialDays, setTrialDays] = useState(String(DEFAULT_TRIAL_DAYS));
   const [moduleKey, setModuleKey] = useState("");
   const [tierKey, setTierKey] = useState("");
   const [seats, setSeats] = useState("1");
@@ -97,8 +112,9 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
 
   if (
-    workspace.subscriptionState === "loading" ||
-    workspace.subscriptionState === "idle"
+    (workspace.subscriptionState === "loading" ||
+      workspace.subscriptionState === "idle") &&
+    !workspace.subscription
   ) {
     return <StateCard>{copy.loadingSubscription}</StateCard>;
   }
@@ -110,7 +126,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
   }
   if (workspace.subscriptionState === "empty") {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+      <Card className="p-5">
         <h3 className="font-semibold">{copy.noSubscription}</h3>
         {workspace.permissions.canCreateSubscription ? (
           <form
@@ -133,12 +149,14 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
           >
             <SelectField
               label={copy.billingCycle}
+              name="billingCycle"
               value={billingCycle}
               onChange={(value) => setBillingCycle(value as BillingCycle)}
               options={["MONTHLY", "ANNUAL"]}
             />
             <TextField
               label={copy.trialDays}
+              name="trialDays"
               value={trialDays}
               onChange={setTrialDays}
               type="number"
@@ -147,18 +165,21 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
             />
             <TextField
               label={copy.moduleKey}
+              name="moduleKey"
               value={moduleKey}
               onChange={setModuleKey}
               required
             />
             <TextField
               label={copy.tierKey}
+              name="tierKey"
               value={tierKey}
               onChange={setTierKey}
               required
             />
             <TextField
               label={copy.seats}
+              name="seats"
               value={seats}
               onChange={setSeats}
               type="number"
@@ -166,20 +187,17 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
               required
             />
             <div className="flex items-end">
-              <button
-                className="primary-button"
-                disabled={Boolean(workspace.mutation.name)}
-              >
+              <Button type="submit" variant="primary" disabled={Boolean(workspace.mutation.name)}>
                 {copy.createSubscription}
-              </button>
+              </Button>
             </div>
           </form>
         ) : (
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-muted-foreground">
             {copy.noCreatePermission}
           </p>
         )}
-      </div>
+      </Card>
     );
   }
 
@@ -221,6 +239,49 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
     });
   };
 
+  const itemColumns: ColumnDef<SubscriptionItemView>[] = [
+    {
+      key: "module",
+      headerEn: copy.module,
+      headerAr: copy.module,
+      cell: (item) => item.moduleName ?? item.moduleKey ?? item.moduleId,
+    },
+    {
+      key: "tier",
+      headerEn: copy.tier,
+      headerAr: copy.tier,
+      cell: (item) => item.tierName ?? item.tierKey ?? item.tierId,
+    },
+    {
+      key: "seats",
+      headerEn: copy.seats,
+      headerAr: copy.seats,
+      cell: (item) => item.seats,
+    },
+    {
+      key: "lineTotal",
+      headerEn: copy.lineTotal,
+      headerAr: copy.lineTotal,
+      cell: (item) => (
+        <span className="font-mono">
+          {item.currencyCode ?? "USD"} {item.lineTotal}
+        </span>
+      ),
+    },
+    {
+      key: "features",
+      headerEn: copy.features,
+      headerAr: copy.features,
+      cell: (item) => (
+        <span className="text-xs">
+          {item.features === null
+            ? copy.enrichmentUnavailable
+            : item.features.join(", ") || "—"}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
@@ -235,15 +296,15 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
           value={`${header.currencyCode ?? "USD"} ${header.totalPrice ?? "—"}`}
         />
       </div>
-      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+      <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">{copy.subscriptionItems}</h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               {copy.periodEnd}: {formatDate(header.currentPeriodEnd, lang)}
             </p>
             {header.cancelAt ? (
-              <p className="text-xs text-amber-700">
+              <p className="text-xs text-warning-subtle-foreground">
                 {copy.cancelAt}: {formatDate(header.cancelAt, lang)}
               </p>
             ) : null}
@@ -252,74 +313,53 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
           header.status !== "CANCELLED" &&
           header.cancelAt === null ? (
             <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-xs text-slate-600">
-                <input
-                  type="checkbox"
+              <label htmlFor="cancel-subscription-confirmation" className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground">
+                <Checkbox
+                  id="cancel-subscription-confirmation"
+                  name="cancelSubscriptionConfirmed"
                   checked={cancelConfirmed}
-                  onChange={(event) => setCancelConfirmed(event.target.checked)}
+                  onCheckedChange={(checked) => setCancelConfirmed(checked === true)}
                 />
                 {copy.confirmCancel}
               </label>
-              <button
+              <Button
                 type="button"
-                className="danger-button"
+                variant="destructive"
                 disabled={!cancelConfirmed || Boolean(workspace.mutation.name)}
                 onClick={() => void workspace.cancelSubscription()}
               >
                 {copy.cancelSubscription}
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b text-start text-xs text-slate-500">
-                <th className="p-2 text-start">{copy.module}</th>
-                <th className="p-2 text-start">{copy.tier}</th>
-                <th className="p-2 text-start">{copy.seats}</th>
-                <th className="p-2 text-start">{copy.lineTotal}</th>
-                <th className="p-2 text-start">{copy.features}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-b border-slate-100 dark:border-slate-900"
-                >
-                  <td className="p-2">
-                    {item.moduleName ?? item.moduleKey ?? item.moduleId}
-                  </td>
-                  <td className="p-2">
-                    {item.tierName ?? item.tierKey ?? item.tierId}
-                  </td>
-                  <td className="p-2">{item.seats}</td>
-                  <td className="p-2 font-mono">
-                    {item.currencyCode ?? "USD"} {item.lineTotal}
-                  </td>
-                  <td className="p-2 text-xs">
-                    {item.features === null
-                      ? copy.enrichmentUnavailable
-                      : item.features.join(", ") || "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-4">
+          <DataTable
+            columns={itemColumns}
+            data={items}
+            getRowId={(item) => item.id}
+            pagination={{
+              page: 1,
+              limit: Math.max(items.length, 1),
+              totalItems: items.length,
+              totalPages: 1,
+              onPageChange: () => {},
+            }}
+          />
         </div>
-      </div>
+      </Card>
 
       {workspace.permissions.canUpdateSubscription && canChangePlan ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+        <Card className="p-5">
           <h3 className="font-semibold">{copy.planChange}</h3>
-          <p className="text-xs text-slate-500">{copy.serverPreview}</p>
+          <p className="text-xs text-muted-foreground">{copy.serverPreview}</p>
           <form
             className="mt-4 grid gap-3 md:grid-cols-2"
             onSubmit={submitPreview}
           >
             <SelectField
               label={copy.operation}
+              name="planChangeOperation"
               value={operation}
               onChange={(value) =>
                 updatePlanDraft(() =>
@@ -329,28 +369,19 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
               options={["ADD", "CHANGE", "REMOVE"]}
             />
             {operation !== "ADD" ? (
-              <label className="space-y-1 text-sm">
-                <span>{copy.item}</span>
-                <select
-                  className="field w-full"
-                  required
-                  value={itemId}
-                  onChange={(event) =>
-                    updatePlanDraft(() => setItemId(event.target.value))
-                  }
-                >
-                  <option value="">{copy.selectItem}</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.moduleName ?? item.moduleKey ?? item.id} ·{" "}
-                      {item.tierName ?? item.tierKey}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <SelectField
+                label={copy.item}
+                name="subscriptionItemId"
+                value={itemId}
+                placeholder={copy.selectItem}
+                required
+                onChange={(value) => updatePlanDraft(() => setItemId(value))}
+                options={items.map((item) => [item.id, `${item.moduleName ?? item.moduleKey ?? item.id} · ${item.tierName ?? item.tierKey}`] as const)}
+              />
             ) : (
               <TextField
                 label={copy.moduleKey}
+                name="moduleKey"
                 value={changeModuleKey}
                 onChange={(value) =>
                   updatePlanDraft(() => setChangeModuleKey(value))
@@ -361,6 +392,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
             {operation !== "REMOVE" ? (
               <TextField
                 label={copy.tierKey}
+                name="tierKey"
                 value={changeTierKey}
                 onChange={(value) =>
                   updatePlanDraft(() => setChangeTierKey(value))
@@ -371,6 +403,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
             {operation !== "REMOVE" ? (
               <TextField
                 label={copy.seats}
+                name="seats"
                 value={changeSeats}
                 onChange={(value) =>
                   updatePlanDraft(() => setChangeSeats(value))
@@ -381,16 +414,13 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
               />
             ) : null}
             <div className="flex items-end">
-              <button
-                className="primary-button"
-                disabled={Boolean(workspace.mutation.name)}
-              >
+              <Button type="submit" variant="primary" disabled={Boolean(workspace.mutation.name)}>
                 {copy.previewChange}
-              </button>
+              </Button>
             </div>
           </form>
           {workspace.planPreview ? (
-            <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm dark:border-indigo-900 dark:bg-indigo-950/40">
+            <div className="mt-4 rounded-lg border border-info/30 bg-info-subtle p-4 text-sm text-info-subtle-foreground">
               <div className="grid gap-2 md:grid-cols-4">
                 <Metric
                   label={copy.operation}
@@ -436,15 +466,15 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
                 />
               </div>
               {!previewIsCurrent ? (
-                <p className="mt-3 text-sm text-red-700">
+                <p className="mt-3 text-sm text-destructive-subtle-foreground">
                   {copy.previewExpired}
                 </p>
               ) : null}
               <div className="mt-3 flex flex-wrap gap-2">
                 {workspace.permissions.canApplySubscriptionUpdate ? (
-                  <button
+                  <Button
                     type="button"
-                    className="primary-button"
+                    variant="primary"
                     disabled={
                       !previewIsCurrent ||
                       !workspace.planPreview.financial.canApply ||
@@ -453,19 +483,15 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
                     onClick={() => void workspace.applyPlanChange()}
                   >
                     {copy.applyReviewedChange}
-                  </button>
+                  </Button>
                 ) : null}
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={workspace.clearPlanPreview}
-                >
+                <Button type="button" variant="outline" onClick={workspace.clearPlanPreview}>
                   {copy.dismiss}
-                </button>
+                </Button>
               </div>
             </div>
           ) : null}
-        </div>
+        </Card>
       ) : workspace.permissions.canUpdateSubscription ? (
         <StateCard>{copy.planChangeUnavailable}</StateCard>
       ) : null}
@@ -480,7 +506,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [note, setNote] = useState("");
-  if (workspace.walletState === "loading" || workspace.walletState === "idle")
+  if ((workspace.walletState === "loading" || workspace.walletState === "idle") && !workspace.wallet)
     return <StateCard>{copy.loadingWallet}</StateCard>;
   if (workspace.walletState === "forbidden")
     return <StateCard>{copy.walletForbidden}</StateCard>;
@@ -501,6 +527,50 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
     setNote("");
     update();
   };
+
+  const ledgerColumns: ColumnDef<WalletLedgerView>[] = [
+    {
+      key: "created",
+      headerEn: copy.created,
+      headerAr: copy.created,
+      cell: (entry) => formatDate(entry.createdAt, lang),
+    },
+    {
+      key: "direction",
+      headerEn: copy.direction,
+      headerAr: copy.direction,
+      cell: (entry) => entry.direction,
+    },
+    {
+      key: "amount",
+      headerEn: copy.amount,
+      headerAr: copy.amount,
+      cell: (entry) => <span className="font-mono">USD {entry.amountUsd}</span>,
+    },
+    {
+      key: "source",
+      headerEn: copy.source,
+      headerAr: copy.source,
+      cell: (entry) => (
+        <span className="font-mono">
+          {entry.sourceCurrencyCode} {entry.sourceAmount}
+        </span>
+      ),
+    },
+    {
+      key: "reason",
+      headerEn: copy.reason,
+      headerAr: copy.reason,
+      cell: (entry) => entry.reason,
+    },
+    {
+      key: "balanceAfter",
+      headerEn: copy.balanceAfter,
+      headerAr: copy.balanceAfter,
+      cell: (entry) => <span className="font-mono">USD {entry.balanceAfterUsd}</span>,
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
@@ -517,12 +587,12 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
       </div>
       {workspace.permissions.canPreviewWalletAdjustment &&
       wallet.status === "ACTIVE" ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+        <Card className="p-5">
           <h3 className="font-semibold">{copy.walletAdjustment}</h3>
-          <p className="text-xs text-slate-500">{copy.fxAuthority}</p>
+          <p className="text-xs text-muted-foreground">{copy.fxAuthority}</p>
           {workspace.inputCurrenciesState === "loading" ||
           workspace.inputCurrenciesState === "idle" ? (
-            <p className="mt-3 text-sm text-slate-500">
+            <p className="mt-3 text-sm text-muted-foreground">
               {copy.loadingCurrencies}
             </p>
           ) : null}
@@ -530,7 +600,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
             <ErrorNotice error={workspace.inputCurrenciesError} lang={lang} />
           ) : null}
           {workspace.inputCurrenciesState === "forbidden" ? (
-            <p className="mt-3 text-sm text-amber-700">
+            <p className="mt-3 text-sm text-warning-subtle-foreground">
               {copy.currenciesForbidden}
             </p>
           ) : null}
@@ -560,6 +630,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
             >
               <SelectField
                 label={copy.direction}
+                name="walletAdjustmentDirection"
                 value={direction}
                 onChange={(value) =>
                   updateWalletDraft(() =>
@@ -570,13 +641,15 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
               />
               <TextField
                 label={copy.sourceAmount}
+                name="sourceAmount"
                 value={amount}
                 onChange={(value) => updateWalletDraft(() => setAmount(value))}
                 required
-                pattern="^(?:0|[1-9]\\d{0,13})(?:\\.\\d{1,4})?$"
+                pattern="^(?:0|[1-9]\d{0,13})(?:\.\d{1,4})?$"
               />
               <SelectField
                 label={copy.currency}
+                name="sourceCurrencyCode"
                 value={selectedCurrency}
                 onChange={(value) =>
                   updateWalletDraft(() => setCurrency(value))
@@ -584,19 +657,16 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                 options={currencyOptions}
               />
               <div>
-                <button
-                  className="primary-button"
-                  disabled={Boolean(workspace.mutation.name)}
-                >
+                <Button type="submit" variant="primary" disabled={Boolean(workspace.mutation.name)}>
                   {copy.previewAdjustment}
-                </button>
+                </Button>
               </div>
             </form>
           ) : workspace.inputCurrenciesState === "empty" ? (
-            <p className="mt-3 text-sm text-slate-500">{copy.noCurrencies}</p>
+            <p className="mt-3 text-sm text-muted-foreground">{copy.noCurrencies}</p>
           ) : null}
           {workspace.walletPreview ? (
-            <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900 dark:bg-indigo-950/40">
+            <div className="mt-4 rounded-lg border border-info/30 bg-info-subtle p-4 text-info-subtle-foreground">
               <div className="grid gap-2 md:grid-cols-4">
                 <Metric
                   label={copy.sourceAmount}
@@ -620,7 +690,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                 />
               </div>
               {!previewIsCurrent ? (
-                <p className="mt-3 text-sm text-red-700">
+                <p className="mt-3 text-sm text-destructive-subtle-foreground">
                   {copy.previewExpired}
                 </p>
               ) : null}
@@ -628,15 +698,16 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                 <div className="mt-3 flex flex-wrap items-end gap-3">
                   <TextField
                     label={copy.auditNote}
+                    name="auditNote"
                     value={note}
                     onChange={setNote}
                     required
                     minLength={1}
                     maxLength={255}
                   />
-                  <button
+                  <Button
                     type="button"
-                    className="primary-button"
+                    variant="primary"
                     disabled={
                       !previewIsCurrent ||
                       !note.trim() ||
@@ -645,88 +716,54 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                     onClick={() => void workspace.confirmWalletAdjustment(note)}
                   >
                     {copy.confirmAdjustment}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={workspace.clearWalletPreview}
-                  >
+                  </Button>
+                  <Button type="button" variant="outline" onClick={workspace.clearWalletPreview}>
                     {copy.dismiss}
-                  </button>
+                  </Button>
                 </div>
               ) : (
-                <p className="mt-3 text-sm text-amber-700">
+                <p className="mt-3 text-sm text-warning-subtle-foreground">
                   {copy.previewOnly}
                 </p>
               )}
             </div>
           ) : null}
-        </div>
+        </Card>
       ) : workspace.permissions.canPreviewWalletAdjustment ? (
         <StateCard>{copy.walletAdjustmentUnavailable}</StateCard>
       ) : null}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+      <Card className="p-5">
         <h3 className="font-semibold">{copy.ledger}</h3>
         {workspace.ledgerState === "loading" ||
         workspace.ledgerState === "idle" ? (
-          <p className="mt-3 text-sm text-slate-500">{copy.loadingLedger}</p>
+          <p className="mt-3 text-sm text-muted-foreground">{copy.loadingLedger}</p>
         ) : null}
         {workspace.ledgerState === "error" ? (
           <ErrorNotice error={workspace.ledgerError} lang={lang} />
         ) : null}
         {workspace.ledgerState === "forbidden" ? (
-          <p className="mt-3 text-sm text-amber-700">{copy.ledgerForbidden}</p>
+          <LedgerForbiddenState title={copy.ledgerForbidden} />
         ) : null}
         {workspace.ledgerState === "empty" ? (
-          <p className="mt-3 text-sm text-slate-500">{copy.noLedger}</p>
+          <EmptyState title={copy.noLedger} />
         ) : null}
-        {workspace.ledgerState === "ready" ? (
-          <>
-            <div className="mt-3 overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="border-b text-xs text-slate-500">
-                    <th className="p-2 text-start">{copy.created}</th>
-                    <th className="p-2 text-start">{copy.direction}</th>
-                    <th className="p-2 text-start">{copy.amount}</th>
-                    <th className="p-2 text-start">{copy.source}</th>
-                    <th className="p-2 text-start">{copy.reason}</th>
-                    <th className="p-2 text-start">{copy.balanceAfter}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {workspace.ledger.items.map((entry) => (
-                    <tr
-                      key={entry.id}
-                      className="border-b border-slate-100 dark:border-slate-900"
-                    >
-                      <td className="p-2">
-                        {formatDate(entry.createdAt, lang)}
-                      </td>
-                      <td className="p-2">{entry.direction}</td>
-                      <td className="p-2 font-mono">USD {entry.amountUsd}</td>
-                      <td className="p-2 font-mono">
-                        {entry.sourceCurrencyCode} {entry.sourceAmount}
-                      </td>
-                      <td className="p-2">{entry.reason}</td>
-                      <td className="p-2 font-mono">
-                        USD {entry.balanceAfterUsd}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Pager
-              page={workspace.ledger.meta.page}
-              hasPrev={workspace.ledger.meta.hasPrev}
-              hasNext={workspace.ledger.meta.hasNext}
-              onPage={workspace.setLedgerPage}
-              lang={lang}
+        {workspace.ledgerState === "ready" || (workspace.ledgerState === "loading" && workspace.ledger.items.length > 0) ? (
+          <div className="mt-3">
+            <DataTable
+              columns={ledgerColumns}
+              data={workspace.ledger.items}
+              getRowId={(entry) => entry.id}
+              pagination={{
+                page: workspace.ledger.meta.page,
+                limit: workspace.ledger.meta.limit,
+                totalItems: workspace.ledger.meta.total,
+                totalPages: Math.max(1, workspace.ledger.meta.totalPages),
+                onPageChange: workspace.setLedgerPage,
+              }}
             />
-          </>
+          </div>
         ) : null}
-      </div>
+      </Card>
     </div>
   );
 }
@@ -738,129 +775,150 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
     Record<string, boolean>
   >({});
   if (
-    workspace.paymentsState === "loading" ||
-    workspace.paymentsState === "idle"
+    (workspace.paymentsState === "loading" ||
+      workspace.paymentsState === "idle") &&
+    workspace.payments.items.length === 0
   )
     return <StateCard>{copy.loadingPayments}</StateCard>;
   if (workspace.paymentsState === "forbidden")
     return <StateCard>{copy.paymentsForbidden}</StateCard>;
   if (workspace.paymentsState === "error")
     return <ErrorNotice error={workspace.paymentsError} lang={lang} />;
+
+  const paymentColumns: ColumnDef<PaymentStatusView>[] = [
+    {
+      key: "created",
+      headerEn: copy.created,
+      headerAr: copy.created,
+      cell: (payment) => formatDate(payment.createdAt, lang),
+    },
+    {
+      key: "status",
+      headerEn: copy.status,
+      headerAr: copy.status,
+      cell: (payment) => payment.status,
+    },
+    {
+      key: "purpose",
+      headerEn: copy.purpose,
+      headerAr: copy.purpose,
+      cell: (payment) => payment.purpose,
+    },
+    {
+      key: "provider",
+      headerEn: copy.provider,
+      headerAr: copy.provider,
+      cell: (payment) => payment.provider,
+    },
+    {
+      key: "amount",
+      headerEn: copy.amount,
+      headerAr: copy.amount,
+      cell: (payment) => (
+        <div className="font-mono">
+          {payment.providerCurrencyCode} {payment.providerAmount}
+          <div className="text-xs font-normal text-muted-foreground">
+            USD {payment.totalAppliedUsd}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      headerEn: copy.actions,
+      headerAr: copy.actions,
+      cell: (payment) => (
+        <div className="flex min-w-56 flex-col gap-2">
+          {workspace.permissions.canRefundPayment &&
+          payment.status === "SUCCEEDED" ? (
+            <>
+              <Field id={`refund-note-${payment.paymentId}`} label={copy.refundNote}>
+                {(field) => (
+                  <Input
+                    {...field}
+                    name={`refundNote.${payment.paymentId}`}
+                    value={refundNotes[payment.paymentId] ?? ""}
+                    onChange={(event) =>
+                      setRefundNotes((current) => ({
+                        ...current,
+                        [payment.paymentId]: event.target.value,
+                      }))
+                    }
+                    maxLength={500}
+                  />
+                )}
+              </Field>
+              <label htmlFor={`refund-confirmation-${payment.paymentId}`} className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground">
+                <Checkbox
+                  id={`refund-confirmation-${payment.paymentId}`}
+                  name={`refundConfirmed.${payment.paymentId}`}
+                  checked={refundConfirmations[payment.paymentId] ?? false}
+                  onCheckedChange={(checked) =>
+                    setRefundConfirmations((current) => ({
+                      ...current,
+                      [payment.paymentId]: checked === true,
+                    }))
+                  }
+                />
+                {copy.confirmRefund}
+              </label>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={
+                  !refundConfirmations[payment.paymentId] ||
+                  Boolean(workspace.mutation.name)
+                }
+                onClick={() =>
+                  void workspace.refundPayment(
+                    payment.paymentId,
+                    refundNotes[payment.paymentId],
+                  )
+                }
+              >
+                {copy.refund}
+              </Button>
+            </>
+          ) : null}
+          {workspace.permissions.canReconcilePayment ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void workspace.selectPayment(payment.paymentId)}
+            >
+              {copy.reconcile}
+            </Button>
+          ) : null}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+      <Card className="p-5">
         <h3 className="font-semibold">{copy.paymentHistory}</h3>
         {workspace.payments.items.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">{copy.noPayments}</p>
+          <p className="mt-3 text-sm text-muted-foreground">{copy.noPayments}</p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b text-xs text-slate-500">
-                  <th className="p-2 text-start">{copy.created}</th>
-                  <th className="p-2 text-start">{copy.status}</th>
-                  <th className="p-2 text-start">{copy.purpose}</th>
-                  <th className="p-2 text-start">{copy.provider}</th>
-                  <th className="p-2 text-start">{copy.amount}</th>
-                  <th className="p-2 text-start">{copy.actions}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workspace.payments.items.map((payment) => (
-                  <tr
-                    key={payment.paymentId}
-                    className="border-b border-slate-100 align-top dark:border-slate-900"
-                  >
-                    <td className="p-2">
-                      {formatDate(payment.createdAt, lang)}
-                    </td>
-                    <td className="p-2">{payment.status}</td>
-                    <td className="p-2">{payment.purpose}</td>
-                    <td className="p-2">{payment.provider}</td>
-                    <td className="p-2 font-mono">
-                      {payment.providerCurrencyCode} {payment.providerAmount}
-                      <div className="text-xs text-slate-500">
-                        USD {payment.totalAppliedUsd}
-                      </div>
-                    </td>
-                    <td className="p-2">
-                      <div className="flex min-w-56 flex-col gap-2">
-                        {workspace.permissions.canRefundPayment &&
-                        payment.status === "SUCCEEDED" ? (
-                          <>
-                            <input
-                              className="field"
-                              value={refundNotes[payment.paymentId] ?? ""}
-                              onChange={(event) =>
-                                setRefundNotes((current) => ({
-                                  ...current,
-                                  [payment.paymentId]: event.target.value,
-                                }))
-                              }
-                              placeholder={copy.refundNote}
-                              maxLength={500}
-                            />
-                            <label className="flex items-center gap-2 text-xs text-slate-600">
-                              <input
-                                type="checkbox"
-                                checked={
-                                  refundConfirmations[payment.paymentId] ??
-                                  false
-                                }
-                                onChange={(event) =>
-                                  setRefundConfirmations((current) => ({
-                                    ...current,
-                                    [payment.paymentId]: event.target.checked,
-                                  }))
-                                }
-                              />
-                              {copy.confirmRefund}
-                            </label>
-                            <button
-                              type="button"
-                              className="danger-button"
-                              disabled={
-                                !refundConfirmations[payment.paymentId] ||
-                                Boolean(workspace.mutation.name)
-                              }
-                              onClick={() =>
-                                void workspace.refundPayment(
-                                  payment.paymentId,
-                                  refundNotes[payment.paymentId],
-                                )
-                              }
-                            >
-                              {copy.refund}
-                            </button>
-                          </>
-                        ) : null}
-                        {workspace.permissions.canReconcilePayment ? (
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            onClick={() =>
-                              void workspace.selectPayment(payment.paymentId)
-                            }
-                          >
-                            {copy.reconcile}
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-3">
+            <DataTable
+              columns={paymentColumns}
+              data={workspace.payments.items}
+              getRowId={(payment) => payment.paymentId}
+              pagination={{
+                page: workspace.payments.meta.page,
+                limit: workspace.payments.meta.limit,
+                totalItems: workspace.payments.meta.total,
+                totalPages: Math.max(1, workspace.payments.meta.totalPages),
+                onPageChange: workspace.setPaymentsPage,
+              }}
+            />
           </div>
         )}
-        <Pager
-          page={workspace.payments.meta.page}
-          hasPrev={workspace.payments.meta.hasPrev}
-          hasNext={workspace.payments.meta.hasNext}
-          onPage={workspace.setPaymentsPage}
-          lang={lang}
-        />
-      </div>
+      </Card>
       {workspace.selectedPaymentId ? (
         <PaymentReconciliationPanel
           key={workspace.selectedPaymentId}
@@ -917,16 +975,12 @@ function PaymentReconciliationPanel({
     authoritativeProviderReference ?? providerReference;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+    <Card className="p-5">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-semibold">{copy.reconciliation}</h3>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => void workspace.selectPayment(null)}
-        >
+        <Button type="button" variant="outline" onClick={() => void workspace.selectPayment(null)}>
           {copy.close}
-        </button>
+        </Button>
       </div>
       {workspace.reconciliationState === "loading" ? (
         <p className="mt-3 text-sm">{copy.loadingReconciliation}</p>
@@ -970,6 +1024,7 @@ function PaymentReconciliationPanel({
             >
               <SelectField
                 label={copy.action}
+                name="reconciliationAction"
                 value={effectiveAction}
                 onChange={(value) => {
                   setAction(value as PaymentReconciliationAction);
@@ -980,6 +1035,7 @@ function PaymentReconciliationPanel({
               />
               <TextField
                 label={copy.evidenceReference}
+                name="evidenceReference"
                 value={effectiveEvidence}
                 onChange={setEvidence}
                 required
@@ -989,6 +1045,7 @@ function PaymentReconciliationPanel({
               {providerReferenceRequired ? (
                 <TextField
                   label={copy.providerReference}
+                  name="providerOutcomeReference"
                   value={effectiveProviderReference}
                   onChange={setProviderReference}
                   required
@@ -998,6 +1055,7 @@ function PaymentReconciliationPanel({
               ) : null}
               <TextField
                 label={copy.auditNote}
+                name="proposalNote"
                 value={proposalNote}
                 onChange={setProposalNote}
                 required
@@ -1005,18 +1063,19 @@ function PaymentReconciliationPanel({
                 maxLength={500}
               />
               <div>
-                <button
-                  className="primary-button"
+                <Button
+                  type="submit"
+                  variant="primary"
                   disabled={
-                  !effectiveEvidence.trim() ||
-                  (providerReferenceRequired &&
-                    !effectiveProviderReference.trim()) ||
+                    !effectiveEvidence.trim() ||
+                    (providerReferenceRequired &&
+                      !effectiveProviderReference.trim()) ||
                     proposalNote.trim().length < 10 ||
                     Boolean(workspace.mutation.name)
                   }
                 >
                   {copy.propose}
-                </button>
+                </Button>
               </div>
             </form>
           ) : hasOpenProposal ? (
@@ -1031,13 +1090,13 @@ function PaymentReconciliationPanel({
               return (
                 <div
                   key={row.id}
-                  className="rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+                  className="rounded-lg border border-border p-3"
                 >
                   <div className="flex flex-wrap justify-between gap-2">
                     <div>
                       <span className="font-medium">{row.action}</span> ·{" "}
                       {row.status}
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         {row.evidenceReference} ·{" "}
                         {formatDate(row.createdAt, lang)}
                       </p>
@@ -1046,7 +1105,7 @@ function PaymentReconciliationPanel({
                   <p className="mt-2 text-sm">{row.proposalNote}</p>
                   {row.status === "PROPOSED" &&
                   row.proposedByAdminId === workspace.actorId ? (
-                    <p className="mt-3 text-sm text-amber-700">
+                    <p className="mt-3 text-sm text-warning-subtle-foreground">
                       {copy.makerChecker}
                     </p>
                   ) : null}
@@ -1054,6 +1113,7 @@ function PaymentReconciliationPanel({
                     <div className="mt-3 flex flex-wrap items-end gap-2">
                       <TextField
                         label={copy.decisionNote}
+                        name={`decisionNote.${row.id}`}
                         value={decisionNotes[row.id] ?? ""}
                         onChange={(value) =>
                           setDecisionNotes((current) => ({
@@ -1064,9 +1124,9 @@ function PaymentReconciliationPanel({
                         minLength={10}
                         maxLength={500}
                       />
-                      <button
+                      <Button
                         type="button"
-                        className="primary-button"
+                        variant="primary"
                         disabled={
                           (decisionNotes[row.id]?.trim().length ?? 0) < 10 ||
                           Boolean(workspace.mutation.name)
@@ -1080,10 +1140,10 @@ function PaymentReconciliationPanel({
                         }
                       >
                         {copy.approve}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="danger-button"
+                        variant="destructive"
                         disabled={
                           (decisionNotes[row.id]?.trim().length ?? 0) < 10 ||
                           Boolean(workspace.mutation.name)
@@ -1097,7 +1157,7 @@ function PaymentReconciliationPanel({
                         }
                       >
                         {copy.reject}
-                      </button>
+                      </Button>
                     </div>
                   ) : null}
                 </div>
@@ -1106,7 +1166,7 @@ function PaymentReconciliationPanel({
           </div>
         </div>
       ) : null}
-    </div>
+    </Card>
   );
 }
 
@@ -1119,7 +1179,7 @@ function BillingSummary({ workspace, lang }: TenantBillingPanelProps) {
     return <ErrorNotice error={workspace.billingSummaryError} lang={lang} />;
   const invoice = workspace.billingSummary?.currentCollectionInvoice;
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
+    <Card className="p-5">
       <h3 className="font-semibold">{copy.collectionInvoice}</h3>
       {invoice ? (
         <>
@@ -1147,11 +1207,11 @@ function BillingSummary({ workspace, lang }: TenantBillingPanelProps) {
           ) : null}
         </>
       ) : (
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-muted-foreground">
           {copy.noCollectionInvoice}
         </p>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -1168,7 +1228,7 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
   };
   return (
     <form
-      className="mt-4 grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-2 dark:border-slate-800"
+      className="mt-4 grid gap-3 border-t border-border pt-4 md:grid-cols-2"
       onSubmit={async (event) => {
         event.preventDefault();
         if (!confirmed) return;
@@ -1189,10 +1249,11 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
     >
       <div className="md:col-span-2">
         <h4 className="font-medium">{copy.offlinePayment}</h4>
-        <p className="text-xs text-slate-500">{copy.offlinePaymentHelp}</p>
+        <p className="text-xs text-muted-foreground">{copy.offlinePaymentHelp}</p>
       </div>
       <TextField
         label={copy.sourceAmount}
+        name="sourceAmount"
         value={amount}
         onChange={(value) => updateDraft(() => setAmount(value))}
         required
@@ -1201,6 +1262,7 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
       />
       <TextField
         label={copy.currency}
+        name="currencyCode"
         value={currencyCode}
         onChange={(value) =>
           updateDraft(() => setCurrencyCode(value.toUpperCase()))
@@ -1212,6 +1274,7 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
       />
       <TextField
         label={copy.offlineReference}
+        name="reference"
         value={reference}
         onChange={(value) => updateDraft(() => setReference(value))}
         required
@@ -1219,21 +1282,24 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
       />
       <TextField
         label={copy.auditNote}
+        name="note"
         value={note}
         onChange={(value) => updateDraft(() => setNote(value))}
         maxLength={500}
       />
-      <label className="flex items-center gap-2 text-xs text-slate-600 md:col-span-2">
-        <input
-          type="checkbox"
+      <label htmlFor="offline-payment-confirmation" className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground md:col-span-2">
+        <Checkbox
+          id="offline-payment-confirmation"
+          name="offlinePaymentConfirmed"
           checked={confirmed}
-          onChange={(event) => setConfirmed(event.target.checked)}
+          onCheckedChange={(checked) => setConfirmed(checked === true)}
         />
         {copy.confirmOfflinePayment}
       </label>
       <div className="md:col-span-2">
-        <button
-          className="danger-button"
+        <Button
+          type="submit"
+          variant="destructive"
           disabled={
             !confirmed ||
             !amount ||
@@ -1242,7 +1308,7 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
           }
         >
           {copy.recordOfflinePayment}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -1261,22 +1327,31 @@ function Metric({
     <div
       className={
         compact
-          ? "rounded-lg bg-white/70 p-2 dark:bg-slate-900/50"
-          : "rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+          ? "rounded-lg bg-card/70 p-2"
+          : "rounded-lg border border-border bg-card p-4"
       }
     >
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 break-words font-medium text-slate-950 dark:text-white">
-        {value}
-      </p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 break-words font-medium text-foreground">{value}</p>
     </div>
   );
 }
 
-function StateCard({ children }: { children: React.ReactNode }) {
+function StateCard({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-      {children}
+    <Card className="p-5 text-sm text-muted-foreground">{children}</Card>
+  );
+}
+
+// A 403 is not an empty state (AGENTS.md) — same layout rhythm as the shared
+// EmptyState pattern, but a distinct icon and an "alert" role so assistive
+// tech and a quick visual scan both tell a permission gap apart from a
+// genuinely empty ledger.
+function LedgerForbiddenState({ title }: { title: string }) {
+  return (
+    <div role="alert" className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+      <ShieldAlert className="mb-1 size-8 text-muted-foreground" aria-hidden="true" />
+      <p className="text-sm font-medium text-foreground">{title}</p>
     </div>
   );
 }
@@ -1284,21 +1359,29 @@ function StateCard({ children }: { children: React.ReactNode }) {
 function ErrorNotice({
   error,
   lang,
+  focusOnMount = false,
 }: {
   error: { message: string; errorCode: string; correlationId?: string } | null;
   lang: "ar" | "en";
+  focusOnMount?: boolean;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error && focusOnMount) ref.current?.focus();
+  }, [error, focusOnMount]);
   if (!error) return null;
   return (
     <div
+      ref={ref}
       role="alert"
-      className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
+      tabIndex={-1}
+      className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <p className="font-medium">{error.message}</p>
       <p className="mt-1 font-mono text-xs">
         {error.errorCode}
         {error.correlationId
-          ? ` · ${lang === "ar" ? "معرّف الارتباط" : "Correlation"}: ${error.correlationId}`
+          ? ` · ${billingCopy[lang].correlationLabel}: ${error.correlationId}`
           : ""}
       </p>
     </div>
@@ -1307,12 +1390,14 @@ function ErrorNotice({
 
 function TextField({
   label,
+  name,
   value,
   onChange,
   type = "text",
   ...inputProps
 }: {
   label: string;
+  name?: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
@@ -1321,83 +1406,71 @@ function TextField({
   "value" | "onChange" | "type"
 >) {
   return (
-    <label className="space-y-1 text-sm">
-      <span>{label}</span>
-      <input
-        {...inputProps}
-        type={type}
-        className="field w-full"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
+    <Field label={label}>
+      {(fp) => (
+        <Input
+          id={fp.id}
+          {...inputProps}
+          name={name}
+          type={type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
+    </Field>
   );
 }
+
+const EMPTY_SELECT_VALUE = "__none__";
+/**
+ * Prefill for the manual trial length. Core's `tenants.trial_days` setting is
+ * what applies when no explicit value is sent; this only seeds the input an
+ * admin is about to override.
+ */
+const DEFAULT_TRIAL_DAYS = 7;
 
 function SelectField({
   label,
+  name,
   value,
   onChange,
   options,
+  placeholder,
+  required,
 }: {
   label: string;
+  name?: string;
   value: string;
   onChange: (value: string) => void;
-  options: readonly string[];
+  options: ReadonlyArray<string | readonly [string, string]>;
+  placeholder?: string;
+  required?: boolean;
 }) {
+  const entries = options.map((option) => typeof option === "string" ? [option, option] as const : option);
+  const generatedId = useId();
+  const id = name ? `tenant-billing-${name}` : generatedId;
+  const labelId = `${id}-label`;
   return (
-    <label className="space-y-1 text-sm">
-      <span>{label}</span>
-      <select
-        className="field w-full"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function Pager({
-  page,
-  hasPrev,
-  hasNext,
-  onPage,
-  lang,
-}: {
-  page: number;
-  hasPrev: boolean;
-  hasNext: boolean;
-  onPage: (page: number) => void;
-  lang: "ar" | "en";
-}) {
-  const copy = billingCopy[lang];
-  return (
-    <div className="mt-3 flex items-center justify-end gap-2">
-      <button
-        type="button"
-        className="secondary-button"
-        disabled={!hasPrev}
-        onClick={() => onPage(Math.max(1, page - 1))}
-      >
-        {copy.previous}
-      </button>
-      <span className="text-xs text-slate-500">
-        {copy.page} {page}
+    <div className="space-y-1.5">
+      <span id={labelId} className="text-sm font-medium text-foreground">
+        {label}
+        {required ? <span className="ms-0.5 text-destructive" aria-hidden="true">*</span> : null}
       </span>
-      <button
-        type="button"
-        className="secondary-button"
-        disabled={!hasNext}
-        onClick={() => onPage(page + 1)}
+      <Select
+        name={name}
+        value={value || EMPTY_SELECT_VALUE}
+        onValueChange={(next) => onChange(next === EMPTY_SELECT_VALUE ? "" : next)}
       >
-        {copy.next}
-      </button>
+        <SelectTrigger id={id} aria-labelledby={labelId} aria-required={required || undefined}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {placeholder ? <SelectItem value={EMPTY_SELECT_VALUE}>{placeholder}</SelectItem> : null}
+          {entries.map(([optionValue, optionLabel]) => (
+            <SelectItem key={optionValue} value={optionValue}>{optionLabel}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -1407,7 +1480,7 @@ function formatDate(value: string | null, lang: "ar" | "en"): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB", {
+    : new Intl.DateTimeFormat(localeForLanguage(lang), {
         dateStyle: "medium",
         timeStyle: "short",
       }).format(date);
@@ -1423,6 +1496,8 @@ const billingCopy = {
     title: "Subscription, wallet & payments",
     subtitle: "Authoritative billing state and reviewed financial commands.",
     refresh: "Refresh",
+    refreshing: "Refreshing billing data while keeping the current view available…",
+    correlationLabel: "Correlation",
     sections: {
       subscription: "Subscription",
       wallet: "Wallet",
@@ -1551,6 +1626,8 @@ const billingCopy = {
     title: "الاشتراك والمحفظة والمدفوعات",
     subtitle: "حالة فوترة موثوقة وأوامر مالية بعد المراجعة.",
     refresh: "تحديث",
+    refreshing: "جارٍ تحديث بيانات الفوترة مع إبقاء العرض الحالي متاحًا…",
+    correlationLabel: "معرّف الارتباط",
     sections: {
       subscription: "الاشتراك",
       wallet: "المحفظة",

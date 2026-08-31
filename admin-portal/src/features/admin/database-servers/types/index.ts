@@ -10,7 +10,7 @@ export type DatabaseServerSslMode =
   | "verify-ca"
   | "verify-full";
 
-export type DatabaseServerHistoryAction =
+type DatabaseServerHistoryAction =
   | "CREATE"
   | "UPDATE"
   | "ACTIVATE"
@@ -18,7 +18,7 @@ export type DatabaseServerHistoryAction =
   | "OFFLINE"
   | "DELETE";
 
-export type DatabaseServerApplicationBindingStatus =
+type DatabaseServerApplicationBindingStatus =
   | "PENDING"
   | "PROVISIONING"
   | "READY"
@@ -28,7 +28,7 @@ export type DatabaseServerApplicationBindingStatus =
   | "DEGRADED"
   | "DISABLED";
 
-export interface DatabaseServerCredentialsDto {
+interface DatabaseServerCredentialsDto {
   username: string; // trimmed, /^(?!pg_)[a-z_][a-z0-9_]{0,62}$/
   password: string; // 1..1024, do not trim
 }
@@ -71,14 +71,14 @@ export interface DatabaseServerView {
   updatedAt: string;
 }
 
-export type DatabaseServerCredentialBootstrapStatus =
+type DatabaseServerCredentialBootstrapStatus =
   | "PENDING"
   | "PROVISIONING"
   | "READY"
   | "RECONCILING"
   | "DEGRADED";
 
-export interface DatabaseServerCredentialBootstrapSummary {
+interface DatabaseServerCredentialBootstrapSummary {
   status: DatabaseServerCredentialBootstrapStatus;
   totalPrincipals: number;
   readyPrincipals: number;
@@ -125,7 +125,7 @@ export interface DatabaseServerApplicationBindingView {
   hasStagedCandidate: boolean;
 }
 
-export interface ApplicationCredentialBootstrapReceiptItem {
+interface ApplicationCredentialBootstrapReceiptItem {
   applicationId: string;
   applicationKey: string;
   databasePrincipal: string;
@@ -278,7 +278,7 @@ export interface DatabaseServerHistoryQueryDto {
   limit?: number; // 1..100
 }
 
-export type DatabaseServerHistoryValue = string | number | boolean | null;
+type DatabaseServerHistoryValue = string | number | boolean | null;
 
 export interface DatabaseServerHistoryView {
   id: string;

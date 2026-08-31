@@ -1,4 +1,5 @@
-import { axiosClient, unwrapCoreData } from "@/lib/api/axiosClient";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { extractCoreData, type SuccessResponse } from "@/shared/api/core-envelope";
 import {
   readDeviceTokenReceipt,
   readNotificationPage,
@@ -36,63 +37,63 @@ export async function listAdminNotifications(
   const params = new URLSearchParams({ limit: String(query.limit) });
   if (query.cursor) params.set("cursor", query.cursor);
   if (query.unreadOnly) params.set("unreadOnly", "true");
-  const response = await axiosClient.get<unknown>(
+  const response = await axiosClient.get<SuccessResponse<unknown>>(
     `${BASE_URL}?${params.toString()}`,
     READ_OPTIONS(signal),
   );
-  return readNotificationPage(unwrapCoreData(response.data));
+  return readNotificationPage(extractCoreData(response));
 }
 
 export async function getAdminNotificationConfig(
   signal?: AbortSignal,
 ): Promise<NotificationRuntimeConfig> {
-  const response = await axiosClient.get<unknown>(
+  const response = await axiosClient.get<SuccessResponse<unknown>>(
     `${BASE_URL}/config`,
     READ_OPTIONS(signal),
   );
-  return readRuntimeConfig(unwrapCoreData(response.data));
+  return readRuntimeConfig(extractCoreData(response));
 }
 
 export async function getAdminNotificationPreferences(
   signal?: AbortSignal,
 ): Promise<NotificationPreference[]> {
-  const response = await axiosClient.get<unknown>(
+  const response = await axiosClient.get<SuccessResponse<unknown>>(
     `${BASE_URL}/preferences`,
     READ_OPTIONS(signal),
   );
-  return readPreferences(unwrapCoreData(response.data));
+  return readPreferences(extractCoreData(response));
 }
 
 export async function getAdminNotificationUnreadCount(
   signal?: AbortSignal,
 ): Promise<number> {
-  const response = await axiosClient.get<unknown>(
+  const response = await axiosClient.get<SuccessResponse<unknown>>(
     `${BASE_URL}/unread-count`,
     READ_OPTIONS(signal),
   );
-  return readUnreadCount(unwrapCoreData(response.data));
+  return readUnreadCount(extractCoreData(response));
 }
 
 export async function upsertAdminNotificationPreference(
   command: NotificationPreferenceCommand,
 ): Promise<NotificationPreference> {
-  const response = await axiosClient.put<unknown>(
+  const response = await axiosClient.put<SuccessResponse<unknown>>(
     `${BASE_URL}/preferences`,
     command,
     NATURALLY_IDEMPOTENT_WRITE,
   );
-  return readPreference(unwrapCoreData(response.data));
+  return readPreference(extractCoreData(response));
 }
 
 export async function registerAdminNotificationDeviceToken(
   command: RegisterDeviceTokenCommand,
 ): Promise<DeviceTokenReceipt> {
-  const response = await axiosClient.post<unknown>(
+  const response = await axiosClient.post<SuccessResponse<unknown>>(
     `${BASE_URL}/device-tokens`,
     command,
     NATURALLY_IDEMPOTENT_WRITE,
   );
-  return readDeviceTokenReceipt(unwrapCoreData(response.data));
+  return readDeviceTokenReceipt(extractCoreData(response));
 }
 
 export async function revokeAdminNotificationDeviceToken(id: string): Promise<void> {
@@ -106,12 +107,12 @@ export async function performAdminNotificationBulkAction(
   action: NotificationBulkAction,
 ): Promise<number> {
   const path = action === "read-all" ? "read-all" : "mark-all-read";
-  const response = await axiosClient.post<unknown>(
+  const response = await axiosClient.post<SuccessResponse<unknown>>(
     `${BASE_URL}/${path}`,
     undefined,
     NATURALLY_IDEMPOTENT_WRITE,
   );
-  return readUpdatedCount(unwrapCoreData(response.data));
+  return readUpdatedCount(extractCoreData(response));
 }
 
 export async function performAdminNotificationItemAction(

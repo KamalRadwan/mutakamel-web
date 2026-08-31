@@ -10,6 +10,12 @@ import {
   Info,
   Loader2,
 } from "lucide-react";
+import {
+  Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/design-system";
 import type { AdminNotification } from "@/features/admin/notifications/types";
 import { useNotificationDropdown } from "./hooks/useNotificationDropdown";
 
@@ -21,72 +27,72 @@ export function NotificationDropdown() {
   if (!view.canRead) return null;
 
   return (
-    <div className="relative" dir={view.dir}>
-      <button
-        type="button"
-        onClick={view.toggleOpen}
-        className="relative cursor-pointer rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-        title={view.copy.title}
-        aria-label={view.copy.title}
-        aria-haspopup="dialog"
-        aria-expanded={view.isOpen}
-        aria-controls={PANEL_ID}
-      >
-        <Bell className="h-4 w-4" aria-hidden="true" />
-        {view.unreadCount > 0 ? (
-          <span className="absolute end-0 top-0 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white dark:ring-slate-950">
-            {view.unreadCount > 99 ? "99+" : view.unreadCount}
-          </span>
-        ) : null}
-      </button>
+    <Popover open={view.isOpen} onOpenChange={view.setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          dir={view.dir}
+          className="relative size-8 p-0 text-muted-foreground"
+          aria-label={view.unreadCount > 0
+            ? `${view.copy.title}: ${new Intl.NumberFormat(view.locale).format(view.unreadCount)} ${view.copy.newNotifications}`
+            : view.copy.title}
+        >
+          <Bell className="size-4" aria-hidden="true" />
+          {view.unreadCount > 0 ? (
+            <span
+              aria-hidden="true"
+              className="absolute end-0 top-0 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold leading-none text-primary-foreground ring-2 ring-card"
+            >
+              {view.unreadCount > 99
+                ? `${new Intl.NumberFormat(view.locale).format(99)}+`
+                : new Intl.NumberFormat(view.locale).format(view.unreadCount)}
+            </span>
+          ) : null}
+        </Button>
+      </PopoverTrigger>
 
-      {view.isOpen ? (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={view.close}
-            aria-label={view.copy.close}
-          />
-          <section
-            id={PANEL_ID}
-            role="dialog"
-            aria-modal="false"
-            aria-labelledby={`${PANEL_ID}-title`}
-            className="absolute end-0 z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl sm:w-96 dark:border-slate-800 dark:bg-slate-900"
-          >
-            <header className="flex items-center justify-between gap-3 border-b border-slate-200 p-3.5 dark:border-slate-800">
+      <PopoverContent
+        id={PANEL_ID}
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby={`${PANEL_ID}-title`}
+        align="end"
+        dir={view.dir}
+        className="w-[min(24rem,calc(100vw-1rem))] overflow-hidden p-0"
+      >
+            <header className="flex items-center justify-between gap-3 border-b border-border p-3.5">
               <div className="min-w-0">
-                <h2
-                  id={`${PANEL_ID}-title`}
-                  className="truncate text-xs font-bold text-slate-900 dark:text-slate-100"
-                >
+                <h2 id={`${PANEL_ID}-title`} className="truncate text-xs font-semibold text-foreground">
                   {view.copy.title}
                 </h2>
                 {view.unreadCount > 0 ? (
-                  <p className="mt-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                  <p className="mt-0.5 text-xs font-medium text-primary">
                     {view.unreadCount} {view.copy.newNotifications}
                   </p>
                 ) : null}
               </div>
               {view.unreadCount > 0 && view.canManage ? (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => void view.markAllRead()}
                   disabled={view.isPending}
-                  className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-400"
+                  className="h-auto shrink-0 px-1.5 py-1 text-xs"
                 >
                   {view.isPending ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                   ) : (
-                    <CheckCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                    <CheckCheck className="size-3.5" aria-hidden="true" />
                   )}
                   <span>{view.copy.readAll}</span>
-                </button>
+                </Button>
               ) : null}
             </header>
 
-            <div aria-live="polite">
+            <div aria-live="polite" aria-atomic="true">
               {view.loadError ? (
                 <DropdownError
                   message={view.copy.dropdownError}
@@ -96,7 +102,7 @@ export function NotificationDropdown() {
                 />
               ) : null}
               {view.actionState === "FORBIDDEN" ? (
-                <p className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                <p className="border-b border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-foreground">
                   {view.copy.managePermission}
                 </p>
               ) : null}
@@ -110,17 +116,15 @@ export function NotificationDropdown() {
               ) : null}
             </div>
 
-            <div className="max-h-80 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800/60">
+            <div className="max-h-80 divide-y divide-border overflow-y-auto">
               {view.loadState === "LOADING" || view.loadState === "IDLE" ? (
-                <div className="flex items-center justify-center gap-2 p-8 text-xs text-slate-500 dark:text-slate-400">
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                <div className="flex items-center justify-center gap-2 p-8 text-xs text-muted-foreground" role="status">
+                  <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                   <span>{view.copy.loading}</span>
                 </div>
               ) : null}
               {view.loadState === "EMPTY" ? (
-                <p className="p-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                  {view.copy.dropdownEmpty}
-                </p>
+                <p className="p-8 text-center text-xs text-muted-foreground">{view.copy.dropdownEmpty}</p>
               ) : null}
               {view.loadState === "READY"
                 ? view.notifications.map((notification) => (
@@ -130,6 +134,7 @@ export function NotificationDropdown() {
                       canManage={view.canManage}
                       isPending={view.isPending}
                       copy={view.copy}
+                      locale={view.locale}
                       onMarkRead={() => void view.markRead(notification.id)}
                       onAcknowledge={() => void view.acknowledge(notification.id)}
                     />
@@ -137,20 +142,16 @@ export function NotificationDropdown() {
                 : null}
             </div>
 
-            <footer className="border-t border-slate-200 bg-slate-50 p-2.5 text-center dark:border-slate-800 dark:bg-slate-900/50">
-              <Link
-                href="/notifications"
-                onClick={view.close}
-                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-              >
-                <span>{view.copy.viewAll}</span>
-                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-              </Link>
+            <footer className="border-t border-border bg-muted p-2.5 text-center">
+              <Button asChild variant="link" size="sm" className="h-auto px-2 py-1 text-xs">
+                <Link href="/notifications" onClick={view.close}>
+                  <span>{view.copy.viewAll}</span>
+                  <ArrowUpRight className="size-3.5 rtl:-scale-x-100" aria-hidden="true" />
+                </Link>
+              </Button>
             </footer>
-          </section>
-        </>
-      ) : null}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -159,6 +160,7 @@ function NotificationPreview({
   canManage,
   isPending,
   copy,
+  locale,
   onMarkRead,
   onAcknowledge,
 }: {
@@ -166,6 +168,7 @@ function NotificationPreview({
   canManage: boolean;
   isPending: boolean;
   copy: ReturnType<typeof useNotificationDropdown>["copy"];
+  locale: string;
   onMarkRead: () => void;
   onAcknowledge: () => void;
 }) {
@@ -173,55 +176,50 @@ function NotificationPreview({
   const urgent = /(?:critical|high|urgent)/i.test(notification.priority);
   return (
     <article
-      className={`flex items-start gap-3 p-3 transition-colors ${
-        unread
-          ? "bg-blue-50/40 dark:bg-slate-800/40"
-          : "bg-transparent opacity-80"
+      className={`flex items-start gap-3 p-3 transition-colors motion-reduce:transition-none ${
+        unread ? "bg-selected/50" : "bg-transparent opacity-80"
       }`}
     >
       <div className="mt-0.5 shrink-0">
         {notification.acknowledgedAt ? (
-          <Check className="h-4 w-4 text-emerald-500" aria-hidden="true" />
+          <Check className="size-4 text-success" aria-hidden="true" />
         ) : urgent ? (
-          <AlertCircle className="h-4 w-4 text-amber-500" aria-hidden="true" />
+          <AlertCircle className="size-4 text-warning" aria-hidden="true" />
         ) : (
-          <Info className="h-4 w-4 text-blue-500" aria-hidden="true" />
+          <Info className="size-4 text-info" aria-hidden="true" />
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">
-          {notification.title}
-        </p>
-        <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-          {notification.body}
-        </p>
-        <time
-          dateTime={notification.createdAt}
-          className="mt-1 block text-[10px] text-slate-400"
-        >
-          {formatNotificationTime(notification.createdAt)}
+        <p className="truncate text-xs font-semibold text-foreground">{notification.title}</p>
+        <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{notification.body}</p>
+        <time dateTime={notification.createdAt} className="mt-1 block text-xs text-muted-foreground">
+          {formatNotificationTime(notification.createdAt, locale)}
         </time>
         {canManage && (!notification.readAt || !notification.acknowledgedAt) ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {!notification.readAt ? (
-              <button
+              <Button
                 type="button"
+                variant="link"
+                size="xs"
                 onClick={onMarkRead}
                 disabled={isPending}
-                className="cursor-pointer text-[10px] font-semibold text-blue-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-400"
+                className="h-auto px-1 py-0.5 text-xs font-semibold"
               >
                 {copy.markRead}
-              </button>
+              </Button>
             ) : null}
             {!notification.acknowledgedAt ? (
-              <button
+              <Button
                 type="button"
+                variant="link"
+                size="xs"
                 onClick={onAcknowledge}
                 disabled={isPending}
-                className="cursor-pointer text-[10px] font-semibold text-emerald-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-400"
+                className="h-auto px-1 py-0.5 text-xs font-semibold"
               >
                 {copy.acknowledge}
-              </button>
+              </Button>
             ) : null}
           </div>
         ) : null}
@@ -242,7 +240,7 @@ function DropdownError({
   error: { errorCode: string; correlationId?: string };
 }) {
   return (
-    <div className="border-b border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+    <div className="border-b border-destructive/30 bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground">
       <p>{message}</p>
       <p className="mt-0.5 font-mono">
         {errorCodeLabel}: {error.errorCode}
@@ -256,8 +254,8 @@ function DropdownError({
   );
 }
 
-function formatNotificationTime(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
+function formatNotificationTime(value: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));

@@ -1,31 +1,856 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme inline {
+  /* Latin first, Arabic second: the browser resolves font-family per
+     character, so Latin/digit runs render in Plex Sans and Arabic runs in
+     Plex Sans Arabic on the same line with no :lang() switching needed. */
+  --font-sans: var(--font-plex-latin), var(--font-plex-arabic), ui-sans-serif,
+    system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+/* =========================================================================
+   Design-system tokens (docs/design-system/tokens.md)
+
+   These are the authoritative semantic roles used by the migrated portal.
+   Legacy Tailwind family aliases remain below as a compatibility safety net
+   for third-party/generated markup; the design census prevents production
+   call sites from reintroducing direct palette dependencies.
+   ========================================================================= */
+
+@theme {
+  /* Action — cobalt interaction and information. This family must never
+     encode success or health. The 500–800 steps match the approved design
+     references in docs/design-system/design-update.md. */
+  --color-action-50: oklch(0.97048 0.014182 254.604);
+  --color-action-100: oklch(0.931918 0.031591 255.585);
+  --color-action-200: oklch(0.882 0.059 254.128);
+  --color-action-300: oklch(0.809 0.099 251.813);
+  --color-action-400: oklch(0.707 0.156 254.624);
+  --color-action-500: oklch(0.54615 0.215208 262.881);
+  --color-action-600: oklch(0.488198 0.217165 264.376);
+  --color-action-700: oklch(0.424445 0.180869 265.638);
+  --color-action-800: oklch(0.379059 0.137761 265.522);
+  --color-action-900: oklch(0.321 0.101 266.2);
+  --color-action-950: oklch(0.245 0.098 267.1);
+
+  /* Success — healthy, completed, connected, and verified states only.
+     `brand` remains a transitional alias to this green family so existing
+     status call sites stay green while action styling migrates to cobalt. */
+  --color-success-50: oklch(0.981926 0.01806 155.826);
+  --color-success-100: oklch(0.962 0.044 156.743);
+  --color-success-200: oklch(0.925 0.084 155.995);
+  --color-success-300: oklch(0.871 0.15 154.449);
+  --color-success-400: oklch(0.783 0.155 163);
+  --color-success-500: oklch(0.723 0.191 149.579);
+  --color-success-600: oklch(0.627 0.17 149.214);
+  --color-success-700: oklch(0.527 0.137 150.069);
+  --color-success-800: oklch(0.447925 0.118 151.328);
+  --color-success-900: oklch(0.393 0.095 152.535);
+  --color-success-950: oklch(0.266 0.072 152.934);
+
+  --color-brand-50: var(--color-success-50);
+  --color-brand-100: var(--color-success-100);
+  --color-brand-200: var(--color-success-200);
+  --color-brand-300: var(--color-success-300);
+  --color-brand-400: var(--color-success-400);
+  --color-brand-500: var(--color-success-500);
+  --color-brand-600: var(--color-success-600);
+  --color-brand-700: var(--color-success-700);
+  --color-brand-800: var(--color-success-800);
+  --color-brand-900: var(--color-success-900);
+  --color-brand-950: var(--color-success-950);
+
+  /* Cold-blue light surface ramp. Dark surfaces continue to use the existing
+     high ink steps; the low ink aliases below repaint legacy neutral classes
+     without assigning status meaning to the surface family. */
+  --color-surface-25: oklch(0.992 0.006 240);
+  --color-surface-50: oklch(0.978 0.012 240);
+  --color-surface-100: oklch(0.955 0.02 240);
+  --color-surface-selected: oklch(0.932953 0.032255 258.369);
+  --color-surface-200: oklch(0.91 0.03 240);
+  --color-surface-300: oklch(0.84 0.035 240);
+  --color-control-border: oklch(0.656043 0.054999 250.432);
+
+  /* Ink — the neutral ramp. Hue 232->245, half the chroma of Tailwind's
+     slate and rotated ~25deg cooler: machined steel, not denim. 12 steps
+     (an admin table needs a zebra-row step above 50 and a dark-canvas step
+     below 950 that Tailwind's 11-step families don't have). */
+  --color-ink-25: var(--color-surface-25);
+  --color-ink-50: var(--color-surface-50);
+  --color-ink-100: var(--color-surface-100);
+  --color-ink-200: var(--color-surface-200);
+  --color-ink-300: var(--color-surface-300);
+  --color-ink-400: oklch(0.715 0.021 235);
+  --color-ink-500: oklch(0.588 0.024 236);
+  --color-ink-600: oklch(0.487 0.024 237);
+  --color-ink-700: oklch(0.404 0.024 238);
+  --color-ink-800: oklch(0.32 0.023 240);
+  --color-ink-900: oklch(0.252 0.021 242);
+  --color-ink-950: oklch(0.176 0.019 244);
+  --color-ink-1000: oklch(0.132 0.017 245);
+
+  /* Danger — warm vermilion, hue 26->30. Deliberately not rose (hue ~15,
+     which reads pink and fights amber); 27 is near-complementary to ink's
+     232, so it has maximum pop against every neutral surface. */
+  --color-danger-50: oklch(0.972 0.014 30);
+  --color-danger-100: oklch(0.94 0.03 30);
+  --color-danger-200: oklch(0.888 0.058 29);
+  --color-danger-300: oklch(0.812 0.098 28);
+  --color-danger-400: oklch(0.716 0.152 28);
+  --color-danger-500: oklch(0.637 0.194 27);
+  --color-danger-600: oklch(0.567 0.203 27);
+  --color-danger-700: oklch(0.487 0.192 27);
+  --color-danger-800: oklch(0.41 0.144 27);
+  --color-danger-900: oklch(0.352 0.118 26);
+  --color-danger-950: oklch(0.232 0.098 26);
+
+  /* Warn — amber, hue 92->44. Large hue torsion is deliberate: amber has to
+     drift toward orange as it darkens or the low steps read as olive. */
+  --color-warn-50: oklch(0.98 0.019 92);
+  --color-warn-100: oklch(0.956 0.045 92);
+  --color-warn-200: oklch(0.912 0.086 88);
+  --color-warn-300: oklch(0.86 0.128 84);
+  --color-warn-400: oklch(0.806 0.152 79);
+  --color-warn-500: oklch(0.752 0.156 74);
+  --color-warn-600: oklch(0.66 0.148 62);
+  --color-warn-700: oklch(0.545 0.13 52);
+  --color-warn-800: oklch(0.455 0.12 48);
+  --color-warn-900: oklch(0.39 0.086 46);
+  --color-warn-950: oklch(0.255 0.078 44);
+}
+
+/* Semantic roles — light values. Named to match shadcn's registry exactly
+   (background/foreground/card/popover/primary/…/sidebar*) so `npx shadcn
+   add <x>` pastes in with zero edits. NOTE: shadcn's own "--accent" means
+   neutral hover fill, not brand — it stays ink here on purpose. Brand as an
+   accent lives only in --primary and --ring. */
+:root {
+  --background: var(--color-surface-50);
+  --foreground: oklch(0.256528 0.058664 258.037);
+
+  --card: white;
+  --card-foreground: var(--foreground);
+  --popover: white;
+  --popover-foreground: var(--foreground);
+
+  --primary: var(--color-action-600);
+  --primary-foreground: white;
+
+  --secondary: var(--color-surface-100);
+  --secondary-foreground: var(--foreground);
+
+  --muted: var(--color-surface-100);
+  --muted-foreground: oklch(0.518211 0.050915 249.823);
+
+  --accent: var(--color-surface-100);
+  --accent-foreground: var(--foreground);
+
+  --selected: var(--color-surface-selected);
+  --selected-foreground: var(--color-action-800);
+
+  /* Subtle fills are the 100 step, not the 50. The 50 steps carry C
+     0.014-0.019, which on a 20px status pill is indistinguishable from
+     white — and *-subtle is the single most-used colored surface in the
+     app (268 call sites vs 35 for the full-strength fills), so it decides
+     whether the portal reads as colored at all. The 100 step is 2.1-2.4x
+     the chroma and every pair stays AA against its -700/-800 label
+     (success 6.49, warn 6.69, danger 5.77, info 8.49). */
+  --info: var(--color-action-700);
+  --info-foreground: white;
+  --info-subtle: var(--color-action-100);
+  --info-subtle-foreground: var(--color-action-800);
+  /* `*-vivid` is the non-text accent: status dots, indicator marks — things
+     a text label already names, so they answer to the 3:1 graphics bar
+     instead of 4.5:1 and can sit far brighter than the -700/-800 steps the
+     filled roles need. Those dark steps are what made every badge read as
+     grey-green rather than green. success-600 is 3.00:1 on its own subtle
+     tint at C 0.170, against C 0.118 for the -800 step it replaces. */
+  --info-vivid: var(--color-action-500);
+
+  --success: var(--color-success-800);
+  --success-foreground: white;
+  --success-subtle: var(--color-success-100);
+  --success-subtle-foreground: var(--color-success-800);
+  --success-vivid: var(--color-success-600);
+
+  --warning: var(--color-warn-800);
+  --warning-foreground: white;
+  --warning-subtle: var(--color-warn-100);
+  --warning-subtle-foreground: var(--color-warn-800);
+  --warning-vivid: var(--color-warn-600);
+
+  /* danger-700, not -600: -600 fails contrast (~3.4:1) with white text. */
+  --destructive: var(--color-danger-700);
+  --destructive-foreground: white;
+  --destructive-subtle: var(--color-danger-100);
+  --destructive-subtle-foreground: var(--color-danger-700);
+  --destructive-vivid: var(--color-danger-500);
+
+  --border: var(--color-surface-200);
+  --input: var(--color-control-border);
+  --ring: var(--color-action-500);
+
+  /* Chart roles are semantic first. Qualitative slots are reserved for
+     unrelated categories and are always paired with labels or patterns. */
+  /* Marks sit just above WCAG's 3:1 floor for non-text graphics (the axis,
+     which is text, keeps 4.5:1 — ChartPalette.test.ts enforces both). They
+     were -600/-700 ramp steps at L 0.49-0.55, which on a white card read
+     dark and muddy rather than as data.
+
+     Two constraints shape these. Lightness is where chroma lives, since
+     sRGB's ceiling peaks near L 0.6-0.7, so brightening buys saturation
+     too. But a categorical palette also has to stay *level*: a series that
+     is darker than its neighbours reads as more important before the data
+     says anything. So every slot is held inside L 0.625-0.681 and takes the
+     chroma available there, rather than each chasing its own maximum — hue
+     does the separating. Explicit values, not ramp aliases, because no
+     single step lands on the floor. */
+  --chart-action: oklch(0.625 0.189 264.376);
+  --chart-success: oklch(0.645 0.168 150.069);
+  --chart-warning: oklch(0.679 0.165 52);
+  --chart-danger: oklch(0.625 0.241 27);
+  --chart-qualitative-1: oklch(0.625 0.189 264.376);
+  --chart-qualitative-2: oklch(0.633 0.105 186.391);
+  --chart-qualitative-3: oklch(0.625 0.231 301.924);
+  --chart-qualitative-4: oklch(0.681 0.173 48.998);
+  --chart-qualitative-5: oklch(0.625 0.236 16.935);
+  --chart-qualitative-6: oklch(0.651 0.168 130.933);
+  --chart-grid: var(--color-surface-200);
+  --chart-axis: var(--color-ink-600);
+  --chart-1: var(--chart-action);
+  --chart-2: var(--chart-success);
+  --chart-3: var(--chart-warning);
+  --chart-4: var(--chart-danger);
+  --chart-5: var(--chart-qualitative-3);
+
+  /* Elevation (docs/design-system/geometry-and-density.md "Elevation"):
+     shadow means "floating above the document," nothing else — cards use
+     border + background step, never a shadow. `pop` is the small-surface
+     elevation (popover, tooltip, dropdown, select, switch thumb, toast,
+     surface.raised); `overlay` is the large-surface elevation (dialog,
+     sheet, alert-dialog). Bridged to the shadow-pop/shadow-overlay
+     utilities via the @theme inline block below so .dark's override
+     actually reaches them (same reason --background needs the inline
+     bridge, see the comment above that block). */
+  --elevation-pop: 0 4px 6px -1px rgb(15 23 32 / 0.08), 0 2px 4px -2px rgb(15 23 32 / 0.06);
+  --elevation-overlay: 0 20px 25px -5px rgb(15 23 32 / 0.12), 0 8px 10px -6px rgb(15 23 32 / 0.08);
+
+  /* Sidebar (Phase 14) is bg-sidebar in BOTH themes — unlike the navbar it
+     replaces, which is permanently dark. */
+  --sidebar: var(--color-surface-25);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--color-action-600);
+  --sidebar-primary-foreground: white;
+  --sidebar-accent: var(--color-surface-100);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-selected: var(--color-surface-selected);
+  --sidebar-selected-foreground: var(--color-action-800);
+  --sidebar-border: var(--color-surface-200);
+  --sidebar-ring: var(--color-action-500);
+}
+
+/* Control height scale (docs/design-system/geometry-and-density.md) —
+   referenced by primitives via Tailwind v4's arbitrary-var syntax
+   (h-(--size-control-md)). Same in both themes, so plain :root, no .dark
+   override needed. Targets below 40px get a hit-area expansion rather than
+   a bigger box (src/design-system/lib/variants.ts hitArea). */
+:root {
+  --size-control-xs: 1.5rem; /* 24px */
+  --size-control-sm: 1.75rem; /* 28px */
+  --size-control-md: 2rem; /* 32px — default */
+  --size-control-lg: 2.25rem; /* 36px */
+  --size-control-xl: 2.5rem; /* 40px */
+}
+
+/* Real pointer targets for dense controls. `ds-hit-area` increases the
+   control box itself; `ds-hit-target` keeps compact checkbox/radio visuals
+   while its generated box remains part of the originating control's hit
+   testing area. The expanded target activates only for coarse pointers. */
+.ds-hit-area {
+  min-block-size: 1.5rem;
+  min-inline-size: 1.5rem;
+}
+
+.ds-hit-target {
+  position: relative;
+}
+
+.ds-hit-target::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  left: 50%;
+  min-block-size: 1.5rem;
+  min-inline-size: 1.5rem;
+  transform: translate(-50%, -50%);
+}
+
+@media (pointer: coarse) {
+  .ds-hit-area {
+    min-block-size: 2.75rem;
+    min-inline-size: 2.75rem;
+  }
+
+  .ds-hit-target::after {
+    min-block-size: 2.75rem;
+    min-inline-size: 2.75rem;
+  }
+}
+
+/* Semantic roles — dark overrides. Interactive fills use dark ink labels so
+   the same bright role remains AA when consumed as standalone text. Control
+   boundaries retain at least 3:1 against the dark card surface. */
+.dark {
+  --background: var(--color-ink-1000);
+  --foreground: var(--color-ink-100);
+
+  --card: var(--color-ink-950);
+  --card-foreground: var(--color-ink-100);
+  --popover: var(--color-ink-900);
+  --popover-foreground: var(--color-ink-100);
+
+  /* Bright action text and fills share one role in the component API. The
+     darker action-500 step was AA as a fill with white, but only 3.66:1 when
+     consumed as text on --card. action-400 + ink-1000 is 7.24:1 on --card
+     and 7.68:1 as a filled-control pair. */
+  --primary: var(--color-action-400);
+  --primary-foreground: var(--color-ink-1000);
+
+  --secondary: var(--color-ink-800);
+  --secondary-foreground: var(--color-ink-100);
+
+  --muted: var(--color-ink-900);
+  --muted-foreground: var(--color-ink-400);
+
+  --accent: var(--color-ink-800);
+  --accent-foreground: var(--color-ink-100);
+
+  --selected: var(--color-action-950);
+  --selected-foreground: var(--color-action-200);
+
+  --info: var(--color-action-400);
+  --info-foreground: var(--color-ink-1000);
+  --info-subtle: var(--color-action-950);
+  --info-subtle-foreground: var(--color-action-200);
+  --info-vivid: var(--color-action-400);
+
+  --success: var(--color-success-300);
+  --success-foreground: var(--color-ink-1000);
+  --success-subtle: var(--color-success-950);
+  --success-subtle-foreground: var(--color-success-200);
+  --success-vivid: var(--color-success-400);
+
+  --warning: var(--color-warn-300);
+  --warning-foreground: var(--color-ink-1000);
+  --warning-subtle: var(--color-warn-950);
+  --warning-subtle-foreground: var(--color-warn-200);
+  --warning-vivid: var(--color-warn-400);
+
+  /* The destructive role is also used for standalone error text/icons.
+     danger-400, not danger-300: at L 0.812 the red ceiling is only C 0.107,
+     so the 300 step could not be anything but pale — it spent its budget on
+     10.16:1 contrast when AA needs 4.5. The 400 step carries C 0.152 (+55%)
+     and still clears 7.04:1 on --card and 7.47:1 with its ink-1000 label. */
+  --destructive: var(--color-danger-400);
+  --destructive-foreground: var(--color-ink-1000);
+  --destructive-subtle: var(--color-danger-950);
+  --destructive-subtle-foreground: var(--color-danger-200);
+  --destructive-vivid: var(--color-danger-400);
+
+  /* 3.04:1 against --card: preserves a restrained dark boundary while
+     keeping form controls and required separators perceivable. */
+  --border: oklch(0.49 0.024 237);
+  --input: oklch(0.49 0.024 237);
+  --ring: var(--color-action-400);
+
+  --chart-action: var(--color-action-400);
+  --chart-success: var(--color-success-400);
+  --chart-warning: var(--color-warn-400);
+  --chart-danger: var(--color-danger-400);
+  --chart-qualitative-1: oklch(0.71374 0.143381 254.624);
+  --chart-qualitative-2: oklch(0.78452 0.132529 181.912);
+  --chart-qualitative-3: oklch(0.721685 0.176688 305.504);
+  --chart-qualitative-4: oklch(0.836861 0.164422 84.429);
+  --chart-qualitative-5: oklch(0.719186 0.168984 13.428);
+  --chart-qualitative-6: oklch(0.849315 0.20734 128.85);
+  --chart-grid: var(--color-ink-800);
+  --chart-axis: var(--color-ink-400);
+  --chart-1: var(--chart-action);
+  --chart-2: var(--chart-success);
+  --chart-3: var(--chart-warning);
+  --chart-4: var(--chart-danger);
+  --chart-5: var(--chart-qualitative-3);
+
+  /* Dark mode substitutes a top inset hairline for shadow rather than a
+     darker shadow — a box-shadow reads poorly against an already-dark
+     canvas (docs/design-system/geometry-and-density.md "Elevation"). */
+  --elevation-pop: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+  --elevation-overlay: inset 0 1px 0 0 rgb(255 255 255 / 0.08);
+
+  --sidebar: var(--color-ink-950);
+  --sidebar-foreground: var(--color-ink-100);
+  --sidebar-primary: var(--color-action-500);
+  --sidebar-primary-foreground: white;
+  --sidebar-accent: var(--color-ink-800);
+  --sidebar-accent-foreground: var(--color-ink-100);
+  --sidebar-selected: var(--color-action-950);
+  --sidebar-selected-foreground: var(--color-action-200);
+  --sidebar-border: var(--color-ink-800);
+  --sidebar-ring: var(--color-action-400);
+}
+
+/* Bridges the semantic :root/.dark custom properties above into Tailwind
+   utility-generating theme keys (bg-background, text-foreground, …). Must
+   be "inline", not plain @theme: a plain @theme's `--color-background:
+   var(--background)` resolves once at :root scope, so .dark's override of
+   --background would never reach the bg-background utility. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-selected: var(--selected);
+  --color-selected-foreground: var(--selected-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-vivid: var(--info-vivid);
+  --color-info-subtle-foreground: var(--info-subtle-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-vivid: var(--success-vivid);
+  --color-success-subtle-foreground: var(--success-subtle-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-vivid: var(--warning-vivid);
+  --color-warning-subtle-foreground: var(--warning-subtle-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-destructive-vivid: var(--destructive-vivid);
+  --color-destructive-subtle-foreground: var(--destructive-subtle-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-action: var(--chart-action);
+  --color-chart-success: var(--chart-success);
+  --color-chart-warning: var(--chart-warning);
+  --color-chart-danger: var(--chart-danger);
+  --color-chart-qualitative-1: var(--chart-qualitative-1);
+  --color-chart-qualitative-2: var(--chart-qualitative-2);
+  --color-chart-qualitative-3: var(--chart-qualitative-3);
+  --color-chart-qualitative-4: var(--chart-qualitative-4);
+  --color-chart-qualitative-5: var(--chart-qualitative-5);
+  --color-chart-qualitative-6: var(--chart-qualitative-6);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-axis: var(--chart-axis);
+  --shadow-pop: var(--elevation-pop);
+  --shadow-overlay: var(--elevation-overlay);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-selected: var(--sidebar-selected);
+  --color-sidebar-selected-foreground: var(--sidebar-selected-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* canvas is an explicit alias distinct from --background for the surface
+     ladder in docs/design-system/geometry-and-density.md (canvas / surface
+     / surface-raised / surface-sunken). */
+  --color-canvas: var(--background);
+}
+
+/* =========================================================================
+   LEGACY PALETTE COMPATIBILITY (docs/design-system/migration.md)
+
+   Everything below overrides Tailwind's built-in palette/type/weight/radius
+   variables directly. Production TS/TSX now uses semantic roles and the
+   census reports zero direct-ramp call sites. These aliases remain so a
+   generated or third-party fragment cannot silently fall back to a warm or
+   inconsistent palette; removing them is a separate compatibility decision.
+
+   Rule: every default Tailwind color family collapses to one of four roles.
+     brand  (success/healthy) <- emerald, green
+     danger                   <- red, rose
+     warn                     <- amber, orange, yellow
+     ink    (everything else) <- slate, gray, zinc, neutral, stone, lime,
+                                  teal, cyan, sky, blue, indigo, violet,
+                                  purple, fuchsia, pink
+   Matching numeric step (500 -> 500) is a near-luminance match against the
+   old palette, so nothing goes unreadable and no layout shifts.
+   ========================================================================= */
+@theme {
+  --color-emerald-50: var(--color-brand-50);
+  --color-emerald-100: var(--color-brand-100);
+  --color-emerald-200: var(--color-brand-200);
+  --color-emerald-300: var(--color-brand-300);
+  --color-emerald-400: var(--color-brand-400);
+  --color-emerald-500: var(--color-brand-500);
+  --color-emerald-600: var(--color-brand-600);
+  --color-emerald-700: var(--color-brand-700);
+  --color-emerald-800: var(--color-brand-800);
+  --color-emerald-900: var(--color-brand-900);
+  --color-emerald-950: var(--color-brand-950);
+
+  --color-green-50: var(--color-brand-50);
+  --color-green-100: var(--color-brand-100);
+  --color-green-200: var(--color-brand-200);
+  --color-green-300: var(--color-brand-300);
+  --color-green-400: var(--color-brand-400);
+  --color-green-500: var(--color-brand-500);
+  --color-green-600: var(--color-brand-600);
+  --color-green-700: var(--color-brand-700);
+  --color-green-800: var(--color-brand-800);
+  --color-green-900: var(--color-brand-900);
+  --color-green-950: var(--color-brand-950);
+
+  --color-red-50: var(--color-danger-50);
+  --color-red-100: var(--color-danger-100);
+  --color-red-200: var(--color-danger-200);
+  --color-red-300: var(--color-danger-300);
+  --color-red-400: var(--color-danger-400);
+  --color-red-500: var(--color-danger-500);
+  --color-red-600: var(--color-danger-600);
+  --color-red-700: var(--color-danger-700);
+  --color-red-800: var(--color-danger-800);
+  --color-red-900: var(--color-danger-900);
+  --color-red-950: var(--color-danger-950);
+
+  --color-rose-50: var(--color-danger-50);
+  --color-rose-100: var(--color-danger-100);
+  --color-rose-200: var(--color-danger-200);
+  --color-rose-300: var(--color-danger-300);
+  --color-rose-400: var(--color-danger-400);
+  --color-rose-500: var(--color-danger-500);
+  --color-rose-600: var(--color-danger-600);
+  --color-rose-700: var(--color-danger-700);
+  --color-rose-800: var(--color-danger-800);
+  --color-rose-900: var(--color-danger-900);
+  --color-rose-950: var(--color-danger-950);
+
+  --color-amber-50: var(--color-warn-50);
+  --color-amber-100: var(--color-warn-100);
+  --color-amber-200: var(--color-warn-200);
+  --color-amber-300: var(--color-warn-300);
+  --color-amber-400: var(--color-warn-400);
+  --color-amber-500: var(--color-warn-500);
+  --color-amber-600: var(--color-warn-600);
+  --color-amber-700: var(--color-warn-700);
+  --color-amber-800: var(--color-warn-800);
+  --color-amber-900: var(--color-warn-900);
+  --color-amber-950: var(--color-warn-950);
+
+  --color-orange-50: var(--color-warn-50);
+  --color-orange-100: var(--color-warn-100);
+  --color-orange-200: var(--color-warn-200);
+  --color-orange-300: var(--color-warn-300);
+  --color-orange-400: var(--color-warn-400);
+  --color-orange-500: var(--color-warn-500);
+  --color-orange-600: var(--color-warn-600);
+  --color-orange-700: var(--color-warn-700);
+  --color-orange-800: var(--color-warn-800);
+  --color-orange-900: var(--color-warn-900);
+  --color-orange-950: var(--color-warn-950);
+
+  --color-yellow-50: var(--color-warn-50);
+  --color-yellow-100: var(--color-warn-100);
+  --color-yellow-200: var(--color-warn-200);
+  --color-yellow-300: var(--color-warn-300);
+  --color-yellow-400: var(--color-warn-400);
+  --color-yellow-500: var(--color-warn-500);
+  --color-yellow-600: var(--color-warn-600);
+  --color-yellow-700: var(--color-warn-700);
+  --color-yellow-800: var(--color-warn-800);
+  --color-yellow-900: var(--color-warn-900);
+  --color-yellow-950: var(--color-warn-950);
+
+  --color-slate-50: var(--color-ink-50);
+  --color-slate-100: var(--color-ink-100);
+  --color-slate-200: var(--color-ink-200);
+  --color-slate-300: var(--color-ink-300);
+  --color-slate-400: var(--color-ink-400);
+  --color-slate-500: var(--color-ink-500);
+  --color-slate-600: var(--color-ink-600);
+  --color-slate-700: var(--color-ink-700);
+  --color-slate-800: var(--color-ink-800);
+  --color-slate-900: var(--color-ink-900);
+  --color-slate-950: var(--color-ink-950);
+
+  --color-gray-50: var(--color-ink-50);
+  --color-gray-100: var(--color-ink-100);
+  --color-gray-200: var(--color-ink-200);
+  --color-gray-300: var(--color-ink-300);
+  --color-gray-400: var(--color-ink-400);
+  --color-gray-500: var(--color-ink-500);
+  --color-gray-600: var(--color-ink-600);
+  --color-gray-700: var(--color-ink-700);
+  --color-gray-800: var(--color-ink-800);
+  --color-gray-900: var(--color-ink-900);
+  --color-gray-950: var(--color-ink-950);
+
+  --color-zinc-50: var(--color-ink-50);
+  --color-zinc-100: var(--color-ink-100);
+  --color-zinc-200: var(--color-ink-200);
+  --color-zinc-300: var(--color-ink-300);
+  --color-zinc-400: var(--color-ink-400);
+  --color-zinc-500: var(--color-ink-500);
+  --color-zinc-600: var(--color-ink-600);
+  --color-zinc-700: var(--color-ink-700);
+  --color-zinc-800: var(--color-ink-800);
+  --color-zinc-900: var(--color-ink-900);
+  --color-zinc-950: var(--color-ink-950);
+
+  --color-neutral-50: var(--color-ink-50);
+  --color-neutral-100: var(--color-ink-100);
+  --color-neutral-200: var(--color-ink-200);
+  --color-neutral-300: var(--color-ink-300);
+  --color-neutral-400: var(--color-ink-400);
+  --color-neutral-500: var(--color-ink-500);
+  --color-neutral-600: var(--color-ink-600);
+  --color-neutral-700: var(--color-ink-700);
+  --color-neutral-800: var(--color-ink-800);
+  --color-neutral-900: var(--color-ink-900);
+  --color-neutral-950: var(--color-ink-950);
+
+  --color-stone-50: var(--color-ink-50);
+  --color-stone-100: var(--color-ink-100);
+  --color-stone-200: var(--color-ink-200);
+  --color-stone-300: var(--color-ink-300);
+  --color-stone-400: var(--color-ink-400);
+  --color-stone-500: var(--color-ink-500);
+  --color-stone-600: var(--color-ink-600);
+  --color-stone-700: var(--color-ink-700);
+  --color-stone-800: var(--color-ink-800);
+  --color-stone-900: var(--color-ink-900);
+  --color-stone-950: var(--color-ink-950);
+
+  --color-lime-50: var(--color-ink-50);
+  --color-lime-100: var(--color-ink-100);
+  --color-lime-200: var(--color-ink-200);
+  --color-lime-300: var(--color-ink-300);
+  --color-lime-400: var(--color-ink-400);
+  --color-lime-500: var(--color-ink-500);
+  --color-lime-600: var(--color-ink-600);
+  --color-lime-700: var(--color-ink-700);
+  --color-lime-800: var(--color-ink-800);
+  --color-lime-900: var(--color-ink-900);
+  --color-lime-950: var(--color-ink-950);
+
+  --color-teal-50: var(--color-ink-50);
+  --color-teal-100: var(--color-ink-100);
+  --color-teal-200: var(--color-ink-200);
+  --color-teal-300: var(--color-ink-300);
+  --color-teal-400: var(--color-ink-400);
+  --color-teal-500: var(--color-ink-500);
+  --color-teal-600: var(--color-ink-600);
+  --color-teal-700: var(--color-ink-700);
+  --color-teal-800: var(--color-ink-800);
+  --color-teal-900: var(--color-ink-900);
+  --color-teal-950: var(--color-ink-950);
+
+  --color-cyan-50: var(--color-ink-50);
+  --color-cyan-100: var(--color-ink-100);
+  --color-cyan-200: var(--color-ink-200);
+  --color-cyan-300: var(--color-ink-300);
+  --color-cyan-400: var(--color-ink-400);
+  --color-cyan-500: var(--color-ink-500);
+  --color-cyan-600: var(--color-ink-600);
+  --color-cyan-700: var(--color-ink-700);
+  --color-cyan-800: var(--color-ink-800);
+  --color-cyan-900: var(--color-ink-900);
+  --color-cyan-950: var(--color-ink-950);
+
+  --color-sky-50: var(--color-ink-50);
+  --color-sky-100: var(--color-ink-100);
+  --color-sky-200: var(--color-ink-200);
+  --color-sky-300: var(--color-ink-300);
+  --color-sky-400: var(--color-ink-400);
+  --color-sky-500: var(--color-ink-500);
+  --color-sky-600: var(--color-ink-600);
+  --color-sky-700: var(--color-ink-700);
+  --color-sky-800: var(--color-ink-800);
+  --color-sky-900: var(--color-ink-900);
+  --color-sky-950: var(--color-ink-950);
+
+  --color-blue-50: var(--color-ink-50);
+  --color-blue-100: var(--color-ink-100);
+  --color-blue-200: var(--color-ink-200);
+  --color-blue-300: var(--color-ink-300);
+  --color-blue-400: var(--color-ink-400);
+  --color-blue-500: var(--color-ink-500);
+  --color-blue-600: var(--color-ink-600);
+  --color-blue-700: var(--color-ink-700);
+  --color-blue-800: var(--color-ink-800);
+  --color-blue-900: var(--color-ink-900);
+  --color-blue-950: var(--color-ink-950);
+
+  --color-indigo-50: var(--color-ink-50);
+  --color-indigo-100: var(--color-ink-100);
+  --color-indigo-200: var(--color-ink-200);
+  --color-indigo-300: var(--color-ink-300);
+  --color-indigo-400: var(--color-ink-400);
+  --color-indigo-500: var(--color-ink-500);
+  --color-indigo-600: var(--color-ink-600);
+  --color-indigo-700: var(--color-ink-700);
+  --color-indigo-800: var(--color-ink-800);
+  --color-indigo-900: var(--color-ink-900);
+  --color-indigo-950: var(--color-ink-950);
+
+  --color-violet-50: var(--color-ink-50);
+  --color-violet-100: var(--color-ink-100);
+  --color-violet-200: var(--color-ink-200);
+  --color-violet-300: var(--color-ink-300);
+  --color-violet-400: var(--color-ink-400);
+  --color-violet-500: var(--color-ink-500);
+  --color-violet-600: var(--color-ink-600);
+  --color-violet-700: var(--color-ink-700);
+  --color-violet-800: var(--color-ink-800);
+  --color-violet-900: var(--color-ink-900);
+  --color-violet-950: var(--color-ink-950);
+
+  --color-purple-50: var(--color-ink-50);
+  --color-purple-100: var(--color-ink-100);
+  --color-purple-200: var(--color-ink-200);
+  --color-purple-300: var(--color-ink-300);
+  --color-purple-400: var(--color-ink-400);
+  --color-purple-500: var(--color-ink-500);
+  --color-purple-600: var(--color-ink-600);
+  --color-purple-700: var(--color-ink-700);
+  --color-purple-800: var(--color-ink-800);
+  --color-purple-900: var(--color-ink-900);
+  --color-purple-950: var(--color-ink-950);
+
+  --color-fuchsia-50: var(--color-ink-50);
+  --color-fuchsia-100: var(--color-ink-100);
+  --color-fuchsia-200: var(--color-ink-200);
+  --color-fuchsia-300: var(--color-ink-300);
+  --color-fuchsia-400: var(--color-ink-400);
+  --color-fuchsia-500: var(--color-ink-500);
+  --color-fuchsia-600: var(--color-ink-600);
+  --color-fuchsia-700: var(--color-ink-700);
+  --color-fuchsia-800: var(--color-ink-800);
+  --color-fuchsia-900: var(--color-ink-900);
+  --color-fuchsia-950: var(--color-ink-950);
+
+  --color-pink-50: var(--color-ink-50);
+  --color-pink-100: var(--color-ink-100);
+  --color-pink-200: var(--color-ink-200);
+  --color-pink-300: var(--color-ink-300);
+  --color-pink-400: var(--color-ink-400);
+  --color-pink-500: var(--color-ink-500);
+  --color-pink-600: var(--color-ink-600);
+  --color-pink-700: var(--color-ink-700);
+  --color-pink-800: var(--color-ink-800);
+  --color-pink-900: var(--color-ink-900);
+  --color-pink-950: var(--color-ink-950);
+}
+
+/* Weight ceiling: font-bold/extrabold/black all compute to 600 (semibold).
+   1,078 pre-existing bold-or-heavier call sites de-escalate with zero file
+   edits — see the 3-weight policy in docs/design-system/typography.md. */
+@theme {
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 600;
+  --font-weight-black: 600;
+}
+
+/* Type scale — 7 steps, 13px floor, 14px base (docs/design-system/
+   typography.md). text-2xs is new; the rest override Tailwind's defaults.
+   Two (text-sm, text-xl) happen to already match Tailwind's stock values —
+   declared explicitly anyway so the scale is self-documenting in one place
+   rather than "correct by coincidence". */
+@theme {
+  --text-2xs: 0.8125rem; /* 13px — compatibility alias; migrate to text-xs */
+  --text-2xs--line-height: 1.125rem; /* 18px */
+  --text-2xs--letter-spacing: 0.06em;
+
+  --text-xs: 0.8125rem; /* 13px — the workhorse: table cells, badges, meta */
+  --text-xs--line-height: 1.125rem; /* 18px */
+  --text-xs--letter-spacing: 0em;
+
+  --text-sm: 0.875rem; /* 14px — base: body, inputs, buttons, labels, nav */
+  --text-sm--line-height: 1.25rem; /* 20px */
+  --text-sm--letter-spacing: -0.003em;
+
+  --text-base: 0.9375rem; /* 15px — prose, dialog descriptions */
+  --text-base--line-height: 1.5rem; /* 24px */
+  --text-base--letter-spacing: -0.006em;
+
+  --text-lg: 1.0625rem; /* 17px — card titles, h2/h3 */
+  --text-lg--line-height: 1.5rem; /* 24px */
+  --text-lg--letter-spacing: -0.01em;
+
+  --text-xl: 1.25rem; /* 20px — page title */
+  --text-xl--line-height: 1.75rem; /* 28px */
+  --text-xl--letter-spacing: -0.014em;
+
+  --text-2xl: 1.5625rem; /* 25px — KPI numerals, ceiling */
+  --text-2xl--line-height: 2rem; /* 32px */
+  --text-2xl--letter-spacing: -0.018em;
+}
+
+/* Arabic gets +1px on the three smallest steps, line-height raised in
+   lockstep so ascenders/descenders don't clip — Plex Arabic needs it where
+   Plex Latin doesn't. text-2xs is Latin-only by convention (no uppercase in
+   Arabic) so it is deliberately not lifted here. */
+html[lang="ar"] {
+  --text-xs: 0.875rem; /* 14px */
+  --text-xs--line-height: 1.25rem; /* 20px */
+  --text-sm: 0.9375rem; /* 15px */
+  --text-sm--line-height: 1.375rem; /* 22px */
+  --text-base: 1rem; /* 16px */
+  --text-base--line-height: 1.625rem; /* 26px */
+}
+
+/* Radius — 5 steps (docs/design-system/geometry-and-density.md). Phase 7's
+   codemod renamed every rounded-2xl/3xl call site to rounded-xl, so no
+   transitional alias is needed for those two Tailwind keys any more. */
+@theme {
+  --radius-xs: 0.1875rem; /* 3px — checkbox */
+  --radius-sm: 0.25rem; /* 4px — chips, inline code */
+  --radius-md: 0.375rem; /* 6px — default: buttons, inputs, badges, tabs */
+  --radius-lg: 0.5rem; /* 8px — cards, table shell, popovers */
+  --radius-xl: 0.625rem; /* 10px — dialogs, drawers */
+}
+
+/* One of the 3-gradient budget — the Skeleton primitive's shimmer sweep
+   (src/design-system/primitives/Skeleton.tsx). */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 body {
-  background-color: #f1f5f9;
-  color: #0f172a;
+  font-family: var(--font-sans);
+  /* Only 400/500/600 are downloaded (src/app/fonts.ts) — this stops a
+     heavier className from faking a weight the family doesn't define. */
+  font-synthesis-weight: none;
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
-.dark body {
-  background-color: #090d16;
-  color: #f8fafc;
-}
-
-@layer components {
-  .primary-button {
-    @apply inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50;
-  }
-
-  .secondary-button {
-    @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900;
-  }
-
-  .danger-button {
-    @apply inline-flex items-center justify-center rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50;
-  }
-
-  .field {
-    @apply min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100;
-  }
-}

@@ -5,12 +5,12 @@ import {
   CheckCircle2,
   CircleDashed,
   GitBranch,
-  Loader2,
   PackageCheck,
   Route,
   ShieldAlert,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { Card, Button } from "@/design-system";
 import type {
   ApplicationTechnicalReadinessView,
   ApplicationView,
@@ -48,34 +48,24 @@ export function ApplicationReleaseAuthorityRail({
     application.lifecycleStatus !== "DISABLED";
 
   return (
-    <section
-      aria-labelledby="release-authority-title"
-      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
-    >
-      <header className="flex flex-col justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center dark:border-slate-800">
+    <Card aria-labelledby="release-authority-title">
+      <header className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-violet-600 dark:text-violet-300">
+          <p className="text-xs font-semibold text-primary">
             {copy.eyebrow}
           </p>
-          <h2 id="release-authority-title" className="mt-1 text-sm font-black">
+          <h2 id="release-authority-title" className="mt-1 text-sm font-semibold text-foreground">
             {copy.title}
           </h2>
-          <p className="mt-1 text-xs text-slate-500">{copy.subtitle}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{copy.subtitle}</p>
         </div>
         {canOfferPublish && canPublish && (
-          <button
-            type="button"
-            onClick={onPublish}
-            disabled={isPublishing}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:focus-visible:ring-offset-slate-900"
-          >
-            {isPublishing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <BookOpenCheck className="h-3.5 w-3.5" />
+          <Button type="button" variant="primary" loading={isPublishing} onClick={onPublish} className="shrink-0">
+            {!isPublishing && (
+              <BookOpenCheck className="size-3.5" aria-hidden="true" />
             )}
             {isPublishing ? copy.publishing : copy.publish}
-          </button>
+          </Button>
         )}
       </header>
 
@@ -133,7 +123,7 @@ export function ApplicationReleaseAuthorityRail({
           />
         </ol>
 
-        <div className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 text-[11px] text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between dark:border-slate-800">
+        <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           {hasAttributablePublication ? (
             <div className="flex flex-wrap gap-x-5 gap-y-1">
               <span>
@@ -149,16 +139,14 @@ export function ApplicationReleaseAuthorityRail({
               </span>
             </div>
           ) : (
-            <p className="text-amber-700 dark:text-amber-300">{copy.unpublishedHint}</p>
+            <p className="text-warning-subtle-foreground">{copy.unpublishedHint}</p>
           )}
           {canOfferPublish && !canPublish && (
-            <p className="font-mono text-amber-700 dark:text-amber-300">
-              {copy.permissionRequired}
-            </p>
+            <p className="font-mono text-warning-subtle-foreground">{copy.permissionRequired}</p>
           )}
         </div>
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -176,23 +164,29 @@ function AuthorityStage({
   state: "ready" | "blocked" | "neutral";
 }) {
   const tone = {
-    ready: "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20",
-    blocked: "border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20",
-    neutral: "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950",
+    ready: "border-success/30 bg-success-subtle",
+    blocked: "border-warning/30 bg-warning-subtle",
+    neutral: "border-border bg-muted",
   }[state];
   const StateIcon = state === "ready" ? CheckCircle2 : state === "blocked" ? ShieldAlert : CircleDashed;
+  const stateIconTone =
+    state === "ready"
+      ? "text-success"
+      : state === "blocked"
+        ? "text-warning"
+        : "text-muted-foreground";
 
   return (
-    <li className={`rounded-xl border p-3 ${tone}`}>
+    <li className={`rounded-md border p-3 ${tone}`}>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          <Icon className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <Icon className="size-3.5" aria-hidden="true" />
           {label}
         </div>
-        <StateIcon className={`h-3.5 w-3.5 ${state === "ready" ? "text-emerald-600" : state === "blocked" ? "text-amber-600" : "text-slate-400"}`} />
+        <StateIcon className={`size-3.5 ${stateIconTone}`} aria-hidden="true" />
       </div>
-      <p className="mt-2 break-words font-mono text-xs font-black" dir="auto">{value}</p>
-      <p className="mt-1 break-words text-[10px] leading-relaxed text-slate-500">{detail}</p>
+      <p className="mt-2 break-words font-mono text-xs font-semibold text-foreground" dir="auto">{value}</p>
+      <p className="mt-1 break-words text-xs leading-relaxed text-muted-foreground">{detail}</p>
     </li>
   );
 }

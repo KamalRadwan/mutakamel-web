@@ -43,6 +43,7 @@ function invoice(status: Invoice["status"] = "DRAFT"): Invoice {
     id: INVOICE_ID,
     subscriptionId: "019f0000-0000-7000-8000-000000000002",
     tenantId: "019f0000-0000-7000-8000-000000000003",
+    tenant: null,
     number: "INV-2026-0001",
     status,
     purpose: "MANUAL",

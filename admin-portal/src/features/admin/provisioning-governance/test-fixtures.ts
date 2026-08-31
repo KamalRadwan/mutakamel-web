@@ -8,14 +8,14 @@ import type {
 
 export const CORRELATION_ID = "019f0000-0000-7000-8000-000000000001";
 export const COMPONENT_ID = "019f0000-0000-7000-8000-000000000002";
-export const RELEASE_ID = "019f0000-0000-7000-8000-000000000003";
+const RELEASE_ID = "019f0000-0000-7000-8000-000000000003";
 export const RUN_ID = "019f0000-0000-7000-8000-000000000004";
-export const SCAN_ID = "019f0000-0000-7000-8000-000000000005";
-export const TENANT_ID = "019f0000-0000-7000-8000-000000000006";
+const SCAN_ID = "019f0000-0000-7000-8000-000000000005";
+const TENANT_ID = "019f0000-0000-7000-8000-000000000006";
 export const OPERATOR_ID = "019f0000-0000-7000-8000-000000000007";
-export const TIMESTAMP = "2026-08-12T09:00:00.000Z";
+const TIMESTAMP = "2026-08-12T09:00:00.000Z";
 
-export const RELEASE: ProvisioningRelease = {
+const RELEASE: ProvisioningRelease = {
   id: RELEASE_ID,
   componentId: COMPONENT_ID,
   releaseVersion: "1.2.3",
@@ -38,7 +38,7 @@ export const RELEASE: ProvisioningRelease = {
   seedPacks: [],
 };
 
-export const COMPONENT: ProvisioningComponent = {
+const COMPONENT: ProvisioningComponent = {
   id: COMPONENT_ID,
   key: "core.identity",
   ownerApp: "core-app",
@@ -69,7 +69,7 @@ export const RUN: DiscoveryRun = {
   createdAt: "2026-08-12T08:00:00.000Z",
 };
 
-export const RUN_DETAIL: DiscoveryRunDetail = {
+const RUN_DETAIL: DiscoveryRunDetail = {
   ...RUN,
   results: [
     {

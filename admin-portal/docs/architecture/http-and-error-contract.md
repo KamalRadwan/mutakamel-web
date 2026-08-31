@@ -90,13 +90,20 @@ Normalize `errorCode` from Core and `code` from Gateway. Preserve
 `correlationId`. Never collapse `403`, `404`, `409`, `422`, unavailable, and
 transport failures into one empty state.
 
+The mapping from normalized errors to inline, summary, toast, banner,
+permission, degraded, and ambiguous-outcome surfaces is defined in
+[Operational UX](../design-system/operational-ux.md#feedback-hierarchy).
+
 ## Current frontend gap
 
 `src/lib/api/axiosClient.ts` partially normalizes the two error shapes, but it
 still exposes broad `any` types and does not yet return the exact
-`NormalizedApiError` contract. Its generic mutation interceptor also generates
-keys too late to own exact user intent; callers must be refactored as described
-in [permissions-idempotency-and-state.md](permissions-idempotency-and-state.md).
+`NormalizedApiError` contract.
+
+The older implicit-idempotency-callsite gap is closed: the later verified
+[permissions/idempotency contract](permissions-idempotency-and-state.md#stable-uuidv7-intent)
+records 151 Axios writes and zero bare/implicit-policy calls. The transport
+fallback remains a safety net, not intent ownership.
 
 ## Source map
 

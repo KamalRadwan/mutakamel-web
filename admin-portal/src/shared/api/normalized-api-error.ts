@@ -1,4 +1,4 @@
-export type ErrorCategory =
+type ErrorCategory =
   | "VALIDATION"
   | "AUTH"
   | "AUTHORIZATION"
@@ -6,29 +6,6 @@ export type ErrorCategory =
   | "CONFLICT"
   | "RATE_LIMIT"
   | "SERVER_ERROR";
-
-export interface CoreErrorResponse {
-  success: false;
-  statusCode: number;
-  errorCode: string;
-  errorCategory: ErrorCategory;
-  message: string;
-  details?: Record<string, string[]>;
-  correlationId: string;
-  timestamp: string;
-  path: string;
-}
-
-export interface GatewayProblemDetails {
-  type: string;
-  title: string;
-  status: number;
-  code: string;
-  detail?: string;
-  instance?: string;
-  correlationId: string;
-  errors?: Record<string, string[]>;
-}
 
 export interface NormalizedApiError {
   isNormalized: true;

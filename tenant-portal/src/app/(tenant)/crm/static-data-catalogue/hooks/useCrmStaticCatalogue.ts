@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useI18n, type Language } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 
 export const CRM_STATIC_DATA_PATH = "/api/tenant/crm/v1/static-data";
 
@@ -27,7 +28,7 @@ export interface CrmStaticData {
   };
 }
 
-export type StaticCatalogueGroupKind =
+type StaticCatalogueGroupKind =
   | "enum"
   | "permission"
   | "owner"
@@ -128,9 +129,35 @@ function labels(items: StaticDataOption[], lang: Language): string[] {
   return items.map((item) => `${item.label[lang]} (${item.value})`);
 }
 
+/**
+ * Permission labels, marked where the server has no Arabic for them.
+ *
+ * `permissionLabel` in crm-app returns the **identical** string for `en` and
+ * `ar` whenever a permission has no dictionary entry, which is true of 78 of
+ * the 98 CRM permissions — every scoped one. Rendering that unmarked would
+ * present English as a translation. This does not translate anything; it
+ * declines to assert a translation that does not exist. Q121.
+ *
+ * Scoped to permissions deliberately. Equality is only *evidence* of the
+ * fallback here — elsewhere in this catalogue two identical strings are
+ * legitimate, as `attachment_family.pdf` ("PDF" in both) shows.
+ */
+function permissionLabels(
+  items: StaticDataOption[],
+  lang: Language,
+  untranslatedNote: string,
+): string[] {
+  return items.map((item) =>
+    item.label.ar === item.label.en
+      ? `${item.label[lang]} — ${untranslatedNote} (${item.value})`
+      : `${item.label[lang]} (${item.value})`,
+  );
+}
+
 export function buildStaticCatalogueGroups(
   data: CrmStaticData,
   lang: Language,
+  untranslatedNote: string,
 ): StaticCatalogueGroup[] {
   const group = (
     id: string,
@@ -156,7 +183,11 @@ export function buildStaticCatalogueGroups(
 
   return [
     ...enumGroups,
-    group("permissions", "permission", labels(data.permissionOptions, lang)),
+    group(
+      "permissions",
+      "permission",
+      permissionLabels(data.permissionOptions, lang, untranslatedNote),
+    ),
     group("ownerTypeOptions", "owner", labels(data.ownerTypeOptions, lang)),
     group("eventOptions", "event", labels(data.eventOptions, lang)),
     group("attachmentPolicy", "attachment", attachmentFamilies),
@@ -187,7 +218,7 @@ export function useCrmStaticCatalogue() {
   const [catalogue, setCatalogue] = useState<CrmStaticData | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<NormalizedApiError | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
@@ -201,12 +232,10 @@ export function useCrmStaticCatalogue() {
       setCatalogue(parseCrmStaticDataResponse(response.data));
     } catch (caught) {
       if (isAbortError(caught)) return;
-      setCatalogue(null);
-      setError(
-        caught instanceof Error && caught.message
-          ? caught.message
-          : "Unable to load CRM static data.",
-      );
+      // A failed REFRESH keeps the last catalogue that loaded. That is what
+      // makes staleness a real, reachable state on this screen — and what
+      // gives the degraded surface something true to say.
+      setError(normalizeApiError(caught));
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
@@ -223,7 +252,7 @@ export function useCrmStaticCatalogue() {
   const groups = useMemo(() => {
     if (!catalogue) return [];
     const query = searchQuery.trim().toLocaleLowerCase();
-    return buildStaticCatalogueGroups(catalogue, lang).filter(
+    return buildStaticCatalogueGroups(catalogue, lang, t.crmStaticCatalogue.untranslatedLabel).filter(
       (item) =>
         !query ||
         item.key.toLocaleLowerCase().includes(query) ||
@@ -241,7 +270,11 @@ export function useCrmStaticCatalogue() {
     searchQuery,
     setSearchQuery,
     isLoading,
-    error,
+    // Nothing loaded at all — the table renders the error state.
+    loadError: catalogue === null ? error : null,
+    // Something loaded, and the newest attempt to refresh it did not. That
+    // is partial/stale data, which is exactly what DegradedBanner is for.
+    isStale: catalogue !== null && error !== null,
     reload: () => load(),
   };
 }

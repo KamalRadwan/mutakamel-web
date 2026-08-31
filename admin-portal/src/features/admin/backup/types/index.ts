@@ -22,12 +22,12 @@ export const BackupArtifactStatus = {
 export type BackupArtifactStatus =
   (typeof BackupArtifactStatus)[keyof typeof BackupArtifactStatus];
 
-export const BackupTrigger = {
+const BackupTrigger = {
   SCHEDULE: "schedule",
   MANUAL: "manual",
 } as const;
 
-export type BackupTrigger =
+type BackupTrigger =
   (typeof BackupTrigger)[keyof typeof BackupTrigger];
 
 export const BackupCompressionAlgorithm = {
@@ -49,13 +49,6 @@ export const RestoreRunStatus = {
 
 export type RestoreRunStatus =
   (typeof RestoreRunStatus)[keyof typeof RestoreRunStatus];
-
-export const RestoreTrigger = {
-  MANUAL: "manual",
-} as const;
-
-export type RestoreTrigger =
-  (typeof RestoreTrigger)[keyof typeof RestoreTrigger];
 
 export interface BackupPolicy {
   id: string;

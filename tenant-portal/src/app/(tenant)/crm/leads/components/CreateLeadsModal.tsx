@@ -1,109 +1,158 @@
 "use client";
 
 import { useState } from "react";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Button } from "@/components/ui/Button";
+import { Field, FormDrawer, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import type {
-  CreateLeadFormData,
-  LeadStage,
-} from "../hooks/useLeads";
+import { localizedName } from "@/lib/format/localized";
+import { useLeadCompanyOptions } from "../hooks/useLeadCompanyOptions";
+import type { CreateLeadFormData, LeadStage } from "../hooks/useLeads";
+import { ExistingCompanyPicker } from "./ExistingCompanyPicker";
 
 interface CreateModalProps {
   isOpen: boolean;
   onClose: () => void;
   stages: LeadStage[];
+  branchId: string | null;
   onSubmit: (data: CreateLeadFormData) => Promise<boolean>;
   error: string | null;
 }
 
-export function CreateLeadsModal({
-  isOpen,
-  onClose,
-  onSubmit,
-  stages,
-  error,
-}: CreateModalProps) {
+const initialForm: CreateLeadFormData = {
+  contactName: "",
+  companyName: "",
+  email: "",
+  phone: "",
+  stageId: "",
+  existingCompanyPartyId: "",
+  contactPartyId: "",
+};
+
+export function CreateLeadsModal({ isOpen, onClose, onSubmit, stages, branchId, error }: CreateModalProps) {
   const { t, lang } = useI18n();
-  const [contactName, setContactName] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [stageId, setStageId] = useState("");
+  const [form, setForm] = useState<CreateLeadFormData>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
+  const companyOptions = useLeadCompanyOptions(branchId, isOpen);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!contactName.trim() || !companyName.trim() || isSubmitting) return;
+  const close = () => {
+    setForm(initialForm);
+    companyOptions.reset();
+    onClose();
+  };
 
+  const handleSubmit = async () => {
+    if (!form.contactName.trim() || !form.companyName.trim() || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const created = await onSubmit({
-        contactName,
-        companyName,
-        email,
-        phone,
-        ...(stageId ? { stageId } : {}),
-      });
-      if (created) {
-        setContactName("");
-        setCompanyName("");
-        setEmail("");
-        setPhone("");
-        setStageId("");
-      }
+      if (await onSubmit(form)) setForm(initialForm);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      closeDisabled={isSubmitting}
-      title={t.crm.addANewLead}
-      maxWidth="md"
+    <FormDrawer
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) close();
+      }}
+      title={t.crmLeads.addTitle}
+      isDirty={isDirty}
+      isSubmitting={isSubmitting}
+      onSubmit={() => void handleSubmit()}
+      error={error ?? undefined}
+      labels={{
+        submit: isSubmitting ? t.crmLeads.creating : t.common.create,
+        cancel: t.common.cancel,
+        discardTitle: t.common.discardTitle,
+        discardDescription: t.common.discardDescription,
+        discardConfirm: t.common.discardConfirm,
+        discardCancel: t.common.cancel,
+      }}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input label={t.crm.nameOfPotentialCustomer} placeholder={t.crm.exampleDr} value={contactName} onChange={(e) => setContactName(e.target.value)} maxLength={180} required />
-        <Input label={t.crm.nameOfTheCompanyEntity} placeholder={t.crm.alHayatHospital} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={180} required />
-        <div className="grid grid-cols-2 gap-3">
-          <Input label={t.crm.eMail} type="email" placeholder="lead@company.com" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={180} required />
-          <Input label={t.crm.mobileNumber} placeholder="+966 50 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={32} required />
-        </div>
-        <Select
-          label={t.crm.initialStage}
-          value={stageId}
-          onChange={(e) => setStageId(e.target.value)}
-          options={[
-            {
-              label: lang === "ar" ? "المرحلة الافتراضية" : "Default stage",
-              value: "",
-            },
-            ...stages
-              .filter((stage) => stage.flag !== "CONVERTED")
-              .map((stage) => ({
-                label: lang === "ar" ? stage.nameAr : stage.nameEn,
-                value: stage.id,
-              })),
-          ]}
+      <div className="flex flex-col gap-4">
+        <ExistingCompanyPicker
+          options={companyOptions}
+          existingCompanyPartyId={form.existingCompanyPartyId ?? ""}
+          contactPartyId={form.contactPartyId ?? ""}
+          disabled={isSubmitting}
+          onCompanyChange={(existingCompanyPartyId, displayName) =>
+            setForm((current) => ({
+              ...current,
+              existingCompanyPartyId,
+              contactPartyId: "",
+              companyName: displayName || current.companyName,
+            }))
+          }
+          onContactChange={(contactPartyId, displayName, contactEmail, contactPhone) =>
+            setForm((current) => ({
+              ...current,
+              contactPartyId,
+              contactName: displayName || current.contactName,
+              email: contactEmail || current.email,
+              phone: contactPhone || current.phone,
+            }))
+          }
         />
-        {error ? (
-          <p
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+        <Field label={t.crmLeads.contactName} required>
+          <Input
+            value={form.contactName}
+            onChange={(event) => setForm((current) => ({ ...current, contactName: event.target.value }))}
+            maxLength={180}
+            required
+            disabled={isSubmitting}
+          />
+        </Field>
+        <Field label={t.crmLeads.companyName} required>
+          <Input
+            value={form.companyName}
+            onChange={(event) => setForm((current) => ({ ...current, companyName: event.target.value }))}
+            maxLength={180}
+            required
+            disabled={isSubmitting}
+          />
+        </Field>
+        <Field label={t.crmLeads.email} required>
+          <Input
+            type="email"
+            dir="ltr"
+            value={form.email}
+            onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+            maxLength={180}
+            required
+            disabled={isSubmitting}
+          />
+        </Field>
+        <Field label={t.crmLeads.phone} required>
+          <Input
+            dir="ltr"
+            value={form.phone}
+            onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+            maxLength={32}
+            required
+            disabled={isSubmitting}
+          />
+        </Field>
+        <Field label={t.crmLeads.stage}>
+          <Select
+            value={form.stageId}
+            onValueChange={(value) => setForm((current) => ({ ...current, stageId: value }))}
           >
-            {error}
-          </p>
-        ) : null}
-        <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>{t.crm.cancellation}</Button>
-          <Button type="submit" variant="primary" disabled={isSubmitting}>{t.crm.saveThePotentialCustomer}</Button>
-        </div>
-      </form>
-    </Modal>
+            <SelectTrigger disabled={isSubmitting}>
+              <SelectValue placeholder={t.crmLeads.defaultStage} />
+            </SelectTrigger>
+            <SelectContent>
+              {stages
+                .filter((stage) => stage.flag !== "CONVERTED")
+                .map((stage) => (
+                  <SelectItem key={stage.id} value={stage.id}>
+                    {localizedName(stage, lang)}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+    </FormDrawer>
   );
 }

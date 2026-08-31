@@ -1,5 +1,8 @@
 # Partner Portal Rules
 
+- **Main branch only**: Always work directly on `main`. Never create or switch branches, check out another ref, detach HEAD, or create a worktree.
+- **Branch safety check**: Before editing a repository, verify that `git branch --show-current` returns `main`. Otherwise, stop and ask the user; do not switch branches or move existing changes yourself.
+
 - **Strict Port Assignment**: This application MUST strictly run on port `5003`. Never switch to any alternate port even for testing.
 - **Styling**: Always use Tailwind CSS first for all Partner Portal pages and components.
 - **Navigation**: Always use `Link` from `next/link` for internal routes.

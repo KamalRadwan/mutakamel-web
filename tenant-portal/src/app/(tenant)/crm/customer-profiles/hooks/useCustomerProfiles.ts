@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useRealtimeResync } from "@/design-system";
 import {
   resolveDefaultTenantBranchId,
   useTenantBranchSelection,
@@ -9,13 +10,14 @@ import {
 } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 
 export const CUSTOMER_PROFILES_PATH = "/api/tenant/crm/v1/customer-profiles";
 export const CUSTOMER_PROFILES_PAGE_SIZE = 25;
 
 export const CUSTOMER_PROFILE_TYPES = ["INDIVIDUAL", "CORPORATE"] as const;
-export const CUSTOMER_PROFILE_STATUSES = [
+const CUSTOMER_PROFILE_STATUSES = [
   "PROSPECT",
   "ACTIVE_CUSTOMER",
   "INACTIVE",
@@ -35,6 +37,15 @@ export interface CustomerProfileItem {
   companyName: string | null;
   phone: string | null;
   email: string | null;
+  // Additive for the phase-4 card/board views (docs/design/views.md's
+  // per-screen card-fields table) — ownerUserId and the joined
+  // acquisitionSource are both genuinely on the response
+  // (CustomerProfileEntity / party-read-model.ts), verified against
+  // backend source since neither has a docs/api/*.md example. No
+  // owner-name enrichment exists server-side, so this is the raw id.
+  ownerUserId: string | null;
+  acquisitionSourceNameAr: string | null;
+  acquisitionSourceNameEn: string | null;
 }
 
 export interface CustomerProfilesPage {
@@ -48,7 +59,6 @@ export interface CustomerProfilesPage {
 }
 
 const LIST_RESPONSE_LIMIT_BYTES = 1_000_000;
-const DETAIL_RESPONSE_LIMIT_BYTES = 250_000;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -145,6 +155,8 @@ export function parseCustomerProfileResponse(
   const companyPhone = nullableText(source, "companyPhone", 32);
   const primaryEmail = nullableText(source, "email", 180);
   const companyEmail = nullableText(source, "companyEmail", 180);
+  const ownerUserId = typeof source.ownerUserId === "string" && isUUIDv7(source.ownerUserId) ? source.ownerUserId : null;
+  const acquisitionSource = record(source.acquisitionSource);
 
   return {
     id: requiredUuidV7(source, "id"),
@@ -155,6 +167,9 @@ export function parseCustomerProfileResponse(
     companyName: nullableText(source, "companyName", 180),
     phone: primaryMobile ?? companyPhone,
     email: primaryEmail ?? companyEmail,
+    ownerUserId,
+    acquisitionSourceNameAr: acquisitionSource ? nullableText(acquisitionSource, "nameAr", 120) : null,
+    acquisitionSourceNameEn: acquisitionSource ? nullableText(acquisitionSource, "nameEn", 120) : null,
   };
 }
 
@@ -244,10 +259,6 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 export function useCustomerProfiles() {
   const { lang, t } = useI18n();
   const { user, isLoading: isAuthLoading } = useTenantAuth();
@@ -257,7 +268,11 @@ export function useCustomerProfiles() {
   const [page, setPage] = useState(1);
   const [reloadToken, setReloadToken] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // A precondition that stops the request being made at all — no session, or
+  // no single trusted branch. It is not a failure, so it renders as an empty
+  // state rather than a red banner over one.
+  const [precondition, setPrecondition] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
 
   const { branchIds, branchId, selectBranch } =
     useTenantBranchSelection(user);
@@ -274,24 +289,17 @@ export function useCustomerProfiles() {
   const load = useCallback(
     async (signal: AbortSignal) => {
       setIsLoading(true);
-      setError(null);
+      setPrecondition(null);
+      setLoadError(null);
       setResult(null);
 
       if (!userId) {
-        setError(
-          lang === "ar"
-            ? "تعذر تحديد جلسة مستخدم موثقة لتحميل ملفات العملاء."
-            : "An authenticated user session is required to load customer profiles.",
-        );
+        setPrecondition(t.crmCustomerProfiles.sessionRequired);
         setIsLoading(false);
         return;
       }
       if (!branchId) {
-        setError(
-          lang === "ar"
-            ? "تعذر تحديد فرع واحد موثوق. عيّن فرعًا أساسيًا أو اختر حسابًا له فرع واحد متاح."
-            : "No single trusted branch is available. Set a primary branch or use an account with one accessible branch.",
-        );
+        setPrecondition(t.crmCustomerProfiles.singleBranchRequired);
         setIsLoading(false);
         return;
       }
@@ -316,14 +324,12 @@ export function useCustomerProfiles() {
       } catch (caught) {
         if (isAbortError(caught)) return;
         setResult(null);
-        setError(
-          errorMessage(caught, "Unable to load CRM customer profiles."),
-        );
+        setLoadError(normalizeApiError(caught));
       } finally {
         if (!signal.aborted) setIsLoading(false);
       }
     },
-    [branchId, lang, page, serverSearch, userId],
+    [branchId, page, serverSearch, t, userId],
   );
 
   useEffect(() => {
@@ -343,6 +349,11 @@ export function useCustomerProfiles() {
     if (result?.hasNext) setPage((current) => current + 1);
   }, [result?.hasNext]);
 
+  // MASTER-PLAN 13.6: one line, and this list reconciles with the server on
+  // an ALL-scoped resync, a realtime reconnect, and a return from offline.
+  const reload = useCallback(() => setReloadToken((current) => current + 1), []);
+  useRealtimeResync(reload);
+
   return {
     t,
     lang,
@@ -355,77 +366,17 @@ export function useCustomerProfiles() {
       setSearchQuery("");
       setServerSearch("");
       setPage(1);
-      setError(null);
+      setPrecondition(null);
+      setLoadError(null);
     },
     pagination: result,
     searchQuery,
     setSearchQuery,
     isLoading: isAuthLoading || isLoading,
-    error,
+    precondition,
+    loadError,
     previousPage,
     nextPage,
-    reload: () => setReloadToken((current) => current + 1),
-  };
-}
-
-export function useCustomerProfile(id: string) {
-  const { user, isLoading: isAuthLoading } = useTenantAuth();
-  const [item, setItem] = useState<CustomerProfileItem | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
-  const userId = user?.id ?? null;
-
-  const load = useCallback(
-    async (signal: AbortSignal) => {
-      setIsLoading(true);
-      setError(null);
-      setItem(null);
-
-      if (!userId) {
-        setError("An authenticated user session is required to load this customer profile.");
-        setIsLoading(false);
-        return;
-      }
-      if (!isUUIDv7(id)) {
-        setError("The customer profile link is invalid.");
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const response = await axiosClient.get<unknown>(customerProfilePath(id), {
-          signal,
-          cache: "no-store",
-          maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
-        });
-        setItem(parseCustomerProfileResponse(response.data));
-      } catch (caught) {
-        if (isAbortError(caught)) return;
-        setItem(null);
-        setError(
-          errorMessage(caught, "Unable to load the CRM customer profile."),
-        );
-      } finally {
-        if (!signal.aborted) setIsLoading(false);
-      }
-    },
-    [id, userId],
-  );
-
-  useEffect(() => {
-    if (isAuthLoading) return;
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
-    });
-    return () => controller.abort();
-  }, [isAuthLoading, load, reloadToken]);
-
-  return {
-    item,
-    isLoading: isAuthLoading || isLoading,
-    error,
-    reload: () => setReloadToken((current) => current + 1),
+    reload,
   };
 }

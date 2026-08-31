@@ -5,8 +5,7 @@ import type { ReactNode } from "react";
 import {
   AlertTriangle,
   CalendarClock,
-  ChevronLeft,
-  ChevronRight,
+  ChevronDown,
   Filter,
   Layers3,
   Loader2,
@@ -24,6 +23,28 @@ import {
   type SubscriptionStatus,
   type SubscriptionsViewModel,
 } from "./types";
+import {
+  PageHeader,
+  StatGrid,
+  StatCard,
+  StatusBadge,
+  DataTable,
+  Card,
+  CardContent,
+  Field,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  Button,
+  Badge,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  type ColumnDef,
+} from "@/design-system";
 
 export function SubscriptionsScreen() {
   const { lang } = useI18n();
@@ -39,63 +60,27 @@ export function SubscriptionsScreen() {
 
   return (
     <div className="space-y-4">
-      <header className="relative overflow-hidden rounded-2xl border border-violet-500/20 bg-gradient-to-r from-slate-950 via-violet-950 to-slate-950 px-4 py-4 text-white shadow-md sm:px-5">
-        <div className="pointer-events-none absolute end-0 top-0 -me-12 -mt-16 size-72 rounded-full bg-violet-500/20 blur-3xl" />
-        <div className="relative flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet-600 shadow-sm">
-              <Layers3 className="size-5" aria-hidden="true" />
-            </span>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-black tracking-tight">
-                  {copy.title}
-                </h1>
-                <span className="rounded-md border border-violet-400/30 bg-violet-400/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-violet-200">
-                  {copy.readOnly}
-                </span>
-              </div>
-              <p className="mt-1 max-w-3xl text-xs leading-5 text-violet-100/80">
-                {copy.subtitle}
-              </p>
-            </div>
-          </div>
-          {view.isRefreshing ? (
-            <span
-              className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold"
-              aria-live="polite"
-            >
-              <Loader2 className="size-3.5 animate-spin" />
+      <PageHeader
+        title={copy.title}
+        action={
+          view.isRefreshing ? (
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground" aria-live="polite">
+              <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
               {copy.loading}
             </span>
-          ) : null}
-        </div>
-      </header>
+          ) : undefined
+        }
+      />
 
       {view.data ? (
-        <section aria-label={copy.total} className="grid gap-3 sm:grid-cols-3">
-          <SummaryCard
-            label={copy.total}
-            value={view.data.total}
-            icon={<Layers3 className="size-4" />}
-            tone="violet"
-          />
-          <SummaryCard
-            label={copy.activeOnPage}
-            value={activeOnPage}
-            icon={<UsersRound className="size-4" />}
-            tone="emerald"
-          />
-          <SummaryCard
-            label={copy.scheduledOnPage}
-            value={scheduledOnPage}
-            icon={<CalendarClock className="size-4" />}
-            tone="amber"
-          />
-        </section>
+        <StatGrid className="sm:grid-cols-3">
+          <StatCard label={copy.total} value={formatInteger(view.data.total, lang)} icon={Layers3} />
+          <StatCard label={copy.activeOnPage} value={formatInteger(activeOnPage, lang)} icon={UsersRound} />
+          <StatCard label={copy.scheduledOnPage} value={formatInteger(scheduledOnPage, lang)} icon={CalendarClock} />
+        </StatGrid>
       ) : null}
 
-      {showControls ? <SubscriptionFilters copy={copy} view={view} /> : null}
+      {showControls ? <SubscriptionFilters copy={copy} view={view} lang={lang} /> : null}
       <SubscriptionResults copy={copy} view={view} lang={lang} />
     </div>
   );
@@ -104,128 +89,125 @@ export function SubscriptionsScreen() {
 function SubscriptionFilters({
   copy,
   view,
+  lang,
 }: {
   copy: SubscriptionsCopy;
   view: SubscriptionsViewModel;
+  lang: "ar" | "en";
 }) {
   return (
-    <form
-      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
-      onSubmit={(event) => {
-        event.preventDefault();
-        view.applyFilters();
-      }}
-    >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-sm font-black">
-          <Filter className="size-4 text-violet-600 dark:text-violet-400" />
-          {copy.filters}
-        </h2>
-        {view.activeFilterCount ? (
-          <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
-            {view.activeFilterCount} {copy.activeFilters}
-          </span>
-        ) : null}
-      </div>
-      <div className="grid gap-3 lg:grid-cols-[180px_minmax(260px,1fr)_220px_130px]">
-        <SelectField
-          label={copy.status}
-          value={view.draft.status}
-          onChange={(value) =>
-            view.setDraftField("status", value as "" | SubscriptionStatus)
-          }
-          options={[
-            { value: "", label: copy.allStatuses },
-            ...SUBSCRIPTION_STATUSES.map((status) => ({
-              value: status,
-              label: statusLabel(status, copy),
-            })),
-          ]}
-        />
-        <label className={labelClass}>
-          <span>{copy.tenantId}</span>
-          <input
-            dir="ltr"
-            value={view.draft.tenantId}
-            onChange={(event) =>
-              view.setDraftField("tenantId", event.target.value)
-            }
-            placeholder={copy.tenantPlaceholder}
-            aria-invalid={Boolean(view.tenantIdError)}
-            aria-describedby={
-              view.tenantIdError ? "subscription-tenant-id-error" : undefined
-            }
-            className={`${inputClass} font-mono ${view.tenantIdError ? "border-rose-500" : ""}`}
-          />
-          {view.tenantIdError ? (
-            <span
-              id="subscription-tenant-id-error"
-              role="alert"
-              className="text-[11px] font-medium text-rose-600 dark:text-rose-300"
-            >
-              {copy.invalidTenantId}
-            </span>
-          ) : null}
-        </label>
-        <SelectField
-          label={copy.sort}
-          value={`${view.draft.sortBy}:${view.draft.sortDir}`}
-          onChange={(value) => {
-            const [sortBy, sortDir] = value.split(":") as [
-              typeof view.draft.sortBy,
-              typeof view.draft.sortDir,
-            ];
-            view.setDraftField("sortBy", sortBy);
-            view.setDraftField("sortDir", sortDir);
+    <Card>
+      <CardContent>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            view.applyFilters();
           }}
-          options={[
-            { value: "createdAt:DESC", label: copy.newest },
-            { value: "createdAt:ASC", label: copy.oldest },
-            { value: "currentPeriodEnd:ASC", label: copy.periodSoonest },
-            { value: "currentPeriodEnd:DESC", label: copy.periodLatest },
-            { value: "status:ASC", label: copy.statusAscending },
-            { value: "status:DESC", label: copy.statusDescending },
-          ]}
-        />
-        <SelectField
-          label={copy.pageSize}
-          value={String(view.limit)}
-          onChange={(value) => view.setLimit(Number(value))}
-          options={[20, 50, 100].map((value) => ({
-            value: String(value),
-            label: String(value),
-          }))}
-        />
-      </div>
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <button
-          type="button"
-          onClick={view.clearFilters}
-          className={secondaryButtonClass}
+          className="space-y-4"
         >
-          <RotateCcw className="size-3.5" />
-          {copy.clear}
-        </button>
-        <button
-          type="button"
-          onClick={view.refresh}
-          disabled={view.isRefreshing}
-          className={secondaryButtonClass}
-        >
-          <RefreshCw
-            className={`size-3.5 ${view.isRefreshing ? "animate-spin" : ""}`}
-          />
-          {copy.refresh}
-        </button>
-        <button
-          type="submit"
-          className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-black text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-        >
-          <Filter className="size-3.5" />
-          {copy.apply}
-        </button>
-      </div>
-    </form>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <Filter className="size-4 text-primary" aria-hidden="true" />
+              {copy.filters}
+            </h2>
+            {view.activeFilterCount ? (
+              <Badge tone="info">
+                {formatInteger(view.activeFilterCount, lang)} {copy.activeFilters}
+              </Badge>
+            ) : null}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[180px_minmax(260px,1fr)_220px_130px]">
+            <Field label={copy.status}>
+              {(fp) => (
+                <Select value={view.draft.status || "ALL"} onValueChange={(value) => view.setDraftField("status", (value === "ALL" ? "" : value) as "" | SubscriptionStatus)}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">{copy.allStatuses}</SelectItem>
+                    {SUBSCRIPTION_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {statusLabel(status, copy)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+            <Field label={copy.tenantId} error={view.tenantIdError ? copy.invalidTenantId : undefined}>
+              {(fp) => (
+                <Input
+                  {...fp}
+                  dir="ltr"
+                  value={view.draft.tenantId}
+                  onChange={(event) => view.setDraftField("tenantId", event.target.value)}
+                  placeholder={copy.tenantPlaceholder}
+                  invalid={Boolean(view.tenantIdError)}
+                  className="font-mono"
+                />
+              )}
+            </Field>
+            <Field label={copy.sort}>
+              {(fp) => (
+                <Select
+                  value={`${view.draft.sortBy}:${view.draft.sortDir}`}
+                  onValueChange={(value) => {
+                    const [sortBy, sortDir] = value.split(":") as [
+                      typeof view.draft.sortBy,
+                      typeof view.draft.sortDir,
+                    ];
+                    view.setDraftField("sortBy", sortBy);
+                    view.setDraftField("sortDir", sortDir);
+                  }}
+                >
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="createdAt:DESC">{copy.newest}</SelectItem>
+                    <SelectItem value="createdAt:ASC">{copy.oldest}</SelectItem>
+                    <SelectItem value="currentPeriodEnd:ASC">{copy.periodSoonest}</SelectItem>
+                    <SelectItem value="currentPeriodEnd:DESC">{copy.periodLatest}</SelectItem>
+                    <SelectItem value="status:ASC">{copy.statusAscending}</SelectItem>
+                    <SelectItem value="status:DESC">{copy.statusDescending}</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+            <Field label={copy.pageSize}>
+              {(fp) => (
+                <Select value={String(view.limit)} onValueChange={(value) => view.setLimit(Number(value))}>
+                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[20, 50, 100].map((value) => (
+                      <SelectItem key={value} value={String(value)}>
+                        {formatInteger(value, lang)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" onClick={view.clearFilters}>
+              <RotateCcw className="size-3.5" />
+              {copy.clear}
+            </Button>
+            <Button type="button" variant="outline" onClick={view.refresh} disabled={view.isRefreshing}>
+              <RefreshCw className={`size-3.5 ${view.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+              {copy.refresh}
+            </Button>
+            <Button type="submit" variant="primary">
+              <Filter className="size-3.5" />
+              {copy.apply}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -239,12 +221,7 @@ function SubscriptionResults({
   lang: "ar" | "en";
 }) {
   if (view.requestState === "LOADING") {
-    return (
-      <StatePanel
-        icon={<Loader2 className="size-7 animate-spin" />}
-        title={copy.loading}
-      />
-    );
+    return <StatePanel icon={<Loader2 className="size-7 animate-spin motion-reduce:animate-none" />} title={copy.loading} />;
   }
   if (view.requestState === "FORBIDDEN") {
     return (
@@ -262,222 +239,169 @@ function SubscriptionResults({
   if (view.requestState === "ERROR") {
     return <FailurePanel title={copy.error} copy={copy} view={view} />;
   }
-  if (view.requestState === "EMPTY" || !view.data?.items.length) {
-    return (
-      <StatePanel icon={<Layers3 className="size-7" />} title={copy.empty} />
-    );
+  if (!view.data) {
+    return <StatePanel icon={<Layers3 className="size-7" />} title={copy.empty} />;
   }
 
-  return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1120px] text-sm">
-          <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-            <tr>
-              {[
-                copy.tenant,
-                copy.lifecycle,
-                copy.plan,
-                copy.seats,
-                copy.price,
-                copy.period,
-                copy.updated,
-              ].map((label) => (
-                <th key={label} scope="col" className="px-4 py-3 text-start">
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {view.data.items.map((item) => (
-              <SubscriptionRow
-                key={item.subscription.id}
-                item={item}
-                copy={copy}
-                lang={lang}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs dark:border-slate-800">
-        <div className="space-y-1 text-slate-500 dark:text-slate-400">
-          <p>
-            {copy.page} {view.data.page} {copy.of}{" "}
-            {Math.max(1, view.data.totalPages)} · {view.data.total}{" "}
-            {copy.results}
-          </p>
-          <p className="break-all font-mono text-[10px]">
-            {copy.correlation}: {view.data.correlationId} · {copy.responseAt}:{" "}
-            {formatDate(view.data.timestamp, lang, true)}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => view.setPage(view.page - 1)}
-            disabled={!view.data.hasPrev || view.isRefreshing}
-            className={pageButtonClass}
-          >
-            <ChevronLeft className="size-4 rtl:rotate-180" />
-            {copy.previous}
-          </button>
-          <button
-            type="button"
-            onClick={() => view.setPage(view.page + 1)}
-            disabled={!view.data.hasNext || view.isRefreshing}
-            className={pageButtonClass}
-          >
-            {copy.next}
-            <ChevronRight className="size-4 rtl:rotate-180" />
-          </button>
-        </div>
-      </footer>
-    </section>
-  );
-}
-
-function SubscriptionRow({
-  item,
-  copy,
-  lang,
-}: {
-  item: SubscriptionListItem;
-  copy: SubscriptionsCopy;
-  lang: "ar" | "en";
-}) {
-  const subscription = item.subscription;
-  return (
-    <tr className="align-top hover:bg-slate-50/60 dark:hover:bg-slate-900/50">
-      <td className="px-4 py-4">
-        {item.tenant ? (
-          <>
-            <Link
-              href={`/tenants/${item.tenant.id}`}
-              className="font-black text-violet-700 hover:underline dark:text-violet-300"
-            >
-              {item.tenant.companyName}
-            </Link>
-            <p className="mt-1 text-xs text-slate-500">{item.tenant.name}</p>
-            <p className="mt-1 text-[10px] text-slate-400">
-              {copy.tenantStatus}: {item.tenant.status}
-            </p>
-          </>
-        ) : (
-          <p className="font-bold text-amber-700 dark:text-amber-300">
-            {copy.tenantUnavailable}
-          </p>
-        )}
-        <p
-          className="mt-2 max-w-52 break-all font-mono text-[10px] text-slate-400"
-          title={subscription.id}
-        >
-          {copy.subscriptionId}: {subscription.id}
-        </p>
-      </td>
-      <td className="px-4 py-4">
-        <StatusPill status={subscription.status} copy={copy} />
-        <p className="mt-2 text-xs text-slate-500">
-          {subscription.billingCycle ?? copy.notConfigured}
-        </p>
-        {subscription.cancelAt ? (
-          <p className="mt-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
-            {copy.cancels}: {formatDate(subscription.cancelAt, lang)}
-          </p>
-        ) : null}
-      </td>
-      <td className="max-w-sm px-4 py-4">
-        <div className="flex flex-wrap gap-1">
-          {item.enabledModules.length ? (
-            item.enabledModules.map((module) => (
-              <span
-                key={module}
-                className="rounded-md bg-violet-50 px-2 py-1 font-mono text-[10px] font-bold text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
-              >
-                {module.replace(/^module\./u, "")}
-              </span>
-            ))
+  const columns: ColumnDef<SubscriptionListItem>[] = [
+    {
+      key: "tenant",
+      headerEn: copy.tenant,
+      headerAr: copy.tenant,
+      cell: (item) => (
+        <div className="max-w-52">
+          {item.tenant ? (
+            <>
+              <Link href={`/tenants/${item.tenant.id}`} className="font-semibold text-action hover:underline">
+                {item.tenant.companyName}
+              </Link>
+              <p className="mt-1 text-sm text-muted-foreground">{item.tenant.name}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{copy.tenantStatus}: {item.tenant.status}</p>
+            </>
           ) : (
-            <span className="text-xs text-slate-400">{copy.noItems}</span>
+            <p className="font-semibold text-warning-subtle-foreground">{copy.tenantUnavailable}</p>
           )}
+          <p className="mt-2 break-all text-sm text-muted-foreground" title={item.subscription.id}>
+            {copy.subscriptionId}:{" "}
+            <code dir="ltr" className="font-mono">{item.subscription.id}</code>
+          </p>
         </div>
-        <details className="mt-2">
-          <summary className="cursor-pointer text-[11px] font-bold text-violet-700 marker:text-violet-500 dark:text-violet-300">
-            {copy.inspectItems} ({item.items.length})
-          </summary>
-          <div className="mt-2 space-y-2">
-            {item.items.length ? (
-              item.items.map((planItem) => (
-                <div
-                  key={planItem.id}
-                  className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-[10px] dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <p className="font-bold">
-                    {copy.module}:{" "}
-                    {planItem.moduleName ??
-                      planItem.moduleKey ??
-                      copy.enrichmentUnavailable}
-                  </p>
-                  <p className="mt-1">
-                    {copy.tier}:{" "}
-                    {planItem.tierName ??
-                      planItem.tierKey ??
-                      copy.enrichmentUnavailable}
-                  </p>
-                  <p className="mt-1 font-mono">
-                    {planItem.seats} {copy.seats} · {planItem.lineTotal}{" "}
-                    {planItem.currencyCode ?? subscription.currencyCode ?? ""}
-                  </p>
-                  <p className="mt-1 text-slate-500">
-                    {planItem.features === null
-                      ? copy.enrichmentUnavailable
-                      : `${planItem.features.length} ${copy.features}`}
-                  </p>
-                </div>
+      ),
+    },
+    {
+      key: "lifecycle",
+      headerEn: copy.lifecycle,
+      headerAr: copy.lifecycle,
+      cell: (item) => (
+        <div>
+          <StatusBadge status={item.subscription.status} enumType="subscription" customLabelEn={statusLabel(item.subscription.status, SUBSCRIPTIONS_COPY.en)} customLabelAr={statusLabel(item.subscription.status, SUBSCRIPTIONS_COPY.ar)} />
+          <p className="mt-2 text-sm text-muted-foreground">{item.subscription.billingCycle ?? copy.notConfigured}</p>
+          {item.subscription.cancelAt ? (
+            <p className="mt-1 text-sm font-semibold text-warning-subtle-foreground">
+              {copy.cancels}: {formatDate(item.subscription.cancelAt, lang)}
+            </p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "plan",
+      headerEn: copy.plan,
+      headerAr: copy.plan,
+      cell: (item) => (
+        <div className="max-w-sm">
+          <div className="flex flex-wrap gap-1">
+            {item.enabledModules.length ? (
+              item.enabledModules.map((module) => (
+                <Badge key={module} tone="info" className="font-mono">
+                  {module.replace(/^module\./u, "")}
+                </Badge>
               ))
             ) : (
-              <p className="text-[11px] text-slate-500">{copy.noItems}</p>
+              <span className="text-sm text-muted-foreground">{copy.noItems}</span>
             )}
           </div>
-        </details>
-      </td>
-      <td className="px-4 py-4">
-        <p className="font-mono text-base font-black">
-          {item.effectiveAllowedUsers}
-        </p>
-        <p className="mt-1 text-[10px] text-slate-500">
-          {copy.baseSeats}: {subscription.allowedUsers}
-        </p>
-      </td>
-      <td className="px-4 py-4 font-mono font-black">
-        {subscription.totalPrice ?? copy.notConfigured}
-        {subscription.totalPrice && subscription.currencyCode
-          ? ` ${subscription.currencyCode}`
-          : ""}
-      </td>
-      <td className="px-4 py-4 text-xs">
-        <p>
-          <span className="font-bold">{copy.ends}:</span>{" "}
-          {formatDate(subscription.currentPeriodEnd, lang)}
-        </p>
-        <p className="mt-1 text-slate-500">
-          <span className="font-bold">{copy.started}:</span>{" "}
-          {formatDate(
-            subscription.currentPeriodStart ?? subscription.startedAt,
-            lang,
-          )}
-        </p>
-        {!subscription.cancelAt ? (
-          <p className="mt-1 text-[10px] text-slate-400">
-            {copy.noCancellation}
-          </p>
-        ) : null}
-      </td>
-      <td className="px-4 py-4 text-xs text-slate-500">
-        {formatDate(subscription.updatedAt, lang, true)}
-      </td>
-    </tr>
+          <Collapsible className="mt-2">
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="group px-2 text-action"
+                aria-label={`${copy.inspectItems}: ${item.tenant?.companyName ?? item.subscription.id} (${formatInteger(item.items.length, lang)})`}
+              >
+                <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+                {copy.inspectItems} ({formatInteger(item.items.length, lang)})
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 space-y-2 motion-reduce:transition-none">
+              {item.items.length ? (
+                item.items.map((planItem) => (
+                  <div key={planItem.id} className="rounded-md border border-border bg-muted p-2 text-sm">
+                    <p className="font-semibold">{copy.module}: {planItem.moduleName ?? planItem.moduleKey ?? copy.enrichmentUnavailable}</p>
+                    <p className="mt-1">{copy.tier}: {planItem.tierName ?? planItem.tierKey ?? copy.enrichmentUnavailable}</p>
+                    <p className="mt-1">
+                      <span className="font-mono">{formatInteger(planItem.seats, lang)}</span> {copy.seats}{" · "}
+                      <bdi dir="ltr" className="font-mono">{planItem.lineTotal} {planItem.currencyCode ?? item.subscription.currencyCode ?? ""}</bdi>
+                    </p>
+                    <p className="mt-1 text-muted-foreground">{planItem.features === null ? copy.enrichmentUnavailable : `${formatInteger(planItem.features.length, lang)} ${copy.features}`}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">{copy.noItems}</p>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      ),
+    },
+    {
+      key: "seats",
+      headerEn: copy.seats,
+      headerAr: copy.seats,
+      cell: (item) => (
+        <div>
+          <p className="font-mono text-base font-semibold">{formatInteger(item.effectiveAllowedUsers, lang)}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{copy.baseSeats}: {formatInteger(item.subscription.allowedUsers, lang)}</p>
+        </div>
+      ),
+    },
+    {
+      key: "price",
+      headerEn: copy.price,
+      headerAr: copy.price,
+      cell: (item) => (
+        <span className="font-mono font-semibold">
+          {item.subscription.totalPrice ?? copy.notConfigured}
+          {item.subscription.totalPrice && item.subscription.currencyCode ? ` ${item.subscription.currencyCode}` : ""}
+        </span>
+      ),
+    },
+    {
+      key: "period",
+      headerEn: copy.period,
+      headerAr: copy.period,
+      cell: (item) => (
+        <div className="text-sm">
+          <p><span className="font-semibold">{copy.ends}:</span> {formatDate(item.subscription.currentPeriodEnd, lang)}</p>
+          <p className="mt-1 text-muted-foreground"><span className="font-semibold">{copy.started}:</span> {formatDate(item.subscription.currentPeriodStart ?? item.subscription.startedAt, lang)}</p>
+          {!item.subscription.cancelAt ? <p className="mt-1 text-sm text-muted-foreground">{copy.noCancellation}</p> : null}
+        </div>
+      ),
+    },
+    {
+      key: "updated",
+      headerEn: copy.updated,
+      headerAr: copy.updated,
+      cell: (item) => <span className="text-sm text-muted-foreground">{formatDate(item.subscription.updatedAt, lang, true)}</span>,
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <DataTable
+        labelEn={SUBSCRIPTIONS_COPY.en.title}
+        labelAr={SUBSCRIPTIONS_COPY.ar.title}
+        columns={columns}
+        data={view.data.items}
+        isRefreshing={view.isRefreshing}
+        getRowId={(item) => item.subscription.id}
+        pagination={{
+          page: view.page,
+          limit: view.limit,
+          totalItems: view.data.total,
+          totalPages: Math.max(1, view.data.totalPages),
+          onPageChange: view.setPage,
+        }}
+        emptyState={{ titleEn: copy.empty, titleAr: copy.empty }}
+      />
+      <p className="break-all rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+        <strong className="font-semibold text-foreground">{copy.correlation}:</strong>{" "}
+        <code dir="ltr" className="select-all font-mono">{view.data.correlationId}</code>{" · "}
+        <strong className="font-semibold text-foreground">{copy.responseAt}:</strong>{" "}
+        {formatDate(view.data.timestamp, lang, true)}
+      </p>
+    </div>
   );
 }
 
@@ -497,13 +421,9 @@ function FailurePanel({
       detail={errorDetail(view, copy)}
       tone="danger"
       action={
-        <button
-          type="button"
-          onClick={view.refresh}
-          className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white hover:bg-rose-500"
-        >
+        <Button type="button" variant="outline" onClick={view.refresh}>
           {copy.retry}
-        </button>
+        </Button>
       }
     />
   );
@@ -524,33 +444,6 @@ function errorDetail(
   ]
     .filter(Boolean)
     .join(" · ");
-}
-
-function StatusPill({
-  status,
-  copy,
-}: {
-  status: SubscriptionStatus;
-  copy: SubscriptionsCopy;
-}) {
-  const tones: Record<SubscriptionStatus, string> = {
-    TRIAL: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-    PENDING_ACTIVATION:
-      "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
-    ACTIVE:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-    PAST_DUE:
-      "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
-    CANCELLED:
-      "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  };
-  return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black ${tones[status]}`}
-    >
-      {statusLabel(status, copy)}
-    </span>
-  );
 }
 
 function statusLabel(
@@ -581,67 +474,10 @@ function formatDate(
   }).format(new Date(value));
 }
 
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
-}) {
-  return (
-    <label className={labelClass}>
-      <span>{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={inputClass}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: number;
-  icon: ReactNode;
-  tone: "violet" | "emerald" | "amber";
-}) {
-  const tones = {
-    violet:
-      "bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300",
-    emerald:
-      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
-    amber:
-      "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300",
-  };
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-bold text-slate-500">{label}</p>
-        <span
-          className={`grid size-8 place-items-center rounded-lg ${tones[tone]}`}
-        >
-          {icon}
-        </span>
-      </div>
-      <p className="mt-2 font-mono text-2xl font-black">{value}</p>
-    </div>
-  );
+function formatInteger(value: number, lang: "ar" | "en"): string {
+  return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function StatePanel({
@@ -659,30 +495,21 @@ function StatePanel({
 }) {
   const colors =
     tone === "danger"
-      ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
+      ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
       : tone === "warning"
-        ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-        : "border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300";
+        ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
+        : "border-border bg-card text-muted-foreground";
   return (
     <section
-      role={tone === "danger" ? "alert" : undefined}
-      className={`flex min-h-56 flex-col items-center justify-center rounded-2xl border p-6 text-center ${colors}`}
+      role={tone === "neutral" ? "status" : "alert"}
+      className={`flex min-h-56 flex-col items-center justify-center rounded-lg border p-6 text-center ${colors}`}
     >
       <span className="mb-3 opacity-75">{icon}</span>
-      <h2 className="text-sm font-black">{title}</h2>
+      <h2 className="text-sm font-semibold">{title}</h2>
       {detail ? (
-        <p className="mt-2 max-w-3xl break-all text-xs opacity-85">{detail}</p>
+        <p className="mt-2 max-w-3xl break-all text-sm opacity-85">{detail}</p>
       ) : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </section>
   );
 }
-
-const labelClass =
-  "grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300";
-const inputClass =
-  "min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-normal text-slate-950 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
-const secondaryButtonClass =
-  "inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 px-3 text-xs font-bold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";
-const pageButtonClass =
-  "inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-slate-300 px-3 font-bold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";

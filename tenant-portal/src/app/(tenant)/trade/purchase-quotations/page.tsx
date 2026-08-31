@@ -1,106 +1,129 @@
 "use client";
 
 import Link from "next/link";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { TableToolbar } from "@/components/ui/TableToolbar";
-import { Table } from "@/components/ui/Table";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, FileText } from "lucide-react";
-import { useTradePurchaseQuotations, PurchaseQuotationItem } from "./hooks/useTradePurchaseQuotations";
-import { CreateTradePurchaseQuotationsModal } from "./components/CreateTradePurchaseQuotationsModal";
-import { DeleteTradePurchaseQuotationsConfirmModal } from "./components/DeleteTradePurchaseQuotationsConfirmModal";
+import { RefreshCw } from "lucide-react";
+import { Button, DataTable, PageHeader, type ColumnDef } from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
+import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
+import {
+  TradeScopeRequired,
+  TradeWriteOutcome,
+} from "../documents/components/TradeBoundaryStates";
+import { TradeDocumentFilters } from "../documents/components/TradeDocumentFilters";
+import { TradeGate } from "../documents/components/TradeGate";
+import { TradeStatusBadge } from "../documents/components/TradeStatusBadge";
+import { useTradeDocumentList } from "../documents/hooks/useTradeDocumentList";
+import { useTradeTableLabels } from "../documents/hooks/useTradeTableLabels";
+import { partyDisplayName } from "../documents/trade-document-contract";
+import { PurchaseQuotationDrawer } from "./components/PurchaseQuotationDrawer";
+import { usePurchaseQuotationForm } from "./hooks/usePurchaseQuotationForm";
+import {
+  PURCHASE_QUOTATIONS_PATH,
+  PURCHASE_QUOTATION_PERMISSIONS,
+  parsePurchaseQuotation,
+  type PurchaseQuotation,
+} from "./purchase-quotation-contract";
 
-export default function TradePurchaseQuotationsPage() {
-  const {
-    items,
-    searchQuery,
-    setSearchQuery,
-    isCreateOpen,
-    setIsCreateOpen,
-    selectedForDelete,
-    setSelectedForDelete,
-    handleCreate,
-    handleDelete,
-  } = useTradePurchaseQuotations();
+export default function PurchaseQuotationsPage() {
+  const { t } = useI18n();
+  const list = useTradeDocumentList<PurchaseQuotation>(
+    PURCHASE_QUOTATIONS_PATH,
+    parsePurchaseQuotation,
+  );
+  const canCreate = list.scope.canWrite(PURCHASE_QUOTATION_PERMISSIONS.create);
+  const form = usePurchaseQuotationForm(
+    list.scope.headers,
+    list.scope.canWrite(PURCHASE_QUOTATION_PERMISSIONS.accounts),
+    null,
+    list.reload,
+  );
+  const labels = useTradeTableLabels(
+    t.tradeDocuments.purchaseQuotations.empty,
+    t.tradeDocuments.purchaseQuotations.loadFailed,
+  );
 
-  const columns = [
+  const columns: ColumnDef<PurchaseQuotation>[] = [
     {
-      header: "رقم طلب RFQ والمورد",
-      cell: (item: PurchaseQuotationItem) => (
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
-            <FileText className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900 dark:text-slate-100">{item.rfqNumber}</p>
-            <p className="text-[11px] text-slate-400">{item.supplierName}</p>
-          </div>
-        </div>
+      id: "number",
+      header: t.tradeDocuments.documentNumber,
+      cell: (row) => (
+        <Link
+          href={`${TENANT_ROUTES.tradePurchaseQuotations}/${row.id}`}
+          className="text-foreground underline-offset-2 hover:underline"
+        >
+          {row.documentNumber}
+        </Link>
       ),
     },
     {
-      header: "التكلفة المعروضة",
-      cell: (item: PurchaseQuotationItem) => (
-        <span className="font-bold text-slate-900 dark:text-slate-100">{item.quotedCost}</span>
-      ),
+      id: "party",
+      header: t.tradeDocuments.supplier,
+      cell: (row) => partyDisplayName(row.partySnapshot) ?? row.partyId,
     },
-    { header: "المهلة الزمنية للتوريد", accessorKey: "deliveryLeadTime" as keyof PurchaseQuotationItem },
-    { header: "صالح حتى تاريخ", accessorKey: "validUntil" as keyof PurchaseQuotationItem },
     {
-      header: "الحالة التقييمية",
-      cell: (item: PurchaseQuotationItem) => (
-        <Badge variant={item.status === "accepted" ? "success" : "warning"}>
-          {item.status === "accepted" ? "مقبول ومُعمد" : "قيد الدراسة والتقييم"}
-        </Badge>
+      id: "status",
+      header: t.common.status,
+      cell: (row) => (
+        <TradeStatusBadge kind="TradePurchaseQuotationStatus" value={row.lifecycleStatus} />
       ),
     },
     {
-      header: "الإجراءات",
-      cell: (item: PurchaseQuotationItem) => (
-        <div className="flex items-center gap-1.5">
-          <Link href={`/trade/purchase-quotations/${item.id}/general`}>
-            <Button variant="ghost" size="sm">
-              <Eye className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedForDelete(item)}>
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
-        </div>
-      ),
+      id: "validUntil",
+      header: t.tradeDocuments.validUntil,
+      cell: (row) => row.validUntil,
     },
+    { id: "reference", header: t.tradeDocuments.reference, cell: (row) => row.reference },
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="عروض أسعار الشراء والـ RFQs (Trade Purchase Quotations)"
-        subtitle="جمع ومقارنة عروض الأسعار المقدمة من الموردين وتحويل المنافسة إلى أمر شراء مُعمد"
-        actionLabel="تسجيل عرض سعر مورد"
-        onAction={() => setIsCreateOpen(true)}
-      />
+    <TradeGate require={PURCHASE_QUOTATION_PERMISSIONS.read}>
+      <div className="flex flex-col gap-4">
+        <PageHeader
+          title={t.tradeDocuments.purchaseQuotations.title}
+          description={t.tradeDocuments.purchaseQuotations.subtitle}
+          primaryAction={
+            canCreate
+              ? { label: t.tradeDocuments.purchaseQuotations.create, onClick: form.open }
+              : undefined
+          }
+          secondaryActions={
+            <Button variant="outline" onClick={() => void list.reload()} disabled={list.isRefreshing}>
+              <RefreshCw
+                className={list.isRefreshing ? "size-4 animate-spin" : "size-4"}
+                aria-hidden="true"
+              />
+              {t.tradeDocuments.reload}
+            </Button>
+          }
+        />
 
-      <TableToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        placeholder="ابحث برقم RFQ أو اسم المورد..."
-      />
+        <TradeWriteOutcome write={form.write} />
 
-      <Table columns={columns} data={items} />
+        {list.scope.isResolved ? (
+          <>
+            <TradeDocumentFilters
+              kind="TradePurchaseQuotationStatus"
+              value={list.status}
+              onChange={list.setStatus}
+            />
+            <DataTable
+              columns={columns}
+              rows={list.items}
+              isLoading={list.isLoading}
+              error={list.queryError}
+              onRetry={() => void list.reload()}
+              page={list.pageInfo}
+              onPageChange={list.setPage}
+              rowKey={(row) => row.id}
+              labels={labels}
+            />
+          </>
+        ) : (
+          <TradeScopeRequired />
+        )}
 
-      <CreateTradePurchaseQuotationsModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSubmit={handleCreate}
-      />
-
-      <DeleteTradePurchaseQuotationsConfirmModal
-        isOpen={!!selectedForDelete}
-        item={selectedForDelete}
-        onClose={() => setSelectedForDelete(null)}
-        onConfirm={handleDelete}
-      />
-    </div>
+        <PurchaseQuotationDrawer state={form} isEdit={false} />
+      </div>
+    </TradeGate>
   );
 }

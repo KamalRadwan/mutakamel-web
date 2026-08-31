@@ -24,3 +24,8 @@ source contracts, not authenticated runtime or deployment evidence.
 All write-sensitive idempotent routes require a caller-owned UUIDv7
 `x-idempotency-key`. Follow each feature document for exact permissions, DTOs,
 response projections, and retry rules.
+
+Shared visual presentation, feedback, freshness, confirmation, and recovery
+behavior is defined in
+[Operational UX](../design-system/operational-ux.md). That document does not
+override endpoint, permission, DTO, enum, or retry contracts in this directory.

@@ -1,110 +1,229 @@
 "use client";
 
 import Link from "next/link";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { TableToolbar } from "@/components/ui/TableToolbar";
-import { Table } from "@/components/ui/Table";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, Radar } from "lucide-react";
-import { useTradeControlTower, ControlTowerItem } from "./hooks/useTradeControlTower";
-import { CreateTradeControlTowerModal } from "./components/CreateTradeControlTowerModal";
-import { DeleteTradeControlTowerConfirmModal } from "./components/DeleteTradeControlTowerConfirmModal";
+import { RefreshCw } from "lucide-react";
+import {
+  Badge,
+  Button,
+  DataTable,
+  DegradedBanner,
+  FilterBar,
+  PageHeader,
+  PermissionGate,
+  type ColumnDef,
+  type FilterValues,
+} from "@/design-system";
+import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
+import { formatDateTime } from "@/lib/format/date";
+import { formatTemplate } from "@/lib/format/template";
+import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
+import { tradeStatusLabel } from "../trade-advanced-validation";
+import {
+  CONTROL_TOWER_READ_PERMISSION,
+  EXCEPTION_SEVERITY_FILTERS,
+  EXCEPTION_STATUSES,
+  isExceptionSeverityFilter,
+  isExceptionStatus,
+  type ControlTowerException,
+} from "./control-tower-contract";
+import { useControlTower } from "./hooks/useControlTower";
 
-export default function TradeControlTowerPage() {
+export default function ControlTowerPage() {
   const {
+    t,
+    lang,
+    canRead,
+    branchIds,
+    branchId,
+    selectBranch,
     items,
-    searchQuery,
-    setSearchQuery,
-    isCreateOpen,
-    setIsCreateOpen,
-    selectedForDelete,
-    setSelectedForDelete,
-    handleCreate,
-    handleDelete,
-  } = useTradeControlTower();
+    pageInfo,
+    status,
+    severity,
+    category,
+    isLoading,
+    isRefreshing,
+    queryError,
+    isEntitlementRefusal,
+    setPage,
+    setStatus,
+    setSeverity,
+    setCategory,
+    reload,
+  } = useControlTower();
 
-  const columns = [
+  const filterValues: FilterValues = {
+    ...(status ? { status: { kind: "select" as const, value: status } } : {}),
+    ...(severity ? { severity: { kind: "select" as const, value: severity } } : {}),
+  };
+
+  const columns: ColumnDef<ControlTowerException>[] = [
     {
-      header: "المؤشر القيادي (Metric Name)",
-      cell: (item: ControlTowerItem) => (
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400">
-            <Radar className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900 dark:text-slate-100">{item.metricName}</p>
-            <p className="text-[11px] text-slate-400">الفئة: {item.category.toUpperCase()}</p>
-          </div>
-        </div>
+      id: "updatedAt",
+      header: t.tradeCommon.updatedAt,
+      cell: (exception) => (
+        <Link
+          href={`${TENANT_ROUTES.tradeControlTower}/${exception.id}`}
+          className="font-medium text-foreground underline-offset-2 hover:underline"
+        >
+          {formatDateTime(exception.updatedAt, lang)}
+        </Link>
       ),
     },
+    { id: "category", header: t.tradeControlTower.category, cell: (exception) => exception.category },
     {
-      header: "القيمة الحالية",
-      cell: (item: ControlTowerItem) => (
-        <span className="font-bold text-slate-900 dark:text-slate-100">{item.currentValue}</span>
-      ),
+      id: "sourceOwner",
+      header: t.tradeControlTower.sourceOwner,
+      cell: (exception) => exception.sourceOwner,
     },
     {
-      header: "الحد الموصى به",
-      cell: (item: ControlTowerItem) => (
-        <span className="font-mono text-xs text-slate-500">{item.targetThreshold}</span>
-      ),
+      id: "severity",
+      // Rendered as it arrives: the filter list, the exported enum and the
+      // literals actually written do not agree, so mapping would misname it.
+      header: t.tradeControlTower.severity,
+      cell: (exception) =>
+        exception.severity === "" ? (
+          "—"
+        ) : (
+          <Badge tone={severityTone(exception.severity)}>
+            {tradeStatusLabel(t.tradeStatus, exception.severity)}
+          </Badge>
+        ),
     },
     {
-      header: "حالة التنبيه",
-      cell: (item: ControlTowerItem) => (
-        <Badge variant={item.alertStatus === "normal" ? "success" : item.alertStatus === "warning" ? "warning" : "danger"}>
-          {item.alertStatus === "normal" ? "مستقر" : item.alertStatus === "warning" ? "تنبيه مبكر" : "حرج جداً"}
+      id: "status",
+      header: t.common.status,
+      cell: (exception) => (
+        <Badge tone={exception.status === "RESOLVED" ? "positive" : "caution"}>
+          {tradeStatusLabel(t.tradeStatus, exception.status)}
         </Badge>
       ),
     },
     {
-      header: "الإجراءات",
-      cell: (item: ControlTowerItem) => (
-        <div className="flex items-center gap-1.5">
-          <Link href={`/trade/control-tower/${item.id}/general`}>
-            <Button variant="ghost" size="sm">
-              <Eye className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedForDelete(item)}>
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
-        </div>
-      ),
+      id: "safeErrorCode",
+      header: t.tradeControlTower.safeErrorCode,
+      cell: (exception) => exception.safeErrorCode,
     },
   ];
 
-  return (
-    <div className="space-y-6">
+  const content = (
+    <div className="flex flex-col gap-4">
       <PageHeader
-        title="برج مراقبة العمليات والتجارة (Trade Control Tower)"
-        subtitle="شاشة المراقبة المركزية والتحذيرات المبكرة لسلسلة الإمداد ومخاطر الائتمان وسرعة البيع"
-        actionLabel="إضافة مؤشر برج المراقبة"
-        onAction={() => setIsCreateOpen(true)}
+        title={t.tradeControlTower.title}
+        description={t.tradeControlTower.subtitle}
+        secondaryActions={
+          <>
+            <TenantBranchSelect
+              branchIds={branchIds}
+              branchId={branchId}
+              onChange={selectBranch}
+              disabled={isRefreshing}
+            />
+            <Button variant="outline" onClick={() => void reload()} disabled={isRefreshing}>
+              <RefreshCw
+                className={isRefreshing ? "size-4 animate-spin" : "size-4"}
+                aria-hidden="true"
+              />
+              {t.tradeCommon.reload}
+            </Button>
+          </>
+        }
       />
 
-      <TableToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        placeholder="ابحث باسم المؤشر أو الفئة..."
+      {isEntitlementRefusal ? (
+        <DegradedBanner message={t.tradeControlTower.entitlementRefusal} />
+      ) : null}
+
+      <FilterBar
+        filters={[
+          {
+            id: "status",
+            kind: "select",
+            label: t.common.status,
+            placeholder: t.tradeCommon.anyStatus,
+            options: EXCEPTION_STATUSES.map((value) => ({
+              value,
+              label: tradeStatusLabel(t.tradeStatus, value),
+            })),
+          },
+          {
+            id: "severity",
+            kind: "select",
+            label: t.tradeControlTower.severity,
+            placeholder: t.tradeCommon.anyStatus,
+            // Built from the QUERY DTO's list, not from ExceptionSeverity:
+            // filtering by INFO or WARNING is a 400.
+            options: EXCEPTION_SEVERITY_FILTERS.map((value) => ({
+              value,
+              label: tradeStatusLabel(t.tradeStatus, value),
+            })),
+          },
+        ]}
+        values={filterValues}
+        onChange={(next) => {
+          const statusValue = next.status;
+          const severityValue = next.severity;
+          setStatus(
+            statusValue?.kind === "select" && isExceptionStatus(statusValue.value)
+              ? statusValue.value
+              : undefined,
+          );
+          setSeverity(
+            severityValue?.kind === "select" && isExceptionSeverityFilter(severityValue.value)
+              ? severityValue.value
+              : undefined,
+          );
+        }}
+        onReset={() => {
+          setStatus(undefined);
+          setSeverity(undefined);
+          setCategory("");
+        }}
+        searchValue={category}
+        onSearchChange={setCategory}
+        searchPlaceholder={t.tradeControlTower.categorySearch}
+        filtersLabel={t.common.filter}
+        clearAllLabel={t.filters.clearAll}
       />
 
-      <Table columns={columns} data={items} />
-
-      <CreateTradeControlTowerModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSubmit={handleCreate}
-      />
-
-      <DeleteTradeControlTowerConfirmModal
-        isOpen={!!selectedForDelete}
-        item={selectedForDelete}
-        onClose={() => setSelectedForDelete(null)}
-        onConfirm={handleDelete}
+      <DataTable
+        columns={columns}
+        rows={items}
+        isLoading={isLoading}
+        error={queryError}
+        onRetry={() => void reload()}
+        page={pageInfo}
+        onPageChange={setPage}
+        rowKey={(exception) => exception.id}
+        labels={{
+          retry: t.common.retry,
+          errorTitle: t.tradeControlTower.loadFailed,
+          emptyTitle:
+            status || severity || category ? t.tradeCommon.emptyForFilter : t.tradeControlTower.empty,
+          selectAll: t.common.actions,
+          selectRow: t.common.actions,
+          sortAscending: t.common.actions,
+          sortDescending: t.common.actions,
+          notSorted: t.common.actions,
+          pagination: {
+            previous: t.common.previousPage,
+            next: t.common.nextPage,
+            summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+          },
+        }}
       />
     </div>
   );
+
+  return canRead ? (
+    content
+  ) : (
+    <PermissionGate require={CONTROL_TOWER_READ_PERMISSION}>{content}</PermissionGate>
+  );
+}
+
+function severityTone(severity: string): "negative" | "caution" | "neutral" {
+  if (severity === "CRITICAL") return "negative";
+  if (severity === "HIGH" || severity === "MEDIUM" || severity === "WARNING") return "caution";
+  return "neutral";
 }

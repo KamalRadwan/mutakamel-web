@@ -13,6 +13,7 @@ import {
   normalizeApiError,
   type NormalizedApiError,
 } from "@/shared/api/normalized-api-error";
+import { usePollWhile } from "@/shared/hooks/usePollWhile";
 import { tenantProvisioningApi } from "../api/tenant-provisioning.api";
 import {
   buildResolveSeedConflictDto,
@@ -139,7 +140,6 @@ export function useTenantProvisioning(
   });
 
   const intentKeys = useRef(new Map<string, string>());
-  const pollInFlight = useRef(false);
 
   const loadOperations = useCallback(
     async (signal?: AbortSignal) => {
@@ -151,7 +151,7 @@ export function useTenantProvisioning(
       try {
         const page = await tenantProvisioningApi.listOperations(
           tenantId,
-          { page: 1, limit: 100, sortBy: "requestedAt", sortDir: "DESC" },
+          { page: 1, limit: 100, sortBy: "generation", sortDir: "DESC" },
           signal,
         );
         if (signal?.aborted) return;
@@ -368,31 +368,27 @@ export function useTenantProvisioning(
     return enabled && (operationPending || prerequisitePending);
   }, [enabled, operations.data.items, prerequisites.data, selectedOperation.data]);
 
-  useEffect(() => {
-    if (!polling || authLoading) return;
-    const timer = window.setInterval(() => {
-      if (pollInFlight.current) return;
-      pollInFlight.current = true;
+  usePollWhile(
+    polling && !authLoading,
+    () => {
       const tasks: Promise<unknown>[] = [loadOperations()];
       if (selectedOperationId) {
         tasks.push(loadSelectedOperation(selectedOperationId));
       }
       if (permissions.canReadPrerequisites) tasks.push(loadPrerequisites());
-      void Promise.all(tasks).finally(() => {
-        pollInFlight.current = false;
-      });
-    }, pollIntervalMs);
-    return () => window.clearInterval(timer);
-  }, [
-    authLoading,
-    loadOperations,
-    loadPrerequisites,
-    loadSelectedOperation,
-    permissions.canReadPrerequisites,
-    pollIntervalMs,
-    polling,
-    selectedOperationId,
-  ]);
+      return Promise.all(tasks).then(() => undefined);
+    },
+    {
+      intervalMs: pollIntervalMs,
+      deps: [
+        loadOperations,
+        loadPrerequisites,
+        loadSelectedOperation,
+        permissions.canReadPrerequisites,
+        selectedOperationId,
+      ],
+    },
+  );
 
   const refreshAfterOperation = useCallback(
     async (operationId: string, detail?: TenantOperationDetail) => {

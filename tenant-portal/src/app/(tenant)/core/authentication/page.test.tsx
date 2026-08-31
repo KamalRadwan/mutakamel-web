@@ -2,23 +2,65 @@
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TooltipProvider } from "@/design-system";
 import type { AuthSessionItem } from "./hooks/useAuthenticationManagement";
 import AuthenticationManagementPage from "./page";
+
+function renderPage() {
+  return render(
+    <TooltipProvider>
+      <AuthenticationManagementPage />
+    </TooltipProvider>,
+  );
+}
 
 const state = vi.hoisted(() => ({
   hook: {} as Record<string, unknown>,
   revoke: vi.fn(),
 }));
 
+const t = {
+  common: {
+    cancel: "Cancel",
+    retry: "Retry",
+    actions: "Actions",
+    previousPage: "Previous page",
+    nextPage: "Next page",
+    showingOf: "Showing {from}–{to} of {total}",
+  },
+  authSessions: {
+    title: "Sign-in sessions",
+    subtitle: "subtitle",
+    refresh: "Refresh",
+    loadFailed: "The sessions could not be loaded or revoked. Try again.",
+    empty: "No sessions available.",
+    thisDevice: "This device",
+    ended: "Ended",
+    columnDevice: "Device",
+    columnClientType: "Client",
+    columnLastActivity: "Last activity",
+    columnCreated: "Created",
+    columnActions: "Actions",
+    endThisSession: "End this session",
+    revokeSession: "Revoke session",
+    confirmEndTitle: "End the current session?",
+    confirmEndMessage: "This browser will be signed out immediately. Other sessions remain active.",
+    confirmRevokeTitle: "Revoke this sign-in session?",
+    confirmRevokeMessage: "That browser or device will lose access immediately.",
+    confirmLoading: "Revoking…",
+    clientTypeWeb: "Web",
+    clientTypeIos: "iOS",
+    clientTypeAndroid: "Android",
+    clientTypeDesktop: "Desktop",
+  },
+};
+
 vi.mock("./hooks/useAuthenticationManagement", () => ({
   useAuthenticationManagement: () => state.hook,
 }));
 
 vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => ({
-    lang: "en",
-    t: { common: { cancel: "Cancel", confirmDelete: "Confirm", delete: "Delete", save: "Save" } },
-  }),
+  useI18n: () => ({ lang: "en", t }),
 }));
 
 const remoteSession: AuthSessionItem = {
@@ -45,11 +87,6 @@ describe("Tenant auth session revocation", () => {
   beforeEach(() => {
     state.revoke.mockReset().mockResolvedValue(true);
     state.hook = hookState(remoteSession);
-    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
-      callback(0);
-      return 1;
-    });
-    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -58,48 +95,57 @@ describe("Tenant auth session revocation", () => {
   });
 
   it("requires an accessible explicit confirmation before revoking a remote session", async () => {
-    render(<AuthenticationManagementPage />);
+    renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Revoke session" }));
 
     expect(state.revoke).not.toHaveBeenCalled();
-    const dialog = screen.getByRole("dialog", {
+    // ConfirmActionModal is built on Radix AlertDialog, which renders
+    // role="alertdialog" — a destructive confirmation, not a plain dialog.
+    const dialog = screen.getByRole("alertdialog", {
       name: "Revoke this sign-in session?",
     });
-    expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Revoke session" }));
 
     await waitFor(() => expect(state.revoke).toHaveBeenCalledWith(remoteSession));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   });
 
   it("keeps current-session wording and disables the dialog while revocation is in flight", () => {
     const currentSession = { ...remoteSession, current: true };
     state.hook = hookState(currentSession);
-    const view = render(<AuthenticationManagementPage />);
+    const view = renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "End this session" }));
     expect(
-      screen.getByRole("dialog", { name: "End the current session?" }),
+      screen.getByRole("alertdialog", { name: "End the current session?" }),
     ).toBeInTheDocument();
 
     state.hook = hookState(currentSession, currentSession.id);
-    view.rerender(<AuthenticationManagementPage />);
+    view.rerender(
+      <TooltipProvider>
+        <AuthenticationManagementPage />
+      </TooltipProvider>,
+    );
 
-    const dialog = screen.getByRole("dialog");
+    const dialog = screen.getByRole("alertdialog");
     expect(dialog).toHaveAttribute("aria-busy", "true");
-    expect(
-      within(dialog).getByRole("button", { name: "Close confirmation" }),
-    ).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
-    expect(within(dialog).getByRole("button", { name: "Revoking..." })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "End this session" })).toBeDisabled();
+  });
+
+  it("never shows the raw wire client type — always the translated label", () => {
+    state.hook = hookState(remoteSession);
+    renderPage();
+    expect(screen.getByText("Web")).toBeInTheDocument();
+    expect(screen.queryByText("WEB")).toBeNull();
   });
 });
 
 function hookState(session: AuthSessionItem, revokingId: string | null = null) {
   return {
+    t,
     lang: "en",
     items: [session],
     isLoading: false,

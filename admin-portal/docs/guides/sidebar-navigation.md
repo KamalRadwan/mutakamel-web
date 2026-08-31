@@ -1,12 +1,30 @@
 # Admin Portal Navigation and Permission Mapping
 
 Last verified against current frontend routes and Core/Worker Gateway contracts
-on **2026-08-25**.
+on **2026-08-29**.
 
 Frontend page paths and API paths are separate namespaces. Navigation uses
 paths such as `/tenants`; requests use `/api/admin/core/v1/tenants`.
 
-## Current top navigation
+This guide is the RBAC-and-route-family reference. For the sidebar/topbar
+component structure, the full 15-section × 54-route table, and how the
+permission-filtered navigation is actually built (`nav-config.ts` +
+`useNavTree.ts`), see
+[design-system/shell-and-navigation.md](../design-system/shell-and-navigation.md)
+— the table below is a condensed route-family summary.
+
+Route existence is not the same as direct sidebar or command-palette
+reachability. Current `NAV_SECTIONS` contains top-level entries; many subroutes
+and dynamic detail/create routes below exist without being individual command
+search results. The approved target is one nested route tree shared by sidebar,
+mobile navigation, breadcrumbs, SubNav, and command search.
+
+## Current sidebar navigation
+
+The horizontal, permanently-dark 15-item navbar this table originally
+described has been replaced by a collapsible sidebar (`AppShell` /
+`Sidebar` / `Topbar`, see the design-system doc above). The route/permission
+mapping itself is unchanged by that replacement:
 
 | UI item | Frontend route | Required permission | Source status |
 |:---|:---|:---|:---|
@@ -26,11 +44,12 @@ paths such as `/tenants`; requests use `/api/admin/core/v1/tenants`.
 | Admin - Provisioning | `/provisioning` | Any visible provisioning read permission | `DONE/SOURCE_INTEGRATED` |
 | Settings | `/settings` | At least one visible child permission | `DONE/SOURCE_INTEGRATED` |
 
-Notifications are exposed through both the navbar and `/notifications`; navbar
-access and each action are permission filtered.
+Notifications are exposed through both the topbar and `/notifications`;
+topbar access and each action are permission filtered.
 
-The same permission-filtered destinations render in desktop and responsive
-mobile menus. A parent renders only when at least one child is visible. Direct
+The same top-level permission-filtered destinations render in the desktop
+sidebar and responsive mobile sheet (`MobileNav`, `Sheet side="start"`). A
+parent renders only when at least one child is visible. Direct
 page guards and backend authorization remain authoritative; hidden navigation
 is not an authorization boundary.
 

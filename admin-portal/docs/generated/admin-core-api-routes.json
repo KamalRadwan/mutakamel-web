@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "generatedAt": "2026-08-29T12:19:27.818Z",
+    "generatedAt": "2026-08-30T18:08:52.020Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "5783c4436da7+dirty",
-    "backendRevision": "949ca7fedc23",
+    "frontendRevision": "684f503f0279+dirty",
+    "backendRevision": "989ee35f6578+dirty",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
   },
   "counts": {
-    "total": 246,
+    "total": 247,
     "byMethod": {
       "GET": 98,
-      "POST": 105,
+      "POST": 106,
       "DELETE": 16,
       "PATCH": 24,
       "PUT": 3
     },
     "byRouteClass": {
       "AUTHENTICATED": 86,
-      "WRITE_SENSITIVE": 133,
+      "WRITE_SENSITIVE": 134,
       "PUBLIC": 6,
       "READ_HEAVY": 21
     },
@@ -44,14 +44,14 @@
       "subscriptions": 8,
       "system-settings": 11,
       "tenant-fqdns": 1,
-      "tenants": 53,
+      "tenants": 54,
       "wallets": 6,
       "users": 10
     }
   },
   "sourceHashes": {
-    "../../../../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "d69af7e23503bee8d6488e7a99d3e1db68527c0549d312e48448426c4a609502",
-    "../../../../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "ba3041ec935c4efcf9f07b4ac12048ebacadaec2475c4d8d6fe1278b4c13e136",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
   },
   "routes": [
     {
@@ -3213,6 +3213,24 @@
       "timeoutClass": "DEFAULT",
       "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": "CORE.TENANT_PROVISIONING.RETRY_LATEST"
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/tenants/:id/restore",
+      "upstreamPath": "/api/v1/admin/tenants/:id/restore",
+      "routeKey": "core.admin.tenants.restore",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.tenants.restore",
+        "admin.tenants.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
     },
     {
       "method": "POST",

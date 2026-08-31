@@ -1,28 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DatabaseBackup, Play, RefreshCw, Trash2 } from "lucide-react";
 import { BackupRunStatus, type BackupRun } from "../types";
 import { BackupDialog } from "../components/BackupDialog";
 import { BackupErrorBanner } from "../components/BackupErrorBanner";
 import { BackupPageHeader } from "../components/BackupPageHeader";
 import { BackupServerSelect } from "../components/BackupServerSelect";
-import { BackupStatePanel } from "../components/BackupStatePanel";
-import { BackupStatusBadge } from "../components/BackupStatusBadge";
 import { useBackupRuns } from "../hooks/useBackupRuns";
-import { formatBackupDate, shortBackupId } from "../lib/backup-format";
-import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
+import { formatBackupDate, formatBackupNumber, shortBackupId } from "../lib/backup-format";
 import { useI18n } from "@/i18n/I18nContext";
+import {
+  Card,
+  CardContent,
+  Field,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  Textarea,
+  Button,
+  DataTable,
+  DegradedBanner,
+  AmbiguousOutcomePanel,
+  StatusBadge,
+  type ColumnDef,
+} from "@/design-system";
 
 export function BackupRunsScreen() {
-  const { lang } = useI18n();
-  const isArabic = lang === "ar";
+  const { dir, lang, t } = useI18n();
+  const copy = t.backup.runsScreen;
+  const locale = lang === "ar" ? "ar-EG" : "en-US";
   const view = useBackupRuns();
   const [startOpen, setStartOpen] = useState(false);
   const [startServerId, setStartServerId] = useState("");
   const [reason, setReason] = useState("");
   const [tenantConcurrency, setTenantConcurrency] = useState(2);
   const [deletingRun, setDeletingRun] = useState<BackupRun | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const serverNameById = useMemo(
+    () => new Map(view.servers.map((server) => [server.id, server.name])),
+    [view.servers],
+  );
 
   const openStart = () => {
     setStartServerId(
@@ -35,77 +56,249 @@ export function BackupRunsScreen() {
     setStartOpen(true);
   };
 
+  const columns: ColumnDef<BackupRun>[] = [
+    {
+      key: "run",
+      headerEn: "Run",
+      headerAr: "العملية",
+      cell: (run) => (
+        <div className="flex items-center gap-3">
+          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-info-subtle text-info-subtle-foreground">
+            <DatabaseBackup className="size-4" aria-hidden="true" />
+          </span>
+          <div>
+            <p dir="ltr" className="font-mono font-semibold" title={run.id}>{shortBackupId(run.id)}</p>
+            {run.reason && <p className="mt-1 max-w-xs truncate text-xs text-muted-foreground" title={run.reason}>{run.reason}</p>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "server",
+      headerEn: "Server",
+      headerAr: "الخادم",
+      cell: (run) => <p className="font-semibold">{serverNameById.get(run.databaseServerId) ?? <span dir="ltr" className="font-mono">{shortBackupId(run.databaseServerId)}</span>}</p>,
+    },
+    { key: "trigger", headerEn: "Trigger", headerAr: "النوع", cell: (run) => <span className="font-semibold">{lang === "ar" ? (run.trigger === "manual" ? "يدوي" : "مجدول") : run.trigger === "manual" ? "Manual" : "Scheduled"}</span> },
+    {
+      key: "progress",
+      headerEn: "Progress",
+      headerAr: "النتيجة",
+      cell: (run) => (
+        <div>
+          <p className="font-semibold tabular-nums"><bdi>{formatBackupNumber(run.succeededTenants, locale)}</bdi> / <bdi>{formatBackupNumber(run.totalTenants, locale)}</bdi></p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {lang === "ar"
+              ? <><bdi>{formatBackupNumber(run.failedTenants, locale)}</bdi> فشل · <bdi>{formatBackupNumber(run.skippedTenants, locale)}</bdi> تم تخطيه</>
+              : <>{formatBackupNumber(run.failedTenants, locale)} failed · {formatBackupNumber(run.skippedTenants, locale)} skipped</>}
+          </p>
+        </div>
+      ),
+    },
+    { key: "started", headerEn: "Started", headerAr: "بدأت", cell: (run) => <span className="text-muted-foreground">{formatBackupDate(run.startedAt, locale)}</span> },
+    {
+      key: "status",
+      headerEn: "Status",
+      headerAr: "الحالة",
+      cell: (run) => (
+        <div>
+          <StatusBadge status={run.status} />
+          {run.hasFailure && <p className="mt-2 max-w-xs text-xs text-destructive">{t.backup.artifactsScreen.failureRetainedNote}</p>}
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      headerEn: "Actions",
+      headerAr: "الإجراءات",
+      align: "end",
+      cell: (run) => {
+        const terminal = run.status !== BackupRunStatus.PENDING && run.status !== BackupRunStatus.RUNNING;
+        return view.canDelete && terminal ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
+            onClick={() => {
+              setDeletingRun(run);
+              setDeleteConfirmation("");
+            }}
+            disabled={Boolean(view.activeAction)}
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+            {copy.deleteAction}
+          </Button>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      },
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       <BackupPageHeader
-        eyebrow={isArabic ? "تنفيذ Worker" : "Worker execution"}
-        title={isArabic ? "عمليات النسخ الاحتياطي" : "Backup runs"}
-        description={isArabic
-          ? "تابع العمليات المجدولة واليدوية. إعادة إرسال نفس الطلب تستخدم هوية أمر ثابتة وتعيد العملية الأصلية."
-          : "Track scheduled and manual executions. Retrying the same request keeps one command identity and returns the original run."}
-        actions={view.canStart ? (
-          <button type="button" onClick={openStart} disabled={Boolean(view.activeAction)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-700 px-4 text-sm font-bold text-white hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50">
-            <Play className="size-4" aria-hidden="true" />{isArabic ? "بدء نسخة يدوية" : "Start manual backup"}
-          </button>
-        ) : undefined}
+        eyebrow={copy.eyebrow}
+        title={copy.title}
+        description={copy.description}
+        actions={
+          view.canStart && (
+            <Button type="button" variant="primary" onClick={openStart} disabled={Boolean(view.activeAction)}>
+              <Play className="size-4" aria-hidden="true" />
+              {copy.startManualBackupAction}
+            </Button>
+          )
+        }
       />
 
-      {view.retryableCommandError || view.pendingCommandAttempt ? (
-        <section role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          <h2 className="font-bold">{isArabic ? "هناك أمر نسخ لم تُحسم نتيجته" : "A backup command still has an unknown outcome"}</h2>
-          <p className="mt-2 text-sm leading-6">{isArabic ? "يحتفظ هذا التبويب بالمفتاح وبصمة غير قابلة للقراءة فقط، ولا يخزن سبب التدقيق. افحص سجل العمليات ثم أعد إدخال القيم الأصلية حرفيًا إذا احتجت لإعادة المحاولة؛ لن يُقبل طلب مختلف بنفس المفتاح." : "This tab retains only the key and a non-readable intent digest; it does not store the audit reason. Check the run history, then re-enter the exact original values if a retry is needed. A different request will not be sent with that key."}</p>
-          {view.retryableCommandError?.correlationId ? <p className="mt-2 text-xs">Correlation ID: <code>{view.retryableCommandError.correlationId}</code></p> : null}
-        </section>
-      ) : null}
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_auto] lg:items-end">
-          <label className="block"><span className={labelClass}>{isArabic ? "الخادم" : "Server"}</span><select value={view.databaseServerId} onChange={(event) => view.setDatabaseServerId(event.target.value)} className={inputClass}><option value="">{isArabic ? "كل الخوادم" : "All servers"}</option>{view.servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}</select></label>
-          <label className="block"><span className={labelClass}>{isArabic ? "الحالة" : "Status"}</span><select value={view.status} onChange={(event) => view.setStatus(event.target.value as BackupRunStatus | "")} className={inputClass}><option value="">{isArabic ? "كل الحالات" : "All statuses"}</option>{Object.values(BackupRunStatus).map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></label>
-          <button type="button" onClick={() => void view.refresh()} disabled={view.isLoading} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 text-sm font-bold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-900"><RefreshCw className={`size-4 ${view.isLoading ? "animate-spin" : ""}`} />{isArabic ? "تحديث" : "Refresh"}</button>
-        </div>
-      </section>
-
-      {view.error ? <BackupErrorBanner error={view.error} /> : null}
-      {view.enrichmentWarning ? (
-        <section role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          <p className="font-bold">{isArabic ? "تعذر تحميل أسماء خوادم قواعد البيانات" : "Database server names are unavailable"}</p>
-          <p className="mt-1 text-xs leading-5">{isArabic ? "تظل بيانات العمليات من Worker متاحة، وتُعرض معرفات الخوادم بدلاً من الأسماء." : "Worker run data remains available; server IDs are shown instead of names."}</p>
-          {view.enrichmentWarning.correlationId ? <p className="mt-2 text-xs">Correlation ID: <code className="font-mono">{view.enrichmentWarning.correlationId}</code></p> : null}
-        </section>
-      ) : null}
-
-      {view.isLoading ? (
-        <BackupStatePanel kind="loading" title={isArabic ? "جارٍ تحميل العمليات" : "Loading backup runs"} description={isArabic ? "قراءة السجل التشغيلي من Worker." : "Reading the bounded operational history from Worker."} />
-      ) : view.error ? null : view.runs.length === 0 ? (
-        <BackupStatePanel kind="empty" title={isArabic ? "لا توجد عمليات" : "No backup runs"} description={isArabic ? "لا توجد نتائج مطابقة للفلاتر الحالية." : "No run matches the current filters."} />
-      ) : (
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
-              <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500 dark:bg-slate-900"><tr><th className="px-5 py-3 text-start">{isArabic ? "العملية" : "Run"}</th><th className="px-5 py-3 text-start">{isArabic ? "الخادم" : "Server"}</th><th className="px-5 py-3 text-start">{isArabic ? "النوع" : "Trigger"}</th><th className="px-5 py-3 text-start">{isArabic ? "النتيجة" : "Progress"}</th><th className="px-5 py-3 text-start">{isArabic ? "بدأت" : "Started"}</th><th className="px-5 py-3 text-start">{isArabic ? "الحالة" : "Status"}</th><th className="px-5 py-3 text-end">{isArabic ? "الإجراءات" : "Actions"}</th></tr></thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{view.runs.map((run) => {
-                const server = view.servers.find((item) => item.id === run.databaseServerId);
-                const terminal = run.status !== BackupRunStatus.PENDING && run.status !== BackupRunStatus.RUNNING;
-                return <tr key={run.id} className="align-top hover:bg-slate-50/70 dark:hover:bg-slate-900/50"><td className="px-5 py-4"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-cyan-50 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300"><DatabaseBackup className="size-4" /></span><div><p className="font-mono font-bold" title={run.id}>{shortBackupId(run.id)}</p>{run.reason ? <p className="mt-1 max-w-xs truncate text-xs text-slate-500" title={run.reason}>{run.reason}</p> : null}</div></div></td><td className="px-5 py-4"><p className="font-semibold">{server?.name ?? shortBackupId(run.databaseServerId)}</p></td><td className="px-5 py-4 font-semibold uppercase">{run.trigger}</td><td className="px-5 py-4"><p className="font-mono font-bold">{run.succeededTenants}/{run.totalTenants}</p><p className="mt-1 text-xs text-slate-500">{run.failedTenants} failed · {run.skippedTenants} skipped</p></td><td className="px-5 py-4 text-slate-600 dark:text-slate-300">{formatBackupDate(run.startedAt, isArabic ? "ar-EG" : "en-US")}</td><td className="px-5 py-4"><BackupStatusBadge status={run.status} />{run.hasFailure ? <p className="mt-2 max-w-xs text-xs text-rose-600 dark:text-rose-300">{isArabic ? "تم تسجيل تفاصيل الفشل بأمان في Worker." : "Failure details are retained in Worker logs."}</p> : null}</td><td className="px-5 py-4 text-end">{view.canDelete && terminal ? <button type="button" onClick={() => setDeletingRun(run)} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"><Trash2 className="size-4" />{isArabic ? "حذف" : "Delete"}</button> : <span className="text-slate-400">—</span>}</td></tr>;
-              })}</tbody>
-            </table>
-          </div>
-          <p className="border-t border-slate-200 px-5 py-3 text-xs text-slate-500 dark:border-slate-800">{isArabic ? "يعرض Worker سجلًا محدودًا؛ لا يتم اختلاق إجمالي أو صفحات غير موجودة في العقد." : "Worker returns a bounded history; the UI does not invent totals or pagination metadata."}</p>
-        </section>
+      {(view.retryableCommandError || view.pendingCommandAttempt) && (
+        <AmbiguousOutcomePanel
+          idempotencyKey={view.pendingCommandAttempt?.idempotencyKey}
+          correlationId={view.retryableCommandError?.correlationId}
+          message={copy.ambiguousMessage}
+        />
       )}
 
-      <BackupDialog open={startOpen} title={isArabic ? "بدء نسخة احتياطية يدوية" : "Start manual backup"} description={isArabic ? "تُحفظ هوية الأمر وبصمة الطلب فقط داخل هذا التبويب حتى تُحسم النتيجة؛ لا يُحفظ سبب التدقيق." : "The command identity and request digest stay in this tab until the outcome is known; the audit reason is not stored."} confirmLabel={isArabic ? "بدء العملية" : "Start run"} onClose={() => { if (!view.activeAction) setStartOpen(false); }} onConfirm={() => void view.startRun({ databaseServerId: startServerId, reason: reason.trim(), tenantConcurrency }).then((run) => { if (run) setStartOpen(false); }).catch(() => undefined)} isSubmitting={view.activeAction === "start"} confirmDisabled={!uuidV7Pattern.test(startServerId) || !reason.trim() || reason.length > 500 || tenantConcurrency < 1 || tenantConcurrency > 10}>
-        {view.canReadServers ? <BackupServerSelect label={isArabic ? "الخادم" : "Database server"} value={startServerId} servers={view.servers} onChange={setStartServerId} placeholder={isArabic ? "اختر خادم قاعدة بيانات" : "Select a database server"} /> : <label className="block"><span className={labelClass}>{isArabic ? "معرف خادم قاعدة البيانات" : "Database server ID"}</span><input value={startServerId} onChange={(event) => setStartServerId(event.target.value.trim())} placeholder="UUIDv7" className={inputClass} /><span className="mt-2 block text-xs text-slate-500">{isArabic ? "يمكن تنفيذ الأمر بالمعرف دون كشف سجل الخوادم." : "The command can be authorized by ID without exposing the server registry."}</span></label>}
-        <label className="block"><span className={labelClass}>{isArabic ? "التزامن" : "Tenant concurrency"}</span><input type="number" min={1} max={10} value={tenantConcurrency} onChange={(event) => setTenantConcurrency(Number(event.target.value))} className={inputClass} /></label>
-        <label className="block"><span className={labelClass}>{isArabic ? "سبب موثق" : "Audit reason"}</span><textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={4} className={`${inputClass} py-3`} /></label>
+      <Card>
+        <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_auto] lg:items-end">
+          <Field label={copy.serverFilterLabel}>
+            {(fp) => (
+              <Select value={view.databaseServerId} onValueChange={view.setDatabaseServerId} dir={dir}>
+                <SelectTrigger {...fp}>
+                  <SelectValue placeholder={copy.allServersPlaceholder} />
+                </SelectTrigger>
+                <SelectContent>
+                  {view.servers.map((server) => (
+                    <SelectItem key={server.id} value={server.id}>{server.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+          <Field label={copy.statusFilterLabel}>
+            {(fp) => (
+              <Select value={view.status} onValueChange={(v) => view.setStatus(v as BackupRunStatus | "")} dir={dir}>
+                <SelectTrigger {...fp}>
+                  <SelectValue placeholder={copy.allStatusesPlaceholder} />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(BackupRunStatus).map((status) => (
+                    <SelectItem key={status} value={status}>{status.replaceAll("_", " ")}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+          <Button type="button" variant="outline" className="sm:col-span-2 lg:col-span-1" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
+            {!view.isLoading && <RefreshCw className="size-4" aria-hidden="true" />}
+            {copy.refreshButton}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {view.error && !startOpen && !deletingRun && <BackupErrorBanner error={view.error} />}
+      {view.enrichmentWarning && (
+        <DegradedBanner>
+          <p className="font-medium">{t.backup.artifactsScreen.degradedTitle}</p>
+          <p className="text-xs leading-5">{copy.degradedDescription}</p>
+        </DegradedBanner>
+      )}
+
+      {view.error && view.runs.length === 0 ? null : (
+        <div className="space-y-3">
+          <DataTable
+            labelEn="Backup runs"
+            labelAr="عمليات النسخ الاحتياطي"
+            columns={columns}
+            data={view.runs}
+            isLoading={view.isLoading && view.runs.length === 0}
+            isRefreshing={view.isLoading && view.runs.length > 0}
+            getRowId={(run) => run.id}
+            getRowLabel={(run) => `${lang === "ar" ? "عملية" : "Run"} ${shortBackupId(run.id)}`}
+            responsiveMode="record-cards"
+            pagination={{ page: 1, limit: view.runs.length || 1, totalItems: view.runs.length, totalPages: 1, onPageChange: () => {} }}
+            emptyState={{
+              titleEn: "No backup runs",
+              titleAr: "لا توجد عمليات",
+              descriptionEn: "No run matches the current filters.",
+              descriptionAr: "لا توجد نتائج مطابقة للفلاتر الحالية.",
+            }}
+          />
+          <p className="rounded-md border border-border bg-muted px-4 py-3 text-xs text-muted-foreground">
+            {copy.boundedHistoryNote}
+          </p>
+        </div>
+      )}
+
+      <BackupDialog
+        open={startOpen}
+        title={copy.startManualBackupDialogTitle}
+        description={copy.dialogDescription}
+        confirmLabel={copy.confirmStart}
+        onClose={() => {
+          if (!view.activeAction) setStartOpen(false);
+        }}
+        onConfirm={() =>
+          void view
+            .startRun({ databaseServerId: startServerId, reason: reason.trim(), tenantConcurrency })
+            .then((run) => {
+              if (run) setStartOpen(false);
+            })
+            .catch(() => undefined)
+        }
+        isSubmitting={view.activeAction === "start"}
+        confirmDisabled={!uuidV7Pattern.test(startServerId) || !reason.trim() || reason.length > 500 || tenantConcurrency < 1 || tenantConcurrency > 10}
+        error={view.error ?? view.retryableCommandError}
+      >
+        {view.canReadServers ? (
+          <BackupServerSelect label={copy.databaseServerFieldLabel} value={startServerId} servers={view.servers} onChange={setStartServerId} placeholder={copy.selectServerPlaceholder} required />
+        ) : (
+          <Field label={copy.databaseServerIdLabel} hint={copy.databaseServerIdHint} required>
+            {(fp) => <Input {...fp} dir="ltr" value={startServerId} onChange={(e) => setStartServerId(e.target.value.trim())} placeholder="UUIDv7" />}
+          </Field>
+        )}
+        <Field label={copy.concurrencyLabel} required>
+          {(fp) => <Input {...fp} dir="ltr" type="number" min={1} max={10} value={tenantConcurrency} onChange={(e) => setTenantConcurrency(Number(e.target.value))} />}
+        </Field>
+        <Field label={copy.auditReasonLabel} required>
+          {(fp) => <Textarea {...fp} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={4} />}
+        </Field>
       </BackupDialog>
 
-      <DestructiveActionModal isOpen={deletingRun !== null} onClose={() => { if (!view.activeAction) setDeletingRun(null); }} onConfirm={() => { if (!deletingRun) return; void view.deleteRun(deletingRun.id).then(() => setDeletingRun(null)).catch(() => undefined); }} title={isArabic ? "حذف عملية النسخ وكل محتوياتها" : "Delete backup run and all recovery data"} description={isArabic ? "حذف نهائي لسجل العملية، وكل ملفات وسجلات النسخ التابعة لها، وملف manifest. لن يمكن استخدام هذه النسخ للاستعادة بعد ذلك." : "Permanently deletes the run record, every artifact object and row in the run, and its manifest. Those recovery points cannot be restored afterward."} targetName={deletingRun?.id ?? ""} actionType="destroy" requireNameTyping isSubmitting={deletingRun ? view.activeAction === `delete:${deletingRun.id}` : false} />
+      <BackupDialog
+        open={deletingRun !== null}
+        title={copy.deleteModalTitle}
+        description={copy.deleteModalDescription}
+        confirmLabel={copy.deleteAction}
+        onClose={() => {
+          if (!view.activeAction) {
+            setDeletingRun(null);
+            setDeleteConfirmation("");
+          }
+        }}
+        onConfirm={() => {
+          if (!deletingRun) return;
+          void view.deleteRun(deletingRun.id).then(() => {
+            setDeletingRun(null);
+            setDeleteConfirmation("");
+          }).catch(() => undefined);
+        }}
+        isSubmitting={deletingRun ? view.activeAction === `delete:${deletingRun.id}` : false}
+        confirmDisabled={!deletingRun || deleteConfirmation !== deletingRun.id}
+        destructive
+        error={view.error}
+      >
+        <div className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground">
+          <p>{lang === "ar" ? "معرّف العملية المطلوب:" : "Required run ID:"}</p>
+          <p dir="ltr" className="mt-1 break-all font-mono font-semibold">{deletingRun?.id}</p>
+        </div>
+        <Field label={lang === "ar" ? "اكتب معرّف العملية للتأكيد" : "Type the run ID to confirm"} required>
+          {(fp) => <Input {...fp} dir="ltr" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} />}
+        </Field>
+      </BackupDialog>
     </div>
   );
 }
 
-const labelClass = "mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500";
-const inputClass = "min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white";
 const uuidV7Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

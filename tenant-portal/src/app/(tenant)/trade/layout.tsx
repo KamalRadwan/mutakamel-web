@@ -1,12 +1,10 @@
-"use client";
+import { TradeScopeProvider } from "./useTradeScope";
 
-import { Navbar } from "@/components/layout/Navbar";
-
+// The operating context is mounted for the whole route group, not per screen:
+// Trade resolves a route's scope target — and therefore which permission is
+// checked at all — from headers that must be identical across every screen the
+// user moves between. A per-screen selector would let two Trade screens
+// disagree about the company they are reading.
 export default function TradeLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#090d16]">
-      <Navbar />
-      <main className="flex-1 w-full p-4">{children}</main>
-    </div>
-  );
+  return <TradeScopeProvider>{children}</TradeScopeProvider>;
 }

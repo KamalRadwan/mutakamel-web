@@ -2,48 +2,63 @@
 
 import { useState } from "react";
 import { RefreshCw, Settings2, SlidersHorizontal, Undo2 } from "lucide-react";
-import { BackupCompressionAlgorithm, type BackupDatabaseConfig } from "../types";
+import { BackupCompressionAlgorithm, type BackupDatabaseConfig, type BackupPolicy } from "../types";
 import { BackupDialog } from "../components/BackupDialog";
 import { BackupErrorBanner } from "../components/BackupErrorBanner";
 import { BackupPageHeader } from "../components/BackupPageHeader";
 import { BackupServerSelect } from "../components/BackupServerSelect";
 import { BackupStatePanel } from "../components/BackupStatePanel";
 import { useBackupPolicies } from "../hooks/useBackupPolicies";
+import { formatBackupNumber } from "../lib/backup-format";
 import { useI18n } from "@/i18n/I18nContext";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+  Field,
+  Input,
+  Checkbox,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  Badge,
+  Button,
+  DataTable,
+  type ColumnDef,
+} from "@/design-system";
 
 export function BackupPoliciesScreen() {
-  const { lang } = useI18n();
-  const isArabic = lang === "ar";
+  const { dir, lang, t } = useI18n();
+  const copy = t.backup.policiesScreen;
+  const locale = lang === "ar" ? "ar-EG" : "en-US";
   const view = useBackupPolicies();
-  const [enabled, setEnabled] = useState(true);
-  const [cronExpression, setCronExpression] = useState("0 2 * * *");
-  const [timezone, setTimezone] = useState("UTC");
-  const [retentionDays, setRetentionDays] = useState("30");
-  const [serverConcurrency, setServerConcurrency] = useState(2);
-  const [tenantConcurrency, setTenantConcurrency] = useState(2);
-  const [defaultBackupEnabled, setDefaultBackupEnabled] = useState(true);
-  const [defaultCompressionEnabled, setDefaultCompressionEnabled] = useState(true);
-  const [defaultAlgorithm, setDefaultAlgorithm] = useState<BackupCompressionAlgorithm>(BackupCompressionAlgorithm.GZIP);
+  const policySourceKey = view.policy ? `${view.policy.id}:${view.policy.updatedAt}` : "none";
+  const loadedPolicyDraft = createPolicyDraft(view.policy, policySourceKey);
+  const [savedPolicyDraft, setSavedPolicyDraft] = useState(loadedPolicyDraft);
+  const policyDraft = savedPolicyDraft.sourceKey === policySourceKey ? savedPolicyDraft : loadedPolicyDraft;
+  const updatePolicyDraft = (next: Partial<Omit<PolicyDraft, "sourceKey">>) => {
+    setSavedPolicyDraft({ ...policyDraft, ...next, sourceKey: policySourceKey });
+  };
+  const {
+    enabled,
+    cronExpression,
+    timezone,
+    retentionDays,
+    serverConcurrency,
+    tenantConcurrency,
+    defaultBackupEnabled,
+    defaultCompressionEnabled,
+    defaultAlgorithm,
+  } = policyDraft;
   const [editingDatabase, setEditingDatabase] = useState<BackupDatabaseConfig | null>(null);
   const [overrideBackup, setOverrideBackup] = useState("inherit");
   const [overrideCompression, setOverrideCompression] = useState("inherit");
   const [overrideAlgorithm, setOverrideAlgorithm] = useState("inherit");
-
-  const [prevPolicy, setPrevPolicy] = useState(view.policy);
-  if (view.policy !== prevPolicy) {
-    setPrevPolicy(view.policy);
-    if (view.policy) {
-      setEnabled(view.policy.enabled);
-      setCronExpression(view.policy.cronExpression);
-      setTimezone(view.policy.timezone);
-      setRetentionDays(String(view.policy.retentionDays));
-      setServerConcurrency(view.policy.serverConcurrency);
-      setTenantConcurrency(view.policy.tenantConcurrency);
-      setDefaultBackupEnabled(view.policy.defaultBackupEnabled);
-      setDefaultCompressionEnabled(view.policy.defaultCompressionEnabled);
-      setDefaultAlgorithm(view.policy.defaultCompressionAlgorithm);
-    }
-  }
 
   const openOverride = (database: BackupDatabaseConfig) => {
     setEditingDatabase(database);
@@ -56,8 +71,8 @@ export function BackupPoliciesScreen() {
     return (
       <BackupStatePanel
         kind="forbidden"
-        title={isArabic ? "اختيار الخادم غير متاح" : "Server selection is restricted"}
-        description={isArabic ? "تحتاج إلى admin.database_servers.read لإعداد سياسة لخادم جديد." : "admin.database_servers.read is required to configure a policy for a registered server."}
+        title={copy.restrictedTitle}
+        description={copy.restrictedDescription}
       />
     );
   }
@@ -72,93 +87,319 @@ export function BackupPoliciesScreen() {
     Number(retentionDays) <= 3650 &&
     serverConcurrency >= 1 && serverConcurrency <= 10 &&
     tenantConcurrency >= 1 && tenantConcurrency <= 10;
+  const cronError = !cronExpression.trim() || cronExpression.length > 120
+    ? lang === "ar" ? "أدخل تعبير جدولة صالحاً بطول لا يتجاوز 120 حرفاً." : "Enter a schedule expression up to 120 characters."
+    : undefined;
+  const timezoneError = !timezone.trim() || timezone.length > 80
+    ? lang === "ar" ? "أدخل منطقة زمنية صالحة بطول لا يتجاوز 80 حرفاً." : "Enter a timezone up to 80 characters."
+    : undefined;
+  const retentionError = retentionDays === "" || Number(retentionDays) < 1 || Number(retentionDays) > 3650
+    ? lang === "ar" ? "يجب أن تكون مدة الاحتفاظ بين 1 و3650 يوماً." : "Retention must be between 1 and 3650 days."
+    : undefined;
+  const serverConcurrencyError = serverConcurrency < 1 || serverConcurrency > 10
+    ? lang === "ar" ? "يجب أن يكون توازي الخوادم بين 1 و10." : "Server concurrency must be between 1 and 10."
+    : undefined;
+  const tenantConcurrencyError = tenantConcurrency < 1 || tenantConcurrency > 10
+    ? lang === "ar" ? "يجب أن يكون توازي المستأجرين بين 1 و10." : "Tenant concurrency must be between 1 and 10."
+    : undefined;
+
+  const databaseColumns: ColumnDef<BackupDatabaseConfig>[] = [
+    {
+      key: "database",
+      headerEn: "Database",
+      headerAr: "قاعدة البيانات",
+      cell: (database) => (
+        <div>
+          <p dir="ltr" className="font-mono font-semibold">{database.databaseName}</p>
+          <p dir="ltr" className="mt-1 font-mono text-xs text-muted-foreground">{database.tenantId}</p>
+        </div>
+      ),
+    },
+    { key: "tenantStatus", headerEn: "Tenant status", headerAr: "حالة المستأجر", cell: (database) => <span className="font-semibold">{database.tenantStatus}</span> },
+    {
+      key: "backup",
+      headerEn: "Backup",
+      headerAr: "النسخ",
+      cell: (database) => (
+        <div className="flex items-center gap-2">
+          {database.backupEnabled ? copy.enabledValue : copy.disabledValue}
+          {database.override && <Badge tone="warn">{lang === "ar" ? "تجاوز" : "Override"}</Badge>}
+        </div>
+      ),
+    },
+    { key: "compression", headerEn: "Compression", headerAr: "الضغط", cell: (database) => <span>{database.compressionEnabled ? database.compressionAlgorithm : "none"}</span> },
+    {
+      key: "actions",
+      headerEn: "Actions",
+      headerAr: "الإجراءات",
+      align: "end",
+      cell: (database) => (
+        <div className="flex items-center justify-end gap-2">
+          {view.canManage && (
+            <Button type="button" variant="outline" size="sm" onClick={() => openOverride(database)} disabled={Boolean(view.activeAction)}>
+              {copy.editAction}
+            </Button>
+          )}
+          {view.canManage && database.override && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void view.resetOverride(database.tenantId).catch(() => undefined)}
+              disabled={Boolean(view.activeAction)}
+              loading={view.activeAction === `reset:${database.tenantId}`}
+              aria-label={copy.resetOverrideAriaLabel}
+              className="size-9 p-0 text-muted-foreground"
+            >
+              {view.activeAction !== `reset:${database.tenantId}` && <Undo2 className="size-4" aria-hidden="true" />}
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       <BackupPageHeader
-        eyebrow={isArabic ? "جدولة Worker" : "Worker scheduling"}
-        title={isArabic ? "سياسات النسخ الاحتياطي" : "Backup policies"}
-        description={isArabic
-          ? "سياسة مستقلة لكل خادم مع إعدادات افتراضية واستثناءات محددة لكل قاعدة بيانات."
-          : "One policy per database server, with inherited defaults and explicit per-database overrides."}
+        eyebrow={copy.eyebrow}
+        title={copy.title}
+        description={copy.description}
       />
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-          <BackupServerSelect label={isArabic ? "خادم قاعدة البيانات" : "Database server"} value={view.selectedServerId} servers={view.servers} onChange={view.setSelectedServerId} disabled={view.isLoading || Boolean(view.activeAction)} placeholder={isArabic ? "اختر خادم قاعدة بيانات" : "Select a database server"} />
-          <button type="button" onClick={() => void view.refresh()} disabled={!view.selectedServerId || view.isLoadingData} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 text-sm font-bold hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-900">
-            <RefreshCw className={`size-4 ${view.isLoadingData ? "animate-spin" : ""}`} aria-hidden="true" />{isArabic ? "تحديث" : "Refresh"}
-          </button>
-        </div>
-      </section>
+      <Card>
+        <CardContent className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <BackupServerSelect
+            label={copy.databaseServerLabel}
+            value={view.selectedServerId}
+            servers={view.servers}
+            onChange={view.setSelectedServerId}
+            disabled={view.isLoading || Boolean(view.activeAction)}
+            placeholder={copy.selectServerPlaceholder}
+            required
+          />
+          <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={!view.selectedServerId || view.isLoadingData} loading={view.isLoadingData}>
+            {!view.isLoadingData && <RefreshCw className="size-4" aria-hidden="true" />}
+            {copy.refreshButton}
+          </Button>
+        </CardContent>
+      </Card>
 
-      {view.error ? <BackupErrorBanner error={view.error} /> : null}
+      {view.error && !editingDatabase && <BackupErrorBanner error={view.error} />}
 
       {view.isLoading || view.isLoadingData ? (
-        <BackupStatePanel kind="loading" title={isArabic ? "جارٍ تحميل السياسة" : "Loading policy"} description={isArabic ? "قراءة الإعدادات وقواعد البيانات التابعة." : "Reading policy and tenant database configuration."} />
-      ) : view.error ? null : !view.selectedServerId || !view.policy ? (
-        <BackupStatePanel kind="empty" title={isArabic ? "اختر خادمًا" : "Select a server"} description={isArabic ? "لا توجد سياسة قابلة للعرض بدون سياق خادم." : "A server context is required before a policy can be displayed."} />
+        <BackupStatePanel kind="loading" title={copy.loadingTitle} description={copy.loadingDescription} />
+      ) : !view.selectedServerId || !view.policy ? (
+        view.error ? null : <BackupStatePanel kind="empty" title={copy.selectServerTitle} description={copy.selectServerDescription} />
       ) : (
         <>
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 sm:p-6">
-            <div className="flex items-start justify-between gap-4">
+          <Card>
+            <CardHeader className="flex-col items-start justify-between gap-3 space-y-0 sm:flex-row">
               <div>
-                <h2 className="flex items-center gap-2 text-base font-bold"><Settings2 className="size-5 text-cyan-700" aria-hidden="true" />{isArabic ? "الإعدادات الافتراضية" : "Policy defaults"}</h2>
-                <p className="mt-1 text-sm text-slate-500">{isArabic ? "تطبق على قواعد البيانات التي لا تملك استثناءً." : "Applied to databases without an explicit override."}</p>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Settings2 className="size-5 text-info" aria-hidden="true" />
+                  {copy.policyDefaultsTitle}
+                </CardTitle>
+                <CardDescription>{copy.policyDefaultsDescription}</CardDescription>
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-bold ${enabled ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>{enabled ? (isArabic ? "مفعلة" : "Enabled") : (isArabic ? "متوقفة" : "Disabled")}</span>
-            </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm font-bold dark:border-slate-700"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} disabled={!view.canManage} />{isArabic ? "تفعيل السياسة" : "Policy enabled"}</label>
-              <Field label={isArabic ? "تعبير Cron" : "Cron expression"}><input value={cronExpression} onChange={(event) => setCronExpression(event.target.value)} disabled={!view.canManage} maxLength={120} className={inputClass} /></Field>
-              <Field label={isArabic ? "المنطقة الزمنية" : "Timezone"}><input value={timezone} onChange={(event) => setTimezone(event.target.value)} disabled={!view.canManage} maxLength={80} className={inputClass} /></Field>
-              <Field label={isArabic ? "الاحتفاظ بالأيام" : "Retention days"}><input type="number" min={1} max={3650} value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} disabled={!view.canManage} className={inputClass} placeholder="30" /></Field>
-              <Field label={isArabic ? "تزامن الخادم" : "Server concurrency"}><input type="number" min={1} max={10} value={serverConcurrency} onChange={(event) => setServerConcurrency(Number(event.target.value))} disabled={!view.canManage} className={inputClass} /></Field>
-              <Field label={isArabic ? "تزامن العملاء" : "Tenant concurrency"}><input type="number" min={1} max={10} value={tenantConcurrency} onChange={(event) => setTenantConcurrency(Number(event.target.value))} disabled={!view.canManage} className={inputClass} /></Field>
-              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm font-bold dark:border-slate-700"><input type="checkbox" checked={defaultBackupEnabled} onChange={(event) => setDefaultBackupEnabled(event.target.checked)} disabled={!view.canManage} />{isArabic ? "النسخ افتراضيًا" : "Backup by default"}</label>
-              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm font-bold dark:border-slate-700"><input type="checkbox" checked={defaultCompressionEnabled} onChange={(event) => setDefaultCompressionEnabled(event.target.checked)} disabled={!view.canManage} />{isArabic ? "الضغط افتراضيًا" : "Compress by default"}</label>
-              <Field label={isArabic ? "خوارزمية الضغط" : "Compression algorithm"}><select value={defaultAlgorithm} onChange={(event) => setDefaultAlgorithm(event.target.value as BackupCompressionAlgorithm)} disabled={!view.canManage} className={inputClass}><option value={BackupCompressionAlgorithm.GZIP}>gzip</option><option value={BackupCompressionAlgorithm.NONE}>none</option></select></Field>
-            </div>
-
-            {view.canManage ? (
-              <div className="mt-6 flex justify-end">
-                <button type="button" disabled={!policyValid || !view.ownsSelectedServerState || view.activeAction === "policy"} onClick={() => void view.savePolicy({ enabled, cronExpression: cronExpression.trim(), timezone: timezone.trim(), retentionDays: Number(retentionDays), serverConcurrency, tenantConcurrency, defaultBackupEnabled, defaultCompressionEnabled, defaultCompressionAlgorithm: defaultAlgorithm }).catch(() => undefined)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-cyan-700 px-5 text-sm font-bold text-white hover:bg-cyan-800 disabled:opacity-50"><Settings2 className="size-4" aria-hidden="true" />{isArabic ? "حفظ السياسة" : "Save policy"}</button>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex items-center justify-between gap-4 border-b border-slate-200 p-5 dark:border-slate-800">
-              <div><h2 className="flex items-center gap-2 text-base font-bold"><SlidersHorizontal className="size-5 text-cyan-700" aria-hidden="true" />{isArabic ? "إعدادات قواعد البيانات" : "Database configuration"}</h2><p className="mt-1 text-sm text-slate-500">{isArabic ? "الاستثناءات ظاهرة بوضوح ويمكن إعادتها للقيم الافتراضية." : "Overrides are explicit and can be reset to policy defaults."}</p></div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold dark:bg-slate-800">{view.databases.length}</span>
-            </div>
-            {view.databases.length === 0 ? (
-              <p className="p-8 text-center text-sm text-slate-500">{isArabic ? "لا توجد قواعد بيانات مستأجرين على هذا الخادم." : "No tenant databases are placed on this server."}</p>
-            ) : (
-              <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 dark:bg-slate-900"><tr><th className="px-5 py-3 text-start">{isArabic ? "قاعدة البيانات" : "Database"}</th><th className="px-5 py-3 text-start">{isArabic ? "حالة المستأجر" : "Tenant status"}</th><th className="px-5 py-3 text-start">{isArabic ? "النسخ" : "Backup"}</th><th className="px-5 py-3 text-start">{isArabic ? "الضغط" : "Compression"}</th><th className="px-5 py-3 text-end">{isArabic ? "الإجراءات" : "Actions"}</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{view.databases.map((database) => <tr key={database.tenantId}><td className="px-5 py-4"><p className="font-mono font-bold">{database.databaseName}</p><p className="mt-1 font-mono text-xs text-slate-500">{database.tenantId}</p></td><td className="px-5 py-4 font-semibold">{database.tenantStatus}</td><td className="px-5 py-4">{database.backupEnabled ? (isArabic ? "مفعّل" : "Enabled") : (isArabic ? "متوقف" : "Disabled")}{database.override ? <span className="ms-2 rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">Override</span> : null}</td><td className="px-5 py-4">{database.compressionEnabled ? database.compressionAlgorithm : "none"}</td><td className="px-5 py-4 text-end"><div className="inline-flex gap-2">{view.canManage ? <button type="button" onClick={() => openOverride(database)} className="min-h-11 rounded-xl border border-slate-300 px-3 text-xs font-bold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900">{isArabic ? "تعديل" : "Edit"}</button> : null}{view.canManage && database.override ? <button type="button" onClick={() => void view.resetOverride(database.tenantId).catch(() => undefined)} disabled={view.activeAction === `reset:${database.tenantId}`} className="grid size-11 place-items-center rounded-xl text-slate-500 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-900" aria-label={isArabic ? "إعادة الافتراضي" : "Reset override"}><Undo2 className="size-4" /></button> : null}</div></td></tr>)}</tbody></table></div>
+              <Badge tone={enabled ? "success" : "neutral"}>{enabled ? copy.policyEnabledBadge : copy.policyDisabledBadge}</Badge>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <label htmlFor="backup-policy-enabled" className="flex min-h-(--size-control-lg) items-center gap-3 rounded-md border border-border px-3 text-sm font-semibold">
+                <Checkbox id="backup-policy-enabled" checked={enabled} onCheckedChange={(c) => updatePolicyDraft({ enabled: c === true })} disabled={!view.canManage} />
+                {copy.policyEnabledLabel}
+              </label>
+              <Field label={copy.cronLabel} error={cronError} required>
+                {(fp) => <Input {...fp} dir="ltr" value={cronExpression} onChange={(e) => updatePolicyDraft({ cronExpression: e.target.value })} disabled={!view.canManage} maxLength={120} />}
+              </Field>
+              <Field label={copy.timezoneLabel} error={timezoneError} required>
+                {(fp) => <Input {...fp} dir="ltr" value={timezone} onChange={(e) => updatePolicyDraft({ timezone: e.target.value })} disabled={!view.canManage} maxLength={80} />}
+              </Field>
+              <Field label={copy.retentionDaysLabel} error={retentionError} required>
+                {(fp) => <Input {...fp} dir="ltr" type="number" min={1} max={3650} value={retentionDays} onChange={(e) => updatePolicyDraft({ retentionDays: e.target.value })} disabled={!view.canManage} placeholder="30" />}
+              </Field>
+              <Field label={copy.serverConcurrencyLabel} error={serverConcurrencyError} required>
+                {(fp) => <Input {...fp} dir="ltr" type="number" min={1} max={10} value={serverConcurrency} onChange={(e) => updatePolicyDraft({ serverConcurrency: Number(e.target.value) })} disabled={!view.canManage} />}
+              </Field>
+              <Field label={copy.tenantConcurrencyLabel} error={tenantConcurrencyError} required>
+                {(fp) => <Input {...fp} dir="ltr" type="number" min={1} max={10} value={tenantConcurrency} onChange={(e) => updatePolicyDraft({ tenantConcurrency: Number(e.target.value) })} disabled={!view.canManage} />}
+              </Field>
+              <label htmlFor="backup-policy-default-enabled" className="flex min-h-(--size-control-lg) items-center gap-3 rounded-md border border-border px-3 text-sm font-semibold">
+                <Checkbox id="backup-policy-default-enabled" checked={defaultBackupEnabled} onCheckedChange={(c) => updatePolicyDraft({ defaultBackupEnabled: c === true })} disabled={!view.canManage} />
+                {copy.backupByDefaultLabel}
+              </label>
+              <label htmlFor="backup-policy-compression-enabled" className="flex min-h-(--size-control-lg) items-center gap-3 rounded-md border border-border px-3 text-sm font-semibold">
+                <Checkbox id="backup-policy-compression-enabled" checked={defaultCompressionEnabled} onCheckedChange={(c) => updatePolicyDraft({ defaultCompressionEnabled: c === true })} disabled={!view.canManage} />
+                {copy.compressByDefaultLabel}
+              </label>
+              <Field label={copy.defaultCompressionAlgorithmLabel} required>
+                {(fp) => (
+                  <Select value={defaultAlgorithm} onValueChange={(v) => updatePolicyDraft({ defaultAlgorithm: v as BackupCompressionAlgorithm })} disabled={!view.canManage} dir={dir}>
+                    <SelectTrigger {...fp}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={BackupCompressionAlgorithm.GZIP}>gzip</SelectItem>
+                      <SelectItem value={BackupCompressionAlgorithm.NONE}>none</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              </Field>
+            </CardContent>
+            {view.canManage && (
+              <CardFooter className="justify-end">
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={!policyValid || !view.ownsSelectedServerState || view.activeAction === "policy"}
+                  loading={view.activeAction === "policy"}
+                  onClick={() =>
+                    void view
+                      .savePolicy({
+                        enabled,
+                        cronExpression: cronExpression.trim(),
+                        timezone: timezone.trim(),
+                        retentionDays: Number(retentionDays),
+                        serverConcurrency,
+                        tenantConcurrency,
+                        defaultBackupEnabled,
+                        defaultCompressionEnabled,
+                        defaultCompressionAlgorithm: defaultAlgorithm,
+                      })
+                      .catch(() => undefined)
+                  }
+                >
+                  {view.activeAction !== "policy" && <Settings2 className="size-4" aria-hidden="true" />}
+                  {copy.savePolicyButton}
+                </Button>
+              </CardFooter>
             )}
+          </Card>
+
+          <section className="space-y-3" aria-labelledby="backup-database-config-title">
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h2 id="backup-database-config-title" className="flex items-center gap-2 text-base font-semibold">
+                  <SlidersHorizontal className="size-5 text-info" aria-hidden="true" />
+                  {copy.databaseConfigTitle}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">{copy.databaseConfigDescription}</p>
+              </div>
+              <Badge tone="neutral">{formatBackupNumber(view.databases.length, locale)}</Badge>
+            </div>
+            <DataTable
+              labelEn="Tenant backup configuration"
+              labelAr="إعدادات النسخ الاحتياطي للمستأجرين"
+              columns={databaseColumns}
+              data={view.databases}
+              getRowId={(database) => database.tenantId}
+              getRowLabel={(database) => database.databaseName}
+              responsiveMode="record-cards"
+              pagination={{ page: 1, limit: view.databases.length || 1, totalItems: view.databases.length, totalPages: 1, onPageChange: () => {} }}
+              emptyState={{ titleEn: "No tenant databases are placed on this server.", titleAr: "لا توجد قواعد بيانات مستأجرين على هذا الخادم." }}
+            />
           </section>
         </>
       )}
 
-      <BackupDialog open={editingDatabase !== null} title={isArabic ? "تعديل استثناء قاعدة البيانات" : "Edit database override"} description={editingDatabase ? editingDatabase.databaseName : ""} confirmLabel={isArabic ? "حفظ الاستثناء" : "Save override"} onClose={() => setEditingDatabase(null)} onConfirm={() => { if (!editingDatabase) return; void view.saveOverride(editingDatabase.tenantId, { backupEnabled: triStateBoolean(overrideBackup), compressionEnabled: triStateBoolean(overrideCompression), compressionAlgorithm: overrideAlgorithm === "inherit" ? null : overrideAlgorithm as BackupCompressionAlgorithm }).then(() => setEditingDatabase(null)).catch(() => undefined); }} isSubmitting={editingDatabase ? view.activeAction === `override:${editingDatabase.tenantId}` : false} confirmDisabled={!view.ownsSelectedServerState}>
-        <Field label={isArabic ? "النسخ الاحتياطي" : "Backup enabled"}><select value={overrideBackup} onChange={(event) => setOverrideBackup(event.target.value)} className={inputClass}><option value="inherit">{isArabic ? "يرث السياسة" : "Inherit policy"}</option><option value="enabled">{isArabic ? "مفعّل" : "Enabled"}</option><option value="disabled">{isArabic ? "متوقف" : "Disabled"}</option></select></Field>
-        <Field label={isArabic ? "الضغط" : "Compression enabled"}><select value={overrideCompression} onChange={(event) => setOverrideCompression(event.target.value)} className={inputClass}><option value="inherit">{isArabic ? "يرث السياسة" : "Inherit policy"}</option><option value="enabled">{isArabic ? "مفعّل" : "Enabled"}</option><option value="disabled">{isArabic ? "متوقف" : "Disabled"}</option></select></Field>
-        <Field label={isArabic ? "الخوارزمية" : "Compression algorithm"}><select value={overrideAlgorithm} onChange={(event) => setOverrideAlgorithm(event.target.value)} className={inputClass}><option value="inherit">{isArabic ? "يرث السياسة" : "Inherit policy"}</option><option value={BackupCompressionAlgorithm.GZIP}>gzip</option><option value={BackupCompressionAlgorithm.NONE}>none</option></select></Field>
+      <BackupDialog
+        open={editingDatabase !== null}
+        title={copy.editOverrideDialogTitle}
+        description={editingDatabase ? editingDatabase.databaseName : ""}
+        confirmLabel={copy.saveOverrideButton}
+        onClose={() => setEditingDatabase(null)}
+        onConfirm={() => {
+          if (!editingDatabase) return;
+          void view
+            .saveOverride(editingDatabase.tenantId, {
+              backupEnabled: triStateBoolean(overrideBackup),
+              compressionEnabled: triStateBoolean(overrideCompression),
+              compressionAlgorithm: overrideAlgorithm === "inherit" ? null : (overrideAlgorithm as BackupCompressionAlgorithm),
+            })
+            .then(() => setEditingDatabase(null))
+            .catch(() => undefined);
+        }}
+        isSubmitting={editingDatabase ? view.activeAction === `override:${editingDatabase.tenantId}` : false}
+        confirmDisabled={!view.ownsSelectedServerState}
+        error={view.error}
+      >
+        <Field label={copy.backupEnabledFieldLabel} required>
+          {(fp) => (
+            <Select value={overrideBackup} onValueChange={setOverrideBackup} dir={dir}>
+              <SelectTrigger {...fp}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inherit">{copy.inheritPolicyOption}</SelectItem>
+                <SelectItem value="enabled">{copy.enabledValue}</SelectItem>
+                <SelectItem value="disabled">{copy.disabledValue}</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
+        <Field label={copy.compressionEnabledFieldLabel} required>
+          {(fp) => (
+            <Select value={overrideCompression} onValueChange={setOverrideCompression} dir={dir}>
+              <SelectTrigger {...fp}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inherit">{copy.inheritPolicyOption}</SelectItem>
+                <SelectItem value="enabled">{copy.enabledValue}</SelectItem>
+                <SelectItem value="disabled">{copy.disabledValue}</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
+        <Field label={copy.overrideAlgorithmFieldLabel} required>
+          {(fp) => (
+            <Select value={overrideAlgorithm} onValueChange={setOverrideAlgorithm} dir={dir}>
+              <SelectTrigger {...fp}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inherit">{copy.inheritPolicyOption}</SelectItem>
+                <SelectItem value={BackupCompressionAlgorithm.GZIP}>gzip</SelectItem>
+                <SelectItem value={BackupCompressionAlgorithm.NONE}>none</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
       </BackupDialog>
     </div>
   );
-}
-
-const inputClass = "mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">{label}{children}</label>;
 }
 
 function triStateBoolean(value: string): boolean | null {
   if (value === "enabled") return true;
   if (value === "disabled") return false;
   return null;
+}
+
+interface PolicyDraft {
+  sourceKey: string;
+  enabled: boolean;
+  cronExpression: string;
+  timezone: string;
+  retentionDays: string;
+  serverConcurrency: number;
+  tenantConcurrency: number;
+  defaultBackupEnabled: boolean;
+  defaultCompressionEnabled: boolean;
+  defaultAlgorithm: BackupCompressionAlgorithm;
+}
+
+function createPolicyDraft(policy: BackupPolicy | null, sourceKey: string): PolicyDraft {
+  return {
+    sourceKey,
+    enabled: policy?.enabled ?? true,
+    cronExpression: policy?.cronExpression ?? "0 2 * * *",
+    timezone: policy?.timezone ?? "UTC",
+    retentionDays: String(policy?.retentionDays ?? 30),
+    serverConcurrency: policy?.serverConcurrency ?? 2,
+    tenantConcurrency: policy?.tenantConcurrency ?? 2,
+    defaultBackupEnabled: policy?.defaultBackupEnabled ?? true,
+    defaultCompressionEnabled: policy?.defaultCompressionEnabled ?? true,
+    defaultAlgorithm: policy?.defaultCompressionAlgorithm ?? BackupCompressionAlgorithm.GZIP,
+  };
 }

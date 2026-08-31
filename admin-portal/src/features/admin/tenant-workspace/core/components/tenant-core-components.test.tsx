@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import {
   CUSTOM_FQDN_ID,
-  TENANT_ID,
   customFqdnFixture,
   tenantFixture,
 } from "../__tests__/fixtures";
@@ -13,19 +12,6 @@ import type { UseTenantFqdnManagementResult } from "../hooks/useTenantFqdnManage
 import { createTenantProfileDraft } from "../model/readers";
 import type { TenantStatus, TenantView } from "../types";
 
-const hooks = vi.hoisted(() => ({
-  core: vi.fn(),
-  fqdn: vi.fn(),
-}));
-
-vi.mock("../hooks/useTenantCoreWorkspace", () => ({
-  useTenantCoreWorkspace: hooks.core,
-}));
-vi.mock("../hooks/useTenantFqdnManagement", () => ({
-  useTenantFqdnManagement: hooks.fqdn,
-}));
-
-import { TenantCoreWorkspace } from "./TenantCoreWorkspace";
 import { TenantFqdnPanel } from "./TenantFqdnPanel";
 import { TenantLifecyclePanel } from "./TenantLifecyclePanel";
 import { TenantProfilePanel } from "./TenantProfilePanel";
@@ -46,6 +32,7 @@ function workspaceFixture(
       canSuspendOrActivate: true,
       canReprovisionOrCancel: true,
       canSoftDelete: true,
+      canRestore: true,
       canDestroy: true,
       canValidateFqdn: true,
       canManageFqdns: true,
@@ -71,6 +58,7 @@ function workspaceFixture(
     reprovision: vi.fn().mockResolvedValue(null),
     cancelProvisioning: vi.fn().mockResolvedValue(null),
     softDelete: vi.fn().mockResolvedValue(tenant),
+    restore: vi.fn().mockResolvedValue(tenant),
     destroy: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as UseTenantCoreWorkspaceResult;
@@ -100,70 +88,6 @@ function fqdnFixture(
   } as UseTenantFqdnManagementResult;
 }
 
-describe("TenantCoreWorkspace", () => {
-  beforeEach(() => {
-    hooks.core.mockReset();
-    hooks.fqdn.mockReset();
-  });
-
-  it("renders a compact Arabic tenant-first workspace with readiness evidence", () => {
-    const workspace = workspaceFixture("PROVISIONING", {
-      isPolling: true,
-    });
-    hooks.core.mockReturnValue(workspace);
-    hooks.fqdn.mockReturnValue(fqdnFixture(workspace.tenant!));
-
-    render(<TenantCoreWorkspace tenantId={TENANT_ID} locale="ar" />);
-    const root = screen.getByTestId("tenant-core-workspace");
-    expect(root).toHaveAttribute("dir", "rtl");
-    expect(screen.getByText("إدارة المستأجر")).toBeInTheDocument();
-    expect(
-      screen.getByText("الوصول لقاعدة المستأجر غير متاح بعد"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "إلغاء التجهيز" }),
-    ).toBeInTheDocument();
-  });
-
-  it("shows forbidden, error correlation, and destroyed states independently", () => {
-    hooks.fqdn.mockReturnValue(fqdnFixture());
-    hooks.core.mockReturnValue(
-      workspaceFixture("ACTIVE", {
-        tenant: null,
-        resourceState: "forbidden",
-      }),
-    );
-    const { rerender } = render(<TenantCoreWorkspace tenantId={TENANT_ID} />);
-    expect(screen.getByText(/do not have permission/i)).toBeInTheDocument();
-
-    hooks.core.mockReturnValue(
-      workspaceFixture("ACTIVE", {
-        tenant: null,
-        resourceState: "error",
-        loadError: {
-          isNormalized: true,
-          httpStatus: 503,
-          errorCode: "TEMPORARY",
-          message: "Temporarily unavailable",
-          correlationId: "corr-1",
-        },
-      }),
-    );
-    rerender(<TenantCoreWorkspace tenantId={TENANT_ID} />);
-    expect(screen.getByText("Temporarily unavailable")).toBeInTheDocument();
-    expect(screen.getByText(/corr-1/)).toBeInTheDocument();
-
-    hooks.core.mockReturnValue(
-      workspaceFixture("DELETED", {
-        tenant: null,
-        resourceState: "destroyed",
-      }),
-    );
-    rerender(<TenantCoreWorkspace tenantId={TENANT_ID} />);
-    expect(screen.getByText(/permanently destroyed/i)).toBeInTheDocument();
-  });
-});
-
 describe("tenant profile and lifecycle panels", () => {
   it("handles a null address and updates all profile fields through one draft", () => {
     const tenant = tenantFixture("ACTIVE", { address: null, phone: null });
@@ -189,6 +113,33 @@ describe("tenant profile and lifecycle panels", () => {
     });
     expect(updateAddressField).toHaveBeenCalledWith("city", "Giza");
     expect(screen.getByRole("button", { name: "Save profile" })).toBeEnabled();
+  });
+
+  it("focuses a persistent validation summary and keeps required profile errors associated", async () => {
+    const tenant = tenantFixture("ACTIVE");
+    const saveProfile = vi.fn();
+    const workspace = workspaceFixture("ACTIVE", {
+      tenant,
+      profileDraft: {
+        ...createTenantProfileDraft(tenant),
+        companyName: "",
+        countryName: "",
+        countryIsoCode: "",
+      },
+      profileDirty: true,
+      saveProfile,
+    });
+    render(<TenantProfilePanel locale="en" workspace={workspace} />);
+
+    const form = screen.getByRole("button", { name: "Save profile" }).closest("form");
+    expect(form).not.toBeNull();
+    fireEvent.submit(form!);
+
+    const summary = screen.getByText("Review the required profile fields.").closest("[role='alert']");
+    await waitFor(() => expect(summary).toHaveFocus());
+    expect(screen.getByLabelText("Company name")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Company name")).toHaveAttribute("name", "companyName");
+    expect(saveProfile).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -226,9 +177,74 @@ describe("tenant profile and lifecycle panels", () => {
     await vi.waitFor(() => expect(destroy).toHaveBeenCalledWith(true));
     expect(onDestroyed).toHaveBeenCalledOnce();
   });
+
+  it("offers restore beside destroy on a deleted tenant", async () => {
+    const restore = vi.fn().mockResolvedValue(tenantFixture("SUSPENDED"));
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", { restore })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Restore tenant" }));
+    const dialog = screen.getByRole("alertdialog", {
+      name: "Restore tenant",
+    });
+    // The dialog states the landing state so restore is not mistaken for
+    // putting the tenant straight back into service.
+    expect(dialog).toHaveTextContent("SUSPENDED");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+
+    await vi.waitFor(() => expect(restore).toHaveBeenCalledOnce());
+  });
+
+  it("hides restore from an admin without the restore grant", () => {
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          permissions: {
+            ...workspaceFixture("DELETED").permissions,
+            canRestore: false,
+          },
+        })}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Restore tenant" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Destroy permanently" }),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("TenantFqdnPanel", () => {
+  it("explains released domains and withholds the attach form on a deleted tenant", () => {
+    const tenant = tenantFixture("DELETED", { fqdns: [] });
+    render(
+      <TenantFqdnPanel
+        locale="en"
+        tenant={tenant}
+        permissions={{
+          canRead: true,
+          canValidateFqdn: true,
+          canManageFqdns: true,
+        }}
+        fqdn={fqdnFixture(tenant)}
+      />,
+    );
+    expect(screen.getByText(/Domains were released/i)).toBeInTheDocument();
+    // Every domain mutation requires an ACTIVE tenant, so the controls that
+    // would only produce a 409 are not rendered at all.
+    expect(
+      screen.queryByRole("button", { name: "Attach domain" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Validate" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("never offers primary promotion to a tenant with its platform domain", () => {
     const tenant = tenantFixture("ACTIVE", {
       fqdns: [tenantFixture().fqdns[0]!, customFqdnFixture()],

@@ -35,6 +35,7 @@ import {
   getAuthErrorCode,
   getAuthErrorStatus,
   isDefinitiveAuthFailure,
+  isMissingCredentialsFailure,
 } from "@/lib/auth/sessionErrors";
 import { startTenantSessionRefreshScheduler } from "@/lib/auth/sessionRefresh";
 
@@ -79,6 +80,21 @@ interface TenantLoginOptions {
 interface TenantAuthContextValue {
   user: TenantUserProfile | null;
   authState: TenantAuthState;
+  /**
+   * The wire code that ended the session, when one was observed.
+   *
+   * This value is the whole of OPEN-QUESTIONS.md Q18: the seven session-ending
+   * codes were already classified here and then discarded, so `/session-expired`
+   * could never say *why*. It is deliberately the **raw code**, not a mapped
+   * message — a screen renders it through its own label table like every other
+   * enum, and inventing a mapping here would make an unrecognised code
+   * disappear silently.
+   *
+   * `null` is honest and common: a session ended in another tab, or by the
+   * lifecycle transition, carries no code, and no reason is better than a
+   * guessed one.
+   */
+  endedReason: string | null;
   /** Non-secret, session-bound fence used only by browser connection owners. */
   realtimeAuthGeneration: string | null;
   isAuthenticated: boolean;
@@ -95,6 +111,7 @@ const TenantAuthContext = createContext<TenantAuthContextValue | undefined>(
 export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TenantUserProfile | null>(null);
   const [authState, setAuthState] = useState<TenantAuthState>("BOOTSTRAPPING");
+  const [endedReason, setEndedReason] = useState<string | null>(null);
   const [realtimeAuthGeneration, setRealtimeAuthGeneration] = useState<string | null>(null);
   const authOperationGeneration = useRef(0);
   const bootstrapAbort = useRef<AbortController | null>(null);
@@ -128,6 +145,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       }
       const profile = readTenantUserProfile(response.data);
       setUser(profile);
+      setEndedReason(null);
       setRealtimeAuthGeneration(readRealtimeAuthGeneration(profile.id));
       setAuthState("AUTHENTICATED");
     } catch (error) {
@@ -138,12 +156,22 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       ) {
         return;
       }
-      if (!isInvalidAuthProfile(error) && !isDefinitiveAuthFailure(error)) {
+      // A 401 that says "no credentials were sent" is not a degraded server —
+      // it is a signed-out visitor, and they belong on the login form. Only a
+      // genuinely inconclusive failure earns the degraded retry screen.
+      if (
+        !isInvalidAuthProfile(error) &&
+        !isDefinitiveAuthFailure(error) &&
+        !isMissingCredentialsFailure(error)
+      ) {
         setAuthState("DEGRADED");
         return;
       }
       clearLocalTenantAuthState();
       setUser(null);
+      setEndedReason(
+        isDefinitiveAuthFailure(error) ? getAuthErrorCode(error) ?? null : null,
+      );
       setRealtimeAuthGeneration(null);
       setAuthState(isDefinitiveAuthFailure(error) ? "ENDED" : "UNAUTHENTICATED");
     } finally {
@@ -169,6 +197,9 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         invalidatePendingAuthWork();
         clearLocalTenantAuthState();
         setUser(null);
+        // A cross-tab session-ended event carries a session id and nothing
+        // else. There is no code to report and none is invented.
+        setEndedReason(null);
         setRealtimeAuthGeneration(null);
         setAuthState("ENDED");
         router.replace("/login");
@@ -199,6 +230,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       if (state === "ENDED") {
         invalidatePendingAuthWork();
         setUser(null);
+        setEndedReason(null);
         setRealtimeAuthGeneration(null);
         setAuthState("ENDED");
         router.replace("/login");
@@ -318,6 +350,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         throw sessionChangedError();
       }
       setUser(profile);
+      setEndedReason(null);
       setRealtimeAuthGeneration(readRealtimeAuthGeneration(profile.id));
       setAuthState("AUTHENTICATED");
       router.push("/");
@@ -334,6 +367,9 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       const disposition = classifyAuthFailure(
         getAuthErrorStatus(error),
         getAuthErrorCode(error),
+      );
+      setEndedReason(
+        disposition === "end" ? getAuthErrorCode(error) ?? null : null,
       );
       setAuthState(disposition === "end" ? "ENDED" : "UNAUTHENTICATED");
       throw error;
@@ -378,6 +414,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         }
         if (generation !== authOperationGeneration.current) throw error;
         setUser(null);
+        setEndedReason(getAuthErrorCode(error) ?? null);
         setRealtimeAuthGeneration(null);
         setAuthState("ENDED");
         router.replace("/login");
@@ -400,6 +437,9 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     }
     if (generation !== authOperationGeneration.current) return;
     setUser(null);
+    // A deliberate sign-out is not a session that expired, so it carries no
+    // reason to report.
+    setEndedReason(null);
     setRealtimeAuthGeneration(null);
     setAuthState("ENDED");
     router.replace("/login");
@@ -408,13 +448,14 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<TenantAuthContextValue>(() => ({
     user,
     authState,
+    endedReason,
     realtimeAuthGeneration,
     isAuthenticated: user !== null,
     isLoading: authState === "BOOTSTRAPPING" && user === null,
     login,
     logout,
     retryBootstrap: () => bootstrap(true),
-  }), [authState, bootstrap, login, logout, realtimeAuthGeneration, user]);
+  }), [authState, bootstrap, endedReason, login, logout, realtimeAuthGeneration, user]);
 
   return (
     <TenantAuthContext.Provider value={value}>

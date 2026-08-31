@@ -168,7 +168,7 @@ export function releaseQuery(query: ReleaseQuery): string {
   ]);
 }
 
-export function validateDiscoveryCommand(
+function validateDiscoveryCommand(
   command: CreateDiscoveryRunCommand,
 ): void {
   const cutoff = new Date(command.cutoffAt);

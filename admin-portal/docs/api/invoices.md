@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-12**
+Last source verification: **2026-08-31**
 
 Owner: **Core**
 
@@ -64,6 +64,27 @@ type InvoiceStatus =
 Keep quantity, price, subtotal, tax, discount, paid, due, and total fields as
 decimal strings. Do not use browser floating-point arithmetic for invoice
 truth.
+
+List rows carry the safe tenant identity Core resolves for them. It is absent
+on single-invoice reads and `null` when the billed tenant no longer exists, so
+keep `tenantId` as the rendering fallback.
+
+```ts
+interface InvoiceTenantSummary {
+  id: string;
+  name: string;
+  companyName: string;
+  status:
+    | "PROVISIONING"
+    | "PROVISIONING_FAILED"
+    | "ACTIVE"
+    | "SUSPENDED"
+    | "DELETED";
+}
+```
+
+`status` and `purpose` are wire enums. Resolve both to written bilingual
+labels before display; do not print the code.
 
 ## Lifecycle rules
 

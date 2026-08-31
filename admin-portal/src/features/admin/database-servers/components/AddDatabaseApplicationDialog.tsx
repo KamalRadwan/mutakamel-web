@@ -1,5 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Plus } from "lucide-react";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Field,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+} from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
 import { applicationsApi } from "@/features/admin/applications/api/applications.api";
 import type { ApplicationView } from "@/features/admin/applications/types";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
@@ -9,19 +26,63 @@ interface Props {
   boundApplicationKeys: string[];
   isSubmitting: boolean;
   onClose: () => void;
-  onBootstrap: (applicationKey: string, expectedCatalogueRevision: string, expectedPolicyRevision: string, reason: string) => Promise<unknown>;
+  onBootstrap: (
+    applicationKey: string,
+    expectedCatalogueRevision: string,
+    expectedPolicyRevision: string,
+    reason: string,
+  ) => Promise<unknown>;
 }
 
-export function AddDatabaseApplicationDialog({ isOpen, boundApplicationKeys, isSubmitting, onClose, onBootstrap }: Props) {
+function isBootstrapEligible(application: ApplicationView): boolean {
+  const lifecycleEligible =
+    application.lifecycleStatus === "ACTIVE" ||
+    (application.lifecycleStatus === "DRAFT" &&
+      application.requiredOnDatabaseServer);
+
+  return (
+    lifecycleEligible &&
+    application.publicationStatus === "PUBLISHED" &&
+    application.databaseAccessMode === "TENANT_DATABASE" &&
+    application.databasePrincipal !== null &&
+    application.activeManifest !== null
+  );
+}
+
+export function AddDatabaseApplicationDialog({
+  isOpen,
+  boundApplicationKeys,
+  isSubmitting,
+  onClose,
+  onBootstrap,
+}: Props) {
+  const { lang, dir } = useI18n();
+  const copy = ADD_APPLICATION_COPY[lang];
   const [applications, setApplications] = useState<ApplicationView[]>([]);
   const [selectedKey, setSelectedKey] = useState("");
   const [reason, setReason] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const boundKeyFingerprint = boundApplicationKeys.join(",");
-  const boundKeys = useMemo(() => new Set(boundKeyFingerprint ? boundKeyFingerprint.split(",") : []), [boundKeyFingerprint]);
-  const available = useMemo(() => applications.filter((application) => !boundKeys.has(application.key) && application.lifecycleStatus === "ACTIVE" && application.publicationStatus === "PUBLISHED" && application.databaseAccessMode === "TENANT_DATABASE"), [applications, boundKeys]);
-  const selected = available.find((application) => application.key === selectedKey) ?? null;
+  const boundKeys = useMemo(
+    () =>
+      new Set(
+        boundKeyFingerprint ? boundKeyFingerprint.split(",") : [],
+      ),
+    [boundKeyFingerprint],
+  );
+  const eligible = useMemo(
+    () => applications.filter(isBootstrapEligible),
+    [applications],
+  );
+  const available = useMemo(
+    () =>
+      eligible.filter((application) => !boundKeys.has(application.key)),
+    [boundKeys, eligible],
+  );
+  const selected =
+    available.find((application) => application.key === selectedKey) ?? null;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -29,30 +90,211 @@ export function AddDatabaseApplicationDialog({ isOpen, boundApplicationKeys, isS
       setIsLoading(true);
       setError(null);
       setReason("");
-      applicationsApi.list({ page: 1, limit: 100, lifecycleStatus: "ACTIVE", publicationStatus: "PUBLISHED", databaseAccessMode: "TENANT_DATABASE" })
+      applicationsApi
+        .list({
+          page: 1,
+          limit: 100,
+          publicationStatus: "PUBLISHED",
+          databaseAccessMode: "TENANT_DATABASE",
+        })
         .then(({ data }) => {
           setApplications(data);
-          setSelectedKey(data.find((application) => !boundKeys.has(application.key) && application.lifecycleStatus === "ACTIVE" && application.publicationStatus === "PUBLISHED" && application.databaseAccessMode === "TENANT_DATABASE")?.key ?? "");
+          setSelectedKey(
+            data.find(
+              (application) =>
+                isBootstrapEligible(application) &&
+                !boundKeys.has(application.key),
+            )?.key ?? "",
+          );
         })
-        .catch((requestError) => setError(normalizeApiError(requestError).message))
+        .catch((requestError) =>
+          setError(normalizeApiError(requestError).message),
+        )
         .finally(() => setIsLoading(false));
     });
   }, [boundKeys, isOpen]);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   if (!isOpen) return null;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selected) return setError("Select an eligible Application.");
-    if (reason.trim().length < 8) return setError("Enter a reason of at least 8 characters.");
+    if (!selected) return setError(copy.selectEligible);
+    if (reason.trim().length < 8) {
+      return setError(copy.reasonMinimum);
+    }
     setError(null);
     try {
-      await onBootstrap(selected.key, selected.catalogueRevision, selected.databasePolicy.policyRevision, reason.trim());
+      await onBootstrap(
+        selected.key,
+        selected.catalogueRevision,
+        selected.databasePolicy.policyRevision,
+        reason.trim(),
+      );
       onClose();
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : "Application access could not be initialized.");
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : copy.initializeFailed,
+      );
     }
   };
 
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"><section role="dialog" aria-modal="true" aria-labelledby="add-database-application-title" className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900"><header className="flex items-start justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800"><div><h2 id="add-database-application-title" className="flex items-center gap-2 text-sm font-black"><Plus className="h-4 w-4 text-blue-500" />Add Application access</h2><p className="mt-1 text-xs text-slate-500">Core creates the fixed principal and password. No secret is returned to this portal.</p></div><button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-4 w-4" /></button></header><form onSubmit={submit} className="space-y-4 p-5">{isLoading ? <div className="flex items-center justify-center gap-2 py-8 text-xs text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Loading eligible Applications…</div> : !available.length ? <div className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-xs text-slate-500 dark:border-slate-700">Every eligible ACTIVE + PUBLISHED Application already has a binding.</div> : <><label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Application<select value={selectedKey} onChange={(event) => setSelectedKey(event.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950">{available.map((application) => <option key={application.id} value={application.key}>{application.name} · {application.databasePrincipal}</option>)}</select></label>{selected && <div className="grid grid-cols-2 gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs dark:border-blue-900 dark:bg-blue-950/30"><div><span className="block text-[10px] font-bold uppercase text-blue-600">Catalogue revision</span><code>{selected.catalogueRevision}</code></div><div><span className="block text-[10px] font-bold uppercase text-blue-600">Policy revision</span><code>{selected.databasePolicy.policyRevision}</code></div></div>}<label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Operational reason<textarea required minLength={8} maxLength={500} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1.5 w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950" /></label></>}{error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">{error}</p>}<footer className="flex justify-end gap-2"><button type="button" onClick={onClose} disabled={isSubmitting} className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button><button type="submit" disabled={isSubmitting || isLoading || !available.length} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-50">{isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Initialize access</button></footer></form></section></div>;
+  const emptyMessage = eligible.length
+    ? copy.allBound
+    : copy.noneEligible;
+
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open && !isSubmitting) onClose();
+      }}
+    >
+      <DialogContent dir={dir} showCloseButton={!isSubmitting} className="p-0">
+        <DialogHeader className="mb-0 border-b border-border px-5 py-4 pe-12">
+          <DialogTitle
+            className="flex items-center gap-2 text-base"
+          >
+            <Plus className="size-4 text-info" aria-hidden="true" />
+            {copy.title}
+          </DialogTitle>
+          <DialogDescription className="text-sm">
+            {copy.description}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4 p-5">
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              {copy.loading}
+            </div>
+          ) : !available.length ? (
+            <div className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
+              {emptyMessage}
+            </div>
+          ) : (
+            <>
+              <Field label={copy.application} required>
+                {({ required, ...fieldProps }) => (
+                  <Select value={selectedKey} onValueChange={setSelectedKey} dir={dir}>
+                    <SelectTrigger {...fieldProps} aria-required={required}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {available.map((application) => (
+                        <SelectItem key={application.id} value={application.key}>
+                          {application.name} · {application.databasePrincipal}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </Field>
+              {selected && (
+                <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted p-3 text-sm">
+                  <div>
+                    <span className="block text-xs font-medium uppercase text-muted-foreground">
+                      {copy.catalogueRevision}
+                    </span>
+                    <code>{selected.catalogueRevision}</code>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-medium uppercase text-muted-foreground">
+                      {copy.policyRevision}
+                    </span>
+                    <code>{selected.databasePolicy.policyRevision}</code>
+                  </div>
+                </div>
+              )}
+              <Field label={copy.reason} hint={copy.reasonHint.replace("{{count}}", String(reason.trim().length))} required>
+                {(fieldProps) => (
+                  <Textarea
+                    {...fieldProps}
+                    minLength={8}
+                    maxLength={500}
+                    rows={3}
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    className="resize-none"
+                  />
+                )}
+              </Field>
+            </>
+          )}
+          {error && (
+            <p
+              ref={errorRef}
+              role="alert"
+              tabIndex={-1}
+              className="rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {error}
+            </p>
+          )}
+          <DialogFooter className="mt-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              {copy.cancel}
+            </Button>
+            <Button
+              type="submit"
+              variant="secondary"
+              size="sm"
+              loading={isSubmitting}
+              disabled={isSubmitting || isLoading || !available.length}
+            >
+              {copy.initialize}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
+
+const ADD_APPLICATION_COPY = {
+  en: {
+    title: "Add Application access",
+    description: "Core creates the fixed principal and password. No secret is returned to this portal.",
+    loading: "Loading eligible Applications…",
+    application: "Application",
+    catalogueRevision: "Catalogue revision",
+    policyRevision: "Policy revision",
+    reason: "Operational reason",
+    reasonHint: "{{count}}/500 · minimum 8 characters",
+    cancel: "Cancel",
+    initialize: "Initialize access",
+    selectEligible: "Select an eligible Application.",
+    reasonMinimum: "Enter a reason of at least 8 characters.",
+    initializeFailed: "Application access could not be initialized.",
+    allBound: "Every eligible Application already has a binding on this database server.",
+    noneEligible: "No Application is eligible. It must be PUBLISHED with tenant-database access and an active permission manifest, and be either ACTIVE or a REQUIRED draft.",
+  },
+  ar: {
+    title: "إضافة وصول تطبيق",
+    description: "ينشئ Core الحساب الثابت وكلمة المرور. لا تُعاد أي أسرار إلى هذه اللوحة.",
+    loading: "جارٍ تحميل التطبيقات المؤهلة…",
+    application: "التطبيق",
+    catalogueRevision: "مراجعة الكتالوج",
+    policyRevision: "مراجعة السياسة",
+    reason: "سبب العملية",
+    reasonHint: "{{count}}/500 · 8 أحرف على الأقل",
+    cancel: "إلغاء",
+    initialize: "تهيئة الوصول",
+    selectEligible: "اختر تطبيقًا مؤهلًا.",
+    reasonMinimum: "أدخل سببًا لا يقل عن 8 أحرف.",
+    initializeFailed: "تعذرت تهيئة وصول التطبيق.",
+    allBound: "كل التطبيقات المؤهلة مرتبطة بالفعل بخادم قاعدة البيانات هذا.",
+    noneEligible: "لا يوجد تطبيق مؤهل. يجب أن يكون منشورًا مع وصول قاعدة بيانات المستأجر وبيان صلاحيات نشط، وأن يكون نشطًا أو مسودة مطلوبة.",
+  },
+} as const;

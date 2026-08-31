@@ -1,111 +1,117 @@
 "use client";
 
 import Link from "next/link";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { TableToolbar } from "@/components/ui/TableToolbar";
-import { Table } from "@/components/ui/Table";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Eye, Trash2, ShoppingBag } from "lucide-react";
-import { useTradePurchaseOrders, PurchaseOrderItem } from "./hooks/useTradePurchaseOrders";
-import { CreateTradePurchaseOrdersModal } from "./components/CreateTradePurchaseOrdersModal";
-import { DeleteTradePurchaseOrdersConfirmModal } from "./components/DeleteTradePurchaseOrdersConfirmModal";
+import { RefreshCw } from "lucide-react";
+import { Button, DataTable, Money, PageHeader, type ColumnDef } from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
+import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
+import { TradeScopeRequired } from "../documents/components/TradeBoundaryStates";
+import { TradeDocumentFilters } from "../documents/components/TradeDocumentFilters";
+import { TradeGate } from "../documents/components/TradeGate";
+import { TradeStatusBadge } from "../documents/components/TradeStatusBadge";
+import { useTradeDocumentList } from "../documents/hooks/useTradeDocumentList";
+import { useTradeTableLabels } from "../documents/hooks/useTradeTableLabels";
+import { partyDisplayName } from "../documents/trade-document-contract";
+import {
+  PURCHASE_ORDERS_PATH,
+  PURCHASE_ORDER_PERMISSIONS,
+  parsePurchaseOrder,
+  type PurchaseOrder,
+} from "./purchase-order-contract";
 
-export default function TradePurchaseOrdersPage() {
-  const {
-    items,
-    searchQuery,
-    setSearchQuery,
-    isCreateOpen,
-    setIsCreateOpen,
-    selectedForDelete,
-    setSelectedForDelete,
-    handleCreate,
-    handleDelete,
-  } = useTradePurchaseOrders();
+export default function PurchaseOrdersPage() {
+  const { t } = useI18n();
+  const list = useTradeDocumentList<PurchaseOrder>(PURCHASE_ORDERS_PATH, parsePurchaseOrder);
+  const labels = useTradeTableLabels(
+    t.tradeDocuments.purchaseOrders.empty,
+    t.tradeDocuments.purchaseOrders.loadFailed,
+  );
 
-  const columns = [
+  const columns: ColumnDef<PurchaseOrder>[] = [
     {
-      header: "رقم الأمر والمورد",
-      cell: (item: PurchaseOrderItem) => (
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-orange-50 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400">
-            <ShoppingBag className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900 dark:text-slate-100">{item.poNumber}</p>
-            <p className="text-[11px] text-slate-400">{item.supplierName}</p>
-          </div>
-        </div>
+      id: "number",
+      header: t.tradeDocuments.documentNumber,
+      cell: (row) => (
+        <Link
+          href={`${TENANT_ROUTES.tradePurchaseOrders}/${row.id}`}
+          className="text-foreground underline-offset-2 hover:underline"
+        >
+          {row.documentNumber ?? row.draftReference ?? row.id}
+        </Link>
       ),
     },
     {
-      header: "المستودع المستلم",
-      cell: (item: PurchaseOrderItem) => (
-        <Badge variant="neutral">{item.warehouseName}</Badge>
+      id: "party",
+      header: t.tradeDocuments.supplier,
+      cell: (row) => partyDisplayName(row.partySnapshot) ?? "—",
+    },
+    {
+      id: "lifecycle",
+      header: t.tradeDocuments.purchaseOrders.lifecycleAxis,
+      cell: (row) => (
+        <TradeStatusBadge kind="TradePurchaseOrderStatus" value={row.lifecycleStatus} />
       ),
     },
     {
-      header: "التكلفة الإجمالية",
-      cell: (item: PurchaseOrderItem) => (
-        <span className="font-bold text-slate-900 dark:text-slate-100">{item.totalCost}</span>
-      ),
-    },
-    { header: "التسليم المتوقع", accessorKey: "expectedDeliveryDate" as keyof PurchaseOrderItem },
-    {
-      header: "الحالة",
-      cell: (item: PurchaseOrderItem) => (
-        <Badge variant={item.status === "issued" ? "info" : item.status === "partially_received" ? "warning" : "success"}>
-          {item.status === "issued" ? "تم الإصدار للمورد" : item.status === "partially_received" ? "مستلم جزئياً" : "مستلم بالكامل"}
-        </Badge>
-      ),
+      id: "approval",
+      header: t.tradeDocuments.purchaseOrders.approvalAxis,
+      cell: (row) => <TradeStatusBadge kind="TradeApprovalStatus" value={row.approvalStatus} />,
     },
     {
-      header: "الإجراءات",
-      cell: (item: PurchaseOrderItem) => (
-        <div className="flex items-center gap-1.5">
-          <Link href={`/trade/purchase-orders/${item.id}/general`}>
-            <Button variant="ghost" size="sm">
-              <Eye className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedForDelete(item)}>
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
-        </div>
+      id: "total",
+      header: t.tradeDocuments.grandTotal,
+      numeric: true,
+      cell: (row) => (
+        <Money
+          value={row.grandTotal}
+          currency={row.currencyCode}
+          minimumFractionDigits={2}
+          maximumFractionDigits={8}
+        />
       ),
     },
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="أوامر الشراء (Trade Purchase Orders)"
-        subtitle="إدارة المشتريات الخارجية والتعميدات الموجهة للموردين وتلقي بضائع التوريد في المستودعات"
-        actionLabel="إصدار أمر شراء"
-        onAction={() => setIsCreateOpen(true)}
-      />
+    <TradeGate require={PURCHASE_ORDER_PERMISSIONS.read}>
+      <div className="flex flex-col gap-4">
+        <PageHeader
+          title={t.tradeDocuments.purchaseOrders.title}
+          description={t.tradeDocuments.purchaseOrders.subtitle}
+          secondaryActions={
+            <Button variant="outline" onClick={() => void list.reload()} disabled={list.isRefreshing}>
+              <RefreshCw
+                className={list.isRefreshing ? "size-4 animate-spin" : "size-4"}
+                aria-hidden="true"
+              />
+              {t.tradeDocuments.reload}
+            </Button>
+          }
+        />
 
-      <TableToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        placeholder="ابحث برقم الأمر، المورد، أو المستودع..."
-      />
-
-      <Table columns={columns} data={items} />
-
-      <CreateTradePurchaseOrdersModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSubmit={handleCreate}
-      />
-
-      <DeleteTradePurchaseOrdersConfirmModal
-        isOpen={!!selectedForDelete}
-        item={selectedForDelete}
-        onClose={() => setSelectedForDelete(null)}
-        onConfirm={handleDelete}
-      />
-    </div>
+        {list.scope.isResolved ? (
+          <>
+            <TradeDocumentFilters
+              kind="TradePurchaseOrderStatus"
+              value={list.status}
+              onChange={list.setStatus}
+            />
+            <DataTable
+              columns={columns}
+              rows={list.items}
+              isLoading={list.isLoading}
+              error={list.queryError}
+              onRetry={() => void list.reload()}
+              page={list.pageInfo}
+              onPageChange={list.setPage}
+              rowKey={(row) => row.id}
+              labels={labels}
+            />
+          </>
+        ) : (
+          <TradeScopeRequired />
+        )}
+      </div>
+    </TradeGate>
   );
 }

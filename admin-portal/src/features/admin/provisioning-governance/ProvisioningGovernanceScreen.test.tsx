@@ -8,10 +8,10 @@ const { languageMock, hookMock } = vi.hoisted(() => ({
   hookMock: vi.fn(),
 }));
 
-vi.mock("@/components/layout/Navbar", () => ({
-  Navbar: () => <nav data-testid="navbar" />,
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => languageMock,
+  useOptionalI18n: () => null,
 }));
-vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => languageMock }));
 vi.mock("./useProvisioningGovernance", () => ({
   useProvisioningGovernance: hookMock,
 }));
@@ -127,6 +127,9 @@ describe("ProvisioningGovernanceScreen", () => {
     expect(screen.getByLabelText("Sort direction")).toBeInTheDocument();
     expect(screen.getByLabelText("Rows per page")).toBeInTheDocument();
     expect(
+      screen.getByRole("region", { name: "Component catalogue" }),
+    ).toHaveAttribute("tabindex", "0");
+    expect(
       screen.getByRole("link", { name: /Fleet rollouts/i }),
     ).toHaveAttribute("href", "/provisioning/fleet");
   });
@@ -169,9 +172,15 @@ describe("ProvisioningGovernanceScreen", () => {
     hookMock.mockReturnValue(view);
     render(<ProvisioningGovernanceScreen />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Discovery runs" }));
+    // Radix Tabs.Trigger activates on mousedown, not click (see
+    // @radix-ui/react-tabs's TabsTrigger) — fireEvent.click alone never
+    // fires it.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Discovery runs" }));
     fireEvent.click(screen.getByRole("button", { name: "Review command" }));
-    const confirmation = screen.getByLabelText("Type RUN");
+    // The typed-confirmation field now comes from the shared
+    // ConfirmActionModal (F-FE-003 consolidation), which always renders this
+    // fixed bilingual aria-label rather than the old "Type RUN" field label.
+    const confirmation = screen.getByLabelText("Type the exact name to confirm");
     const submit = screen.getByRole("button", { name: "Start discovery" });
     expect(submit).toBeDisabled();
     fireEvent.change(confirmation, { target: { value: "RUN" } });

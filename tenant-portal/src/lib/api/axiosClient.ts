@@ -12,6 +12,8 @@ import {
 } from "../auth/sessionCoordinator";
 import { safeSessionStorage, safeStorage } from "../safeStorage";
 import { generateUUIDv7 } from "../uuid";
+import { ar } from "../../i18n/dictionaries/ar";
+import { en } from "../../i18n/dictionaries/en";
 
 // Cookie auth and the readable double-submit CSRF proof require same-origin
 // canonical Gateway paths. Deployment ingress owns /api/*.
@@ -414,7 +416,13 @@ async function sendPreparedRequest<T>(
       disposition === "refresh" &&
       !isRetry &&
       !request.skipAuthRefresh &&
-      !request.publicAuthEndpoint
+      !request.publicAuthEndpoint &&
+      // Only refresh when there was a session to refresh. A visitor who has
+      // never signed in also gets a 401, and refreshing on their behalf
+      // replaces the honest "you are signed out" error with whatever the
+      // refresh attempt fails with — a coordination error, which reads as
+      // "the server is degraded" and left the login form unreachable.
+      request.hadSessionMetadata
     ) {
       publishTenantAuthLifecycle("STALE");
       try {
@@ -948,14 +956,21 @@ function createLocalApiError(
   });
 }
 
+// The one permitted i18n change inside the transport — see
+// docs/architecture/data-layer.md#permitted-changes (D9 in DEFECTS.md).
+// This module has no React tree to read useI18n() from, so it reads the
+// same tenant_lang key useLanguage() does, directly, and selects between
+// the same two dictionary objects I18nContext.tsx does — the strings
+// themselves still live only in i18n/dictionaries/, not duplicated here.
 function dispatchForbiddenToast(): void {
   if (typeof window === "undefined") return;
+  const t = safeStorage.getItem("tenant_lang") === "en" ? en : ar;
   window.dispatchEvent(
     new CustomEvent("global-toast", {
       detail: {
         type: "error",
-        title: "Access denied",
-        message: "You do not have permission to perform this action.",
+        title: t.errors.accessDenied,
+        message: t.errors.accessDeniedMessage,
       },
     }),
   );

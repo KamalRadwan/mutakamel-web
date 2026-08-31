@@ -6,7 +6,7 @@ export const CHALLENGE_ID = "019f1000-0000-7000-8000-000000000003";
 export const IDEMPOTENCY_KEY = "019f1000-0000-7000-8000-000000000004";
 export const PUBLIC_KEY = `${"A".repeat(43)}=`;
 export const SIGNATURE = `${"A".repeat(86)}==`;
-export const FINGERPRINT = "a".repeat(64);
+const FINGERPRINT = "a".repeat(64);
 
 export const ACTIVE_KEY: PublisherKey = {
   publisherKeyId: PUBLISHER_KEY_ID,

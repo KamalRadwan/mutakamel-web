@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-25**
+Last source verification: **2026-08-26**
 
 This is the browser-facing Database Servers V1 contract. API Gateway is the
 browser authority; Core owns registration, PostgreSQL role administration,
@@ -597,6 +597,10 @@ The active source:
   state/failure evidence, maintenance-aware hour policy, manual rotation, and
   reconciliation; Backup owns the equivalent `mutakamel_backup` UI;
 - retains per-Application add, rotation, and reconciliation controls;
+- lists an Application for per-server bootstrap when it is `PUBLISHED`, uses
+  tenant-database access with a current active manifest, and is either
+  `ACTIVE` or a `REQUIRED` `DRAFT`; required drafts must remain addable so
+  exact READY fleet coverage can be established before Application activation;
 - exposes list-row soft delete only to administrators holding delete plus
   critical permissions and only for empty `DRAINING`/`OFFLINE` rows;
 - exposes a `deleted=true` registry filter and shows permanent Destroy only for

@@ -6,13 +6,20 @@ const devApiTarget = (
 
 const nextConfig: NextConfig = {
   experimental: {
-    optimizePackageImports: ['lucide-react', 'date-fns', 'recharts'],
+    optimizePackageImports: ['lucide-react'],
   },
   async rewrites() {
     if (process.env.NODE_ENV !== "development") return [];
     return [{
       source: "/api/:path*",
       destination: `${devApiTarget}/api/:path*`,
+    }];
+  },
+  async redirects() {
+    return [{
+      source: "/crm/pipeline",
+      destination: "/crm/opportunities",
+      permanent: false,
     }];
   },
   webpack: (config) => {

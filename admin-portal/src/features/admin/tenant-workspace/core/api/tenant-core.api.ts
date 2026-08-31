@@ -106,6 +106,22 @@ export const tenantCoreApi = {
     return readTenantProvisioningCommandResult(extractCoreData(response));
   },
 
+  /**
+   * Reverses a soft delete. Core returns the tenant as SUSPENDED, so the
+   * response is the authority on the landing state rather than the caller.
+   */
+  restore: async (
+    tenantId: string,
+    idempotencyKey: string,
+  ): Promise<TenantView> => {
+    const response = await axiosClient.post<SuccessResponse<unknown>>(
+      `${TENANTS_URL}/${tenantId}/restore`,
+      undefined,
+      keyed(idempotencyKey),
+    );
+    return readTenantView(extractCoreData(response));
+  },
+
   softDelete: async (
     tenantId: string,
     idempotencyKey: string,

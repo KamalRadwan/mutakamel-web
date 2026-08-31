@@ -1,33 +1,50 @@
 "use client";
 
-import Link from "next/link";
-import { Building2, Eye, RefreshCw, UserRound } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Table } from "@/components/ui/Table";
-import { TableToolbar } from "@/components/ui/TableToolbar";
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
+import {
+  BoardView,
+  Button,
+  CardView,
+  ConfirmActionModal,
+  DegradedBanner,
+  EmptyState,
+  FilterBar,
+  PageHeader,
+  PermissionGate,
+  TableView,
+  ViewSwitcher,
+  useWorkspaceState,
+  type BoardCardMove,
+  type BoardColumnDef,
+  type WorkspaceViewLabels,
+} from "@/design-system";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
+import { useI18n } from "@/i18n/I18nContext";
+import { formatTemplate } from "@/lib/format/template";
 import {
   type CustomerProfileItem,
   type CustomerProfileStatus,
-  type CustomerProfileType,
   useCustomerProfiles,
 } from "./hooks/useCustomerProfiles";
+import { CreateCustomerProfileDrawer } from "./components/CreateCustomerProfileDrawer";
+import { CustomerProfileCard } from "./components/CustomerProfileCard";
+import { useCustomerProfileColumns } from "./components/useCustomerProfileColumns";
+import { useCustomerProfilesCapabilities } from "./hooks/useCustomerProfilesCapabilities";
+import { useCreateCustomerProfile } from "./hooks/useCreateCustomerProfile";
+import { useCustomerProfileBoardMove } from "./hooks/useCustomerProfileBoardMove";
+import { useCrmAcquisitionSources } from "../shared/hooks/useCrmAcquisitionSources";
 
-function statusVariant(
-  status: CustomerProfileStatus,
-): "success" | "warning" | "danger" | "neutral" {
-  if (status === "ACTIVE_CUSTOMER") return "success";
-  if (status === "PROSPECT") return "warning";
-  if (status === "BLACKLISTED") return "danger";
-  return "neutral";
-}
+// Board axis is CustomerStatusEnum — fixed, 4 values, no catalogue fetch,
+// unlike leads/opportunities. See
+// docs/api/crm-customer-profiles.md#frontend-notes.
+const BOARD_STATUS_ORDER: CustomerProfileStatus[] = ["PROSPECT", "ACTIVE_CUSTOMER", "INACTIVE", "BLACKLISTED"];
+const TERMINAL_STATUS: CustomerProfileStatus = "BLACKLISTED";
 
 export default function CustomerProfilesPage() {
+  const { t } = useI18n();
   const {
-    t,
-    lang,
     items,
     branchIds,
     branchId,
@@ -36,222 +53,225 @@ export default function CustomerProfilesPage() {
     searchQuery,
     setSearchQuery,
     isLoading,
-    error,
+    precondition,
+    loadError,
     previousPage,
     nextPage,
     reload,
   } = useCustomerProfiles();
+  const { capabilities, error: capabilitiesError } =
+    useCustomerProfilesCapabilities(branchId);
+  const { displayItems, handleCardMove } = useCustomerProfileBoardMove(items, reload);
+  const router = useRouter();
+  // The Pagination control only ever steps by one, and this hook exposes
+  // cursors rather than a page setter — so a page written to the URL is
+  // applied here as the equivalent step.
+  const applyPage = useCallback(
+    (target: number) => {
+      if (target > (pagination?.page ?? 1)) nextPage();
+      else previousPage();
+    },
+    [nextPage, pagination?.page, previousPage],
+  );
+  const workspace = useWorkspaceState("customerProfiles", { defaultView: "table", onPageChange: applyPage });
+  const { view, setView } = workspace;
+  // BLACKLISTED is terminal in practice — confirms via a real modal, not
+  // window.confirm. confirmMove needs a Promise<boolean>, so the pending
+  // move sits in state until the user resolves it here.
+  const [pendingTerminalMove, setPendingTerminalMove] = useState<{
+    move: BoardCardMove;
+    resolve: (confirmed: boolean) => void;
+  } | null>(null);
 
-  const copy =
-    lang === "ar"
-      ? {
-          subtitle: "ملفات العملاء الحالية من CRM للفرع الموثوق في الجلسة.",
-          reload: "إعادة التحميل",
-          search: "ابحث بالاسم أو بيانات التواصل...",
-          name: "اسم العميل",
-          type: "النوع",
-          contact: "التواصل",
-          status: "الحالة",
-          actions: "الإجراءات",
-          loading: "جارٍ تحميل ملفات العملاء...",
-          empty: "لا توجد ملفات عملاء مطابقة.",
-          unavailable: "غير متوفر",
-          view: "عرض",
-          previous: "السابق",
-          next: "التالي",
-          records: "ملف",
-          page: "صفحة",
-        }
-      : {
-          subtitle: "Current CRM customer profiles for the trusted session branch.",
-          reload: "Reload",
-          search: "Search by name or contact details...",
-          name: "Customer name",
-          type: "Type",
-          contact: "Contact",
-          status: "Status",
-          actions: "Actions",
-          loading: "Loading customer profiles...",
-          empty: "No matching customer profiles.",
-          unavailable: "Not available",
-          view: "View",
-          previous: "Previous",
-          next: "Next",
-          records: "profiles",
-          page: "Page",
-        };
+  const boardColumns: BoardColumnDef[] = BOARD_STATUS_ORDER.map((status) => ({
+    id: status,
+    label: t.statusValues[`CustomerStatus.${status}`] ?? status,
+    count: displayItems.filter((item) => item.status === status).length,
+    outcomeRole: status === "ACTIVE_CUSTOMER" ? "positive" : status === "BLACKLISTED" ? "negative" : status === "INACTIVE" ? "caution" : undefined,
+  }));
 
-  const typeLabels: Record<CustomerProfileType, string> =
-    lang === "ar"
-      ? { INDIVIDUAL: "فرد", CORPORATE: "شركة" }
-      : { INDIVIDUAL: "Individual", CORPORATE: "Corporate" };
-  const statusLabels: Record<CustomerProfileStatus, string> =
-    lang === "ar"
-      ? {
-          PROSPECT: "محتمل",
-          ACTIVE_CUSTOMER: "نشط",
-          INACTIVE: "غير نشط",
-          BLACKLISTED: "محظور",
-        }
-      : {
-          PROSPECT: "Prospect",
-          ACTIVE_CUSTOMER: "Active customer",
-          INACTIVE: "Inactive",
-          BLACKLISTED: "Blacklisted",
-        };
+  const canUpdate = capabilities.update !== null;
+  const sources = useCrmAcquisitionSources();
+  // A new profile opens on its own detail screen: the list defaults to page
+  // one sorted by createdAt DESC, but a filter or a later page would hide the
+  // record that was just created.
+  const create = useCreateCustomerProfile(branchId, (profileId) =>
+    router.push(`/crm/customer-profiles/${profileId}`),
+  );
+  const tableColumns = useCustomerProfileColumns();
 
-  const columns = [
-    {
-      header: copy.name,
-      cell: (item: CustomerProfileItem) => {
-        const ProfileIcon =
-          item.profileType === "CORPORATE" ? Building2 : UserRound;
-        return (
-          <div className="flex items-center gap-2.5">
-            <div className="rounded-xl bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-              <ProfileIcon className="size-4" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="font-bold text-slate-900 dark:text-slate-100">
-                {item.displayName}
-              </p>
-              {item.companyName && item.companyName !== item.displayName && (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {item.companyName}
-                </p>
-              )}
-            </div>
+  // No session or no single trusted branch means the request was never
+  // made. That is an empty state next to the control that resolves it, not
+  // an error banner about a failure that did not happen.
+  const preconditionState = precondition ? <EmptyState title={precondition} /> : undefined;
+
+  // One label set, three views — the shared contract, so a view switch cannot
+  // silently drop a control the way it used to. See
+  // docs/design/views.md#the-shared-contract.
+  const viewLabels: WorkspaceViewLabels = {
+    retry: t.common.retry,
+    errorTitle: t.crmCustomerProfiles.loadFailed,
+    emptyTitle: t.crmCustomerProfiles.empty,
+    selectAll: t.views.selectAll,
+    selectRow: t.views.selectItem,
+    sortAscending: t.views.sortAscending,
+    sortDescending: t.views.sortDescending,
+    notSorted: t.views.notSorted,
+    pagination: {
+      previous: t.common.previousPage,
+      next: t.common.nextPage,
+      summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+    },
+  };
+
+  const pageInfo = {
+    page: pagination?.page ?? 1,
+    limit: pagination?.limit ?? 25,
+    total: pagination?.total ?? 0,
+  };
+
+  function openProfile(item: CustomerProfileItem) {
+    router.push(`/crm/customer-profiles/${encodeURIComponent(item.id)}`);
+  }
+
+  // A CRM route is reachable by direct URL even when the sidebar hides it, so
+  // the 403 is reachable in-body and gets the mandated surface rather than a
+  // load error — AGENTS.md, docs/design/states.md. Permission string and
+  // scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
+  return (
+    <PermissionGate require="crm.customer_profiles.read" scoped>
+      <div className="flex h-full flex-col gap-4">
+        <PageHeader
+          title={t.crm.customerProfilesAndCards}
+          description={t.crmCustomerProfiles.subtitle}
+          primaryAction={
+            capabilities.create && branchId
+              ? {
+                  label: t.crmCustomerProfileActions.createAction,
+                  onClick: create.openDrawer,
+                }
+              : undefined
+          }
+          secondaryActions={
+            <Button variant="outline" onClick={reload} disabled={isLoading}>
+              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+              {t.common.retry}
+            </Button>
+          }
+        />
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <FilterBar
+            filters={[]}
+            values={{}}
+            onChange={() => undefined}
+            onReset={() => undefined}
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder={t.crmCustomerProfiles.search}
+          />
+          <div className="flex items-center gap-2">
+            <TenantBranchSelect branchIds={branchIds} branchId={branchId} onChange={selectBranch} disabled={isLoading} />
+            <ViewSwitcher
+              value={view}
+              onChange={setView}
+              available={["board", "card", "table"]}
+              labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
+            />
           </div>
-        );
-      },
-    },
-    {
-      header: copy.type,
-      cell: (item: CustomerProfileItem) => (
-        <Badge variant="info">{typeLabels[item.profileType]}</Badge>
-      ),
-    },
-    {
-      header: copy.contact,
-      cell: (item: CustomerProfileItem) => (
-        <div className="space-y-0.5" dir="ltr">
-          <p>{item.email ?? copy.unavailable}</p>
-          {item.phone && (
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {item.phone}
-            </p>
+        </div>
+
+        {/* A capabilities fetch that FAILED is not the same as a 403, and the
+            hook no longer conflates them — the controls are hidden either way,
+            but only this case is a degradation worth naming. */}
+        {capabilitiesError && <DegradedBanner message={t.crmCustomerProfiles.capabilitiesUnavailable} />}
+
+        <div className="min-h-0 flex-1">
+          {view === "board" && (
+            <BoardView
+              columns={boardColumns}
+              columnOf={(item) => item.status}
+              items={displayItems}
+              itemKey={(item) => item.id}
+              renderCard={(item) => <CustomerProfileCard item={item} />}
+              canDrag={() => canUpdate}
+              confirmMove={(move) =>
+                move.toColumnId === TERMINAL_STATUS
+                  ? new Promise<boolean>((resolve) => setPendingTerminalMove({ move, resolve }))
+                  : true
+              }
+              onCardMove={(move) => void handleCardMove(move)}
+              onActivate={openProfile}
+              selection={workspace.selection}
+              isLoading={isLoading}
+              error={loadError}
+              onRetry={reload}
+              page={pageInfo}
+              onPageChange={workspace.setPage}
+              emptyState={preconditionState}
+              labels={{
+                ...viewLabels,
+                emptyColumn: t.crmCustomerProfiles.empty,
+                moveTo: t.views.moveTo,
+              }}
+            />
+          )}
+          {view === "card" && (
+            <CardView
+              items={displayItems}
+              itemKey={(item) => item.id}
+              renderCard={(item) => <CustomerProfileCard item={item} />}
+              onActivate={openProfile}
+              selection={workspace.selection}
+              isLoading={isLoading}
+              error={loadError}
+              onRetry={reload}
+              page={pageInfo}
+              onPageChange={workspace.setPage}
+              sort={workspace.sort}
+              emptyState={preconditionState}
+              labels={{ ...viewLabels, sortBy: t.views.sortBy }}
+            />
+          )}
+          {view === "table" && (
+            <TableView
+              columns={tableColumns}
+              items={displayItems}
+              itemKey={(item) => item.id}
+              onActivate={openProfile}
+              selection={workspace.selection}
+              isLoading={isLoading}
+              error={loadError}
+              onRetry={reload}
+              page={pageInfo}
+              onPageChange={workspace.setPage}
+              sort={workspace.sort}
+              emptyState={preconditionState}
+              labels={viewLabels}
+            />
           )}
         </div>
-      ),
-    },
-    {
-      header: copy.status,
-      cell: (item: CustomerProfileItem) => (
-        <Badge variant={statusVariant(item.status)}>
-          {statusLabels[item.status]}
-        </Badge>
-      ),
-    },
-    {
-      header: copy.actions,
-      cell: (item: CustomerProfileItem) => (
-        <Link
-          href={"/crm/customer-profiles/" + encodeURIComponent(item.id)}
-          aria-label={copy.view + " " + item.displayName}
-          className="inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          <Eye className="size-4" aria-hidden="true" />
-          {copy.view}
-        </Link>
-      ),
-    },
-  ];
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title={t.crm.customerProfilesAndCards}
-        subtitle={copy.subtitle}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <TenantBranchSelect
-            branchIds={branchIds}
-            branchId={branchId}
-            onChange={selectBranch}
-            disabled={isLoading}
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={reload}
-            disabled={isLoading}
-          >
-            <RefreshCw
-              className={"size-4 " + (isLoading ? "animate-spin" : "")}
-              aria-hidden="true"
-            />
-            {copy.reload}
-          </Button>
-        </div>
-      </PageHeader>
+        <CreateCustomerProfileDrawer create={create} sources={sources.items} />
 
-      <TableToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        placeholder={copy.search}
-      />
-
-      {error && (
-        <div
-          role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
-        >
-          {error}
-        </div>
-      )}
-
-      {isLoading ? (
-        <p
-          role="status"
-          className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900"
-        >
-          {copy.loading}
-        </p>
-      ) : error ? null : (
-        <Table columns={columns} data={items} emptyText={copy.empty} />
-      )}
-
-      {!isLoading && !error && pagination && (
-        <nav
-          aria-label={lang === "ar" ? "ترقيم صفحات العملاء" : "Customer profile pagination"}
-          className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900"
-        >
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            {pagination.total} {copy.records} · {copy.page} {pagination.page}
-            {pagination.totalPages > 0 ? " / " + pagination.totalPages : ""}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={previousPage}
-              disabled={!pagination.hasPrev}
-            >
-              {copy.previous}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={nextPage}
-              disabled={!pagination.hasNext}
-            >
-              {copy.next}
-            </Button>
-          </div>
-        </nav>
-      )}
-    </div>
+        <ConfirmActionModal
+          open={pendingTerminalMove !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              pendingTerminalMove?.resolve(false);
+              setPendingTerminalMove(null);
+            }
+          }}
+          title={t.crmCustomerProfiles.confirmBlacklistTitle}
+          description={t.crmCustomerProfiles.confirmBlacklistMessage}
+          confirmLabel={t.crmCustomerProfiles.confirmBlacklistAction}
+          cancelLabel={t.common.cancel}
+          onConfirm={() => {
+            pendingTerminalMove?.resolve(true);
+            setPendingTerminalMove(null);
+          }}
+        />
+      </div>
+    </PermissionGate>
   );
 }

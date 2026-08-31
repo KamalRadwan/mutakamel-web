@@ -22,13 +22,14 @@ function seedSession(
   sessionId = SESSION_ONE,
   eventId = "activity-event",
   savedAt = Date.now(),
+  sessionExpiresIn = 1_800,
 ) {
   sessionStorage.setItem(
     "admin_session_meta",
     JSON.stringify({
       savedAt,
       expiresIn: 600,
-      sessionExpiresIn: 1_800,
+      sessionExpiresIn,
       tokenType: "Bearer",
       sessionId,
       remember: false,
@@ -123,6 +124,30 @@ function refreshedSessionResponse() {
         authorizationVersion: 1,
         profileVersion: 1,
       },
+    },
+  }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function presenceResponse({
+  sessionId = SESSION_ONE,
+  sessionExpiresIn = 1_800,
+  idleExpiresAt = new Date(Date.now() + sessionExpiresIn * 1_000).toISOString(),
+  absoluteExpiresAt = new Date(Date.now() + 12 * 60 * 60_000).toISOString(),
+}: {
+  sessionId?: string;
+  sessionExpiresIn?: number;
+  idleExpiresAt?: string;
+  absoluteExpiresAt?: string;
+} = {}) {
+  return new Response(JSON.stringify({
+    data: {
+      sessionId,
+      sessionExpiresIn,
+      idleExpiresAt,
+      absoluteExpiresAt,
     },
   }), {
     status: 200,
@@ -273,6 +298,400 @@ describe("admin activity checkpoint liveness", () => {
       "/api/admin/core/v1/auth/activity",
       "/api/admin/core/v1/auth/activity",
     ]);
+  });
+
+  it("keeps a visible tab present on a bounded cadence and stops while hidden", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(sessionStorage, localStorage);
+    const { documentState } = stubActivityBrowser(
+      "/dashboard",
+      sessionStorage,
+      localStorage,
+    );
+
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      requests.push({ url, init });
+      return presenceResponse();
+    }));
+
+    const scheduler = api.startAdminVisibleSessionPresenceScheduler();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(requests).toEqual([]);
+
+    await vi.advanceTimersByTimeAsync(
+      api.ADMIN_VISIBLE_PRESENCE_MAX_INTERVAL_MS - 1,
+    );
+    expect(requests).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(requests.map(({ url }) => url)).toEqual([
+      "/api/admin/core/v1/auth/presence",
+    ]);
+    const presenceHeaders = new Headers(requests[0]?.init.headers);
+    expect(presenceHeaders.get("x-csrf-token")).toBe("csrf-proof");
+    expect(presenceHeaders.has("x-auth-user-activity")).toBe(false);
+    expect(requests[0]?.init.credentials).toBe("include");
+    expect(requests[0]?.init.body).toBeUndefined();
+
+    documentState.visibilityState = "hidden";
+    scheduler.syncVisibility();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(requests).toHaveLength(1);
+
+    documentState.visibilityState = "visible";
+    scheduler.syncVisibility();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(requests.map(({ url }) => url)).toEqual([
+      "/api/admin/core/v1/auth/presence",
+      "/api/admin/core/v1/auth/presence",
+    ]);
+
+    documentState.visibilityState = "hidden";
+    scheduler.syncVisibility();
+    await vi.advanceTimersByTimeAsync(30 * 60_000);
+    expect(requests).toHaveLength(2);
+
+    documentState.visibilityState = "visible";
+    scheduler.syncVisibility();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(requests).toHaveLength(3);
+    scheduler.stop();
+    await vi.advanceTimersByTimeAsync(30 * 60_000);
+    expect(requests).toHaveLength(3);
+  });
+
+  it("uses current remaining timing, including a positive remainder below thirty seconds", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(
+      sessionStorage,
+      localStorage,
+      SESSION_ONE,
+      "stale-short-idle-event",
+      Date.now() - 290_000,
+      300,
+    );
+    stubActivityBrowser("/dashboard", sessionStorage, localStorage);
+
+    let attempt = 0;
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      urls.push(url);
+      attempt += 1;
+      return attempt === 1
+        ? new Response(null, { status: 503 })
+        : presenceResponse({ sessionExpiresIn: 300 });
+    }));
+
+    expect(
+      api.getAdminVisiblePresenceDelayMs(300, Date.now() - 290_000),
+    ).toBe(5_000);
+    const scheduler = api.startAdminVisibleSessionPresenceScheduler();
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(urls).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(urls).toEqual(["/api/admin/core/v1/auth/presence"]);
+    await vi.advanceTimersByTimeAsync(2_499);
+    expect(urls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(urls).toHaveLength(2);
+
+    scheduler.stop();
+  });
+
+  it("checkpoints halfway through Core's minimum five-minute idle window", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(
+      sessionStorage,
+      localStorage,
+      SESSION_ONE,
+      "short-idle-event",
+      Date.now(),
+      300,
+    );
+    stubActivityBrowser("/dashboard", sessionStorage, localStorage);
+
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      urls.push(url);
+      return presenceResponse({ sessionExpiresIn: 300 });
+    }));
+
+    expect(api.getAdminVisiblePresenceDelayMs(300)).toBe(150_000);
+    const scheduler = api.startAdminVisibleSessionPresenceScheduler();
+    await vi.advanceTimersByTimeAsync(149_999);
+    expect(urls).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(urls).toEqual(["/api/admin/core/v1/auth/presence"]);
+
+    scheduler.stop();
+  });
+
+  it("retries a failed minimum-TTL presence checkpoint before its deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(
+      sessionStorage,
+      localStorage,
+      SESSION_ONE,
+      "short-idle-retry-event",
+      Date.now(),
+      300,
+    );
+    stubActivityBrowser("/dashboard", sessionStorage, localStorage);
+
+    let attempt = 0;
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      urls.push(url);
+      attempt += 1;
+      return attempt === 1
+        ? new Response(null, { status: 503 })
+        : presenceResponse({ sessionExpiresIn: 300 });
+    }));
+
+    const scheduler = api.startAdminVisibleSessionPresenceScheduler();
+    await vi.advanceTimersByTimeAsync(150_000);
+    expect(urls).toEqual(["/api/admin/core/v1/auth/presence"]);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(urls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(urls).toEqual([
+      "/api/admin/core/v1/auth/presence",
+      "/api/admin/core/v1/auth/presence",
+    ]);
+
+    scheduler.stop();
+  });
+
+  it("preserves an earlier presence retry across same-session timing updates", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(
+      sessionStorage,
+      localStorage,
+      SESSION_ONE,
+      "retry-reschedule-event",
+      Date.now(),
+      300,
+    );
+    stubActivityBrowser("/dashboard", sessionStorage, localStorage);
+
+    let attempt = 0;
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      urls.push(url);
+      attempt += 1;
+      return attempt === 1
+        ? new Response(null, { status: 503 })
+        : presenceResponse({ sessionExpiresIn: 1_800 });
+    }));
+
+    const scheduler = api.startAdminVisibleSessionPresenceScheduler();
+    await vi.advanceTimersByTimeAsync(150_000);
+    expect(urls).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    seedSession(
+      sessionStorage,
+      localStorage,
+      SESSION_ONE,
+      "refreshed-same-session-event",
+      Date.now(),
+      1_800,
+    );
+    const metadataBeforePresence = sessionStorage.getItem("admin_session_meta");
+    scheduler.reschedule();
+
+    await vi.advanceTimersByTimeAsync(3_999);
+    expect(urls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(urls).toEqual([
+      "/api/admin/core/v1/auth/presence",
+      "/api/admin/core/v1/auth/presence",
+    ]);
+    expect(sessionStorage.getItem("admin_session_meta")).toBe(
+      metadataBeforePresence,
+    );
+
+    scheduler.stop();
+  });
+
+  it("stops presence scheduling once Core reports the absolute bound", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(
+      sessionStorage,
+      localStorage,
+      SESSION_ONE,
+      "absolute-bound-event",
+      Date.now(),
+      300,
+    );
+    stubActivityBrowser("/dashboard", sessionStorage, localStorage);
+
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      urls.push(url);
+      const absoluteDeadline = new Date(Date.now() + 150_000).toISOString();
+      return presenceResponse({
+        sessionExpiresIn: 150,
+        idleExpiresAt: absoluteDeadline,
+        absoluteExpiresAt: absoluteDeadline,
+      });
+    }));
+
+    const scheduler = api.startAdminVisibleSessionPresenceScheduler();
+    await vi.advanceTimersByTimeAsync(150_000);
+    expect(urls).toEqual(["/api/admin/core/v1/auth/presence"]);
+
+    scheduler.reschedule();
+    scheduler.wake();
+    await vi.advanceTimersByTimeAsync(30 * 60_000);
+    expect(urls).toHaveLength(1);
+
+    scheduler.stop();
+  });
+
+  it("rejects a presence timing response fenced to another session", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(
+      sessionStorage,
+      localStorage,
+      SESSION_ONE,
+      "presence-fence-event",
+      Date.now(),
+      300,
+    );
+    stubActivityBrowser("/dashboard", sessionStorage, localStorage);
+
+    let attempt = 0;
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      urls.push(url);
+      attempt += 1;
+      return presenceResponse({
+        sessionId: attempt === 1 ? SESSION_TWO : SESSION_ONE,
+        sessionExpiresIn: 300,
+      });
+    }));
+
+    const scheduler = api.startAdminVisibleSessionPresenceScheduler();
+    await vi.advanceTimersByTimeAsync(150_000);
+    expect(urls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(urls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(urls).toHaveLength(2);
+
+    scheduler.stop();
+  });
+
+  it("ends only the still-bound session on a terminal presence response", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(
+      sessionStorage,
+      localStorage,
+      SESSION_ONE,
+      "terminal-presence-event",
+      Date.now(),
+      300,
+    );
+    const { dispatchEvent } = stubActivityBrowser(
+      "/dashboard",
+      sessionStorage,
+      localStorage,
+    );
+
+    let presenceCalls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/admin/core/v1/auth/presence") {
+        presenceCalls += 1;
+        return new Response(JSON.stringify({
+          code: "AUTH_SESSION_IDLE_EXPIRED",
+        }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+
+    const scheduler = api.startAdminVisibleSessionPresenceScheduler();
+    await vi.advanceTimersByTimeAsync(150_000);
+    expect(presenceCalls).toBe(1);
+    expect(sessionStorage.getItem("admin_session_meta")).toBeNull();
+    expect(JSON.parse(
+      localStorage.getItem("admin_auth_session_event") ?? "null",
+    )).toMatchObject({ kind: "session-ended", sessionId: SESSION_ONE });
+    expect(dispatchEvent.mock.calls.some(([event]) =>
+      (event as Event).type === "admin-auth-lifecycle"
+    )).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(presenceCalls).toBe(1);
+    scheduler.stop();
+  });
+
+  it("backs repeated transient presence failures off up to a bounded cadence", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const sessionStorage = new MemoryStorage();
+    const localStorage = new MemoryStorage();
+    seedSession(
+      sessionStorage,
+      localStorage,
+      SESSION_ONE,
+      "presence-backoff-event",
+      Date.now(),
+      300,
+    );
+    stubActivityBrowser("/dashboard", sessionStorage, localStorage);
+
+    const callTimes: number[] = [];
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      callTimes.push(Date.now());
+      return new Response(null, { status: 503 });
+    }));
+
+    const scheduler = api.startAdminVisibleSessionPresenceScheduler();
+    await vi.advanceTimersByTimeAsync(150_000);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(callTimes.map((at) => at - callTimes[0]!)).toEqual([
+      0,
+      5_000,
+      10_000,
+      15_000,
+    ]);
+
+    await vi.advanceTimersByTimeAsync(7_999);
+    expect(callTimes).toHaveLength(4);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(callTimes[4]! - callTimes[3]!).toBe(8_000);
+
+    scheduler.stop();
   });
 
   it("keeps the session on transient and permission checkpoint failures", async () => {

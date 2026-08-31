@@ -12,6 +12,7 @@ import {
   normalizeApiError,
   type NormalizedApiError,
 } from "@/shared/api/normalized-api-error";
+import { usePollWhile } from "@/shared/hooks/usePollWhile";
 import { tenantCoreApi } from "../api/tenant-core.api";
 import {
   createTenantIntentKeyStore,
@@ -198,48 +199,18 @@ export function useTenantCoreWorkspace(
 
   const currentTenant = loadedTenantId === tenantId ? tenant : null;
 
-  useEffect(() => {
-    if (currentTenant?.status !== "PROVISIONING" || !permissions.canRead) {
-      return;
-    }
-
-    let cancelled = false;
-    let timer: number | undefined;
-    let attempts = 0;
-    const schedule = () => {
-      timer = window.setTimeout(async () => {
-        if (cancelled) return;
-        attempts += 1;
-        setPollAttempts(attempts);
-        const next = await loadTenant(true);
-        if (cancelled) return;
-        if (
-          (next?.status ?? tenantRef.current?.status) === "PROVISIONING" &&
-          attempts < maxProvisioningPolls
-        ) {
-          schedule();
-          return;
-        }
-        if (
-          attempts >= maxProvisioningPolls &&
-          (next?.status ?? tenantRef.current?.status) === "PROVISIONING"
-        ) {
-          setPollExhausted(true);
-        }
-      }, pollIntervalMs);
-    };
-    schedule();
-    return () => {
-      cancelled = true;
-      if (timer !== undefined) window.clearTimeout(timer);
-    };
-  }, [
-    currentTenant?.status,
-    loadTenant,
-    maxProvisioningPolls,
-    permissions.canRead,
-    pollIntervalMs,
-  ]);
+  usePollWhile(
+    currentTenant?.status === "PROVISIONING" && permissions.canRead,
+    () => loadTenant(true),
+    {
+      intervalMs: pollIntervalMs,
+      maxAttempts: maxProvisioningPolls,
+      onAttempt: setPollAttempts,
+      onExhausted: () => setPollExhausted(true),
+      shouldContinue: () => tenantRef.current?.status === "PROVISIONING",
+      deps: [loadTenant],
+    },
+  );
 
   const assertCurrentTenant = useCallback((): TenantView => {
     const current = tenantRef.current;
@@ -504,6 +475,25 @@ export function useTenantCoreWorkspace(
     tenantId,
   ]);
 
+  const restore = useCallback(async () => {
+    requirePermission(permissions.canRestore, "TENANT_RESTORE_FORBIDDEN");
+    const current = assertCurrentTenant();
+    requireState(current.status === "DELETED", "TENANT_RESTORE_NOT_ALLOWED");
+    const updated = await runWrite(
+      "restore",
+      { action: "tenant.restore", tenantId },
+      (key) => tenantCoreApi.restore(tenantId, key),
+    );
+    applyTenant(updated, true);
+    return updated;
+  }, [
+    applyTenant,
+    assertCurrentTenant,
+    permissions.canRestore,
+    runWrite,
+    tenantId,
+  ]);
+
   const destroy = useCallback(
     async (destroySubscriptions = false) => {
       requirePermission(permissions.canDestroy, "TENANT_DESTROY_FORBIDDEN");
@@ -570,6 +560,7 @@ export function useTenantCoreWorkspace(
     reprovision,
     cancelProvisioning,
     softDelete,
+    restore,
     destroy,
   };
 }

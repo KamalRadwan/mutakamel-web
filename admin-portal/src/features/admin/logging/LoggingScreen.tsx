@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
-  Activity,
   AlertTriangle,
   Edit3,
   FileClock,
   Filter,
   Gauge,
   Loader2,
+  MoreHorizontal,
   Radio,
   RefreshCw,
   RotateCcw,
@@ -19,6 +19,30 @@ import {
   X,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import {
+  PageHeader,
+  Card,
+  Field,
+  Input,
+  Textarea,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  Checkbox,
+  Button,
+  Badge,
+  DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  ConfirmActionModal,
+  AmbiguousOutcomePanel,
+  useToast,
+  type ColumnDef,
+} from "@/design-system";
 import { LOGGING_COPY, type LoggingCopy } from "./copy";
 import { useLiveLogging } from "./useLiveLogging";
 import { useLoggingConsole } from "./useLoggingConsole";
@@ -31,6 +55,7 @@ import {
   type LoggingHistoryRow,
   type LoggingOverride,
   type ResourceView,
+  type RuntimeLogRow,
 } from "./types";
 
 type ConsoleView = ReturnType<typeof useLoggingConsole>;
@@ -44,25 +69,7 @@ export function LoggingScreen() {
 
   return (
     <div className="space-y-4" dir={lang === "ar" ? "rtl" : "ltr"}>
-      <header className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 px-4 py-4 text-white shadow-md sm:px-5">
-        <div className="pointer-events-none absolute end-0 top-0 -me-12 -mt-16 size-72 rounded-full bg-cyan-500/20 blur-3xl" />
-        <div className="relative flex items-start gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-cyan-600 shadow-sm">
-            <Activity className="size-5" aria-hidden="true" />
-          </span>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg font-black tracking-tight">{copy.title}</h1>
-              <span className="rounded-md border border-amber-300/30 bg-amber-300/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-100">
-                {copy.critical}
-              </span>
-            </div>
-            <p className="mt-1 max-w-4xl text-xs leading-5 text-cyan-100/80">
-              {copy.subtitle}
-            </p>
-          </div>
-        </div>
-      </header>
+      <PageHeader title={copy.title} />
 
       {!view.canRead && view.directory.state === "FORBIDDEN" ? (
         <StatePanel
@@ -101,17 +108,114 @@ function DirectoryPanel({
   lang: "ar" | "en";
 }) {
   const rows = view.directory.data;
+
+  const columns: ColumnDef<LoggingOverride>[] = [
+    {
+      key: "scope",
+      headerEn: copy.scope,
+      headerAr: copy.scope,
+      cell: (row) => {
+        const expired =
+          row.expiresAt !== null &&
+          view.directory.timestamp !== null &&
+          Date.parse(row.expiresAt) <= Date.parse(view.directory.timestamp);
+        return (
+          <div>
+            <p className="font-semibold text-foreground">{row.scope}</p>
+            <Badge tone={expired ? "neutral" : "success"} className="mt-1">
+              {expired ? copy.expired : copy.active}
+            </Badge>
+          </div>
+        );
+      },
+    },
+    {
+      key: "target",
+      headerEn: copy.target,
+      headerAr: copy.target,
+      cell: (row) => (
+        <div>
+          <p className="font-semibold text-foreground">{row.appName ?? copy.global}</p>
+          {row.tenantId ? (
+            <Link
+              href={`/tenants/${row.tenantId}`}
+              className="mt-1 block max-w-56 break-all font-mono text-sm text-action hover:underline"
+            >
+              {row.tenantId}
+            </Link>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "level",
+      headerEn: copy.level,
+      headerAr: copy.level,
+      cell: (row) => <LevelPill level={row.level} />,
+    },
+    {
+      key: "reason",
+      headerEn: copy.reason,
+      headerAr: copy.reason,
+      cell: (row) => (
+        <span className="block max-w-64 whitespace-pre-wrap break-words">
+          {row.reason ?? copy.notRecorded}
+        </span>
+      ),
+    },
+    {
+      key: "expires",
+      headerEn: copy.expires,
+      headerAr: copy.expires,
+      cell: (row) =>
+        row.expiresAt ? formatDate(row.expiresAt, lang, true) : copy.legacyPermanent,
+    },
+    {
+      key: "updated",
+      headerEn: copy.updated,
+      headerAr: copy.updated,
+      cell: (row) => formatDate(row.updatedAt, lang, true),
+    },
+    {
+      key: "actions",
+      headerEn: copy.actions,
+      headerAr: copy.actions,
+      cell: (row) =>
+        view.canUpdate ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" aria-label={`${copy.actions}: ${row.appName || copy.global}`}>
+                <MoreHorizontal className="size-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => view.editOverride(row)}>
+                <Edit3 className="size-4" aria-hidden="true" />
+                {copy.edit}
+              </DropdownMenuItem>
+              <DropdownMenuItem destructive onSelect={() => view.requestDelete(row)}>
+                <Trash2 className="size-4" aria-hidden="true" />
+                {copy.remove}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <span className="text-sm text-muted-foreground">{copy.readOnlyEditor}</span>
+        ),
+    },
+  ];
+
   return (
-    <section className={panelClass}>
+    <Card className="p-4">
       <PanelHeading
         icon={<Gauge className="size-4" />}
         title={copy.directory}
         help={copy.directoryHelp}
         action={
           rows ? (
-            <div className="flex gap-2 text-[10px] font-black">
-              <Metric label={copy.rowsOnPage} value={rows.length} />
-              <Metric label={copy.activeOnPage} value={view.activeCount} />
+            <div className="flex gap-2 text-sm font-semibold">
+              <Metric label={copy.rowsOnPage} value={rows.length} lang={lang} />
+              <Metric label={copy.activeOnPage} value={view.activeCount} lang={lang} />
             </div>
           ) : null
         }
@@ -167,29 +271,31 @@ function DirectoryPanel({
             label: String(limit),
           }))}
         />
-        <label className="flex min-h-10 items-center gap-2 self-end rounded-xl border border-slate-300 px-3 text-xs font-bold dark:border-slate-700">
-          <input
-            type="checkbox"
+        <label className="flex min-h-11 items-center gap-2 self-end rounded-md border border-input px-3 text-sm font-semibold">
+          <Checkbox
             checked={view.directoryDraft.includeExpired}
-            onChange={(event) =>
-              view.setDirectoryDraftField("includeExpired", event.target.checked)
+            onCheckedChange={(checked) =>
+              view.setDirectoryDraftField("includeExpired", checked === true)
             }
-            className="size-4 accent-cyan-600"
           />
           {copy.includeExpired}
         </label>
         <div className="flex items-end justify-end gap-2">
-          <IconButton label={copy.reset} onClick={view.resetDirectoryFilters}>
-            <RotateCcw className="size-3.5" />
-          </IconButton>
-          <IconButton label={copy.refresh} onClick={view.refreshDirectory}>
+          <Button type="button" variant="outline" size="sm" onClick={view.resetDirectoryFilters}>
+            <RotateCcw className="size-3.5" aria-hidden="true" />
+            {copy.reset}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={view.refreshDirectory}>
             <RefreshCw
-              className={`size-3.5 ${view.directory.isRefreshing ? "animate-spin" : ""}`}
+              className={`size-3.5 ${view.directory.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`}
+              aria-hidden="true"
             />
-          </IconButton>
-          <button type="submit" className={primaryButtonClass}>
-            <Filter className="size-3.5" /> {copy.apply}
-          </button>
+            {copy.refresh}
+          </Button>
+          <Button type="submit" variant="primary" size="sm">
+            <Filter className="size-3.5" aria-hidden="true" />
+            {copy.apply}
+          </Button>
         </div>
       </form>
 
@@ -197,53 +303,51 @@ function DirectoryPanel({
         <>
           <ResourceNotice resource={view.directory} copy={copy} />
           {rows.length ? (
-            <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-              <table className="w-full min-w-[980px] text-xs">
-                <thead className={tableHeadClass}>
-                  <tr>
-                    {[copy.scope, copy.target, copy.level, copy.reason, copy.expires, copy.updated, copy.actions].map(
-                      (label) => (
-                        <th key={label} scope="col" className={thClass}>
-                          {label}
-                        </th>
-                      ),
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {rows.map((row) => (
-                    <OverrideRow
-                      key={row.id}
-                      row={row}
-                      view={view}
-                      copy={copy}
-                      lang={lang}
-                      referenceTimestamp={view.directory.timestamp}
-                    />
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-4">
+              <DataTable
+                labelEn={LOGGING_COPY.en.directory}
+                labelAr={LOGGING_COPY.ar.directory}
+                columns={columns}
+                data={rows}
+                isRefreshing={view.directory.isRefreshing}
+                getRowId={(row) => row.id}
+                pagination={{
+                  page: 1,
+                  limit: Math.max(rows.length, 1),
+                  totalItems: rows.length,
+                  totalPages: 1,
+                  onPageChange: () => {},
+                }}
+              />
+              <footer className="mt-3 flex items-center justify-between gap-3 text-sm">
+                <span className="font-semibold text-muted-foreground">
+                  {copy.page} {formatInteger(view.directoryPage, lang)}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => view.setDirectoryPage(view.directoryPage - 1)}
+                    disabled={view.directoryPage <= 1 || view.directory.isRefreshing}
+                  >
+                    {copy.previous}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => view.setDirectoryPage(view.directoryPage + 1)}
+                    disabled={!view.directoryHasNext || view.directory.isRefreshing}
+                  >
+                    {copy.next}
+                  </Button>
+                </div>
+              </footer>
             </div>
           ) : (
             <InlineEmpty text={copy.emptyDirectory} />
           )}
-          <footer className="mt-3 flex items-center justify-between gap-3 text-xs">
-            <span className="font-bold text-slate-500">
-              {copy.page} {view.directoryPage}
-            </span>
-            <div className="flex gap-2">
-              <IconButton
-                label={copy.previous}
-                onClick={() => view.setDirectoryPage(view.directoryPage - 1)}
-                disabled={view.directoryPage <= 1 || view.directory.isRefreshing}
-              />
-              <IconButton
-                label={copy.next}
-                onClick={() => view.setDirectoryPage(view.directoryPage + 1)}
-                disabled={!view.directoryHasNext || view.directory.isRefreshing}
-              />
-            </div>
-          </footer>
           <Correlation resource={view.directory} copy={copy} lang={lang} />
         </>
       ) : (
@@ -254,82 +358,7 @@ function DirectoryPanel({
           retry={view.refreshDirectory}
         />
       )}
-    </section>
-  );
-}
-
-function OverrideRow({
-  row,
-  view,
-  copy,
-  lang,
-  referenceTimestamp,
-}: {
-  row: LoggingOverride;
-  view: ConsoleView;
-  copy: LoggingCopy;
-  lang: "ar" | "en";
-  referenceTimestamp: string | null;
-}) {
-  const expired =
-    row.expiresAt !== null &&
-    referenceTimestamp !== null &&
-    Date.parse(row.expiresAt) <= Date.parse(referenceTimestamp);
-  return (
-    <tr className="align-top hover:bg-slate-50 dark:hover:bg-slate-900/60">
-      <td className={tdClass}>
-        <p className="font-black">{row.scope}</p>
-        <span
-          suppressHydrationWarning
-          className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${
-            expired
-              ? "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-          }`}
-        >
-          {expired ? copy.expired : copy.active}
-        </span>
-      </td>
-      <td className={tdClass}>
-        <p className="font-bold">{row.appName ?? copy.global}</p>
-        {row.tenantId ? (
-          <Link
-            href={`/tenants/${row.tenantId}`}
-            className="mt-1 block max-w-56 break-all font-mono text-[10px] text-cyan-700 hover:underline dark:text-cyan-300"
-          >
-            {row.tenantId}
-          </Link>
-        ) : null}
-      </td>
-      <td className={tdClass}>
-        <LevelPill level={row.level} />
-      </td>
-      <td className={`${tdClass} max-w-64 whitespace-pre-wrap break-words`}>
-        {row.reason ?? copy.notRecorded}
-      </td>
-      <td className={tdClass}>
-        {row.expiresAt ? formatDate(row.expiresAt, lang, true) : copy.legacyPermanent}
-      </td>
-      <td className={tdClass}>{formatDate(row.updatedAt, lang, true)}</td>
-      <td className={tdClass}>
-        {view.canUpdate ? (
-          <div className="flex gap-1">
-            <IconButton label={copy.edit} onClick={() => view.editOverride(row)}>
-              <Edit3 className="size-3.5" />
-            </IconButton>
-            <IconButton
-              label={copy.remove}
-              onClick={() => view.requestDelete(row)}
-              danger
-            >
-              <Trash2 className="size-3.5" />
-            </IconButton>
-          </div>
-        ) : (
-          <span className="text-[10px] text-slate-400">{copy.readOnlyEditor}</span>
-        )}
-      </td>
-    </tr>
+    </Card>
   );
 }
 
@@ -339,7 +368,7 @@ function OverrideEditor({ view, copy }: { view: ConsoleView; copy: LoggingCopy }
   const needsTenant = draft.scope === "TENANT" || draft.scope === "TENANT_APP";
   const busy = view.mutationState === "SAVING" || view.mutationState === "DELETING";
   return (
-    <section className={panelClass}>
+    <Card className="p-4">
       <PanelHeading
         icon={<Save className="size-4" />}
         title={copy.editor}
@@ -404,52 +433,54 @@ function OverrideEditor({ view, copy }: { view: ConsoleView; copy: LoggingCopy }
           options={OVERRIDE_LOG_LEVELS.map((level) => ({ value: level, label: level }))}
           disabled={!view.canUpdate || busy}
         />
-        <label className={labelClass}>
-          <span>{copy.reason}</span>
-          <textarea
-            value={draft.reason}
-            maxLength={255}
-            rows={3}
-            disabled={!view.canUpdate || busy}
-            onChange={(event) => view.setOverrideDraftField("reason", event.target.value)}
-            className={inputClass}
-          />
-          <span className="flex justify-between text-[10px] text-slate-400">
-            <span className="text-rose-600 dark:text-rose-300">
-              {view.overrideErrors.reason ? copy.reasonInvalid : ""}
-            </span>
-            <span>{draft.reason.length}/255</span>
-          </span>
-        </label>
+        <Field label={copy.reason} hint={`${draft.reason.length}/255`} error={view.overrideErrors.reason ? copy.reasonInvalid : undefined}>
+          {(fp) => (
+            <Textarea
+              {...fp}
+              value={draft.reason}
+              maxLength={255}
+              rows={3}
+              disabled={!view.canUpdate || busy}
+              invalid={Boolean(view.overrideErrors.reason)}
+              onChange={(event) => view.setOverrideDraftField("reason", event.target.value)}
+            />
+          )}
+        </Field>
         <TextField
           label={copy.expiresAt}
           type="datetime-local"
           value={draft.expiresAtLocal}
           onChange={(value) => view.setOverrideDraftField("expiresAtLocal", value)}
-          error={view.overrideErrors.expiresAt ? copy.expiryInvalid : copy.expiryHelp}
+          error={view.overrideErrors.expiresAt ? copy.expiryInvalid : undefined}
+          hint={copy.expiryHelp}
           disabled={!view.canUpdate || busy}
         />
         {!view.canUpdate ? (
-          <p className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          <p className="rounded-md border border-warning bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
             {copy.readOnlyEditor} {copy.updatePermission}
           </p>
         ) : null}
-        <button
+        <Button
           type="submit"
+          variant="primary"
           disabled={!view.canUpdate || busy || view.mutationState === "STALE"}
-          className={`${primaryButtonClass} justify-center disabled:cursor-not-allowed disabled:opacity-40`}
+          className="justify-center"
         >
-          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+          {busy ? (
+            <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          ) : (
+            <Save className="size-3.5" aria-hidden="true" />
+          )}
           {copy.save}
-        </button>
+        </Button>
       </form>
-    </section>
+    </Card>
   );
 }
 
 function EffectiveInspector({ view, copy }: { view: ConsoleView; copy: LoggingCopy }) {
   return (
-    <section className={panelClass}>
+    <Card className="p-4">
       <PanelHeading
         icon={<Gauge className="size-4" />}
         title={copy.effective}
@@ -480,19 +511,20 @@ function EffectiveInspector({ view, copy }: { view: ConsoleView; copy: LoggingCo
           error={view.effectiveErrors.tenantId ? copy.invalidUuid : undefined}
           mono
         />
-        <button type="submit" className={`${secondaryButtonClass} justify-center`}>
-          <Gauge className="size-3.5" /> {copy.resolve}
-        </button>
+        <Button type="submit" variant="secondary" className="justify-center">
+          <Gauge className="size-3.5" aria-hidden="true" />
+          {copy.resolve}
+        </Button>
       </form>
       {view.effective.state === "LOADING" ? (
-        <p className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-          <Loader2 className="size-3.5 animate-spin" /> {copy.loading}
+        <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> {copy.loading}
         </p>
       ) : view.effective.data ? (
-        <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-900 dark:bg-cyan-950/40">
+        <div className="mt-4 rounded-md border border-info/30 bg-info-subtle p-4">
           <div className="flex items-center justify-between gap-3">
             <LevelPill level={view.effective.data.level} />
-            <span className="font-mono text-xs font-black">
+            <span className="font-mono text-sm font-semibold">
               {copy.source}: {view.effective.data.source === "FALLBACK" ? copy.fallback : view.effective.data.source}
             </span>
           </div>
@@ -506,7 +538,7 @@ function EffectiveInspector({ view, copy }: { view: ConsoleView; copy: LoggingCo
           retry={() => void view.resolveEffective()}
         />
       ) : null}
-    </section>
+    </Card>
   );
 }
 
@@ -520,13 +552,68 @@ function HistoryPanel({
   lang: "ar" | "en";
 }) {
   const rows = view.history.data;
+
+  const columns: ColumnDef<LoggingHistoryRow>[] = [
+    {
+      key: "timestamp",
+      headerEn: copy.timestamp,
+      headerAr: copy.timestamp,
+      cell: (row) => formatDate(row.createdAt, lang, true),
+    },
+    {
+      key: "action",
+      headerEn: copy.action,
+      headerAr: copy.action,
+      cell: (row) => <Badge tone="neutral">{row.action}</Badge>,
+    },
+    {
+      key: "target",
+      headerEn: copy.target,
+      headerAr: copy.target,
+      cell: (row) => (
+        <div>
+          <p className="font-semibold text-foreground">
+            {row.scope} · {row.appName ?? copy.global}
+          </p>
+          {row.tenantId ? <p dir="ltr" className="mt-1 break-all text-start font-mono text-sm">{row.tenantId}</p> : null}
+        </div>
+      ),
+    },
+    {
+      key: "previousValue",
+      headerEn: copy.previousValue,
+      headerAr: copy.previousValue,
+      cell: (row) => (row.previousLevel ? <LevelPill level={row.previousLevel} /> : copy.notRecorded),
+    },
+    {
+      key: "newValue",
+      headerEn: copy.newValue,
+      headerAr: copy.newValue,
+      cell: (row) => (row.level ? <LevelPill level={row.level} /> : copy.notRecorded),
+    },
+    {
+      key: "actor",
+      headerEn: copy.actor,
+      headerAr: copy.actor,
+      cell: (row) => (
+        <span dir="ltr" className="block max-w-52 break-all text-start font-mono text-sm">{row.actorId ?? copy.notRecorded}</span>
+      ),
+    },
+    {
+      key: "reason",
+      headerEn: copy.reason,
+      headerAr: copy.reason,
+      cell: (row) => (
+        <span className="block max-w-72 whitespace-pre-wrap break-words">
+          {row.reason ?? row.previousReason ?? copy.notRecorded}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <section className={panelClass}>
-      <PanelHeading
-        icon={<FileClock className="size-4" />}
-        title={copy.history}
-        help={copy.history}
-      />
+    <Card className="p-4">
+      <PanelHeading icon={<FileClock className="size-4" />} title={copy.history} help={copy.history} />
       <form
         className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6"
         onSubmit={(event) => {
@@ -600,40 +687,40 @@ function HistoryPanel({
           }))}
         />
         <div className="flex gap-2 sm:col-span-2 xl:col-span-6 xl:justify-end">
-          <IconButton label={copy.reset} onClick={view.resetHistoryFilters}>
-            <RotateCcw className="size-3.5" />
-          </IconButton>
-          <IconButton label={copy.refresh} onClick={view.refreshHistory}>
-            <RefreshCw className="size-3.5" />
-          </IconButton>
-          <button type="submit" className={primaryButtonClass}>
-            <Filter className="size-3.5" /> {copy.apply}
-          </button>
+          <Button type="button" variant="outline" size="sm" onClick={view.resetHistoryFilters}>
+            <RotateCcw className="size-3.5" aria-hidden="true" />
+            {copy.reset}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={view.refreshHistory}>
+            <RefreshCw className="size-3.5" aria-hidden="true" />
+            {copy.refresh}
+          </Button>
+          <Button type="submit" variant="primary" size="sm">
+            <Filter className="size-3.5" aria-hidden="true" />
+            {copy.apply}
+          </Button>
         </div>
       </form>
       {rows ? (
         <>
           <ResourceNotice resource={view.history} copy={copy} />
           {rows.length ? (
-            <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-              <table className="w-full min-w-[1080px] text-xs">
-                <thead className={tableHeadClass}>
-                  <tr>
-                    {[copy.timestamp, copy.action, copy.target, copy.previousValue, copy.newValue, copy.actor, copy.reason].map(
-                      (label) => (
-                        <th key={label} className={thClass} scope="col">
-                          {label}
-                        </th>
-                      ),
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {rows.map((row) => (
-                    <HistoryRow key={row.id} row={row} copy={copy} lang={lang} />
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-4">
+              <DataTable
+                labelEn={LOGGING_COPY.en.history}
+                labelAr={LOGGING_COPY.ar.history}
+                columns={columns}
+                data={rows}
+                isRefreshing={view.history.isRefreshing}
+                getRowId={(row) => row.id}
+                pagination={{
+                  page: 1,
+                  limit: Math.max(rows.length, 1),
+                  totalItems: rows.length,
+                  totalPages: 1,
+                  onPageChange: () => {},
+                }}
+              />
             </div>
           ) : (
             <InlineEmpty text={copy.emptyHistory} />
@@ -648,36 +735,7 @@ function HistoryPanel({
           retry={view.refreshHistory}
         />
       )}
-    </section>
-  );
-}
-
-function HistoryRow({
-  row,
-  copy,
-  lang,
-}: {
-  row: LoggingHistoryRow;
-  copy: LoggingCopy;
-  lang: "ar" | "en";
-}) {
-  return (
-    <tr className="align-top hover:bg-slate-50 dark:hover:bg-slate-900/60">
-      <td className={tdClass}>{formatDate(row.createdAt, lang, true)}</td>
-      <td className={tdClass}>
-        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black dark:bg-slate-800">
-          {row.action}
-        </span>
-      </td>
-      <td className={tdClass}>
-        <p className="font-black">{row.scope} · {row.appName ?? copy.global}</p>
-        {row.tenantId ? <p className="mt-1 break-all font-mono text-[10px]">{row.tenantId}</p> : null}
-      </td>
-      <td className={tdClass}>{row.previousLevel ? <LevelPill level={row.previousLevel} /> : copy.notRecorded}</td>
-      <td className={tdClass}>{row.level ? <LevelPill level={row.level} /> : copy.notRecorded}</td>
-      <td className={`${tdClass} max-w-52 break-all font-mono text-[10px]`}>{row.actorId ?? copy.notRecorded}</td>
-      <td className={`${tdClass} max-w-72 whitespace-pre-wrap break-words`}>{row.reason ?? row.previousReason ?? copy.notRecorded}</td>
-    </tr>
+    </Card>
   );
 }
 
@@ -694,15 +752,15 @@ function LivePanel({
     live.connectionState,
   );
   return (
-    <section className={panelClass}>
+    <Card className="p-4">
       <PanelHeading
         icon={<Radio className="size-4" />}
         title={copy.live}
         help={copy.liveHelp}
         action={<LiveStatus state={live.connectionState} copy={copy} />}
       />
-      <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-violet-900 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100">
-        <ShieldAlert className="me-2 inline size-4" />
+      <div className="mt-3 rounded-md border border-info/30 bg-info-subtle p-3 text-sm leading-5 text-info-subtle-foreground">
+        <ShieldAlert className="me-2 inline size-4" aria-hidden="true" />
         {copy.privacy}
       </div>
       {live.canLive ? (
@@ -738,127 +796,183 @@ function LivePanel({
           />
         </div>
       ) : (
-        <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <p className="mt-4 rounded-md border border-warning bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
           {copy.forbidden} {copy.livePermission}
         </p>
       )}
       {live.canLive ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {!running ? (
-            <button type="button" onClick={live.start} className={primaryButtonClass}>
-              <Radio className="size-3.5" /> {copy.start}
-            </button>
+            <Button type="button" variant="primary" size="sm" onClick={live.start}>
+              <Radio className="size-3.5" aria-hidden="true" /> {copy.start}
+            </Button>
           ) : (
-            <button type="button" onClick={live.stop} className={dangerButtonClass}>
-              <X className="size-3.5" /> {copy.stop}
-            </button>
+            <Button type="button" variant="destructive" size="sm" onClick={live.stop}>
+              <X className="size-3.5" aria-hidden="true" /> {copy.stop}
+            </Button>
           )}
-          <IconButton label={copy.clear} onClick={live.clear} disabled={!live.rows.length} />
+          <Button type="button" variant="outline" size="sm" onClick={live.clear} disabled={!live.rows.length}>
+            {copy.clear}
+          </Button>
           {["UNAVAILABLE", "ERROR", "STALE", "RECONNECTING"].includes(
             live.connectionState,
           ) ? (
-            <IconButton label={copy.retryNow} onClick={live.retryNow}>
-              <RefreshCw className="size-3.5" />
-            </IconButton>
+            <Button type="button" variant="outline" size="sm" onClick={live.retryNow}>
+              <RefreshCw className="size-3.5" aria-hidden="true" />
+              {copy.retryNow}
+            </Button>
           ) : null}
           {live.reconnectAttempt ? (
-            <span className="self-center text-xs text-slate-500">
-              {copy.reconnectAttempt}: {live.reconnectAttempt}
+            <span className="self-center text-sm text-muted-foreground">
+              {copy.reconnectAttempt}: {formatInteger(live.reconnectAttempt, lang)}
             </span>
           ) : null}
           {live.lastActivityAt ? (
-            <span className="self-center text-xs text-slate-500">
+            <span className="self-center text-sm text-muted-foreground">
               {copy.receivedAt}: {formatDate(live.lastActivityAt, lang, true)}
             </span>
           ) : null}
         </div>
       ) : null}
       {live.controlError ? (
-        <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-xs text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
+        <p role="alert" className="mt-3 rounded-md border border-destructive bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground">
           {live.controlError.message} · {copy.errorCode}: {live.controlError.code}
         </p>
       ) : null}
       {live.rows.length ? (
-        <div className="mt-4 max-h-[520px] overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="w-full min-w-[920px] text-xs">
-            <thead className={`${tableHeadClass} sticky top-0`}>
-              <tr>
-                {[copy.timestamp, copy.level, copy.service, copy.tenantId, copy.message, copy.correlation].map(
-                  (label) => (
-                    <th key={label} className={thClass} scope="col">{label}</th>
-                  ),
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-mono dark:divide-slate-800">
-              {live.rows.map((row) => (
-                <tr key={row.sequence} className="align-top">
-                  <td className={tdClass}>{formatDate(row.timestamp, lang, true)}</td>
-                  <td className={tdClass}><LevelPill level={row.level} /></td>
-                  <td className={tdClass}>{row.serviceName}</td>
-                  <td className={`${tdClass} max-w-48 break-all text-[10px]`}>{row.tenantId ?? copy.notRecorded}</td>
-                  <td className={`${tdClass} max-w-xl whitespace-pre-wrap break-words font-sans`}>{row.message ?? copy.notRecorded}</td>
-                  <td className={`${tdClass} max-w-48 break-all text-[10px]`}>{row.correlationId ?? copy.notRecorded}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <LiveRowsTable rows={live.rows} copy={copy} lang={lang} />
       ) : (
-        <p className="mt-4 text-center text-xs text-slate-500">
+        <p className="mt-4 text-center text-sm text-muted-foreground">
           {liveStateText(live.connectionState, copy)}
         </p>
       )}
-    </section>
+    </Card>
+  );
+}
+
+function LiveRowsTable({ rows, copy, lang }: { rows: RuntimeLogRow[]; copy: LoggingCopy; lang: "ar" | "en" }) {
+  const columns: ColumnDef<RuntimeLogRow>[] = [
+    {
+      key: "timestamp",
+      headerEn: copy.timestamp,
+      headerAr: copy.timestamp,
+      cell: (row) => <span className="whitespace-nowrap">{formatDate(row.timestamp, lang, true)}</span>,
+    },
+    {
+      key: "level",
+      headerEn: copy.level,
+      headerAr: copy.level,
+      cell: (row) => <LevelPill level={row.level} />,
+    },
+    {
+      key: "service",
+      headerEn: copy.service,
+      headerAr: copy.service,
+      cell: (row) => <code dir="ltr" className="font-mono text-sm">{row.serviceName}</code>,
+    },
+    {
+      key: "tenantId",
+      headerEn: copy.tenantId,
+      headerAr: copy.tenantId,
+      cell: (row) => <code dir="ltr" className="block max-w-48 break-all text-start font-mono text-sm">{row.tenantId ?? copy.notRecorded}</code>,
+    },
+    {
+      key: "message",
+      headerEn: copy.message,
+      headerAr: copy.message,
+      cell: (row) => <span className="block max-w-xl whitespace-pre-wrap break-words">{row.message ?? copy.notRecorded}</span>,
+    },
+    {
+      key: "correlation",
+      headerEn: copy.correlation,
+      headerAr: copy.correlation,
+      cell: (row) => <code dir="ltr" className="block max-w-48 break-all text-start font-mono text-sm">{row.correlationId ?? copy.notRecorded}</code>,
+    },
+  ];
+
+  return (
+    <div className="mt-4 max-h-[520px] overflow-y-auto">
+      <DataTable
+        labelEn={LOGGING_COPY.en.live}
+        labelAr={LOGGING_COPY.ar.live}
+        columns={columns}
+        data={rows}
+        getRowId={(row) => String(row.sequence)}
+        responsiveMode="horizontal-scroll"
+        pagination={{
+          page: 1,
+          limit: Math.max(rows.length, 1),
+          totalItems: rows.length,
+          totalPages: 1,
+          onPageChange: () => {},
+        }}
+      />
+    </div>
   );
 }
 
 function MutationFeedback({ view, copy }: { view: ConsoleView; copy: LoggingCopy }) {
-  if (["IDLE", "CONFIRMING_UPSERT", "CONFIRMING_DELETE"].includes(view.mutationState)) return null;
+  const toast = useToast();
+  const succeeded = view.mutationState === "SUCCESS";
+  const clearMutationOutcome = view.clearMutationOutcome;
+  useEffect(() => {
+    if (!succeeded) return;
+    toast.success(copy.success);
+    clearMutationOutcome();
+  }, [succeeded, toast, copy.success, clearMutationOutcome]);
+
+  if (["IDLE", "CONFIRMING_UPSERT", "CONFIRMING_DELETE", "SUCCESS"].includes(view.mutationState)) return null;
+
+  if (view.mutationState === "STALE") {
+    return (
+      <AmbiguousOutcomePanel
+        className="fixed bottom-4 end-4 z-40 w-[min(440px,calc(100vw-2rem))] shadow-pop"
+        message={copy.unknownOutcome}
+        correlationId={view.mutationCorrelationId ?? undefined}
+        onRetryExact={view.retryIntent ? view.retryExactMutation : undefined}
+        onReconcile={view.retryIntent ? view.reconcileUnknownMutation : undefined}
+      />
+    );
+  }
+
   const titles: Partial<Record<ConsoleView["mutationState"], string>> = {
     SAVING: copy.saving,
     DELETING: copy.deleting,
-    SUCCESS: copy.success,
     VALIDATION: copy.validationFailure,
     CONFLICT: copy.conflict,
     FORBIDDEN: copy.mutationForbidden,
     UNAVAILABLE: copy.mutationUnavailable,
-    STALE: copy.unknownOutcome,
     ERROR: copy.mutationError,
   };
   const busy = view.mutationState === "SAVING" || view.mutationState === "DELETING";
   return (
     <aside
-      role={view.mutationState === "SUCCESS" ? "status" : "alert"}
-      className={`fixed bottom-4 end-4 z-40 w-[min(440px,calc(100vw-2rem))] rounded-2xl border p-4 shadow-2xl ${
-        view.mutationState === "SUCCESS"
-          ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
-          : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100"
-      }`}
+      role="alert"
+      className="fixed bottom-4 end-4 z-40 w-[min(440px,calc(100vw-2rem))] rounded-lg border border-warning bg-warning-subtle p-4 text-warning-subtle-foreground shadow-pop"
     >
       <div className="flex items-start gap-3">
-        {busy ? <Loader2 className="mt-0.5 size-5 animate-spin" /> : <AlertTriangle className="mt-0.5 size-5" />}
+        {busy ? (
+          <Loader2 className="mt-0.5 size-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        ) : (
+          <AlertTriangle className="mt-0.5 size-5" aria-hidden="true" />
+        )}
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-black">{titles[view.mutationState]}</p>
+          <p className="text-sm font-semibold">{titles[view.mutationState]}</p>
           {view.mutationError ? (
-            <p className="mt-2 break-all text-xs">
+            <p className="mt-2 break-all text-sm">
               {view.mutationError.message} · {copy.errorCode}: {view.mutationError.errorCode}
             </p>
           ) : null}
           {view.mutationCorrelationId ? (
-            <p className="mt-2 break-all font-mono text-[10px]">
+            <p className="mt-2 break-all font-mono text-sm">
               {copy.correlation}: {view.mutationCorrelationId}
             </p>
           ) : null}
           {!busy ? (
             <div className="mt-3 flex flex-wrap gap-2">
-              {view.mutationState === "STALE" && view.retryIntent ? (
-                <>
-                  <button type="button" onClick={view.retryExactMutation} className={primaryButtonClass}>{copy.retryExact}</button>
-                  <button type="button" onClick={view.reconcileUnknownMutation} className={secondaryButtonClass}>{copy.reconcile}</button>
-                </>
-              ) : null}
-              <button type="button" onClick={view.clearMutationOutcome} className={secondaryButtonClass}>{copy.dismiss}</button>
+              <Button type="button" variant="outline" size="sm" onClick={view.clearMutationOutcome}>
+                {copy.dismiss}
+              </Button>
             </div>
           ) : null}
         </div>
@@ -874,24 +988,22 @@ function MutationConfirmation({ view, copy }: { view: ConsoleView; copy: Logging
   const target = upsert
     ? `${intent.command.scope} · ${intent.command.appName ?? copy.global} · ${intent.command.tenantId ?? copy.noTenant}`
     : `${intent.row.scope} · ${intent.row.appName ?? copy.global} · ${intent.row.tenantId ?? copy.noTenant}`;
+  const detailEn = upsert
+    ? `${copy.confirmUpsertDetail} ${target} · ${intent.command.level} · ${intent.command.expiresAt}`
+    : `${copy.confirmDeleteDetail} ${target}`;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm">
-      <section role="dialog" aria-modal="true" aria-labelledby="logging-confirm-title" className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex items-start gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"><ShieldAlert className="size-5" /></span>
-          <div>
-            <h2 id="logging-confirm-title" className="text-base font-black">{upsert ? copy.confirmUpsert : copy.confirmDelete}</h2>
-            <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">{upsert ? copy.confirmUpsertDetail : copy.confirmDeleteDetail}</p>
-          </div>
-        </div>
-        <p className="mt-4 break-all rounded-xl bg-slate-100 p-3 font-mono text-xs dark:bg-slate-900">{target}</p>
-        {upsert ? <p className="mt-2 text-xs"><LevelPill level={intent.command.level} /> · {intent.command.expiresAt}</p> : null}
-        <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={view.closeConfirmation} className={secondaryButtonClass}>{copy.cancel}</button>
-          <button type="button" onClick={view.confirmMutation} className={dangerButtonClass}><ShieldAlert className="size-3.5" />{copy.confirm}</button>
-        </div>
-      </section>
-    </div>
+    <ConfirmActionModal
+      isOpen
+      onClose={view.closeConfirmation}
+      onConfirm={() => view.confirmMutation()}
+      titleEn={upsert ? copy.confirmUpsert : copy.confirmDelete}
+      titleAr={upsert ? copy.confirmUpsert : copy.confirmDelete}
+      descriptionEn={detailEn}
+      descriptionAr={detailEn}
+      confirmTextEn={copy.confirm}
+      confirmTextAr={copy.confirm}
+      variant={upsert ? "warning" : "danger"}
+    />
   );
 }
 
@@ -906,20 +1018,44 @@ function ResourceStatePanel<T>({
   empty: string;
   retry: () => void;
 }) {
-  if (resource.state === "LOADING") return <StatePanel icon={<Loader2 className="size-6 animate-spin" />} title={copy.loading} />;
+  if (resource.state === "LOADING") return <StatePanel icon={<Loader2 className="size-6 animate-spin motion-reduce:animate-none" />} title={copy.loading} />;
   if (resource.state === "FORBIDDEN") return <StatePanel icon={<ShieldAlert className="size-6" />} title={copy.forbidden} detail={copy.readPermission} tone="warning" />;
   const title = resource.state === "EMPTY" ? empty : resource.state === "UNAVAILABLE" ? copy.unavailable : resource.state === "STALE" ? copy.stale : copy.error;
-  return <StatePanel icon={<AlertTriangle className="size-6" />} title={title} detail={errorDetail(resource, copy)} tone={resource.state === "EMPTY" ? "neutral" : "danger"} action={resource.state === "EMPTY" ? undefined : <button type="button" onClick={retry} className={secondaryButtonClass}>{copy.retry}</button>} />;
+  return (
+    <StatePanel
+      icon={<AlertTriangle className="size-6" />}
+      title={title}
+      detail={errorDetail(resource, copy)}
+      tone={resource.state === "EMPTY" ? "neutral" : "danger"}
+      action={
+        resource.state === "EMPTY" ? undefined : (
+          <Button type="button" variant="outline" size="sm" onClick={retry}>
+            {copy.retry}
+          </Button>
+        )
+      }
+    />
+  );
 }
 
 function ResourceNotice<T>({ resource, copy }: { resource: ResourceView<T>; copy: LoggingCopy }) {
   if (resource.state !== "STALE" && !(resource.state === "LOADING" && resource.data)) return null;
-  return <p role="status" className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{resource.state === "STALE" ? copy.stale : copy.loading} {errorDetail(resource, copy)}</p>;
+  return (
+    <p role="status" className="mt-3 rounded-md border border-warning bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
+      {resource.state === "STALE" ? copy.stale : copy.loading} {errorDetail(resource, copy)}
+    </p>
+  );
 }
 
 function Correlation<T>({ resource, copy, lang = "en" }: { resource: ResourceView<T>; copy: LoggingCopy; lang?: "ar" | "en" }) {
   if (!resource.correlationId) return null;
-  return <p className="mt-3 break-all font-mono text-[10px] text-slate-400">{copy.correlation}: {resource.correlationId}{resource.timestamp ? ` · ${copy.responseAt}: ${formatDate(resource.timestamp, lang, true)}` : ""}</p>;
+  return (
+    <p className="mt-3 break-all text-sm text-muted-foreground">
+      <strong className="font-semibold text-foreground">{copy.correlation}:</strong>{" "}
+      <code dir="ltr" className="select-all font-mono">{resource.correlationId}</code>
+      {resource.timestamp ? ` · ${copy.responseAt}: ${formatDate(resource.timestamp, lang, true)}` : ""}
+    </p>
+  );
 }
 
 function errorDetail<T>(resource: ResourceView<T>, copy: LoggingCopy): string {
@@ -928,7 +1064,20 @@ function errorDetail<T>(resource: ResourceView<T>, copy: LoggingCopy): string {
 
 function LiveStatus({ state, copy }: { state: LiveView["connectionState"]; copy: LoggingCopy }) {
   const live = state === "LIVE";
-  return <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] font-black ${live ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}><span className={`size-2 rounded-full ${live ? "animate-pulse bg-emerald-500" : "bg-slate-400"}`} />{liveStateText(state, copy)}</span>;
+  return (
+    <span
+      role="status"
+      aria-live="polite"
+      className={`inline-flex items-center gap-2 rounded-sm px-2.5 py-1 text-sm font-semibold ${
+        live
+          ? "bg-success-subtle text-success-subtle-foreground"
+          : "bg-muted text-muted-foreground"
+      }`}
+    >
+      <span className={`size-2 rounded-full ${live ? "animate-pulse bg-success motion-reduce:animate-none" : "bg-muted-foreground"}`} aria-hidden="true" />
+      {liveStateText(state, copy)}
+    </span>
+  );
 }
 
 function liveStateText(state: LiveView["connectionState"], copy: LoggingCopy): string {
@@ -946,49 +1095,148 @@ function liveStateText(state: LiveView["connectionState"], copy: LoggingCopy): s
 }
 
 function LevelPill({ level }: { level: string }) {
-  const tone = level === "fatal" || level === "error" ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300" : level === "warn" ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300" : level === "info" ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" : "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300";
-  return <span className={`inline-flex rounded-full px-2 py-1 font-mono text-[10px] font-black ${tone}`}>{level}</span>;
+  const tone =
+    level === "fatal" || level === "error"
+      ? "danger"
+      : level === "warn"
+        ? "warn"
+        : level === "info"
+          ? "info"
+          : "neutral";
+  return <Badge tone={tone} className="font-mono normal-case tracking-normal">{level}</Badge>;
 }
 
 function PanelHeading({ icon, title, help, action }: { icon: ReactNode; title: string; help: string; action?: ReactNode }) {
-  return <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="flex items-center gap-2 text-sm font-black text-slate-900 dark:text-slate-100"><span className="text-cyan-600 dark:text-cyan-400">{icon}</span>{title}</h2><p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400">{help}</p></div>{action}</div>;
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <span className="text-primary">{icon}</span>
+          {title}
+        </h2>
+        <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">{help}</p>
+      </div>
+      {action}
+    </div>
+  );
 }
 
-function SelectField({ label, value, options, onChange, error, disabled }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void; error?: string; disabled?: boolean }) {
-  return <label className={labelClass}><span>{label}</span><select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={inputClass}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{error ? <span role="alert" className="text-[10px] text-rose-600 dark:text-rose-300">{error}</span> : null}</label>;
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+  error,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  error?: string;
+  disabled?: boolean;
+}) {
+  const toItemValue = (v: string) => (v === "" ? "__ANY__" : v);
+  return (
+    <Field label={label} error={error}>
+      {(fp) => (
+        <Select
+          value={toItemValue(value)}
+          onValueChange={(next) => onChange(next === "__ANY__" ? "" : next)}
+          disabled={disabled}
+        >
+          <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={toItemValue(option.value)} value={toItemValue(option.value)}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </Field>
+  );
 }
 
-function TextField({ label, value, onChange, error, mono, disabled, type = "text" }: { label: string; value: string; onChange: (value: string) => void; error?: string; mono?: boolean; disabled?: boolean; type?: string }) {
-  return <label className={labelClass}><span>{label}</span><input dir={mono ? "ltr" : undefined} type={type} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error && error !== "Required, future, and no more than 24 hours from now.")} className={`${inputClass} ${mono ? "font-mono" : ""}`} />{error ? <span className={`text-[10px] ${error.includes("24") || error.includes("24 ساعة") ? "text-slate-400" : "text-rose-600 dark:text-rose-300"}`}>{error}</span> : null}</label>;
+function TextField({
+  label,
+  value,
+  onChange,
+  error,
+  hint,
+  mono,
+  disabled,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  hint?: string;
+  mono?: boolean;
+  disabled?: boolean;
+  type?: string;
+}) {
+  return (
+    <Field label={label} error={error} hint={hint}>
+      {(fp) => (
+        <Input
+          {...fp}
+          dir={mono ? "ltr" : undefined}
+          type={type}
+          value={value}
+          disabled={disabled}
+          invalid={Boolean(error)}
+          onChange={(event) => onChange(event.target.value)}
+          className={mono ? "font-mono" : undefined}
+        />
+      )}
+    </Field>
+  );
 }
 
-function IconButton({ label, onClick, children, disabled, danger }: { label: string; onClick: () => void; children?: ReactNode; disabled?: boolean; danger?: boolean }) {
-  return <button type="button" onClick={onClick} disabled={disabled} className={danger ? dangerButtonClass : secondaryButtonClass}>{children}{label}</button>;
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return <span className="rounded-lg bg-slate-100 px-2 py-1 dark:bg-slate-800">{label}: <span className="font-mono">{value}</span></span>;
+function Metric({ label, value, lang }: { label: string; value: number; lang: "ar" | "en" }) {
+  return (
+    <span className="rounded-md bg-muted px-2 py-1">
+      {label}: <span className="font-mono">{formatInteger(value, lang)}</span>
+    </span>
+  );
 }
 
 function InlineEmpty({ text }: { text: string }) {
-  return <p className="mt-4 rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500 dark:border-slate-700">{text}</p>;
+  return (
+    <p className="mt-4 rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+      {text}
+    </p>
+  );
 }
 
 function StatePanel({ icon, title, detail, tone = "neutral", action }: { icon: ReactNode; title: string; detail?: string; tone?: "neutral" | "warning" | "danger"; action?: ReactNode }) {
-  const colors = tone === "danger" ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100" : "border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300";
-  return <section className={`mt-4 flex min-h-36 flex-col items-center justify-center rounded-xl border p-5 text-center ${colors}`}><span className="mb-2 opacity-75">{icon}</span><h3 className="text-sm font-black">{title}</h3>{detail ? <p className="mt-2 max-w-3xl break-all text-xs opacity-85">{detail}</p> : null}{action ? <div className="mt-3">{action}</div> : null}</section>;
+  const colors =
+    tone === "danger"
+      ? "border-destructive bg-destructive-subtle text-destructive-subtle-foreground"
+      : tone === "warning"
+        ? "border-warning bg-warning-subtle text-warning-subtle-foreground"
+        : "border-border bg-card text-muted-foreground";
+  return (
+    <section role={tone === "neutral" ? "status" : "alert"} className={`mt-4 flex min-h-36 flex-col items-center justify-center rounded-lg border p-5 text-center ${colors}`}>
+      <span className="mb-2 opacity-75">{icon}</span>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      {detail ? <p className="mt-2 max-w-3xl break-all text-sm opacity-85">{detail}</p> : null}
+      {action ? <div className="mt-3">{action}</div> : null}
+    </section>
+  );
 }
 
 function formatDate(value: string, lang: "ar" | "en", time = false): string {
   return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", { year: "numeric", month: "short", day: "2-digit", ...(time ? { hour: "2-digit", minute: "2-digit", second: "2-digit" } : {}), timeZone: "UTC" }).format(new Date(value));
 }
 
-const panelClass = "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950";
-const labelClass = "grid gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300";
-const inputClass = "min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-normal text-slate-950 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
-const primaryButtonClass = "inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-600 px-3 text-xs font-black text-white hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500";
-const secondaryButtonClass = "inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-slate-300 px-3 text-xs font-bold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-900";
-const dangerButtonClass = "inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-rose-600 px-3 text-xs font-black text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-40";
-const tableHeadClass = "bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:bg-slate-900 dark:text-slate-400";
-const thClass = "px-3 py-2.5 text-start";
-const tdClass = "px-3 py-3";
+function formatInteger(value: number, lang: "ar" | "en"): string {
+  return new Intl.NumberFormat(lang === "ar" ? "ar-EG" : "en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
+}

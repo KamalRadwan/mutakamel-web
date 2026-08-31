@@ -7,6 +7,11 @@ import type {
 export function useSystemPrincipalRotationEditor(
   binding: DatabaseServerProvisioningPrincipalBindingView,
   onSave: (dto: UpdateDatabaseServerSystemPrincipalRotationDto) => Promise<unknown>,
+  messages?: {
+    invalidInterval: string;
+    invalidReason: string;
+    updateFailed: string;
+  },
 ) {
   const [prevBinding, setPrevBinding] = useState(binding);
   const [enabled, setEnabled] = useState(binding.rotationEnabled);
@@ -27,11 +32,11 @@ export function useSystemPrincipalRotationEditor(
 
   const submit = async () => {
     if (intervalHours < 24 || intervalHours > 8760) {
-      setError("Rotation interval must be between 24 and 8760 hours.");
+      setError(messages?.invalidInterval ?? "Rotation interval must be between 24 and 8760 hours.");
       return;
     }
     if (reason.trim().length < 8) {
-      setError("Enter a reason of at least 8 characters.");
+      setError(messages?.invalidReason ?? "Enter a reason of at least 8 characters.");
       return;
     }
     setPending(true);
@@ -47,7 +52,7 @@ export function useSystemPrincipalRotationEditor(
       });
       setReason("");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Policy update failed.");
+      setError(requestError instanceof Error ? requestError.message : (messages?.updateFailed ?? "Policy update failed."));
     } finally {
       setPending(false);
     }

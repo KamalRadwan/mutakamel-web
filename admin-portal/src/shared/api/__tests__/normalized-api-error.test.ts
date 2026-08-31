@@ -7,7 +7,7 @@ class MockAxiosError extends Error {
   isAxiosError = true;
   response: unknown;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(message: string, code: string, config: any, request: any, response: unknown) {
+  constructor(message: string, _code: string, _config: any, _request: any, response: unknown) {
     super(message);
     this.name = 'AxiosError';
     this.response = response;

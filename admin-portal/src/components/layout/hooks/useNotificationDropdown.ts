@@ -16,6 +16,7 @@ import type {
   NotificationRuntimeConfig,
 } from "@/features/admin/notifications/types";
 import { useI18n } from "@/i18n/I18nContext";
+import { localeForLanguage } from "@/i18n/locale";
 import { adminCan } from "@/lib/auth/rbac";
 import {
   normalizeApiError,
@@ -132,15 +133,6 @@ export function useNotificationDropdown() {
     }
   }, [canRead, previewLimit, user?.id]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsOpen(false);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [isOpen]);
-
   const runAction = useCallback(async (
     operation: () => Promise<unknown>,
     applySuccess: () => void,
@@ -223,9 +215,9 @@ export function useNotificationDropdown() {
     },
   ), [page?.items, runAction]);
 
-  const toggleOpen = useCallback(() => {
-    if (!isOpen) void loadPreview();
-    setIsOpen(!isOpen);
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    if (nextOpen && !isOpen) void loadPreview();
+    setIsOpen(nextOpen);
   }, [isOpen, loadPreview]);
   const close = useCallback(() => setIsOpen(false), []);
   const exposesPreview = Boolean(currentOwnerId) && previewOwnerId === currentOwnerId;
@@ -237,6 +229,7 @@ export function useNotificationDropdown() {
   return useMemo(() => ({
     copy,
     dir,
+    locale: localeForLanguage(lang),
     canRead,
     canManage,
     isOpen,
@@ -247,7 +240,7 @@ export function useNotificationDropdown() {
     actionState: exposesAction ? actionState : "IDLE",
     actionError: exposesAction ? actionError : null,
     isPending: exposesAction && actionState === "PENDING",
-    toggleOpen,
+    setOpen: handleOpenChange,
     close,
     markAllRead,
     markRead,
@@ -271,7 +264,8 @@ export function useNotificationDropdown() {
     markAllRead,
     markRead,
     page?.items,
-    toggleOpen,
+    handleOpenChange,
+    lang,
     unreadCount,
   ]);
 }

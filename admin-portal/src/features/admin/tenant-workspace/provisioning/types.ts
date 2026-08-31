@@ -1,4 +1,7 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import type { PaginationMeta } from "@/types/common";
+
+export type { PaginationMeta };
 
 export const TENANT_OPERATION_TYPES = [
   "INITIAL_PROVISION",
@@ -9,7 +12,7 @@ export const TENANT_OPERATION_TYPES = [
   "DECOMMISSION",
 ] as const;
 
-export type TenantOperationType = (typeof TENANT_OPERATION_TYPES)[number];
+type TenantOperationType = (typeof TENANT_OPERATION_TYPES)[number];
 
 export const TENANT_OPERATION_STATUSES = [
   "REQUESTED",
@@ -26,34 +29,13 @@ export const TENANT_OPERATION_STATUSES = [
 
 export type TenantOperationStatus = (typeof TENANT_OPERATION_STATUSES)[number];
 
-export const TERMINAL_OPERATION_STATUSES = [
-  "SUCCEEDED",
-  "FAILED_RETRYABLE",
-  "MANUAL_RECOVERY_REQUIRED",
-  "CANCELLED",
-] as const satisfies readonly TenantOperationStatus[];
-
-export const RETRYABLE_OPERATION_STATUSES = [
-  "FAILED_RETRYABLE",
-  "MANUAL_RECOVERY_REQUIRED",
-  "CANCELLED",
-] as const satisfies readonly TenantOperationStatus[];
-
-export const CANCELLABLE_OPERATION_STATUSES = [
-  "REQUESTED",
-  "PLANNING",
-  "QUEUED",
-  "RUNNING",
-  "WAITING_RETRY",
-] as const satisfies readonly TenantOperationStatus[];
-
 export const TENANT_OPERATION_ACTOR_TYPES = [
   "ADMIN",
   "TENANT_USER",
   "SYSTEM",
 ] as const;
 
-export type TenantOperationActorType =
+type TenantOperationActorType =
   (typeof TENANT_OPERATION_ACTOR_TYPES)[number];
 
 export const TENANT_OPERATION_STEP_KINDS = [
@@ -68,7 +50,7 @@ export const TENANT_OPERATION_STEP_KINDS = [
   "ACTIVATION",
 ] as const;
 
-export type TenantOperationStepKind =
+type TenantOperationStepKind =
   (typeof TENANT_OPERATION_STEP_KINDS)[number];
 
 export const TENANT_OPERATION_STEP_STATUSES = [
@@ -96,7 +78,7 @@ export const TENANT_COMPONENT_INSTALLATION_STATES = [
   "INCOMPATIBLE",
 ] as const;
 
-export type TenantComponentInstallationState =
+type TenantComponentInstallationState =
   (typeof TENANT_COMPONENT_INSTALLATION_STATES)[number];
 
 export const TENANT_COMPONENT_SELECTION_SOURCES = [
@@ -105,7 +87,7 @@ export const TENANT_COMPONENT_SELECTION_SOURCES = [
   "DEPENDENCY",
 ] as const;
 
-export type TenantComponentSelectionSource =
+type TenantComponentSelectionSource =
   (typeof TENANT_COMPONENT_SELECTION_SOURCES)[number];
 
 export const TENANT_SEED_POLICIES = [
@@ -118,7 +100,7 @@ export const TENANT_SEED_POLICIES = [
   "MANUAL_CONFLICT",
 ] as const;
 
-export type TenantSeedPolicy = (typeof TENANT_SEED_POLICIES)[number];
+type TenantSeedPolicy = (typeof TENANT_SEED_POLICIES)[number];
 
 export const TENANT_SEED_STATUSES = [
   "PENDING",
@@ -130,10 +112,10 @@ export const TENANT_SEED_STATUSES = [
   "SKIPPED_NOT_SELECTED",
 ] as const;
 
-export type TenantSeedStatus = (typeof TENANT_SEED_STATUSES)[number];
+type TenantSeedStatus = (typeof TENANT_SEED_STATUSES)[number];
 
 export const RELEASE_RISK_LEVELS = ["LOW", "MEDIUM", "HIGH"] as const;
-export type ReleaseRiskLevel = (typeof RELEASE_RISK_LEVELS)[number];
+type ReleaseRiskLevel = (typeof RELEASE_RISK_LEVELS)[number];
 
 export const PREREQUISITE_REQUEST_STATUSES = [
   "REQUESTED",
@@ -144,7 +126,7 @@ export const PREREQUISITE_REQUEST_STATUSES = [
   "EXPIRED_AWAITING_RELEASE",
 ] as const;
 
-export type PrerequisiteRequestStatus =
+type PrerequisiteRequestStatus =
   (typeof PREREQUISITE_REQUEST_STATUSES)[number];
 
 export const MAINTENANCE_FENCE_STATUSES = [
@@ -155,7 +137,7 @@ export const MAINTENANCE_FENCE_STATUSES = [
   "EXPIRED_AWAITING_RELEASE",
 ] as const;
 
-export type MaintenanceFenceStatus =
+type MaintenanceFenceStatus =
   (typeof MAINTENANCE_FENCE_STATUSES)[number];
 
 export const PREREQUISITE_EVIDENCE_STATUSES = [
@@ -165,7 +147,7 @@ export const PREREQUISITE_EVIDENCE_STATUSES = [
   "EXPIRED",
 ] as const;
 
-export type PrerequisiteEvidenceStatus =
+type PrerequisiteEvidenceStatus =
   (typeof PREREQUISITE_EVIDENCE_STATUSES)[number];
 
 export const SEED_CONFLICT_DECISIONS = [
@@ -175,15 +157,6 @@ export const SEED_CONFLICT_DECISIONS = [
 ] as const;
 
 export type SeedConflictDecision = (typeof SEED_CONFLICT_DECISIONS)[number];
-
-export interface PaginationMeta {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-  hasNext: boolean;
-  hasPrev: boolean;
-}
 
 export interface ProvisioningPage<T> {
   items: T[];
@@ -258,6 +231,7 @@ export interface TenantOperationProgress {
 }
 
 export interface TenantOperationDetail extends TenantOperationSummary {
+  prerequisiteCount: number;
   progress: TenantOperationProgress;
   timelineEventCount: number;
   steps: TenantOperationStep[];
@@ -441,7 +415,7 @@ export interface TenantPrerequisiteEvidenceRecord
   evidence: TenantPrerequisiteEvidence[];
 }
 
-export interface FleetTargetSelection {
+interface FleetTargetSelection {
   componentKey: string;
   componentId: string;
   targetReleaseId: string;
@@ -577,7 +551,7 @@ export interface TenantSeedStateQuery {
   sortDir?: "ASC" | "DESC";
 }
 
-export type ProvisioningResourceStatus =
+type ProvisioningResourceStatus =
   | "idle"
   | "loading"
   | "ready"

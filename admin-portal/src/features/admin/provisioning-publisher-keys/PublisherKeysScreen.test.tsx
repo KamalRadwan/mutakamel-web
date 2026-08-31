@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PublisherKeysScreen } from "./PublisherKeysScreen";
 import type { PublisherKeysView } from "./usePublisherKeys";
@@ -16,7 +16,6 @@ const { languageMock, viewBox } = vi.hoisted(() => ({
   viewBox: { current: null as unknown },
 }));
 
-vi.mock("@/components/layout/Navbar", () => ({ Navbar: () => <nav>Navbar</nav> }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => languageMock }));
 vi.mock("./usePublisherKeys", () => ({
   usePublisherKeys: () => viewBox.current,
@@ -108,9 +107,14 @@ describe("PublisherKeysScreen", () => {
     expect(screen.getByRole("heading", { name: "Publisher-key detail" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Create an actor-bound challenge/u })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Register the verified public key/u })).toBeTruthy();
+    const directoryRegion = screen.getByRole("region", { name: "Trusted-key directory" });
+    expect(directoryRegion).toHaveAttribute("tabindex", "0");
+    const selectedInspect = screen.getByRole("button", { name: "Inspect" });
+    expect(selectedInspect).toHaveAttribute("aria-pressed", "true");
+    expect(selectedInspect.querySelector("svg")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+    fireEvent.click(selectedInspect);
     fireEvent.click(screen.getByRole("button", { name: "Create challenge" }));
     fireEvent.click(screen.getByRole("button", { name: "Review registration" }));
     fireEvent.click(screen.getByRole("button", { name: "Review revocation" }));
@@ -120,6 +124,30 @@ describe("PublisherKeysScreen", () => {
     expect(view.requestChallenge).toHaveBeenCalledOnce();
     expect(view.requestRegister).toHaveBeenCalledOnce();
     expect(view.requestRevoke).toHaveBeenCalledOnce();
+  });
+
+  it("keeps directory evidence mounted and marks the named region busy during refresh", () => {
+    const view = makeView();
+    view.directory.isRefreshing = true;
+    viewBox.current = view;
+    render(<PublisherKeysScreen />);
+
+    const region = screen.getByRole("region", { name: "Trusted-key directory" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByText(ACTIVE_KEY.keyId).length).toBeGreaterThan(0);
+  });
+
+  it("moves focus to persistent mutation failures", async () => {
+    const view = makeView();
+    view.mutation = {
+      ...view.mutation,
+      state: "FORBIDDEN",
+    };
+    viewBox.current = view;
+    render(<PublisherKeysScreen />);
+
+    const alert = screen.getByRole("alert");
+    await waitFor(() => expect(alert).toHaveFocus());
   });
 
   it("keeps directory and challenge permissions independent", () => {
@@ -185,10 +213,24 @@ describe("PublisherKeysScreen", () => {
     viewBox.current = view;
     render(<PublisherKeysScreen />);
 
+    // Radix AlertDialogContent renders role="alertdialog", not "dialog" -
+    // the more precise ARIA role for a confirmation that requires an
+    // immediate response, which the hand-rolled dialog this replaced didn't
+    // distinguish.
     expect(
-      screen.getByRole("dialog", { name: "Confirm critical key registration" }),
+      screen.getByRole("alertdialog", { name: "Confirm critical key registration" }),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    // F-FE-003 consolidation: the shared ConfirmActionModal now requires
+    // typing the exact challenge ID before Confirm is enabled, replacing the
+    // old read-only <dl> preview with a stronger typed-confirmation gate.
+    const confirmButton = screen.getByRole("button", { name: "Confirm" });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.change(
+      screen.getByLabelText("Type the exact name to confirm"),
+      { target: { value: CHALLENGE_ID } },
+    );
+    expect(confirmButton).toBeEnabled();
+    fireEvent.click(confirmButton);
     expect(view.confirmMutation).toHaveBeenCalledOnce();
   });
 
