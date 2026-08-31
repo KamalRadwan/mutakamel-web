@@ -34,3 +34,13 @@ next-env.d.ts
 *.pem
 .idea
 .vscode
+
+# Build output, agent/editor and VCS metadata
+dist/
+**/dist/
+.claude/
+**/.claude/
+.agents/
+**/.agents/
+.agent/
+**/.agent/

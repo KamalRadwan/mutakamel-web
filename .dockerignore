@@ -25,3 +25,15 @@ yarn-error.log*
 .idea
 .DS_Store
 README.md
+
+# Build output, agent/editor and VCS metadata: never part of a build context.
+dist
+**/dist
+.git
+**/.git
+.claude
+**/.claude
+.agents
+**/.agents
+.agent
+**/.agent
