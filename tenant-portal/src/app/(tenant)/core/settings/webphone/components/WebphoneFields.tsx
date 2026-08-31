@@ -2,8 +2,8 @@
 
 import { useId, type ReactNode } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { Input } from "@/design-system";
+import { Select } from "@/design-system";
 import { webphoneFieldErrorText } from "../webphone-copy";
 
 export function TextField({

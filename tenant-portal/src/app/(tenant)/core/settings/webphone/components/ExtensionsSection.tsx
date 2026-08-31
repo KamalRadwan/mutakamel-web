@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Plus, Trash2, Users } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/design-system";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { WEBPHONE_COPY, webphoneErrorText } from "../webphone-copy";
 import type { TenantWebphoneSettingsState } from "../hooks/useTenantWebphoneSettings";

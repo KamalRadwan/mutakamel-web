@@ -18,7 +18,6 @@ import {
   Target,
   XCircle,
 } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
 import {
   readPreconditionCode,
   type MigrationPreconditionCode,
@@ -701,7 +700,6 @@ export function MigrationsPageFrame({
       dir={dir}
       className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"
     >
-      <Navbar />
       <main className="mx-auto w-full max-w-[1600px] space-y-4 px-4 py-5 sm:px-6 lg:px-8">
         {children}
       </main>

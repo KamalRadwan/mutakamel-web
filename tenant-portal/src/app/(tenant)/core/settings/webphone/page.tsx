@@ -1,8 +1,8 @@
 "use client";
 
 import { RotateCw } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/design-system";
+import { PageHeader } from "@/design-system";
 import { useToast } from "@/components/ui/ToastContext";
 import { useTenantWebphoneSettings } from "./hooks/useTenantWebphoneSettings";
 import { WEBPHONE_COPY, webphoneErrorText } from "./webphone-copy";

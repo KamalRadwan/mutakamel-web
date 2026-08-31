@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, Save, ServerCog } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/design-system";
 import { WEBPHONE_COPY, webphoneErrorText } from "../webphone-copy";
 import type { TenantWebphoneSettingsState } from "../hooks/useTenantWebphoneSettings";
 import type { WebphoneIceTransportPolicy } from "../webphone-contract";
