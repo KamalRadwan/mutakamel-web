@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -66,27 +67,41 @@ export interface CreateLeadFormData {
   email: string;
   phone: string;
   stageId?: string;
+  /**
+   * An organization Party already in the tenant Directory — MASTER-PLAN 8.4.
+   *
+   * `CreateLeadDto.existingCompanyPartyId` is deliberately narrower than a
+   * generic `partyId`: the service revalidates that the party is an ACTIVE
+   * ORGANIZATION inside the lead's branch, and rejects anything else with
+   * `LEAD_EXISTING_COMPANY_INVALID` / `LEAD_EXISTING_COMPANY_OUTSIDE_BRANCH`.
+   */
+  existingCompanyPartyId?: string;
+  /** An existing contact person on that party — `contacts[].contactPartyId`. */
+  contactPartyId?: string;
 }
 
 export function buildCreateLeadRequest(
   form: CreateLeadFormData,
   branchId: string,
 ) {
+  const contact = {
+    fullName: form.contactName.trim(),
+    email: form.email.trim(),
+    phone: form.phone.trim(),
+    isPrimary: true,
+    ...(form.contactPartyId ? { contactPartyId: form.contactPartyId } : {}),
+  };
   return {
     branchId,
     leadProfileType: "CORPORATE" as const,
     displayName: form.companyName.trim(),
     companyName: form.companyName.trim(),
     companyPhone: form.phone.trim(),
-    contacts: [
-      {
-        fullName: form.contactName.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        isPrimary: true,
-      },
-    ],
+    contacts: [contact],
     ...(form.stageId ? { stageId: form.stageId } : {}),
+    ...(form.existingCompanyPartyId
+      ? { existingCompanyPartyId: form.existingCompanyPartyId }
+      : {}),
   };
 }
 
@@ -355,6 +370,17 @@ export function useLeads() {
 
   const { branchIds, branchId, selectBranch } =
     useTenantBranchSelection(user);
+  // `crm.leads.capabilities.get` is BRANCH_REQUIRED in the Gateway route
+  // contract, so it needs the two scope headers as well as the branchId query
+  // parameter. Without them the Gateway answers 400 GW.REQUEST.INVALID before
+  // crm-app sees the request — `validateOrganizationScope` in
+  // api-gateway-app/src/common/middleware/route-context.middleware.ts — and
+  // every action control on this screen silently degraded to "unavailable"
+  // for a reason that had nothing to do with permissions (D11 / 8.5).
+  const capabilityScopeHeaders = useOrganizationScopeHeaders(
+    "BRANCH_REQUIRED",
+    branchId,
+  );
 
   const changePage = useCallback((nextPage: number) => {
     pageRef.current = nextPage;
@@ -438,6 +464,7 @@ export function useLeads() {
                 signal,
                 cache: "no-store",
                 maxResponseBytes: 256 * 1024,
+                headers: capabilityScopeHeaders,
               },
             ),
           ]);
@@ -516,7 +543,7 @@ export function useLeads() {
         }
       }
     },
-    [branchId, changePage, page, searchQuery],
+    [branchId, capabilityScopeHeaders, changePage, page, searchQuery],
   );
 
   useEffect(() => {
@@ -532,11 +559,11 @@ export function useLeads() {
 
   const handleCreate = async (form: CreateLeadFormData): Promise<boolean> => {
     if (!branchId) {
-      setError("Select one accessible branch before creating a lead.");
+      setError(t.crmLeads.messages.selectBranchToCreate);
       return false;
     }
     if (!capabilities?.create) {
-      setError("You do not have permission to create leads in this branch.");
+      setError(t.crmLeads.messages.createNotPermitted);
       return false;
     }
 
@@ -558,15 +585,15 @@ export function useLeads() {
       await fetchLeads(undefined, 1, searchQueryRef.current);
       return true;
     } catch (caught) {
-      const message = errorMessage(caught, "Unable to create the lead.");
+      const message = errorMessage(caught, t.crmLeads.messages.createFailed);
       if (isAmbiguousMutationError(caught)) {
         changeSearchQuery("");
         const reloaded = await fetchLeads(undefined, 1, "");
         setIsCreateOpen(false);
         setError(
           reloaded
-            ? "The creation result is uncertain. Page one was refreshed without filters; review it before submitting again."
-            : "The creation result is uncertain and the unfiltered lead list could not be refreshed. Reload before trying again.",
+            ? t.crmLeads.messages.createAmbiguousRefreshed
+            : t.crmLeads.messages.createAmbiguousStale,
         );
       } else {
         setError(message);
@@ -578,7 +605,7 @@ export function useLeads() {
   const handleDelete = async () => {
     if (!selectedForDelete || isDeleting) return;
     if (!capabilityAllowsOwner(capabilities?.delete ?? null, selectedForDelete.ownerUserId)) {
-      setError("You do not have permission to delete this lead.");
+      setError(t.crmLeads.messages.deleteNotPermitted);
       setSelectedForDelete(null);
       return;
     }
@@ -604,7 +631,7 @@ export function useLeads() {
       changePage(requestedPage);
       await fetchLeads(undefined, requestedPage);
     } catch (caught) {
-      const message = errorMessage(caught, "Unable to delete the lead.");
+      const message = errorMessage(caught, t.crmLeads.messages.deleteFailed);
       if (isAmbiguousMutationError(caught)) {
         await fetchLeads(
           undefined,
@@ -625,7 +652,7 @@ export function useLeads() {
   ) => {
     if (movingLeadRef.current !== null) return;
     if (!branchId) {
-      setError("Select one accessible branch before moving a lead.");
+      setError(t.crmLeads.messages.selectBranchToMove);
       return;
     }
     const lead = items.find(({ id }) => id === leadId);
@@ -633,16 +660,16 @@ export function useLeads() {
       !lead ||
       !capabilityAllowsOwner(capabilities?.update ?? null, lead.ownerUserId)
     ) {
-      setError("You do not have permission to move this lead.");
+      setError(t.crmLeads.messages.moveNotPermitted);
       return;
     }
     if (stages.find(({ id }) => id === lead.stageId)?.flag === "CONVERTED") {
-      setError("Converted leads cannot be moved between stages.");
+      setError(t.crmLeads.messages.convertedCannotMove);
       return;
     }
     const destinationStage = stages.find(({ id }) => id === destinationStageId);
     if (!destinationStage || destinationStage.flag === "CONVERTED") {
-      setError("The selected lead stage is no longer available.");
+      setError(t.crmLeads.messages.stageUnavailable);
       return;
     }
 
@@ -667,7 +694,7 @@ export function useLeads() {
         searchQueryRef.current,
       );
     } catch (caught) {
-      const message = errorMessage(caught, "Unable to move the lead.");
+      const message = errorMessage(caught, t.crmLeads.messages.moveFailed);
       if (isAmbiguousMutationError(caught)) {
         await fetchLeads(
           undefined,

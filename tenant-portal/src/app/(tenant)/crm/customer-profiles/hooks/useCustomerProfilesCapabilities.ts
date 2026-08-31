@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -57,6 +58,13 @@ function isAbortError(error: unknown): boolean {
 }
 
 export function useCustomerProfilesCapabilities(branchId: string | null) {
+  // GET /customer-profiles/capabilities is BRANCH_REQUIRED in the Gateway
+  // route contract, which means it wants the scope HEADERS as well as the
+  // branchId query parameter — see src/lib/api/organization-scope.ts and
+  // OPEN-QUESTIONS.md Q24. Additive on purpose: when the branch's company
+  // cannot be derived this resolves to {} and the request goes out exactly
+  // as it did before, so a contract misreading cannot blank the screen.
+  const scopeHeaders = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   const [capabilities, setCapabilities] = useState<CustomerProfilesCapabilities>(EMPTY_CAPABILITIES);
   const [isLoading, setIsLoading] = useState(false);
   // Set only when the question could not be ASKED. A 403 is an answer, and
@@ -77,6 +85,7 @@ export function useCustomerProfilesCapabilities(branchId: string | null) {
         signal,
         cache: "no-store",
         maxResponseBytes: 50_000,
+        headers: scopeHeaders,
       });
       setCapabilities(parseCapabilitiesResponse(response.data) ?? EMPTY_CAPABILITIES);
     } catch (caught) {
@@ -94,7 +103,7 @@ export function useCustomerProfilesCapabilities(branchId: string | null) {
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
-  }, [branchId]);
+  }, [branchId, scopeHeaders]);
 
   useEffect(() => {
     const controller = new AbortController();

@@ -3,6 +3,8 @@
 import { ShieldAlert } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useTenantAuth } from "@/context/AuthContext";
+import { cn } from "../../lib/cn";
+import { proseMeasure } from "../../lib/variants";
 import { hasPermission } from "./hasPermission";
 
 export interface PermissionGateProps {
@@ -26,7 +28,7 @@ export function PermissionGate({ require, scoped, children }: PermissionGateProp
     <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
       <ShieldAlert className="size-8 text-muted-foreground" aria-hidden="true" />
       <p className="text-sm font-medium text-foreground">{t.permissionGate.title}</p>
-      <p className="max-w-sm text-xs text-muted-foreground">{t.permissionGate.description}</p>
+      <p className={cn("text-xs text-muted-foreground", proseMeasure)}>{t.permissionGate.description}</p>
     </div>
   );
 }

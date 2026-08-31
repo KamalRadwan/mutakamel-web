@@ -6,6 +6,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Tenant Portal Rules
 
+- **Main branch only**: Always work directly on `main`. Never create or switch branches, check out another ref, detach HEAD, or create a worktree.
+- **Branch safety check**: Before editing a repository, verify that `git branch --show-current` returns `main`. Otherwise, stop and ask the user; do not switch branches or move existing changes yourself.
+
 ## Absolute prohibitions
 
 - **Never edit any file under `../backend/`.** Read it to verify contracts.
@@ -87,7 +90,10 @@ had to ask a human is a bug in the documentation.
 - No `any` — `unknown` plus a validator at the boundary.
 - **No garbage**: no unused imports, variables, types, props, exports or files;
   no commented-out code; no dead branches; no duplicated logic.
-- Files stay under ~300 lines. Past that, split by responsibility.
+- Files holding **logic or markup** stay under ~300 lines. Past that, split by
+  responsibility. Three categories are exempt, and nothing else is — the full
+  list and the scheduled splits are in
+  `docs/architecture/file-architecture.md#the-300-line-rule-and-its-three-exemptions`.
 - Comment **why**, never **what**. Non-obvious constants cite their backend
   source path.
 

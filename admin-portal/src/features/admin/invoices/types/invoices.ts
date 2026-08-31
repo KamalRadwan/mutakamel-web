@@ -21,6 +21,24 @@ export const INVOICE_PURPOSES = [
 
 export type InvoicePurpose = (typeof INVOICE_PURPOSES)[number];
 
+export const INVOICE_TENANT_STATUSES = [
+  "PROVISIONING",
+  "PROVISIONING_FAILED",
+  "ACTIVE",
+  "SUSPENDED",
+  "DELETED",
+] as const;
+
+export type InvoiceTenantStatus = (typeof INVOICE_TENANT_STATUSES)[number];
+
+/** Safe tenant identity Core attaches to paginated admin invoice rows. */
+export interface InvoiceTenantSummary {
+  id: string;
+  name: string;
+  companyName: string;
+  status: InvoiceTenantStatus;
+}
+
 export const INVOICE_SORT_FIELDS = [
   "number",
   "status",
@@ -46,6 +64,8 @@ export interface Invoice {
   id: string;
   subscriptionId: string;
   tenantId: string;
+  /** Null on single-invoice reads and when the billed tenant is gone. */
+  tenant: InvoiceTenantSummary | null;
   number: string;
   status: InvoiceStatus;
   purpose: InvoicePurpose;

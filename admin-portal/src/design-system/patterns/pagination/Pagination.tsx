@@ -1,11 +1,13 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatLocaleNumber } from "@/i18n/locale";
+import { cn } from "../../lib/cn";
 import { Button } from "../../primitives/Button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../primitives/Select";
 import type { DataTablePaginationProps } from "../data-table/types";
+import { pageWindow } from "./page-window";
 
 const LIMIT_OPTIONS = [10, 20, 50, 100];
 
@@ -66,7 +68,18 @@ export function Pagination({
           </label>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center justify-center gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!hasPrev}
+            onClick={() => onPageChange(1)}
+            aria-label={lang === "ar" ? "الصفحة الأولى" : "First page"}
+            className="px-2"
+          >
+            {lang === "ar" ? <ChevronsRight className="size-3.5" /> : <ChevronsLeft className="size-3.5" />}
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -74,10 +87,36 @@ export function Pagination({
             disabled={!hasPrev}
             onClick={() => onPageChange(safePage - 1)}
             aria-label={lang === "ar" ? "الصفحة السابقة" : "Previous page"}
+            className="px-2"
           >
             {lang === "ar" ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
-            {lang === "ar" ? "السابق" : "Previous"}
           </Button>
+
+          {pageWindow(safePage, safeTotalPages).map((slot) =>
+            typeof slot === "number" ? (
+              <Button
+                key={slot}
+                type="button"
+                variant={slot === safePage ? "primary" : "outline"}
+                size="sm"
+                onClick={() => onPageChange(slot)}
+                aria-label={lang === "ar" ? `الصفحة ${number(slot)}` : `Page ${number(slot)}`}
+                aria-current={slot === safePage ? "page" : undefined}
+                className={cn("min-w-8 px-2 tabular-nums", slot === safePage && "pointer-events-none")}
+              >
+                {number(slot)}
+              </Button>
+            ) : (
+              <span
+                key={slot}
+                aria-hidden="true"
+                className="px-1 text-muted-foreground select-none"
+              >
+                …
+              </span>
+            ),
+          )}
+
           <Button
             type="button"
             variant="outline"
@@ -85,9 +124,20 @@ export function Pagination({
             disabled={!hasNext}
             onClick={() => onPageChange(safePage + 1)}
             aria-label={lang === "ar" ? "الصفحة التالية" : "Next page"}
+            className="px-2"
           >
-            {lang === "ar" ? "التالي" : "Next"}
             {lang === "ar" ? <ChevronLeft className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!hasNext}
+            onClick={() => onPageChange(safeTotalPages)}
+            aria-label={lang === "ar" ? "الصفحة الأخيرة" : "Last page"}
+            className="px-2"
+          >
+            {lang === "ar" ? <ChevronsLeft className="size-3.5" /> : <ChevronsRight className="size-3.5" />}
           </Button>
         </div>
       </div>

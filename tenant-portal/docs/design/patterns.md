@@ -37,6 +37,16 @@ only when no pattern fits.
 | `AsyncJobState` | `async-job/` | A 202 job: queued / running / succeeded / failed / artifact-expired |
 | `BulkActionBar` · `BulkConfirmDialog` · `BulkResultPanel` | `bulk-actions/` | Selection count, scoped confirm, and partial success |
 | `ReadOnlyGate` | `access-mode/` | FULL / READ_ONLY / DUNNING / BLOCKED as an in-body boundary |
+| `DetailHeader` | `detail-header/` | The detail-screen header. **Composes `PageHeader`** |
+| `DetailSection` | `detail-section/` | A labelled field group for read-mostly detail bodies |
+| `Timeline` | `timeline/` | Audit history, stage history, delivery attempts, approval ladders |
+| `AttachmentList` | `attachment-list/` | Stored attachments plus the upload affordance |
+| `EditDrawer` | `edit-drawer/` | The **edit** counterpart to `FormDrawer`, which is create-only |
+| `DeletionBlockerDialog` | `deletion-blocker/` | A 409 with reasons — the list of blocking children |
+| `AtomicReplacementConfirm` | `atomic-replacement/` | The pre-write diff for a full-replacement `PUT` |
+| `OfflineBanner` · `useConnectivity` | `offline-banner/` | The connection strip, mounted once in `AppShell` |
+| `useRealtimeResync` | `realtime-resync/` | The one line a list adds to reconcile with the server |
+| `LineChart` · `BarChart` · `AreaChart` · `DonutChart` · `Sparkline` | `chart/` | The chart wrappers and the palette law |
 
 ## DataTable
 
@@ -94,6 +104,27 @@ Owns, so no screen re-implements them:
 - Horizontal overflow inside its own container — **the page never scrolls
   sideways**
 
+### Column resize and reorder
+
+Optional, and off unless the caller passes `columnLayout`. The caller owns the
+`{ order, widths }` object, so it can be persisted per user or not at all.
+
+**Drag is never the only path.** That is the rule the board view is being fixed
+for (audit B3), and there is no reason to ship a second WCAG AA failure here:
+reorder is a menu on the header, and resize is an ARIA window-splitter
+(`role="separator"`, `aria-valuenow`) that responds to a drag **and** to the
+arrow keys.
+
+- Reorder is worded **earlier / later**, never left / right. The same column
+  moves the opposite way on screen in Arabic.
+- **Sticky columns are not reorderable** and are pinned back to their declared
+  edge. A sticky action column dragged into the middle would stick over the data
+  while the user scrolls.
+- A stored layout survives a release that adds or removes a column: unknown ids
+  are dropped, and columns the layout has never seen are appended.
+- Widths clamp to 64–720px, and the resize handle's direction is computed from
+  `dir` — in RTL a drag toward smaller `clientX` makes the column wider.
+
 Rules:
 
 - Column headers arrive translated. `DataTable` never touches the dictionary.
@@ -106,12 +137,13 @@ Rules:
 
 ```ts
 interface FilterBarProps {
-  filters: FilterDef[];
-  values: Record<string, string | undefined>;
-  onChange: (next: Record<string, string | undefined>) => void;
+  filters: FilterDef[];                          // a discriminated union — see below
+  values: FilterValues;                          // Record<string, FilterValue | undefined>
+  onChange: (next: FilterValues) => void;
   onReset: () => void;
   searchValue: string;
   onSearchChange: (q: string) => void;
+  maxVisibleChips?: number;                      // default 6
 }
 ```
 
@@ -122,15 +154,52 @@ interface FilterBarProps {
   [mobile input rule](DESIGN-SYSTEM.md#inputs-are-16px-on-mobile) applies.
 - Active filters render as removable chips; a "Clear all" appears only when at
   least one is set.
-- **Chips wrap before they shrink, and never truncate.** Past two rows the
-  remainder collapses into a `+n` **button** that opens a popover of the rest,
-  each still removable. A static `+n` count hides filter state the user is
+- **Chips wrap before they shrink, and never truncate.** Past `maxVisibleChips`
+  the remainder collapses into a `+n` **button** that opens a popover of the
+  rest, each still removable. A static `+n` count hides filter state the user is
   entitled to change; a truncated chip label (`Acquisition so…`) tells them
   nothing about what is filtering their data. Full rule in
-  [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#toolbar--28px-controls).
+  [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#toolbar--28px-controls), and see
+  [Chip overflow](#chip-overflow--a-count-not-a-row-count) for why the threshold
+  is a count rather than the row count that wording originally specified.
 - Filters that map to an enum build their options from
   [../reference/enums.md](../reference/enums.md) with `t.status.*` labels.
 - Collapses behind a "Filters" button with a count badge below `lg`.
+
+### The five filter kinds
+
+`FilterDef` is a discriminated union, and `FilterValue` mirrors it:
+
+| `kind` | Control | Value shape |
+| --- | --- | --- |
+| `select` | `Select` | `{ value: string }` |
+| `multiSelect` | `MultiSelect` | `{ values: string[] }` |
+| `dateRange` | `DateRangePicker` with the six presets | `{ from?: string; to?: string }` — **ISO strings** |
+| `numericRange` | two `Input type=number` | `{ min?: string; max?: string }` — **decimal strings** |
+| `boolean` | `Switch` | `{ value: true }` |
+
+**Every leaf is a string.** Filter state lives in the query string, a decimal
+bound must not be `Number()`d, and an ISO date has to survive a pasted link
+exactly as written. `dateRange` converts to `Date` only at the picker boundary.
+
+A `boolean` filter that is switched off **clears** rather than storing `false`:
+`?archived=false` and "no archived filter" are the same query, and storing one
+of them puts a chip on screen for a filter that is not filtering.
+
+A `multiSelect` contributes **one chip per selected value**, each individually
+removable. A single chip listing five stages can only be removed as a block,
+which is not what the user is asking for when they click the X on one of them.
+
+### Chip overflow — a count, not a row count
+
+The rule this page originally stated was "past two rows". A row count cannot be
+known without measuring every chip's `offsetTop` after layout, which means all
+the chips paint and then visibly collapse on every filter change and every
+resize. `maxVisibleChips` is a count instead — six by default, roughly two rows
+at the widths this bar renders at, and deterministic. The rule that matters is
+unchanged: **the overflow is a button opening a popover of still-removable
+chips, never a static `+n`.** `MultiSelect` follows the same rule inside its own
+trigger.
 
 ## PageHeader
 
@@ -146,6 +215,276 @@ interface PageHeaderProps {
 
 **The only place a `primary` button may appear.** If a screen seems to need two
 primary actions, one of them is secondary.
+
+`titleAdornment` and `leading` are slots `DetailHeader` fills; nothing else
+should need them.
+
+## DetailHeader
+
+The header every detail screen in phases 4–12 uses: back control, record name,
+status badge, subtitle, action cluster.
+
+**It composes `PageHeader` rather than reimplementing it.** That is the whole
+resolution of the one-filled-primary question: there is one implementation of
+the filled primary in the system and `PageHeader` owns it, in both shapes. A
+detail screen renders `DetailHeader` **instead of** `PageHeader`, never both, so
+the ceiling holds by construction rather than by review.
+
+The ceiling is a ceiling, not a quota.
+[detail-screens.md](detail-screens.md#customer-profile) is explicit that an
+`INDIVIDUAL` customer profile simply has no primary action; do not promote Edit
+to fill the slot.
+
+### Multi-action document headers
+
+Phases 11 and 12 build headers carrying **six to eight lifecycle actions** —
+a quotation reaching Draft → Send → Revise → Accept → Reject → Convert →
+Duplicate → Cancel, and the same shape for sales orders, invoices and
+policies. The one-filled-primary rule alone does not tell you what to do with
+the other seven, and "make them all `outline`" produces a row of eight equally
+loud controls that is worse than the thing the rule was protecting against.
+
+**The rule: a lifecycle header shows the ONE action that advances the document,
+and nothing else at that weight.**
+
+| Tier | What goes in it | Variant | Where |
+| --- | --- | --- | --- |
+| **Advance** | The single next step in the document's lifecycle, for its *current* status | `primary` (filled) | `PageHeader`'s `primaryAction` |
+| **Alternate** | Other actions legal right now — Revise, Duplicate, Download PDF | `outline` | `secondaryActions`, at most **three** |
+| **Everything else** | Legal but rare, and every destructive action | `DropdownMenu` overflow, `ghost` trigger | End of `secondaryActions` |
+
+Four consequences, each of which resolves a real ambiguity:
+
+1. **The advance action is computed from status, not listed.** A quotation in
+   `DRAFT` advances by Send; the same screen in `SENT` advances by Accept. One
+   filled button whose label changes — never Send and Accept side by side, one
+   of them disabled.
+2. **A status with no next step has no filled action.** A cancelled document
+   gets `primaryAction: undefined`. The slot is a ceiling, not a quota, and
+   promoting Duplicate to fill it makes the header lie about what the document
+   needs.
+3. **Destructive lifecycle actions never sit in the header row.** Cancel, Void
+   and Reject go in the overflow and confirm through `AlertDialog`, where the
+   filled `destructive` button lives. That is the *only* other filled button
+   on the screen, and it is inside a modal, so the two never render together.
+4. **An action the user cannot perform is absent, not disabled.** Admission
+   comes from `capabilities`, not permission strings. A disabled control the
+   user can never enable is an information leak about the workflow and a dead
+   tab stop.
+
+If more than three actions qualify as Alternate, the header is being asked to
+do a job that belongs to the document body — put the rest in the section they
+act on.
+
+This is stated once here rather than in each of 11.5, 11.14, 12.13 and 12.14,
+which is where it bites. Recorded by MASTER-PLAN task 3.38.
+
+## DetailSection
+
+A labelled field group — a definition list, not a table. These are attributes of
+one record, and a `<table>` would announce row and column positions that carry
+no meaning.
+
+A field whose value is missing still renders its label, with `emptyValueLabel`.
+Hiding the row leaves the reader unable to tell "not recorded" from "this record
+has no such field".
+
+## Timeline
+
+Audit history, stage history, delivery attempts, approval ladders. One rail, one
+marker per event.
+
+**An event *type* never takes a hue** — a "note added" and a "stage changed" are
+categories, and colouring them is the hue-coded-control anti-pattern arriving one
+row at a time. `tone` encodes an **outcome**: a delivery attempt that *failed* is
+`negative`; "email sent" takes no tone at all. In-progress is `ink` plus the
+pending dot, exactly as `StatusBadge` does it. `Stepper` carries the same rule
+for step position.
+
+It never sorts. "Newest first" and "oldest first" are both correct depending on
+whether the reader is auditing or following a process, so the caller decides.
+
+## AttachmentList
+
+Stored attachments plus the upload affordance, built on `FileUpload`.
+
+Delete is a **plain control here, not a confirmation**. The confirmation is the
+caller's: an attachment on a record with dependents is a
+`DeletionBlockerDialog`, an ordinary one is a `ConfirmActionModal`, and this
+pattern cannot know which. It reports the intent and stops.
+
+## EditDrawer
+
+Every `FormDrawer` in the app is create-only; roughly twenty screens in phases
+4–12 open a drawer on an **existing** record. It composes `FormDrawer`, so the
+dirty guard, the escape/backdrop handling and the one filled submit are the same
+code rather than a second copy, and adds the four things an edit needs:
+
+- a **load** state, distinct from a submit state;
+- a **load failure** with a retry, which is not a submit failure;
+- a **deleted-record** state that offers **no** retry, for the same reason
+  `NotFoundState` does not;
+- a **revert** to the last server values, enabled only once something changed.
+
+A drawer whose record never loaded does not fire the dirty guard on close —
+there is nothing to discard, and a confirmation about changes that do not exist
+is a dead end.
+
+The 409 / 412 / 428 surface is passed in as a `conflict` node rather than owned:
+only the caller knows what "their changes" were, and this drawer must not guess
+a diff it cannot see.
+
+## DeletionBlockerDialog
+
+The 409-with-reasons surface: a company that still has branches, a branch that
+still has departments, a team that still has placed users.
+
+`ConfirmActionModal` cannot host it — one description string, no slot for a list
+— so today those 409s render as a bare "failed" and the user is left to guess.
+
+**There is no confirm button and no "delete anyway".** The backend has already
+refused; offering an action guaranteed to fail is worse than offering none.
+
+## AtomicReplacementConfirm
+
+The pre-write diff for a full-replacement `PUT` — team memberships (4.15) and
+scope-role assignments (4.21), the most destructive writes in Core.
+
+Those endpoints replace the entire collection atomically, so the request body
+describes only the destination: **what is being taken away is invisible in the
+payload.** A user who edits a list of eight and saves has no way to see that
+three assignments just disappeared, and it looks exactly like an ordinary save.
+
+Removals and additions are always expanded; unchanged rows collapse. When
+anything is removed the confirm takes the `destructive` variant and is gated on
+an acknowledgement, which resets on close — consent is per attempt, so a second,
+different removal cannot inherit the first one's.
+
+`computeReplacementDiff` matches on **id**, never on label: two records may share
+a display name, and a removed item's label has to come from the server's copy
+because it is by definition absent from the new one.
+
+## OfflineBanner and useConnectivity
+
+`TenantRealtimeProvider` has been dispatching `server-draining`,
+`permanent-stop` and `resync-required` to `window` since it was built, **with
+zero subscribers**. A tenant whose realtime server drains sees a portal that
+looks fine and silently stops updating.
+
+`useConnectivity()` is that subscriber. Three states, three different truths,
+and collapsing them into one "you are offline" would be wrong in two of the
+three:
+
+| Status | Means | Recovers by |
+| --- | --- | --- |
+| `offline` | the browser lost the network | itself |
+| `draining` | the realtime server is shutting down; a reconnect is coming | itself |
+| `stopped` | the realtime client gave up permanently | **a reload, and only a reload** |
+
+`stopped` outranks everything, including `offline`: coming back online does not
+restart a client that has given up, and saying "online" again would be a lie
+about whether live updates are flowing. Only `stopped` gets an action.
+
+`stopped` also names **why** (13.5). The five
+`RealtimeApplicationStopReason` values are not interchangeable — a connection
+replaced by another tab, access withdrawn, a workspace taken offline and a
+session that could not be renewed each imply a different next move — so each
+has its own sentence in both dictionaries, keyed by the wire value and typed
+against the package's own union, so a reason added upstream fails the build
+until both dictionaries carry a sentence for it. An unrecognised value falls
+back to the generic line: a wire value is never shown.
+
+The banner is `caution`, not `negative` — none of the three means a request
+failed — and takes `role="status"`, not `alert`.
+
+## useRealtimeResync
+
+`resync-required` is **not** a banner: a strip that flickers on every reconnect
+is noise. It is a signal a *screen* acts on, and this hook is the one mechanism
+for acting on it. One line, in the hook that owns the fetch:
+
+```ts
+useRealtimeResync(reload);
+```
+
+**Why every list needs it.** The realtime protocol carries no entity change
+events at all — notifications and presence are the only live streams. A lead,
+an opportunity or an invoice changes with nothing sent to say so, which makes
+these three signals the entire staleness vocabulary the app has:
+
+| Signal | Fires when | Why a list must care |
+| --- | --- | --- |
+| `realtime.sync.required.v1`, scope `ALL` | the server declares client state suspect | the data underneath the screen moved |
+| a **second or later** `session.ready.v1` | the socket dropped and came back | the gap is unobservable — nothing says what changed |
+| the browser's `online` | the network returned | same gap, different cause |
+
+`NOTIFICATIONS` and `PRESENCE` scopes are deliberately ignored: the
+notification runtime reconciles its own cursor cache, and making every open list
+refetch because a notification cursor went ambiguous would be a self-inflicted
+request storm. That is exactly what the old scope-blind `resyncCount` on
+`useConnectivity` would have done, which is why it was removed rather than kept
+alongside this.
+
+Three details that are behaviour, not implementation:
+
+- **It never fires on mount.** The connection a page loads with is not a
+  reconnect; counting it would double every list's first fetch.
+- **It holds a signal raised while the tab is hidden** and runs it once on
+  return. Whatever went stale is still stale, and a portal open in eight tabs
+  should not multiply every reconnect by eight.
+- **It reads the callback fresh on every call**, so a `reload` whose identity
+  changes with the filters neither resubscribes nor fires a stale closure. A
+  rejected async `reload` is swallowed — there is no caller to catch it, and
+  the screen renders its own load failure anyway.
+
+One implementation detail is load-bearing and must not be "tidied up": the four
+window listeners are attached on the first subscriber and **never detached**.
+The count of established connections belongs to the *page*, not to a screen.
+Tearing it down with the last subscriber resets that count on every navigation,
+so the first reconnect after any navigation is counted as a first connection and
+silently swallowed — the exact failure this hook exists to prevent. The first
+draft did precisely that, and it survived until a test asserted across an
+unmount.
+
+## Charts
+
+Five wrappers over `recharts`: `LineChart`, `BarChart`, `AreaChart`,
+`DonutChart`, `Sparkline`.
+
+**There is no generic categorical palette, and one must not be invented.**
+[tokens.md § Charts](tokens.md#charts) is the law; `chart-palette.ts` is its
+implementation. There are exactly two ways to colour a series:
+
+1. **A status breakdown** — `byStatus`, win/loss, stage outcome — uses the four
+   roles through `STATUS_FILL`.
+2. **A qualitative breakdown** — `bySource`, `byOwner`, `byCountry` — uses
+   **top-N plus "Other" on the single-hue `brand-200 … brand-800` ramp**, through
+   `topNWithOther`. The largest slice is the darkest: **order carries the
+   meaning, not hue.** Six categories plus "Other" is the ceiling, because that
+   is how many steps the ramp has. Past it the answer is a table.
+
+`caution` and `negative` are never adjacent fills. Two mechanisms enforce it,
+because one is not enough: `STATUS_DRAW_ORDER` puts `brand` between them, which
+covers every breakdown with three or more roles; and every segment carries a
+background-coloured stroke, which covers the two-role `{caution, negative}` case
+where reordering has nowhere to put a separator.
+
+Other rules the wrappers own so no dashboard re-decides them:
+
+- **Mount animation is off** — `isAnimationActive={false}` on every series, from
+  one constant. See [motion.md](motion.md#charts-do-not-animate-in).
+- **Colours are `var()` references**, never resolved values, so a chart repaints
+  with the theme flip and with a tenant's runtime brand override (6.17).
+- **RTL is mirrored**: the x axis reverses, the value axis moves to the reading
+  end, the legend aligns to it, and the donut sweeps the other way. All computed
+  from `dir` — recharts takes physical props, the same third-party situation
+  [theming.md](theming.md#third-party-physical-apis) describes for Radix.
+- **Numbers go through `Intl` with an explicit locale**, never the runtime
+  default.
+- **`summary` is required, not optional.** An SVG chart is unreadable to a
+  screen reader whatever ARIA is bolted onto it, so every chart states its
+  numbers in words in a `<figcaption>`. A `Sparkline` carries the trend in its
+  accessible name for the same reason.
 
 ## FormDrawer
 
@@ -195,6 +534,37 @@ Resolves the wire value through the mapping in
   signal.
 - An unmapped value renders `neutral` with the raw value in a monospace face,
   so a backend addition is visible rather than silently swallowed.
+
+## When the API gives you an id and no name
+
+**Settled by Q14 on 2026-08-28. It has since been re-litigated twice — Q70
+(Trade's operating-context selector) and Q83 (the supplier picker) — which is
+why it now lives here as a rule instead of in three separate answers.**
+
+Many list projections carry `customerProfileId`, `ownerUserId`, `branchId` or
+`partyId` and no display name. The rule, in order:
+
+1. **Never fabricate a name.** Not from an id, not from an adjacent field, not
+   from a lookup the actor's grants do not cover. A wrong name is worse than a
+   visible identifier, because it looks authoritative.
+2. **If a purpose-built projection carries the name, use it** — but only where
+   the screen's own contract says to. The opportunity *card* endpoint carries
+   `customerDisplayName`; the generic list does not, and the table is
+   specified to use the generic list.
+3. **Otherwise render the raw id through `identifierText`** — `wrap-anywhere`
+   plus `<bdi>`, so a 36-character token cannot overflow a cell or reverse
+   under RTL — and **link it to the detail route when one exists.** An id that
+   navigates somewhere is a working affordance; an id that just sits there is
+   debt.
+4. **Null renders as the "not provided" empty phrase**, never as a blank cell
+   and never as the string `null`.
+5. **Do not open a new question for it.** Link to
+   [Q14](../build/OPEN-QUESTIONS.md) and state which of the cases above
+   applies. A fourth number for the same settled decision is noise.
+
+The reason this keeps coming back is that it *looks* like a gap each time it is
+met. It is a decision, and the decision is that an honest identifier beats an
+invented name.
 
 ## PermissionGate
 

@@ -38,16 +38,25 @@ describe("Accordion", () => {
     expect(screen.getByRole("button", { name: "Billing" })).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("does not animate its height — motion.md bans transitioning height, keyframes included", () => {
+  it("takes the one permitted height KEYFRAME, and never a height transition", () => {
     const { container } = renderAccordion();
     fireEvent.click(screen.getByRole("button", { name: "Billing" }));
     const markup = container.innerHTML;
-    expect(markup).not.toContain("animate-accordion");
+
+    // MASTER-PLAN 1.42 narrowed the ban rather than dropping it — see
+    // docs/design/motion.md#the-one-height-exception. A keyframe over a height
+    // Radix has already measured is permitted on a disclosure panel, and
+    // nowhere else.
+    expect(markup).toContain("data-[state=open]:animate-accordion-down");
+    expect(markup).toContain("data-[state=closed]:animate-accordion-up");
+    // Exit is faster than enter, as everywhere else in the budget.
+    expect(markup).toContain("data-[state=open]:duration-150");
+    expect(markup).toContain("data-[state=closed]:duration-100");
+
+    // What stays banned: TRANSITIONING height, and the grid-template-rows
+    // trick, which is the same layout animation by another property.
     expect(markup).not.toContain("transition-[height]");
     expect(markup).not.toContain("grid-rows-");
-    // Radix always publishes --radix-accordion-content-height; what matters is
-    // that nothing here consumes it to drive a height.
-    expect(markup).not.toContain("h-(--radix-accordion-content-height)");
   });
 
   it("rotates the chevron vertically, which needs no RTL mirror", () => {

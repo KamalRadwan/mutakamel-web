@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Clock } from "lucide-react";
 import { cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -32,7 +33,16 @@ export function OpportunityBoardCard({ item, canUpdate, onImportanceChange }: Op
 
   return (
     <div className="flex flex-col gap-1.5">
-      <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+      {/* The title is the route into the detail screen, per
+          docs/design/detail-screens.md#routes. A link rather than a card-wide
+          click target: this card lives inside a drag surface, and making the
+          whole card activatable would fire navigation on a short drag. */}
+      <Link
+        href={`/crm/opportunities/${encodeURIComponent(item.id)}`}
+        className="truncate rounded-xs text-sm font-medium text-foreground hover:underline"
+      >
+        {item.title}
+      </Link>
       {item.customerDisplayName && <p className="truncate text-xs text-muted-foreground">{item.customerDisplayName}</p>}
       <div className="flex items-center justify-between gap-2 pt-1">
         <OpportunityImportanceStars

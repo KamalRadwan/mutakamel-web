@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generatedAt": "2026-08-30T18:06:12.280Z",
+    "generatedAt": "2026-08-30T23:50:14.793Z",
     "generator": "scripts/docs/generate-route-inventory.mjs",
-    "frontendRevision": "684f503f0279+dirty",
-    "backendRevision": "989ee35f6578+dirty",
+    "frontendRevision": "9ee533219112+dirty",
+    "backendRevision": "68fef9f8c0d2+dirty",
     "sourcePolicy": "Gateway master ownership and canonicalization rules for master=tenant",
     "canonicalNamespaces": [
       "/api/tenant/core/v1/*",
@@ -34,7 +34,7 @@
     }
   },
   "sourceHashes": {
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "ba3041ec935c4efcf9f07b4ac12048ebacadaec2475c4d8d6fe1278b4c13e136",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "94245e324428d1b6d98423348d41d7fee66468f89d18622a22f12919137105de",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts": "6506da8aa1b48f54b4506a89e13a9b722c64161110a3634190bfa76a3b2f0111",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts": "75e277fa597ab6af4b09a1cdfe96a391c8d139543d60cf38f0abd016edba836c",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63",

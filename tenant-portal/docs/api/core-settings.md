@@ -9,8 +9,10 @@ Owning app: **core-app**
 Canonical prefixes: `/api/tenant/core/v1/workspace-settings`, `.../currencies`,
 `.../taxes`, `.../numbering`, `.../email-config`, `.../notifications`
 
-Portal status: **partial** — only the notifications dropdown is live, and it
-uses 3 of the 14 notification routes. Everything else is MASTER-PLAN Phase 5.
+Portal status: **built** — all six screens ship in MASTER-PLAN Phase 5. Every
+route on this page is called except the three alias halves the portal
+deliberately does not use (`POST /:id/ack`, `POST /mark-all-read`,
+`POST /:id/dismiss`).
 
 Source inspected:
 `core-app/src/tenant/workspace-settings/workspace-settings.controller.ts`,
@@ -230,10 +232,26 @@ so silently skips notifications.
 
 | Screen | Plan task | State |
 | --- | --- | --- |
-| `/core/settings/workspace` | 5.1 | not started |
-| `/core/settings/currencies` | 5.2 | not started |
-| `/core/settings/taxes` | 5.3 | not started |
-| `/core/settings/numbering` | 5.4–5.6 | not started |
-| `/core/settings/email` | 5.7–5.9 | not started |
-| `/core/notifications` | 5.10–5.13 | dropdown only — 3 of 14 routes |
-| `/core/settings` hub | 5.14 | not started |
+| `/core/settings/workspace` | 5.1 | live |
+| `/core/settings/currencies` | 5.2 | live |
+| `/core/settings/taxes` | 5.3 | live |
+| `/core/settings/numbering` | 5.4–5.6 | live |
+| `/core/settings/email` | 5.7–5.9 | live — DNS panel shows the host only, see below |
+| `/core/notifications` | 5.10–5.13 | live — inbox, preferences, devices |
+| `/core/notifications/[id]` | 5.19 | live — resolved from the list, no by-id route exists |
+| `/core/settings` hub | 5.14 | live |
+
+### Three things the contract does not give the UI
+
+Recorded so the next reader does not go looking for them:
+
+- **`mark-all-read` / `read-all` answer `200 { updated: n }`, not 204.** The
+  "all read/ack/dismiss routes return 204" line above covers the per-id
+  commands; the two bulk aliases return a body.
+- **The DKIM record's expected value is never projected**, and no SPF record is
+  checked at all — `DnsTenantEmailVerificationAdapter` compares against a
+  deployment env registry. The screen shows the derived host
+  `${dkimSelector}._domainkey.${senderDomain}` and says the value is not
+  available. See [Q22](../build/OPEN-QUESTIONS.md#q22--the-email-dns-records-a-tenant-must-publish-are-not-returned-by-the-api).
+- **Device tokens cannot be listed**, only registered and revoked. See
+  [Q23](../build/OPEN-QUESTIONS.md#q23--device-tokens-can-be-registered-and-revoked-but-never-listed).

@@ -129,9 +129,35 @@ function labels(items: StaticDataOption[], lang: Language): string[] {
   return items.map((item) => `${item.label[lang]} (${item.value})`);
 }
 
+/**
+ * Permission labels, marked where the server has no Arabic for them.
+ *
+ * `permissionLabel` in crm-app returns the **identical** string for `en` and
+ * `ar` whenever a permission has no dictionary entry, which is true of 78 of
+ * the 98 CRM permissions — every scoped one. Rendering that unmarked would
+ * present English as a translation. This does not translate anything; it
+ * declines to assert a translation that does not exist. Q121.
+ *
+ * Scoped to permissions deliberately. Equality is only *evidence* of the
+ * fallback here — elsewhere in this catalogue two identical strings are
+ * legitimate, as `attachment_family.pdf` ("PDF" in both) shows.
+ */
+function permissionLabels(
+  items: StaticDataOption[],
+  lang: Language,
+  untranslatedNote: string,
+): string[] {
+  return items.map((item) =>
+    item.label.ar === item.label.en
+      ? `${item.label[lang]} — ${untranslatedNote} (${item.value})`
+      : `${item.label[lang]} (${item.value})`,
+  );
+}
+
 export function buildStaticCatalogueGroups(
   data: CrmStaticData,
   lang: Language,
+  untranslatedNote: string,
 ): StaticCatalogueGroup[] {
   const group = (
     id: string,
@@ -157,7 +183,11 @@ export function buildStaticCatalogueGroups(
 
   return [
     ...enumGroups,
-    group("permissions", "permission", labels(data.permissionOptions, lang)),
+    group(
+      "permissions",
+      "permission",
+      permissionLabels(data.permissionOptions, lang, untranslatedNote),
+    ),
     group("ownerTypeOptions", "owner", labels(data.ownerTypeOptions, lang)),
     group("eventOptions", "event", labels(data.eventOptions, lang)),
     group("attachmentPolicy", "attachment", attachmentFamilies),
@@ -222,7 +252,7 @@ export function useCrmStaticCatalogue() {
   const groups = useMemo(() => {
     if (!catalogue) return [];
     const query = searchQuery.trim().toLocaleLowerCase();
-    return buildStaticCatalogueGroups(catalogue, lang).filter(
+    return buildStaticCatalogueGroups(catalogue, lang, t.crmStaticCatalogue.untranslatedLabel).filter(
       (item) =>
         !query ||
         item.key.toLocaleLowerCase().includes(query) ||

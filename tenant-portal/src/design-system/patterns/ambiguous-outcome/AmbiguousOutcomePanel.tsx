@@ -2,6 +2,7 @@
 
 import { CircleAlert } from "lucide-react";
 import { cn } from "../../lib/cn";
+import { identifierText, proseMeasure } from "../../lib/variants";
 import { Button } from "../../primitives/Button";
 
 export interface AmbiguousOutcomeLabels {
@@ -66,7 +67,9 @@ export function AmbiguousOutcomePanel({
           <h2 className="text-sm font-medium text-caution-800 dark:text-caution-300">
             {labels.title}
           </h2>
-          <p className="text-xs text-caution-800 dark:text-caution-300">{description}</p>
+          <p className={cn("text-xs text-caution-800 dark:text-caution-300", proseMeasure)}>
+            {description}
+          </p>
         </div>
       </div>
 
@@ -109,12 +112,14 @@ function Evidence({
       <dd
         className={cn(
           "min-w-0 text-caution-900 dark:text-caution-200",
-          // select-all so the key can be copied in one gesture — there is no
-          // CopyButton primitive yet (MASTER-PLAN 1.14).
-          monospace && "font-mono break-all select-all",
+          // select-all so the key can be copied in one gesture.
+          monospace && cn(identifierText, "select-all"),
         )}
       >
-        {children}
+        {/* bdi, not span: without it bidirectional reordering mangles a Latin
+            key inside Arabic chrome and the DISPLAYED value is wrong, not
+            merely ugly — accessibility.md#bidirectional-text. */}
+        {monospace ? <bdi>{children}</bdi> : children}
       </dd>
     </div>
   );

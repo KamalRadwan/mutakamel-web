@@ -8,6 +8,8 @@ import {
   publishTenantAuthLifecycle,
 } from "@/lib/auth/sessionCoordinator";
 import { TenantAuthGuard } from "@/components/auth/TenantAuthGuard";
+import { I18nProvider } from "@/i18n/I18nContext";
+import { ar } from "@/i18n/dictionaries/ar";
 import { TenantAuthProvider, useTenantAuth } from "./AuthContext";
 
 const replace = vi.fn();
@@ -256,21 +258,23 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     }));
 
     render(
-      <TenantAuthProvider>
-        <TenantAuthGuard>
-          <LoginProbe />
-        </TenantAuthGuard>
-      </TenantAuthProvider>,
+      <I18nProvider>
+        <TenantAuthProvider>
+          <TenantAuthGuard>
+            <LoginProbe />
+          </TenantAuthGuard>
+        </TenantAuthProvider>
+      </I18nProvider>,
     );
     await waitFor(() => expect(
-      screen.getByRole("button", { name: "إعادة المحاولة" }),
+      screen.getByRole("button", { name: ar.common.retry }),
     ).toBeTruthy());
     replace.mockReset();
 
-    fireEvent.click(screen.getByRole("button", { name: "إعادة المحاولة" }));
+    fireEvent.click(screen.getByRole("button", { name: ar.common.retry }));
 
     await waitFor(() => expect(
-      screen.getByText("جاري التحقق من الجلسة..."),
+      screen.getByText(ar.sessionGuard.verifying),
     ).toBeTruthy());
     expect(replace).not.toHaveBeenCalledWith("/login");
 
@@ -379,11 +383,13 @@ describe("TenantAuthProvider committed login bootstrap", () => {
       });
     }));
     render(
-      <TenantAuthProvider>
-        <TenantAuthGuard>
-          <LoginProbe />
-        </TenantAuthGuard>
-      </TenantAuthProvider>,
+      <I18nProvider>
+        <TenantAuthProvider>
+          <TenantAuthGuard>
+            <LoginProbe />
+          </TenantAuthGuard>
+        </TenantAuthProvider>
+      </I18nProvider>,
     );
     await waitFor(() => expect(
       screen.getByText("AUTHENTICATED:tenant@example.test"),
@@ -402,7 +408,7 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     });
 
     await waitFor(() => expect(
-      screen.getByText("جاري التحقق من الجلسة..."),
+      screen.getByText(ar.sessionGuard.verifying),
     ).toBeTruthy());
     expect(replace).not.toHaveBeenCalledWith("/login");
 
@@ -411,13 +417,101 @@ describe("TenantAuthProvider committed login bootstrap", () => {
       publishTenantAuthLifecycle("REFRESHING");
       publishTenantAuthLifecycle("AUTHENTICATED");
     });
-    expect(screen.getByText("جاري التحقق من الجلسة...")).toBeTruthy();
+    expect(screen.getByText(ar.sessionGuard.verifying)).toBeTruthy();
     expect(replace).not.toHaveBeenCalledWith("/login");
 
     resolveSwitchedProfile(jsonResponse(profileResponse()));
     await waitFor(() => expect(
       screen.getByText("AUTHENTICATED:tenant@example.test"),
     ).toBeTruthy());
+  });
+
+  // MASTER-PLAN 13.7 / OPEN-QUESTIONS.md Q18. The provider classified these
+  // seven codes and then dropped them, so /session-expired could only ever
+  // print a generic headline. This is the end-to-end proof that the code the
+  // Gateway sent survives into the URL — the guard's own test stubs the
+  // context, so only this one shows `endedReason` is actually populated.
+  //
+  // No seeded session state on purpose: `tenant_session_meta` lives in
+  // sessionStorage, so a user who closes the tab and comes back has a
+  // remembered cookie and no metadata. That is the single most common way
+  // anyone meets this screen, and with no session id to refresh the transport
+  // publishes no tombstone — so the bootstrap failure, and its code, is the
+  // outcome the provider records.
+  it.each([
+    "AUTH_SESSION_IDLE_EXPIRED",
+    "AUTH_SESSION_ABSOLUTE_EXPIRED",
+    "AUTH_SECURITY_STALE",
+  ])("carries the %s that ended the session into /session-expired", async (code) => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code }, 401)));
+
+    render(
+      <I18nProvider>
+        <TenantAuthProvider>
+          <TenantAuthGuard>
+            <LoginProbe />
+          </TenantAuthGuard>
+        </TenantAuthProvider>
+      </I18nProvider>,
+    );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(
+      `/session-expired?reason=${code}`,
+    ));
+  });
+
+  it("claims no expiry for a visitor who simply presented no credentials", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      jsonResponse({ code: "MISSING_BEARER_TOKEN" }, 401),
+    ));
+
+    render(
+      <I18nProvider>
+        <TenantAuthProvider>
+          <TenantAuthGuard>
+            <LoginProbe />
+          </TenantAuthGuard>
+        </TenantAuthProvider>
+      </I18nProvider>,
+    );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    expect(replace).not.toHaveBeenCalledWith(
+      expect.stringContaining("/session-expired"),
+    );
+  });
+
+  // The half of Q18 that is still OPEN, pinned so that closing it is a
+  // deliberate act rather than an accident.
+  //
+  // With a session id in storage the transport tries a refresh, the refresh
+  // fails definitively, and `endTenantBrowserSession` publishes the same
+  // cross-tab tombstone another tab would send. That tombstone carries a
+  // session id and no code, and its handler in this file redirects to /login
+  // itself — so a session that ends *while the user is working* still loses
+  // both the reason and the screen. Re-pointing those two redirects is
+  // Tier-1 redirect logic and wants its own review; see HANDOFF.md's second
+  // 2026-08-31 amendment.
+  it("loses the reason when the tombstone path ends the session first", async () => {
+    seedSessionState("session-a");
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      jsonResponse({ code: "AUTH_SESSION_IDLE_EXPIRED" }, 401),
+    ));
+
+    render(
+      <I18nProvider>
+        <TenantAuthProvider>
+          <TenantAuthGuard>
+            <LoginProbe />
+          </TenantAuthGuard>
+        </TenantAuthProvider>
+      </I18nProvider>,
+    );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    expect(replace).not.toHaveBeenCalledWith(
+      "/session-expired?reason=AUTH_SESSION_IDLE_EXPIRED",
+    );
   });
 });
 

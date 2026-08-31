@@ -4,6 +4,8 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { Bell, Clock, Columns3, FolderGit2, UserCheck } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useLanguage } from "@/i18n/useLanguage";
+import { INTL_LOCALE } from "@/lib/format/locale";
+import { formatTemplate } from "@/lib/format/template";
 import {
   markAllTenantNotificationsRead,
   markTenantNotificationRead,
@@ -47,9 +49,11 @@ export function NotificationsDropdown() {
   );
 
   const formatter = useMemo(
-    () => new Intl.DateTimeFormat(lang === "ar" ? "ar-EG-u-nu-latn" : "en-US", { dateStyle: "medium", timeStyle: "short" }),
+    () => new Intl.DateTimeFormat(INTL_LOCALE[lang], { dateStyle: "medium", timeStyle: "short" }),
     [lang],
   );
+
+  const countFormatter = useMemo(() => new Intl.NumberFormat(INTL_LOCALE[lang]), [lang]);
 
   async function resyncCurrentGeneration() {
     const current = tenantNotificationRuntime.getSnapshot();
@@ -88,16 +92,33 @@ export function NotificationsDropdown() {
   const triggerLabel =
     snapshot.unreadCount > 0 ? `${t.common.notifications}, ${snapshot.unreadCount}` : t.common.notifications;
 
+  // B13 (SKILL-AUDIT.md): the realtime count changes silently otherwise. A
+  // whole phrase, not a bare number, announced politely and without moving
+  // focus — accessibility.md#announcements. The trigger's aria-label alone
+  // cannot do this: a screen reader only re-reads it when focus returns.
+  const unreadAnnouncement =
+    snapshot.unreadCount > 0
+      ? formatTemplate(t.common.unreadNotifications, {
+          count: countFormatter.format(snapshot.unreadCount),
+        })
+      : t.common.noUnreadNotifications;
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" aria-label={triggerLabel} className="relative">
-          <Bell className={cn("size-4", snapshot.unreadCount > 0 && "animate-bell-ring text-negative-600 dark:text-negative-400")} aria-hidden="true" />
+          <Bell
+            className={cn("size-4", snapshot.unreadCount > 0 && "text-negative-600 dark:text-negative-400")}
+            aria-hidden="true"
+          />
           {snapshot.unreadCount > 0 && (
             <span className="absolute end-1 top-1 size-1.5 rounded-full bg-negative-500" aria-hidden="true" />
           )}
         </Button>
       </DropdownMenuTrigger>
+      <span role="status" aria-live="polite" className="sr-only">
+        {unreadAnnouncement}
+      </span>
       <DropdownMenuContent align="end" className="w-96 p-0">
         <div className="flex items-center justify-between gap-2 border-b border-border p-2.5">
           <div className="flex min-w-0 items-center gap-2">
@@ -128,7 +149,7 @@ export function NotificationsDropdown() {
                 onClick={() => void handleMarkRead(item)}
                 disabled={pending || item.readAt !== null}
                 className={cn(
-                  "flex w-full items-start gap-2 border-b border-border px-3 py-2.5 text-start transition-colors last:border-b-0",
+                  "flex w-full cursor-pointer items-start gap-2 border-b border-border px-3 py-2.5 text-start transition-colors last:border-b-0",
                   "hover:bg-accent disabled:cursor-default",
                   item.readAt === null && "bg-brand-50 dark:bg-brand-950/30",
                 )}

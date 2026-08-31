@@ -220,10 +220,23 @@ query via `BranchListQueryDto`.
 
 | Parameter | Values |
 | --- | --- |
-| `sortOrder` | `ASC` · `DESC` |
+| `sortDir` | `ASC` · `DESC` — **defaults to `ASC`**, not to the endpoint's natural order |
 | `sortBy` | Per-endpoint; the API page lists the allowed set |
 | `page` | Integer ≥ 1 |
 | `limit` | Integer, endpoint-bounded |
+
+**The parameter is `sortDir`.** This table called it `sortOrder` until
+2026-08-31 — the fifth page on the project to carry that error.
+`sortOrder` is a real name but a different thing: a **server-owned entity
+column** on ordered catalogues (pipeline stages, acquisition sources), written
+through a reorder route that takes a full ordered id list. It is not a query
+parameter anywhere, and sending it is silently ignored.
+
+Two more traps that the shared DTO cannot express, so they are per endpoint:
+`sortBy` must be validated against each endpoint's own whitelist, and several
+CRM lists (tasks, calendar events, reminders) **accept `sortBy`/`sortDir` and
+then ignore them**, ordering by a fixed column. Do not offer a sort control on
+a list whose server will not honour it.
 
 ## Core and Trade enums
 

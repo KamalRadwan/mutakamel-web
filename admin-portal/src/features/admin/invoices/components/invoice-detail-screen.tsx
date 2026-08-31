@@ -24,9 +24,11 @@ import { useInvoiceDetail } from "../hooks/use-invoice-detail";
 import type { InvoiceLine, InvoiceValidationCode } from "../types/invoices";
 import {
   formatInvoiceDate,
+  formatInvoiceDateOnly,
   formatInvoiceDecimal,
   formatInvoiceMoney,
   INVOICE_COPY,
+  invoicePurposeLabel,
   InvoiceFieldError,
   InvoiceMutationNotice,
   InvoicePageFrame,
@@ -103,7 +105,7 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
               <StatusBadge status={invoice.status} enumType="invoice" />
             </div>
             <code dir="ltr" className="mt-2 block break-all text-start text-sm text-muted-foreground">{invoice.id}</code>
-            <p dir="ltr" className="mt-2 text-start font-mono text-sm font-semibold text-muted-foreground">{invoice.purpose}</p>
+            <p className="mt-2 text-sm font-semibold text-muted-foreground">{invoicePurposeLabel(invoice.purpose, lang)}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={detail.refresh} disabled={detail.isRefreshing}>
@@ -143,7 +145,7 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
         <EvidenceCard title={copy.identity}>
           <Evidence label={copy.tenantId} value={invoice.tenantId} mono link={`/tenants/${invoice.tenantId}`} />
           <Evidence label={copy.subscriptionId} value={invoice.subscriptionId} mono />
-          <Evidence label={copy.purpose} value={invoice.purpose} mono />
+          <Evidence label={copy.purpose} value={invoicePurposeLabel(invoice.purpose, lang)} />
         </EvidenceCard>
         <EvidenceCard title={copy.financials}>
           <Evidence label={copy.total} value={formatInvoiceMoney(invoice.total, invoice.currencyCode)} mono />
@@ -154,8 +156,8 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
           <Evidence label={copy.fxRate} value={invoice.fxUnitsPerUsd ?? copy.notRecorded} mono />
         </EvidenceCard>
         <EvidenceCard title={copy.dates}>
-          <Evidence label={copy.periodStart} value={formatInvoiceDate(invoice.periodStart, lang)} />
-          <Evidence label={copy.periodEnd} value={formatInvoiceDate(invoice.periodEnd, lang)} />
+          <Evidence label={copy.periodStart} value={formatInvoiceDateOnly(invoice.periodStart, lang)} />
+          <Evidence label={copy.periodEnd} value={formatInvoiceDateOnly(invoice.periodEnd, lang)} />
           <Evidence label={copy.issuedAt} value={formatInvoiceDate(invoice.issuedAt, lang)} />
           <Evidence label={copy.dueAt} value={formatInvoiceDate(invoice.dueAt, lang)} />
           <Evidence label={copy.paidAt} value={formatInvoiceDate(invoice.paidAt, lang)} />

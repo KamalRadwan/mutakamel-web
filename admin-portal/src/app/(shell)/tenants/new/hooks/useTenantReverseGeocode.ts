@@ -48,12 +48,19 @@ export function useTenantReverseGeocode() {
     [],
   );
 
-  const lookup = useCallback(async () => {
+  /**
+   * `at` lets a caller pass the coordinates it just chose.
+   *
+   * The map picker sets the two fields and looks up in the same handler, and
+   * React has not applied those updates yet at that point -- reading them
+   * from state would resolve whatever was there before.
+   */
+  const lookup = useCallback(async (at?: { latitude: string; longitude: string }) => {
     let latitudeValue: number;
     let longitudeValue: number;
     try {
-      latitudeValue = parseCoordinate(latitude, "latitude");
-      longitudeValue = parseCoordinate(longitude, "longitude");
+      latitudeValue = parseCoordinate(at?.latitude ?? latitude, "latitude");
+      longitudeValue = parseCoordinate(at?.longitude ?? longitude, "longitude");
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : "";
       setValidationCode(

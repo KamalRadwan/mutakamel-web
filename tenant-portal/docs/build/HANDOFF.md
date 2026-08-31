@@ -49,7 +49,7 @@ effect; `TenantHostStateBoundary` reads `usePathname()` and a `status` prop it
 is handed.
 
 Leaving them fenced cost more than it protected, and
-[DEFECTS.md#d16](DEFECTS.md#d16--two-auth-screens-were-never-converted) already
+[DEFECTS.md#d16](DEFECTS.md#d16--two-auth-screens-were-never-converted--fixed-2026-08-31) already
 schedules their conversion — the fence and the defect list contradicted each
 other:
 
@@ -57,7 +57,7 @@ other:
   two surfaces a real outage goes through. An English-speaking operator during
   a degraded session reads Arabic or nothing.
 - They carry the entire remaining census debt —
-  [D17](DEFECTS.md#d17--the-census-baseline-was-banked-with-violations-in-it) —
+  [D17](DEFECTS.md#d17--the-census-baseline-was-banked-with-violations-in-it--fixed-2026-08-31) —
   which is why `eslint.config.mjs` had to exclude `src/components/auth/**`
   wholesale, blinding the design gates on four files rather than two.
 
@@ -74,6 +74,62 @@ they *do* carry spine behaviour. The rest of Tier 1 is unchanged.
 
 Recorded because a binding document is not amended by editing the files it
 protects — see MASTER-PLAN task 3.36.
+
+#### Amendment · 2026-08-31 (second) — a fourth and fifth permitted change
+
+**Phase 13 hardening: the CSP nonce (13.1) and the session-ending reason
+(13.7).** Two tasks each need exactly one fenced file, and neither can be done
+anywhere else.
+
+The fence protects **behaviour**: auth-generation fencing, single-flight
+refresh, cross-tab session sync, CSRF, UUIDv7 idempotency, fail-closed host
+admission. Adding a response header, and surfacing a code the file already
+computes, touch none of them.
+
+**Fourth permitted change — `src/proxy.ts`, CSP only.**
+
+A nonce must be fresh per request, so it can be minted nowhere else:
+[../architecture/security-headers.md](../architecture/security-headers.md#the-nonce-problem)
+has specified this file since it was written, and
+[DECISIONS.md#d16](DECISIONS.md#d16--the-csp-policy-decided-against-what-actually-exists--assumed)
+records that no CSP string and no nonce were ever put in it.
+
+| Permitted | Not permitted |
+| --- | --- |
+| Minting a per-request nonce and setting `Content-Security-Policy` on every response | Any change to **which** module path is supported, or to where an unsupported one redirects |
+| Widening `config.matcher` so the header reaches every document, not only `/core`, `/crm`, `/trade` | Any change to the `405` rule, which stays gated on the three module segments exactly as today |
+| Passing the nonce forward on the request headers so Next can read it | Any change to host admission, or to `TenantHostAdmission.tsx` |
+
+The matcher is the one genuinely load-bearing line, because the existing
+`proxy.test.ts` deliberately pins `/`, `/login`, `/search` and
+`/getting-started` as **unmatched**: a matched path with no allowlist entry
+used to redirect to `/unavailable`, which is how six finished screens shipped
+unreachable (DEFECTS.md D22, Q40). The redirect and the `405` are therefore
+re-gated on the module segment itself rather than on the matcher, so widening
+the matcher cannot resurrect that defect — and the test now pins the
+**behaviour** (`/login` is passed through untouched, and carries the header)
+rather than the weaker proxy of it.
+
+**Fifth permitted change — `src/context/AuthContext.tsx` and
+`src/components/auth/TenantAuthGuard.tsx`, the ended reason only.**
+
+[OPEN-QUESTIONS.md#q18](OPEN-QUESTIONS.md#q18--the-session-ending-reason-cannot-reach-session-expired)
+names this exactly: the seven session-ending codes are classified in
+`AuthContext` and then discarded, so `/session-expired` can never say why.
+
+| Permitted | Not permitted |
+| --- | --- |
+| Adding `endedReason` to `TenantAuthContextValue`, set from the code `getAuthErrorCode` already reads | Any change to **when** `ENDED` is set, or to any refresh, bootstrap or lock condition |
+| Appending that reason to the `/session-expired` destination the guard **already** chooses | Any change to **which** destination the guard chooses, or to the effect's `!isAuthenticated && !isPublic` condition |
+| Adding `endedReason` to the guard effect's dependency array | `AuthContext`'s own two `router.replace("/login")` calls |
+
+That last row is the second half of Q18 and it stays **open**: re-pointing
+those two calls is redirect logic in a spine file, it decides where a user
+lands when a session ends mid-work, and it wants its own review rather than a
+ride on this one. Q18 is therefore narrowed, not closed — see its entry.
+
+`TenantHostAdmission.tsx` and `TenantPortalRuntime.tsx` stay fenced in full.
+The rest of Tier 1 is unchanged.
 
 ### Tier 2 — live features. Keep the logic, replace the markup.
 
@@ -216,3 +272,31 @@ A question you had to ask a human is a bug in these docs. Log it in
 Before writing markup for a screen, read
 [../design/views.md](../design/views.md) — the three-view contract is the
 single most detailed spec here and the easiest to get wrong.
+
+## Before you write CRM code, read the audit review
+
+[CRM-AUDIT-REVIEW.md](CRM-AUDIT-REVIEW.md) is this project's response to an
+external documentation-versus-implementation audit of `crm-app`, dated
+2026-08-31. **Meet the verdict before the code, not after.** It carries three
+things you will otherwise reconstruct badly:
+
+1. **Which audit claims were re-verified, and how.** Four were re-checked
+   against source and a live PostgreSQL. All four held — but two were *sharper*
+   than the audit stated, and one claim about the backend was later found
+   **wrong** when Phase 14 re-read it before acting
+   ([D23](DEFECTS.md#d23--editing-a-widgets-name-can-destroy-its-query-spec--fixed-2026-08-31)).
+   That is the standard: a claim is a claim until you have opened the file.
+2. **Ten product decisions**, each written into the document that owns it rather
+   than left in the review. This project has already answered the same question
+   three times under three numbers (Q14, Q70, Q83). The decisions exist so that
+   does not happen a fourth time.
+3. **What is explicitly not this repository's to fix.** Most of the audit's
+   findings are `crm-app`'s. Adding them here as portal tasks would be the same
+   category error the audit warns about. They are recorded as external
+   dependencies in [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md) — Q17, Q36, Q72, Q120
+   and Q121 — and nowhere else.
+
+Its verdict on readiness is **NOT READY**, and it holds on both sides of the
+wire for different reasons. Do not read a green `pnpm verify` as contradicting
+it: the gate proves type-validated, lint-validated and unit-tested, and nothing
+about a real authenticated session.

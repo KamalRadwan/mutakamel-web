@@ -44,24 +44,39 @@ export const AccordionTrigger = forwardRef<
 ));
 AccordionTrigger.displayName = "AccordionTrigger";
 
-// No height animation, deliberately.
+// The one height animation in the system, added by MASTER-PLAN task 1.42.
 //
-// docs/design/motion.md bans transitioning `height` outright, and the budget it
-// declares complete does not list a disclosure animation at all. The usual
-// shadcn recipe (`animate-accordion-down`, driven by
-// `--radix-accordion-content-height`) is exactly the banned transition wearing
-// a keyframe costume, and the alternative `grid-template-rows` trick is the
-// same layout animation by another property.
+// motion.md previously banned this outright, and the ban is now narrowed
+// rather than dropped — see docs/design/motion.md#the-one-height-exception.
+// The general rule still stands: never TRANSITION height, width, or a layout
+// transform. What is permitted is a keyframe over a height the LIBRARY has
+// already measured, on a disclosure panel, and nowhere else.
 //
-// So the panel opens and closes by hard cut. That is also what every dropdown
-// in this app already does, which motion.md notes nobody ever remarked on.
-// MASTER-PLAN task 1.42 owns extending the budget if that is ever revisited;
-// until it does, this stays uninanimated rather than quietly exceeding it.
+// It earns the exception on the budget's own first job — explain where
+// something came from. Without it a long accordion snaps everything below it
+// up or down under the pointer, which is the layout-jump the animation exists
+// to prevent.
+//
+// The keyframes come from `tw-animate-css`, which already ships
+// `accordion-down` / `accordion-up` reading `--radix-accordion-content-height`.
+// No rule is added to globals.css.
+//
+// Under `prefers-reduced-motion` the global reset collapses this to a hard
+// cut, and — unlike the pending dot and the spinner — **nothing is lost**: the
+// open state is carried by `aria-expanded` and by the chevron.
 export const AccordionContent = forwardRef<
   React.ComponentRef<typeof AccordionPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
-  <AccordionPrimitive.Content ref={ref} className="overflow-hidden text-sm" {...props}>
+  <AccordionPrimitive.Content
+    ref={ref}
+    className={cn(
+      "overflow-hidden text-sm ease-(--ease-out-quart)",
+      "data-[state=open]:animate-accordion-down data-[state=open]:duration-150",
+      "data-[state=closed]:animate-accordion-up data-[state=closed]:duration-100",
+    )}
+    {...props}
+  >
     <div className={cn("pb-3", className)}>{children}</div>
   </AccordionPrimitive.Content>
 ));

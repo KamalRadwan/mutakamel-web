@@ -241,8 +241,44 @@ checked:
 - **No `any`.** `unknown` plus a validator at the boundary.
 - **No default exports** except Next's required `page`/`layout`/`error` files.
   Named exports are greppable and rename-safe.
-- **Files stay under ~300 lines.** Past that, split by responsibility — a
-  1,000-line hook is three hooks.
+- **Files holding logic or markup stay under ~300 lines.** Past that, split by
+  responsibility — a 1,000-line hook is three hooks. Three narrow exemptions
+  below.
+
+### The ~300-line rule and its three exemptions
+
+Sixteen files in `src/` exceed 300 lines today. Planning around a rule the
+codebase already breaks is how a rule stops meaning anything, so each of those
+files is either **exempt for a stated reason** or **has a scheduled split** —
+MASTER-PLAN task 3.39.
+
+**Exempt, because the rule's purpose does not apply:**
+
+| Category | Files | Why |
+| --- | --- | --- |
+| **Dictionaries** | `src/i18n/dictionaries/ar.ts`, `en.ts` | Flat key–value data, one key per line, no control flow. The rule exists so a reader can hold a file's *behaviour* in their head; these have none. Splitting by namespace would also break the `Dictionary` type's single-source shape, which is what makes a missing Arabic key a compile error |
+| **The Tier-1 spine** | `src/lib/api/axiosClient.ts`, `src/lib/notifications/tenant-notification-runtime.ts`, `src/context/AuthContext.tsx`, `src/context/TenantRealtimeProvider.tsx` | [HANDOFF.md](../build/HANDOFF.md#tier-1--the-spine-do-not-touch) freezes these. A split is a rewrite of exactly the code the freeze protects, and it buys nothing a reader needs |
+| **Exhaustive response contracts** | `core/contracts/user-contract.ts`, `role-contract.ts`, `organization-contract.ts` | One validator per DTO field, in declaration order. Length tracks the DTO's field count, not complexity; splitting one contract across files makes it *harder* to check against the source DTO |
+
+**Scheduled splits — genuinely oversized logic:**
+
+| File | Lines | Split into |
+| --- | ---: | --- |
+| `crm/opportunities/hooks/usePipelineWorkspace.ts` | ~1,080 | Response parsing/validation · board projection and stage-move mutation · the workspace state machine. It is three hooks wearing one name |
+| `crm/leads/hooks/useLeads.ts` | ~730 | Lead + capabilities parsing · list/filter state · the create/update/delete mutations |
+| `crm/customer-profiles/hooks/useCustomerProfiles.ts` | ~440 | Parsing out of the hook, as above |
+| `crm/opportunities/components/opportunities-workspace.tsx` | ~330 | Column definitions out of the component, the way the other list screens already do it |
+| ~~`crm/custom-fields/hooks/useCrmCustomFields.ts`~~ | — | **Done in Phase 8 (8.19).** Parsing and constants moved to `crm/custom-fields/custom-field-contract.ts`, matching the `<entity>-contract.ts` shape the other catalogue screens use; the hook keeps state and mutations |
+| ~~`crm/lead-stages/hooks/useLeadStages.ts`~~ | — | **Done in Phase 8 (8.17).** The four mutations moved to `hooks/useLeadStageMutations.ts`; the hook keeps list, filter and dialog state |
+| `core/organization/components/OrganizationLevelWorkspace.tsx` | ~310 | Marginal. Split when next edited, not as its own task |
+
+These are scheduled **with the phase that next touches the file** — Phase 8 for
+the CRM hooks, Phase 4 for the organization workspace — not as a standalone
+refactor pass. Splitting a working hook nobody is changing is churn with a
+regression risk and no reader.
+
+The two hard numbers stay: a **new** file over ~300 lines is a review failure,
+and nothing joins the exempt table without a row explaining why.
 
 ## Comments
 

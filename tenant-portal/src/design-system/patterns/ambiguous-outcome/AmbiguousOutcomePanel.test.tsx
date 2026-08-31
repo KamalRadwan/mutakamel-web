@@ -41,9 +41,16 @@ describe("AmbiguousOutcomePanel", () => {
     expect(screen.getByRole("button", { name: labels.retry })).toBeInTheDocument();
   });
 
-  it("renders the idempotency key in monospace, so it is legible as evidence", () => {
+  it("renders the idempotency key in monospace, wrapping rather than overflowing", () => {
     renderPanel();
-    expect(screen.getByText(KEY)).toHaveClass("font-mono");
+    // <bdi> so bidirectional reordering cannot mangle a Latin key inside
+    // Arabic chrome, and wrap-anywhere (never break-all) so a 36-character
+    // token cannot push the panel off screen — B11.
+    const value = screen.getByText(KEY);
+    expect(value.tagName).toBe("BDI");
+    expect(value.parentElement).toHaveClass("font-mono");
+    expect(value.parentElement).toHaveClass("wrap-anywhere");
+    expect(value.parentElement).not.toHaveClass("break-all");
   });
 
   it("is a persistent in-body status region, not a transient announcement", () => {

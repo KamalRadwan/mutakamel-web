@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "../lib/cn";
-import { controlSize, focusRing, type ControlSizeProps } from "../lib/variants";
+import { controlSize, focusRing, textEntrySize, type ControlSizeProps } from "../lib/variants";
 
 export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
@@ -21,11 +21,15 @@ export const SelectTrigger = forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex w-full items-center justify-between gap-2 rounded-sm border border-input bg-card text-sm text-foreground",
+      "flex w-full cursor-pointer items-center justify-between gap-2 rounded-sm border border-input bg-card text-foreground",
       "disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       "data-[placeholder]:text-muted-foreground",
       focusRing,
       controlSize({ size }),
+      // B1: a select sits in the same row as the inputs it filters, so it
+      // takes the same 16px-below-sm step. Must follow controlSize —
+      // tailwind-merge keeps the last font-size in a group.
+      textEntrySize({ size }),
       className,
     )}
     {...props}

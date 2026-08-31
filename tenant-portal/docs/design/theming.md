@@ -22,18 +22,41 @@ Four separate defects, all in the same seam:
 
 All four are fixed in the foundation phase, before any screen is converted.
 
-## Two axes, three states each
+## Three axes, three states each
 
 | Axis | States | Stored as |
 | --- | --- | --- |
 | Theme | `light`, `dark`, `system` | `localStorage["tenant_theme"]` |
 | Language | `ar`, `en` | `localStorage["tenant_lang"]` |
+| Density | `compact`, `standard`, `comfortable` | `localStorage["tenant_density"]` |
 
 Direction is **derived** from language and never stored separately:
 `ar → rtl`, `en → ltr`.
 
-Defaults for a first-ever visitor: **Arabic, RTL, system theme.** Arabic is a
-product decision, not a fallback.
+Defaults for a first-ever visitor: **Arabic, RTL, system theme, compact
+density.** Arabic is a product decision, not a fallback, and so is compact —
+see [DECISIONS.md](../build/DECISIONS.md).
+
+### Density is the absence of a value, not a value
+
+The other two axes store a default that means something. Density does not.
+`compact` is what `globals.css` already declares (`--ui-scale: 0.9`), so
+choosing it **removes** the stored key and **removes** the inline property
+rather than writing `0.9` a second time:
+
+| Choice | `localStorage` | `<html style>` |
+| --- | --- | --- |
+| `compact` | key removed | `--ui-scale` removed |
+| `standard` | `"standard"` | `--ui-scale: 1` |
+| `comfortable` | `"comfortable"` | `--ui-scale: 1.1` |
+
+One number, one home. A second copy of `0.9` is a number that can drift from
+the stylesheet, and no gate would catch the drift — which is close to how the
+first `--ui-scale` implementation shipped **inverted** with every gate green.
+
+Only the geometry tokens multiply by it. **Type does not**, and neither does
+radius: the 13 px Latin / 14 px Arabic floor is absolute, and radius is a shape
+constant. Comfortable makes rows taller, not letters bigger.
 
 ## No flash — the mechanism
 
@@ -83,7 +106,7 @@ Notes that matter:
 
 ## Providers read the same keys
 
-`I18nProvider` and `ThemeProvider` must read the identical `localStorage` keys
+`I18nProvider`, `ThemeProvider` and `DensityProvider` must read the identical `localStorage` keys
 via `useSyncExternalStore`, so their **first client render already agrees**
 with what the bootstrap script wrote. No `useEffect` correction, no hydration
 mismatch, no flash.

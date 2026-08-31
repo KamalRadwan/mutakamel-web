@@ -24,7 +24,15 @@ const APPS = {
     file: "core-reference.md",
     title: "Core — Route Reference",
     upstream: "core-app",
-    semantic: ["core-auth.md", "core-notifications.md"],
+    semantic: [
+      "core-auth.md",
+      "core-notifications.md",
+      "core-identity.md",
+      "core-settings.md",
+      "core-billing.md",
+      "core-directory.md",
+      "core-templates.md",
+    ],
   },
   crm: {
     file: "crm-reference.md",
@@ -41,7 +49,7 @@ const APPS = {
     file: "trade-reference.md",
     title: "Trade — Route Reference",
     upstream: "trade-app",
-    semantic: [],
+    semantic: ["trade-foundation.md", "trade-documents.md", "trade-advanced.md"],
   },
 };
 

@@ -116,7 +116,17 @@ const CLAIMS = [
   ["positive text · dark", "positive-300", "ink-1000", 4.5, 12.29],
   ["focus ring · light (non-text)", "brand-500", "ink-50", 3.0, 3.4],
   ["focus ring · dark (non-text)", "brand-400", "ink-1000", 3.0, 7.96],
-  ["zebra row separation (non-text)", "ink-25", "white", 1.0, null],
+  // Zebra separation. The previous single claim here was vacuous twice over:
+  // it required a ratio of 1.0, which two IDENTICAL colours satisfy exactly, so
+  // the check could never fail; and it compared the zebra against `white`
+  // (= --card), while DataTable's wrapper sets no background at all and
+  // AppShell renders the workspace on `bg-canvas`. It was checking a pair the
+  // product does not render, at a threshold that cannot fail.
+  //
+  // 1.02 is chosen so identical colours (1.00) FAIL. It is not a legibility
+  // threshold — zebra is non-text separation and is meant to be barely there.
+  ["zebra vs canvas · light (non-text)", "ink-25", "ink-100", 1.02, null],
+  ["zebra vs canvas · dark (non-text)", "ink-950", "ink-1000", 1.02, null],
 
   // Badge tones. Badge.tsx renders <tone>-800 on <tone>-100 in light and
   // <tone>-300 on <tone>-950 in dark, for all four roles — eight pairs this
@@ -160,7 +170,7 @@ if (outOfGamut.length > 0) {
   process.stdout.write("\n");
 }
 
-process.stdout.write("  ratio   need  claimed  role\n");
+process.stdout.write("  ratio    need  claimed  role\n");
 for (const [label, fg, bg, need, claimed] of CLAIMS) {
   const ratio = contrast(rgb[fg], rgb[bg]);
   const pass = ratio >= need;
@@ -169,7 +179,7 @@ for (const [label, fg, bg, need, claimed] of CLAIMS) {
   if (claimDrift) drift += 1;
   process.stdout.write(
     `  ${pass ? "OK " : "FAIL"} ${ratio.toFixed(2).padStart(6)}  ` +
-      `${need.toFixed(1)}   ${claimed === null ? "  -  " : claimed.toFixed(1).padStart(5)}` +
+      `${need.toFixed(2).padStart(4)}   ${claimed === null ? "  -  " : claimed.toFixed(1).padStart(5)}` +
       `${claimDrift ? " <-" : "  "}  ${label}\n`,
   );
 }

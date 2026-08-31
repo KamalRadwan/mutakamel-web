@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Check, MoveHorizontal } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatLocaleNumber } from "@/i18n/locale";
 import { cn } from "../../lib/cn";
@@ -59,11 +59,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
     getRowLabel,
     responsiveMode = "horizontal-scroll",
     emptyState,
+    showRowNumbers = true,
   } = props;
   const { lang } = useI18n();
   const { rows } = useDataTable({ data, getRowId });
   const tableLabel = lang === "ar" ? (labelAr ?? "جدول البيانات") : (labelEn ?? "Data table");
-  const scrollHintId = useId();
   const busy = isLoading || isRefreshing;
   const [preservedRows, setPreservedRows] = useState(rows);
   const [announcement, setAnnouncement] = useState("");
@@ -252,6 +252,12 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   const rowLabel = (row: VisibleRow<T>) => getRowLabel?.(row.original) ?? row.id;
 
+  // Continuous across pages, so the ordinal identifies a record in the whole
+  // result set rather than repeating 1..limit on every page.
+  const rowNumber = (index: number) =>
+    (Math.max(1, pagination.page) - 1) * pagination.limit + index + 1;
+  const leadingColumnCount = (selectable ? 1 : 0) + (showRowNumbers ? 1 : 0);
+
   const emptyContent = emptyState ? (
     <div className="flex flex-col items-center gap-1.5">
       <p className="text-sm font-medium text-foreground">
@@ -281,19 +287,9 @@ export function DataTable<T>(props: DataTableProps<T>) {
           actions={selection?.actions}
         />
       )}
-      {responsiveMode === "horizontal-scroll" && (
-        <p id={scrollHintId} className="flex items-center gap-2 border-b border-border bg-muted px-4 py-2 text-xs text-muted-foreground">
-          <MoveHorizontal className="size-4 shrink-0" aria-hidden="true" />
-          {lang === "ar"
-            ? "مرّر أفقياً لعرض جميع الأعمدة"
-            : "Scroll horizontally to view all columns"}
-        </p>
-      )}
-
       <div
         role="region"
         aria-label={tableLabel}
-        aria-describedby={responsiveMode === "horizontal-scroll" ? scrollHintId : undefined}
         aria-busy={busy || undefined}
         tabIndex={responsiveMode === "horizontal-scroll" ? 0 : undefined}
         className={cn(
@@ -376,6 +372,15 @@ export function DataTable<T>(props: DataTableProps<T>) {
                   />
                 </TableHead>
               )}
+              {showRowNumbers && (
+                <TableHead
+                  scope="col"
+                  className="w-12 text-xs normal-case tracking-normal text-muted-foreground"
+                  title={lang === "ar" ? "رقم الصف" : "Row number"}
+                >
+                  {lang === "ar" ? "م" : "N"}
+                </TableHead>
+              )}
               {columns.map((column) => {
                 const activeSort = sort?.sortBy === column.key;
                 return (
@@ -428,15 +433,15 @@ export function DataTable<T>(props: DataTableProps<T>) {
           </TableHeader>
           <TableBody>
             {initialLoading ? (
-              <DataTableSkeleton columnCount={columns.length + (selectable ? 1 : 0)} />
+              <DataTableSkeleton columnCount={columns.length + leadingColumnCount} />
             ) : visibleRows.length === 0 ? (
               <TableRow className="hover:bg-transparent dark:hover:bg-transparent">
-                <TableCell colSpan={columns.length + (selectable ? 1 : 0)} className="py-10 text-center">
+                <TableCell colSpan={columns.length + leadingColumnCount} className="py-10 text-center">
                   {emptyContent}
                 </TableCell>
               </TableRow>
             ) : (
-              visibleRows.map((row) => {
+              visibleRows.map((row, rowIndex) => {
                 const rowSelected = isSelected(row);
                 return (
                   <TableRow
@@ -455,6 +460,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
                             lang === "ar" ? `تحديد ${rowLabel(row)}` : `Select ${rowLabel(row)}`
                           }
                         />
+                      </TableCell>
+                    )}
+                    {showRowNumbers && (
+                      <TableCell className="h-11 py-2.5 text-xs tabular-nums text-muted-foreground">
+                        {formatLocaleNumber(lang, rowNumber(rowIndex))}
                       </TableCell>
                     )}
                     {columns.map((column) => (

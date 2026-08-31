@@ -11,7 +11,16 @@ import {
   ShieldCheck,
   User,
 } from "lucide-react";
+import { useState } from "react";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   AmbiguousOutcomePanel,
   Button,
   Checkbox,
@@ -25,6 +34,9 @@ import {
   Textarea,
 } from "@/design-system";
 import { CountrySelect } from "@/components/shared/CountrySelect";
+import { IndustrySelect } from "@/components/shared/IndustrySelect";
+import { JobTitleSelect } from "@/components/shared/JobTitleSelect";
+import { PhoneNumberInput } from "@/components/shared/PhoneNumberInput";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantAddressGeocoding } from "./components/TenantAddressGeocoding";
 import { TenantApplicationsStep } from "./components/TenantApplicationsStep";
@@ -45,6 +57,8 @@ export default function RegisterTenantWizardPage() {
     validationSummaryRef,
     formData,
     setFormData,
+    applyCompanyName,
+    markTenantCodeManual,
     selectCountry,
     countryTimezoneOptions,
     applicationCandidates,
@@ -90,7 +104,7 @@ export default function RegisterTenantWizardPage() {
     prevStep,
     onCancel,
   } = useRegisterTenant();
-  const { lang } = useI18n();
+  const { lang, dir } = useI18n();
   const wizardLocked = isSubmitting || pendingCreateRecovery !== null;
   const labels = t.tenants.wizard.fieldLabels;
   const placeholders = t.tenants.wizard.placeholders;
@@ -113,6 +127,8 @@ export default function RegisterTenantWizardPage() {
     setFormData((current) => ({ ...current, [key]: value }));
     clearValidationError(fieldId);
   };
+
+  const [isConfirmingCreate, setIsConfirmingCreate] = useState(false);
 
   const headingClassName =
     "flex items-center gap-2 border-b border-border pb-3 text-base font-semibold text-foreground outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
@@ -174,7 +190,15 @@ export default function RegisterTenantWizardPage() {
         onStepChange={goToStep}
       />
 
-      <form onSubmit={handleSubmit} aria-busy={isSubmitting} noValidate>
+      <form
+        onSubmit={(event) => {
+          // A stray Enter in any text field used to submit the whole wizard.
+          // Creation is irreversible, so it only ever runs from the dialog.
+          event.preventDefault();
+        }}
+        aria-busy={isSubmitting}
+        noValidate
+      >
         <div className="mb-6">
           <TenantValidationSummary
             ref={validationSummaryRef}
@@ -195,6 +219,54 @@ export default function RegisterTenantWizardPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
+                  id="tenant-company-name"
+                  label={labels.companyName}
+                  required
+                  error={validationError("tenant-company-name")}
+                >
+                  {(field) => (
+                    <>
+                      <Input
+                        {...field}
+                        name="companyName"
+                        type="text"
+                        value={formData.companyName}
+                        onChange={(event) => {
+                          applyCompanyName(event.target.value);
+                          clearValidationError("tenant-company-name");
+                          clearValidationError("tenant-name");
+                        }}
+                        placeholder={placeholders.companyName}
+                        aria-describedby={[
+                          field["aria-describedby"],
+                          identityValidationEvidence
+                            ? "tenant-company-identity"
+                            : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(" ") || undefined}
+                      />
+                      {identityValidationEvidence ? (
+                        <p
+                          id="tenant-company-identity"
+                          className={`mt-1 text-sm ${
+                            identityValidationEvidence.result.fields.companyName
+                              .available
+                              ? "text-success-subtle-foreground"
+                              : "text-destructive-subtle-foreground"
+                          }`}
+                        >
+                          {
+                            identityValidationEvidence.result.fields.companyName
+                              .message
+                          }
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </Field>
+
+                <Field
                   id="tenant-name"
                   label={labels.tenantName}
                   required
@@ -208,17 +280,21 @@ export default function RegisterTenantWizardPage() {
                           name="name"
                           type="text"
                           value={formData.name}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            // Typing here takes ownership of the code; the
+                            // company name stops overwriting it.
+                            markTenantCodeManual();
                             updateField(
                               "tenant-name",
                               "name",
                               event.target.value
                                 .toLowerCase()
                                 .replace(/[^a-z0-9-]/g, ""),
-                            )
-                          }
+                            );
+                          }}
                           placeholder={placeholders.tenantName}
                           className="flex-1 font-mono"
+                          dir="ltr"
                           aria-describedby={[
                             field["aria-describedby"],
                             identityValidationEvidence
@@ -265,62 +341,12 @@ export default function RegisterTenantWizardPage() {
                         className="mt-1 font-mono text-sm text-muted-foreground"
                         dir="ltr"
                       >
-                        {t.tenants.wizard.derivedFqdn(
+                        {t.tenants.wizard.workspaceAddress(
                           formData.name
                             ? `${formData.name}.mutakamel.ai`
                             : "name.mutakamel.ai",
                         )}
                       </p>
-                    </>
-                  )}
-                </Field>
-
-                <Field
-                  id="tenant-company-name"
-                  label={labels.companyName}
-                  required
-                  error={validationError("tenant-company-name")}
-                >
-                  {(field) => (
-                    <>
-                      <Input
-                        {...field}
-                        name="companyName"
-                        type="text"
-                        value={formData.companyName}
-                        onChange={(event) =>
-                          updateField(
-                            "tenant-company-name",
-                            "companyName",
-                            event.target.value,
-                          )
-                        }
-                        placeholder={placeholders.companyName}
-                        aria-describedby={[
-                          field["aria-describedby"],
-                          identityValidationEvidence
-                            ? "tenant-company-identity"
-                            : undefined,
-                        ]
-                          .filter(Boolean)
-                          .join(" ") || undefined}
-                      />
-                      {identityValidationEvidence ? (
-                        <p
-                          id="tenant-company-identity"
-                          className={`mt-1 text-sm ${
-                            identityValidationEvidence.result.fields.companyName
-                              .available
-                              ? "text-success-subtle-foreground"
-                              : "text-destructive-subtle-foreground"
-                          }`}
-                        >
-                          {
-                            identityValidationEvidence.result.fields.companyName
-                              .message
-                          }
-                        </p>
-                      ) : null}
                     </>
                   )}
                 </Field>
@@ -351,7 +377,7 @@ export default function RegisterTenantWizardPage() {
                 </div>
               ) : null}
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                   id="tenant-industry"
                   label={labels.industry}
@@ -359,61 +385,17 @@ export default function RegisterTenantWizardPage() {
                   error={validationError("tenant-industry")}
                 >
                   {(field) => (
-                    <Input
-                      {...field}
+                    <IndustrySelect
+                      id={field.id}
                       name="industry"
-                      type="text"
                       value={formData.industry}
-                      onChange={(event) =>
-                        updateField("tenant-industry", "industry", event.target.value)
+                      onChange={(industry) =>
+                        updateField("tenant-industry", "industry", industry)
                       }
+                      disabled={wizardLocked}
+                      aria-describedby={field["aria-describedby"]}
+                      aria-invalid={field["aria-invalid"]}
                     />
-                  )}
-                </Field>
-
-                <Field
-                  id="tenant-country"
-                  label={labels.country}
-                  required
-                  error={validationError("tenant-country")}
-                  className="lg:col-span-2"
-                >
-                  {(field) => (
-                    <>
-                      <CountrySelect
-                        id={field.id}
-                        label={labels.country}
-                        value={formData.countryIsoCode}
-                        onChange={(countryIsoCode) => {
-                          const selected = selectCountry(countryIsoCode);
-                          if (selected) {
-                            clearValidationError("tenant-country");
-                            clearValidationError("tenant-timezone");
-                            clearValidationError("tenant-phone-country-code");
-                          }
-                          return selected;
-                        }}
-                        disabled={wizardLocked}
-                        placeholder={t.tenants.wizard.chooseCountryPlaceholder}
-                        searchPlaceholder={
-                          t.tenants.wizard.searchCountriesPlaceholder
-                        }
-                        emptyLabel={t.tenants.wizard.noMatchingCountries}
-                        aria-describedby={field["aria-describedby"]}
-                        aria-invalid={field["aria-invalid"]}
-                        className="block w-full"
-                      />
-                      <Input
-                        type="hidden"
-                        name="countryIsoCode"
-                        value={formData.countryIsoCode}
-                      />
-                      {formData.countryName ? (
-                        <p className="mt-1 font-mono text-sm text-muted-foreground" dir="ltr">
-                          {formData.countryName} · {formData.countryIsoCode}
-                        </p>
-                      ) : null}
-                    </>
                   )}
                 </Field>
 
@@ -430,7 +412,7 @@ export default function RegisterTenantWizardPage() {
                       onValueChange={(timezone) =>
                         updateField("tenant-timezone", "timezone", timezone)
                       }
-                      disabled={wizardLocked || countryTimezoneOptions.length === 0}
+                      disabled={wizardLocked}
                       required
                     >
                       <SelectTrigger
@@ -438,7 +420,9 @@ export default function RegisterTenantWizardPage() {
                         aria-describedby={field["aria-describedby"]}
                         aria-invalid={field["aria-invalid"]}
                       >
-                        <SelectValue placeholder={t.tenants.wizard.chooseTimezone} />
+                        <SelectValue
+                          placeholder={t.tenants.wizard.chooseTimezonePlaceholder}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {countryTimezoneOptions.map((timezone) => (
@@ -454,49 +438,36 @@ export default function RegisterTenantWizardPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
-                  id="tenant-phone-country-code"
-                  label={labels.tenantPhoneCountryCode}
-                  required
-                  error={validationError("tenant-phone-country-code")}
-                >
-                  {(field) => (
-                    <Input
-                      {...field}
-                      name="phoneCountryCode"
-                      type="tel"
-                      dir="ltr"
-                      value={formData.phoneCountryCode}
-                      onChange={(event) =>
-                        updateField(
-                          "tenant-phone-country-code",
-                          "phoneCountryCode",
-                          event.target.value,
-                        )
-                      }
-                      placeholder={placeholders.callingCode}
-                    />
-                  )}
-                </Field>
-                <Field
                   id="tenant-phone"
-                  label={labels.tenantPhone}
-                  labelAction={
-                    <span className="text-xs text-muted-foreground">
-                      {t.tenants.wizard.optionalLabel}
-                    </span>
+                  label={labels.companyPhone}
+                  required
+                  error={
+                    validationError("tenant-phone-country-code") ??
+                    validationError("tenant-phone")
                   }
                 >
                   {(field) => (
-                    <Input
-                      {...field}
+                    <PhoneNumberInput
+                      id={field.id}
                       name="phone"
-                      type="tel"
-                      dir="ltr"
-                      value={formData.phone}
-                      onChange={(event) =>
-                        updateField("tenant-phone", "phone", event.target.value)
-                      }
-                      placeholder={placeholders.phone}
+                      value={{
+                        callingCode: formData.phoneCountryCode,
+                        nationalNumber: formData.phone,
+                      }}
+                      onChange={(next) => {
+                        setFormData((current) => ({
+                          ...current,
+                          phoneCountryCode: next.callingCode,
+                          phone: next.nationalNumber,
+                        }));
+                        clearValidationError("tenant-phone-country-code");
+                        clearValidationError("tenant-phone");
+                      }}
+                      disabled={wizardLocked}
+                      required
+                      numberPlaceholder={placeholders.phone}
+                      aria-describedby={field["aria-describedby"]}
+                      aria-invalid={field["aria-invalid"]}
                     />
                   )}
                 </Field>
@@ -540,24 +511,46 @@ export default function RegisterTenantWizardPage() {
                 />
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <AddressInput
-                    id="tenant-address-street"
-                    name="street"
-                    label={labels.street}
-                    value={formData.street}
-                    maxLength={200}
-                    onChange={(value) => updateField("tenant-address-street", "street", value)}
-                  />
-                  <AddressInput
-                    id="tenant-address-building-number"
-                    name="buildingNo"
-                    label={labels.buildingNumber}
-                    value={formData.buildingNo}
-                    maxLength={100}
-                    onChange={(value) =>
-                      updateField("tenant-address-building-number", "buildingNo", value)
-                    }
-                  />
+                  <Field
+                    id="tenant-country"
+                    label={labels.country}
+                    required
+                    error={validationError("tenant-country")}
+                    className="sm:col-span-2"
+                  >
+                    {(field) => (
+                      <>
+                        <CountrySelect
+                          id={field.id}
+                          label={labels.country}
+                          value={formData.countryIsoCode}
+                          onChange={(countryIsoCode) => {
+                            const selected = selectCountry(countryIsoCode);
+                            if (selected) {
+                              clearValidationError("tenant-country");
+                              clearValidationError("tenant-timezone");
+                              clearValidationError("tenant-phone-country-code");
+                            }
+                            return selected;
+                          }}
+                          disabled={wizardLocked}
+                          placeholder={t.tenants.wizard.chooseCountryPlaceholder}
+                          searchPlaceholder={
+                            t.tenants.wizard.searchCountriesPlaceholder
+                          }
+                          emptyLabel={t.tenants.wizard.noMatchingCountries}
+                          aria-describedby={field["aria-describedby"]}
+                          aria-invalid={field["aria-invalid"]}
+                          className="block w-full"
+                        />
+                        <Input
+                          type="hidden"
+                          name="countryIsoCode"
+                          value={formData.countryIsoCode}
+                        />
+                      </>
+                    )}
+                  </Field>
                   <AddressInput
                     id="tenant-address-city"
                     name="city"
@@ -585,6 +578,34 @@ export default function RegisterTenantWizardPage() {
                     }
                   />
                   <AddressInput
+                    id="tenant-address-street"
+                    name="street"
+                    label={labels.street}
+                    value={formData.street}
+                    maxLength={200}
+                    onChange={(value) => updateField("tenant-address-street", "street", value)}
+                  />
+                  <AddressInput
+                    id="tenant-address-street2"
+                    name="street2"
+                    label={labels.street2}
+                    value={formData.street2}
+                    maxLength={200}
+                    onChange={(value) =>
+                      updateField("tenant-address-street2", "street2", value)
+                    }
+                  />
+                  <AddressInput
+                    id="tenant-address-building-number"
+                    name="buildingNo"
+                    label={labels.buildingNumber}
+                    value={formData.buildingNo}
+                    maxLength={100}
+                    onChange={(value) =>
+                      updateField("tenant-address-building-number", "buildingNo", value)
+                    }
+                  />
+                  <AddressInput
                     id="tenant-address-postal-code"
                     name="postalCode"
                     label={labels.postalCode}
@@ -602,26 +623,6 @@ export default function RegisterTenantWizardPage() {
                     maxLength={100}
                     onChange={(value) =>
                       updateField("tenant-address-landmark", "landmark", value)
-                    }
-                  />
-                  <AddressInput
-                    id="tenant-tax-number"
-                    name="taxNumber"
-                    label={labels.taxNumber}
-                    value={formData.taxNumber}
-                    onChange={(value) => updateField("tenant-tax-number", "taxNumber", value)}
-                  />
-                  <AddressInput
-                    id="tenant-commercial-registration-number"
-                    name="commercialRegistrationNumber"
-                    label={labels.commercialRegistrationNumber}
-                    value={formData.commercialRegistrationNumber}
-                    onChange={(value) =>
-                      updateField(
-                        "tenant-commercial-registration-number",
-                        "commercialRegistrationNumber",
-                        value,
-                      )
                     }
                   />
                 </div>
@@ -644,6 +645,41 @@ export default function RegisterTenantWizardPage() {
                     />
                   )}
                 </Field>
+              </section>
+
+              <section
+                aria-labelledby="tenant-commercial-heading"
+                className="space-y-4 pt-2"
+              >
+                <h3
+                  id="tenant-commercial-heading"
+                  className="flex items-center gap-2 text-sm font-semibold text-foreground"
+                >
+                  <ShieldCheck aria-hidden="true" className="size-4 text-info" />
+                  {t.tenants.wizard.commercialSectionTitle}
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <AddressInput
+                    id="tenant-tax-number"
+                    name="taxNumber"
+                    label={labels.taxNumber}
+                    value={formData.taxNumber}
+                    onChange={(value) => updateField("tenant-tax-number", "taxNumber", value)}
+                  />
+                  <AddressInput
+                    id="tenant-commercial-registration-number"
+                    name="commercialRegistrationNumber"
+                    label={labels.commercialRegistrationNumber}
+                    value={formData.commercialRegistrationNumber}
+                    onChange={(value) =>
+                      updateField(
+                        "tenant-commercial-registration-number",
+                        "commercialRegistrationNumber",
+                        value,
+                      )
+                    }
+                  />
+                </div>
               </section>
             </section>
           ) : null}
@@ -727,7 +763,7 @@ export default function RegisterTenantWizardPage() {
                 </Field>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                   id="tenant-owner-job-title"
                   label={labels.jobTitle}
@@ -735,44 +771,20 @@ export default function RegisterTenantWizardPage() {
                   error={validationError("tenant-owner-job-title")}
                 >
                   {(field) => (
-                    <Input
-                      {...field}
+                    <JobTitleSelect
+                      id={field.id}
                       name="ownerJobTitle"
-                      type="text"
-                      autoComplete="organization-title"
                       value={formData.ownerJobTitle}
-                      onChange={(event) =>
+                      onChange={(jobTitle) =>
                         updateField(
                           "tenant-owner-job-title",
                           "ownerJobTitle",
-                          event.target.value,
+                          jobTitle,
                         )
                       }
-                    />
-                  )}
-                </Field>
-                <Field
-                  id="tenant-owner-phone-country-code"
-                  label={labels.ownerPhoneCountryCode}
-                  required
-                  error={validationError("tenant-owner-phone-country-code")}
-                >
-                  {(field) => (
-                    <Input
-                      {...field}
-                      name="ownerPhoneCountryCode"
-                      type="tel"
-                      dir="ltr"
-                      autoComplete="tel-country-code"
-                      value={formData.ownerPhoneCountryCode}
-                      onChange={(event) =>
-                        updateField(
-                          "tenant-owner-phone-country-code",
-                          "ownerPhoneCountryCode",
-                          event.target.value,
-                        )
-                      }
-                      placeholder={placeholders.callingCode}
+                      disabled={wizardLocked}
+                      aria-describedby={field["aria-describedby"]}
+                      aria-invalid={field["aria-invalid"]}
                     />
                   )}
                 </Field>
@@ -780,20 +792,33 @@ export default function RegisterTenantWizardPage() {
                   id="tenant-owner-phone"
                   label={labels.ownerPhone}
                   required
-                  error={validationError("tenant-owner-phone")}
+                  error={
+                    validationError("tenant-owner-phone-country-code") ??
+                    validationError("tenant-owner-phone")
+                  }
                 >
                   {(field) => (
-                    <Input
-                      {...field}
+                    <PhoneNumberInput
+                      id={field.id}
                       name="ownerPhone"
-                      type="tel"
-                      dir="ltr"
-                      autoComplete="tel-national"
-                      value={formData.ownerPhone}
-                      onChange={(event) =>
-                        updateField("tenant-owner-phone", "ownerPhone", event.target.value)
-                      }
-                      placeholder={placeholders.phone}
+                      value={{
+                        callingCode: formData.ownerPhoneCountryCode,
+                        nationalNumber: formData.ownerPhone,
+                      }}
+                      onChange={(next) => {
+                        setFormData((current) => ({
+                          ...current,
+                          ownerPhoneCountryCode: next.callingCode,
+                          ownerPhone: next.nationalNumber,
+                        }));
+                        clearValidationError("tenant-owner-phone-country-code");
+                        clearValidationError("tenant-owner-phone");
+                      }}
+                      disabled={wizardLocked}
+                      required
+                      numberPlaceholder={placeholders.phone}
+                      aria-describedby={field["aria-describedby"]}
+                      aria-invalid={field["aria-invalid"]}
                     />
                   )}
                 </Field>
@@ -968,10 +993,11 @@ export default function RegisterTenantWizardPage() {
               </Button>
             ) : (
               <Button
-                type="submit"
+                type="button"
                 variant="primary"
                 loading={isSubmitting}
                 disabled={wizardLocked}
+                onClick={() => setIsConfirmingCreate(true)}
               >
                 {!isSubmitting ? (
                   <CheckCircle2 aria-hidden="true" className="size-4" />
@@ -981,6 +1007,37 @@ export default function RegisterTenantWizardPage() {
             )}
           </footer>
         </fieldset>
+
+        <AlertDialog
+          open={isConfirmingCreate}
+          onOpenChange={(open) => !open && setIsConfirmingCreate(false)}
+        >
+          <AlertDialogContent dir={dir}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t.tenants.wizard.confirmCreateTitle}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t.tenants.wizard.confirmCreateBody}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isSubmitting}>
+                {t.tenants.wizard.confirmCreateNo}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={isSubmitting || wizardLocked}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setIsConfirmingCreate(false);
+                  void handleSubmit(event);
+                }}
+              >
+                {t.tenants.wizard.confirmCreateYes}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </form>
     </div>
   );

@@ -115,14 +115,17 @@ export default function AuthenticationManagementPage() {
         }
       />
 
+      {/* No pagination: this endpoint returns the whole list and declares no
+          page/limit query at all (verified in its controller). The fake
+          single-page object this replaced rendered working-looking controls
+          over data that could never advance —
+          docs/design/states.md#pagination-is-real-or-absent. */}
       <DataTable
         columns={columns}
         rows={items}
         isLoading={isLoading}
         error={error ? { status: 0, code: error } : null}
         onRetry={() => void reload()}
-        page={{ page: 1, limit: Math.max(items.length, 1), total: items.length }}
-        onPageChange={() => undefined}
         rowKey={(session) => session.id}
         labels={{
           retry: t.common.retry,

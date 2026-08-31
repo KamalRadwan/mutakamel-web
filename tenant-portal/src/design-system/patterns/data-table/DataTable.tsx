@@ -1,31 +1,27 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import type { ReactNode } from "react";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { Checkbox } from "../../primitives/Checkbox";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../primitives/Table";
+import { Table, TableBody, TableCell, TableRow } from "../../primitives/Table";
 import { cn } from "../../lib/cn";
+import { useVirtualWindow } from "../../views/useVirtualWindow";
 import { EmptyState } from "../empty-state/EmptyState";
 import { ErrorState } from "../error-state/ErrorState";
 import { Pagination } from "../pagination/Pagination";
+import type { ColumnLayoutLabels } from "./ColumnHeaderControls";
+import { applyColumnLayout, resolveColumnLayout, type ColumnLayoutState } from "./column-layout";
+import { DataTableHeader } from "./DataTableHeader";
 import { DataTableSkeleton } from "./DataTableSkeleton";
-import type { ColumnDef, PageInfo, SelectionState, SortState } from "./types";
+import type { ColumnDef, DataTableLabels, PageInfo, SelectionState, SortState } from "./types";
 
-export interface DataTableLabels {
-  retry: string;
-  errorTitle: string;
-  emptyTitle: string;
-  selectAll: string;
-  selectRow: string;
-  sortAscending: string;
-  sortDescending: string;
-  notSorted: string;
-  pagination: {
-    previous: string;
-    next: string;
-    summary: (from: number, to: number, total: number) => string;
-  };
-}
+// Above this many rows the body renders a window plus two spacer rows instead
+// of the whole page — task 2.9. Rows are uniform by construction, so the
+// window is exact. The estimate is --size-row at the DEFAULT --ui-scale --
+// density is user-selectable, so this constant is right for compact and wrong
+// for the other two; one laid-out row replaces it immediately either way.
+const VIRTUALIZE_ABOVE = 100;
+const ESTIMATED_ROW_PX = 32;
 
 export interface DataTableProps<T> {
   columns: ColumnDef<T>[];
@@ -33,22 +29,37 @@ export interface DataTableProps<T> {
   isLoading: boolean;
   error?: NormalizedApiError | null;
   onRetry?: () => void;
-  page: PageInfo;
-  onPageChange: (page: number) => void;
+  page?: PageInfo;
+  onPageChange?: (page: number) => void;
   sort?: SortState;
   onSortChange?: (sort: SortState) => void;
   rowKey: (row: T) => string;
   onRowClick?: (row: T) => void;
   selection?: SelectionState;
-  emptyState?: React.ReactNode;
+  emptyState?: ReactNode;
   labels: DataTableLabels;
+  /**
+   * Column order and widths, owned by the caller so they can be persisted per
+   * user. Omit and the table renders its declared columns, unchanged.
+   */
+  columnLayout?: ColumnLayoutState;
+  /** Required whenever `columnLayout` is passed; the controls are unusable unnamed. */
+  layoutLabels?: ColumnLayoutLabels;
+  /**
+   * Leading ordinal column. Numbering is continuous across pages — row 1 of
+   * page 2 at a limit of 20 reads 21 — so the value identifies a record within
+   * the whole result set, not just the visible page. Opt out for nested or
+   * detail tables where an ordinal carries no meaning.
+   */
+  showRowNumbers?: boolean;
   className?: string;
 }
 
-// The table view for all three CRM workspaces. Owns 36px rows, the sticky
-// header, zebra rows, server pagination/sorting, selection, keyboard
-// navigation and the loading/empty/error states — no screen re-implements
-// any of these. See docs/design/patterns.md#datatable.
+// The table view for all three CRM workspaces. Owns the row height, the
+// sticky header, zebra rows, server pagination/sorting, selection, keyboard
+// navigation and the loading/empty/error states — no screen re-implements any
+// of these. Feature code reaches it through TableView, which adapts it to the
+// shared view contract. See docs/design/patterns.md#datatable.
 export function DataTable<T>({
   columns,
   rows,
@@ -64,11 +75,35 @@ export function DataTable<T>({
   selection,
   emptyState,
   labels,
+  columnLayout,
+  layoutLabels,
+  showRowNumbers = true,
   className,
 }: DataTableProps<T>) {
+  // Resolved every render rather than stored: the declared column set is the
+  // source of truth, and a layout persisted before a column existed must not
+  // hide it.
+  const layout = columnLayout ? resolveColumnLayout(columns, columnLayout.layout) : undefined;
+  const orderedColumns = layout ? applyColumnLayout(columns, layout) : columns;
+
+  const { scrollRef, itemRef, range } = useVirtualWindow({
+    count: rows.length,
+    threshold: VIRTUALIZE_ABOVE,
+    estimatedRowSize: ESTIMATED_ROW_PX,
+  });
+
   const selectedCount = selection ? rows.filter((row) => selection.selectedIds.has(rowKey(row))).length : 0;
   const allSelected = selection !== undefined && rows.length > 0 && selectedCount === rows.length;
   const someSelected = selectedCount > 0 && !allSelected;
+  const hasStickyStart = selection !== undefined || columns.some((column) => column.sticky === "start");
+  const hasStickyEnd = columns.some((column) => column.sticky === "end");
+  const cellCount = orderedColumns.length + (selection ? 1 : 0) + (showRowNumbers ? 1 : 0);
+
+  // Continuous across pages, so the ordinal identifies a record in the whole
+  // result set rather than repeating 1..limit on every page. The windowed body
+  // renders a slice, so the absolute index carries the window offset too.
+  const pageOffset = page ? (Math.max(1, page.page) - 1) * page.limit : 0;
+  const rowNumber = (index: number) => pageOffset + (range ? range.start : 0) + index + 1;
 
   function toggleSelectAll() {
     if (!selection) return;
@@ -96,7 +131,7 @@ export function DataTable<T>({
   if (isLoading) {
     return (
       <div className={cn("overflow-x-auto", className)}>
-        <DataTableSkeleton columns={columns} />
+        <DataTableSkeleton columns={orderedColumns} />
       </div>
     );
   }
@@ -109,68 +144,50 @@ export function DataTable<T>({
     return emptyState ?? <EmptyState title={labels.emptyTitle} className={className} />;
   }
 
-  return (
-    <div className={cn("flex flex-col gap-3", className)}>
-      {/* Horizontal overflow lives inside this container — the page itself
-          never scrolls sideways. */}
-      <div className="overflow-x-auto rounded-md border border-border">
-        <Table>
-          <TableHeader className="sticky top-0 z-(--z-sticky-header)">
-            <TableRow className="odd:bg-transparent hover:bg-transparent">
-              {selection && (
-                <TableHead className="w-8">
-                  <Checkbox
-                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label={labels.selectAll}
-                  />
-                </TableHead>
-              )}
-              {columns.map((column) => {
-                const isSorted = sort?.id === column.id;
-                const SortIcon = isSorted ? (sort!.direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
-                const sortAriaLabel = isSorted
-                  ? sort!.direction === "asc"
-                    ? labels.sortDescending
-                    : labels.sortAscending
-                  : labels.notSorted;
+  const visibleRows = range ? rows.slice(range.start, range.end) : rows;
 
-                return (
-                  <TableHead
-                    key={column.id}
-                    style={{ width: column.width }}
-                    className={cn(
-                      column.align === "end" && "text-end",
-                      column.sticky === "start" && "sticky start-0 z-(--z-sticky-header) bg-card",
-                      column.sticky === "end" && "sticky end-0 z-(--z-sticky-header) bg-card",
-                    )}
-                  >
-                    {column.sortable ? (
-                      <button
-                        type="button"
-                        onClick={() => handleSort(column)}
-                        className="inline-flex items-center gap-1 hover:text-foreground"
-                        aria-label={`${column.header} — ${sortAriaLabel}`}
-                      >
-                        {column.header}
-                        <SortIcon className="size-3" aria-hidden="true" />
-                      </button>
-                    ) : (
-                      column.header
-                    )}
-                  </TableHead>
-                );
-              })}
-            </TableRow>
-          </TableHeader>
+  return (
+    <div className={cn("flex flex-col gap-3", range && "h-full min-h-0", className)}>
+      {/* Horizontal overflow lives inside this container — the page itself
+          never scrolls sideways. When the body is windowed this container also
+          owns the vertical scroll, which is what finally gives the sticky
+          header something to stick to. */}
+      <div
+        ref={scrollRef}
+        className={cn("overflow-x-auto rounded-md border border-border", range && "min-h-0 flex-1 overflow-y-auto")}
+      >
+        <Table>
+          <DataTableHeader
+            columns={orderedColumns}
+            sort={sort}
+            onSort={handleSort}
+            hasSelection={selection !== undefined}
+            showRowNumbers={showRowNumbers}
+            selectAllState={allSelected ? true : someSelected ? "indeterminate" : false}
+            onToggleSelectAll={toggleSelectAll}
+            layout={layout}
+            columnLayout={columnLayout}
+            layoutLabels={layoutLabels}
+            labels={labels}
+          />
           <TableBody>
-            {rows.map((row) => {
+            {range && range.paddingStart > 0 && (
+              <TableRow
+                aria-hidden="true"
+                className="border-b-0 odd:bg-transparent hover:bg-transparent"
+                style={{ height: range.paddingStart }}
+              >
+                <TableCell colSpan={cellCount} className="p-0" />
+              </TableRow>
+            )}
+            {visibleRows.map((row, index) => {
               const id = rowKey(row);
               const isSelected = selection?.selectedIds.has(id) ?? false;
 
               return (
                 <TableRow
                   key={id}
+                  ref={index === 0 ? itemRef : undefined}
                   data-state={isSelected ? "selected" : undefined}
                   tabIndex={onRowClick ? 0 : undefined}
                   onClick={() => onRowClick?.(row)}
@@ -180,7 +197,17 @@ export function DataTable<T>({
                       onRowClick(row);
                     }
                   }}
-                  className={cn(onRowClick && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset")}
+                  // Four sticky layers overlap this grid. Without a scroll
+                  // margin, tabbing into a row lands the focus ring behind the
+                  // sticky header or a sticky column with no visual indication
+                  // at all — WCAG 2.2 AA focus-not-obscured.
+                  className={cn(
+                    "scroll-mt-(--size-row)",
+                    hasStickyStart && "scroll-ms-16",
+                    hasStickyEnd && "scroll-me-16",
+                    onRowClick &&
+                      "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                  )}
                 >
                   {selection && (
                     <TableCell onClick={(event) => event.stopPropagation()}>
@@ -191,7 +218,12 @@ export function DataTable<T>({
                       />
                     </TableCell>
                   )}
-                  {columns.map((column) => (
+                  {showRowNumbers && (
+                    <TableCell className="text-xs tabular-nums text-muted-foreground">
+                      {rowNumber(index)}
+                    </TableCell>
+                  )}
+                  {orderedColumns.map((column) => (
                     <TableCell
                       key={column.id}
                       className={cn(
@@ -206,10 +238,21 @@ export function DataTable<T>({
                 </TableRow>
               );
             })}
+            {range && range.paddingEnd > 0 && (
+              <TableRow
+                aria-hidden="true"
+                className="border-b-0 odd:bg-transparent hover:bg-transparent"
+                style={{ height: range.paddingEnd }}
+              >
+                <TableCell colSpan={cellCount} className="p-0" />
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
-      <Pagination page={page} onPageChange={onPageChange} labels={labels.pagination} />
+      {page && onPageChange && (
+        <Pagination page={page} onPageChange={onPageChange} labels={labels.pagination} />
+      )}
     </div>
   );
 }

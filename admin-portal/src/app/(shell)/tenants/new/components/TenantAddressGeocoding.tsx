@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Loader2, MapPinned } from "lucide-react";
-import { Button, Input } from "@/design-system";
+import { Button } from "@/design-system";
+import { LocationPickerDialog } from "@/components/shared/LocationPickerDialog";
+import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import {
   useTenantReverseGeocode,
@@ -22,6 +25,8 @@ export function TenantAddressGeocoding({
 }: TenantAddressGeocodingProps) {
   const state = useTenantReverseGeocode();
   const copy = lang === "ar" ? AR : EN;
+  const { t } = useI18n();
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   return (
     <section className="rounded-lg border border-info/30 bg-info-subtle p-4">
@@ -40,46 +45,49 @@ export function TenantAddressGeocoding({
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-        <CoordinateInput
-          id="tenant-map-latitude"
-          label={copy.latitude}
-          value={state.latitude}
-          onChange={state.setLatitude}
-          disabled={disabled || state.isLoading}
-          invalid={
-            state.validationCode?.startsWith("INVALID_LATITUDE") ?? false
-          }
-          errorId="tenant-map-coordinate-error"
-        />
-        <CoordinateInput
-          id="tenant-map-longitude"
-          label={copy.longitude}
-          value={state.longitude}
-          onChange={state.setLongitude}
-          disabled={disabled || state.isLoading}
-          invalid={
-            state.validationCode?.startsWith("INVALID_LONGITUDE") ?? false
-          }
-          errorId="tenant-map-coordinate-error"
-        />
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button
           type="button"
           variant="outline"
-          onClick={() => {
-            void state.lookup().catch(() => undefined);
-          }}
+          onClick={() => setIsMapOpen(true)}
           disabled={disabled || state.isLoading}
         >
-          {state.isLoading ? (
+          <MapPinned aria-hidden="true" className="size-4" />
+          {t.tenants.wizard.pickOnMap}
+        </Button>
+        {/* The resolved point stays visible so a mis-drop is obvious before
+            the address is applied. */}
+        {state.latitude && state.longitude ? (
+          <p className="font-mono text-xs text-muted-foreground" dir="ltr">
+            {state.latitude}, {state.longitude}
+          </p>
+        ) : null}
+        {state.isLoading ? (
+          <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2
               aria-hidden="true"
-              className="h-4 w-4 animate-spin motion-reduce:animate-none"
+              className="size-4 animate-spin motion-reduce:animate-none"
             />
-          ) : null}
-          {state.isLoading ? copy.lookingUp : copy.lookup}
-        </Button>
+            {copy.lookingUp}
+          </span>
+        ) : null}
       </div>
+
+      <LocationPickerDialog
+        open={isMapOpen}
+        onOpenChange={setIsMapOpen}
+        onConfirm={(location) => {
+          // The map only chooses the point; Core still resolves the address
+          // through the existing reverse-geocode endpoint.
+          const latitude = String(location.latitude);
+          const longitude = String(location.longitude);
+          state.setLatitude(latitude);
+          state.setLongitude(longitude);
+          // Pass the point explicitly: the two setters above have not been
+          // applied to state yet in this handler.
+          void state.lookup({ latitude, longitude }).catch(() => undefined);
+        }}
+      />
 
       {state.validationCode ? (
         <p
@@ -147,47 +155,6 @@ export function TenantReverseGeocodeError({
         </p>
       ) : null}
     </div>
-  );
-}
-
-function CoordinateInput({
-  id,
-  label,
-  value,
-  onChange,
-  disabled,
-  invalid,
-  errorId,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  disabled: boolean;
-  invalid: boolean;
-  errorId: string;
-}) {
-  return (
-    <label
-      htmlFor={id}
-      className="space-y-1 text-xs font-semibold text-foreground"
-    >
-      <span>{label}</span>
-      <Input
-        id={id}
-        name={id.endsWith("latitude") ? "latitude" : "longitude"}
-        type="text"
-        inputMode="decimal"
-        dir="ltr"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        disabled={disabled}
-        aria-invalid={invalid}
-        aria-describedby={invalid ? errorId : undefined}
-        placeholder="30.0444000"
-        className="font-mono"
-      />
-    </label>
   );
 }
 

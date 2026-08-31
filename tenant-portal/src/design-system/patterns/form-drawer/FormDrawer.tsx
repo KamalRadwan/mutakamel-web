@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "lucide-react";
+import { cn } from "../../lib/cn";
+import { proseMeasure } from "../../lib/variants";
 import { Button } from "../../primitives/Button";
 import {
   Sheet,
@@ -31,6 +33,16 @@ export interface FormDrawerProps {
   isSubmitting: boolean;
   onSubmit: () => void;
   error?: string;
+  /** Blocks submit for a reason other than an in-flight request — an unloaded record, a hard validation stop. */
+  submitDisabled?: boolean;
+  /**
+   * Rendered at the footer's inline start, opposite Cancel and Submit.
+   *
+   * The slot `EditDrawer` puts its destructive action in. Deliberately not a
+   * `destructiveAction` prop: this pattern must not decide that the only thing
+   * a footer can carry on that side is a delete.
+   */
+  footerLeading?: React.ReactNode;
   labels: FormDrawerLabels;
   children: React.ReactNode;
 }
@@ -48,10 +60,46 @@ export function FormDrawer({
   isSubmitting,
   onSubmit,
   error,
+  submitDisabled,
+  footerLeading,
   labels,
   children,
 }: FormDrawerProps) {
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // B2 (SKILL-AUDIT.md): after a rejected submit, focus lands on the FIRST
+  // invalid field, not on the submit button. A sighted user sees the toast;
+  // a screen-reader user hears "there are errors" and is then sitting on a
+  // button with no route to the field that is actually wrong. Arriving on
+  // the field is what makes its aria-describedby error text get read.
+  // docs/design/patterns.md#focus-after-a-failed-submit.
+  //
+  // Keyed on isSubmitting and error as well as the attempt itself: a
+  // synchronous validation stop renders its errors in the same commit, while
+  // a 422 renders them only once the request settles.
+  useEffect(() => {
+    if (!submitAttempted || isSubmitting) return;
+    const firstInvalid = bodyRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    firstInvalid?.focus();
+  }, [submitAttempted, isSubmitting, error]);
+
+  // A reopened drawer starts clean; otherwise the previous attempt's focus
+  // rule fires against a fresh form. Adjusted during render rather than in an
+  // effect — the setState-in-effect form causes a cascading render, and React
+  // documents this exact case:
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (!open) setSubmitAttempted(false);
+  }
+
+  function handleSubmit() {
+    setSubmitAttempted(true);
+    onSubmit();
+  }
 
   function requestClose() {
     if (isDirty) {
@@ -86,21 +134,36 @@ export function FormDrawer({
           </SheetHeader>
 
           {error && (
-            <div className="flex items-start gap-2 rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
+            <div
+              role="alert"
+              className={cn(
+                "flex items-start gap-2 rounded-sm border border-negative-200 bg-negative-100 p-2.5",
+                "text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300",
+                proseMeasure,
+              )}
+            >
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              {error}
+              <span className="min-w-0 wrap-anywhere">{error}</span>
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto">{children}</div>
+          <div ref={bodyRef} className="flex-1 overflow-y-auto">
+            {children}
+          </div>
 
           <SheetFooter>
+            {footerLeading && <div className="me-auto flex items-center gap-2">{footerLeading}</div>}
             {/* Deliberately not SheetClose — that closes via Radix's own
                 context and would bypass the dirty guard below. */}
             <Button variant="outline" onClick={requestClose} disabled={isSubmitting}>
               {labels.cancel}
             </Button>
-            <Button variant="primary" onClick={onSubmit} loading={isSubmitting}>
+            <Button
+              variant="primary"
+              onClick={handleSubmit}
+              loading={isSubmitting}
+              disabled={submitDisabled}
+            >
               {labels.submit}
             </Button>
           </SheetFooter>

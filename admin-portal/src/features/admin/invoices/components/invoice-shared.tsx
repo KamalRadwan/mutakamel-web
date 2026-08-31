@@ -2,10 +2,12 @@
 
 import type { ReactNode } from "react";
 import { AlertTriangle, FileText, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
-import { PageHeader, Badge, Button } from "@/design-system";
+import { PageHeader, Badge, Button, resolveStatusTone } from "@/design-system";
 import type {
   CoreSnapshot,
   InvoiceMutationState,
+  InvoicePurpose,
+  InvoiceStatus,
   InvoiceValidationCode,
 } from "../types/invoices";
 
@@ -41,6 +43,7 @@ export const INVOICE_COPY = {
     number: "Invoice",
     purpose: "Purpose",
     tenant: "Tenant",
+    tenantUnavailable: "Tenant no longer exists",
     total: "Total",
     period: "Service period",
     dueAt: "Due at",
@@ -160,6 +163,7 @@ export const INVOICE_COPY = {
     number: "الفاتورة",
     purpose: "الغرض",
     tenant: "المستأجر",
+    tenantUnavailable: "المستأجر لم يعد موجودًا",
     total: "الإجمالي",
     period: "فترة الخدمة",
     dueAt: "تاريخ الاستحقاق",
@@ -251,6 +255,31 @@ export const INVOICE_COPY = {
 } as const;
 
 export type InvoiceCopy = (typeof INVOICE_COPY)["en"] | (typeof INVOICE_COPY)["ar"];
+
+/**
+ * Purpose is a wire enum with no design-system vocabulary of its own.
+ * Operators read invoices, not Core's codes, so it is resolved to a written
+ * label in both languages before it reaches the screen.
+ */
+const INVOICE_PURPOSE_LABELS: Record<InvoicePurpose, { en: string; ar: string }> = {
+  TRIAL_ACTIVATION: { en: "Trial activation", ar: "تفعيل التجربة" },
+  RENEWAL: { en: "Renewal", ar: "تجديد" },
+  PRORATION: { en: "Proration", ar: "تسوية تناسبية" },
+  MANUAL: { en: "Manual", ar: "يدوية" },
+};
+
+export function invoicePurposeLabel(purpose: InvoicePurpose, lang: "ar" | "en"): string {
+  return INVOICE_PURPOSE_LABELS[purpose][lang];
+}
+
+/**
+ * Read from the same tone map the status badge renders, so a status chosen in
+ * the filter is worded exactly like the badges it returns.
+ */
+export function invoiceStatusLabel(status: InvoiceStatus, lang: "ar" | "en"): string {
+  const tone = resolveStatusTone(status, "invoice");
+  return lang === "ar" ? tone.labelAr : tone.labelEn;
+}
 
 export function InvoicePageFrame({
   children,
@@ -384,6 +413,30 @@ export function formatInvoiceDate(value: string | null, lang: "ar" | "en"): stri
     timeStyle: "short",
     timeZone: "UTC",
   }).format(new Date(value));
+}
+
+/**
+ * A service period is a calendar boundary, not an instant: its stored
+ * timestamps are day edges in UTC, so a locale clock would only add noise.
+ * Rendered as a fixed dd/MM/yyyy in Latin digits so the same row reads
+ * identically in both languages.
+ */
+export function formatInvoiceDateOnly(value: string | null, lang: "ar" | "en"): string {
+  if (!value) return INVOICE_COPY[lang].notRecorded;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return INVOICE_COPY[lang].notRecorded;
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  return `${day}/${month}/${parsed.getUTCFullYear()}`;
+}
+
+export function formatInvoiceServicePeriod(
+  start: string | null,
+  end: string | null,
+  lang: "ar" | "en",
+): string {
+  if (!start && !end) return INVOICE_COPY[lang].notRecorded;
+  return `${formatInvoiceDateOnly(start, lang)} → ${formatInvoiceDateOnly(end, lang)}`;
 }
 
 export function formatInvoiceDecimal(value: string): string {

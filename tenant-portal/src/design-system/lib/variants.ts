@@ -58,6 +58,24 @@ export const readOnlySurface =
 export const hitArea =
   "relative after:absolute after:-inset-2 after:content-['']";
 
+// B11 (SKILL-AUDIT.md): UUIDs, correlationIds, idempotency keys and cursors
+// are unbroken 36-character tokens with no natural break point, and they
+// overflow a toast or a narrow cell. `wrap-anywhere` is overflow-wrap:
+// anywhere — deliberately NOT word-break: break-all, which also hyphenates
+// ordinary Arabic and English prose mid-syllable.
+// docs/design/typography.md#identifiers-wrap-never-overflow.
+//
+// Wrap the value itself in <bdi> at the call site: without it, bidirectional
+// reordering mangles a Latin id inside an Arabic sentence and the DISPLAYED
+// value is wrong, not merely ugly — accessibility.md#bidirectional-text.
+export const identifierText = "font-mono wrap-anywhere";
+
+// B17: prose is capped at 65 characters. `max-w-prose` is exactly 65ch in
+// Tailwind v4, so this is the documented rule expressed as a scale utility
+// rather than an arbitrary value. Exempt: table cells, labels, badges, nav
+// items — docs/design/typography.md#prose-is-capped-at-65-characters.
+export const proseMeasure = "max-w-prose";
+
 export const focusRing =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring " +
   "focus-visible:ring-offset-2 focus-visible:ring-offset-background";

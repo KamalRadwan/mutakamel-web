@@ -1,6 +1,8 @@
 "use client";
 
 import { Inbox, type LucideIcon } from "lucide-react";
+import { cn } from "../../lib/cn";
+import { proseMeasure } from "../../lib/variants";
 import { Button } from "../../primitives/Button";
 
 export interface EmptyStateProps {
@@ -19,7 +21,7 @@ export function EmptyState({ title, description, icon: Icon = Inbox, action, cla
     <div className={`flex flex-col items-center justify-center gap-2 px-4 py-12 text-center ${className ?? ""}`}>
       <Icon className="size-8 text-muted-foreground" aria-hidden="true" />
       <p className="text-sm font-medium text-foreground">{title}</p>
-      {description && <p className="max-w-sm text-xs text-muted-foreground">{description}</p>}
+      {description && <p className={cn("text-xs text-muted-foreground", proseMeasure)}>{description}</p>}
       {action && (
         <Button variant="outline" size="sm" onClick={action.onClick} className="mt-2">
           {action.label}

@@ -128,12 +128,25 @@ Three distinct states, and conflating the last two is a real information bug:
 | State | Looks like | Semantics | Means |
 | --- | --- | --- | --- |
 | Normal | full contrast | — | Edit it |
-| `readOnly` | **full contrast**, muted border, no focus ring on the input itself | `aria-readonly` | The value matters, you just cannot change it here |
+| `readOnly` | **full contrast**, muted surface, **keeps its focus ring** | `aria-readonly` + the native `readOnly` attribute | The value matters, you just cannot change it here |
 | `disabled` | `opacity-50`, `cursor-not-allowed` | `disabled` | Not applicable, or temporarily unavailable |
 
 `readOnly` keeps **normal text contrast** — the value is still information the
 user needs to read. Dimming it to 50% says "this doesn't apply to you", which
 is false.
+
+**It also keeps its focus ring.** An earlier draft of this table said "no focus
+ring on the input itself"; that was wrong and is corrected here. A `readOnly`
+input is still focusable, still reachable by Tab, and still selectable for
+copying — WCAG 2.4.7 requires a visible indicator on anything that can take
+focus, and `readOnly` is not `disabled`, which is the state that removes the
+control from the tab order. The implementation is `readOnlySurface` in
+`src/design-system/lib/variants.ts`.
+
+`Field` takes a `readOnly` prop that sets **both** the native attribute (which
+is what makes `read-only:*` variants render, and what stops typing) and
+`aria-readonly` (which is what a screen reader announces on a composite control
+like `Select` that has no native read-only state).
 
 This is not hypothetical: `crm-catalogues.md` documents CRM settings sections
 that are deliberately read-only in this portal. Rendering those as `disabled`
@@ -201,12 +214,89 @@ Skeletons match the **shape** of what is loading — a table skeleton is rows of
 the right height and column widths, not a grey rectangle. `DataTableSkeleton`
 handles this for tables.
 
-## Not built
+## Built in Phase 1
 
-`Combobox` (searchable select), `DatePicker`, `FileUpload`. Each is built when
-a screen genuinely needs it, specified here at that point. Do not hand-roll one
-inside a feature directory — that is how the current app ended up with 46
-hand-rolled buttons.
+The "not built" list this section used to carry is empty. Everything on it —
+`Combobox`, `DatePicker`, `DateRangePicker`, `FileUpload` — now exists, along
+with the rest of Phase 1's primitives.
+
+| Primitive | Built on | Notes |
+| --- | --- | --- |
+| `Calendar` | `react-day-picker` | No vendored stylesheet — see [DECISIONS D15](../build/DECISIONS.md#d15--third-party-components-take-no-stylesheet--assumed) |
+| `DatePicker` · `DateRangePicker` | `Calendar` | `Intl` with an explicit locale; Arabic uses Western digits |
+| `Combobox` | `Popover` + `Input` | Type-ahead over a large remote list, debounced |
+| `MultiSelect` | `Popover` + `Badge` | Chips in the trigger; overflow is a **button**, never a static count |
+| `Stepper` | plain `<ol>` | A step's position never takes a hue |
+| `Progress` | `@radix-ui/react-progress` | Determinate and indeterminate — see below |
+| `Accordion` · `Collapsible` | Radix | The one permitted height keyframe — [motion.md](motion.md#the-one-height-exception) |
+| `ToggleGroup` · `Slider` · `HoverCard` · `ContextMenu` | Radix | |
+| `CopyButton` | `Button` | `aria-live` confirmation for UUIDs and correlation ids |
+| `Money` · `DateTime` | plain + `Intl` | Correctness primitives — a decimal string is never `Number()`d |
+| **`FileUpload`** | plain `<label>` + `<input type=file>` | See below |
+| **`CommandPalette`** | `cmdk` + `Dialog` | See below |
+| **`RichTextEditor`** | `contenteditable` | See below |
+
+### FileUpload
+
+Drag-and-drop plus click, with the MIME allowlist and the size cap enforced
+**before** anything reaches the caller. Rejections come back as
+already-translated strings rather than being rendered here, so a screen can
+choose between an inline list and its own surface.
+
+Backend caps it is built for: branding 2 MB · party image 2 MB · template asset
+5 MiB · CRM attachment 26 MiB.
+
+**There is no progress bar, and there is no fake one.** `fetch` cannot report
+upload progress — only `XMLHttpRequest` can — and `AGENTS.md` says `fetch` is
+called in exactly one file. A file in flight renders the **indeterminate**
+`Progress` bar, which announces as indeterminate because Radix omits
+`aria-valuenow` for a null value. An optional `progress` prop exists for the day
+a transport reports real bytes; driving it from a timer is the fabricated-success
+failure in [anti-patterns.md § 13](anti-patterns.md#13-fake-data-and-fake-success).
+Full reasoning: [DECISIONS D14](../build/DECISIONS.md#d14--fileupload-has-no-progress-bar--assumed).
+
+The drop zone is a `<label>`, not a `<button>`: it has to open the native
+picker on click **and** stay a valid drop target, and a button wrapping a file
+input is neither.
+
+### CommandPalette
+
+Ctrl/Cmd+K over a list of groups the caller supplies. It is generic and reads no
+dictionary; `NavCommandPalette` in the shell is what feeds it the
+**permission-filtered** nav tree, so a route the user cannot reach is not
+offered.
+
+The shortcut listens on `event.code === "KeyK"`, not `event.key`. An Arabic
+keyboard layout produces `ن` for that physical key, and a `key` check silently
+stops working for half the users.
+
+Styling takes no stylesheet: six of `cmdk`'s seven parts take a `className`, and
+the group heading — which does not — is reached by a Tailwind arbitrary variant
+on the group's own class list. See
+[DECISIONS D15](../build/DECISIONS.md#d15--third-party-components-take-no-stylesheet--assumed).
+
+### RichTextEditor
+
+For `loginHtml` and email templates. `contenteditable` plus
+`document.execCommand`: formally deprecated, universally implemented, and
+without a replacement — the alternative is a 200KB editor framework for two
+fields.
+
+**Everything that leaves it is sanitized** by `sanitizeRichText`, an allowlist,
+on every change and on every paste. `loginHtml` renders on the **login page**,
+before a session exists, so the output is treated as hostile by construction.
+The allowlist drops every attribute except a safe `href`, drops `<script>` and
+`<style>` contents entirely, refuses `javascript:` and `data:` hrefs while
+keeping the words, and unwraps the `<div>`/`<font>` soup `execCommand` emits.
+
+This is defence in depth, not the boundary: the backend sanitizes what it
+stores, and the renderer still treats stored HTML as untrusted.
+
+## Icons
+
+`iconSize` ties an icon to the control it sits in, and `mirrorInRtl` is the one
+RTL mirror mechanism in the system. Full rules, the enforcement table and the
+canonical icon-per-concept map: [icons.md](icons.md).
 
 ## Checklist for every primitive
 

@@ -6,6 +6,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Admin Portal Rules
 
+- **Main branch only**: Always work directly on `main`. Never create or switch branches, check out another ref, detach HEAD, or create a worktree.
+- **Branch safety check**: Before editing a repository, verify that `git branch --show-current` returns `main`. Otherwise, stop and ask the user; do not switch branches or move existing changes yourself.
+
 - **Fixed Port**: Run this application only on port `5001`. Do not select an
   alternate port for development or testing.
 - **Documentation First**: Read `docs/README.md` and

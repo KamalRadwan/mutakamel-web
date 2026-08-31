@@ -35,21 +35,42 @@ export function AppToast({ type, title, message, onDismiss }: AppToastProps) {
   const Icon = ICONS[type];
 
   return (
+    // B14 — the toast accessibility contract, in one place:
+    //   * role="status" ALWAYS, never role="alert". alert implies
+    //     aria-live="assertive", which interrupts what the user is reading
+    //     mid-sentence; every write result in this product is a toast, so
+    //     assertive would make the app shout constantly.
+    //   * aria-live and aria-atomic are stated rather than left implicit,
+    //     because sonner's own wrapper is aria-atomic="false" and would
+    //     otherwise announce only the changed text node.
+    //   * Nothing here is autofocused. Focus stays where the user put it.
+    //   * The dismiss control is a real button, so a permanent
+    //     (duration: 0) toast is always keyboard-dismissable.
+    // docs/design/DESIGN-SYSTEM.md#the-accessibility-contract.
     <div
-      role={type === "error" ? "alert" : "status"}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       className="flex w-full max-w-sm items-start gap-2 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-overlay"
     >
       <Icon className={cn("mt-0.5 size-4 shrink-0", ICON_TONE[type])} aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{title}</p>
-        {message && <p className="mt-0.5 whitespace-pre-line text-xs text-muted-foreground">{message}</p>}
+        {/* wrap-anywhere, not break-all: the message often ends in a bare
+            36-character correlationId, which otherwise pushes the toast off
+            screen — B11, typography.md#identifiers-wrap-never-overflow. */}
+        {message && (
+          <p className="mt-0.5 whitespace-pre-line wrap-anywhere text-xs text-muted-foreground">
+            <bdi>{message}</bdi>
+          </p>
+        )}
       </div>
       <button
         type="button"
         onClick={onDismiss}
         aria-label={t.common.dismiss}
         className={cn(
-          "relative -m-1 shrink-0 rounded-xs p-1 text-muted-foreground opacity-70 hover:opacity-100",
+          "relative -m-1 shrink-0 cursor-pointer rounded-xs p-1 text-muted-foreground opacity-70 hover:opacity-100",
           focusRing,
         )}
       >

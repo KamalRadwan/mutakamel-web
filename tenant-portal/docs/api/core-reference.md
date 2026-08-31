@@ -9,9 +9,9 @@ Status: **verified** (Gateway exposure and transport policy only)
 
 Last source verification: **2026-08-30**
 
-Generated at: **2026-08-30T18:06:12.280Z**
+Generated at: **2026-08-30T23:50:14.793Z**
 
-Backend revision: `989ee35f6578+dirty`
+Backend revision: `68fef9f8c0d2+dirty`
 
 Owning app: **core-app**
 
@@ -26,6 +26,11 @@ shapes or error codes — those live in the hand-written pages:
 
 - [core-auth.md](core-auth.md)
 - [core-notifications.md](core-notifications.md)
+- [core-identity.md](core-identity.md)
+- [core-settings.md](core-settings.md)
+- [core-billing.md](core-billing.md)
+- [core-directory.md](core-directory.md)
+- [core-templates.md](core-templates.md)
 
 Read [README.md](README.md) first for envelopes, pagination, idempotency and
 the capabilities contract.

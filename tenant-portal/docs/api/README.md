@@ -58,11 +58,29 @@ Unwrap with `unwrapCoreData<T>()`. Failures carry `errorCode`.
 
 ### CRM — raw
 
-CRM returns the payload directly. Lists are:
+CRM returns the payload directly. Lists are **flat** — every pagination field
+sits at the top level, and there is **no `meta` wrapper anywhere in crm-app**:
 
 ```json
-{ "items": [ ], "meta": { "page": 1, "limit": 25, "total": 143, "totalPages": 6 } }
+{
+  "items": [ ],
+  "total": 143,
+  "page": 1,
+  "limit": 25,
+  "totalPages": 6,
+  "hasNext": true,
+  "hasPrev": false
+}
 ```
+
+This example said `{ items, meta }` until 2026-08-31, and it cost a real
+defect: `useOpportunitiesList.ts` required `payload.meta` and threw
+`"Invalid opportunities response."` on every genuine response, while its own
+test fed the same wrong shape back and passed. `meta` is **Core's** shape.
+Mixing the two is standing rule S1, and this page was the source of the mix.
+
+Note `totalPages` is **0**, not 1, when `total` is 0 — `paginatedReadModels`
+short-circuits before the divide.
 
 **Do not run a CRM response through `unwrapCoreData`** — there is no `data`
 key and you will get `undefined`.
@@ -111,13 +129,95 @@ CRM list endpoints extend `PaginationQueryDto` via `BranchListQueryDto`:
 | `page` | integer ≥ 1 | |
 | `limit` | integer | endpoint-bounded |
 | `sortBy` | string | allowed set is per-endpoint |
-| `sortOrder` | `ASC` \| `DESC` | |
+| `sortDir` | `ASC` \| `DESC` | **uppercase** — see below |
 | **`branchId`** | UUIDv7 | **required on every CRM list** |
 
 `branchId` is `@IsUUID('7')` and **not optional**. A CRM list request without
 it is a 422. The branch selector must resolve before the first fetch.
 
 Pagination is server-side. Never slice a client array.
+
+### Sort parameters differ per endpoint
+
+There is no single sort dialect. **Verify every paginated call against its own
+controller, not against the shared DTO** — this is gap G13, closed by
+MASTER-PLAN task 3.37. Three forms exist today:
+
+| Dialect | Parameters | Where | Source |
+| --- | --- | --- | --- |
+| **Shared** | `sortBy` + `sortDir` = `ASC` \| `DESC` | Every endpoint extending `PaginationQueryDto` — all CRM lists, Core directory | `@mutakamel/database` `dtos/pagination-query.dto`, `SortDirectionEnum` |
+| **Template definitions** | `sortBy` + `sortDirection` = `asc` \| `desc` | `GET /api/tenant/core/v1/templates`, `POST /api/tenant/core/v1/templates/search` | `core-app/src/tenant/template-platform/dto/template-platform.dto.ts`, `TemplateListRequestDto` |
+| **Template assets** | one combined `sort` token | `GET /api/tenant/core/v1/templates/assets` | same file, `ListTemplateAssetsQueryDto` |
+
+The combined token is an exact enum, not a free-form `field:direction` pair —
+only these four values are accepted:
+
+```text
+createdAt:desc   createdAt:asc   fileName:asc   fileName:desc
+```
+
+Two traps this closes:
+
+- **`sortOrder` is not a query parameter anywhere.** It is an *entity field*
+  on lead stages and acquisition sources — the tenant-defined display order.
+  Four pages of this documentation used it as the sort direction; no code ever
+  did (`useCustomerProfiles` has always sent `sortDir=DESC`).
+- **Case is protocol.** `sortDir` is `ASC`/`DESC`; `sortDirection` is
+  `asc`/`desc`. The wrong case is a `400`, and because the backend runs
+  `forbidNonWhitelisted`, so is the wrong parameter *name*.
+
+### `search` is per endpoint, not universal
+
+Enumerated from service and repository source on **2026-08-31** for MASTER-PLAN
+13.21. `PaginationQueryDto` carries an optional `search` (`@MaxLength(200)`),
+so **every** endpoint extending it accepts the parameter — but accepting it and
+honouring it are different things, and there is no way to tell from the DTO.
+
+| Endpoint | Honours it? | Matched columns |
+| --- | --- | --- |
+| `GET /core/v1/directory/parties` | yes | `displayName`, `legalName`, `firstName`, `lastName`, `organizationName`, `taxNumber`, `commercialRegistrationNumber` |
+| `GET /crm/v1/leads` | yes | party `display_name` / `first_name` / `last_name` / `organization_name`, **and** any `party_contact_methods.value` |
+| `GET /crm/v1/customer-profiles` | yes | the same party predicate |
+| `GET /crm/v1/opportunities` | yes | **`title` only** |
+| `GET /crm/v1/activities` | yes | `subject` |
+| `GET /crm/v1/tasks` | yes | `title` |
+| `GET /crm/v1/calendar-events` | yes | `title` |
+| `GET /crm/v1/reminders` | **no — accepted and ignored** | none |
+| `GET /trade/v1/items` | no field | — |
+| `POST /trade/v1/items/search` | exact match only | `canonical_code` / `status` / `item_kind`, compared with `=` |
+| `GET|POST /trade/v1/quotations`, `sales-orders`, `purchase-orders`, `purchase-quotations`, `invoices`, `contracts` | no field | — |
+
+Three consequences worth stating separately:
+
+- **Leads and opportunities do not search alike.** Leads reach the party's
+  contact methods; opportunities read one column. An opportunity found by its
+  customer's name is not a result that route can return, and a screen that
+  implies otherwise teaches users the data is missing.
+- **Reminders is the dangerous one.** `RemindersQueryDto extends
+  BranchListQueryDto`, so `?search=` validates — and
+  `ActivitiesService.listScopedReminders` passes `undefined` where every sibling
+  passes a search tuple. No `400`, no filtering, and a caller cannot tell an
+  ignored term from one that matched everything. Recorded as
+  [Q113](../build/OPEN-QUESTIONS.md#q113--crm-reminders-accepts-a-search-term-and-silently-ignores-it).
+- **A missing field is a `400`, not a no-op.** `DocumentListQueryDto` and
+  `CatalogListQueryDto` declare no `search` at all, so under
+  `forbidNonWhitelisted` a speculative one is rejected outright
+  ([Q110](../build/OPEN-QUESTIONS.md#q110--trade-items-cannot-be-text-searched-the-search-route-is-an-exact-code-lookup),
+  [Q111](../build/OPEN-QUESTIONS.md#q111--no-commercial-document-list-accepts-a-search-term)).
+
+`POST` on a `/search` path is not evidence of a richer query. Both Trade
+document search routes bind the **same** `DocumentListQueryDto` as their `GET`
+list and call the same service method; only `POST /core/v1/templates/search`
+and `POST /trade/v1/items/search` take a different DTO from their `GET`.
+
+### There is no export route
+
+Also established 2026-08-31, for 13.22. Of the 573 Gateway routes, exactly one
+matches export/csv/xlsx/download — `GET /crm/v1/attachments/:id/download`,
+which streams a stored attachment. Every other CSV/XLSX reference in the three
+services is **ingest**. Twelve routes render a PDF and all twelve render a
+Trade *document*; nothing renders a dashboard. Recorded as
+[Q114](../build/OPEN-QUESTIONS.md#q114--there-is-no-export-route-anywhere-for-any-list-or-any-dashboard).
 
 ## Scoped permissions
 
@@ -217,33 +317,109 @@ directly; record it in [../build/OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md).
 
 ## Coverage
 
-Verified 2026-08-28 by `pnpm docs:audit-api`, which parses the controllers
-directly rather than trusting the inventory alone:
+Re-measured **2026-08-31** by `pnpm docs:audit-api`, which parses the
+controllers directly rather than trusting the inventory alone:
 
 | | |
 | --- | ---: |
-| Gateway routes | 573 |
-| Route-level documented (generated pages) | **573 — 100%** |
-| Semantically documented | 92 |
-| Semantic gaps **inside a family the portal builds** | **0** |
+| Gateway routes | 569 |
+| Route-level documented (generated pages) | **569 — 100%** |
+| Semantically documented | **473** |
+| **Route-level only** | **27** — 26 CRM, 1 Core |
 | Permission omissions on a documented route | **0** |
 
-The 412 route-level-only routes are all in families with no portal screen —
-dashboards, widgets, outbound email, notes, attachments, tasks, calendar,
-reminders, Core organization/users/billing/templates, and all of Trade. That is
-a scope decision, not an omission: documenting a contract for a screen nobody
-is building would rot before it was read.
+**The 26 is not the same 26 the CRM audit reported, even though the number is
+identical.** The audit's reading was taken before `crm-dashboards.md` landed, and
+the expectation was that the count would have dropped since. It did not, and the
+reason matters: **the 40 dashboard and widget routes were never among the 26.**
+They are all semantically documented. The 26 are these, and they have not moved:
+
+| Owning controller | Routes | Portal screens |
+| --- | ---: | --- |
+| `crm/activities/activities.controller.ts` | 11 — activities, tasks, calendar events, reminders | `/crm/activities`, `/crm/tasks`, `/crm/calendar`, `/crm/reminders` |
+| `crm/notes-attachments/notes-attachments.controller.ts` | 9 — notes, attachments, upload, download | The notes and attachments panels on every CRM detail screen |
+| `crm/outbound-emails/outbound-emails.controller.ts` | 6 — options, preview, create, list, detail, retry | `/crm/outbound-emails` |
+
+**This paragraph used to say these families had "no portal screen", and that is
+the part that was wrong.** It was true on 2026-08-28 and stopped being true when
+Phase 8B built them. Every one of the 26 now has a screen calling it with no
+hand-written contract page behind it — which is the same condition that produced
+[D23](../build/DEFECTS.md#d23--editing-a-widgets-name-can-destroy-its-query-spec--fixed-2026-08-31):
+a screen reconstructing a request body from what its form happened to model,
+with nothing written down to contradict it.
+
+The 1 Core entry is `GET /public/tenant-host/status`, which is public and
+transport-level; `core-reference.md` covers it and no semantic page is owed.
+
+**Stated, not closed.** Writing three contract pages is a phase of work, not a
+task inside one. What is recorded here is the honest number, which families it
+covers, and why it is a live risk rather than a scope decision.
+
+**One product decision is parked on the missing activities page.** The CRM audit
+review's open question 5 — reminder recipient and lifecycle — was decided:
+
+> The recipient is the **owner of the source record at fire time, re-resolved at
+> delivery**, not at creation. The reminder auto-cancels when its source task or
+> activity reaches `DONE` or `CANCELLED`, and a delivery failure is a durable
+> recorded fact rather than a silent drop.
+
+Resolving the recipient at *creation* time is exactly what makes a reassignment
+misdeliver, and "re-check at the moment it matters" is the same rule the email
+module already applies to its final scope check — one rule, two places.
+
+It is recorded **here** rather than in the document that owns it because that
+document is one of the three above and does not exist yet. Whoever writes
+`crm-activities.md` should move this into it. Leaving a decision in a coverage
+note is how decisions get re-litigated, so this is a placement to fix, not a
+place to add more.
+
+## Two different questions, two different words
+
+Every page answers both, and they are independent:
+
+**Contract status** — does this page match backend source? `verified` means
+someone opened the controllers and DTOs it describes, on the date given.
+
+**Portal status** — what does the app actually do with these routes?
+
+| Word | Means |
+| --- | --- |
+| `not built` | No screen calls these routes |
+| `partial` | Some routes have screens, some do not; the page says which |
+| `built` | Screens exist and every gate is green — typecheck, lint, RTL, census, contrast, unit tests, docs. **Not exercised against a live session** |
+| `verified` | Driven against a real authenticated session, and observed to work |
+
+**Nothing in this product is `verified` yet, and that is not a wording
+choice.** P4 in [MANUAL-TEST-PLAN.md](../build/MANUAL-TEST-PLAN.md) is blocked:
+the one tenant user is `INVITED` and both invite tokens have expired, so no
+authenticated session exists to drive. Phases 4 through 8 each closed with some
+form of *"nothing here has been exercised against a real authenticated
+session"*. `built` is the honest ceiling until that clears.
+
+The exception is the unauthenticated half of `core-auth`, which **has** been
+driven — login screen, wrong-password, the forgot-password field binding,
+`branding/public`, and `auth/me` answering 401 — recorded as runs 1 and 2 in
+the manual test plan. The authenticated half has not.
 
 ## Domain pages
 
-| Page | Status |
-| --- | --- |
-| [core-auth.md](core-auth.md) | verified — live in portal |
-| [core-notifications.md](core-notifications.md) | verified — live in portal |
-| [crm-leads.md](crm-leads.md) | verified — live, needs 3-view work |
-| [crm-customer-profiles.md](crm-customer-profiles.md) | verified — live, needs 3-view work |
-| [crm-opportunities.md](crm-opportunities.md) | verified — live, needs 3-view work |
-| [crm-catalogues.md](crm-catalogues.md) | verified — live |
+| Page | Contract | Portal |
+| --- | --- | --- |
+| [core-auth.md](core-auth.md) | verified | **partial** — the unauthenticated paths are verified; the authenticated half is built only |
+| [core-identity.md](core-identity.md) | verified | built — Phase 4, all 50 routes called |
+| [core-settings.md](core-settings.md) | verified | built — Phase 5, 30 of 33 routes |
+| [core-billing.md](core-billing.md) | verified | built — Phase 6, 22 of 23 routes |
+| [core-directory.md](core-directory.md) | verified | built — Phase 7 |
+| [core-templates.md](core-templates.md) | verified | **partial** — Phase 7; the layout-document editor is not buildable, see 7.12 |
+| [core-notifications.md](core-notifications.md) | verified | **partial** — 9 of 14 routes unused |
+| [crm-leads.md](crm-leads.md) | verified | built — Phase 8A |
+| [crm-customer-profiles.md](crm-customer-profiles.md) | verified | built — Phase 8A |
+| [crm-opportunities.md](crm-opportunities.md) | verified | built — Phase 8A |
+| [crm-catalogues.md](crm-catalogues.md) | verified | built — Phase 8B |
+| [crm-dashboards.md](crm-dashboards.md) | verified | built — Phase 9 · 40 routes |
+| [trade-foundation.md](trade-foundation.md) | verified | not built — Phase 10 · 42 routes |
+| [trade-documents.md](trade-documents.md) | verified | not built — Phase 11 · 60 routes |
+| [trade-advanced.md](trade-advanced.md) | verified | not built — Phase 12 · 129 routes |
 | [core-reference.md](core-reference.md) | **generated** — all 199 Core routes |
 | [crm-reference.md](crm-reference.md) | **generated** — all 143 CRM routes |
 | [trade-reference.md](trade-reference.md) | **generated** — all 231 Trade routes; no portal screen |

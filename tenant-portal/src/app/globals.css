@@ -212,7 +212,11 @@ html[lang="ar"] {
      (docs/design/typography.md). Radius stays fixed at 2/4/6/8 for the same
      reason: it is a shape constant, not a density one.
 
-     0.9 is the shipped default. See docs/build/DECISIONS.md#d2--ui-scale.
+     0.9 is the shipped default, and it is also the "compact" density the
+     user can change from the user menu. The other two densities override this
+     variable with an inline style on <html>; compact is expressed by REMOVING
+     that override, so this line stays the only place 0.9 is written.
+     See docs/build/DECISIONS.md#d2--ui-scale and docs/design/theming.md.
 
      Scaling the tokens rather than the root font-size is deliberate twice
      over: `html { font-size }` is a banned selector in this file
@@ -225,7 +229,9 @@ html[lang="ar"] {
   --size-control-lg: calc(2.25rem * var(--ui-scale));
   --size-control-xl: calc(2.5rem * var(--ui-scale));
 
-  /* Stacking order — six real layers. They collide if left to chance: a sticky
+  /* Stacking order — closes SKILL-AUDIT.md B7 ("no z-index scale"), the gap
+     that produces a dropdown behind a sticky column. Six real layers. They
+     collide if left to chance: a sticky
      table column will happily cover an open dropdown. Declared once here;
      never write a bare z-50. Two orderings are easy to get backwards — the
      sticky HEADER sits above the sticky CELL (otherwise the first column
@@ -616,10 +622,11 @@ body {
 }
 
 /* ---------- 7. Keyframes ----------
-   docs/design/motion.md#the-budget. animate-bell-ring is pre-existing and
-   temporary: its only consumer, NotificationsDropdown, is deleted in phase 3
-   (docs/build/PHASE-1-DELETE.md#5-old-presentation-layer) — remove this
-   keyframe in the same change. */
+   docs/design/motion.md#the-budget. `bellRing`/`animate-bell-ring` used to
+   live here under a standing instruction to delete it with its consumer;
+   both are gone as of MASTER-PLAN 3.33. An infinitely-ringing bell is
+   outside the motion budget, and the unread state is carried by the dot,
+   the count badge and the live region instead. */
 
 @keyframes shimmer {
   100% {
@@ -647,44 +654,6 @@ body {
     opacity: 0.45;
     transform: scale(0.82);
   }
-}
-
-@keyframes bellRing {
-  0% {
-    transform: rotate(0deg);
-  }
-  10% {
-    transform: rotate(25deg);
-  }
-  20% {
-    transform: rotate(-25deg);
-  }
-  30% {
-    transform: rotate(20deg);
-  }
-  40% {
-    transform: rotate(-20deg);
-  }
-  50% {
-    transform: rotate(12deg);
-  }
-  60% {
-    transform: rotate(-12deg);
-  }
-  70% {
-    transform: rotate(6deg);
-  }
-  80% {
-    transform: rotate(-6deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-}
-
-.animate-bell-ring {
-  animation: bellRing 1.4s ease-in-out infinite;
-  transform-origin: top center;
 }
 
 /* The pending dot — docs/design/motion.md#the-pending-dot. Its own class
@@ -721,5 +690,54 @@ body {
   .dot-pending {
     animation: none !important;
     opacity: 0.45;
+  }
+
+  /* The second survivor. Left to the generic reset, `animate-spin` plays
+     one 0.01ms revolution and settles on an arbitrary rotation, which is a
+     motionless icon that still claims to be a spinner. Stopping it outright
+     is honest: every spinner site pairs with `aria-busy` and visible text
+     (Button, TenantAuthGuard, Combobox, the reload controls), so the state
+     survives the loss of the animation. */
+  .animate-spin {
+    animation: none !important;
+  }
+}
+
+/* ---------- 7. Print ----------
+   MASTER-PLAN 13.13. Placed here rather than in components for the two things
+   a utility cannot express: the page box, and undoing dark mode.
+
+   The dark-mode rule is the point of this block. `.dark` is on
+   documentElement, and it survives printing — so an owner who works in dark
+   mode and prints an invoice gets light text on a dark ground, which a printer
+   renders as light text on WHITE. The document comes out blank-looking. Only
+   the tokens a printed document actually uses are reset; re-declaring the
+   whole ramp here would be a second palette to keep in sync. */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  .dark {
+    --background: var(--color-ink-50);
+    --foreground: var(--color-ink-900);
+    --canvas: white;
+    --card: white;
+    --card-foreground: var(--color-ink-900);
+    --popover: white;
+    --popover-foreground: var(--color-ink-900);
+    --muted-foreground: var(--color-ink-600);
+    --border: var(--color-ink-200);
+    --row-zebra: var(--color-ink-25);
+    --elevation-pop: none;
+    --elevation-overlay: none;
+  }
+
+  /* A document is read as one continuous thing on paper; the shell's scroll
+     containers otherwise clip it to the first viewport-height. */
+  .print-document {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
   }
 }

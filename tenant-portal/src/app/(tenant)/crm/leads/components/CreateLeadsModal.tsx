@@ -3,12 +3,16 @@
 import { useState } from "react";
 import { Field, FormDrawer, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { localizedName } from "@/lib/format/localized";
+import { useLeadCompanyOptions } from "../hooks/useLeadCompanyOptions";
 import type { CreateLeadFormData, LeadStage } from "../hooks/useLeads";
+import { ExistingCompanyPicker } from "./ExistingCompanyPicker";
 
 interface CreateModalProps {
   isOpen: boolean;
   onClose: () => void;
   stages: LeadStage[];
+  branchId: string | null;
   onSubmit: (data: CreateLeadFormData) => Promise<boolean>;
   error: string | null;
 }
@@ -19,16 +23,20 @@ const initialForm: CreateLeadFormData = {
   email: "",
   phone: "",
   stageId: "",
+  existingCompanyPartyId: "",
+  contactPartyId: "",
 };
 
-export function CreateLeadsModal({ isOpen, onClose, onSubmit, stages, error }: CreateModalProps) {
+export function CreateLeadsModal({ isOpen, onClose, onSubmit, stages, branchId, error }: CreateModalProps) {
   const { t, lang } = useI18n();
   const [form, setForm] = useState<CreateLeadFormData>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
+  const companyOptions = useLeadCompanyOptions(branchId, isOpen);
 
   const close = () => {
     setForm(initialForm);
+    companyOptions.reset();
     onClose();
   };
 
@@ -63,6 +71,29 @@ export function CreateLeadsModal({ isOpen, onClose, onSubmit, stages, error }: C
       }}
     >
       <div className="flex flex-col gap-4">
+        <ExistingCompanyPicker
+          options={companyOptions}
+          existingCompanyPartyId={form.existingCompanyPartyId ?? ""}
+          contactPartyId={form.contactPartyId ?? ""}
+          disabled={isSubmitting}
+          onCompanyChange={(existingCompanyPartyId, displayName) =>
+            setForm((current) => ({
+              ...current,
+              existingCompanyPartyId,
+              contactPartyId: "",
+              companyName: displayName || current.companyName,
+            }))
+          }
+          onContactChange={(contactPartyId, displayName, contactEmail, contactPhone) =>
+            setForm((current) => ({
+              ...current,
+              contactPartyId,
+              contactName: displayName || current.contactName,
+              email: contactEmail || current.email,
+              phone: contactPhone || current.phone,
+            }))
+          }
+        />
         <Field label={t.crmLeads.contactName} required>
           <Input
             value={form.contactName}
@@ -115,7 +146,7 @@ export function CreateLeadsModal({ isOpen, onClose, onSubmit, stages, error }: C
                 .filter((stage) => stage.flag !== "CONVERTED")
                 .map((stage) => (
                   <SelectItem key={stage.id} value={stage.id}>
-                    {lang === "ar" ? stage.nameAr : stage.nameEn}
+                    {localizedName(stage, lang)}
                   </SelectItem>
                 ))}
             </SelectContent>

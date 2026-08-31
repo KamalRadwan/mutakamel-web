@@ -2,15 +2,16 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-27**
+Last source verification: **2026-08-31**
 
 Owning app: **crm-app**
 
 Canonical prefix: `/api/tenant/crm/v1/opportunities`, `/pipelines`,
 `/opportunity-stages`
 
-Portal status: **live** — board, card and table views, plus delete. See
-the full breakdown below.
+Portal status: **built** — board, card and table views, plus delete. See the
+full breakdown below. Not exercised against a live session: CRM is blocked
+twice over, by P4 and by Q17.
 
 Source inspected:
 `crm-app/src/crm/opportunities/opportunities.controller.ts`,
@@ -40,11 +41,20 @@ Pipelines and stages:
 | GET | `/api/tenant/crm/v1/pipelines` | `crm.pipelines.read` |
 | GET | `/api/tenant/crm/v1/pipelines/:id` | `crm.pipelines.read` |
 | GET | `/api/tenant/crm/v1/pipelines/configuration` | `crm.pipelines.read` |
-| GET | `/api/tenant/crm/v1/opportunity-stages` | `crm.pipelines.read` |
-| GET | `/api/tenant/crm/v1/opportunity-stages/:id` | `crm.pipelines.read` |
+| GET | `/api/tenant/crm/v1/opportunity-stages` | `crm.pipelines.manage` |
+| GET | `/api/tenant/crm/v1/opportunity-stages/:id` | `crm.pipelines.manage` |
 | POST | `/api/tenant/crm/v1/opportunity-stages` | `crm.pipelines.manage` |
 | PATCH | `/api/tenant/crm/v1/opportunity-stages/:id` | `crm.pipelines.manage` |
 | DELETE | `/api/tenant/crm/v1/opportunity-stages/:id` | `crm.pipelines.manage` |
+
+**Both GETs require `.manage`, not `.read`** — every one of the five routes on
+`opportunity-stages.controller.ts` carries `@RequirePermissions('crm.pipelines.manage')`.
+This table said `.read` for the two reads until 2026-08-31. Gating a screen on
+`.read` would admit an actor whose every subsequent request answers 403, which
+is worse than not showing them the screen: `PermissionGate` would never fire,
+and they would meet the refusal one control at a time.
+
+The same applies to `GET /pipelines/configuration`.
 | PUT | `/api/tenant/crm/v1/pipelines/:id/default` | `crm.pipelines.manage` |
 | PATCH | `/api/tenant/crm/v1/pipelines/:id/stages/reorder` | `crm.pipelines.manage` |
 | DELETE | `/api/tenant/crm/v1/pipelines/:id/stages/:pipelineStageId` | `crm.pipelines.manage` |
@@ -178,7 +188,7 @@ Do not try to unify them — `DataTable` uses `page`/`limit` against
 | Parameter | Type | Required |
 | --- | --- | --- |
 | `branchId` | UUIDv7 | **yes** |
-| `page`, `limit`, `sortBy`, `sortOrder` | pagination | no |
+| `page`, `limit`, `sortBy`, `sortDir` | pagination | no — `sortDir` is `ASC`/`DESC`, see [README.md#sort-parameters-differ-per-endpoint](README.md#sort-parameters-differ-per-endpoint) |
 | `pipelineId` | UUIDv7 | no |
 | `stageId` | UUIDv7 | no |
 | `status` | `OpportunityStatusEnum` | no |
@@ -212,6 +222,16 @@ pipeline's entry stage. Confirm before sending.
 
 Same contract as leads. No opportunities permission required, only branch
 membership. Drives every action control. `null` means unavailable.
+
+It reports **only** `opportunities.{create,update,delete}` —
+`OpportunitiesService.getCapabilities` resolves nothing else. Notes and
+attachments capabilities exist only on `GET /leads/capabilities`, which is
+resource-and-branch scoped rather than lead scoped and needs no leads
+permission.
+
+Like the leads one, this route is `BRANCH_REQUIRED`: the two scope headers are
+mandatory alongside the query parameter, and omitting them is a Gateway 400
+before crm-app sees the request.
 
 See [README.md](README.md#capabilities-endpoints).
 
@@ -250,7 +270,8 @@ they do not exist.
 | Card view | live |
 | Capabilities-driven actions | live — update (drag/importance) and delete; see [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md#q14--opportunities-table-has-no-customerowner-display-names--resolved-2026-08-28) for the table's Customer/Owner column gap |
 | Delete | live — `DELETE /:id`, capability-gated |
-| Create | not started — routed through lead conversion (deferred, see Q3/Q12 in OPEN-QUESTIONS.md), not a raw "add opportunity" button |
-| Pipeline transfer | not started |
-| Stage history | not started |
-| Detail route | not started |
+| Create | live — `POST /opportunities` against an existing customer, plus the lead-conversion route |
+| Update | live — `PATCH /:id`, changed keys only; no pipeline or stage, which the DTO does not carry |
+| Pipeline transfer | live — `PUT /:id/pipeline`, confirmed, terminal target stages filtered out |
+| Stage history | live — `GET /:id/stage-history` on `Timeline`, in the server order |
+| Detail route | live — `/crm/opportunities/[id]`; **the proxy does not admit the path yet, see OPEN-QUESTIONS.md Q40** |

@@ -107,11 +107,13 @@ it from direction rather than hardcoding — see [theming.md](theming.md#rtl).
 | Font pairing, type scale, weights, Arabic lift, numerals | [typography.md](typography.md) |
 | Radius, spacing, control heights, row density, elevation | [geometry.md](geometry.md) |
 | Animation budget and permitted keyframes | [motion.md](motion.md) |
+| Icon sizes, the one RTL mirror, the icon-per-concept map | [icons.md](icons.md) |
 | Every primitive's props and variants | [primitives.md](primitives.md) |
 | Every composite pattern's props | [patterns.md](patterns.md) |
 | **Board / card / table — the three-view contract** | [views.md](views.md) |
 | Lead & customer detail screens, lead conversion | [detail-screens.md](detail-screens.md) |
 | The per-screen accessibility checklist | [accessibility.md](accessibility.md) |
+| **The eleven states every data screen renders** | [states.md](states.md) |
 | Sidebar, topbar, navigation map | [shell.md](shell.md) |
 | Light/dark, RTL, no-flash first paint | [theming.md](theming.md) |
 | Dictionary structure, zero-ternary rule | [i18n.md](i18n.md) |
@@ -126,8 +128,9 @@ src/design-system/
   lib/
     cn.ts           className merge
     variants.ts     shared CVA fragments: focusRing, controlSize, surface
-  primitives/       21 files — see primitives.md
-  patterns/         12 directories — see patterns.md
+    icons.ts        iconSize, mirrorInRtl — see icons.md
+  primitives/       see primitives.md
+  patterns/         see patterns.md
   views/            board / card / table — see views.md
   shell/            AppShell, Sidebar, Topbar, MobileNav, nav-config
   feedback/         ToastProvider, useToast, AppToast

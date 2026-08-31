@@ -90,6 +90,58 @@ the 44pt native figure — see
 The 32px default clears it outright; the 24px `xs` sits at it and keeps the
 expansion above.
 
+## Density does not move the breakpoints
+
+`--ui-scale` multiplies geometry. It does **not** touch
+`--breakpoint-*`, and it cannot: a breakpoint is measured against the
+viewport, which is a property of the user's screen, not of our tokens. This
+file customises no breakpoints, so Tailwind v4's defaults stand — `sm` 40rem,
+`md` 48rem, `lg` 64rem, `xl` 80rem, `2xl` 96rem.
+
+The consequence is that **every responsive boundary now fires at a different
+content density than it was drawn for**, and since density became a user
+preference ([theming.md](theming.md#density-is-the-absence-of-a-value-not-a-value))
+it fires at *three*.
+
+The shell makes it concrete. `--size-sidebar` is `14.5rem` scaled, so the
+content column at a given viewport width is whatever the sidebar leaves:
+
+| Viewport | Sidebar @ compact | @ standard | @ comfortable | Content column, compact → comfortable |
+|---|---:|---:|---:|---:|
+| `md` 768 px | 208.8 px | 232 px | 255.2 px | 559.2 → 512.8 px |
+| `lg` 1024 px | 208.8 px | 232 px | 255.2 px | 815.2 → 768.8 px |
+| `xl` 1280 px | 208.8 px | 232 px | 255.2 px | 1071.2 → 1024.8 px |
+
+The sidebar swing is 46.4 px — about **9 % of the content column at `md`** —
+and no `md:` rule knows it happened. A layout that *just* fits two columns at
+`md` on compact can overflow at comfortable while remaining, as far as CSS is
+concerned, at exactly the same breakpoint.
+
+Vertically the same thing costs rows. Measured in the running app at
+1366×768 with the real chrome (page gutter, `PageHeader`, `FilterBar`, table
+header, pager):
+
+| Density | Row | Topbar | Rows visible |
+|---|---:|---:|---:|
+| compact 0.9 | 32.4 px | 39.6 px | **15** |
+| standard 1.0 | 36 px | 44 px | **14** |
+| comfortable 1.1 | 39.6 px | 48.4 px | ~13 *(derived, not measured)* |
+
+**What this means when writing a screen.** Do not tune a `md:`/`lg:` rule
+against what you see at one density — you are looking at one of three layouts
+that rule produces. Prefer container-relative sizing and `min-w-0` over
+column counts pinned to a breakpoint, and let dense tables scroll rather than
+assuming a row budget. Where a layout genuinely cannot survive the swing, the
+honest fix is a wider breakpoint, not a smaller token.
+
+**Not verified at each breakpoint.** MASTER-PLAN 0.33 also asks for an eyes-on
+pass over the shell and one dense table at every breakpoint. That needs an
+authenticated session, which is blocked on P4
+([MANUAL-TEST-PLAN.md](../build/MANUAL-TEST-PLAN.md)). The arithmetic above is
+derived from the token definitions and from measurements already taken in the
+running app; the comfortable row count is the one figure that is derived rather
+than observed, and is marked as such.
+
 ## Spacing
 
 Tailwind's default 4px-based scale, restricted to these steps:
@@ -161,6 +213,12 @@ ladder and the two non-obvious orderings (sticky header above sticky cell;
 toast above overlay) are in
 [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#stacking-order).
 
+This is [SKILL-AUDIT.md](SKILL-AUDIT.md) **B7**, implemented by MASTER-PLAN
+tasks 0.17–0.20: tokens in `globals.css`, every literal replaced in the
+primitives and `DataTable`, an ESLint selector banning a bare `z-<number>`
+outside `src/design-system/`, and a census counter behind it. Named here so
+13.19's "all 17 B-items implemented" has a citation rather than a claim.
+
 A bare `z-` utility in feature code is a bug — it works until the day two
 layers meet.
 
@@ -211,3 +269,7 @@ Row-level actions are `ghost` icon buttons. Bulk actions on a selection are
 `outline`. Destructive actions are `outline` with `text-destructive` until
 confirmed inside an `AlertDialog`, where the confirm button is the filled
 `destructive`.
+
+A document header carrying six to eight lifecycle actions is the case this
+rule does not settle on its own — the three-tier resolution is in
+[patterns.md](patterns.md#multi-action-document-headers).

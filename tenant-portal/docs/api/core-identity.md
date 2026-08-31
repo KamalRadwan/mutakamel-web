@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-31**
+Last source verification: **2026-08-31** (re-verified against controllers and services while building Phase 4)
 
 Owning app: **core-app**
 
@@ -13,8 +13,14 @@ Upstream: `/api/v1/tenant/organization`, `/api/v1/tenant/users`,
 `/api/v1/tenant/` (roles and permissions share the bare `tenant` controller
 prefix — see the note under [Roles](#roles--7-routes))
 
-Portal status: **not-started** — this page is the contract for MASTER-PLAN
-Phase 4. No screen calls any route here yet.
+Portal status: **built** — MASTER-PLAN Phase 4 landed 2026-08-31. All 50 routes
+are called from a screen under `src/app/(tenant)/core/{organization,users,roles,profile}`
+and every response passes a validator in `app/(tenant)/core/contracts/`.
+`pnpm docs:verify-called-routes` proves the path set matches this page exactly.
+
+Three states this page asks for **cannot be discriminated from the wire**, and
+the screens say so rather than guessing — see Q18, Q20 and Q21 in
+[../build/OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md).
 
 Source inspected:
 `core-app/src/tenant/organization/organization.controller.ts`,
@@ -113,7 +119,10 @@ it has children or directly-placed users.
 - **Deletion blockers are 409s with meaning.** A company with branches, a branch
   with departments, a department with teams, a team with placed users. Render
   *which* children block it (MASTER-PLAN task 4.10 + the `DeletionBlockerDialog`
-  pattern), never a bare "failed".
+  pattern), never a bare "failed". The list arrives as `details.blockers`, and it
+  is **server-authored English prose, not an enum** — `OrganizationService`
+  builds each phrase from a string literal, so the headline is localized from the
+  `ORG_NODE_NOT_EMPTY` code and the phrases render verbatim underneath.
 - **HQ uniqueness** — a company may have one headquarters branch. Setting a
   second is a 409.
 - Creating under an **inactive** parent is rejected. Deactivating a parent that
@@ -173,7 +182,11 @@ swallowed by the id route. Keep that in mind when reading the source order.
   A tenant at cap gets **403 `USER_LIMIT_REACHED`** — an actionable outcome that
   should link to the plan-change path, not a generic error (task 4.29).
 - **`POST /users/:userId/modules` has its own capacity check** behind a
-  PostgreSQL advisory lock. Seat exhaustion is a real, expected 403.
+  PostgreSQL advisory lock. Seat exhaustion is a real, expected outcome — and it
+  is a **422 `SEAT_LIMIT_REACHED`**, not a 403: `UserModulesService.assign`
+  throws `UnprocessableEntityException`. `MODULE_NOT_SUBSCRIBED` and
+  `MODULE_NOT_FOUND` are 422 from the same method; `SUBSCRIPTION_NOT_FOUND` is
+  a 404.
 - **Suspend and activate both advance the security epoch**, so every existing
   token for that user goes stale immediately. Activate is *not* a no-op undo —
   it re-admits the user with fresh credentials required.
@@ -184,8 +197,10 @@ swallowed by the id route. Keep that in mind when reading the source order.
 - **`DEACTIVATED` is a fourth state, not a synonym for deleted.** The plan's
   verb set ("suspend / activate / delete") does not cover it; the list filter
   does. Render all four.
-- **`INVITED` has no screen yet** — pending badge, resend, revoke and
-  invite-expired are task 4.33.
+- **`INVITED`**: pending badge and revoke (`DELETE /users/:id`) are built.
+  **There is no resend route on this controller** — `TenantUsersService.invite`
+  sends the invitation once from `POST /users` — so the screen states that
+  rather than offering a control with nothing behind it (Q21).
 
 ### Two role models coexist — this is not a mistake
 

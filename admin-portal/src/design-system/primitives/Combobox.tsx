@@ -28,6 +28,12 @@ export interface ComboboxProps {
   disabled?: boolean;
   className?: string;
   contentClassName?: string;
+  /**
+   * Keep the list below the trigger even when the viewport would rather flip
+   * it upward. A long list near the bottom of a form otherwise opens over the
+   * fields the user just filled in, which reads as the page jumping.
+   */
+  preferDownward?: boolean;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
 }
@@ -45,6 +51,7 @@ export function Combobox({
   disabled,
   className,
   contentClassName,
+  preferDownward = false,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
 }: ComboboxProps) {
@@ -92,6 +99,8 @@ export function Combobox({
       <PopoverContent
         id={popupId}
         align="start"
+        side="bottom"
+        avoidCollisions={!preferDownward}
         className={cn("w-[--radix-popover-trigger-width] min-w-56 max-w-[calc(100vw-2rem)] p-0", contentClassName)}
       >
         <Command label={searchPlaceholder} loop shouldFilter className="flex max-h-80 flex-col">

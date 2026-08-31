@@ -8,7 +8,10 @@ import { INVOICE_SORT_FIELDS, INVOICE_STATUSES, type Invoice, type InvoiceListFi
 import {
   formatInvoiceDate,
   formatInvoiceMoney,
+  formatInvoiceServicePeriod,
   INVOICE_COPY,
+  invoicePurposeLabel,
+  invoiceStatusLabel,
   InvoiceFieldError,
   InvoiceHero,
   InvoicePageFrame,
@@ -125,7 +128,7 @@ function InvoiceFilters({
                     <SelectItem value="ALL">{copy.allStatuses}</SelectItem>
                     {INVOICE_STATUSES.map((status) => (
                       <SelectItem key={status} value={status}>
-                        {status.replaceAll("_", " ")}
+                        {invoiceStatusLabel(status, lang)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -141,7 +144,7 @@ function InvoiceFilters({
                   <SelectContent>
                     {INVOICE_SORT_FIELDS.map((field) => (
                       <SelectItem key={field} value={field}>
-                        {field}
+                        {copy[field]}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -236,24 +239,28 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
       headerEn: copy.number,
       headerAr: copy.number,
       cell: (invoice) => (
-        <div>
-          <Link href={`/invoices/${invoice.id}`} className="font-mono font-semibold text-action hover:underline">
-            {invoice.number}
-          </Link>
-          <code dir="ltr" className="mt-1 block break-all text-start text-sm text-muted-foreground">{invoice.id}</code>
-        </div>
+        <Link href={`/invoices/${invoice.id}`} className="font-mono font-semibold text-action hover:underline">
+          {invoice.number}
+        </Link>
       ),
     },
     { key: "status", headerEn: copy.status, headerAr: copy.status, cell: (invoice) => <StatusBadge status={invoice.status} enumType="invoice" /> },
-    { key: "purpose", headerEn: copy.purpose, headerAr: copy.purpose, cell: (invoice) => <span className="font-mono text-sm font-semibold">{invoice.purpose}</span> },
+    { key: "purpose", headerEn: copy.purpose, headerAr: copy.purpose, cell: (invoice) => <span className="text-sm font-semibold">{invoicePurposeLabel(invoice.purpose, lang)}</span> },
     {
       key: "tenant",
       headerEn: copy.tenant,
       headerAr: copy.tenant,
       cell: (invoice) => (
-        <Link dir="ltr" href={`/tenants/${invoice.tenantId}`} className="font-mono text-sm text-action hover:underline">
-          {invoice.tenantId}
-        </Link>
+        <div className="max-w-52">
+          <Link href={`/tenants/${invoice.tenantId}`} className="font-semibold text-action hover:underline">
+            {invoice.tenant ? invoice.tenant.companyName : <bdi dir="ltr" className="font-mono text-sm">{invoice.tenantId}</bdi>}
+          </Link>
+          {invoice.tenant ? (
+            <p dir="ltr" className="mt-1 text-start text-sm text-muted-foreground">{invoice.tenant.name}</p>
+          ) : (
+            <p className="mt-1 text-sm text-warning-subtle-foreground">{copy.tenantUnavailable}</p>
+          )}
+        </div>
       ),
     },
     {
@@ -267,11 +274,9 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
       headerEn: copy.period,
       headerAr: copy.period,
       cell: (invoice) => (
-        <span className="whitespace-nowrap">
-          {formatInvoiceDate(invoice.periodStart, lang)}
-          <span className="mx-1">{lang === "ar" ? "←" : "→"}</span>
-          {formatInvoiceDate(invoice.periodEnd, lang)}
-        </span>
+        <bdi dir="ltr" className="whitespace-nowrap">
+          {formatInvoiceServicePeriod(invoice.periodStart, invoice.periodEnd, lang)}
+        </bdi>
       ),
     },
     { key: "dueAt", headerEn: copy.dueAt, headerAr: copy.dueAt, cell: (invoice) => <span className="whitespace-nowrap">{formatInvoiceDate(invoice.dueAt, lang)}</span> },

@@ -1,7 +1,18 @@
 "use client";
 
 import { BookOpen, RefreshCw } from "lucide-react";
-import { Badge, Button, DataTable, DegradedBanner, FilterBar, PageHeader, SubNav, NAV_SECTIONS, type ColumnDef } from "@/design-system";
+import {
+  Badge,
+  Button,
+  DataTable,
+  DegradedBanner,
+  FilterBar,
+  PageHeader,
+  PermissionGate,
+  SubNav,
+  NAV_SECTIONS,
+  type ColumnDef,
+} from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
 import {
   type StaticCatalogueGroup,
@@ -49,66 +60,75 @@ export default function CrmStaticCataloguePage() {
     },
   ];
 
+  // A CRM route is reachable by direct URL even when the sidebar hides it, so
+  // the 403 is reachable in-body and gets the mandated surface rather than a
+  // load error — AGENTS.md, docs/design/states.md. Permission string and
+  // scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader
-        title={t.crm.staticDataCatalogAndRefere}
-        description={t.crmStaticCatalogue.subtitle}
-        secondaryActions={
-          <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
-            <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
-            {t.crmStaticCatalogue.reload}
-          </Button>
-        }
-      />
+    <PermissionGate require="crm.settings.read">
+      <div className="flex flex-col gap-4">
+        <PageHeader
+          title={t.crm.staticDataCatalogAndRefere}
+          description={t.crmStaticCatalogue.subtitle}
+          secondaryActions={
+            <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+              {t.crmStaticCatalogue.reload}
+            </Button>
+          }
+        />
 
-      <SubNav items={CRM_SETUP_ITEMS} />
+        <SubNav items={CRM_SETUP_ITEMS} />
 
-      {/* The degraded surface is for partial or stale data, and nothing
-          else — see docs/design/patterns.md#where-a-result-belongs. It used
-          to fire on every successful load, which left a real degradation
-          with nowhere to appear. */}
-      {isStale && <DegradedBanner message={t.crmStaticCatalogue.stale} />}
+        {/* The degraded surface is for partial or stale data, and nothing
+            else — see docs/design/patterns.md#where-a-result-belongs. It used
+            to fire on every successful load, which left a real degradation
+            with nowhere to appear. */}
+        {isStale && <DegradedBanner message={t.crmStaticCatalogue.stale} />}
 
-      <FilterBar
-        filters={[]}
-        values={{}}
-        onChange={() => undefined}
-        onReset={() => undefined}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchPlaceholder={t.crmStaticCatalogue.search}
-      />
+        <FilterBar
+          filters={[]}
+          values={{}}
+          onChange={() => undefined}
+          onReset={() => undefined}
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder={t.crmStaticCatalogue.search}
+        />
 
-      {/* A permanent caveat about what this catalogue means, not a condition
-          that can clear. It reads as a caption, not a banner. */}
-      <p className="text-xs text-muted-foreground">{t.crmStaticCatalogue.advertisedPolicy}</p>
+        {/* A permanent caveat about what this catalogue means, not a condition
+            that can clear. It reads as a caption, not a banner. */}
+        <p className="text-xs text-muted-foreground">{t.crmStaticCatalogue.advertisedPolicy}</p>
 
-      <DataTable
-        columns={columns}
-        rows={groups}
-        isLoading={isLoading && !catalogue}
-        error={loadError}
-        onRetry={() => void reload()}
-        page={{ page: 1, limit: Math.max(groups.length, 1), total: groups.length }}
-        onPageChange={() => undefined}
-        rowKey={(item) => item.id}
-        labels={{
-          retry: t.common.retry,
-          errorTitle: t.crmStaticCatalogue.loadFailed,
-          emptyTitle: t.crmStaticCatalogue.empty,
-          selectAll: t.common.actions,
-          selectRow: t.common.actions,
-          sortAscending: t.common.actions,
-          sortDescending: t.common.actions,
-          notSorted: t.common.actions,
-          pagination: {
-            previous: t.common.previousPage,
-            next: t.common.nextPage,
-            summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
-          },
-        }}
-      />
-    </div>
+        {/* No pagination: this endpoint returns the whole list and declares no
+            page/limit query at all (verified in its controller). The fake
+            single-page object this replaced rendered working-looking controls
+            over data that could never advance —
+            docs/design/states.md#pagination-is-real-or-absent. */}
+        <DataTable
+          columns={columns}
+          rows={groups}
+          isLoading={isLoading && !catalogue}
+          error={loadError}
+          onRetry={() => void reload()}
+          rowKey={(item) => item.id}
+          labels={{
+            retry: t.common.retry,
+            errorTitle: t.crmStaticCatalogue.loadFailed,
+            emptyTitle: t.crmStaticCatalogue.empty,
+            selectAll: t.common.actions,
+            selectRow: t.common.actions,
+            sortAscending: t.common.actions,
+            sortDescending: t.common.actions,
+            notSorted: t.common.actions,
+            pagination: {
+              previous: t.common.previousPage,
+              next: t.common.nextPage,
+              summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+            },
+          }}
+        />
+      </div>
+    </PermissionGate>
   );
 }

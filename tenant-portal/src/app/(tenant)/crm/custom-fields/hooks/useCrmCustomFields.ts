@@ -5,165 +5,14 @@ import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { isUUIDv7 } from "@/lib/uuid";
-
-export const CRM_CUSTOM_FIELDS_PATH = "/api/tenant/crm/v1/custom-fields";
-
-export const CRM_CUSTOM_FIELD_OWNER_TYPES = [
-  "LEAD",
-  "PARTY",
-  "CUSTOMER_PROFILE",
-  "OPPORTUNITY",
-] as const;
-
-const CRM_CUSTOM_FIELD_TYPES = [
-  "TEXT",
-  "TEXTAREA",
-  "NUMBER",
-  "DATE",
-  "DATETIME",
-  "BOOLEAN",
-  "SELECT",
-  "MULTI_SELECT",
-  "URL",
-  "EMAIL",
-  "PHONE",
-] as const;
-
-export const CRM_CUSTOM_FIELD_SIMPLE_CREATE_TYPES = [
-  "TEXT",
-  "TEXTAREA",
-  "NUMBER",
-  "DATE",
-  "DATETIME",
-  "BOOLEAN",
-  "URL",
-  "EMAIL",
-  "PHONE",
-] as const;
-
-const CRM_CUSTOM_FIELD_RESPONSE_OWNER_TYPES = [
-  ...CRM_CUSTOM_FIELD_OWNER_TYPES,
-  "LEAD_AND_PARTY",
-] as const;
-const CRM_CUSTOM_FIELD_KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
-
-type CrmCustomFieldOwnerType =
-  (typeof CRM_CUSTOM_FIELD_RESPONSE_OWNER_TYPES)[number];
-export type CrmCustomFieldCreateOwnerType =
-  (typeof CRM_CUSTOM_FIELD_OWNER_TYPES)[number];
-type CrmCustomFieldType = (typeof CRM_CUSTOM_FIELD_TYPES)[number];
-export type CrmCustomFieldSimpleCreateType =
-  (typeof CRM_CUSTOM_FIELD_SIMPLE_CREATE_TYPES)[number];
-
-export interface CustomFieldItem {
-  id: string;
-  ownerType: CrmCustomFieldOwnerType;
-  fieldKey: string;
-  nameAr: string;
-  nameEn: string;
-  type: CrmCustomFieldType;
-  optionsCount: number;
-  isSearchable: boolean;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-export interface CreateCustomFieldInput {
-  ownerType: CrmCustomFieldCreateOwnerType;
-  fieldKey: string;
-  nameAr: string;
-  nameEn: string;
-  type: CrmCustomFieldSimpleCreateType;
-  isSearchable: boolean;
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function invalidResponse(): never {
-  throw new Error("Invalid CRM custom-fields response.");
-}
-
-function isMember<const T extends readonly string[]>(
-  values: T,
-  value: unknown,
-): value is T[number] {
-  return typeof value === "string" && values.includes(value as T[number]);
-}
-
-export function parseCrmCustomField(payload: unknown): CustomFieldItem {
-  const source = record(payload);
-  if (
-    !source ||
-    !isUUIDv7(source.id) ||
-    !isMember(CRM_CUSTOM_FIELD_RESPONSE_OWNER_TYPES, source.ownerType) ||
-    typeof source.fieldKey !== "string" ||
-    !isValidCrmCustomFieldKey(source.fieldKey) ||
-    typeof source.nameAr !== "string" ||
-    source.nameAr.length === 0 ||
-    source.nameAr.length > 120 ||
-    typeof source.nameEn !== "string" ||
-    source.nameEn.length === 0 ||
-    source.nameEn.length > 120 ||
-    !isMember(CRM_CUSTOM_FIELD_TYPES, source.type) ||
-    !Array.isArray(source.options) ||
-    source.options.length > 100 ||
-    typeof source.isSearchable !== "boolean" ||
-    typeof source.isActive !== "boolean" ||
-    !Number.isSafeInteger(source.sortOrder) ||
-    (source.sortOrder as number) < 1
-  ) {
-    invalidResponse();
-  }
-
-  if (
-    ((source.type === "SELECT" || source.type === "MULTI_SELECT") &&
-      source.options.length === 0)
-  ) {
-    invalidResponse();
-  }
-
-  return {
-    id: source.id,
-    ownerType: source.ownerType,
-    fieldKey: source.fieldKey,
-    nameAr: source.nameAr,
-    nameEn: source.nameEn,
-    type: source.type,
-    optionsCount: source.options.length,
-    isSearchable: source.isSearchable,
-    isActive: source.isActive,
-    sortOrder: source.sortOrder as number,
-  };
-}
-
-export function parseCrmCustomFieldsResponse(
-  payload: unknown,
-): CustomFieldItem[] {
-  if (!Array.isArray(payload) || payload.length > 100) invalidResponse();
-  const definitions = payload.map(parseCrmCustomField);
-  const ids = new Set<string>();
-  const identities = new Set<string>();
-  for (const definition of definitions) {
-    const identity = `${definition.ownerType}\u0000${definition.fieldKey}`;
-    if (ids.has(definition.id) || identities.has(identity)) invalidResponse();
-    ids.add(definition.id);
-    identities.add(identity);
-  }
-  return definitions;
-}
-
-export function normalizeCrmCustomFieldKey(value: string): string {
-  return value.trim().replace(/\s+/g, "_").toLowerCase();
-}
-
-export function isValidCrmCustomFieldKey(value: string): boolean {
-  return CRM_CUSTOM_FIELD_KEY_PATTERN.test(value);
-}
+import {
+  CRM_CUSTOM_FIELDS_PATH,
+  normalizeCrmCustomFieldKey,
+  parseCrmCustomField,
+  parseCrmCustomFieldsResponse,
+  type CreateCustomFieldInput,
+  type CustomFieldItem,
+} from "../custom-field-contract";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
@@ -189,7 +38,7 @@ async function readDefinitions(signal?: AbortSignal): Promise<CustomFieldItem[]>
 }
 
 export function useCrmCustomFields() {
-  const { lang, t } = useI18n();
+  const { t } = useI18n();
   const { user } = useTenantAuth();
   const canManage = user?.permissions.includes("crm.custom_fields.manage") ?? false;
   const [definitions, setDefinitions] = useState<CustomFieldItem[]>([]);
@@ -280,17 +129,13 @@ export function useCrmCustomFields() {
           }
           setIsCreateOpen(false);
           setCreateError(
-            lang === "ar"
-              ? reloaded
-                ? "نتيجة الإنشاء غير مؤكدة. حُدّثت القائمة؛ راجعها قبل المحاولة مجددًا."
-                : "نتيجة الإنشاء غير مؤكدة وتعذر تحديث القائمة. أعد التحميل قبل المحاولة مجددًا."
-              : reloaded
-                ? "The creation result is uncertain. The catalogue was refreshed; review it before trying again."
-                : "The creation result is uncertain and the catalogue could not be refreshed. Reload before trying again.",
+            reloaded
+              ? t.crmCustomFields.ambiguousCreateRefreshed
+              : t.crmCustomFields.ambiguousCreateStale,
           );
         } else {
           setCreateError(
-            errorMessage(caught, "Unable to create the custom field."),
+            errorMessage(caught, t.crmCustomFields.createFailed),
           );
         }
         return false;
@@ -298,7 +143,7 @@ export function useCrmCustomFields() {
         setIsCreating(false);
       }
     },
-    [canManage, lang],
+    [canManage, t],
   );
 
   const openCreate = () => {
@@ -314,7 +159,6 @@ export function useCrmCustomFields() {
 
   return {
     t,
-    lang,
     items,
     searchQuery,
     setSearchQuery,

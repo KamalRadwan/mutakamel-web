@@ -2,11 +2,15 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-27**
+Last source verification: **2026-08-31** (Trade section; CRM 2026-08-27, Core
+2026-08-28)
 
 Source: `../backend/mutakamel-apps/crm-app/node_modules/@mutakamel/crm-app-common/dist/constants/permissions.d.ts`
 (package `0.0.1`), plus `@RequirePermissions` decorators on the owning
-controllers.
+controllers. Trade comes from
+`../backend/mutakamel-apps/trade-app/packages/common/src/constants/permissions.ts`
+and `constants/features.ts`, plus the `@RequireTradeAccess` and
+`@RequireTradeFeature` decorators.
 
 ## Two shapes
 
@@ -188,7 +192,153 @@ grep -rhoE "@RequirePermissions\([^)]*\)" \
 
 ## Trade permissions
 
-Not extracted. Trade has 231 Gateway routes and **no portal screen**, so
-enumerating its permissions would produce documentation that rots before it is
-read. Extract from `trade-app/src/**/*.controller.ts` the same way when a Trade
-screen is first built, and add a section here in the same change.
+**89 permissions across 23 groups**, extracted from `TRADE_PERMISSIONS` in
+`../backend/mutakamel-apps/trade-app/packages/common/src/constants/permissions.ts`
+and cross-checked against every `@RequireTradeAccess` decorator in
+`trade-app/src/**/*.controller.ts` (2026-08-31, MASTER-PLAN 10.1).
+
+Trade uses `trade.resource.action`, like CRM's shape and unlike Core's
+`group.resource.action`. It has **no `own`/`team`/`all` scope suffixes** — do
+not apply CRM's scope matching. The scope lives on the *route*, not the string;
+see the model below.
+
+| Group | Permissions |
+| --- | --- |
+| `configuration` | `trade.configuration.read` · `trade.configuration.manage` |
+| `catalog_master` | `trade.catalog_master.manage` |
+| `items` | `trade.items.read` · `trade.items.manage` |
+| `commercial_accounts` | `trade.commercial_accounts.read` · `trade.commercial_accounts.manage` |
+| `credit` | `trade.credit.view` · `trade.credit.override` |
+| `pricing` | `trade.pricing.read` · `trade.pricing.manage` · `trade.pricing.view_cost` · `trade.pricing.override` |
+| `policy` | `trade.policy.read` · `trade.policy.manage` · `trade.policy.test` · `trade.policy.approve` · `trade.policy.publish` · `trade.policy.view_sensitive_facts` |
+| `document_profiles` | `trade.document_profiles.read` · `trade.document_profiles.manage` · `trade.document_profiles.validate` · `trade.document_profiles.publish` |
+| `extensions` | `trade.extensions.read` · `trade.extensions.manage` · `trade.extensions.publish` |
+| `import` | `trade.import.manage` · `trade.import.execute` |
+| `webhooks` | `trade.webhooks.manage` · `trade.webhooks.replay` |
+| `automation` | `trade.automation.manage` |
+| `quotations` | `trade.quotations.create` · `trade.quotations.read` · `trade.quotations.update` · `trade.quotations.send` · `trade.quotations.accept` · `trade.quotations.reject` · `trade.quotations.cancel` · `trade.quotations.convert` |
+| `sales_orders` | `trade.sales_orders.create` · `trade.sales_orders.read` · `trade.sales_orders.update` · `trade.sales_orders.confirm` · `trade.sales_orders.hold` · `trade.sales_orders.cancel` · `trade.sales_orders.amend` |
+| `purchase_orders` | `trade.purchase_orders.create` · `trade.purchase_orders.read` · `trade.purchase_orders.update` · `trade.purchase_orders.submit` · `trade.purchase_orders.approve` · `trade.purchase_orders.confirm` · `trade.purchase_orders.cancel` |
+| `purchase_quotations` | `trade.purchase_quotations.create` · `trade.purchase_quotations.read` · `trade.purchase_quotations.update` · `trade.purchase_quotations.issue` |
+| `invoices` | `trade.invoices.create` · `trade.invoices.read` · `trade.invoices.update` · `trade.invoices.issue` |
+| `contracts` | `trade.contracts.create` · `trade.contracts.read` · `trade.contracts.update` · `trade.contracts.activate` |
+| `purchasing` | `trade.purchasing.override` |
+| `inventory` | `trade.inventory.read` · `trade.inventory.view_cost` · `trade.inventory.nodes.manage` · `trade.inventory.opening_balance` · `trade.inventory.reserve` · `trade.inventory.receive` · `trade.inventory.deliver` · `trade.inventory.adjust` · `trade.inventory.governance.manage` |
+| `control_tower` | `trade.control_tower.read` · `trade.control_tower.retry` · `trade.control_tower.resolve` · `trade.control_tower.view_sensitive` |
+| `dashboards` | `trade.dashboards.read` · `trade.dashboards.create` · `trade.dashboards.update` · `trade.dashboards.delete` · `trade.dashboards.share` |
+| `widgets` | `trade.widgets.read` · `trade.widgets.create` · `trade.widgets.update` · `trade.widgets.delete` · `trade.widgets.share` |
+
+### Nine of the 89 guard no route
+
+**80 appear on a `@RequireTradeAccess`; nine never do.** Do not build a control
+that assumes holding one of these grants anything:
+
+```text
+trade.credit.override            trade.pricing.override
+trade.pricing.view_cost          trade.policy.view_sensitive_facts
+trade.inventory.view_cost        trade.control_tower.view_sensitive
+trade.automation.manage          trade.sales_orders.amend
+trade.purchasing.override
+```
+
+Four of the nine are not entirely inert: `pricing.view_cost`,
+`inventory.view_cost`, `policy.view_sensitive_facts` and
+`control_tower.view_sensitive` appear as **`fieldPermissions`** on dashboard
+metrics in `trade-app/src/modules/dashboards/dashboard-catalog.ts`, so they
+redact fields rather than admit routes. The other five guard nothing anywhere.
+MASTER-PLAN 10.2 says "eight"; the route-decorator count is nine.
+
+## The Trade authorization model
+
+Six global guards run in `trade-app/src/common/common.module.ts`, in order, and
+the first to refuse wins. Three of them decide admission, and they decide
+different questions:
+
+| Guard | Question | Refusal |
+| --- | --- | --- |
+| `TradeSubscriptionGuard` | is the **tenant** entitled? | 403 `TRADE.MODULE.DISABLED` · 403 `TRADE.ENTITLEMENT.FEATURE_REQUIRED` · 403 `TRADE.PROVISIONING.MAINTENANCE_ACTIVE` · 503 `TRADE.DEPENDENCY.ENTITLEMENT_UNAVAILABLE` |
+| `TradeScopeGuard` | is the **operating context** well formed? | 400 `TRADE.CONTEXT.MISSING_COMPANY` / `MISSING_BRANCH` / `INVALID_ID` · 422 `BRANCH_COMPANY_MISMATCH` / `SCOPE_INACTIVE` / `EXECUTION_TARGET_MISMATCH` |
+| `TradePermissionsGuard` | does the **actor** hold the grant *at that scope*? | 403 `TRADE.AUTH.TARGET_DENIED` |
+
+### Features — eight of fifteen gate anything
+
+`TRADE_FEATURES` lists 15. Only these eight appear in a
+`@RequireTradeFeature` / `@RequireAnyTradeFeature`:
+
+```text
+trade.catalog     trade.pricing    trade.sales       trade.purchasing
+trade.inventory   trade.analytics  trade.policy_studio  trade.automation
+```
+
+`trade.automation` gates only through `@RequireAnyTradeFeature(...TRADE_MVP_FEATURES)`
+on `POST /configuration/resolve`. The other seven — `trade.pos`,
+`trade.channels`, `trade.contracts_recurring`, `trade.intercompany`,
+`trade.extension_marketplace`, `trade.control_tower_advanced`,
+`trade.intelligence` — are **inert**: they exist in the catalogue and gate
+nothing. Note especially that channels are gated on `trade.catalog`, not
+`trade.channels`, and contracts are not feature-gated at all.
+
+### Scope targets — the string alone never decides
+
+Every handler declares `@RequireTradeAccess(permission, target)`, and the guard
+matches the grant's `scope_target` **exactly** against the target the request
+resolved to:
+
+| Target | Resolves to | Headers |
+| --- | --- | --- |
+| `TENANT` | `TENANT` | none |
+| `COMPANY` | `COMPANY` | company |
+| `BRANCH` | `BRANCH` | company + branch |
+| `COMPANY_OR_BRANCH` | branch when a branch header is present, else company | company, optionally branch |
+| `OPERATING_CONTEXT` | branch → company → tenant, by what is present | all optional |
+| `DASHBOARD_CONTEXT` | as `OPERATING_CONTEXT`, **and the guard returns true immediately** | all optional |
+
+Three consequences the portal is built around:
+
+1. **A `TENANT` grant does not satisfy a `BRANCH` route.** There is no
+   widening, so no permission string can predict admission on a
+   branch-targeted route.
+2. **Only `tenant_users.is_tenant_owner` bypasses.** It is the first branch of
+   `TradePermissionsGuard.canActivate`.
+3. **`DASHBOARD_CONTEXT` routes are not permission-gated at all** — the
+   declared `trade.dashboards.*` and `trade.widgets.*` strings are never
+   checked by the guard.
+
+Legacy `tenant_user_branch_roles` rows are unioned into the lookup, but **only**
+when the resolved target is `BRANCH`.
+
+### The Gateway enforces zero Trade permissions
+
+All 231 Trade route contracts have `requiredPermissions` absent, verified by
+parsing `api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts`.
+Every Trade permission decision happens inside trade-app, so a Trade 403 always
+comes from the app and never from the edge. What the Gateway *does* enforce on
+34 of the 231 is the header **shape**, through `organizationScopeMode` — a
+different mechanism with a different error (`GW.REQUEST.INVALID`, 400), and on
+`/uoms` the two policies disagree with each other.
+
+### Where the portal reads them
+
+`/auth/me` returns every seeded permission key to a tenant **owner**
+(`fetchPermissionKeys` in
+`core-app/src/tenant/tenant-auth/tenant-auth.service.ts` selects the whole of
+`tenant_permissions` for an owner), and trade-app seeds its 89 keys into that
+table through its `trade.permissions` seed pack
+(`trade-app/src/database/provisioning/trade-tenant-installer.registry.ts`). So
+an owner's permission array already contains the Trade strings once the module
+is provisioned, and contains none of them when it is not — which is why the
+Trade nav needs no owner-specific predicate.
+
+**There is no Trade `capabilities` endpoint** (Q30), so action admission falls
+back to the permission string plus `user.isTenantOwner`
+(`canPerformTradeAction` in `src/app/(tenant)/trade/trade-scope.ts`). That is
+advisory in a stronger sense than Core's, for reason 1 above.
+
+### Regenerating
+
+```bash
+grep -oE "[A-Z_]+: \"trade\.[a-z_.]+\"" \
+  ../../backend/mutakamel-apps/trade-app/packages/common/src/constants/permissions.ts
+grep -rhoE "RequireTradeAccess\(\s*TRADE_PERMISSIONS\.[A-Z_]+" \
+  ../../backend/mutakamel-apps/trade-app/src --include="*.controller.ts" | sort -u
+```

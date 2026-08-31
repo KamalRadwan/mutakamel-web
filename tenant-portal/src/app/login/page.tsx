@@ -32,6 +32,8 @@ export default function LoginPage() {
     openForgotModal,
     resetEmail,
     setResetEmail,
+    failure,
+    failureKind,
     toggleShowPassword,
     toggleRememberMe,
     handleSubmit,
@@ -56,10 +58,37 @@ export default function LoginPage() {
             <p className="mt-1 text-xs text-muted-foreground">{t.auth.subtitle}</p>
           </div>
 
+          {/* B9 / WCAG 2.2 `accessible-authentication`. A password manager
+              needs three things and this form gives all three: a real <form>
+              wrapping both fields, a `name` on each control, and the
+              `autocomplete` tokens below. `name` matters as much as
+              `autocomplete` — several managers key their heuristics off it.
+              Paste is never blocked; there is no onPaste handler anywhere on
+              this page and there must never be one.
+              docs/design/DESIGN-SYSTEM.md#71-login--login. */}
+          {/* 4.31 — in-body, not a toast: the next step differs per failure and
+              a toast disappears before it can be read. */}
+          {failureKind ? (
+            <div
+              role="alert"
+              className="mb-4 flex flex-col gap-1 rounded-sm border border-negative-200 bg-negative-100 p-3 text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
+            >
+              <p className="text-xs font-medium">{t.coreIdentity.loginFailure[failureKind].title}</p>
+              <p className="text-2xs">{t.coreIdentity.loginFailure[failureKind].description}</p>
+              {failure?.correlationId ? (
+                <p className="font-mono text-2xs">
+                  {t.errors.reference}: {failure.correlationId}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Field label={t.auth.emailLabel} required>
               <Input
                 type="email"
+                name="email"
+                autoComplete="username"
                 size="lg"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
@@ -72,27 +101,36 @@ export default function LoginPage() {
                 <div className="relative">
                   <Input
                     type={showPassword ? "text" : "password"}
+                    name="password"
+                    autoComplete="current-password"
                     size="lg"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     className="pe-9"
                     required
                   />
-                  {/* Button's chrome doesn't fit a borderless icon overlaid
-                      on the input itself. */}
-                  {/* eslint-disable-next-line no-restricted-syntax */}
-                  <button
+                  {/* `ghost` has no chrome to fight with — bg-transparent,
+                      no border — so this overlay control is a real Button
+                      rather than raw markup, and it inherits the focus ring,
+                      the pointer cursor and the hit-area expansion for free.
+                      The accessible name has to say what the control DOES; it
+                      previously read "Password", which is the field's name,
+                      not the toggle's. */}
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={toggleShowPassword}
-                    className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-pressed={showPassword}
+                    aria-label={showPassword ? t.auth.hidePassword : t.auth.showPassword}
+                    className="absolute end-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? (
                       <EyeOff className="size-4" aria-hidden="true" />
                     ) : (
                       <Eye className="size-4" aria-hidden="true" />
                     )}
-                    <span className="sr-only">{t.auth.passwordLabel}</span>
-                  </button>
+                  </Button>
                 </div>
               </Field>
               <Button
@@ -130,6 +168,8 @@ export default function LoginPage() {
             <Field label={t.auth.emailLabel} required>
               <Input
                 type="email"
+                name="resetEmail"
+                autoComplete="email"
                 placeholder={t.auth.resetEmailPlaceholder}
                 value={resetEmail}
                 onChange={(event) => setResetEmail(event.target.value)}

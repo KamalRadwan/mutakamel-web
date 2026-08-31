@@ -15,6 +15,11 @@ const OUTCOME_BORDER: Record<NonNullable<BoardColumnDef["outcomeRole"]>, string>
 export interface BoardColumnProps {
   column: BoardColumnDef;
   emptyLabel: string;
+  // Whether this column renders no cards RIGHT NOW, which is not the same as
+  // column.count: the count is the server's total for the stage, and a column
+  // whose first page has not arrived still needs the drop zone rather than a
+  // blank body.
+  isEmpty: boolean;
   children: ReactNode;
 }
 
@@ -22,7 +27,7 @@ export interface BoardColumnProps {
 // top border in the mapped outcome role only when the stage carries one;
 // intermediate stages get no color at all — stage is conveyed by column
 // position and label, never a hue. See docs/design/DESIGN-SYSTEM.md#board-view.
-export function BoardColumn({ column, emptyLabel, children }: BoardColumnProps) {
+export function BoardColumn({ column, emptyLabel, isEmpty, children }: BoardColumnProps) {
   return (
     <div
       className={cn(
@@ -59,7 +64,7 @@ export function BoardColumn({ column, emptyLabel, children }: BoardColumnProps) 
                 which reads as broken. Still rendered (not swapped out) while
                 dragging over an empty column, so it stays a valid drop
                 target for the placeholder below. */}
-            {column.count === 0 && (
+            {isEmpty && (
               <div className="flex min-h-16 flex-1 items-center justify-center rounded-sm border border-dashed border-ink-300 text-2xs text-muted-foreground">
                 {emptyLabel}
               </div>

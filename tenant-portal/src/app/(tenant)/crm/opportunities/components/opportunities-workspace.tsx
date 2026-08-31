@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
-import { ExternalLink } from "lucide-react";
 import {
-  Badge,
   Button,
   CardView,
-  type ColumnDef,
-  DataTable,
   DegradedBanner,
   EmptyState,
   ErrorState,
@@ -20,32 +16,39 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  StatusBadge,
+  TableView,
   ViewSwitcher,
-  useWorkspaceView,
+  useWorkspaceState,
+  type MoveToTarget,
+  type SortState,
+  type WorkspaceViewLabels,
 } from "@/design-system";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDate } from "@/lib/format/date";
+import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
+import { CreateOpportunityDrawer } from "./CreateOpportunityDrawer";
 import { DeleteOpportunityDialog } from "./DeleteOpportunityDialog";
+import { useOpportunityColumns } from "./useOpportunityColumns";
 import { OpportunityBoardColumn } from "./OpportunityBoardColumn";
 import { OpportunityCardTile } from "./OpportunityCardTile";
 import { TerminalMoveDialog } from "./TerminalMoveDialog";
 import { useDeleteOpportunity } from "../hooks/useDeleteOpportunity";
 import { useOpportunityCards } from "../hooks/useOpportunityCards";
 import { type OpportunityListItem, useOpportunitiesList } from "../hooks/useOpportunitiesList";
+import { useCreateOpportunity } from "../hooks/useCreateOpportunity";
 import { usePipelineWorkspace } from "../hooks/usePipelineWorkspace";
 
 export function OpportunitiesWorkspace() {
   const { t, lang } = useI18n();
-  const [view, setView] = useWorkspaceView("opportunities", "board");
   const [isMounted, setIsMounted] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState<OpportunityListItem | null>(null);
   const { deleteOpportunity, isDeleting, error: deleteError, clearError } = useDeleteOpportunity();
 
+  const router = useRouter();
   const {
     board,
+    capabilities,
     pipelines,
     branchIds,
     branchId,
@@ -70,8 +73,34 @@ export function OpportunitiesWorkspace() {
     loadMoreStage,
   } = usePipelineWorkspace();
 
+  // applyPage and applySort are hoisted declarations reaching a `list` bound
+  // further down: the view decides whether the list is fetched at all, and the
+  // view comes from the hook these are passed to. They are only ever called
+  // from an effect, long after this render has bound everything.
+  function applyPage(next: number) {
+    list.setPage(next);
+  }
+  function applySort(next: SortState) {
+    list.setSort(next);
+  }
+
+  const workspace = useWorkspaceState("opportunities", {
+    defaultView: "board",
+    onPageChange: applyPage,
+    onSortChange: applySort,
+  });
+  const { view, setView } = workspace;
+
   const cards = useOpportunityCards(view === "card" ? selectedPipelineId : null, view === "card" ? branchId : null);
   const list = useOpportunitiesList(view === "table" ? branchId : null, selectedPipelineId);
+
+  // A new opportunity opens on its own detail screen: the board is grouped by
+  // stage and a freshly created deal is easy to lose in a long entry column.
+  const openOpportunity = useCallback(
+    (opportunityId: string) => router.push(`/crm/opportunities/${opportunityId}`),
+    [router],
+  );
+  const create = useCreateOpportunity(branchId, pipelines, openOpportunity);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +124,14 @@ export function OpportunitiesWorkspace() {
     moveCard(draggableId, source.droppableId, destination.droppableId);
   }
 
+  const tableColumns = useOpportunityColumns({
+    stageById,
+    onDelete: (item) => {
+      clearError();
+      setSelectedForDelete(item);
+    },
+  });
+
   async function handleDelete() {
     if (!selectedForDelete) return;
     if (await deleteOpportunity(selectedForDelete.id)) {
@@ -102,68 +139,6 @@ export function OpportunitiesWorkspace() {
       list.reload();
     }
   }
-
-  const tableColumns: ColumnDef<OpportunityListItem>[] = [
-    { id: "title", header: t.crmOpportunities.title, cell: (item) => <span className="font-medium text-foreground">{item.title}</span> },
-    {
-      id: "customer",
-      header: t.crmOpportunities.customer,
-      cell: (item) => (
-        <Link
-          href={`/crm/customer-profiles/${encodeURIComponent(item.customerProfileId)}`}
-          aria-label={t.crmOpportunities.viewCustomer}
-          className="inline-flex items-center gap-1 text-brand-700 hover:underline dark:text-brand-300"
-        >
-          <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
-          <span className="max-w-32 truncate font-mono text-2xs">{item.customerProfileId}</span>
-        </Link>
-      ),
-    },
-    {
-      id: "stage",
-      header: t.crmOpportunities.stage,
-      cell: (item) => {
-        const stage = stageById.get(item.stageId);
-        return <Badge tone="neutral">{stage ? (lang === "ar" ? stage.nameAr : stage.nameEn) : item.stageId}</Badge>;
-      },
-    },
-    { id: "status", header: t.common.status, cell: (item) => <StatusBadge value={item.status} kind="OpportunityStatus" /> },
-    {
-      id: "owner",
-      header: t.crmOpportunities.owner,
-      cell: (item) =>
-        item.ownerUserId ? (
-          <span className="font-mono text-2xs">{item.ownerUserId}</span>
-        ) : (
-          <span className="text-muted-foreground">{t.crmOpportunities.notProvided}</span>
-        ),
-    },
-    {
-      id: "expectedClose",
-      header: t.crmOpportunities.expectedClose,
-      sortable: true,
-      cell: (item) => (item.expectedCloseDate ? formatDate(item.expectedCloseDate, lang) : t.crmOpportunities.notProvided),
-    },
-    {
-      id: "actions",
-      header: t.common.actions,
-      align: "end",
-      sticky: "end",
-      cell: (item) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            clearError();
-            setSelectedForDelete(item);
-          }}
-          aria-label={`${t.common.delete}: ${item.title}`}
-        >
-          {t.common.delete}
-        </Button>
-      ),
-    },
-  ];
 
   // Neither a failure nor "no results". A branch was never chosen, or nobody
   // has configured a pipeline for this tenant yet — the second is what the
@@ -185,6 +160,31 @@ export function OpportunitiesWorkspace() {
   }
 
   const pipelineEmptyState = resolvePipelineEmptyState();
+
+  // One label set, three views — the shared contract. See
+  // docs/design/views.md#the-shared-contract.
+  const viewLabels: WorkspaceViewLabels = {
+    retry: t.common.retry,
+    errorTitle: t.crmOpportunities.loadFailed,
+    emptyTitle: t.crmOpportunities.empty,
+    selectAll: t.views.selectAll,
+    selectRow: t.views.selectItem,
+    sortAscending: t.views.sortAscending,
+    sortDescending: t.views.sortDescending,
+    notSorted: t.views.notSorted,
+    pagination: {
+      previous: t.common.previousPage,
+      next: t.common.nextPage,
+      summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+    },
+  };
+
+  // The single-pointer alternative to dragging offers exactly the stages a
+  // drag could reach: WON and LOST are drop-disabled on this board, so they
+  // are not destinations here either.
+  const moveTargets: MoveToTarget[] = (selectedPipeline?.stages ?? [])
+    .filter((stage) => stage.flag !== "WON" && stage.flag !== "LOST")
+    .map((stage) => ({ id: stage.id, label: localizedName(stage, lang) }));
 
   // The board is hand-composed rather than a BoardView, so it has to render
   // the same four states BoardView owns for the other panes. It previously
@@ -225,6 +225,8 @@ export function OpportunitiesWorkspace() {
               onImportanceChange={(cardId, importance) => void updateImportance(cardId, importance)}
               onLoadMore={() => void loadMoreStage(lane.stage.id)}
               isLoadingMore={loadingStageId === lane.stage.id}
+              moveTargets={moveTargets}
+              onMoveCard={moveCard}
             />
           ))}
         </div>
@@ -234,7 +236,15 @@ export function OpportunitiesWorkspace() {
 
   return (
     <div className="flex h-full flex-col gap-4">
-      <PageHeader title={t.crmOpportunities.heading} description={t.crmOpportunities.subtitle} />
+      <PageHeader
+        title={t.crmOpportunities.heading}
+        description={t.crmOpportunities.subtitle}
+        primaryAction={
+          capabilities?.create
+            ? { label: t.crmOpportunityDetail.createAction, onClick: create.openDrawer }
+            : undefined
+        }
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -246,7 +256,7 @@ export function OpportunitiesWorkspace() {
             <SelectContent>
               {pipelines.map((pipeline) => (
                 <SelectItem key={pipeline.id} value={pipeline.id}>
-                  {lang === "ar" ? pipeline.nameAr : pipeline.nameEn}
+                  {localizedName(pipeline, lang)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -279,14 +289,15 @@ export function OpportunitiesWorkspace() {
           <div className="flex h-full flex-col gap-3 overflow-y-auto">
             <CardView
               items={cards.items}
-              renderCard={(item) => <OpportunityCardTile item={item} />}
               itemKey={(item) => item.id}
+              renderCard={(item) => <OpportunityCardTile item={item} />}
+              selection={workspace.selection}
+              onActivate={(item) => openOpportunity(item.id)}
               isLoading={cards.isLoading}
               error={cards.error}
               onRetry={() => void cards.reload()}
-              errorTitle={t.crmOpportunities.loadFailed}
-              retryLabel={t.common.retry}
               emptyState={pipelineEmptyState ?? <EmptyState title={t.crmOpportunities.empty} />}
+              labels={{ ...viewLabels, sortBy: t.views.sortBy }}
             />
             {cards.hasMore && (
               <Button variant="outline" size="sm" className="self-center" onClick={() => void cards.loadMore()} disabled={cards.isLoadingMore}>
@@ -297,33 +308,21 @@ export function OpportunitiesWorkspace() {
         )}
 
         {view === "table" && (
-          <DataTable
+          <TableView
             columns={tableColumns}
-            rows={list.items}
+            items={list.items}
+            itemKey={(item) => item.id}
+            selection={workspace.selection}
+            onActivate={(item) => openOpportunity(item.id)}
             isLoading={list.isLoading}
             error={list.error}
             onRetry={() => list.reload()}
             page={list.pageInfo}
-            onPageChange={list.setPage}
-            sort={list.sort}
-            onSortChange={list.setSort}
-            rowKey={(item) => item.id}
+            onPageChange={workspace.setPage}
+            sort={workspace.sort ?? list.sort}
+            onSortChange={workspace.setSort}
             emptyState={pipelineEmptyState}
-            labels={{
-              retry: t.common.retry,
-              errorTitle: t.crmOpportunities.loadFailed,
-              emptyTitle: t.crmOpportunities.empty,
-              selectAll: t.common.actions,
-              selectRow: t.common.actions,
-              sortAscending: t.common.actions,
-              sortDescending: t.common.actions,
-              notSorted: t.common.actions,
-              pagination: {
-                previous: t.common.previousPage,
-                next: t.common.nextPage,
-                summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
-              },
-            }}
+            labels={viewLabels}
           />
         )}
       </div>
@@ -338,6 +337,8 @@ export function OpportunitiesWorkspace() {
         isSubmitting={isMutating}
         error={terminalMove ? error : null}
       />
+
+      <CreateOpportunityDrawer create={create} pipelines={pipelines} branchId={branchId} />
 
       <DeleteOpportunityDialog
         item={selectedForDelete}

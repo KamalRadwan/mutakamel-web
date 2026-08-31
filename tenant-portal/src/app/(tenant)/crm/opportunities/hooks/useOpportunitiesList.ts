@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRealtimeResync } from "@/design-system";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -108,15 +109,21 @@ export function parseOpportunitiesListResponse(
   payload: unknown,
   expectedBranchId: string,
 ): { items: OpportunityListItem[]; pageInfo: OpportunitiesListPageInfo } {
+  // CRM pages are FLAT. `paginatedReadModels` in crm-app returns
+  // { items, total, page, limit, totalPages, hasNext, hasPrev } with no
+  // `meta` wrapper anywhere in the module — that is Core's shape, not CRM's
+  // (standing rule S1). This parser required `payload.meta` and threw
+  // "Invalid opportunities response." on every real response; its test made it
+  // look correct by feeding the same wrong shape back, and even named itself
+  // after it. Corrected 2026-08-31 against crm-app source.
   const page = record(payload);
-  const meta = page && record(page.meta);
-  if (!page || !meta || !Array.isArray(page.items)) {
+  if (!page || !Array.isArray(page.items)) {
     throw new Error("Invalid opportunities response.");
   }
   const items = page.items.map((item) => parseItem(item, expectedBranchId));
-  const total = meta.total;
-  const pageNumber = meta.page;
-  const limit = meta.limit;
+  const total = page.total;
+  const pageNumber = page.page;
+  const limit = page.limit;
   if (
     !Number.isSafeInteger(total) ||
     !Number.isSafeInteger(pageNumber) ||
@@ -203,6 +210,11 @@ export function useOpportunitiesList(branchId: string | null, pipelineId: string
 
   const SORTABLE_IDS = ["createdAt", "expectedCloseDate"] as const;
 
+  // MASTER-PLAN 13.6: one line, and this list reconciles with the server on
+  // an ALL-scoped resync, a realtime reconnect, and a return from offline.
+  const reload = useCallback(() => void fetchList(pageRef.current), [fetchList]);
+  useRealtimeResync(reload);
+
   return {
     items,
     pageInfo,
@@ -215,6 +227,6 @@ export function useOpportunitiesList(branchId: string | null, pipelineId: string
     isLoading,
     error,
     setPage: (nextPage: number) => void fetchList(nextPage),
-    reload: () => void fetchList(pageRef.current),
+    reload,
   };
 }

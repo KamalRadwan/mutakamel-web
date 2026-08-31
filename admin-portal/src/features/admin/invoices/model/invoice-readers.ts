@@ -1,12 +1,14 @@
 import {
   INVOICE_PURPOSES,
   INVOICE_STATUSES,
+  INVOICE_TENANT_STATUSES,
   type CoreSnapshot,
   type Invoice,
   type InvoiceLine,
   type InvoicePage,
   type InvoicePurpose,
   type InvoiceStatus,
+  type InvoiceTenantSummary,
 } from "../types/invoices";
 
 const UUID_V7 =
@@ -58,6 +60,7 @@ function readInvoice(value: unknown, detail = true): Invoice {
   const row = requiredRecord(value);
   const purpose = oneOf(row.purpose, INVOICE_PURPOSES);
   const status = oneOf(row.status, INVOICE_STATUSES);
+  const tenantId = uuidV7(row.tenantId);
   const linesValue = row.lines;
   if (detail && !Array.isArray(linesValue)) invalid();
   if (!detail && linesValue !== undefined && !Array.isArray(linesValue)) invalid();
@@ -65,7 +68,8 @@ function readInvoice(value: unknown, detail = true): Invoice {
   return {
     id: uuidV7(row.id),
     subscriptionId: uuidV7(row.subscriptionId),
-    tenantId: uuidV7(row.tenantId),
+    tenantId,
+    tenant: readInvoiceTenant(row.tenant, tenantId),
     number: boundedString(row.number, 40),
     status: status as InvoiceStatus,
     purpose: purpose as InvoicePurpose,
@@ -92,6 +96,29 @@ function readInvoice(value: unknown, detail = true): Invoice {
     ...(Array.isArray(linesValue)
       ? { lines: linesValue.map(readInvoiceLine) }
       : {}),
+  };
+}
+
+/**
+ * Reads the tenant identity Core attaches to list rows. Absent on single
+ * invoice reads and null once the billed tenant is gone, so the caller must
+ * keep rendering the tenant UUID as its fallback. A summary whose id does not
+ * match the invoice's own tenantId is a mismatched billing recipient, not a
+ * cosmetic defect, so it fails the whole response closed.
+ */
+function readInvoiceTenant(
+  value: unknown,
+  tenantId: string,
+): InvoiceTenantSummary | null {
+  if (value === null || value === undefined) return null;
+  const row = requiredRecord(value);
+  const id = uuidV7(row.id);
+  if (id !== tenantId) invalid();
+  return {
+    id,
+    name: boundedString(row.name, 160),
+    companyName: boundedString(row.companyName, 160),
+    status: oneOf(row.status, INVOICE_TENANT_STATUSES),
   };
 }
 

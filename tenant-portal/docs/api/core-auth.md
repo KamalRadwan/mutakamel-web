@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-27**
+Last source verification: **2026-08-31**
 
 Owning app: **core-app**
 
@@ -10,8 +10,15 @@ Canonical prefix: `/api/tenant/core/v1/auth`
 
 Upstream: `/tenant/auth` (`@Controller('tenant/auth')`)
 
-Portal status: **live and tested** — login, bootstrap, refresh, logout,
-cross-tab coordination, session list and revoke.
+Portal status: **partial** — login, bootstrap, refresh, logout, cross-tab
+coordination, session list and revoke are all built.
+
+The **unauthenticated** half is genuinely verified against the running app:
+the login screen renders, a wrong password is refused, the forgot-password
+dialog's own field reaches the request body, `branding/public` answers 200
+pre-auth and `auth/me` answers 401. The **authenticated** half is not — P4 is
+blocked, so no session has ever been established. See
+[README.md](README.md#two-different-questions-two-different-words).
 
 Source inspected:
 `core-app/src/tenant/tenant-auth/tenant-auth.controller.ts`,
@@ -36,6 +43,28 @@ Source inspected:
 
 `logout` is `@Public()` deliberately — logging out with an already-expired
 access token must still clear cookies rather than 401.
+
+## The invite and reset links carry their token in the **fragment**
+
+`TenantPublicUrlService.buildTenantActionUrl` builds
+`https://<tenant-host>/tenant/accept-invite#token=…` — `url.hash`, not
+`url.searchParams`, and the portal path is `/tenant/accept-invite`, **not**
+`/accept-invite`. Both details are load-bearing:
+
+- A fragment is never sent to a server, so the single-use token cannot land in
+  an access log or a `Referer` header. The screens read it once and then clear it
+  with `history.replaceState`, so a shared screenshot or a back-button revisit
+  does not carry a live credential.
+- The `/tenant` prefix is what the email actually links to. A screen at
+  `/accept-invite` would never be reached.
+
+Both posts go out `nonReplayable`: the token is single-use, and replaying it
+after a refresh would spend a credential the first attempt may already have
+consumed.
+
+**Every rejection is one code.** `findUsableActionToken` answers
+`400 INVALID_ACTION_TOKEN` for not-found, already-used and expired alike, so the
+UI cannot tell a user which of the three happened — see Q20.
 
 ## Cookies, not bearer tokens
 
@@ -149,7 +178,7 @@ Branch on status and `errorCode`, never message text — see
 | Logout | live, tested |
 | Session list and revoke | live, tested |
 | Activity heartbeat | live |
-| Accept invite | **not started** — no route exists |
-| Forgot password | partial — see [D1](../build/DEFECTS.md#d1--forgot-password-sends-the-wrong-address) |
-| Reset password | **not started** — no route exists |
+| Accept invite | live at **`/tenant/accept-invite`** — the path the invite email links to |
+| Forgot password | live — D1 is stale, and `useLogin.test.ts` pins the dialog's own address to the request body |
+| Reset password | live at **`/tenant/reset-password`** |
 | Logout-all | not surfaced in the UI |

@@ -2,7 +2,7 @@
 
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useLogin } from "./useLogin";
+import { classifyLoginFailure, useLogin } from "./useLogin";
 
 const postMock = vi.fn().mockResolvedValue(undefined);
 const loginMock = vi.fn().mockResolvedValue(undefined);
@@ -72,5 +72,30 @@ describe("useLogin — D1 (docs/build/DEFECTS.md#d1)", () => {
 
     expect(result.current.resetEmail).toBe("");
     expect(result.current.isForgotModalOpen).toBe(true);
+  });
+});
+
+// 4.31 — every branch is a status + errorCode pair read from core-app source.
+// One shared toast made these indistinguishable, and each one needs a different
+// next action from the user.
+describe("classifyLoginFailure", () => {
+  it.each([
+    [{ status: 401, code: "INVALID_CREDENTIALS" }, "invalidCredentials"],
+    [{ status: 403, code: "ACCOUNT_NOT_ACTIVE" }, "accountNotActive"],
+    [{ status: 403, code: "SUBSCRIPTION_PAST_DUE" }, "subscriptionPastDue"],
+    [{ status: 503, code: "TENANT_INACTIVE" }, "tenantInactive"],
+    [{ status: 429, code: "GW.RATE.LIMIT_EXCEEDED" }, "rateLimited"],
+    [{ status: 0 }, "offline"],
+    [{ status: 500 }, "unknown"],
+  ])("maps %o to its own screen state", (error, expected) => {
+    expect(classifyLoginFailure(error)).toBe(expected);
+  });
+
+  it("falls back to invalid credentials for a 401 whose code did not survive", () => {
+    expect(classifyLoginFailure({ status: 401 })).toBe("invalidCredentials");
+  });
+
+  it("puts the rate limit ahead of the status, so a 429 is never read as offline", () => {
+    expect(classifyLoginFailure({ status: 429 })).toBe("rateLimited");
   });
 });

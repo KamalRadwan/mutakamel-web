@@ -30,19 +30,96 @@ works in a real authenticated session — say so honestly when reporting.
 `scripts/design/census.mjs` counts the signals this system intends to change
 and diffs them against `docs/design/census.baseline.json`.
 
-| Counter | Target |
-| --- | ---: |
-| `colorUtilityTotal` | 0 |
-| `colorFamiliesInUse` | 0 |
-| `arbitraryTypeSize` | 0 |
-| `fontBoldOrHeavier` | 0 |
-| `roundedXlOrAbove` | 0 |
-| `gradients` | ≤ 2 |
-| `backdropBlur` | ≤ 1 |
-| `handRolledButtons` | 0 |
-| `handRolledTables` | 0 |
-| `physicalRtlViolations` | 0 |
-| `languageTernaries` | 0 |
+| Counter | Target | Notes |
+| --- | ---: | --- |
+| `colorUtilityTotal` | 0 | The 22 raw Tailwind families |
+| `colorFamiliesInUse` | 0 | |
+| `roleRampUtilities` | ratchet | See below — no zero target yet |
+| `arbitraryTypeSize` | 0 | |
+| `fontBoldOrHeavier` | 0 | |
+| `roundedXlOrAbove` | 0 | |
+| `gradients` | ≤ 2 | |
+| `backdropBlur` | ≤ 1 | |
+| `handRolledButtons` | **2** | Both in `src/context/AuthContext.test.tsx` — test-harness markup, not UI. Named, not silently excluded |
+| `handRolledTables` | 0 | |
+| `physicalRtlViolations` | 0 | |
+| `languageTernaries` | **5** | The real floor — see below |
+
+### The three things 3.30 fixed
+
+Until MASTER-PLAN task 3.30 this script could report a clean run while the
+things it exists to catch were sitting in the tree:
+
+1. **It skipped all of `src/design-system/`** — the ratchet was blind to its own
+   subject. Every hardcoded ramp step inside the system was uncounted by every
+   counter. It now walks that directory and reports it under
+   `designSystemCounts`, a **separate** block that ratchets the same way but
+   carries no zero target: the design system is where a ramp step, a
+   `<button>` and a `<table>` legitimately live. `globals.css` is tallied with
+   it, being the token source rather than feature code.
+2. **It counted only the 22 Tailwind families**, so `brand-*`, `ink-*`,
+   `positive-*`, `caution-*` and `negative-*` were invisible and
+   "`colorUtilityTotal: 0`" did not mean "no raw ramp step in feature code".
+   `roleRampUtilities` counts them. It is a **ratchet, not a zero target**: the
+   measured feature-code figure is real, and several of those sites have no
+   semantic token to move to yet (role-tinted banners, icon tints). Driving it
+   down needs new semantic tokens, which is design-system work, not a sweep.
+3. **The gradient counter could not fire.** It matched v3's `bg-gradient-to-`
+   while the code uses Tailwind v4's `bg-linear-to-`, so the baseline read
+   `gradients: 0` while one gradient existed. Both spellings now match.
+
+### The two counters that cannot reach zero, and why
+
+Task 3.17 re-baselined honestly rather than closing on a number that was not
+true. Two counters have a floor above zero, and every site is named here so the
+next reader can tell a floor from a regression:
+
+**`languageTernaries` floor: 5.**
+
+| Site | Count | Why it is exempt |
+| --- | ---: | --- |
+| `src/i18n/I18nContext.tsx` | 3 | The provider must branch on language to pick the dictionary object and compute `dir`. This is the mechanism the rule is implemented *by*; it cannot use itself |
+| `src/lib/format/localized.ts` | 2 | `localizedName`/`alternateName` contain the syntax **by definition** — [i18n.md](i18n.md#the-one-exemption-bilingual-data-fields) makes this the one permitted home for bilingual **data-field** selection |
+
+Any count above 5 is a real violation. That is the point of the helper: it
+removes the syntax from feature code entirely and restores the counter as a
+gate rather than a number with a footnote.
+
+**`handRolledButtons` floor: 2**, both in `src/context/AuthContext.test.tsx`.
+They are a test harness's own controls, which is why `eslint.config.mjs`
+already excludes test files from the hand-rolled-button rule with the same
+reasoning. The census is deliberately **not** taught to skip them — a named
+floor is honest, a silent exclusion is not.
+
+**`handRolledTables` floor: 1**, in
+`src/app/(tenant)/crm/dashboards/[id]/components/WidgetDataTable.tsx`
+(banked 2026-08-31, Phase 9).
+
+It is **not** a `DataTable` reimplementation, which is what this counter exists
+to catch. It is a chart's accessible text equivalent: task 9.14 requires every
+dashboard chart to carry the same numbers in a form a screen reader can
+traverse, and a real `<table>` with a `<caption>` is that form — an SVG with an
+`aria-label` is not. It has no pagination, no sorting, no selection and no
+server state; it renders a `WidgetTableModel` and nothing else. Building it on
+`DataTable` would make the counter clean and the screen worse. A **second**
+hand-rolled table in feature code is still the regression to catch.
+
+### Reading the design-system block
+
+Three numbers under `designSystemCounts` look like budget breaches and are not.
+All three were invisible before 3.30, which is exactly why they are counted now.
+
+| Counter | Value | What it actually is |
+| --- | ---: | --- |
+| `backdropBlur` | 3 | **One** mechanism — the modal scrim — with three call sites: `AlertDialog`, `Dialog`, `Sheet`. The documented budget of 1 is one *use*; the counter measures occurrences. A fourth that is not a scrim is the regression to catch |
+| `gradients` | 1 | `Skeleton`'s shimmer sweep, the only gradient in the product. Budget is 2 |
+| `handRolledButtons` / `handRolledTables` | 6 / 3 | The definition sites. `Button` is where a `<button>` is supposed to be, and `Table` is where a `<table>` is supposed to be |
+
+`roleRampUtilities` is the number to watch here. It is high in both blocks and
+has no target yet: several sites have no semantic token to move to (role-tinted
+banners, icon tints), so closing the gap means **adding tokens**, which is
+design-system work rather than a sweep. It ratchets meanwhile, which is what
+stops it growing while nobody is looking.
 
 `--check` fails on any undeclared regression. `--update` moves the baseline
 forward **once a phase's delta has been reviewed and is the intended delta**.

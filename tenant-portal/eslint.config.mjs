@@ -30,6 +30,40 @@ const eslintConfig = defineConfig([
               group: ["@/design-system/**"],
               message: "Import from the @/design-system barrel, not a deep path — see docs/architecture/file-architecture.md#the-barrel.",
             },
+            // Envelope discipline (S1). unwrapCoreData takes `unknown`, so
+            // nothing stops it being applied to a CRM body — where it either
+            // silently no-ops or, the day a CRM route carries a `data` key,
+            // silently returns the wrong object. Feature code goes through
+            // src/lib/api/envelope.ts, whose path types cannot accept a CRM
+            // route at all.
+            {
+              group: ["@/lib/api/axiosClient", "**/api/axiosClient", "./axiosClient"],
+              importNames: ["unwrapCoreData"],
+              message:
+                "Do not unwrap a response through the Core helper directly — use readCoreData / readCrmBody from @/lib/api/envelope. See docs/architecture/data-layer.md#response-envelopes.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Deliberately overrides the block above for the transport and session
+  // layer, which owns unwrapCoreData and must keep calling it. Flat config
+  // resolves two blocks setting the same rule key as last-write-wins rather
+  // than merging (enforcement.md#the-trap-that-made-these-useless-elsewhere),
+  // so this block restates the barrel pattern instead of only removing one —
+  // dropping it here would silently switch the barrel rule off for src/lib/.
+  {
+    files: ["src/lib/**/*.ts", "src/context/**/*.ts", "src/context/**/*.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/design-system/**"],
+              message: "Import from the @/design-system barrel, not a deep path — see docs/architecture/file-architecture.md#the-barrel.",
+            },
           ],
         },
       ],
@@ -47,18 +81,17 @@ const eslintConfig = defineConfig([
   // no-restricted-syntax can only reject every occurrence, not count them —
   // `pnpm design:census -- --check` is what enforces the budget.
   //
-  // Excluded beyond src/design-system/: src/components/auth/ is Tier-1 (the
-  // spine — HANDOFF.md says do not touch, no carve-out for styling-only
-  // edits), and it is the sole remaining source of every violation these
-  // rules would catch. Linting code that can never legally be fixed would
-  // make this gate permanently, uninformatively red. Test files are
-  // excluded because their raw <button>s are test-harness code, not
-  // production markup — the hand-rolled-button rule is about UI.
+  // src/components/auth/ was excluded here while HANDOFF.md fenced it as
+  // Tier-1 "do not touch", which made it the sole remaining source of every
+  // violation these rules catch. HANDOFF.md's 2026-08-31 amendment permits
+  // the presentation-only conversion, MASTER-PLAN 3.12–3.13 landed it, and
+  // the exclusion came out with 3.14 — the four files now lint like any
+  // other feature code. Test files stay excluded because their raw
+  // <button>s are test-harness code, not production markup.
   {
     files: ["**/*.ts", "**/*.tsx"],
     ignores: [
       "src/design-system/**",
-      "src/components/auth/**",
       "**/*.test.ts",
       "**/*.test.tsx",
     ],
@@ -84,12 +117,12 @@ const eslintConfig = defineConfig([
         },
         {
           selector:
-            "ConditionalExpression[test.operator='==='][test.right.value='ar']:matches([consequent.type='Literal'], [alternate.type='Literal'])",
+            "ConditionalExpression[test.operator='==='][test.right.value='ar']:matches([consequent.type='Literal'], [alternate.type='Literal'], [consequent.type='TemplateLiteral'], [alternate.type='TemplateLiteral'], [consequent.type='ConditionalExpression'], [alternate.type='ConditionalExpression'])",
           message: 'Language ternary around a string — add the key to both dictionaries instead. See docs/design/i18n.md#the-zero-ternary-rule.',
         },
         {
           selector:
-            "ConditionalExpression[test.type='Identifier'][test.name=/^(?:isRtl|isArabic)$/]:matches([consequent.type='Literal'], [alternate.type='Literal'])",
+            "ConditionalExpression[test.type='Identifier'][test.name=/^(?:isRtl|isArabic)$/]:matches([consequent.type='Literal'], [alternate.type='Literal'], [consequent.type='TemplateLiteral'], [alternate.type='TemplateLiteral'], [consequent.type='ConditionalExpression'], [alternate.type='ConditionalExpression'])",
           message: 'Language ternary around a string — add the key to both dictionaries instead. See docs/design/i18n.md#the-zero-ternary-rule.',
         },
         {
@@ -103,9 +136,17 @@ const eslintConfig = defineConfig([
           message: 'Language ternary around a string — add the key to both dictionaries instead. See docs/design/i18n.md#the-zero-ternary-rule.',
         },
         {
-          selector: "Literal[value=/\bz-(?:0|10|20|30|40|50|\[[0-9]+\])\b/]",
+          // Every backslash here is doubled on purpose: this is a JS string
+          // literal, so a single \b is the backspace character, not a regex
+          // word boundary. The rule matched nothing at all until 3.35.
+          selector: "Literal[value=/\\bz-(?:0|10|20|30|40|50|\\[[0-9]+\\])\\b/]",
           message:
             "Bare z-index — use a token: z-(--z-sticky-cell|--z-sticky-header|--z-topbar|--z-dropdown|--z-overlay|--z-toast). See docs/design/DESIGN-SYSTEM.md#stacking-order.",
+        },
+        {
+          selector: "Literal[value=/\\brtl:(?:rotate-180|scale-x-)/]",
+          message:
+            "Non-canonical RTL mirror — the one mechanism is rtl:-scale-x-100. See docs/design/icons.md#mirroring.",
         },
         {
           selector: "JSXElement > JSXOpeningElement[name.name='button']",

@@ -345,8 +345,8 @@ export function TenantApplicationsStep({
             />
           ) : null}
           {previewState === "ready" && preview ? (
-            <div className="space-y-4">
-              <dl className="grid gap-3 text-xs sm:grid-cols-3">
+            <div className="space-y-3">
+              <dl className="grid gap-2 text-2xs sm:grid-cols-3">
                 <div className="rounded-lg bg-muted p-3">
                   <dt className="text-muted-foreground">{copy.selectedApplicationsLabel}</dt>
                   <dd className="mt-1 font-mono font-semibold">{preview.selectedApplicationKeys.join(", ")}</dd>
@@ -360,16 +360,27 @@ export function TenantApplicationsStep({
                   <dd className="mt-1 font-semibold">{preview.steps.length}</dd>
                 </div>
               </dl>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {preview.components.map((component) => (
-                  <div key={component.componentId} className="rounded-lg border border-border p-3 text-xs">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-mono font-semibold text-foreground">{component.componentKey}</p>
-                      <span className={`rounded-sm px-2 py-0.5 text-xs font-semibold ${component.selectionSource === "FOUNDATION" ? "bg-info-subtle text-info-subtle-foreground" : "bg-muted text-muted-foreground"}`}>
-                        {component.selectionSource}
+                  <div
+                    key={component.componentId}
+                    className="rounded-md border border-border px-2.5 py-2 text-2xs leading-4"
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <p className="truncate font-mono font-semibold text-foreground">{component.componentKey}</p>
+                      <span
+                        className={`shrink-0 rounded-sm px-1.5 py-0.5 text-2xs font-semibold ${component.selectionSource === "FOUNDATION" ? "bg-info-subtle text-info-subtle-foreground" : "bg-muted text-muted-foreground"}`}
+                        // The full word is kept for screen readers; the badge
+                        // shows the first letter once space is this tight.
+                        title={component.selectionSource}
+                      >
+                        {component.selectionSource.charAt(0)}
+                        <span className="sr-only">{component.selectionSource.slice(1)}</span>
                       </span>
                     </div>
-                    <p className="mt-1 text-muted-foreground">{component.ownerApp} · v{component.releaseVersion}</p>
+                    <p className="mt-0.5 truncate text-muted-foreground" title={`${component.ownerApp} · v${component.releaseVersion}`}>
+                      {component.ownerApp} · v{component.releaseVersion}
+                    </p>
                   </div>
                 ))}
               </div>

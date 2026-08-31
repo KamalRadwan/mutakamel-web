@@ -21,11 +21,43 @@ palette, dense data workspace, Next.js 16.**
 | Deliberate divergences (documented, keeping ours) | 5 |
 | Skill guidance that does not apply to this product | 5 |
 
-## Status — documentation closed, code outstanding
+## Status — documentation closed, code landed
 
-**All 17 gaps are now specified in the docs (2026-08-28).** Every B-item below
-has an exact rule in the page that owns it. **None of them are implemented in
-`src/` yet** — that is the next piece of work.
+**All 17 gaps are specified in the docs (2026-08-28) and implemented in `src/`
+(2026-08-31).** Every B-item below has an exact rule in the page that owns it
+and a call site in the code.
+
+| Gap | Landed in | Where |
+| --- | --- | --- |
+| B1 · 16px inputs | Phase 3 · 3.1 | `textEntrySize` on `Input`, `Textarea`, `SelectTrigger`, `Combobox`, `MultiSelect`; `FilterBar`'s search inherits it through `Input` |
+| B2 · Focus after failed submit | 3.2 | `FormDrawer` focuses the first `[aria-invalid="true"]`; covered by `FormDrawer.test.tsx` |
+| B3 · Board single-pointer alternative | Phase 2 | `views.md` |
+| B4 · `focus-not-obscured` | Phase 2 | `DataTable` scroll-margin |
+| B5 · `aria-sort` | Phase 2 | `DataTable` |
+| B6 · Skip link | 3.3 | `AppShell`, first focusable element, `<main id="main" tabIndex={-1}>`; covered by `AppShell.test.tsx` |
+| B7 · z-index scale | Phase 0 · 0.17–0.20 | Six `--z-*` tokens, an ESLint selector, a census counter |
+| B8 · `cursor-pointer` | 3.4 / 3.31 | `Button` base CVA, plus every clickable row, card and overlay control |
+| B9 · Autofill on login | 3.5 | `autocomplete` + `name` on both fields, paste never blocked |
+| B10 · Validate on blur | 3.6 | `useBlurValidation`; covered by `Field.test.tsx` |
+| B11 · Long-token wrapping | 3.7 | `identifierText` (`wrap-anywhere`, never `break-all`) plus `<bdi>` |
+| B12 · Chip overflow | Phase 1 | `FilterBar` |
+| B13 · Badge announcement | 3.8 | Polite live region announcing a whole phrase in `NotificationsDropdown` |
+| B14 · Toast a11y contract | 3.9 | `AppToast` is `role="status"` + explicit `aria-live="polite"`, never `role="alert"` |
+| B15 · Scroll restoration | Phase 2 | `useScrollRestoration` |
+| B16 · `readOnly` ≠ `disabled` | 3.10 | `readOnlySurface` + `Field readOnly`; covered by `Field.test.tsx` |
+| B17 · Prose line length | 3.11 | `proseMeasure` on every prose surface |
+
+**One correction found while implementing B8.** `Button`'s base carried
+`disabled:pointer-events-none` alongside the documented
+`disabled:cursor-not-allowed`, which made the cursor rule unrenderable — a
+pointer-events-none element is not hit-tested, so the cursor comes from its
+ancestor. The `pointer-events-none` was also doing no work: a native
+`<button disabled>` already blocks clicks and focus, and Tailwind's
+`disabled:` variant is the `:disabled` **pseudo-class**, which never matches
+the `<a>` an `asChild` button renders. It was removed, and the per-variant
+hovers moved to `not-disabled:hover:*` so a disabled control still does not
+light up. A disabled button inside a `Tooltip` now also shows its tooltip,
+which is the accessible way to say *why* it is disabled.
 
 | Gap | Specified in |
 | --- | --- |

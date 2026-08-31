@@ -2,14 +2,21 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-27**
+Last source verification: **2026-08-31**
 
 Owning app: **crm-app**
 
 Canonical prefix: `/api/tenant/crm/v1/customer-profiles`
 
-Portal status: **partial** — read-only list and detail. All three views are
-phase 4 work.
+Portal status: **built** — list in three views, detail, create, update, status
+change, delete and add-contact. Not exercised against a live session: CRM is
+blocked twice over, by P4 and by Q17.
+
+`GET /:id` returns `CustomerProfileReadModel`, which joins the acquisition
+source and a Party summary and **no contact relationships** — a profile can
+gain a contact and cannot list the ones it has (Q41). The registration
+identifiers (`taxNumber`, `commercialRegistrationNumber`) live on the joined
+Party, not on the profile row.
 
 Source inspected:
 `crm-app/src/crm/customer-profiles/customer-profiles.controller.ts`,
@@ -35,7 +42,7 @@ Source inspected:
 | Parameter | Type | Required |
 | --- | --- | --- |
 | `branchId` | UUIDv7 | **yes** |
-| `page`, `limit`, `sortBy`, `sortOrder` | pagination | no |
+| `page`, `limit`, `sortBy`, `sortDir` | pagination | no — `sortDir` is `ASC`/`DESC`, see [README.md#sort-parameters-differ-per-endpoint](README.md#sort-parameters-differ-per-endpoint) |
 | `profileType` | `CrmProfileTypeEnum` | no — `INDIVIDUAL` \| `CORPORATE` |
 | `status` | `CustomerStatusEnum` | no — 4 values |
 | `acquisitionSourceId` | UUIDv7 | no |
@@ -59,6 +66,42 @@ status is a fixed enum rather than a tenant catalogue.
 
 `BLACKLISTED` is terminal in practice and should confirm before sending.
 
+### `BLACKLISTED` is sticky, and today the server does not honour that
+
+**Decided 2026-08-31**, from the CRM audit review's open question 2: *is
+`BLACKLISTED` sticky, or may a WON opportunity clear it?*
+
+**The decision is sticky** — it clears only on an explicit re-activation with an
+audit trail. A blacklist is a compliance and consent state, recorded by a human
+on purpose. A sales outcome must not silently overrule it, because the system
+then forgets a decision somebody deliberately made.
+
+**Verified against source, and crm-app does not implement that today.** Two call
+sites promote the customer unconditionally when an opportunity enters `WON`:
+
+| Site | What it does |
+| --- | --- |
+| `opportunities.service.ts:223` | `updateById(customerProfileId, { status: ACTIVE_CUSTOMER })` on a status-set WIN |
+| `opportunities.service.ts:708` | The same, on a stage move that enters a `WON`-flagged stage |
+
+Neither reads the current status first. The blacklist is overwritten with no
+audit event distinguishing it from an ordinary promotion.
+
+The path is reachable, though it needs an ordering: `opportunities.service.ts:137`
+refuses to **create** an opportunity for a blacklisted customer
+(`409 CUSTOMER_PROFILE_BLACKLISTED`). So the sequence is *open the opportunity
+while the customer is active → blacklist the customer → win the opportunity*,
+and the blacklist is gone. Blacklisting rarely happens before a deal exists; it
+happens because of one.
+
+**What this means for the portal.** Do not present `BLACKLISTED` as a state the
+UI can rely on persisting, and do not build a "customer is blacklisted" gate
+that assumes the flag survives. Treat a customer that changed from
+`BLACKLISTED` to `ACTIVE_CUSTOMER` without a user action as a possible instance
+of this, not as data. This is an ask on crm-app — guard both promotions with
+`WHERE status <> 'BLACKLISTED'`, and add an explicit audited re-activation —
+not something the portal can fix.
+
 ## DELETE /customer-profiles/:id
 
 Returns **`204`** with no body.
@@ -78,11 +121,12 @@ Returns **`204`** with no body.
 
 | Capability | Status |
 | --- | --- |
-| List, branch-scoped, paginated | live (read-only) |
-| Detail route | live (read-only) |
-| **Board view** | **not built** |
-| **Card view** | **not built** |
-| **Table view** | **not built** — currently a flat list, no switcher |
-| Capabilities-driven actions | not wired |
-| Create / update / delete | not started |
-| Add contact | not started |
+| List, branch-scoped, paginated | live |
+| Detail route | live — full action cluster and custom-fields rail |
+| Board view | live — `CustomerStatusEnum` axis, no catalogue fetch |
+| Card view | live |
+| Table view | live |
+| Capabilities-driven actions | live — edit, status, delete and add-contact |
+| Create / update / delete | live — `POST`, `PATCH /:id`, `DELETE /:id` |
+| Add contact | live — `POST /:id/contacts`; **this route declares `organizationScopeMode: NONE`, so it must send NO scope headers** |
+| Contacts list | **no route exists** — the read model joins no relationships, see OPEN-QUESTIONS.md Q41 |

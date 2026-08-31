@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FileX } from "lucide-react";
 import { cn } from "../../lib/cn";
+import { proseMeasure } from "../../lib/variants";
 import { Button } from "../../primitives/Button";
 
 export interface NotFoundStateProps {
@@ -38,7 +39,7 @@ export function NotFoundState({
     >
       <FileX className="size-8 text-muted-foreground" aria-hidden="true" />
       <p className="text-sm font-medium text-foreground">{title}</p>
-      {description && <p className="max-w-sm text-xs text-muted-foreground">{description}</p>}
+      {description && <p className={cn("text-xs text-muted-foreground", proseMeasure)}>{description}</p>}
       {onBack ? (
         <Button variant="outline" size="sm" onClick={onBack} className="mt-2">
           {backLabel}

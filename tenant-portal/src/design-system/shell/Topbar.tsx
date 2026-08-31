@@ -20,7 +20,7 @@ export function Topbar({ onMobileMenuOpen }: TopbarProps) {
   const { t } = useI18n();
 
   return (
-    <header className="flex h-(--size-topbar) shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-3">
+    <header className="flex h-(--size-topbar) shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-3 print:hidden">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" className="lg:hidden" onClick={onMobileMenuOpen} aria-label={t.nav.workspaceCenter}>
           <Menu className="size-4" aria-hidden="true" />

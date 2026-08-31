@@ -5,23 +5,28 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2 } from "lucide-react";
 import { cn } from "../lib/cn";
-import { controlSize, focusRing } from "../lib/variants";
+import { controlSize, focusRing, hitArea } from "../lib/variants";
 
 export const buttonVariants = cva(
   cn(
     "inline-flex items-center justify-center whitespace-nowrap rounded-sm font-medium",
-    "transition-colors disabled:opacity-50 disabled:pointer-events-none",
+    // B8 (SKILL-AUDIT.md): neither Radix nor Preflight sets a pointer cursor
+    // on a <button>, so every button in the product showed an arrow.
+    "cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
     focusRing,
   ),
   {
     variants: {
       variant: {
-        primary: "bg-primary text-primary-foreground hover:bg-brand-700 dark:hover:bg-brand-300",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-ink-200 dark:hover:bg-ink-700",
-        outline: "border border-border bg-transparent hover:bg-accent",
-        ghost: "bg-transparent hover:bg-accent",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-negative-800",
-        link: "bg-transparent text-brand-700 dark:text-brand-300 hover:underline p-0! h-auto!",
+        primary:
+          "bg-primary text-primary-foreground not-disabled:hover:bg-brand-700 dark:not-disabled:hover:bg-brand-300",
+        secondary:
+          "bg-secondary text-secondary-foreground not-disabled:hover:bg-ink-200 dark:not-disabled:hover:bg-ink-700",
+        outline: "border border-border bg-transparent not-disabled:hover:bg-accent",
+        ghost: "bg-transparent not-disabled:hover:bg-accent",
+        destructive:
+          "bg-destructive text-destructive-foreground not-disabled:hover:bg-negative-800",
+        link: "bg-transparent text-brand-700 dark:text-brand-300 not-disabled:hover:underline p-0! h-auto!",
       },
     },
     defaultVariants: { variant: "outline" },
@@ -53,7 +58,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <Comp
         ref={ref}
-        className={cn(buttonVariants({ variant }), controlSize({ size }), className)}
+        className={cn(
+          buttonVariants({ variant }),
+          controlSize({ size }),
+          // 24px is exactly the WCAG 2.2 web-target-size bar, so the xs step
+          // keeps the invisible expansion rather than growing the visible box
+          // — geometry.md#hit-area-expansion-not-bigger-boxes.
+          size === "xs" && hitArea,
+          className,
+        )}
         disabled={disabled || loading}
         aria-busy={loading || undefined}
         {...props}

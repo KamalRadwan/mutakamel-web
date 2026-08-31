@@ -1,15 +1,21 @@
 "use client";
 
 import { forwardRef } from "react";
+import type { VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";
+import { surface } from "../lib/variants";
 
-export const Card = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn("rounded-md border border-border bg-card text-card-foreground", className)}
-      {...props}
-    />
+export interface CardProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof surface> {}
+
+// The canonical consumer of the `surface` ladder — base / raised / sunken are
+// the same three steps geometry.md#elevation defines, so a card asks for a
+// level rather than restating the classes. Radius stays here: it is geometry,
+// not elevation, and every level carries the same one.
+export const Card = forwardRef<HTMLDivElement, CardProps>(
+  ({ className, level = "base", ...props }, ref) => (
+    <div ref={ref} className={cn("rounded-md", surface({ level }), className)} {...props} />
   ),
 );
 Card.displayName = "Card";

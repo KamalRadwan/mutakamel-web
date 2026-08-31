@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useRealtimeResync } from "@/design-system";
 import {
   resolveDefaultTenantBranchId,
   useTenantBranchSelection,
@@ -58,7 +59,6 @@ export interface CustomerProfilesPage {
 }
 
 const LIST_RESPONSE_LIMIT_BYTES = 1_000_000;
-const DETAIL_RESPONSE_LIMIT_BYTES = 250_000;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -259,10 +259,6 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 export function useCustomerProfiles() {
   const { lang, t } = useI18n();
   const { user, isLoading: isAuthLoading } = useTenantAuth();
@@ -353,6 +349,11 @@ export function useCustomerProfiles() {
     if (result?.hasNext) setPage((current) => current + 1);
   }, [result?.hasNext]);
 
+  // MASTER-PLAN 13.6: one line, and this list reconciles with the server on
+  // an ALL-scoped resync, a realtime reconnect, and a return from offline.
+  const reload = useCallback(() => setReloadToken((current) => current + 1), []);
+  useRealtimeResync(reload);
+
   return {
     t,
     lang,
@@ -376,68 +377,6 @@ export function useCustomerProfiles() {
     loadError,
     previousPage,
     nextPage,
-    reload: () => setReloadToken((current) => current + 1),
-  };
-}
-
-export function useCustomerProfile(id: string) {
-  const { user, isLoading: isAuthLoading } = useTenantAuth();
-  const [item, setItem] = useState<CustomerProfileItem | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
-  const userId = user?.id ?? null;
-
-  const load = useCallback(
-    async (signal: AbortSignal) => {
-      setIsLoading(true);
-      setError(null);
-      setItem(null);
-
-      if (!userId) {
-        setError("An authenticated user session is required to load this customer profile.");
-        setIsLoading(false);
-        return;
-      }
-      if (!isUUIDv7(id)) {
-        setError("The customer profile link is invalid.");
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const response = await axiosClient.get<unknown>(customerProfilePath(id), {
-          signal,
-          cache: "no-store",
-          maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
-        });
-        setItem(parseCustomerProfileResponse(response.data));
-      } catch (caught) {
-        if (isAbortError(caught)) return;
-        setItem(null);
-        setError(
-          errorMessage(caught, "Unable to load the CRM customer profile."),
-        );
-      } finally {
-        if (!signal.aborted) setIsLoading(false);
-      }
-    },
-    [id, userId],
-  );
-
-  useEffect(() => {
-    if (isAuthLoading) return;
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
-    });
-    return () => controller.abort();
-  }, [isAuthLoading, load, reloadToken]);
-
-  return {
-    item,
-    isLoading: isAuthLoading || isLoading,
-    error,
-    reload: () => setReloadToken((current) => current + 1),
+    reload,
   };
 }

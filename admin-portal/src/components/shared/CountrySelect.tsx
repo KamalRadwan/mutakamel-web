@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { Country } from "country-state-city";
 import { Globe } from "lucide-react";
 import { Combobox, type ComboboxOption } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { getCountryOptions } from "@/lib/geo/country-data";
 
 interface CountrySelectProps {
   id?: string;
@@ -46,17 +46,20 @@ export function CountrySelect({
   const resolvedLabel = label ?? (allowAll ? resolvedAllLabel : t.tenants.wizard.countryLabel);
 
   const options = useMemo<ComboboxOption[]>(() => {
-    const countryOptions = Country.getAllCountries().map((country) => ({
+    const countryOptions = getCountryOptions().map((country) => ({
       value: country.isoCode,
       label: `${country.name} (${country.isoCode})`,
-      keywords: [country.name, country.isoCode],
+      // The ISO code and calling code stay searchable even though only the
+      // name is shown, so "EG" and "+20" both find Egypt.
+      keywords: [country.name, country.isoCode, country.callingCode],
       leading: (
         <span
-          dir="ltr"
-          className="inline-flex min-w-8 shrink-0 justify-center rounded-sm bg-muted px-1 py-0.5 font-mono text-xs text-muted-foreground"
+          // The flag is decoration: the name and ISO code carry the meaning,
+          // and emoji flags do not render on every platform.
           aria-hidden="true"
+          className="w-5 shrink-0 text-center text-base leading-none"
         >
-          {country.isoCode}
+          {country.flag}
         </span>
       ),
     }));
@@ -84,6 +87,7 @@ export function CountrySelect({
       searchPlaceholder={resolvedSearchPlaceholder}
       emptyLabel={resolvedEmptyLabel}
       disabled={disabled}
+      preferDownward
       aria-describedby={ariaDescribedBy}
       aria-invalid={ariaInvalid}
       className={className}

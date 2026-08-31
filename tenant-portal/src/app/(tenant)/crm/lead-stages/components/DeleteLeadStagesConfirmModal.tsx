@@ -2,6 +2,7 @@
 
 import { ConfirmActionModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { localizedName } from "@/lib/format/localized";
 import type { LeadStageItem } from "../lead-stage-contract";
 
 interface DeleteModalProps {
@@ -15,7 +16,7 @@ interface DeleteModalProps {
 
 export function DeleteLeadStagesConfirmModal({ isOpen, isSubmitting, item, error, onClose, onConfirm }: DeleteModalProps) {
   const { t, lang } = useI18n();
-  const name = item ? (lang === "ar" ? item.nameAr : item.nameEn) : "";
+  const name = localizedName(item, lang);
 
   return (
     <ConfirmActionModal

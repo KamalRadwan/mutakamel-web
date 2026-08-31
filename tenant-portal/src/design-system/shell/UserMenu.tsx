@@ -5,12 +5,15 @@ import Link from "next/link";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
+import { DENSITY_OPTIONS, useDensity, type Density } from "../theme/DensityProvider";
 import { Avatar, AvatarFallback } from "../primitives/Avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../primitives/DropdownMenu";
@@ -22,6 +25,15 @@ function initials(firstName: string, lastName: string): string {
 export function UserMenu() {
   const { t } = useI18n();
   const { user, logout } = useTenantAuth();
+  const { density, setDensity } = useDensity();
+
+  // A lookup, not a ternary chain: the zero-ternary rule exists because a
+  // nested one carried hardcoded Arabic past the lint gate once already.
+  const densityLabel: Record<Density, string> = {
+    compact: t.common.densityCompact,
+    standard: t.common.densityStandard,
+    comfortable: t.common.densityComfortable,
+  };
 
   if (!user) return null;
 
@@ -52,6 +64,20 @@ export function UserMenu() {
             {t.common.profile}
           </Link>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+          {t.common.density}
+        </DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={density}
+          onValueChange={(next) => setDensity(next as Density)}
+        >
+          {DENSITY_OPTIONS.map((option) => (
+            <DropdownMenuRadioItem key={option} value={option}>
+              {densityLabel[option]}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={() => void logout()}>
           <LogOut className="size-4" aria-hidden="true" />

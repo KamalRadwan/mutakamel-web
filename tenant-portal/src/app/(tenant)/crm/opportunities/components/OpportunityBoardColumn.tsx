@@ -2,8 +2,9 @@
 
 import { Droppable } from "@hello-pangea/dnd";
 import { Loader2 } from "lucide-react";
-import { Badge, BoardCard, Button, cn, resolveStatusRole } from "@/design-system";
+import { Badge, BoardCard, Button, cn, resolveStatusRole, type MoveToTarget } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { localizedName } from "@/lib/format/localized";
 import { OpportunityBoardCard } from "./OpportunityBoardCard";
 import type { OpportunityBoardLane, OpportunityCardRecord } from "../hooks/pipeline-types";
 import { formatCurrencyAmount } from "../hooks/pipeline-types";
@@ -28,6 +29,11 @@ interface OpportunityBoardColumnProps {
   onImportanceChange: (cardId: string, importance: number) => void;
   onLoadMore: () => void;
   isLoadingMore: boolean;
+  // WCAG 2.2 AA dragging-alternative: every card needs a single-pointer path
+  // to the same move the drag performs. The targets come from the workspace,
+  // which owns the pipeline's stage list and the terminal-stage rule.
+  moveTargets: MoveToTarget[];
+  onMoveCard: (cardId: string, fromStageId: string, toStageId: string) => void;
 }
 
 export function OpportunityBoardColumn({
@@ -37,6 +43,8 @@ export function OpportunityBoardColumn({
   onImportanceChange,
   onLoadMore,
   isLoadingMore,
+  moveTargets,
+  onMoveCard,
 }: OpportunityBoardColumnProps) {
   const { t, lang } = useI18n();
   const { stage, items, summary, activitySummary } = lane;
@@ -54,7 +62,7 @@ export function OpportunityBoardColumn({
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-xs font-medium text-foreground">
-              {lang === "ar" ? stage.nameAr : stage.nameEn}
+              {localizedName(stage, lang)}
             </span>
             <Badge tone="neutral">{summary.totalCount}</Badge>
           </div>
@@ -96,7 +104,15 @@ export function OpportunityBoardColumn({
               </div>
             )}
             {items.map((item, index) => (
-              <BoardCard key={item.id} draggableId={item.id} index={index} isDragDisabled={isBusy || !canUpdate(item)}>
+              <BoardCard
+                key={item.id}
+                draggableId={item.id}
+                index={index}
+                isDragDisabled={isBusy || !canUpdate(item)}
+                moveTargets={isBusy || !canUpdate(item) ? [] : moveTargets.filter(({ id }) => id !== stage.id)}
+                onMoveTo={(toStageId) => onMoveCard(item.id, stage.id, toStageId)}
+                moveToLabel={t.views.moveTo}
+              >
                 <OpportunityBoardCard
                   item={item}
                   canUpdate={canUpdate(item) && !isBusy}

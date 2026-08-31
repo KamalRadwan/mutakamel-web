@@ -6,7 +6,8 @@ Last source verification: **2026-08-27**
 
 Owning app: **crm-app**
 
-Portal status: **live** — all five screens are server-backed.
+Portal status: **built** — all five screens are server-backed. Not exercised
+against a live session: CRM is blocked twice over, by P4 and by Q17.
 
 Covers the tenant-configured vocabulary the workspaces depend on: lead stages,
 acquisition sources, custom fields, CRM settings, and the read-only static
@@ -48,6 +49,45 @@ Consequences for the UI:
   into it is terminal.
 
 Deleting a stage that holds leads is a `409`. Surface it and refetch.
+
+### `stage.isDefault` is the only authority. `settings.defaultLeadStageId` is dead
+
+**Decided 2026-08-31**, from the CRM audit review's open question 3: *which of
+the two fields decides where a new lead lands?*
+
+There are two candidates, and this looked like a genuine ambiguity. It is not —
+**one of them is already dead**, and this was settled by finding the reader
+rather than by argument:
+
+| Field | Read by anything? |
+| --- | --- |
+| `crm_lead_stages.is_default` | **Yes.** `leads.service.ts:1085` resolves the stage for a new lead with `where: { isDefault: true, isActive: true }` |
+| `crm_settings.default_lead_stage_id` | **No.** It is seeded, stored, exposed on `GET /settings` and accepted on `PATCH /settings` — and no code path consults it when creating a lead |
+
+So `stage.isDefault` is the authority, and `defaultLeadStageId` should be deleted
+from Settings or turned into a read-through of it.
+
+**Why this matters more than a tidy-up:** a settings screen that offers
+`defaultLeadStageId` is a control that lies. The user picks a stage, the request
+succeeds, the value is stored and echoed back — and new leads keep landing
+somewhere else. There is no error to notice. **Do not build an editor for
+`defaultLeadStageId` in this portal.** If it has to appear at all, it is
+read-only and labelled as reflecting the stage catalogue.
+
+The `isDefault` side already carries its own protections, verified in
+`lead-stages.service.ts`. A default always exists, and it is always a stage a
+lead can legitimately start in:
+
+| Rule | Outcome |
+| --- | --- |
+| The first stage created becomes the default whether or not you ask | line 33 |
+| Setting a default clears the previous one in the same transaction | line 92 |
+| A `CONVERTED`-flagged stage cannot be the default | `422 LEAD_STAGE_DEFAULT_CONVERTED` |
+| The default stage cannot be deactivated | `422 LEAD_STAGE_DEFAULT_DEACTIVATE` |
+| The default stage cannot be deleted | `422 LEAD_STAGE_DEFAULT_DELETE` |
+
+All three are `422`, not `409` — a stage-catalogue screen that routes every
+"cannot do that" through its conflict path will show the wrong recovery.
 
 ## Acquisition sources
 
@@ -97,6 +137,40 @@ typed.
 `POST /custom-fields/:id/requirements` sets the per-operation requirement flags
 (`CREATE` / `UPDATE` / `CONVERT`) as one call — it is not a `PATCH` of the
 definition.
+
+### `fieldKey` is unique per `ownerType`, not per tenant
+
+**Decided 2026-08-31**, from the CRM audit review's open question 4. The audit
+found the documentation implying tenant-global uniqueness and the implementation
+enforcing per-`ownerType` uniqueness, and asked which was intended.
+
+**The implementation is right; the documentation was wrong.** Verified at
+`custom-fields.service.ts:614`, where the uniqueness identity is built as:
+
+```ts
+const identity = `${row.ownerType}\u0000${row.fieldKey}`;
+```
+
+Scoped uniqueness is also the more useful model, which is why this is not merely
+the cheaper answer: a `priority` field on a Lead and a `priority` field on an
+Opportunity are genuinely different fields, and forcing `lead_priority` /
+`opportunity_priority` makes every tenant re-encode the owner type into the key
+by hand. Global uniqueness would buy nothing user-visible and cost a migration
+with a collision survey attached.
+
+Three consequences the screen must get right:
+
+- **Validate duplicates within the chosen `ownerType` only.** A form that greys
+  out a key because it exists under a different owner type is wrong, and the
+  server will happily accept what the form refused.
+- **`fieldKey` is normalized before it is stored** — trimmed, whitespace to
+  underscores, lowercased — then matched against `^[a-z][a-z0-9_]{0,63}$`, else
+  `422 CUSTOM_FIELD_KEY_INVALID`. Echo the normalized form back to the user
+  rather than what they typed, or the next duplicate check disagrees with the
+  server.
+- **`422 CUSTOM_FIELD_KEY_AMBIGUOUS`** exists for a value write whose `fieldKey`
+  resolves to more than one definition for that record. It is a distinct outcome
+  from `404 CUSTOM_FIELD_NOT_FOUND` and needs its own message.
 
 ### Duplicate route family
 

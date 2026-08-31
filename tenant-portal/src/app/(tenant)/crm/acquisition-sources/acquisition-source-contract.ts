@@ -1,6 +1,29 @@
 export const ACQUISITION_SOURCES_PATH =
   "/api/tenant/crm/v1/acquisition-sources";
+export const ACQUISITION_SOURCE_REORDER_PATH =
+  "/api/tenant/crm/v1/acquisition-sources/reorder";
 export const ACQUISITION_SOURCE_NAME_MAX_LENGTH = 120;
+
+// Icon upload bounds, from @mutakamel/storage's BUCKETS.CRM_SOURCE_ICONS entry
+// (MAX_SIZE_BYTES 2 * MB, ALLOWED_MIME png/jpeg/x-icon/vnd.microsoft.icon) as
+// re-asserted in acquisition-sources.controller.ts's requireIconUpload.
+export const ACQUISITION_SOURCE_ICON_MAX_BYTES = 2 * 1024 * 1024;
+export const ACQUISITION_SOURCE_ICON_MIME_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
+] as const;
+// The controller also rejects a file whose EXTENSION does not match its type,
+// with 415 CRM_ACQUISITION_SOURCE_ICON_EXTENSION_UNSUPPORTED.
+const ACQUISITION_SOURCE_ICON_EXTENSIONS: Record<string, string[]> = {
+  "image/png": [".png"],
+  "image/jpeg": [".jpeg", ".jpg"],
+  "image/x-icon": [".ico"],
+  "image/vnd.microsoft.icon": [".ico"],
+};
+/** The multipart field name the FileInterceptor binds to. */
+export const ACQUISITION_SOURCE_ICON_FIELD = "file";
 
 const MAX_ACQUISITION_SOURCES = 500;
 const UUID_V7_PATTERN =
@@ -25,6 +48,57 @@ export interface CreateAcquisitionSourceInput {
 export function acquisitionSourcePath(id: string): string {
   if (!UUID_V7_PATTERN.test(id)) invalidResponse();
   return `${ACQUISITION_SOURCES_PATH}/${encodeURIComponent(id)}`;
+}
+
+export function acquisitionSourceIconPath(id: string): string {
+  return `${acquisitionSourcePath(id)}/icon`;
+}
+
+/**
+ * The complete ordered id list `PATCH /acquisition-sources/reorder` replaces
+ * the dense one-based display order with.
+ *
+ * The payload must contain **every non-deleted source exactly once**
+ * (`ReorderAcquisitionSourcesDto` plus the service's own check), so this is
+ * built from the unfiltered catalogue — never from a searched subset.
+ */
+export function moveAcquisitionSourceOrder(
+  sources: readonly AcquisitionSource[],
+  sourceId: string,
+  direction: -1 | 1,
+): string[] | null {
+  const ordered = [...sources].sort(
+    (left, right) => left.sortOrder - right.sortOrder,
+  );
+  const index = ordered.findIndex(({ id }) => id === sourceId);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= ordered.length) return null;
+  const ids = ordered.map(({ id }) => id);
+  [ids[index], ids[target]] = [ids[target], ids[index]];
+  return ids;
+}
+
+/**
+ * Classifies an icon file before it is sent.
+ *
+ * The three failures the controller answers with distinct statuses — 400 for a
+ * missing or empty file, 413 for one over 2 MB, 415 for an unsupported type or
+ * a mismatched extension — are three different messages, and checking size and
+ * type here means the two that can be known locally cost no round trip. The
+ * server still re-checks all of them, including the magic-byte test this
+ * cannot do.
+ */
+export type IconRejection = "empty" | "tooLarge" | "unsupportedType" | "extensionMismatch";
+
+export function classifyIconFile(file: File): IconRejection | null {
+  if (file.size <= 0) return "empty";
+  if (file.size > ACQUISITION_SOURCE_ICON_MAX_BYTES) return "tooLarge";
+  const mimeType = file.type.trim().toLowerCase();
+  const extensions = ACQUISITION_SOURCE_ICON_EXTENSIONS[mimeType];
+  if (!extensions) return "unsupportedType";
+  const dot = file.name.lastIndexOf(".");
+  const extension = dot >= 0 ? file.name.slice(dot).toLowerCase() : "";
+  return extensions.includes(extension) ? null : "extensionMismatch";
 }
 
 export function buildCreateAcquisitionSourceRequest(

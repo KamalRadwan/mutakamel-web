@@ -1,5 +1,8 @@
 # Global Workspace Rules
 
+- **Main branch only**: Always work directly on `main`. Never create or switch branches, check out another ref, detach HEAD, or create a worktree.
+- **Branch safety check**: Before editing a repository, verify that `git branch --show-current` returns `main`. Otherwise, stop and ask the user; do not switch branches or move existing changes yourself.
+
 - **Code Base Modification Permission**: Only read from codebase files when requested; do not modify or edit files unless explicitly instructed by the user.
 - **Strict Backend Code Prohibition**: NEVER edit, modify, or update backend code files under `../backend/` or any backend application under any circumstances. Only read backend files for API contract verification.
 - **Styling Standards**: ALWAYS use Tailwind CSS utility classes exclusively for styling components and layouts. NEVER write plain/vanilla CSS files or inline CSS styles (except CSS variable tokens in `globals.css`).

@@ -84,6 +84,13 @@ interface DataTableBaseProps<T> {
   getRowLabel?: (row: T) => string;
   responsiveMode?: "priority-columns" | "horizontal-scroll" | "record-cards";
   emptyState?: DataTableEmptyState;
+  /**
+   * Leading ordinal column. Numbering is continuous across pages — row 1 of
+   * page 2 at a limit of 20 reads 21 — so the value identifies a record within
+   * the whole result set, not just the visible page. Opt out for nested or
+   * detail tables where an ordinal carries no meaning.
+   */
+  showRowNumbers?: boolean;
 }
 
 interface DataTableWithoutSelection<T> {

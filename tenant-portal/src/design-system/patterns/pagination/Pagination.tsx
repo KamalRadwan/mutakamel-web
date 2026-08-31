@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "../../primitives/Button";
 import type { PageInfo } from "../data-table/types";
+import { pageWindow } from "./page-window";
 
 export interface PaginationProps {
   page: PageInfo;
@@ -11,6 +12,10 @@ export interface PaginationProps {
     previous: string;
     next: string;
     summary: (from: number, to: number, total: number) => string;
+    /** Optional; the numbered controls fall back to English-neutral labels. */
+    first?: string;
+    last?: string;
+    page?: (n: number) => string;
   };
   className?: string;
 }
@@ -31,14 +36,41 @@ export function Pagination({ page, onPageChange, labels, className }: Pagination
           variant="ghost"
           size="sm"
           disabled={page.page <= 1}
+          onClick={() => onPageChange(1)}
+          aria-label={labels.first ?? "First page"}
+        >
+          <ChevronsLeft className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={page.page <= 1}
           onClick={() => onPageChange(page.page - 1)}
           aria-label={labels.previous}
         >
           <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden="true" />
         </Button>
-        <span className="px-2 text-xs tabular-nums text-foreground">
-          {page.page} / {lastPage}
-        </span>
+
+        {pageWindow(page.page, lastPage).map((slot) =>
+          typeof slot === "number" ? (
+            <Button
+              key={slot}
+              variant={slot === page.page ? "primary" : "ghost"}
+              size="sm"
+              onClick={() => onPageChange(slot)}
+              aria-label={labels.page?.(slot) ?? `Page ${slot}`}
+              aria-current={slot === page.page ? "page" : undefined}
+              className={slot === page.page ? "pointer-events-none min-w-8 tabular-nums" : "min-w-8 tabular-nums"}
+            >
+              {slot}
+            </Button>
+          ) : (
+            <span key={slot} aria-hidden="true" className="px-1 text-xs text-muted-foreground select-none">
+              …
+            </span>
+          ),
+        )}
+
         <Button
           variant="ghost"
           size="sm"
@@ -47,6 +79,15 @@ export function Pagination({ page, onPageChange, labels, className }: Pagination
           aria-label={labels.next}
         >
           <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={page.page >= lastPage}
+          onClick={() => onPageChange(lastPage)}
+          aria-label={labels.last ?? "Last page"}
+        >
+          <ChevronsRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
         </Button>
       </div>
     </div>

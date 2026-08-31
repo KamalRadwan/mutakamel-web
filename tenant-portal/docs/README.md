@@ -27,6 +27,7 @@ Do not skim. These are ordered so that each one assumes the previous.
 | 7 | [api/README.md](api/README.md) | Gateway rules, envelopes, idempotency |
 | 8 | The specific `api/*.md` for your feature | Routes, DTOs, permissions, errors |
 | 9 | [build/HANDOFF.md](build/HANDOFF.md) | If you are executing the rebuild |
+| 10 | [build/CRM-AUDIT-REVIEW.md](build/CRM-AUDIT-REVIEW.md) | **What an outside audit found, and which of its claims survived re-checking.** Read it before writing CRM code — it is the verdict on the state of this stack, and it settles ten questions that were otherwise going to be re-litigated |
 
 ## Map
 
@@ -67,6 +68,7 @@ docs/
 | [views.md](design/views.md) | **The three-view contract** — board, card, table |
 | [detail-screens.md](design/detail-screens.md) | Lead & customer detail, and the conversion flow |
 | [accessibility.md](design/accessibility.md) | The single per-screen a11y checklist |
+| [states.md](design/states.md) | **The eleven-state contract** — every state a data screen renders |
 | [SKILL-AUDIT.md](design/SKILL-AUDIT.md) | ui-ux-pro-max audit — 17 gaps, 5 divergences |
 | [shell.md](design/shell.md) | Sidebar, topbar, navigation map |
 | [theming.md](design/theming.md) | Light/dark, RTL, and the no-flash requirement |

@@ -7,8 +7,10 @@ import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
   ACQUISITION_SOURCES_PATH,
+  ACQUISITION_SOURCE_REORDER_PATH,
   acquisitionSourcePath,
   buildCreateAcquisitionSourceRequest,
+  moveAcquisitionSourceOrder,
   parseAcquisitionSourceResponse,
   parseAcquisitionSourcesResponse,
   type AcquisitionSource,
@@ -34,6 +36,7 @@ export function useAcquisitionSources() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedForDelete, setSelectedForDelete] =
     useState<AcquisitionSource | null>(null);
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
     setIsLoading(true);
@@ -169,10 +172,60 @@ export function useAcquisitionSources() {
     }
   };
 
+  /**
+   * `PATCH /acquisition-sources/reorder` — task 8.18.
+   *
+   * The body is `{ orderedIds }`: the COMPLETE display order, every
+   * non-deleted source exactly once. There is no per-source rank field to
+   * PATCH — `sortOrder` is an entity field the server owns, never a query
+   * parameter and never a writable one.
+   *
+   * Auto-idempotency is left on: this route is `idempotent: true` in the
+   * Gateway contract and answers IDEM_MISSING without the key.
+   */
+  const handleMove = async (
+    source: AcquisitionSource,
+    direction: -1 | 1,
+  ): Promise<void> => {
+    if (!canManage || reorderingId) return;
+    const orderedIds = moveAcquisitionSourceOrder(items, source.id, direction);
+    if (!orderedIds) return;
+    const previous = items;
+    setReorderingId(source.id);
+    setMutationError(null);
+    // Optimistic: re-rank locally so the row moves before the round trip.
+    setItems((current) =>
+      orderedIds.map((id, index) => {
+        const entry = current.find((candidate) => candidate.id === id);
+        return { ...(entry as AcquisitionSource), sortOrder: index + 1 };
+      }),
+    );
+    try {
+      const response = await axiosClient.patch<unknown>(
+        ACQUISITION_SOURCE_REORDER_PATH,
+        { orderedIds },
+        { cache: "no-store", maxResponseBytes: CATALOGUE_RESPONSE_LIMIT_BYTES },
+      );
+      setItems(parseAcquisitionSourcesResponse(response.data));
+    } catch (error) {
+      // Rollback AND say why — a silent revert leaves the user watching a
+      // change undo itself (docs/design/states.md, state 8).
+      setItems(previous);
+      setMutationError(errorMessage(error, t.crmAcquisitionSources.reorderFailed));
+      await load();
+    } finally {
+      setReorderingId(null);
+    }
+  };
+
   return {
     t,
     lang,
     items: filteredItems,
+    // Reorder writes the whole catalogue order, so it must be driven by the
+    // unfiltered list; a searched view is not the real order and the controls
+    // are suppressed while one is active.
+    isFiltered: searchQuery.trim().length > 0,
     hasLoadedItems: items.length > 0,
     searchQuery,
     setSearchQuery,
@@ -204,11 +257,21 @@ export function useAcquisitionSources() {
       setMutationError(null);
       setSelectedForDelete(null);
     },
+    reorderingId,
+    handleMove,
+    // The icon upload lives in useAcquisitionSourceIcon; this is how its
+    // result reaches the list without that hook owning the catalogue.
+    applyUpdatedSource: (updated: AcquisitionSource) => {
+      setItems((current) =>
+        current.map((entry) => (entry.id === updated.id ? updated : entry)),
+      );
+    },
     handleCreate,
     handleDelete,
     reload: () => load(),
   };
 }
+
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";

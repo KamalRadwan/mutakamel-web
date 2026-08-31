@@ -24,13 +24,23 @@ export const CollapsibleTrigger = forwardRef<
 ));
 CollapsibleTrigger.displayName = "CollapsibleTrigger";
 
-// Like Accordion, this does not animate its height — see the note in
-// Accordion.tsx. motion.md bans transitioning `height`, and the keyframe
-// version of the same transition is the same ban.
+// The same single height exception Accordion takes, for the same reason and
+// under the same rule — docs/design/motion.md#the-one-height-exception. The
+// keyframes ship with `tw-animate-css` and read
+// `--radix-collapsible-content-height`; nothing is added to globals.css.
 export const CollapsibleContent = forwardRef<
   React.ComponentRef<typeof CollapsiblePrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof CollapsiblePrimitive.Content>
 >(({ className, ...props }, ref) => (
-  <CollapsiblePrimitive.Content ref={ref} className={cn("overflow-hidden", className)} {...props} />
+  <CollapsiblePrimitive.Content
+    ref={ref}
+    className={cn(
+      "overflow-hidden ease-(--ease-out-quart)",
+      "data-[state=open]:animate-collapsible-down data-[state=open]:duration-150",
+      "data-[state=closed]:animate-collapsible-up data-[state=closed]:duration-100",
+      className,
+    )}
+    {...props}
+  />
 ));
 CollapsibleContent.displayName = "CollapsibleContent";

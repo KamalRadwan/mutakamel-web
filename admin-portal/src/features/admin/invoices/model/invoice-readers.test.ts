@@ -98,6 +98,38 @@ describe("invoice wire readers", () => {
     expect(result.data.lines?.[0]).not.toHaveProperty("internalCost");
   });
 
+  it("projects the tenant identity a list row renders and nulls it when absent", () => {
+    const named = {
+      ...row(),
+      tenant: {
+        id: "019f0000-0000-7000-8000-000000000003",
+        name: "acme-retail",
+        companyName: "Acme Retail LLC",
+        status: "ACTIVE",
+        ownerEmail: "must-not-project@example.com",
+      },
+    };
+    const result = readInvoicePage(
+      envelope([named, row()], {
+        page: 1,
+        limit: 20,
+        total: 2,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      }),
+    );
+
+    expect(result.data.items[0].tenant).toEqual({
+      id: "019f0000-0000-7000-8000-000000000003",
+      name: "acme-retail",
+      companyName: "Acme Retail LLC",
+      status: "ACTIVE",
+    });
+    expect(result.data.items[0].tenant).not.toHaveProperty("ownerEmail");
+    expect(result.data.items[1].tenant).toBeNull();
+  });
+
   it("supports Core's direct pre-interceptor pagination shape", () => {
     const result = readInvoicePage(
       envelope({
@@ -118,6 +150,30 @@ describe("invoice wire readers", () => {
     ["unknown status", { ...row(true), status: "CANCELLED" }],
     ["missing detail lines", row(false)],
     ["non-v7 identifier", { ...row(true), tenantId: "tenant-1" }],
+    [
+      "a tenant summary billing another tenant",
+      {
+        ...row(true),
+        tenant: {
+          id: "019f0000-0000-7000-8000-0000000000ff",
+          name: "other",
+          companyName: "Other LLC",
+          status: "ACTIVE",
+        },
+      },
+    ],
+    [
+      "an unknown tenant status",
+      {
+        ...row(true),
+        tenant: {
+          id: "019f0000-0000-7000-8000-000000000003",
+          name: "acme-retail",
+          companyName: "Acme Retail LLC",
+          status: "ARCHIVED",
+        },
+      },
+    ],
   ])("fails closed for %s", (_label, malformed) => {
     expect(() => readInvoiceSnapshot(envelope(malformed))).toThrow(
       "INVALID_ADMIN_INVOICE_RESPONSE",

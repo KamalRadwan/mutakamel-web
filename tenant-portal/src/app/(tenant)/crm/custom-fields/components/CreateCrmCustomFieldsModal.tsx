@@ -11,7 +11,7 @@ import {
   type CreateCustomFieldInput,
   type CrmCustomFieldCreateOwnerType,
   type CrmCustomFieldSimpleCreateType,
-} from "../hooks/useCrmCustomFields";
+} from "../custom-field-contract";
 
 interface CreateModalProps {
   isOpen: boolean;

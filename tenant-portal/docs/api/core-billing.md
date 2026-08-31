@@ -9,9 +9,15 @@ Owning app: **core-app**
 Canonical prefixes: `/api/tenant/core/v1/billing`, `.../subscription`,
 `.../payments`, `.../wallet`, `.../branding`
 
-Portal status: **not-started** — MASTER-PLAN Phase 6. No screen calls any of
-these. The one exception is the *idea* of branding: nothing reads it yet
-(gap G2).
+Portal status: **built** — MASTER-PLAN Phase 6, 2026-08-31. Screens exist for
+every route except `GET /wallet`, which is not called because
+`GET /billing/summary` already returns the identical `WalletView`. Gap G2 is
+closed: `TenantBrandingTokens` reads `GET /branding/public` from the **root**
+layout, so the tenant brand reaches the login screen as well as the shell.
+
+A green `pnpm verify` does **not** prove this works against a real
+authenticated session. Nothing here has been exercised against a live tenant,
+a live payment provider or a real `primaryColor`.
 
 Source inspected:
 `core-app/src/tenant/billing/tenant-billing.controller.ts`,
@@ -63,6 +69,21 @@ wrong in the last decimal place is worse than no total.
 
 All carry `Cache-Control: private, no-store`.
 
+### The two shapes the quote form needs
+
+`GET /api/tenant/core/v1/billing/payment-input-currencies` returns
+`{walletCurrencyCode,items:[{currencyCode,isBaseCurrency}],total}`.
+`walletCurrencyCode` is typed `typeof BASE_CURRENCY` — it is **always USD**,
+which is the same "one wallet, always USD" rule stated above, expressed in the
+payload. `total` is `items.length`, not a page count; this route is not paged.
+
+`paymentCurrencyCode` on the quote body is `@Matches(/^[A-Z]{3}$/u)` after an
+upper-case trim — exactly three uppercase letters — and
+must be one of `payment-input-currencies`.
+The regex is a *shape* check only: a well-formed
+code that is not on the list is still refused, so populate the picker from the
+route rather than from any currency list you already hold.
+
 ### The payment flow, and the one thing that must not be got wrong
 
 ```text
@@ -100,6 +121,12 @@ immutable FX evidence — they are **not** a second balance. A UI that shows
 `topup` is `@AllowedDuringDunning()` on purpose: paying is exactly what a
 past-due tenant needs to be able to do.
 
+Its result cannot be read back per payment, though.
+`GET /billing/payments/:paymentId` requires `purpose === INVOICE_SETTLEMENT`
+and a non-null `invoiceId`, so it answers `PAYMENT_NOT_FOUND` for a top-up. The
+only readback is the paginated `GET /payments` —
+[Q26](../build/OPEN-QUESTIONS.md#q26--a-wallet-top-ups-status-cannot-be-read-back).
+
 ---
 
 ## Subscription — 4 routes
@@ -121,6 +148,13 @@ required for `ADD` and must be ≥1; `itemId` is required for everything except
 **The API has no downgrade path.** A UI that offers "reduce seats" or "remove
 module" and then surfaces a rejection is a worse experience than not offering
 it. Show the ceiling honestly and route reductions to support.
+
+**And no upgrade path it can drive, either.** `ADD` needs a module *and* a tier
+identifier, and there is no tenant-facing route that enumerates either — the
+catalogues are behind `AdminGuard`. The portal therefore expresses only
+`operation: CHANGE` with `itemId` + `seats`, and says plainly that adding a
+module or moving to a higher tier goes through support. See
+[Q25](../build/OPEN-QUESTIONS.md#q25--no-tenant-facing-module--tier-catalogue-for-a-plan-change).
 
 The preview is **durable, owner-bound and price-frozen**, and it expires.
 `apply` revalidates collection, price and wallet before committing, so a stale
@@ -163,13 +197,22 @@ state, not just a banner (task 6.14).
 
 ```text
 primaryColor · secondaryColor · fontFamily · appName · tabTitle · loginHtml
+logoUrl · iconUrl
 ```
 
-**There are no storage keys in it.** The logo and icon are separate binary
-routes, streamed through Core so no Storage credential ever reaches the
-browser. An earlier draft of MASTER-PLAN invented `logoStorageKey` and
-`iconStorageKey` — they do not exist. This is the field list; verify against
-`update-branding.dto.ts` before adding to it.
+**There are no storage keys in it.** An earlier draft of MASTER-PLAN invented
+`logoStorageKey` and `iconStorageKey`; they do not exist.
+
+`logoUrl` and `iconUrl` do — corrected 2026-08-31 against
+`BrandingService.getPublic()`, which returns **eight** fields, and against the
+Swagger example in `branding.controller.ts`. They are same-origin **paths** to
+the two public binary routes (`/api/tenant/core/v1/branding/public/logo` and
+`.../icon`), or `null` when no asset is stored or storage is unavailable. The
+bytes stream through Core, so no Storage credential ever reaches the browser —
+which is the property the "no storage keys" rule was protecting, and it still
+holds. The portal validates both fields against those two exact constants
+rather than treating them as free-form URLs. See
+[Q27](../build/OPEN-QUESTIONS.md#q27--publicbrandingview-carries-two-fields-the-contract-page-omits).
 
 The three public routes are the ones the **login screen** needs, because they
 resolve from the host before anyone has authenticated.
@@ -204,11 +247,23 @@ over static tokens. The runtime checker (task 13.26) is not optional.
 
 | Screen | Plan task | State |
 | --- | --- | --- |
-| `/core/billing` summary | 6.1 | not started |
-| `/core/billing/invoices` + detail | 6.2–6.3 | not started |
-| Payment quote / intent / status | 6.4–6.7 | not started |
-| Wallet top-up + history | 6.8–6.10 | not started |
-| `/core/subscription` | 6.11–6.13, 6.19 | not started |
-| Dunning surface | 6.14 | not started |
-| `/core/settings/branding` | 6.15–6.16 | not started |
-| Branding → tokens | 6.17–6.18 | not started (gap G2) |
+| `/core/billing` summary | 6.1 | built |
+| `/core/billing/invoices` + detail | 6.2–6.3 | built |
+| Payment quote / intent / status | 6.4–6.7 | built |
+| Wallet top-up + history | 6.8–6.10 | built |
+| `/core/subscription` | 6.11–6.13, 6.19 | built; seat increase only (Q25) |
+| Dunning surface | 6.14 | built |
+| `/core/settings/branding` | 6.15–6.16 | built |
+| Branding → tokens | 6.17–6.18 | built (G2 closed) |
+
+### The runtime contrast guard, measured
+
+`src/lib/branding/brand-ramp.ts` derives the ramp the way Phase 0 does — hold
+each step's OKLCH lightness, keep the tenant's hue, bisect chroma to the sRGB
+gamut — then re-measures all six token pairs before applying anything.
+
+The guard is not decorative. Scanning all 360 hues, the light primary fill
+(`white` on `brand-600`) bottoms out at **4.32:1 around hue 143**, so an
+ordinary brand green such as `#16a34a` is refused at 4.34:1 and falls back to
+the system brand, with the reason stated on the settings screen. Every other
+pair clears its threshold at every hue.

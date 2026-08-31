@@ -172,7 +172,7 @@ only way to trace a report back to a server log.
 CRM list endpoints inherit `PaginationQueryDto`:
 
 ```ts
-{ page?: number; limit?: number; sortBy?: string; sortOrder?: "ASC" | "DESC" }
+{ page?: number; limit?: number; sortBy?: string; sortDir?: "ASC" | "DESC" }
 ```
 
 Plus a **required** `branchId` on every CRM list — `BranchListQueryDto`

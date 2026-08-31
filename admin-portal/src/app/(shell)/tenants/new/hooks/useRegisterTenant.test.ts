@@ -256,6 +256,8 @@ async function renderReadyRegistration() {
       ...current,
       name: "acme",
       companyName: "Acme LLC",
+      // The sector no longer comes pre-filled, so the fixture states it.
+      industry: "Retail & Wholesale",
       ownerEmail: "owner@example.com",
       ownerFirstName: "Ada",
       ownerLastName: "Lovelace",
@@ -644,6 +646,18 @@ describe("useRegisterTenant silent quote recovery", () => {
     document.body.append(summary);
     result.current.validationSummaryRef.current = summary;
 
+    // The country is seeded from the host timezone, which differs between
+    // machines. Clearing it keeps this assertion about a *missing* country
+    // rather than about wherever the test happens to run.
+    act(() => {
+      result.current.setFormData((current) => ({
+        ...current,
+        countryIsoCode: "",
+        countryName: "",
+        timezone: "",
+      }));
+    });
+
     act(() => {
       result.current.nextStep();
     });
@@ -656,6 +670,7 @@ describe("useRegisterTenant silent quote recovery", () => {
       expect.arrayContaining([
         expect.objectContaining({ fieldId: "tenant-name", step: 1 }),
         expect.objectContaining({ fieldId: "tenant-company-name", step: 1 }),
+        expect.objectContaining({ fieldId: "tenant-industry", step: 1 }),
         expect.objectContaining({ fieldId: "tenant-country", step: 1 }),
       ]),
     );

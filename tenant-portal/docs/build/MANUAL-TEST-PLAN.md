@@ -206,3 +206,51 @@ None of these was catchable from `pnpm verify`; all three were green throughout.
 - **No in-body error on login** — every failure is a toast.
 - `TenantAuthGuard`'s loading and degraded screens are still hardcoded Arabic
   with raw palette classes — defect D16, tasks 3.12–3.14.
+
+---
+
+## Run 2 — 2026-08-31 · pre-auth surfaces and the token layer
+
+**Still blocked at P4.** The one tenant user is `INVITED`; both invite tokens
+have expired, so no authenticated session exists and sections B–H remain
+unrunnable. Sections that need no session were run instead.
+
+| Check | Result |
+| --- | --- |
+| Stack reachable | All nine containers healthy; Gateway answers `200` for the tenant Host |
+| `GET /branding/public` (pre-auth) | **200** — the three `@Public()` branding routes the login screen needs do resolve from the host |
+| `GET /auth/me` unauthenticated | **401**, then the login form renders. Correct fail-closed path |
+| Login screen renders | Yes — heading, email, password, forgot-password, remember-session, submit, footer |
+| Readex Pro | Loads and applies (`"Readex Pro", "Readex Pro Fallback", …`) — D20 stays fixed |
+| Theme flip, light → dark | **Verified.** All 23 semantic tokens remap onto the new ramps; `--primary` is exactly D1's pair; `--card`'s literal `white` becomes `ink-950` |
+| Density, stored preference | **Verified.** `comfortable` → bootstrap writes `--ui-scale: 1.1` before hydration; row 32.4 px → **39.6 px**, sidebar 208.8 px → **255.2 px** |
+| Density, live change with no reload | **Not verifiable in this harness** — see below |
+
+### The harness cannot observe live style changes, and nearly cost two false defects
+
+Changing density without a reload appeared to do nothing, and the same appeared
+true of an attribute-driven rewrite. Both readings were wrong. The control that
+settled it: setting a plain `height: 77px` — no custom property anywhere — on
+the same element still read back as `32.3906px`. **The browser pane was not
+re-running layout at all**, so every live-mutation measurement taken in it was
+meaningless.
+
+Fresh-load measurements *are* reliable, which is why the table above is stated
+in those terms. Anything requiring observation of an in-place change needs a
+real browser session.
+
+**The rule this earns: a measurement is not trustworthy until it has been seen
+to detect a change you know you made.** It is the instrument-side twin of *a
+gate is not done until it has rejected something* — the rule that had already
+caught the dead z-index selector and, this run, the vacuous zebra check
+([DEFECTS.md](DEFECTS.md) D21).
+
+### What P4 is still blocking
+
+- MASTER-PLAN **0.10, 0.20, 0.28, 0.33** — every remaining Phase 0 task is an
+  eyes-on pass over authenticated screens
+- **3.19** — the keyboard-only pass, which `accessibility.md` is explicit no
+  mechanical gate can replace
+- Manual test sections **B–H**, including the whole CRM script
+- CRM specifically is blocked twice over: **Q17** (grants) would still stop it
+  even with a session

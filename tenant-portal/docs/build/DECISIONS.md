@@ -170,6 +170,71 @@ applied in the same pre-hydration bootstrap so there is no flash.
 **Why.** The owner stated a personal preference. Tenant staff on other hardware
 may not share it, and this costs one token plus one menu item.
 
+### Shipped 2026-08-31 · one label changed, and one thing the plan got backwards
+
+Built as `DensityProvider` beside `ThemeProvider`, with the write duplicated
+into `layout.tsx`'s pre-hydration bootstrap and a test that pins the two
+against each other by reading the real file.
+
+**The middle option is labelled "Standard", not "Default".** 1.0 is *not* the
+default — 0.9 is. A menu that offers "Default" next to the option actually in
+force would be telling the user something untrue about their own settings, and
+the point of showing three choices is that the user can see which one they are
+on. The plan's wording is corrected here rather than in the UI.
+
+**Compact writes nothing.** The obvious implementation stores `"compact"` and
+sets `--ui-scale: 0.9` inline. That puts 0.9 in two places — `globals.css`
+and a TypeScript constant — with nothing to keep them equal. Instead compact
+**removes** the stored key and **removes** the inline property, letting the
+stylesheet stay the single source. Given that this very decision's parent (D2)
+records a `--ui-scale` implementation that shipped **inverted** with every
+gate green, a second uncheckable copy of the number was not worth the symmetry.
+
+Consequence recorded rather than fixed: `DataTable`'s `ESTIMATED_ROW_PX = 32`
+is `--size-row` at compact. It is now wrong for the other two densities for
+exactly one frame, because the first laid-out row replaces the estimate. The
+comment says so instead of implying the constant is universal.
+
+### Verified live — and the instrument lied first
+
+D2's whole point is that this token once shipped **inverted** with every gate
+green, so unit tests were not going to be enough. Driving the running app with
+`tenant_density=comfortable` in `localStorage`:
+
+| | compact (default) | comfortable |
+|---|---:|---:|
+| `<html style>` | *no override* | `--ui-scale: 1.1` |
+| `--size-row` consumer | 32.4 px | **39.6 px** |
+| `--size-sidebar` consumer | 208.8 px | **255.2 px** |
+
+The bootstrap writes the property before hydration and the geometry follows.
+**That is the path a real user takes, and it works.**
+
+**What could not be verified, and why the failure to verify was nearly recorded
+as two defects.** Changing the density *without* a reload appeared to do
+nothing: `--ui-scale` re-substituted correctly — `--size-row` computed to
+`calc(2.25rem * 1.1)` — while the consuming element stayed at 32.4 px. I first
+read that as the feature being broken, then as Tailwind's 137 KB stylesheet
+breaking `var()` invalidation, and got as far as testing an attribute-driven
+`:root[data-density]` rewrite instead.
+
+Both readings were wrong. The control that settled it was setting a plain
+`height: 77px` — no custom property anywhere — on the same element:
+`getComputedStyle` still reported **32.3906 px**. The browser pane was not
+re-running layout at all, so *every* live-mutation measurement taken in it was
+meaningless, and the two "findings" were properties of the instrument.
+
+The rule this earns, and the reason it is written here rather than forgotten:
+**a measurement is not trustworthy until it has been seen to detect a change
+you know you made.** It is the same rule as `gate is not done until it has
+rejected something`, applied to instruments instead of gates.
+
+So the live no-reload change is **unverified, not broken** — it needs a real
+browser session. The code path is identical to the one proven on load
+(`applyDensity` writes the same property the bootstrap writes, pinned to it by
+test), and it was left alone rather than rewritten to chase a defect that the
+evidence does not support.
+
 ---
 
 ## D4 · Board naming — `confirmed`
@@ -491,9 +556,124 @@ styling mechanism next to CVA for exactly two components.
 stylesheet — at which point the rule, not the workaround, is what gets
 revisited.
 
+## D-4.17 — the device store wins for rendering; the profile row is the durable copy
+
+**Decision.** `localStorage` is authoritative for what gets painted. The
+`GET/PUT /users/me/profile` row is the durable, cross-device copy, written after
+the local change, and read only to seed a device that has no local value yet.
+
+**Why it cannot be the other way round.** The no-flash mechanism in
+`src/app/layout.tsx` is a `beforeInteractive` script that sets `lang`, `dir` and
+`.dark` from `localStorage` *before React exists*. A server round-trip cannot
+feed that frame. Making the profile row authoritative for rendering would mean
+either a flash on every load or a blocking request in front of first paint, and
+`docs/design/theming.md#no-flash--the-mechanism` already settled that trade.
+
+**What this means concretely.**
+
+- `/core/profile` applies the choice locally first, then `PUT`s it. A failed
+  write leaves the local choice standing and says so — it does not roll the
+  user's screen back to a value they just rejected.
+- The screen shows both: the live device preference, and a second section
+  stating what the server holds. They can legitimately differ, and hiding that
+  would make a failed sync invisible.
+- A `themeKey` the portal does not recognise is displayed verbatim rather than
+  silently rewritten. The column is a free `varchar(64)`; another client may own
+  values this one does not.
+
+**Density (MASTER-PLAN 0.14) follows the same rule, and is not built yet.**
+0.14 has not landed, so there is no density preference to reconcile today. When
+it does: density is a render-time preference read by the same pre-hydration
+script, so `localStorage` wins there too. `UpdateTenantProfileDto` has no
+`density` field — `themeKey`, `language` and a free-form `extensions` object are
+all it declares — so the durable copy would live under `extensions`, which is
+the documented extension point rather than an invented DTO key. That choice
+should be confirmed when 0.14 is built, not assumed now.
+
+**Reverse it by:** dropping the no-flash guarantee, or moving preference
+resolution to the server with a per-tenant cookie the layout can read
+synchronously.
+
+## D-4.2 — the Core identity contracts live at the segment root, not in one screen
+
+**Decision.** `app/(tenant)/core/contracts/` holds the four modules every Core
+identity screen shares — the envelope reader and guards, and one contract each
+for organization, users and roles. `app/(tenant)/core/hooks/` holds the two
+hooks that are shared the same way: the remote-picker loader and the error-text
+mapper.
+
+**Why not per screen.** Organization, users and roles are three views of one
+backend resource graph. The invite drawer needs company, branch, department and
+team; the user detail needs roles; the role editor needs the permission
+catalogue; the team form needs users. Copying the envelope reader and the guard
+helpers into each screen is the duplication
+`file-architecture.md#cleanliness-rules` forbids, and importing a whole parse
+module from a sibling screen is more than the "narrow, named type/enum" the
+dependency rules allow.
+
+**Why this is not a new layer.** A parent route segment is neither of the two
+things the rules constrain. `app/(tenant)/core/` already owns `layout.tsx` and
+`error.tsx` for exactly these screens; these modules are owned the same way, and
+nothing outside `core/` imports them.
+
+**Reverse it by:** the day organization, users and roles stop sharing a resource
+graph — at which point each screen takes its own `<entity>-contract.ts` and the
+shared folder disappears.
+
 ## Log
 
 | Date | Change |
 |---|---|
 | 2026-08-30 | File created. D1, D2, D4 confirmed by the owner. D3, D5–D11 assumed by recommendation. D12, D13 open. |
+| 2026-08-31 | Phase 4: D-4.17 (preference precedence) and D-4.2 (shared Core identity contracts) added. |
 | 2026-08-31 | Phase 1: D14 and D15 added. D9 split by surface after the 1.46 de-risk — board columns move to `react-window`, the two non-dnd surfaces keep `@tanstack/react-virtual`. |
+
+---
+
+## D16 · The CSP policy, decided against what actually exists — `assumed`
+
+**Question.** MASTER-PLAN 13.25 split 13.1 because the CSP decision sat seven
+phases after the two things it must permit: the runtime brand-token injection
+(6.17) and the second pre-hydration bootstrap script (0.14). Both now exist, so
+the policy can be decided against real code instead of a guess.
+
+**The finding that changes the shape of the problem.** The fear behind 13.25
+was that runtime token injection would force `style-src 'unsafe-inline'`,
+which would gut the policy. It does not, because neither consumer injects
+markup:
+
+| Consumer | How it writes | CSP exposure |
+| --- | --- | --- |
+| `applyBrandingTokens` (6.17) | `root.style.setProperty("--color-brand-…", …)` | **None.** A CSSOM mutation from script is not a style attribute parsed from markup |
+| `applyDensity` + the bootstrap (0.14) | `d.style.setProperty("--ui-scale", …)` / `removeProperty` | **None**, same reason |
+| The bootstrap `<script>` itself | inline `<script>` in `layout.tsx` | **This is the only real exposure.** It needs a nonce |
+
+Neither creates a `<style>` element and neither assigns a `style` **attribute**
+string, so `style-src` never sees them. `style-src-attr` governs attributes
+that come from markup; CSSOM writes are outside CSP's scope.
+
+**Decision.**
+
+- CSP is minted per request in `src/proxy.ts` and handed to Next as a nonce —
+  the arrangement [security-headers.md](../architecture/security-headers.md)
+  already specifies. Nginx cannot do it: it cannot generate a fresh nonce.
+- `script-src 'nonce-<n>' 'strict-dynamic'` — the bootstrap script carries the
+  nonce. Nothing else inline.
+- `style-src` needs **no** `'unsafe-inline'` for branding or density. Whether
+  Next's own framework styles force it is a separate question, to be answered
+  by observation when the header ships, not assumed here.
+- `connect-src` must admit the Gateway origin; `img-src` must admit the
+  same-origin branding logo and icon binary routes.
+
+**Status: the doc describes a mechanism that is not built.**
+`security-headers.md` says CSP is generated in `src/proxy.ts`; there is no
+`Content-Security-Policy` string and no nonce anywhere in that file today.
+Enforcement is 13.1 and remains open. This entry decides the policy so that
+13.1 is an implementation task rather than a design one.
+
+**One thing to confirm rather than trust.** The CSSOM claim above is spec
+behaviour, and this project has already been caught twice believing a
+mechanism worked because the reasoning was sound (`--ui-scale` shipped
+inverted; the z-index selector matched nothing). When 13.1 ships the header,
+**verify the brand ramp still applies with the policy live** before calling it
+done — the failure mode is silent, and the tenant just sees the system brand.

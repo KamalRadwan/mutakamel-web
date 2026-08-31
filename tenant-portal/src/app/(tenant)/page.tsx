@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Lock, TrendingUp } from "lucide-react";
-import { PageHeader } from "@/design-system";
+import { Compass, Lock, Search, TrendingUp } from "lucide-react";
+import { PageHeader, cn, proseMeasure } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -17,7 +17,19 @@ export default function DashboardPage() {
   const { t } = useI18n();
   const { user } = useTenantAuth();
   const crmEntryRoute = getFirstPermittedCrmRoute(user?.permissions ?? []);
+  // A tenant with no branch cannot load a single CRM list — `branchId` is
+  // required on every one of them — so a launcher that only offers those lists
+  // is a dead end. `/auth/me` already answers this, at no request cost:
+  // `accessibleBranches` is derived straight from the `branches` table for an
+  // owner. MASTER-PLAN 13.23.
+  const needsFirstRun = (user?.accessibleBranches.length ?? 0) === 0;
   const destinations = [
+    {
+      href: TENANT_ROUTES.search,
+      icon: Search,
+      title: t.workspaceHome.searchTitle,
+      description: t.workspaceHome.searchDescription,
+    },
     {
       href: TENANT_ROUTES.coreSessions,
       icon: Lock,
@@ -42,6 +54,23 @@ export default function DashboardPage() {
         title={user ? t.workspaceHome.greeting(`${user.firstName} ${user.lastName}`) : ""}
         description={t.workspaceHome.subtitle}
       />
+
+      {needsFirstRun ? (
+        <Link
+          href={TENANT_ROUTES.gettingStarted}
+          className="flex items-start gap-3 rounded-md border border-primary bg-card p-4 transition-colors hover:bg-accent"
+        >
+          <Compass className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-foreground">
+              {t.workspaceHome.firstRunTitle}
+            </span>
+            <span className={cn("text-xs text-muted-foreground", proseMeasure)}>
+              {t.workspaceHome.firstRunDescription}
+            </span>
+          </span>
+        </Link>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         {destinations.map(({ href, icon: Icon, title, description }) => (

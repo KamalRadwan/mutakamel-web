@@ -37,11 +37,19 @@ describe("Collapsible", () => {
     expect(className).toContain("cursor-pointer");
   });
 
-  it("does not animate its height", () => {
+  it("takes the same single height keyframe Accordion does, on the same terms", () => {
     const { container } = renderCollapsible();
     fireEvent.click(screen.getByRole("button", { name: "Advanced filters" }));
     const markup = container.innerHTML;
-    expect(markup).not.toContain("animate-collapsible");
+
+    // docs/design/motion.md#the-one-height-exception — a keyframe over a height
+    // Radix has already measured, on a disclosure panel.
+    expect(markup).toContain("data-[state=open]:animate-collapsible-down");
+    expect(markup).toContain("data-[state=closed]:animate-collapsible-up");
+    expect(markup).toContain("data-[state=open]:duration-150");
+    expect(markup).toContain("data-[state=closed]:duration-100");
+
+    // Transitioning height, and the grid-template-rows trick, both stay banned.
     expect(markup).not.toContain("transition-[height]");
     expect(markup).not.toContain("grid-rows-");
   });

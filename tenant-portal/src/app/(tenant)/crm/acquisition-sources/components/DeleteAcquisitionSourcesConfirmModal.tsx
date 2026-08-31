@@ -2,6 +2,7 @@
 
 import { ConfirmActionModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { localizedName } from "@/lib/format/localized";
 import type { AcquisitionSource } from "../acquisition-source-contract";
 
 interface DeleteModalProps {
@@ -22,7 +23,7 @@ export function DeleteAcquisitionSourcesConfirmModal({
   error,
 }: DeleteModalProps) {
   const { t, lang } = useI18n();
-  const name = (lang === "ar" ? item?.nameAr : item?.nameEn) ?? "";
+  const name = localizedName(item, lang);
   const message = t.crmAcquisitionSources.deleteMessage(name);
 
   return (

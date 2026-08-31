@@ -232,8 +232,11 @@ visit. Full rule and rationale in
 
 ### Prose is capped at 65 characters
 
-`max-w-[65ch]` on dialog descriptions, empty states, error prose, and the
-ambiguous-outcome panel. Past roughly 75 characters the eye loses the line
+`max-w-prose` on dialog descriptions, empty states, error prose, and the
+ambiguous-outcome panel — Tailwind v4's `prose` max-width **is** `65ch`, so
+this is the scale utility rather than an arbitrary value. One symbol,
+`proseMeasure` in `src/design-system/lib/variants.ts`, so the cap is greppable
+and moves in one place. Past roughly 75 characters the eye loses the line
 return; in a full-width ERP container prose otherwise runs to 160+.
 
 Exempt: table cells, labels, badges, nav items. Those are not prose and a
@@ -248,6 +251,13 @@ they push their container off-screen.
 ```css
 overflow-wrap: anywhere;   /* on the mono / ID utility */
 ```
+
+Implemented as `identifierText` in `src/design-system/lib/variants.ts` —
+`font-mono wrap-anywhere`, Tailwind v4's `wrap-anywhere` being exactly
+`overflow-wrap: anywhere`. Wrap the value itself in `<bdi>` at the call site
+([accessibility.md](accessibility.md#bidirectional-text)): without it,
+bidirectional reordering mangles a Latin id inside Arabic chrome and the
+**displayed value is wrong**, not merely ugly.
 
 **Never `word-break: break-all`** — it applies to ordinary prose as well and
 hyphenates normal Arabic and English words mid-syllable.

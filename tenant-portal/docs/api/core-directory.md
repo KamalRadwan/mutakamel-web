@@ -9,7 +9,7 @@ Owning app: **core-app**
 Canonical prefixes: `/api/tenant/core/v1/directory`, `.../activities`,
 `.../activity-types`, `.../audit`
 
-Portal status: **not-started** — MASTER-PLAN Phase 7.
+Portal status: **built** — MASTER-PLAN Phase 7, tasks 7.1-7.9, 7.20-7.22.
 
 Source inspected:
 `core-app/src/tenant/directory/directory.controller.ts`,
@@ -176,11 +176,23 @@ last page.
 
 | Screen | Plan task | State |
 | --- | --- | --- |
-| `/core/directory` list, three views | 7.1 | not started |
-| `/core/directory/[id]` detail | 7.2–7.3 | not started |
-| Contact methods · addresses · roles · relationships | 7.4–7.7 | not started |
-| Party image | 7.8 | not started |
-| `/core/directory/settings` | 7.9 | not started |
-| `/core/audit` | 7.20 | not started |
-| Entity history on detail screens | 7.21 | not started |
-| `/core/activities` | 7.22 | not started |
+| `/core/directory` list, three views | 7.1 | built |
+| `/core/directory/[id]` detail | 7.2–7.3 | built |
+| Contact methods · addresses · relationships | 7.4, 7.5, 7.7 | built |
+| Party roles | 7.6 | built, tenant-wide only — see below |
+| Party image | 7.8 | built |
+| `/core/directory/settings` | 7.9 | built |
+| `/core/audit` | 7.20 | built |
+| Entity history on detail screens | 7.21 | built on party and template detail |
+| `/core/activities` | 7.22 | built |
+
+### What the portal does not offer
+
+**Branch-scoped party roles.** `CreatePartyRoleDto` accepts an optional
+`branchId`, but `DirectoryService` re-checks it against the actor's branch scope
+and answers `BRANCH_PERMISSION_DENIED`. The directory screen has no branch
+picker, so offering a branch id would only produce a refusal — roles are
+assigned tenant-wide until one exists.
+
+**`GET /parties/:id/contacts` is read on organization parties only.** It returns
+`emptyPage` for a `PERSON`, so the section is not rendered there.

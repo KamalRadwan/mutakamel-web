@@ -76,7 +76,15 @@ for (const file of existsSync(srcRoot) ? walk(srcRoot) : []) {
     const raw = m[1];
     // Skip obvious concatenation fragments — a bare prefix or a trailing slash.
     if (/\/v1\/?$/u.test(raw) || raw.endsWith("/")) continue;
+    // Prose, not a call: `/api/tenant/core/v1/...` in a doc comment.
+    if (raw.endsWith("...")) continue;
     const key = normalise(raw);
+    // A template-literal TYPE — `/api/tenant/core/v1/${string}` in
+    // src/lib/api/envelope.ts — normalises to one parameter directly under the
+    // version prefix. No Gateway route has that shape, and a path assembled
+    // entirely from a variable is already banned by the canonical-path rule, so
+    // this can only ever be a type alias.
+    if (/^\/api\/tenant\/[a-z]+\/v1\/:P$/u.test(key)) continue;
     if (!calls.has(key)) calls.set(key, new Set());
     calls.get(key).add(file.replace(portalRoot, "").replaceAll("\\", "/").replace(/^\//u, ""));
   }

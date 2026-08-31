@@ -17,7 +17,9 @@ vi.mock("@/i18n/I18nContext", async () => {
     typeof import("@/i18n/dictionaries/en")
   >("@/i18n/dictionaries/en");
   return {
-    useI18n: () => ({ t: dictionary, lang: "en" }),
+    useI18n: () => ({ t: dictionary, lang: "en", dir: "ltr" }),
+    // The map picker pulls in DialogContent, which reads this one.
+    useOptionalI18n: () => ({ t: dictionary, lang: "en", dir: "ltr" }),
   };
 });
 
@@ -120,7 +122,7 @@ describe("RegisterTenantWizardPage field associations", () => {
   it("associates localized labels and names with identity, address, and phone controls", () => {
     currentStep = 1;
     useRegisterTenantMock.mockImplementation(hookState);
-    render(<RegisterTenantWizardPage />);
+    const { container } = render(<RegisterTenantWizardPage />);
     const labels = en.tenants.wizard.fieldLabels;
 
     expect(screen.getByLabelText(labels.tenantName)).toHaveAttribute("name", "name");
@@ -128,7 +130,13 @@ describe("RegisterTenantWizardPage field associations", () => {
       "name",
       "companyName",
     );
-    expect(screen.getByLabelText(labels.industry)).toHaveAttribute("name", "industry");
+    // The sector is a combobox now, so the submitted value rides a hidden
+    // input rather than the labelled control itself.
+    expect(screen.getByRole("combobox", { name: labels.industry })).toHaveAttribute(
+      "id",
+      "tenant-industry",
+    );
+    expect(container.querySelector('input[name="industry"]')).not.toBeNull();
     expect(screen.getByRole("combobox", { name: labels.country })).toHaveAttribute(
       "id",
       "tenant-country",
@@ -137,11 +145,11 @@ describe("RegisterTenantWizardPage field associations", () => {
       "id",
       "tenant-timezone",
     );
-    expect(screen.getByLabelText(labels.tenantPhoneCountryCode)).toHaveAttribute(
-      "name",
-      "phoneCountryCode",
-    );
-    expect(screen.getByLabelText(labels.tenantPhone)).toHaveAttribute("name", "phone");
+    // The calling code moved into the phone control as its own combobox.
+    expect(
+      screen.getByRole("combobox", { name: labels.phoneCallingCode }),
+    ).toHaveAttribute("id", "tenant-phone-code");
+    expect(screen.getByLabelText(labels.companyPhone)).toHaveAttribute("name", "phone");
 
     const addressFields = [
       [labels.street, "street"],
@@ -158,27 +166,23 @@ describe("RegisterTenantWizardPage field associations", () => {
     for (const [label, name] of addressFields) {
       expect(screen.getByLabelText(label)).toHaveAttribute("name", name);
     }
-    expect(screen.getByLabelText("Latitude (-90 to 90)")).toHaveAttribute(
-      "name",
-      "latitude",
-    );
-    expect(screen.getByLabelText("Longitude (-180 to 180)")).toHaveAttribute(
-      "name",
-      "longitude",
-    );
+    // Coordinates are chosen on a map now, not typed.
+    expect(screen.queryByLabelText(/Latitude/u)).toBeNull();
+    expect(screen.queryByLabelText(/Longitude/u)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: en.tenants.wizard.pickOnMap }),
+    ).toBeInTheDocument();
   });
 
   it("associates localized labels, names, and required semantics with owner phone subfields", () => {
     currentStep = 2;
     useRegisterTenantMock.mockImplementation(hookState);
-    render(<RegisterTenantWizardPage />);
+    const { container } = render(<RegisterTenantWizardPage />);
     const labels = en.tenants.wizard.fieldLabels;
     const ownerFields = [
       [labels.ownerEmail, "ownerEmail"],
       [labels.firstName, "ownerFirstName"],
       [labels.lastName, "ownerLastName"],
-      [labels.jobTitle, "ownerJobTitle"],
-      [labels.ownerPhoneCountryCode, "ownerPhoneCountryCode"],
       [labels.ownerPhone, "ownerPhone"],
     ] as const;
 
@@ -187,5 +191,17 @@ describe("RegisterTenantWizardPage field associations", () => {
       expect(input).toHaveAttribute("name", name);
       expect(input).toBeRequired();
     }
+
+    // The job title is a catalogue combobox now, and the owner's calling code
+    // folded into the phone control as its own combobox -- both post their
+    // value through a companion input rather than the labelled control.
+    expect(screen.getByRole("combobox", { name: labels.jobTitle })).toHaveAttribute(
+      "id",
+      "tenant-owner-job-title",
+    );
+    expect(container.querySelector('input[name="ownerJobTitle"]')).not.toBeNull();
+    expect(
+      screen.getByRole("combobox", { name: labels.phoneCallingCode }),
+    ).toHaveAttribute("id", "tenant-owner-phone-code");
   });
 });

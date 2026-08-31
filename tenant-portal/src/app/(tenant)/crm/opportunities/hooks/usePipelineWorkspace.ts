@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -594,6 +595,17 @@ export function usePipelineWorkspace() {
 
   const { branchIds, branchId, selectBranch } =
     useTenantBranchSelection(user);
+  // `crm.opportunities.capabilities.get` is BRANCH_REQUIRED in the Gateway
+  // route contract, so it needs the two scope headers as well as the branchId
+  // query parameter. Without them the Gateway answers 400 GW.REQUEST.INVALID
+  // before crm-app sees the request — validateOrganizationScope() in
+  // api-gateway-app/src/common/middleware/route-context.middleware.ts — and
+  // every capability-gated control degraded for a reason unrelated to
+  // permissions (D11 / MASTER-PLAN 8.5).
+  const capabilityScopeHeaders = useOrganizationScopeHeaders(
+    "BRANCH_REQUIRED",
+    branchId,
+  );
 
   const setSelectedPipelineId = useCallback(
     (nextPipelineId: string | null) => {
@@ -644,6 +656,7 @@ export function usePipelineWorkspace() {
               signal,
               cache: "no-store",
               maxResponseBytes: 128 * 1024,
+              headers: capabilityScopeHeaders,
             },
           ),
         ]);
@@ -692,7 +705,7 @@ export function usePipelineWorkspace() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [branchId],
+    [branchId, capabilityScopeHeaders],
   );
 
   const fetchBoardData = useCallback(

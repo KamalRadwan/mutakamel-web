@@ -29,6 +29,12 @@ import {
   getAdminAuthHandling,
   getApiRequestOutcome,
 } from "@/lib/api/axiosClient";
+import {
+  countryFromBrowserTimezone,
+  deriveTenantCode,
+  getAllTimezones,
+  resolveBrowserTimezone,
+} from "@/lib/geo/country-data";
 import { tenantRegistrationApi } from "../api/tenant-registration.api";
 import {
   buildTenantSubscriptionLines,
@@ -145,7 +151,9 @@ export function useRegisterTenant() {
   const [formData, setFormData] = useState({
     name: "",
     companyName: "",
-    industry: "Retail & E-commerce",
+    // No pre-filled sector: it is a required business fact, and a default
+    // that looks answered gets submitted unread.
+    industry: "",
     countryName: "",
     countryIsoCode: "",
     timezone: "",
@@ -154,6 +162,7 @@ export function useRegisterTenant() {
     taxNumber: "",
     commercialRegistrationNumber: "",
     street: "",
+    street2: "",
     city: "",
     state: "",
     district: "",
@@ -175,11 +184,74 @@ export function useRegisterTenant() {
     billingCycle: "MONTHLY" as TenantBillingCycle,
   });
 
-  const countryTimezoneOptions = useMemo(
-    () =>
-      getCanonicalCountrySelection(formData.countryIsoCode)?.timezones ?? [],
-    [formData.countryIsoCode],
-  );
+  /**
+   * Every zone, not just the selected country's.
+   *
+   * A tenant can be registered in one country and operate on another
+   * country's clock; the country-scoped list made that unselectable. Country
+   * selection still *suggests* a zone, it no longer constrains one.
+   */
+  const countryTimezoneOptions = useMemo(() => getAllTimezones(), []);
+
+  /**
+   * Seeds the country from the browser's own timezone on first render.
+   *
+   * A default, not an assertion: it only fills a blank country and never
+   * overrides a choice the admin has already made. Resolved locally, so no
+   * IP address leaves the browser and nothing depends on a lookup service.
+   */
+  const hasSeededCountry = useRef(false);
+  useEffect(() => {
+    if (hasSeededCountry.current) return;
+    hasSeededCountry.current = true;
+    if (formData.countryIsoCode) return;
+    const isoCode = countryFromBrowserTimezone();
+    if (!isoCode) return;
+    const seeded = getCanonicalCountrySelection(isoCode);
+    if (!seeded) return;
+    const browserZone = resolveBrowserTimezone();
+    // Seeding in a state initializer instead would run during SSR, where
+    // `Intl` reports the *server's* zone and the markup would not match what
+    // the browser then renders. An effect is the SSR-safe place for it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFormData((current) =>
+      current.countryIsoCode
+        ? current
+        : {
+            ...current,
+            countryName: seeded.countryName,
+            countryIsoCode: seeded.countryIsoCode,
+            // Prefer the admin's actual zone over the country's first one.
+            timezone:
+              browserZone && seeded.timezones.includes(browserZone)
+                ? browserZone
+                : (seeded.timezones[0] ?? ""),
+            phoneCountryCode: seeded.callingCode,
+            ownerPhoneCountryCode:
+              current.ownerPhoneCountryCode || seeded.callingCode,
+          },
+    );
+    // Runs once on mount; later country edits are the admin's to make.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Keeps the tenant code in step with the company name until the admin
+   * edits the code directly, after which their value is left alone.
+   */
+  const hasManualTenantCode = useRef(false);
+  const markTenantCodeManual = useCallback(() => {
+    hasManualTenantCode.current = true;
+  }, []);
+  const applyCompanyName = useCallback((companyName: string) => {
+    setFormData((current) => ({
+      ...current,
+      companyName,
+      ...(hasManualTenantCode.current
+        ? {}
+        : { name: deriveTenantCode(companyName) }),
+    }));
+  }, []);
 
   const selectCountry = useCallback((countryIsoCode: string) => {
     const nextCountry = getCanonicalCountrySelection(countryIsoCode);
@@ -381,6 +453,17 @@ export function useRegisterTenant() {
       );
       if (generation !== databaseRequestGeneration.current) return;
       setDatabasePlacementOptions(options);
+      // A single eligible server is not a choice; preselect it so the step is
+      // already satisfied instead of asking the admin to confirm the obvious.
+      // Only fills a blank selection, so an explicit pick is never overridden.
+      if (options.length === 1) {
+        const only = options[0]!;
+        setFormData((current) =>
+          current.databaseServerId
+            ? current
+            : { ...current, databaseServerId: only.id },
+        );
+      }
     } catch (caught) {
       if (generation !== databaseRequestGeneration.current) return;
       setDatabasePlacementError(normalizeApiError(caught));
@@ -497,6 +580,14 @@ export function useRegisterTenant() {
       }
       const options = readStoragePlacementOptions(response.data);
       setStoragePlacementOptions(options);
+      if (options.length === 1) {
+        const only = options[0]!;
+        setFormData((current) =>
+          current.storageServerId
+            ? current
+            : { ...current, storageServerId: only.id },
+        );
+      }
       setFormData((current) =>
         current.storageServerId &&
         !options.some((option) => option.id === current.storageServerId)
@@ -747,7 +838,8 @@ export function useRegisterTenant() {
     });
   }, [identityFingerprint]);
 
-  const handleValidateIdentity = async () => {
+  /** Resolves to whether the identity is confirmed available. */
+  const handleValidateIdentity = async (): Promise<boolean> => {
     const fingerprint = identityFingerprint;
     const generation = ++identityRequestGeneration.current;
     identityRequestAbort.current?.abort();
@@ -770,13 +862,14 @@ export function useRegisterTenant() {
         fingerprint !==
           tenantIdentityFingerprint(formData.name, formData.companyName)
       ) {
-        return;
+        return false;
       }
       setIdentityValidationEvidence({ fingerprint, result });
       if (result.valid) {
         clearValidationError("tenant-name");
         clearValidationError("tenant-company-name");
         toast.success(t.tenants.registerFlow.identityAvailableTitle, result.message);
+        return true;
       } else {
         const errors: TenantWizardValidationError[] = [];
         if (!result.fields.name.valid || !result.fields.name.available) {
@@ -798,13 +891,14 @@ export function useRegisterTenant() {
         }
         showValidationErrors(errors, 1);
         toast.error(t.tenants.registerFlow.identityUnavailableTitle, result.message);
+        return false;
       }
     } catch (caught) {
       if (
         generation !== identityRequestGeneration.current ||
         controller.signal.aborted
       ) {
-        return;
+        return false;
       }
       const error = normalizeApiError(caught);
       setIdentityValidationError(error);
@@ -813,6 +907,7 @@ export function useRegisterTenant() {
         1,
       );
       toast.error(t.tenants.registerFlow.identityCheckFailedTitle, error.message);
+      return false;
     } finally {
       if (generation === identityRequestGeneration.current) {
         setIsValidatingIdentity(false);
@@ -923,6 +1018,7 @@ export function useRegisterTenant() {
             ? { postalCode: formData.postalCode }
             : {}),
           ...(formData.street.trim() ? { street1: formData.street } : {}),
+          ...(formData.street2.trim() ? { street2: formData.street2 } : {}),
           ...(formData.buildingNo.trim()
             ? { buildingNo: formData.buildingNo }
             : {}),
@@ -1102,13 +1198,27 @@ export function useRegisterTenant() {
     }
   };
 
-  const goToStep = (step: number) => {
+  const goToStep = async (step: number) => {
     if (isSubmitting || pendingCreateRecovery) return;
     const next = Math.max(1, Math.min(5, step));
     if (next <= currentStep) {
       setValidationErrors([]);
       setCurrentStep(next);
       return;
+    }
+    // Leaving step 1 with an unchecked name used to fail with "check
+    // availability first", which is a demand for a click the wizard can make
+    // itself. Run the check and continue on success; a genuine clash still
+    // stops here with the server's own message.
+    if (
+      next > 1 &&
+      !hasValidIdentityEvidence &&
+      formData.name.trim() &&
+      formData.companyName.trim() &&
+      !isValidatingIdentity
+    ) {
+      const available = await handleValidateIdentity();
+      if (!available) return;
     }
     const identityErrors = getIdentityValidationErrors();
     if (next > 1 && identityErrors.length > 0) {
@@ -1165,7 +1275,11 @@ export function useRegisterTenant() {
   return {
     t,
     currentStep,
-    goToStep,
+    goToStep: (step: number) => {
+      void goToStep(step);
+    },
+    applyCompanyName,
+    markTenantCodeManual,
     validationErrors,
     clearValidationError,
     focusValidationField,
@@ -1220,7 +1334,9 @@ export function useRegisterTenant() {
     recoverTenantCreateStatus,
     handleValidateIdentity,
     handleSubmit,
-    nextStep: () => goToStep(currentStep + 1),
+    nextStep: () => {
+      void goToStep(currentStep + 1);
+    },
     prevStep: () => {
       if (!isSubmitting && !pendingCreateRecovery) {
         setValidationErrors([]);

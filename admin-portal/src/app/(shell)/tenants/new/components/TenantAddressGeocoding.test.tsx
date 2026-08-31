@@ -11,6 +11,45 @@ vi.mock("../api/tenant-registration.api", () => ({
   tenantRegistrationApi: { reverseGeocode: reverseGeocodeMock },
 }));
 
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({
+    dir: "ltr",
+    t: {
+      tenants: {
+        wizard: {
+          pickOnMap: "Pick on map",
+          mapDialogTitle: "Pick the company location",
+          mapDialogDescription: "Drag the marker or click the map.",
+          mapConfirm: "Use this location",
+          mapCancel: "Cancel",
+          mapLoading: "Loading map…",
+        },
+      },
+    },
+  }),
+}));
+
+// Leaflet needs a laid-out DOM that jsdom does not provide. The picker is
+// stubbed so these tests cover the wiring -- point chosen -> reverse geocode
+// -> apply -- rather than the map widget itself.
+vi.mock("@/components/shared/LocationPickerDialog", () => ({
+  LocationPickerDialog: ({
+    open,
+    onConfirm,
+  }: {
+    open: boolean;
+    onConfirm: (location: { latitude: number; longitude: number }) => void;
+  }) =>
+    open ? (
+      <button
+        type="button"
+        onClick={() => onConfirm({ latitude: 30.0444, longitude: 31.2357 })}
+      >
+        confirm-map-point
+      </button>
+    ) : null,
+}));
+
 import {
   TenantAddressGeocoding,
   TenantReverseGeocodeError,
@@ -19,20 +58,17 @@ import {
 describe("TenantAddressGeocoding", () => {
   beforeEach(() => reverseGeocodeMock.mockReset());
 
-  it("validates coordinates before calling Core", () => {
+  it("asks for a point on the map instead of raw coordinates", () => {
     render(<TenantAddressGeocoding lang="en" onApply={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText("Latitude (-90 to 90)"), {
-      target: { value: "30.12345678" },
-    });
-    fireEvent.change(screen.getByLabelText("Longitude (-180 to 180)"), {
-      target: { value: "31.2" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Find address" }));
 
+    // The latitude/longitude boxes are gone: a typo in either silently
+    // resolved to the wrong country.
+    expect(screen.queryByLabelText(/Latitude/u)).toBeNull();
+    expect(screen.queryByLabelText(/Longitude/u)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Pick on map" }),
+    ).toBeInTheDocument();
     expect(reverseGeocodeMock).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "no more than seven decimal places",
-    );
   });
 
   it("renders an editable suggestion and applies it only on confirmation", async () => {
@@ -47,13 +83,8 @@ describe("TenantAddressGeocoding", () => {
     reverseGeocodeMock.mockResolvedValue(suggestion);
     render(<TenantAddressGeocoding lang="en" onApply={onApply} />);
 
-    fireEvent.change(screen.getByLabelText("Latitude (-90 to 90)"), {
-      target: { value: "30.0444" },
-    });
-    fireEvent.change(screen.getByLabelText("Longitude (-180 to 180)"), {
-      target: { value: "31.2357" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Find address" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pick on map" }));
+    fireEvent.click(screen.getByRole("button", { name: "confirm-map-point" }));
 
     await screen.findByText("Tahrir Street, Cairo, Egypt");
     expect(onApply).not.toHaveBeenCalled();
