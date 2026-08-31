@@ -45,7 +45,5 @@ dist/
 **/dist/
 .claude/
 **/.claude/
-.agents/
-**/.agents/
-.agent/
+**/.agent/
 **/.agent/
