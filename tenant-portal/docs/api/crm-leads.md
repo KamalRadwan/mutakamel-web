@@ -20,6 +20,15 @@ it needs `x-mutakamel-company-id` and `x-mutakamel-branch-id` as well as the
 `400 GW.REQUEST.INVALID` before crm-app sees the request, which reads exactly
 like "no capabilities" and is not a permission answer.
 
+The company header comes from `/auth/me.accessibleBranchCompanies`, with
+branch-specific team memberships used only when an older Core response omits
+that field. This supports owners and role grants without a matching team
+membership. The shared scope hook preserves header identity until the company,
+branch, or route mode changes, so loading and error state updates do not restart
+the list or detail capabilities requests. A failed list retains its error and
+correlation reference; retries are explicit, and selecting another branch
+starts one new load.
+
 Source inspected:
 `crm-app/src/crm/leads/leads.controller.ts`,
 `crm-app/src/crm/leads/dto/lead.dto.ts`,

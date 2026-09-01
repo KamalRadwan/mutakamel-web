@@ -106,19 +106,23 @@ export function OpportunityBoardColumn({
             {items.map((item, index) => (
               <BoardCard
                 key={item.id}
-                draggableId={item.id}
                 index={index}
-                isDragDisabled={isBusy || !canUpdate(item)}
-                moveTargets={isBusy || !canUpdate(item) ? [] : moveTargets.filter(({ id }) => id !== stage.id)}
-                onMoveTo={(toStageId) => onMoveCard(item.id, stage.id, toStageId)}
-                moveToLabel={t.views.moveTo}
-              >
-                <OpportunityBoardCard
-                  item={item}
-                  canUpdate={canUpdate(item) && !isBusy}
-                  onImportanceChange={(next) => onImportanceChange(item.id, next)}
-                />
-              </BoardCard>
+                card={{
+                  id: item.id,
+                  isDragDisabled: isBusy || !canUpdate(item),
+                  moveTargets:
+                    isBusy || !canUpdate(item) ? [] : moveTargets.filter(({ id }) => id !== stage.id),
+                  onMoveTo: (toStageId: string) => onMoveCard(item.id, stage.id, toStageId),
+                  moveToLabel: t.views.moveTo,
+                  content: (
+                    <OpportunityBoardCard
+                      item={item}
+                      canUpdate={canUpdate(item) && !isBusy}
+                      onImportanceChange={(next) => onImportanceChange(item.id, next)}
+                    />
+                  ),
+                }}
+              />
             ))}
             {provided.placeholder}
             {lane.pageInfo.hasMore && (

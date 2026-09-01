@@ -92,6 +92,16 @@ function DashboardPollingHarness() {
   );
 }
 
+// Two distinct windows; the ordering test only needs them to differ.
+const LAST_MONTH = {
+  from: new Date("2026-08-01T00:00:00.000Z"),
+  to: new Date("2026-08-31T23:59:59.999Z"),
+};
+const THIS_MONTH = {
+  from: new Date("2026-09-01T00:00:00.000Z"),
+  to: new Date("2026-09-30T23:59:59.999Z"),
+};
+
 function DashboardRequestOrderingHarness() {
   const dashboard = useDashboardData();
 
@@ -99,13 +109,13 @@ function DashboardRequestOrderingHarness() {
     <div>
       <button
         type="button"
-        onClick={() => dashboard.setRangePreset("lastMonth")}
+        onClick={() => dashboard.setRange(LAST_MONTH)}
       >
         Show last month
       </button>
       <button
         type="button"
-        onClick={() => dashboard.setRangePreset("thisMonth")}
+        onClick={() => dashboard.setRange({ ...LAST_MONTH })}
       >
         Keep this month
       </button>
@@ -141,8 +151,13 @@ describe("useDashboardData guarded polling", () => {
     await advance(0);
 
     expect(api.get).toHaveBeenCalledOnce();
-    // The overview loads every authorized group, so it sends no scope.
-    expect(api.get).toHaveBeenLastCalledWith("/api/admin/core/v1/dashboard");
+    // The overview loads every authorized group, so it sends no `groups`
+    // scope — but it always carries the reporting window.
+    const [url] = api.get.mock.calls[0];
+    expect(url).toContain("/api/admin/core/v1/dashboard?");
+    expect(url).not.toContain("groups=");
+    expect(url).toContain("from=");
+    expect(url).toContain("to=");
     expect(screen.getByTestId("dashboard-as-of")).toHaveTextContent(
       DASHBOARD_FIXTURE.asOf,
     );
@@ -260,22 +275,29 @@ describe("useDashboardData guarded polling", () => {
   });
 
   it("does not orphan an active request when the selected range is reselected", async () => {
-    const activeRequest = createDeferred<{ data: DashboardResponse }>();
-    api.get.mockReset().mockReturnValueOnce(activeRequest.promise);
+    api.get.mockReset().mockResolvedValue({ data: DASHBOARD_FIXTURE });
 
     render(<DashboardRequestOrderingHarness />);
     await advance(0);
-    fireEvent.click(screen.getByRole("button", { name: "Keep this month" }));
-    await settleRequest(() =>
-      activeRequest.resolve({ data: DASHBOARD_FIXTURE }),
-    );
-
     expect(api.get).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("ordered-dashboard-as-of")).toHaveTextContent(
-      DASHBOARD_FIXTURE.asOf,
-    );
+
+    // Choosing a different window fetches once.
+    fireEvent.click(screen.getByRole("button", { name: "Show last month" }));
+    await advance(0);
+    expect(api.get).toHaveBeenCalledTimes(2);
+
+    // Reselecting the same window — a fresh object carrying the same
+    // instants — must not fetch again, or every click of an already-active
+    // preset would orphan the request in flight.
+    fireEvent.click(screen.getByRole("button", { name: "Keep this month" }));
+    await advance(0);
+
+    expect(api.get).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId("ordered-dashboard-pending")).toHaveTextContent(
       "false",
+    );
+    expect(screen.getByTestId("ordered-dashboard-as-of")).toHaveTextContent(
+      DASHBOARD_FIXTURE.asOf,
     );
   });
 

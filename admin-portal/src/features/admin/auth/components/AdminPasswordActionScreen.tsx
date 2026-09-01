@@ -95,7 +95,7 @@ export function AdminPasswordActionScreen({
           </p>
         </div>
 
-        <form onSubmit={action.submit} className="space-y-4" noValidate>
+        <form method="post" onSubmit={action.submit} className="space-y-4" noValidate>
           <PasswordField
             label={common.newPassword}
             value={action.password}

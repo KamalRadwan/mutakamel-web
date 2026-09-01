@@ -99,23 +99,27 @@ const rgb = Object.fromEntries(
   Object.entries(T).map(([k, v]) => [k, oklchToLinearSrgb(...v)]),
 );
 
-/* ---------- The claims from docs/design/DESIGN-SYSTEM.md ---------- */
+/* ---------- The claims from docs/design/DESIGN-SYSTEM.md ----------
+   Recomputed when the palette was replaced with the admin portal's — see the
+   port note at the top of src/app/globals.css. The REQUIRED ratios are
+   untouched; only the "claimed" column moved, because that column records what
+   the shipped colours actually measure. */
 
 const CLAIMS = [
   // [label, foreground, background, required ratio, claimed in DESIGN-SYSTEM.md]
-  ["primary fill · light", "white", "brand-600", 4.5, 4.79],
-  ["primary fill · dark", "ink-950", "brand-400", 4.5, 7.47],
-  ["link/text · light", "brand-700", "white", 4.5, 6.88],
-  ["link/text · dark", "brand-300", "ink-1000", 4.5, 11.24],
+  ["primary fill · light", "white", "brand-600", 4.5, 6.7],
+  ["primary fill · dark", "ink-950", "brand-400", 4.5, 7.24],
+  ["link/text · light", "brand-700", "white", 4.5, 8.72],
+  ["link/text · dark", "brand-300", "ink-1000", 4.5, 11.12],
   ["muted text · light", "ink-600", "white", 4.5, 6.31],
-  ["muted text · dark", "ink-400", "ink-1000", 4.5, 8.07],
-  ["body text · light", "ink-900", "ink-50", 4.5, 15.37],
-  ["body text · dark", "ink-100", "ink-1000", 4.5, 18.31],
+  ["muted text · dark", "ink-400", "ink-1000", 4.5, 7.98],
+  ["body text · light", "ink-900", "ink-50", 4.5, 14.92],
+  ["body text · dark", "ink-100", "ink-1000", 4.5, 17.65],
   ["destructive fill", "white", "negative-700", 4.5, 7.02],
-  ["positive text · light", "positive-700", "white", 4.5, 5.78],
-  ["positive text · dark", "positive-300", "ink-1000", 4.5, 12.29],
-  ["focus ring · light (non-text)", "brand-500", "ink-50", 3.0, 3.4],
-  ["focus ring · dark (non-text)", "brand-400", "ink-1000", 3.0, 7.96],
+  ["positive text · light", "positive-700", "white", 4.5, 5.02],
+  ["positive text · dark", "positive-300", "ink-1000", 4.5, 14.35],
+  ["focus ring · light (non-text)", "brand-500", "ink-50", 3.0, 4.86],
+  ["focus ring · dark (non-text)", "brand-400", "ink-1000", 3.0, 7.68],
   // Zebra separation. The previous single claim here was vacuous twice over:
   // it required a ratio of 1.0, which two IDENTICAL colours satisfy exactly, so
   // the check could never fail; and it compared the zebra against `white`
@@ -131,14 +135,14 @@ const CLAIMS = [
   // Badge tones. Badge.tsx renders <tone>-800 on <tone>-100 in light and
   // <tone>-300 on <tone>-950 in dark, for all four roles — eight pairs this
   // gate never checked, on the most numerous coloured element in the product.
-  ["badge brand · light", "brand-800", "brand-100", 4.5, 7.9],
-  ["badge positive · light", "positive-800", "positive-100", 4.5, 7.19],
-  ["badge caution · light", "caution-800", "caution-100", 4.5, 6.29],
-  ["badge negative · light", "negative-800", "negative-100", 4.5, 8.07],
-  ["badge brand · dark", "brand-300", "brand-950", 4.5, 9.49],
-  ["badge positive · dark", "positive-300", "positive-950", 4.5, 9.91],
-  ["badge caution · dark", "caution-300", "caution-950", 4.5, 10.45],
-  ["badge negative · dark", "negative-300", "negative-950", 4.5, 9.47],
+  ["badge brand · light", "brand-800", "brand-100", 4.5, 8.49],
+  ["badge positive · light", "positive-800", "positive-100", 4.5, 6.46],
+  ["badge caution · light", "caution-800", "caution-100", 4.5, 6.73],
+  ["badge negative · light", "negative-800", "negative-100", 4.5, 7.89],
+  ["badge brand · dark", "brand-300", "brand-950", 4.5, 9.15],
+  ["badge positive · dark", "positive-300", "positive-950", 4.5, 10.61],
+  ["badge caution · dark", "caution-300", "caution-950", 4.5, 10.46],
+  ["badge negative · dark", "negative-300", "negative-950", 4.5, 9.24],
 ];
 
 // The one genuine contrast-driven exclusion. The docs used to claim two more
@@ -155,7 +159,11 @@ let failures = 0;
 let drift = 0;
 
 process.stdout.write("\nPALETTE CONTRAST VERIFICATION\n");
-process.stdout.write("(computed from the OKLCH values in docs/design/DESIGN-SYSTEM.md)\n\n");
+// Names the file this script actually parses. It used to print
+// DESIGN-SYSTEM.md, which is the file the CLAIMS were written from, not the
+// file the COLOURS are read from — and that is the exact confusion the parse
+// rewrite above existed to end.
+process.stdout.write("(computed from the OKLCH values in src/app/globals.css)\n\n");
 
 // An out-of-gamut token is not a warning. The browser clips it, so the colour
 // that ships is not the colour that was measured — which silently invalidates

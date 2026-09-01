@@ -10,10 +10,14 @@ import {
 import { TenantAuthGuard } from "@/components/auth/TenantAuthGuard";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { ar } from "@/i18n/dictionaries/ar";
+import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
 import { TenantAuthProvider, useTenantAuth } from "./AuthContext";
 
 const replace = vi.fn();
 const push = vi.fn();
+const SCOPE_BRANCH = "0192f3a0-0000-7000-8000-000000000002";
+const SCOPE_COMPANY = "0192f3a0-0000-7000-8000-000000000001";
+const OTHER_SCOPE_COMPANY = "0192f3a0-0000-7000-8000-000000000004";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, push }),
@@ -61,6 +65,11 @@ function LoginProbe() {
   );
 }
 
+function OrganizationScopeProbe() {
+  const headers = useOrganizationScopeHeaders("BRANCH_REQUIRED", SCOPE_BRANCH);
+  return <output data-testid="organization-scope">{JSON.stringify(headers)}</output>;
+}
+
 describe("TenantAuthProvider committed login bootstrap", () => {
   beforeEach(() => {
     const localStorage = new MemoryStorage();
@@ -75,6 +84,7 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     });
     vi.stubGlobal("localStorage", localStorage);
     vi.stubGlobal("sessionStorage", sessionStorage);
+    vi.spyOn(document, "cookie", "get").mockReturnValue("");
     Object.defineProperty(window.navigator, "locks", {
       configurable: true,
       value: {
@@ -95,6 +105,222 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     vi.restoreAllMocks();
   });
 
+  it.each([false, true])(
+    "settles a guest without /me or refresh when cookies are absent (stored metadata: %s)",
+    async (hasStoredMetadata) => {
+      if (hasStoredMetadata) seedSessionState("stale-session");
+      vi.spyOn(document, "cookie", "get").mockReturnValue("unrelated-preference=1");
+      const addListener = vi.spyOn(window, "addEventListener");
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+
+      render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+
+      await waitFor(() => expect(screen.getByText("UNAUTHENTICATED:none")).toBeTruthy());
+      fireEvent.focus(window);
+      fireEvent(window, new Event("online"));
+      fireEvent(window, new Event("pageshow"));
+      fireEvent.click(screen.getByRole("button", { name: "retry" }));
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(addListener.mock.calls.some(([type]) => type === "pointerdown"))
+        .toBe(false);
+      expect(window.sessionStorage.getItem("tenant_session_meta")).toBeNull();
+    },
+  );
+
+  it.each([
+    "mutakamel-http-tenant-csrf",
+    "__Host-mutakamel-tenant-csrf",
+  ])("restores a %s session without stored metadata", async (cookieName) => {
+    vi.spyOn(document, "cookie", "get").mockReturnValue(`${cookieName}=csrf-proof`);
+    const addListener = vi.spyOn(window, "addEventListener");
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("/api/tenant/core/v1/auth/me");
+      expect(init?.method).toBe("GET");
+      expect(init?.credentials).toBe("include");
+      expect(new Headers(init?.headers).has("Authorization")).toBe(false);
+      return jsonResponse(profileResponse());
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+
+    await waitFor(() => expect(screen.getByText("AUTHENTICATED:tenant@example.test")).toBeTruthy());
+    // Inside its own waitFor, not asserted straight after the one above.
+    //
+    // That first waitFor polls the DOM, and the DOM is written at commit time.
+    // Activity tracking starts in a useEffect (AuthContext's `authState`/`user`
+    // effect), and React flushes passive effects AFTER the commit — so there is
+    // a window where the probe already reads AUTHENTICATED and the listener has
+    // not been registered yet. Asserting immediately made this test fail on
+    // roughly one run in three, and only when other tests ran alongside it,
+    // because they are what made the machine slow enough to land in that window.
+    //
+    // Keep it as a retried assertion rather than an `act()`/flush: if tracking
+    // genuinely never starts, this still fails on the waitFor timeout, so the
+    // test keeps its teeth.
+    await waitFor(() =>
+      expect(addListener.mock.calls.some(([type]) => type === "pointerdown")).toBe(true),
+    );
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("restores an owner and resolves branch scope without a team membership", async () => {
+    vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(profileResponse({
+      accessibleBranches: [SCOPE_BRANCH],
+      accessibleCompanies: [SCOPE_COMPANY],
+      accessibleBranchCompanies: [{ branchId: SCOPE_BRANCH, companyId: SCOPE_COMPANY }],
+    }))));
+
+    render(
+      <TenantAuthProvider><LoginProbe /><OrganizationScopeProbe /></TenantAuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText("AUTHENTICATED:tenant@example.test")).toBeTruthy());
+    expect(JSON.parse(screen.getByTestId("organization-scope").textContent ?? "null")).toEqual({
+      "x-mutakamel-company-id": SCOPE_COMPANY,
+      "x-mutakamel-branch-id": SCOPE_BRANCH,
+    });
+  });
+
+  it.each([SCOPE_COMPANY, OTHER_SCOPE_COMPANY])(
+    "accepts truncated company projections while requiring the selected company (%s)",
+    async (selectedCompany) => {
+      const otherBranch = "0192f3a0-0000-7000-8000-000000000003";
+      vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(profileResponse({
+        accessibleBranches: [SCOPE_BRANCH, otherBranch],
+        accessibleCompanies: [SCOPE_COMPANY],
+        accessibleBranchCompanies: [
+          { branchId: SCOPE_BRANCH, companyId: selectedCompany },
+          { branchId: otherBranch, companyId: OTHER_SCOPE_COMPANY },
+        ],
+        accessScope: { branchesTruncated: false, companiesTruncated: true },
+      }))));
+
+      render(
+        <TenantAuthProvider><LoginProbe /><OrganizationScopeProbe /></TenantAuthProvider>,
+      );
+
+      await waitFor(() => expect(screen.getByText("AUTHENTICATED:tenant@example.test")).toBeTruthy());
+      expect(JSON.parse(screen.getByTestId("organization-scope").textContent ?? "null")).toEqual(
+        selectedCompany === SCOPE_COMPANY
+          ? { "x-mutakamel-company-id": SCOPE_COMPANY, "x-mutakamel-branch-id": SCOPE_BRANCH }
+          : {},
+      );
+    },
+  );
+
+  it.each([
+    { name: "null map", mapping: null },
+    { name: "object instead of array", mapping: { branchId: SCOPE_BRANCH, companyId: SCOPE_COMPANY } },
+    { name: "null entry", mapping: [null] },
+    { name: "invalid branch UUID", mapping: [{ branchId: "branch", companyId: SCOPE_COMPANY }] },
+    { name: "invalid company UUID", mapping: [{ branchId: SCOPE_BRANCH, companyId: "company" }] },
+    { name: "inaccessible branch", mapping: [{ branchId: "0192f3a0-0000-7000-8000-000000000003", companyId: SCOPE_COMPANY }] },
+    { name: "inaccessible company", mapping: [{ branchId: SCOPE_BRANCH, companyId: "0192f3a0-0000-7000-8000-000000000005" }] },
+    { name: "conflicting ownership", mapping: [
+      { branchId: SCOPE_BRANCH, companyId: SCOPE_COMPANY },
+      { branchId: SCOPE_BRANCH, companyId: OTHER_SCOPE_COMPANY },
+    ] },
+  ])("rejects an auth profile with $name", async ({ mapping }) => {
+    vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
+    const fetchMock = vi.fn(async () => jsonResponse(profileResponse({
+      accessibleBranches: [SCOPE_BRANCH],
+      accessibleCompanies: [SCOPE_COMPANY, OTHER_SCOPE_COMPANY],
+      accessibleBranchCompanies: mapping,
+    })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+
+    await waitFor(() => expect(screen.getByText("UNAUTHENTICATED:none")).toBeTruthy());
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    "mutakamel-http-tenant-csrf",
+    "__Host-mutakamel-tenant-csrf",
+  ])("still refreshes expired access for an established %s session", async (cookieName) => {
+    seedSessionState("019f0000-0000-7000-8000-000000000002");
+    vi.spyOn(document, "cookie", "get").mockReturnValue(`${cookieName}=csrf-proof`);
+    let refreshed = false;
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/tenant/core/v1/auth/refresh") {
+        expect(init?.method).toBe("POST");
+        expect(new Headers(init?.headers).get("x-csrf-token")).toBe("csrf-proof");
+        refreshed = true;
+        return jsonResponse(webAuthResponse());
+      }
+      if (url === "/api/tenant/core/v1/auth/me") {
+        return refreshed
+          ? jsonResponse(profileResponse())
+          : jsonResponse({ code: "TOKEN_EXPIRED" }, 401);
+      }
+      throw new Error("Unexpected auth request");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+
+    await waitFor(() => expect(screen.getByText("AUTHENTICATED:tenant@example.test")).toBeTruthy());
+    expect(fetchMock.mock.calls.filter(([url]) =>
+      url === "/api/tenant/core/v1/auth/refresh",
+    )).toHaveLength(1);
+  });
+
+  it("does not authenticate from a CSRF hint when the server rejects the session", async () => {
+    vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=stale-proof");
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ code: "COMMON.AUTH.MISSING_BEARER_TOKEN" }, 401),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+
+    await waitFor(() => expect(screen.getByText("UNAUTHENTICATED:none")).toBeTruthy());
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tenant/core/v1/auth/me",
+      expect.objectContaining({ method: "GET", credentials: "include" }),
+    );
+  });
+
+  it("posts login credentials as JSON and bootstraps without Web Locks", async () => {
+    Object.defineProperty(window.navigator, "locks", { configurable: true, value: undefined });
+    let loginAccepted = false;
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).not.toContain("?");
+      if (url === "/api/tenant/core/v1/auth/login") {
+        expect(init?.method).toBe("POST");
+        expect(init?.credentials).toBe("include");
+        const headers = new Headers(init?.headers);
+        expect(headers.get("Content-Type")).toBe("application/json");
+        expect(headers.has("Authorization")).toBe(false);
+        expect(JSON.parse(String(init?.body))).toEqual({
+          email: "tenant@example.test",
+          password: "correct horse battery staple",
+        });
+        loginAccepted = true;
+        vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
+        return jsonResponse(webAuthResponse());
+      }
+      if (url === "/api/tenant/core/v1/auth/me") {
+        return loginAccepted ? jsonResponse(profileResponse()) : endedSessionResponse();
+      }
+      throw new Error("Unexpected auth request");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+    await waitFor(() => expect(screen.getByText("UNAUTHENTICATED:none")).toBeTruthy());
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "login" }));
+    await waitFor(() => expect(screen.getByText("AUTHENTICATED:tenant@example.test")).toBeTruthy());
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(push).toHaveBeenCalledWith("/");
+  });
+
   it.each(["http-503", "network"] as const)(
     "commits login metadata before /me and stays degraded on %s failure",
     async (failureKind) => {
@@ -104,6 +330,7 @@ describe("TenantAuthProvider committed login bootstrap", () => {
         requestedPaths.push(`${init?.method ?? "GET"} ${url}`);
         if (url === "/api/tenant/core/v1/auth/login") {
           loginAccepted = true;
+          vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
           return jsonResponse(webAuthResponse());
         }
         if (url === "/api/tenant/core/v1/auth/me" && !loginAccepted) {
@@ -128,7 +355,7 @@ describe("TenantAuthProvider committed login bootstrap", () => {
         </TenantAuthProvider>,
       );
       await waitFor(() =>
-        expect(screen.getByText("ENDED:none")).toBeTruthy(),
+        expect(screen.getByText("UNAUTHENTICATED:none")).toBeTruthy(),
       );
 
       fireEvent.click(screen.getByRole("button", { name: "login" }));
@@ -152,7 +379,7 @@ describe("TenantAuthProvider committed login bootstrap", () => {
       );
       expect(requestedPaths.filter(
         (request) => request === "GET /api/tenant/core/v1/auth/me",
-      )).toHaveLength(2);
+      )).toHaveLength(1);
       expect(push).not.toHaveBeenCalledWith("/");
     },
   );
@@ -443,6 +670,7 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     "AUTH_SESSION_ABSOLUTE_EXPIRED",
     "AUTH_SECURITY_STALE",
   ])("carries the %s that ended the session into /session-expired", async (code) => {
+    vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code }, 401)));
 
     render(
@@ -461,9 +689,10 @@ describe("TenantAuthProvider committed login bootstrap", () => {
   });
 
   it("claims no expiry for a visitor who simply presented no credentials", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () =>
+    const fetchMock = vi.fn(async () =>
       jsonResponse({ code: "MISSING_BEARER_TOKEN" }, 401),
-    ));
+    );
+    vi.stubGlobal("fetch", fetchMock);
 
     render(
       <I18nProvider>
@@ -476,6 +705,7 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     );
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalledWith(
       expect.stringContaining("/session-expired"),
     );
@@ -551,7 +781,7 @@ function webAuthResponse(): Record<string, unknown> {
   };
 }
 
-function profileResponse(): Record<string, unknown> {
+function profileResponse(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     data: {
       id: "tenant-user-a",
@@ -564,11 +794,13 @@ function profileResponse(): Record<string, unknown> {
       accessibleCompanies: ["company-a"],
       permissions: [],
       teamMemberships: [],
+      ...overrides,
     },
   };
 }
 
 function seedSessionState(sessionId: string): void {
+  vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
   const savedAt = Date.now();
   const eventId = `event-${sessionId}`;
   window.localStorage.setItem("tenant_auth_session_event", JSON.stringify({

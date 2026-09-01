@@ -15,7 +15,9 @@ namespace — not a section of `core`. Its routes are therefore absent from
 
 The previous implementation stored per-user SIP state as `webphone_*` columns on
 `tenant_users` and served it from `/api/tenant/core/v1/users/me/webphone`. That
-surface is deleted; those paths now return 404. See [users.md](users.md).
+surface is deleted; those paths now return 404. See
+[core-identity.md](core-identity.md#users--22-routes), which absorbed the
+former `users.md`.
 
 ## Source of truth
 

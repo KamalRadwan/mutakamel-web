@@ -1,7 +1,20 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Radix Switch measures its thumb through ResizeObserver, which jsdom does not
+// implement. The stub only has to exist; nothing here asserts on measurement.
+beforeAll(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+});
 
 const { api, toastMock, authMock } = vi.hoisted(() => ({
   api: {
@@ -37,7 +50,10 @@ vi.mock("@/context/AuthContext", () => ({
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en", t: {} }),
 }));
-vi.mock("@/components/ui/ToastContext", () => ({
+// The real module the `@/design-system` barrel re-exports `useToast` from.
+// Mocking the barrel itself would replace every primitive the screen renders;
+// this replaces only the toaster, which is the one thing under assertion.
+vi.mock("@/design-system/feedback/useToast", () => ({
   useToast: () => toastMock,
 }));
 

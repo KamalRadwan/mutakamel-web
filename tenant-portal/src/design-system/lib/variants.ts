@@ -1,15 +1,19 @@
 import { cva, type VariantProps } from "class-variance-authority";
 
-// Sizes and paddings from docs/design/DESIGN-SYSTEM.md#3--sizing--density —
-// that file supersedes geometry.md's 28-44px scale with a tighter 24-40px one.
+// Control height scale — xs/sm/md/lg/xl map to the 24/28/32/36/40px
+// --size-control-* tokens. Heights, paddings and the fixed 1.5 gap are the
+// admin portal's (admin-portal/src/design-system/lib/variants.ts), so a
+// control of a given size is the same physical control in both portals. The
+// two paddings that moved are xs (1.5 -> 2) and sm (2 -> 2.5); lg tightened
+// from px-4 to px-3.5 so the lg step is not the same width as xl.
 export const controlSize = cva("", {
   variants: {
     size: {
-      xs: "h-(--size-control-xs) px-1.5 text-xs gap-1",
-      sm: "h-(--size-control-sm) px-2   text-xs gap-1.5",
-      md: "h-(--size-control-md) px-3   text-sm gap-1.5",
-      lg: "h-(--size-control-lg) px-4   text-sm gap-2",
-      xl: "h-(--size-control-xl) px-4   text-base gap-2.5",
+      xs: "h-(--size-control-xs) px-2   text-xs  gap-1.5",
+      sm: "h-(--size-control-sm) px-2.5 text-xs  gap-1.5",
+      md: "h-(--size-control-md) px-3   text-sm  gap-1.5",
+      lg: "h-(--size-control-lg) px-3.5 text-sm  gap-1.5",
+      xl: "h-(--size-control-xl) px-4   text-base gap-1.5",
     },
   },
   defaultVariants: { size: "md" },
@@ -49,14 +53,23 @@ export const readOnlySurface =
   "read-only:bg-muted read-only:text-foreground read-only:cursor-default " +
   "read-only:border-border read-only:placeholder:text-muted-foreground";
 
-// Controls below the 44px touch-target floor get an invisible expanded hit
-// area instead of a bigger visible box — see geometry.md#hit-area-expansion.
+// Controls below the 44px touch-target floor get a real expanded target
+// instead of a bigger visible box — see geometry.md#hit-area-expansion.
 //
-// 8px, not 6px: at --ui-scale 0.9 the default control is 28.8px, and 6px per
-// side reaches only 40.8px — under the floor this exists to clear. 8px gives
-// 44.8px. Re-derive if the scale default moves again.
-export const hitArea =
-  "relative after:absolute after:-inset-2 after:content-['']";
+// This is admin's mechanism, and it replaces a fixed `after:-inset-2`. That
+// 8px was derived from --ui-scale 0.9 ("28.8px + 8px per side = 44.8px"), a
+// number that silently stopped being right the moment the scale default moved
+// to 1. The class pair below is declared in globals.css and expressed in
+// minimum sizes rather than a hardcoded inset, so it holds the WCAG floor at
+// any scale — and it expands only for coarse pointers, where the floor
+// actually applies.
+//
+// hitArea grows the control box itself; hitTarget keeps a compact visual box
+// (checkbox, radio) while its generated ::after stays part of the same
+// hit-testing area.
+export const hitArea = "ds-hit-area";
+
+export const hitTarget = "ds-hit-target";
 
 // B11 (SKILL-AUDIT.md): UUIDs, correlationIds, idempotency keys and cursors
 // are unbroken 36-character tokens with no natural break point, and they

@@ -560,7 +560,7 @@ function StorageServerEditor({
         </>
       }
     >
-      <form id="storage-server-editor-form" onSubmit={submit} className="space-y-4 py-1">
+      <form method="post" id="storage-server-editor-form" onSubmit={submit} className="space-y-4 py-1">
         {error && (
           <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <p>{error.message}</p>
@@ -664,7 +664,7 @@ function SafeRotationEditor({
         </>
       }
     >
-      <form id="safe-rotation-form" onSubmit={submit} className="space-y-4 py-1">
+      <form method="post" id="safe-rotation-form" onSubmit={submit} className="space-y-4 py-1">
         {error && (
           <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <p>{error.message}</p>

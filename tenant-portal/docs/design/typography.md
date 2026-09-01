@@ -17,70 +17,131 @@ products.
 Alongside that: 83 arbitrary `text-[Npx]` sizes, 157 `font-bold`/`extrabold`/
 `black` sites against 30 normal/medium, and no scale of any kind.
 
-## Pairing: Readex Pro + DM Mono
+## The faces: IBM Plex Sans, Plex Sans Arabic, Plex Mono
 
-**Readex Pro** carries all interface text — headings and body, Arabic and
-Latin, from one family.
+Ported verbatim from the admin portal, so both portals draw the same
+superfamily. **Plex Sans** and **Plex Sans Arabic** carry all interface text
+between them; **Plex Mono** carries machine values.
 
-This is the single most consequential typographic decision in the system.
-Readex Pro is a superfamily drawn for Arabic and Latin *together*, so a status
-badge's Latin `QUALIFIED` sitting inside an Arabic sentence shares the family's
-own vertical metrics. It does not jump baseline or x-height the way two
-separately-chosen faces do, no matter how carefully they are matched.
+This is still the single most consequential typographic decision in the system,
+and the port did not change what it is *for* — only how it is spelled. Plex
+Sans Arabic was drawn against Plex Latin by the same team, so a status badge's
+Latin `QUALIFIED` sitting inside an Arabic sentence still shares vertical
+metrics with the sentence around it. It does not jump baseline or x-height the
+way two independently-chosen faces do.
 
-What that buys, concretely:
-
-- No `:lang()` switching and no per-script font stack.
-- One set of vertical metrics, so line-height maths is correct for both scripts.
-- Mixed-script table cells — extremely common here, an Arabic customer name
-  beside a Latin UUID fragment — align without per-cell correction.
-
-It is also not a face anyone reaches for by default, which matters: picking
-Inter, Geist, or Cairo is exactly the choice that makes a product look
-generated rather than designed.
-
-**DM Mono** carries identifiers and machine values: UUIDs, correlation IDs,
-idempotency keys, error codes, decimal strings. It is narrow, has unambiguous
-`0`/`O` and `1`/`l`, and its light colour sits quietly next to Readex without
-competing.
-
-```ts
-// src/app/fonts.ts
-import { Readex_Pro, DM_Mono } from "next/font/google";
-
-export const readex = Readex_Pro({
-  subsets: ["latin", "arabic"],
-  weight: ["400", "500", "600"],
-  variable: "--font-readex",
-  display: "swap",
-});
-
-export const dmMono = DM_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-dm-mono",
-  display: "swap",
-});
-```
+The one thing that genuinely changed: this is **two sans families, not one**,
+and the stack order now does the work a single family used to do for free.
 
 ```css
-@theme inline {
-  --font-sans: var(--font-readex), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
-  --font-mono: var(--font-dm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+@theme {
+  --font-sans: var(--font-plex-latin), var(--font-plex-arabic), ui-sans-serif,
+    system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 ```
 
-Both fonts must be applied via `className` on `<html>` in
-`src/app/layout.tsx`, never loaded through a `<link>` — `next/font` self-hosts
-them, which removes the render-blocking round trip to Google and the privacy
-question that comes with it.
+**Latin first, Arabic second.** The browser resolves `font-family` per
+*character*, not per element: a Latin run finds its glyphs in Plex Sans and
+stops there, an Arabic run finds nothing in Plex Sans and falls through to Plex
+Sans Arabic. Both render on the same line, with no `:lang()` switching and no
+per-script stack — the property the single-family choice used to buy, bought
+here by ordering.
 
-> **Verify at build time.** These faces have not been rendered in this
-> environment. Confirm that Readex Pro's Arabic subset loads and that its
-> numerals are legible at `text-xs` before converting screens. If Readex Pro's
-> Arabic proves too wide for the table density in
-> [geometry.md](geometry.md), the fallback choice is **Zain** (also a
-> Latin+Arabic superfamily, narrower) — record the switch here if it happens.
+Note `@theme`, **not** `@theme inline`. Under Tailwind v4 `inline` means
+"substitute this value into utilities and do not emit the custom property", so
+an inline `--font-sans` does not exist at runtime and
+`body { font-family: var(--font-sans) }` resolves to nothing — the app renders
+in the system stack while the webfont downloads and draws no glyph. `body`
+therefore also names the two variables directly rather than going through
+`--font-sans`.
+
+What the pairing buys, concretely:
+
+- No `:lang()` switching and no component branching on language to pick a face.
+- One set of vertical metrics across both scripts, so line-height maths is
+  correct for both.
+- Mixed-script table cells — extremely common here, an Arabic customer name
+  beside a Latin UUID fragment — align without per-cell correction.
+
+**Plex Mono** carries identifiers and machine values: UUIDs, correlation IDs,
+idempotency keys, error codes, decimal strings. Unambiguous `0`/`O` and
+`1`/`l`, and it sits quietly beside Plex Sans because it is the same
+superfamily rather than a mono chosen to look compatible.
+
+```ts
+// src/app/fonts.ts
+import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
+
+export const plexLatin = IBM_Plex_Sans({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-latin",
+  display: "swap",
+  preload: false,
+});
+
+export const plexArabic = IBM_Plex_Sans_Arabic({
+  subsets: ["arabic"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-arabic",
+  display: "swap",
+  preload: false,
+});
+
+export const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
+  display: "swap",
+  preload: false,
+});
+```
+
+All three `.variable` classNames go on `<body>` in `src/app/layout.tsx`, never
+through a `<link>` — `next/font` self-hosts them, which removes the
+render-blocking round trip to Google and the privacy question that comes with
+it.
+
+**`latin-ext` draws no glyph this UI renders.** It is declared so a tenant or a
+person named with an accented character still renders in Plex rather than
+dropping to a system sans mid-word.
+
+### Nothing is preloaded, and that is deliberate
+
+A preload is a promise that a file is needed for the first paint. This app
+cannot make that promise about any of these faces:
+
+- The language lives in `localStorage`, so the server always renders
+  `lang="ar"` and the client corrects it after hydration. Every Arabic preload
+  the server emits is wasted on an English operator, and the other way round.
+- `latin-ext` carries no glyph this UI draws.
+- Which weights a screen needs depends on the screen.
+
+Preloading anyway costs a wasted download per face and makes the browser warn
+that a preloaded resource went unused on every page load — the browser
+reporting exactly that broken promise. `display: swap` keeps text visible while
+a face arrives.
+
+### Pairing: Readex Pro + DM Mono
+
+**Superseded.** These were the system's faces until the token layer was
+replaced with the admin portal's. The reasoning that chose them — one
+superfamily across scripts, three weights, a quiet mono for identifiers — is
+the reasoning the Plex trio satisfies as well, with the extra property that
+both portals now set the same type.
+
+Two things retired with them. Readex Pro was chosen partly because *nobody
+reaches for it by default*, which is no longer the argument: Plex is chosen
+because the sibling portal already ships it, and consistency between the two
+products beats distinctiveness within one. And the standing "verify at build
+time, fall back to **Zain** if Readex Pro's Arabic proves too wide at row
+density" instruction is closed — there is no Zain fallback, and the row it
+would have been measured against is 44px now, not 36.
+
+Build records that link to this section, notably
+[../build/PHASE-2-FOUNDATION.md](../build/PHASE-2-FOUNDATION.md), describe what
+that phase installed and are accurate as history.
 
 ## Three weights, physically enforced
 
@@ -114,31 +175,32 @@ Hierarchy comes from size and color. Never weight.
 
 ```css
 @theme {
-  --text-2xs: 0.75rem;              /* 12px — Latin uppercase micro-labels ONLY */
-  --text-2xs--line-height: 1rem;    /* 16px */
+  --text-2xs: 0.8125rem;              /* 13px — compatibility alias; migrate to text-xs */
+  --text-2xs--line-height: 1.125rem;  /* 18px */
   --text-2xs--letter-spacing: 0.06em;
 
-  --text-xs: 0.8125rem;             /* 13px — workhorse: table cells, badges, meta */
-  --text-xs--line-height: 1.125rem; /* 18px */
+  --text-xs: 0.8125rem;               /* 13px — workhorse: table headers, badges, meta */
+  --text-xs--line-height: 1.125rem;   /* 18px */
+  --text-xs--letter-spacing: 0em;
 
-  --text-sm: 0.875rem;              /* 14px — base: body, inputs, buttons, nav */
-  --text-sm--line-height: 1.25rem;  /* 20px */
+  --text-sm: 0.875rem;                /* 14px — base: body, table cells, inputs, buttons, nav */
+  --text-sm--line-height: 1.25rem;    /* 20px */
   --text-sm--letter-spacing: -0.003em;
 
-  --text-base: 0.9375rem;           /* 15px — prose, dialog descriptions */
-  --text-base--line-height: 1.5rem; /* 24px */
+  --text-base: 0.9375rem;             /* 15px — prose, dialog descriptions */
+  --text-base--line-height: 1.5rem;   /* 24px */
   --text-base--letter-spacing: -0.006em;
 
-  --text-lg: 1.0625rem;             /* 17px — card titles, h2/h3 */
-  --text-lg--line-height: 1.5rem;   /* 24px */
+  --text-lg: 1.0625rem;               /* 17px — card titles, h2/h3 */
+  --text-lg--line-height: 1.5rem;     /* 24px */
   --text-lg--letter-spacing: -0.01em;
 
-  --text-xl: 1.25rem;               /* 20px — page title */
-  --text-xl--line-height: 1.75rem;  /* 28px */
+  --text-xl: 1.25rem;                 /* 20px — page title */
+  --text-xl--line-height: 1.75rem;    /* 28px */
   --text-xl--letter-spacing: -0.014em;
 
-  --text-2xl: 1.5rem;               /* 24px — KPI numerals. CEILING. */
-  --text-2xl--line-height: 2rem;    /* 32px */
+  --text-2xl: 1.5625rem;              /* 25px — KPI numerals. CEILING. */
+  --text-2xl--line-height: 2rem;      /* 32px */
   --text-2xl--letter-spacing: -0.018em;
 }
 ```
@@ -149,9 +211,20 @@ CRM.
 The scale is compressed at the bottom — 13 → 14 → 15px, where roughly 90% of
 the app's pixels live — and opens up by about 1.2× per step above that.
 
-**`text-2xs` is Latin-uppercase micro-labels only.** There is no uppercase in
-Arabic, so it must never wrap Arabic text. If you need a small label that can
-hold Arabic, use `text-xs`.
+**Only two steps moved in the admin port**, and both are at the ends:
+`text-2xs` 12 → 13px and `text-2xl` 24 → 25px. Everything between is
+byte-identical to what it was, which is why the port changed no layout.
+
+**`text-2xs` is now a compatibility alias for `text-xs`.** It is the same 13px
+at the same 18px line-height; the only difference left is its `0.06em`
+tracking, which is what an uppercase micro-label wants. That makes it a *style*
+rather than a *size*, and new code should reach for `text-xs` plus explicit
+tracking instead. `text-xs` gained an explicit `letter-spacing: 0em` in the
+same move, so it cannot silently inherit that tracking.
+
+Where `text-2xs` is still used, the old rule holds: **Latin uppercase
+micro-labels only.** There is no uppercase in Arabic, so it must never wrap
+Arabic text — which is also why it is the one step the Arabic lift skips.
 
 ## Arabic gets a lift
 
@@ -169,9 +242,10 @@ html[lang="ar"] {
 }
 ```
 
-Arabic Naskh forms need more vertical room at small sizes than Latin does to
-keep dots and diacritics separable. `text-2xs` is deliberately **not** lifted —
-it is Latin-only by definition.
+Plex Sans Arabic's Naskh forms need more vertical room at small sizes than Plex
+Latin does to keep dots and diacritics separable. `text-2xs` is deliberately
+**not** lifted — it is Latin-only by convention, there being no uppercase in
+Arabic. This block is identical to admin's, and the port did not touch it.
 
 Because the lift is driven by `html[lang]`, it follows the language toggle
 automatically. No component branches on language for sizing, ever.
@@ -267,13 +341,14 @@ hyphenates normal Arabic and English words mid-syllable.
 | Element | Class | Weight |
 | --- | --- | --- |
 | Page title | `text-xl` | 600 |
-| Section / card title | `text-lg` | 500 |
+| Section / card title | `text-lg` | 600 |
+| Card description | `text-sm` | 400 |
 | Dialog title | `text-lg` | 600 |
 | Body prose, dialog description | `text-base` | 400 |
 | Form label | `text-sm` | 500 |
-| Input, button, nav item | `text-sm` | 400 / 600 for button label |
-| Table header `<th>` | `text-xs` | 600 |
-| Table body cell | `text-xs` | **400** |
+| Input, button, nav item | `text-sm` | 400 / 500 for button label |
+| Table header `<th>` | `text-xs` uppercase, `tracking-wide` | 600 |
+| Table body cell | `text-sm` | **400** |
 | Badge | `text-xs` | 500 |
 | Metadata, helper, timestamp | `text-xs` | 400 |
 | Latin uppercase micro-label | `text-2xs` | 500 |
@@ -282,3 +357,10 @@ hyphenates normal Arabic and English words mid-syllable.
 
 Table body cells are 400. A table where every cell is bold is a table with no
 hierarchy at all.
+
+Two rows moved with the admin port. **The table now renders at `text-sm`, not
+`text-xs`** — one step up, paid for by the row growing from 36px to 44px, so
+the cell has the room. And the header cell is uppercase with `tracking-wide`,
+both undone under `rtl:` (`rtl:normal-case rtl:tracking-normal`): Arabic has no
+uppercase, and letter-spacing breaks its joined forms rather than opening them
+up.

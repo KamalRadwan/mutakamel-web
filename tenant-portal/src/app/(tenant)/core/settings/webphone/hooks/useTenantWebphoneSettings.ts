@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { axiosClient, unwrapCoreData } from "@/lib/api/axiosClient";
+import { axiosClient } from "@/lib/api/axiosClient";
 import { getAuthErrorCode, getAuthErrorStatus } from "@/lib/auth/sessionErrors";
 import { generateUUIDv7 } from "@/lib/uuid";
 import {
@@ -13,6 +13,7 @@ import {
   readWebphoneConfig,
   readWebphoneExtensions,
   readWebphoneSeats,
+  unwrapWebphoneEnvelope,
   validateConfigForm,
   type CreateWebphoneEndpointDto,
   type CreateWebphoneExtensionDto,
@@ -133,7 +134,7 @@ export function useTenantWebphoneSettings() {
         cache: "no-store",
       });
       if (currentGeneration !== generation.current) return;
-      applyConfig(readWebphoneConfig(unwrapCoreData(response.data)));
+      applyConfig(readWebphoneConfig(unwrapWebphoneEnvelope(response.data)));
       setEntitlement("ACTIVE");
     } catch (caught) {
       if (currentGeneration !== generation.current) return;
@@ -272,7 +273,7 @@ export function useTenantWebphoneSettings() {
     const response = await axiosClient.get<unknown>(CONFIG_ENDPOINT, {
       cache: "no-store",
     });
-    applyConfig(readWebphoneConfig(unwrapCoreData(response.data)));
+    applyConfig(readWebphoneConfig(unwrapWebphoneEnvelope(response.data)));
   }, [applyConfig]);
 
   /**
@@ -313,7 +314,7 @@ export function useTenantWebphoneSettings() {
           patch,
           { headers: { "x-idempotency-key": key } },
         );
-        applyConfig(readWebphoneConfig(unwrapCoreData(response.data)));
+        applyConfig(readWebphoneConfig(unwrapWebphoneEnvelope(response.data)));
       },
     );
   }, [applyConfig, canUpdateConfig, config, failLocally, form, runMutation]);
@@ -553,7 +554,7 @@ function readOrDefault<T>(
 ): T {
   if (result.status !== "fulfilled") return fallback;
   try {
-    return parse(unwrapCoreData(result.value.data));
+    return parse(unwrapWebphoneEnvelope(result.value.data));
   } catch {
     return fallback;
   }

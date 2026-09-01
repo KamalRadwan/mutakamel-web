@@ -71,7 +71,22 @@ export function TenantAuthGuard({ children }: { children: React.ReactNode }) {
     if (isAuthenticated && pathname === "/login") router.replace("/");
   }, [authState, endedReason, isAuthenticated, isLoading, isPublic, pathname, router]);
 
-  if (isLoading) {
+  // `!isPublic` is load-bearing, not a tidy-up. A public page owns interactive
+  // state, and this branch REPLACES it — React unmounts the subtree and every
+  // useState in it is destroyed.
+  //
+  // That is what made a failed sign-in do nothing at all. `login()` sets
+  // BOOTSTRAPPING before the request, so pressing "تسجيل الدخول" swapped the
+  // form for this spinner and unmounted it; the 401 then set `failure` on a
+  // component that no longer existed, and when the state settled the form came
+  // back freshly mounted with `failure` null. Measured: the POST returns 401
+  // and not one character changes on screen.
+  //
+  // A public page has its own in-place affordance for this — the submit button
+  // already shows `isSubmitting` — so the global spinner was never the right
+  // thing to show over it, and showing the login form during the initial
+  // session check is better than a spinner that resolves into that same form.
+  if (isLoading && !isPublic) {
     return (
       // role="status" + aria-busy is the spinner's reduced-motion fallback —
       // the ring stops turning, so the announced text is what carries the

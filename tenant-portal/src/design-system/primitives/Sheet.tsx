@@ -64,7 +64,7 @@ export const SheetContent = forwardRef<
         {showCloseButton && (
           <DialogPrimitive.Close
             className={cn(
-              "absolute end-4 top-4 rounded-xs text-muted-foreground opacity-70 hover:opacity-100 disabled:pointer-events-none",
+              "absolute end-4 top-4 rounded-md text-muted-foreground opacity-70 hover:opacity-100 disabled:pointer-events-none",
               focusRing,
             )}
           >

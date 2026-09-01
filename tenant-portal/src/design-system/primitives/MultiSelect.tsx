@@ -54,7 +54,7 @@ export function MultiSelect({
   invalid,
   onBlur,
   id,
-  size = "md",
+  size = "lg",
   className,
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);

@@ -13,15 +13,15 @@ export type WebphoneIceServerKind = "STUN" | "TURN";
 export type WebphoneIceTransportPolicy = "all" | "relay";
 export type WebphoneTransport = "ws" | "wss";
 
-export const WEBPHONE_REGISTER_EXPIRES_MIN = 30;
-export const WEBPHONE_REGISTER_EXPIRES_MAX = 86_400;
-export const WEBPHONE_TURN_TTL_MIN_SECONDS = 60;
-export const WEBPHONE_TURN_TTL_MAX_SECONDS = 86_400;
-export const WEBPHONE_ENDPOINT_PRIORITY_MIN = 0;
-export const WEBPHONE_ENDPOINT_PRIORITY_MAX = 100;
-export const WEBPHONE_ICE_SORT_ORDER_MIN = 0;
-export const WEBPHONE_ICE_SORT_ORDER_MAX = 1_000;
-export const WEBPHONE_ICE_URLS_MAX = 8;
+const WEBPHONE_REGISTER_EXPIRES_MIN = 30;
+const WEBPHONE_REGISTER_EXPIRES_MAX = 86_400;
+const WEBPHONE_TURN_TTL_MIN_SECONDS = 60;
+const WEBPHONE_TURN_TTL_MAX_SECONDS = 86_400;
+const WEBPHONE_ENDPOINT_PRIORITY_MIN = 0;
+const WEBPHONE_ENDPOINT_PRIORITY_MAX = 100;
+const WEBPHONE_ICE_SORT_ORDER_MIN = 0;
+const WEBPHONE_ICE_SORT_ORDER_MAX = 1_000;
+const WEBPHONE_ICE_URLS_MAX = 8;
 
 const WS_URL_PATTERN = /^wss?:\/\/\S+$/iu;
 const SIP_DOMAIN_PATTERN = /^[a-z0-9.-]+(?::[0-9]+)?$/iu;
@@ -213,6 +213,28 @@ export type WebphoneFieldErrors = Record<string, string>;
 
 // --- Response parsing --------------------------------------------------------
 
+/**
+ * Strips the Core response envelope from a WebPhone payload.
+ *
+ * WebPhone is mounted into `core-app` but is its **own** Gateway namespace,
+ * `/api/tenant/webphone/v1` — it is not a section under the Core prefix, and
+ * `docs/api/webphone.md` is explicit that the Core-shaped spelling of it 404s.
+ * `src/lib/api/envelope.ts` therefore has no reader
+ * that will accept these paths: `readCoreData` takes a `CorePath`, and a
+ * webphone path is not assignable to it. That type separation is deliberate
+ * (S1 / MASTER-PLAN 3.20) and must not be loosened to let a fourth namespace
+ * through the Core door, so the unwrap lives here, next to the validators that
+ * consume it, rather than being imported from the transport.
+ *
+ * The shape is Core's: `{ success, data, correlationId }`. Anything without a
+ * `data` key passes through untouched, which is what a `204` and a bare
+ * payload both need.
+ */
+export function unwrapWebphoneEnvelope(payload: unknown): unknown {
+  const envelope = plainRecord(payload);
+  return envelope && "data" in envelope ? envelope.data : payload;
+}
+
 export function readWebphoneConfig(payload: unknown): WebphoneConfig {
   const config = plainRecord(payload);
   if (
@@ -260,7 +282,7 @@ export function readWebphoneConfig(payload: unknown): WebphoneConfig {
   };
 }
 
-export function readWebphoneEndpoint(payload: unknown): WebphoneEndpoint {
+function readWebphoneEndpoint(payload: unknown): WebphoneEndpoint {
   const endpoint = plainRecord(payload);
   if (
     !endpoint ||

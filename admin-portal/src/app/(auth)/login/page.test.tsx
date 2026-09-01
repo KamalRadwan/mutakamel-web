@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import LoginPage from "./page";
 
 vi.mock("@/components/auth/AuthShell", () => ({
@@ -42,6 +42,21 @@ vi.mock("./hooks/useLogin", async () => {
 });
 
 describe("LoginPage forgot-password dialog", () => {
+  afterEach(cleanup);
+
+  it("keeps login and recovery credentials out of native GET submissions", async () => {
+    render(<LoginPage />);
+    await screen.findByRole("dialog", { name: "Forgot Password?" });
+
+    const credentials = document.querySelectorAll<HTMLInputElement>(
+      'input[name="email"], input[name="password"]',
+    );
+    expect(credentials).toHaveLength(3);
+    for (const input of credentials) {
+      expect(input.form?.method).toBe("post");
+    }
+  });
+
   it("programmatically associates the visible description with the dialog", async () => {
     render(<LoginPage />);
 

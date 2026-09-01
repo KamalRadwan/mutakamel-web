@@ -1,11 +1,10 @@
 "use client";
 
-import { RotateCw, Calendar, Printer, Clock } from "lucide-react";
+import { RotateCw, Printer, Clock } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   Badge,
   Button,
-  Input,
   PageHeader,
   Select,
   SelectContent,
@@ -13,7 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system";
-import { DateRangePreset } from "../hooks/useDashboardData";
+import type { DateRange } from "../utils/date-range-presets";
+import { DashboardRangePicker } from "./DashboardRangePicker";
 import type { DashboardPrintFallbackReason } from "../hooks/useDashboardPrint";
 
 export type AutoRefreshInterval = "off" | "30s" | "60s" | "5m";
@@ -21,10 +21,8 @@ export type AutoRefreshInterval = "off" | "30s" | "60s" | "5m";
 interface DashboardHeaderProps {
   isRefreshing: boolean;
   onRefresh: () => void;
-  rangePreset: DateRangePreset;
-  onRangeChange: (preset: DateRangePreset) => void;
-  customRange?: { from?: string; to?: string };
-  onCustomRangeChange?: (range: { from?: string; to?: string }) => void;
+  range: DateRange;
+  onRangeChange: (range: DateRange) => void;
   autoRefreshInterval?: AutoRefreshInterval;
   autoRefreshPaused?: boolean;
   onAutoRefreshChange?: (interval: AutoRefreshInterval) => void;
@@ -37,10 +35,8 @@ interface DashboardHeaderProps {
 export function DashboardHeader({
   isRefreshing,
   onRefresh,
-  rangePreset,
+  range,
   onRangeChange,
-  customRange,
-  onCustomRangeChange,
   autoRefreshInterval = "off",
   autoRefreshPaused = false,
   onAutoRefreshChange,
@@ -74,47 +70,7 @@ export function DashboardHeader({
       }
       action={
         <div className="flex flex-wrap items-center gap-2">
-          <div
-            role="group"
-            aria-label={t.dashboard.rangePresetGroupLabel}
-            className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted p-1 text-xs"
-          >
-            <Calendar className="ms-1.5 size-3.5 text-muted-foreground" aria-hidden="true" />
-            <Button type="button" variant={rangePreset === "thisMonth" ? "primary" : "ghost"} size="sm" aria-pressed={rangePreset === "thisMonth"} onClick={() => onRangeChange("thisMonth")}>
-              {t.dashboard.thisMonth}
-            </Button>
-            <Button type="button" variant={rangePreset === "lastMonth" ? "primary" : "ghost"} size="sm" aria-pressed={rangePreset === "lastMonth"} onClick={() => onRangeChange("lastMonth")}>
-              {t.dashboard.lastMonth}
-            </Button>
-            <Button type="button" variant={rangePreset === "custom" ? "primary" : "ghost"} size="sm" aria-pressed={rangePreset === "custom"} onClick={() => onRangeChange("custom")}>
-              {t.dashboard.customRangeLabel}
-            </Button>
-          </div>
-
-          {rangePreset === "custom" && onCustomRangeChange && (
-            <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted p-1 text-xs">
-              <Input
-                type="date"
-                value={customRange?.from ?? ""}
-                onChange={(event) =>
-                  onCustomRangeChange({ ...customRange, from: event.target.value || undefined })
-                }
-                aria-label={t.dashboard.fromDateLabel}
-                className="h-7 w-auto px-2 text-xs"
-              />
-              <span className="text-muted-foreground" aria-hidden="true">–</span>
-              <Input
-                type="date"
-                value={customRange?.to ?? ""}
-                min={customRange?.from}
-                onChange={(event) =>
-                  onCustomRangeChange({ ...customRange, to: event.target.value || undefined })
-                }
-                aria-label={t.dashboard.toDateLabel}
-                className="h-7 w-auto px-2 text-xs"
-              />
-            </div>
-          )}
+          <DashboardRangePicker value={range} onChange={onRangeChange} />
 
           {onAutoRefreshChange && (
             <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted p-1 text-xs">

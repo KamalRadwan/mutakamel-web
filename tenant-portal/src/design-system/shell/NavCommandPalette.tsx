@@ -7,12 +7,19 @@ import { CommandPalette, type CommandGroupDef } from "../primitives/CommandPalet
 import { useNavTree } from "./useNavTree";
 
 /**
- * Ctrl/Cmd+K over the **permission-filtered** nav tree.
+ * Ctrl/Cmd+K over the **permission-filtered** nav tree — every app, always.
  *
- * The tree comes from `useNavTree()`, the same source the sidebar uses, so a
- * route the user cannot reach is not offered here either. That is the whole
- * reason this wiring lives in the shell rather than in the primitive: the
- * palette itself is generic and takes groups as a prop.
+ * The tree comes from `useNavTree()`, so a route the user cannot reach is not
+ * offered here either. That is the whole reason this wiring lives in the shell
+ * rather than in the primitive: the palette itself is generic and takes groups
+ * as a prop.
+ *
+ * Deliberately NOT app-scoped, which is why it consumes `useNavTree()`
+ * directly rather than `useNavApps()` the way the sidebar does. Scoping the
+ * sidebar makes twelve of the fifteen sections invisible at any moment; a
+ * palette that hid them too would mean finding a Trade screen from CRM
+ * required knowing to switch apps first. "Jump anywhere by name" is the one
+ * affordance that should not care which app you are standing in.
  *
  * Route labels come from the dictionary at this layer, so the palette can stay
  * a dictionary-free primitive. Both the Arabic and English labels are added to

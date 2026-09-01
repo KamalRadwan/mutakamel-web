@@ -11,12 +11,18 @@ const STORAGE_KEY = "tenant_density";
 // OTHER tabs, so a same-tab change needs its own event to reach subscribers.
 const LOCAL_CHANGE_EVENT = "tenant-density-change";
 
-// The shipped default is compact, and globals.css already carries 0.9 on
-// :root — see docs/build/DECISIONS.md#d2--ui-scale. So compact is expressed by
-// REMOVING the inline property, never by writing "0.9" a second time. One
+// The shipped default is STANDARD, and globals.css already carries 1 on
+// :root — see docs/build/DECISIONS.md#d2--ui-scale. So standard is expressed by
+// REMOVING the inline property, never by writing "1" a second time. One
 // number, one home; a second copy is a number that can drift.
-export const DENSITY_SCALE: Record<Exclude<Density, "compact">, string> = {
-  standard: "1",
+//
+// The default used to be compact (0.9). That one multiplier is why the tenant
+// portal rendered about 10% smaller than the admin portal at every control,
+// row and chrome edge; adopting admin's geometry means adopting its scale,
+// which is 1. Compact is still here, one click away in the user menu, for the
+// operator who wants more rows on a 1366x768 laptop.
+export const DENSITY_SCALE: Record<Exclude<Density, "standard">, string> = {
+  compact: "0.9",
   comfortable: "1.1",
 };
 
@@ -28,7 +34,7 @@ function isDensity(value: string | null): value is Density {
 
 function readDensity(): Density {
   const stored = safeStorage.getItem(STORAGE_KEY);
-  return isDensity(stored) ? stored : "compact";
+  return isDensity(stored) ? stored : "standard";
 }
 
 function subscribe(callback: () => void): () => void {
@@ -43,7 +49,7 @@ function subscribe(callback: () => void): () => void {
 // Matches both the stylesheet default and the bootstrap script's no-op path,
 // so the first client render agrees with the server's.
 function getServerSnapshot(): Density {
-  return "compact";
+  return "standard";
 }
 
 /**
@@ -53,7 +59,7 @@ function getServerSnapshot(): Density {
  */
 export function applyDensity(density: Density): void {
   const root = document.documentElement;
-  if (density === "compact") {
+  if (density === "standard") {
     root.style.removeProperty("--ui-scale");
     return;
   }
@@ -75,7 +81,7 @@ export function DensityProvider({ children }: { children: React.ReactNode }) {
   }, [density]);
 
   const setDensity = (next: Density) => {
-    if (next === "compact") {
+    if (next === "standard") {
       safeStorage.removeItem(STORAGE_KEY);
     } else {
       safeStorage.setItem(STORAGE_KEY, next);

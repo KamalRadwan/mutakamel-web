@@ -71,7 +71,7 @@ export function Combobox({
   invalid,
   onBlur,
   id,
-  size = "md",
+  size = "lg",
   className,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);

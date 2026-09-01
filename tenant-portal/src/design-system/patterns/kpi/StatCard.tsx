@@ -15,14 +15,14 @@ export interface StatCardProps {
 // of the entire type scale — see docs/design/typography.md#the-7-step-scale.
 export function StatCard({ label, value, icon: Icon, className }: StatCardProps) {
   return (
-    <div className={cn("flex items-center gap-3 rounded-md border border-border bg-card p-3", className)}>
+    <div className={cn("flex items-center gap-3 rounded-lg border border-border bg-card p-4", className)}>
       {Icon && (
         <span className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-muted">
           <Icon className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
         </span>
       )}
       <div className="min-w-0">
-        <p className="truncate text-xs text-muted-foreground">{label}</p>
+        <p className="truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</p>
         <p className="font-mono text-2xl font-semibold tabular-nums text-foreground">{value}</p>
       </div>
     </div>

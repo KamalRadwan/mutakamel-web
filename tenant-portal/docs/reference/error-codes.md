@@ -8,7 +8,7 @@ Status: **verified** (parsed from `throw new *Exception` sites)
 
 Last source verification: **2026-08-31**
 
-Codes: **309** across **36** areas
+Codes: **310** across **36** areas
 
 ## Scope
 
@@ -483,7 +483,7 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/branding` · 6 codes
 
 ## Directory
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/directory` · 17 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/directory` · 18 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -502,6 +502,7 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/directory` · 17 codes
 | `PARTY_RELATIONSHIP_INVALID` | 409, 422 |
 | `PARTY_RELATIONSHIP_NOT_FOUND` | 404 |
 | `PARTY_ROLE_ALREADY_EXISTS` | 409 |
+| `PARTY_ROLE_LIMIT_EXCEEDED` | 422 |
 | `PARTY_ROLE_NOT_FOUND` | 404 |
 | `PERMISSION_SCOPE_UNAVAILABLE` | 403 |
 

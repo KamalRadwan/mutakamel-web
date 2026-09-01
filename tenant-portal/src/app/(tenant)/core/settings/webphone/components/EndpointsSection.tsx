@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Network, Plus, Save, Trash2 } from "lucide-react";
+import { Network, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/design-system";
 import { WEBPHONE_COPY, webphoneErrorText } from "../webphone-copy";
 import type { TenantWebphoneSettingsState } from "../hooks/useTenantWebphoneSettings";
@@ -48,10 +48,10 @@ export function EndpointsSection({
       title={copy.endpointsSection}
       help={copy.endpointsSectionHelp}
       describedBy={describedBy}
-      icon={<Network className="size-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />}
+      icon={<Network className="size-4 text-muted-foreground" aria-hidden="true" />}
     >
       {state.endpoints.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-[11px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <p className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
           {copy.endpointsEmpty}
         </p>
       ) : (
@@ -70,9 +70,9 @@ export function EndpointsSection({
           event.preventDefault();
           void submitDraft();
         }}
-        className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950"
+        className="grid gap-4 rounded-lg border border-border p-4"
       >
-        <h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+        <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {copy.addEndpoint}
         </h3>
         <div className="grid gap-4 lg:grid-cols-3">
@@ -130,10 +130,14 @@ export function EndpointsSection({
           />
         ) : null}
         <div>
-          <Button type="submit" variant="primary" size="sm" disabled={disabled}>
-            {pending && state.mutation.target === "endpoint:new" ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
+          <Button
+            type="submit"
+            variant="secondary"
+            size="sm"
+            disabled={disabled}
+            loading={pending && state.mutation.target === "endpoint:new"}
+          >
+            {pending && state.mutation.target === "endpoint:new" ? null : (
               <Plus className="size-4" aria-hidden="true" />
             )}
             {pending && state.mutation.target === "endpoint:new"
@@ -185,7 +189,7 @@ function EndpointRow({
   return (
     <article
       aria-label={`${copy.endpointRegion}: ${endpoint.websocketUrl}`}
-      className="grid gap-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800"
+      className="grid gap-4 rounded-lg border border-border p-4"
     >
       <div className="grid gap-4 lg:grid-cols-3">
         <TextField
@@ -242,12 +246,9 @@ function EndpointRow({
           size="sm"
           onClick={() => void save()}
           disabled={disabled || !dirty}
+          loading={rowPending}
         >
-          {rowPending ? (
-            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-          ) : (
-            <Save className="size-3.5" aria-hidden="true" />
-          )}
+          {rowPending ? null : <Save className="size-3.5" aria-hidden="true" />}
           {copy.save}
         </Button>
         <Button
@@ -264,7 +265,7 @@ function EndpointRow({
           {endpoint.enabled ? copy.disable : copy.enable}
         </Button>
         <Button
-          variant="danger"
+          variant="destructive"
           size="sm"
           disabled={disabled}
           aria-label={`${copy.removeEndpoint}: ${endpoint.websocketUrl}`}

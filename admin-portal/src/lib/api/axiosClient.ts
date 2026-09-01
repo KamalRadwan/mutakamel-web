@@ -22,6 +22,7 @@ const API_BASE_URL = "";
 const SESSION_META_KEY = "admin_session_meta";
 const REMEMBER_PREFERENCE_KEY = "admin_auth_remember";
 const ADMIN_CSRF_COOKIE = "__Host-mutakamel-admin-csrf";
+const ADMIN_HTTP_CSRF_COOKIE = "mutakamel-http-admin-csrf";
 const ADMIN_COOKIE_QUARANTINE_KEY = "admin_auth_cookie_quarantine";
 const ADMIN_COOKIE_QUARANTINE_COOKIE = "mutakamel_admin_cookie_quarantine";
 const ADMIN_COOKIE_QUARANTINE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
@@ -683,7 +684,7 @@ export async function refreshAdminCookieSession(
     rememberOverride ??
     storedMeta?.remember ??
     safeStorage.getItem(REMEMBER_PREFERENCE_KEY) === "1";
-  const csrfToken = readBrowserCookie(ADMIN_CSRF_COOKIE);
+  const csrfToken = readAdminCsrfCookie();
   assertFallbackAdminAuthIntentCurrent();
   const response = await fetch(
     `${API_BASE_URL}/api/admin/core/v1/auth/refresh`,
@@ -1018,7 +1019,7 @@ async function runAdminActivityTouch(
   }
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const csrfToken = readBrowserCookie(ADMIN_CSRF_COOKIE);
+    const csrfToken = readAdminCsrfCookie();
     if (!csrfToken) return;
 
     let response: Response;
@@ -1168,7 +1169,7 @@ async function runAdminPresenceCheckpoint(
   }
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const csrfToken = readBrowserCookie(ADMIN_CSRF_COOKIE);
+    const csrfToken = readAdminCsrfCookie();
     if (!csrfToken) return null;
 
     let response: Response;
@@ -2006,7 +2007,7 @@ function prepareRequest(
     headers.set("x-idempotency-key", generateUUIDv7());
   }
 
-  const csrfToken = readBrowserCookie(ADMIN_CSRF_COOKIE);
+  const csrfToken = readAdminCsrfCookie();
   if (
     csrfToken &&
     ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
@@ -2271,7 +2272,7 @@ async function runAdminCookieCleanup(
     ) {
       return false;
     }
-    const csrfToken = readBrowserCookie(ADMIN_CSRF_COOKIE);
+    const csrfToken = readAdminCsrfCookie();
     const response = await fetch(`${API_BASE_URL}/api/admin/core/v1/auth/logout`, {
       method: "POST",
       headers: {
@@ -2503,6 +2504,13 @@ function removeLegacyBrowserTokens(): void {
     safeSessionStorage.removeItem(key);
     safeStorage.removeItem(key);
   }
+}
+
+function readAdminCsrfCookie(): string | undefined {
+  const names = typeof window !== "undefined" && window.location?.protocol === "http:"
+    ? [ADMIN_HTTP_CSRF_COOKIE, ADMIN_CSRF_COOKIE]
+    : [ADMIN_CSRF_COOKIE, ADMIN_HTTP_CSRF_COOKIE];
+  return readBrowserCookie(names[0]) ?? readBrowserCookie(names[1]);
 }
 
 function readBrowserCookie(name: string): string | undefined {

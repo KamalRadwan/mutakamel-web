@@ -7,8 +7,9 @@ import { focusRing, readOnlySurface, textEntrySize, type ControlSizeProps } from
 
 // Matches Input's padding and type size at every step, but deliberately does
 // NOT reuse `controlSize`: that sets a fixed `h-(--size-control-*)`, which on a
-// multi-line control would clamp it to one 28.8px row and defeat the point of a
-// textarea. Height comes from `rows` instead.
+// multi-line control would clamp it to a single 32px row and defeat the point
+// of a textarea. Height comes from `rows` instead. (It was 28.8px before the
+// --ui-scale default moved from 0.9 to 1 with the admin geometry port.)
 const textareaSize = cva("", {
   variants: {
     size: {
@@ -33,7 +34,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         ref={ref}
         rows={rows}
         className={cn(
-          "flex w-full rounded-sm border border-input bg-card text-foreground",
+          "flex w-full rounded-md border border-input bg-card text-foreground",
           "resize-y placeholder:text-muted-foreground",
           "disabled:cursor-not-allowed disabled:opacity-50",
           "aria-invalid:border-destructive aria-invalid:ring-destructive/20",

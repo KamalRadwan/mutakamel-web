@@ -123,7 +123,7 @@ function FatalAlertForm({ form, token, errors, configured, lang, disabled, showT
 }) {
   const copy = dict(lang).form;
   return (
-    <form aria-label={copy.ariaLabel} onSubmit={(event) => event.preventDefault()} className="grid gap-5 rounded-lg border border-border bg-card p-5 lg:grid-cols-2">
+    <form method="post" aria-label={copy.ariaLabel} onSubmit={(event) => event.preventDefault()} className="grid gap-5 rounded-lg border border-border bg-card p-5 lg:grid-cols-2">
       <label htmlFor="fatal-alert-enabled" className="flex min-h-14 cursor-pointer items-center justify-between gap-4 rounded-lg border border-input bg-muted px-4 lg:col-span-2">
         <span><strong className="block text-sm">{copy.enableLabel}</strong><span className="text-xs text-muted-foreground">{copy.enableHelp}</span></span>
         <Switch id="fatal-alert-enabled" checked={form.enabled} disabled={disabled} onCheckedChange={(enabled) => onUpdate("enabled", enabled)} />

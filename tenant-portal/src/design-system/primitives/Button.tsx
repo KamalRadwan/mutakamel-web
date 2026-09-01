@@ -9,7 +9,7 @@ import { controlSize, focusRing, hitArea } from "../lib/variants";
 
 export const buttonVariants = cva(
   cn(
-    "inline-flex items-center justify-center whitespace-nowrap rounded-sm font-medium",
+    "inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium",
     // B8 (SKILL-AUDIT.md): neither Radix nor Preflight sets a pointer cursor
     // on a <button>, so every button in the product showed an arrow.
     "cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed",

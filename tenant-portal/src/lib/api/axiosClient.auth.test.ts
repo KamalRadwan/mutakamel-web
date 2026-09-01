@@ -57,6 +57,87 @@ describe("tenant browser session coordination", () => {
     stop();
   });
 
+  it("ends stale tab metadata without activity or refresh when the cookie proof is gone", async () => {
+    const addListener = vi.spyOn(window, "addEventListener");
+    const consoleWarning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(document, "cookie", "get").mockReturnValue("");
+    const api = await import("./axiosClient");
+    await seedSession(api, "session-a");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const stop = api.startTenantActivityTracking();
+
+    emitTrustedPointer(addListener);
+    await vi.advanceTimersByTimeAsync(0);
+    emitTrustedPointer(addListener);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(api.getStoredTenantSessionMeta()).toBeNull();
+    expect((await import("../auth/sessionCoordinator"))
+      .readLatestTenantAuthEvent()).toMatchObject({
+        kind: "session-ended",
+        sessionId: "session-a",
+      });
+    expect(consoleWarning).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("does not refresh when the cookie proof disappears with an activity 401", async () => {
+    const addListener = vi.spyOn(window, "addEventListener");
+    const consoleWarning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    let cookie = "mutakamel-http-tenant-csrf=csrf-proof";
+    vi.spyOn(document, "cookie", "get").mockImplementation(() => cookie);
+    const api = await import("./axiosClient");
+    await seedSession(api, "session-a");
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe("/api/tenant/core/v1/auth/activity");
+      cookie = "";
+      return jsonResponse({ code: "TOKEN_EXPIRED" }, 401);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const stop = api.startTenantActivityTracking();
+
+    emitTrustedPointer(addListener);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(api.getStoredTenantSessionMeta()).toBeNull();
+    expect(consoleWarning).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("tears down an invalid refresh once without logging an expected checkpoint failure", async () => {
+    const addListener = vi.spyOn(window, "addEventListener");
+    const consoleWarning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const api = await import("./axiosClient");
+    await seedSession(api, "session-a");
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "/api/tenant/core/v1/auth/activity") {
+        return jsonResponse({ code: "TOKEN_EXPIRED" }, 401);
+      }
+      if (url === "/api/tenant/core/v1/auth/refresh") {
+        return jsonResponse({ code: "INVALID_REFRESH_TOKEN" }, 401);
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const stop = api.startTenantActivityTracking();
+
+    emitTrustedPointer(addListener);
+    await vi.advanceTimersByTimeAsync(0);
+    emitTrustedPointer(addListener);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/tenant/core/v1/auth/activity",
+      "/api/tenant/core/v1/auth/refresh",
+    ]);
+    expect(api.getStoredTenantSessionMeta()).toBeNull();
+    expect(consoleWarning).not.toHaveBeenCalled();
+    stop();
+  });
+
   it("refreshes expired access once and replays activity without idempotency bloat", async () => {
     const addListener = vi.spyOn(window, "addEventListener");
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -112,10 +193,9 @@ describe("tenant browser session coordination", () => {
     await seedSession(api, "session-b");
     resolveActivity(new Response(null, { status: 204 }));
 
-    await vi.waitFor(() => expect(consoleWarning).toHaveBeenCalledWith(
-        "Tenant activity checkpoint failed.",
-        expect.objectContaining({ code: "AUTH_SESSION_CHANGED", status: 409 }),
-      ));
+    await vi.waitFor(() => expect(api.getStoredTenantSessionMeta()?.sessionId)
+      .toBe("session-b"));
+    expect(consoleWarning).not.toHaveBeenCalled();
     expect(api.getStoredTenantSessionMeta()?.sessionId).toBe("session-b");
     stop();
   });
@@ -356,7 +436,7 @@ describe("tenant browser session coordination", () => {
     expect(api.getStoredTenantSessionMeta()?.sessionId).toBe("session-b");
   });
 
-  it("bounds Web Lock acquisition and makes missing coordination explicit", async () => {
+  it("bounds Web Lock acquisition before any refresh request", async () => {
     const api = await import("./axiosClient");
     await seedSession(api, "session-a");
     const fetchMock = vi.fn();
@@ -385,18 +465,119 @@ describe("tenant browser session coordination", () => {
     await timedOutAssertion;
     expect(fetchMock).not.toHaveBeenCalled();
 
-    Object.defineProperty(window.navigator, "locks", {
-      configurable: true,
-      value: undefined,
+  });
+
+  it("serializes auth operations without Web Locks and recovers after failure", async () => {
+    Object.defineProperty(window.navigator, "locks", { configurable: true, value: undefined });
+    const api = await import("./axiosClient");
+    const order: string[] = [];
+    let rejectFirst!: (error: Error) => void;
+    const pending = new Promise<string>((_resolve, reject) => { rejectFirst = reject; });
+    const first = api.withTenantAuthLock(async () => {
+      order.push("first");
+      return pending;
     });
-    await expect(api.coordinateTenantSessionRefresh("session-a"))
-      .rejects.toMatchObject({
-        response: {
-          status: 503,
-          data: { errorCode: "AUTH_SESSION_COORDINATION_UNAVAILABLE" },
-        },
-      });
-    expect(fetchMock).not.toHaveBeenCalled();
+    const firstFailure = expect(first).rejects.toThrow("request failed");
+    const second = api.withTenantAuthLock(async () => {
+      order.push("second");
+      return "ok";
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(order).toEqual(["first"]);
+    rejectFirst(new Error("request failed"));
+    await firstFailure;
+    await expect(second).resolves.toBe("ok");
+    expect(order).toEqual(["first", "second"]);
+  });
+
+  it("times out HTTP callers without releasing unsettled work or running expired waiters", async () => {
+    Object.defineProperty(window.navigator, "locks", { configurable: true, value: undefined });
+    const api = await import("./axiosClient");
+    let resolveFirst!: () => void;
+    let activeSignal: AbortSignal | undefined;
+    const pending = new Promise<void>((resolve) => { resolveFirst = resolve; });
+    const first = api.withTenantAuthLock(async (signal) => {
+      activeSignal = signal;
+      return pending;
+    });
+    const firstFailure = expect(first).rejects.toMatchObject({
+      response: { status: 503, data: { errorCode: "AUTH_SESSION_COORDINATION_UNAVAILABLE" } },
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+    const expiredCallback = vi.fn(async () => "expired");
+    const expired = api.withTenantAuthLock(expiredCallback);
+    const expiredFailure = expect(expired).rejects.toMatchObject({
+      response: { status: 503, data: { errorCode: "AUTH_SESSION_COORDINATION_UNAVAILABLE" } },
+    });
+    await vi.advanceTimersByTimeAsync(9_000);
+    await firstFailure;
+    expect(activeSignal?.aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expiredFailure;
+    const nextCallback = vi.fn(async () => "next");
+    const next = api.withTenantAuthLock(nextCallback);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(nextCallback).not.toHaveBeenCalled();
+    resolveFirst();
+    await expect(next).resolves.toBe("next");
+    expect(expiredCallback).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["http:", "mutakamel-http-tenant-csrf=http-proof; __Host-mutakamel-tenant-csrf=secure-proof", "http-proof"],
+    ["https:", "mutakamel-http-tenant-csrf=http-proof; __Host-mutakamel-tenant-csrf=secure-proof", "secure-proof"],
+    ["http:", "__Host-mutakamel-tenant-csrf=secure-proof", "secure-proof"],
+    ["https:", "mutakamel-http-tenant-csrf=http-proof", "http-proof"],
+    ["http:", "mutakamel-http-tenant-csrf=; __Host-mutakamel-tenant-csrf=secure-proof", "secure-proof"],
+  ])("uses the available %s CSRF profile without exposing a bearer", async (protocol, cookie, expected) => {
+    vi.stubGlobal("window", {
+      location: { protocol },
+      localStorage: window.localStorage,
+      sessionStorage: window.sessionStorage,
+    });
+    vi.spyOn(document, "cookie", "get").mockReturnValue(cookie);
+    const api = await import("./axiosClient");
+    expect(api.hasTenantSessionCookieHint()).toBe(true);
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("x-csrf-token")).toBe(expected);
+      expect(headers.has("Authorization")).toBe(false);
+      expect(init?.credentials).toBe("include");
+      return new Response(null, { status: 204 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await api.axiosClient.post("/api/tenant/core/v1/auth/logout", undefined, {
+      skipAuthRefresh: true,
+      skipAutoIdempotency: true,
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    "",
+    "unrelated-preference=1",
+    "mutakamel-http-tenant-csrf=",
+    "__Host-mutakamel-tenant-csrf=%E0%A4",
+  ])("does not infer a session from missing or unusable CSRF cookie %s", async (cookie) => {
+    vi.spyOn(document, "cookie", "get").mockReturnValue(cookie);
+    const api = await import("./axiosClient");
+    expect(api.hasTenantSessionCookieHint()).toBe(false);
+  });
+
+  it("refreshes with the HTTP CSRF cookie when Web Locks are unavailable", async () => {
+    Object.defineProperty(window.navigator, "locks", { configurable: true, value: undefined });
+    vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=http-proof");
+    const api = await import("./axiosClient");
+    await seedSession(api, "session-a");
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("/api/tenant/core/v1/auth/refresh");
+      expect(new Headers(init?.headers).get("x-csrf-token")).toBe("http-proof");
+      return jsonResponse(webAuthResponse("session-a"));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(api.coordinateTenantSessionRefresh("session-a")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(api.getStoredTenantSessionMeta()?.sessionId).toBe("session-a");
   });
 
   it("keeps refresh cancellation active until the response body completes", async () => {

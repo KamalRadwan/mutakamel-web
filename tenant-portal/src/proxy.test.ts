@@ -249,13 +249,20 @@ describe("Content Security Policy", () => {
     expect(policyOf(proxy(request("/crm/leads")))).toContain(directive);
   });
 
-  it("gives script-src a nonce and strict-dynamic, and never 'unsafe-inline'", () => {
+  // `'self'` is asserted absent, not merely unused. A browser that honours
+  // `'strict-dynamic'` discards `'self'`, every host-source and
+  // `'unsafe-inline'` from this directive — so listing it states a policy the
+  // browser does not enforce, and Firefox reports it as an ignored source on
+  // every page load. `default-src 'self'` above is untouched; this is only
+  // about the directive `'strict-dynamic'` governs.
+  it("gives script-src a nonce and strict-dynamic, and no ignored sources", () => {
     const policy = policyOf(proxy(request("/crm/leads")));
     const scriptSource = directive(policy, "script-src");
 
     expect(scriptSource).toMatch(/'nonce-[0-9a-f]{32}'/u);
     expect(scriptSource).toContain("'strict-dynamic'");
     expect(scriptSource).not.toContain("'unsafe-inline'");
+    expect(scriptSource).not.toContain("'self'");
   });
 
   // The theme bootstrap is an inline <script>. It survives the policy above

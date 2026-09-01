@@ -2,7 +2,7 @@
 
 Status: **verified against current source**
 
-Last source verification: **2026-08-27**
+Last source verification: **2026-08-31**
 
 ## What already exists and must not be rewritten
 
@@ -17,7 +17,11 @@ handle failure modes that are expensive to rediscover:
 - **Cross-tab session sync** — logout or account replacement in one tab
   invalidates in-flight work in others.
 - **UUIDv7 idempotency keys** auto-attached to unsafe methods.
-- **Double-submit CSRF** from the `__Host-mutakamel-tenant-csrf` cookie.
+- **Double-submit CSRF** from `mutakamel-http-tenant-csrf` for HTTP or
+  `__Host-mutakamel-tenant-csrf` for the secure cookie profile.
+- **Auth mutation serialization** uses browser Web Locks when available and
+  an abortable per-tab queue otherwise. Cross-tab session events and generation
+  fences remain active; the queue does not provide cross-tab mutual exclusion.
 - **Relative-origin assertion** — a request to an absolute or protocol-relative
   URL throws rather than leaking credentials off-origin.
 - **Response byte bounds**.

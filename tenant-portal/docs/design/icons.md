@@ -19,13 +19,13 @@ meaning alone: it accompanies a label, or it takes an `aria-label` and a
 control is sized by the control's own token rather than by whichever `size-*`
 value the author reached for.
 
-| `size` | Control height (at `--ui-scale` 0.9) | Icon |
+| `size` | Control height (at the shipped `--ui-scale` 1) | Icon |
 | --- | ---: | --- |
-| `xs` | 21.6px | `size-3` — 12px |
-| `sm` | 25.2px | `size-3.5` — 14px |
-| `md` | 28.8px | `size-3.5` — 14px |
-| `lg` | 32.4px | `size-4` — 16px |
-| `xl` | 36px | `size-5` — 20px |
+| `xs` | 24px | `size-3` — 12px |
+| `sm` | 28px | `size-3.5` — 14px |
+| `md` | 32px | `size-3.5` — 14px |
+| `lg` | 36px | `size-4` — 16px |
+| `xl` | 40px | `size-5` — 20px |
 
 ```tsx
 import { iconSize } from "@/design-system";
@@ -37,9 +37,10 @@ import { iconSize } from "@/design-system";
 ```
 
 `md` and `sm` deliberately land on the same 14px glyph. The control heights are
-4px apart; the icon scale has fewer steps than the control scale because a 0.5px
-icon difference is noise, and rounding it into existence would produce two
-glyph sizes nobody can tell apart.
+4px apart; the icon scale has fewer steps than the control scale because a
+sub-pixel icon difference is noise, and rounding it into existence would produce
+two glyph sizes nobody can tell apart. The heights above are whole pixels since
+`--ui-scale` moved to 1 — the ratios the scale encodes did not change with it.
 
 The scale carries `shrink-0`. An icon that shrinks inside a flex row is the
 single most common cause of a squashed chevron next to a long Arabic label.

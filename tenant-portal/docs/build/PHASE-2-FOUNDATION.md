@@ -56,7 +56,10 @@ eleven call sites.
 
 Fixes [DEFECTS.md](DEFECTS.md) D3 and D4.
 
-- Bootstrap `Script` with `strategy="beforeInteractive"` in `src/app/layout.tsx`
+- Bootstrap script in `src/app/layout.tsx` (built as `next/script` with
+  `strategy="beforeInteractive"`; now a plain inline `<script>` — `next/script`
+  applies no prop but `nonce` to the tag, so it could not carry the
+  `suppressHydrationWarning` that CSP nonce hiding makes necessary)
 - `suppressHydrationWarning` on the `html` element
 - `useLanguage()` built on `useSyncExternalStore` over the same storage key
 - `ThemeProvider` reading `tenant_theme`, supporting `system`

@@ -275,7 +275,7 @@ export function PasswordDialog({
   };
   return (
     <DialogFrame title={copy.changePassword} onClose={onClose} locale={locale}>
-      <form noValidate onSubmit={submit} className="grid gap-3">
+      <form method="post" noValidate onSubmit={submit} className="grid gap-3">
         <DialogInputField id="tenant-user-password" name="newPassword" label={copy.password} type="password" minLength={12} maxLength={128} required value={password} error={localError ?? undefined} onChange={(value) => { setPassword(value); setLocalError(null); }} />
         <DialogInputField id="tenant-user-password-confirmation" name="passwordConfirmation" label={copy.passwordConfirmation} type="password" minLength={12} maxLength={128} required value={confirmation} error={localError ?? undefined} onChange={(value) => { setConfirmation(value); setLocalError(null); }} />
         <DialogError controller={controller} localError={localError} summary={copy.validationSummary} />

@@ -24,6 +24,11 @@ afterEach(() => {
   i18n.lang = "en";
 });
 
+const TODAY = {
+  from: new Date("2026-09-01T00:00:00"),
+  to: new Date("2026-09-01T23:59:59.999"),
+};
+
 describe("DashboardRefreshPauseControl", () => {
   it("offers an explicit pause and resume without hiding current data", () => {
     const onOperatorPausedChange = vi.fn();
@@ -88,7 +93,7 @@ describe("DashboardHeader print fallback", () => {
     const props = {
       isRefreshing: false,
       onRefresh: vi.fn(),
-      rangePreset: "thisMonth" as const,
+      range: TODAY,
       onRangeChange: vi.fn(),
       onPrintReport: vi.fn(),
       printFallbackReason: "charts-unavailable" as const,

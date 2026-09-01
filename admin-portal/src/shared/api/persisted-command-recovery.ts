@@ -1,3 +1,4 @@
+import { sha256 } from "@noble/hashes/sha2.js";
 import { safeSessionStorage } from "@/lib/safeStorage";
 import { generateUUIDv7 } from "@/lib/utils/uuid";
 
@@ -121,18 +122,13 @@ export function clearPersistedCommandAttempt(storageKey: string): void {
 }
 
 export async function sha256CanonicalJson(value: unknown): Promise<string> {
-  if (!globalThis.crypto?.subtle) {
-    throw new Error("COMMAND_RECOVERY_DIGEST_UNAVAILABLE");
-  }
   const serialized = JSON.stringify(canonicalize(value));
   if (serialized === undefined) {
     throw new Error("COMMAND_RECOVERY_INTENT_NOT_SERIALIZABLE");
   }
-  const digest = await globalThis.crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(serialized),
-  );
-  return Array.from(new Uint8Array(digest), (byte) =>
+  // Keep recovery evidence identical on HTTP, where SubtleCrypto is unavailable.
+  const digest = sha256(new TextEncoder().encode(serialized));
+  return Array.from(digest, (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
 }

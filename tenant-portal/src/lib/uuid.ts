@@ -30,3 +30,29 @@ export function generateUUIDv7(): string {
   }
   return value;
 }
+
+/**
+ * `crypto.randomUUID()` is defined **only in a secure context** — HTTPS, or a
+ * `localhost` origin. Tenant development is neither: it runs over plain HTTP on
+ * a real tenant hostname (`http://mersany.mutakamel.ai:5002`) because the
+ * Gateway resolves the tenant from `Host`, and `localhost` resolves to no
+ * tenant at all. In that context the browser simply does not define
+ * `randomUUID`, and `@mutakamel/realtime-app-client` throws
+ * `crypto.randomUUID is not a function` from its handshake before the provider
+ * can mount.
+ *
+ * `crypto.getRandomValues` has no such gate, so `generateUUIDv7` costs nothing
+ * in randomness quality — it is the same CSPRNG.
+ *
+ * It is used **unconditionally**, never `crypto.randomUUID()`, even where the
+ * native call exists. This workspace issues UUIDv7 only (AGENTS.md), and
+ * `randomUUID()` emits a v4 — so preferring it in a secure context would make
+ * the identifier version depend on how the page happened to be served.
+ *
+ * Shaped as an object because that is what `createBrowserClientIdentifiers`
+ * takes (`BrowserIdentifierCrypto`), and passing `window.crypto` straight in is
+ * the bug this exists to prevent.
+ */
+export const uuidCrypto: { randomUUID(): string } = {
+  randomUUID: generateUUIDv7,
+};

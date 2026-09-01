@@ -6,12 +6,17 @@ import { useI18n } from "@/i18n/I18nContext";
 import { useDirection } from "@/i18n/useLanguage";
 import { cn } from "../lib/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../primitives/Tooltip";
-import type { NavSection } from "./nav-config";
+import type { NavApp, NavAppId, NavSection } from "./nav-config";
 import type { SidebarState } from "./useSidebar";
 
 export interface SidebarProps {
   sections: NavSection[];
   state: SidebarState;
+  /** The switcher's options, each carrying its permission-filtered sections. */
+  /** Only to name the landmark after the active app — the switcher itself
+   *  lives in the topbar. */
+  apps: NavApp[];
+  activeApp: NavAppId;
 }
 
 // Active state is a 2px logical inset-start bar plus weight 500 — never a
@@ -23,7 +28,7 @@ export interface SidebarProps {
 // children), so collapsing to the icon rail is just "shrink to icon +
 // Tooltip" per item — there is no hierarchy that would need a flyout, which
 // shell.md's spec anticipates for a deeper tree than this one has.
-export function Sidebar({ sections, state }: SidebarProps) {
+export function Sidebar({ sections, state, apps, activeApp }: SidebarProps) {
   const { t } = useI18n();
   const dir = useDirection();
   const pathname = usePathname();
@@ -31,10 +36,15 @@ export function Sidebar({ sections, state }: SidebarProps) {
   // Radix takes a physical side — compute it from direction rather than
   // hardcoding one. See docs/design/theming.md#third-party-physical-apis.
   const tooltipSide = dir === "rtl" ? "left" : "right";
+  // The landmark names the app it lists. It used to be a fixed "workspace
+  // center", which stopped being true the moment the sidebar became
+  // app-scoped: a <nav> announced as Workspace while listing CRM sections
+  // tells a screen-reader user the wrong thing about where they are.
+  const activeAppLabelKey = apps.find((entry) => entry.id === activeApp)?.labelKey;
 
   return (
     <nav
-      aria-label={t.nav.workspaceCenter}
+      aria-label={t.nav[activeAppLabelKey as keyof typeof t.nav] ?? t.nav.workspaceCenter}
       className={cn(
         "flex h-full flex-col gap-1 overflow-y-auto border-e border-border bg-sidebar py-2 transition-[width] duration-150",
         isCollapsed ? "w-(--size-rail) items-center px-1" : "w-(--size-sidebar) px-2",

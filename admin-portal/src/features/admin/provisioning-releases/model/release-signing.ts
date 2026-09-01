@@ -1,3 +1,4 @@
+import { sha256 } from "@noble/hashes/sha2.js";
 import type { ReleaseDraft } from "../types/provisioning-releases";
 import { canonicalJson } from "./release-validation";
 
@@ -35,8 +36,9 @@ export async function buildVerifiedSigningPayload(
     requiresMaintenance: draft.requiresMaintenance,
   });
   const bytes = new TextEncoder().encode(payload);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const computedDigest = Array.from(new Uint8Array(digest), (byte) =>
+  // This verifies a digest, not a private-key signature, and must work on HTTP.
+  const digest = sha256(bytes);
+  const computedDigest = Array.from(digest, (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
   let binary = "";

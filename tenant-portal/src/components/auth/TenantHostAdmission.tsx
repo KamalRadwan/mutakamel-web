@@ -2,13 +2,13 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   fetchTenantHostStatus,
-  normalizeTenantRequestHost,
+  resolveTenantAdmissionHost,
 } from "@/shared/tenancy/tenant-host-admission.server";
 import { TenantHostStateBoundary } from "./TenantHostStateBoundary";
 
 export async function TenantHostAdmission({ children }: { children: React.ReactNode }) {
   const requestHeaders = await headers();
-  const host = normalizeTenantRequestHost(requestHeaders.get("host"));
+  const host = resolveTenantAdmissionHost(requestHeaders.get("host"));
   if (!host) notFound();
 
   const gatewayOrigin = process.env.TENANT_GATEWAY_INTERNAL_ORIGIN

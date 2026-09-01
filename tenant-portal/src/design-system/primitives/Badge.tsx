@@ -6,19 +6,29 @@ import { cn } from "../lib/cn";
 
 // Five tones: the four outcome roles plus neutral for categories. There is
 // no "info" tone — a value that isn't an outcome takes neutral, never blue.
+//
+// Ported from admin-portal/src/design-system/primitives/Badge.tsx. Two things
+// changed and both are the same change underneath: the tones now name the
+// `*-subtle` SEMANTIC roles instead of raw ramp steps, and the border is gone.
+//
+// The roles already carry their own dark values (globals.css declares each one
+// twice, under :root and under .dark), so eight `dark:` variants and four
+// borders collapse into four class pairs that resolve identically in light —
+// bg-*-100 with *-800 ink — and slightly better in dark, where the role's
+// *-200 label sits above the *-300 this file hardcoded.
+//
+// Uppercase + tracking is admin's treatment for a badge, undone under `rtl:`:
+// Arabic has no letter case, and letter-spacing breaks Naskh joins.
 export const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs font-medium w-fit",
+  "inline-flex w-fit items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide rtl:normal-case rtl:tracking-normal",
   {
     variants: {
       tone: {
-        brand: "border-brand-200 bg-brand-100 text-brand-800 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300",
-        positive:
-          "border-positive-200 bg-positive-100 text-positive-800 dark:border-positive-800 dark:bg-positive-950 dark:text-positive-300",
-        caution:
-          "border-caution-200 bg-caution-100 text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300",
-        negative:
-          "border-negative-200 bg-negative-100 text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300",
-        neutral: "border-border bg-secondary text-secondary-foreground",
+        brand: "bg-info-subtle text-info-subtle-foreground",
+        positive: "bg-success-subtle text-success-subtle-foreground",
+        caution: "bg-warning-subtle text-warning-subtle-foreground",
+        negative: "bg-destructive-subtle text-destructive-subtle-foreground",
+        neutral: "bg-muted text-muted-foreground",
       },
     },
     defaultVariants: { tone: "neutral" },

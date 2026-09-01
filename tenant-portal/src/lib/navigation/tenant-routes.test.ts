@@ -25,7 +25,14 @@ describe("Tenant Portal production route surface", () => {
     // The screen renders disabled for an unsubscribed workspace, so redirecting
     // it away would hide the capability instead of explaining it.
     expect(isSupportedCorePath(TENANT_ROUTES.coreWebphoneSettings)).toBe(true);
-    expect(isSupportedCorePath("/core/settings")).toBe(false);
+    // `/core/settings` is a built page and has always been admitted. This line
+    // asserted `false` because it was written against the merge's truncated
+    // duplicate of `CORE_EXACT_PATHS`, which held only three entries; the real
+    // set has carried `coreSettings` since before the merge. Asserting `false`
+    // here would mean `proxy.ts` redirects the whole Core settings landing page
+    // to `/unavailable`.
+    expect(isSupportedCorePath("/core/settings")).toBe(true);
+    // The WebPhone admission is exact, not a prefix — a deeper path is still out.
     expect(isSupportedCorePath("/core/settings/webphone/extra")).toBe(false);
   });
 

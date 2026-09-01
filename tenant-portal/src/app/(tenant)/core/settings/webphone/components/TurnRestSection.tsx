@@ -31,7 +31,7 @@ export function TurnRestSection({
       title={copy.turnRestSection}
       help={copy.turnRestSectionHelp}
       describedBy={describedBy}
-      icon={<KeyRound className="size-4 text-amber-500" aria-hidden="true" />}
+      icon={<KeyRound className="size-4 text-muted-foreground" aria-hidden="true" />}
     >
       <div className="grid gap-4 lg:grid-cols-2">
         <SwitchField
@@ -53,14 +53,14 @@ export function TurnRestSection({
       </div>
 
       <div>
-        <h3 className="text-xs font-bold">{copy.turnRestUris}</h3>
+        <h3 className="text-xs font-medium text-foreground">{copy.turnRestUris}</h3>
         {turnUris.length ? (
           <ul className="mt-2 flex flex-wrap gap-2">
             {turnUris.map((uri) => (
               <li
                 key={uri}
                 dir="ltr"
-                className="rounded-lg bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="rounded-sm bg-muted px-2 py-1 font-mono text-xs text-foreground"
               >
                 {uri}
               </li>
@@ -69,10 +69,8 @@ export function TurnRestSection({
         ) : (
           <p
             role={form.turnRestEnabled ? "alert" : undefined}
-            className={`mt-2 text-[11px] font-semibold ${
-              form.turnRestEnabled
-                ? "text-amber-700 dark:text-amber-300"
-                : "text-slate-500 dark:text-slate-400"
+            className={`mt-2 max-w-prose text-xs ${
+              form.turnRestEnabled ? "font-medium text-foreground" : "text-muted-foreground"
             }`}
           >
             {form.turnRestEnabled ? copy.turnRestNoUris : copy.iceEmpty}

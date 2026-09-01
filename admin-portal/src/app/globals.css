@@ -183,7 +183,18 @@
   --warning-subtle-foreground: var(--color-warn-800);
   --warning-vivid: var(--color-warn-600);
 
-  /* danger-700, not -600: -600 fails contrast (~3.4:1) with white text. */
+  /* danger-700, not -600 — but NOT for the reason this comment used to give.
+     It claimed "-600 fails contrast (~3.4:1) with white text". Measured
+     against the ramp above, white on danger-600 (oklch 0.567 0.203 27) is
+     5.01:1, which passes AA. The 3.4:1 figure belongs to some earlier -600
+     step and outlived it; nothing enforced it, because no test asserts a
+     ratio for -600.
+
+     The real reason to stay on -700 is headroom, not compliance. Destructive
+     is the one role a user cannot undo by looking again, it is drawn as a
+     filled button at small sizes, and 7.02:1 leaves room for the hover state
+     to darken without approaching the 4.5 floor. -600 would spend that margin
+     for nothing. */
   --destructive: var(--color-danger-700);
   --destructive-foreground: white;
   --destructive-subtle: var(--color-danger-100);

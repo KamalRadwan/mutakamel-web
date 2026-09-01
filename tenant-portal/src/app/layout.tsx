@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import Script from "next/script";
-import { dmMono, readex } from "./fonts";
+import { plexArabic, plexLatin, plexMono } from "./fonts";
 import "./globals.css";
 import { DirectionBridge } from "@/i18n/DirectionBridge";
 import { DensityProvider, ThemeProvider, TooltipProvider } from "@/design-system";
 import { TenantBrandingTokens } from "./TenantBrandingTokens";
+import { InlineBootstrapScript } from "./InlineBootstrapScript";
 
 export const metadata: Metadata = {
   title: "Tenant Portal - Mutakamel Crowd Capital",
@@ -18,9 +18,12 @@ export const metadata: Metadata = {
 // docs/design/theming.md#no-flash--the-mechanism.
 //
 // Density writes nothing for the default: globals.css already carries
-// --ui-scale: 0.9, so compact is the ABSENCE of an override rather than an
-// override that happens to agree. DensityProvider.applyDensity does the same,
-// and its test pins both against this string so they cannot drift.
+// --ui-scale: 1, so STANDARD is the ABSENCE of an override rather than an
+// override that happens to agree. The default moved from compact (0.9) to
+// standard (1) when the admin portal's geometry was adopted — 0.9 was the one
+// reason the tenant chrome rendered ~10% smaller than admin's at every edge.
+// DensityProvider.applyDensity does the same, and its test pins both against
+// this string so they cannot drift.
 const BOOTSTRAP = `(function(){try{
   var d=document.documentElement;
   var l=localStorage.getItem("tenant_lang")==="en"?"en":"ar";
@@ -29,7 +32,7 @@ const BOOTSTRAP = `(function(){try{
   var dark=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);
   d.classList.toggle("dark",dark);
   var s=localStorage.getItem("tenant_density");
-  if(s==="standard")d.style.setProperty("--ui-scale","1");
+  if(s==="compact")d.style.setProperty("--ui-scale","0.9");
   else if(s==="comfortable")d.style.setProperty("--ui-scale","1.1");
 }catch(e){}})();`;
 
@@ -51,13 +54,11 @@ export default async function RootLayout({
   return (
     <html lang="ar" dir="rtl" className="h-full" suppressHydrationWarning>
       <head>
-        <Script id="theme-bootstrap" strategy="beforeInteractive" nonce={nonce}>
-          {BOOTSTRAP}
-        </Script>
+        <InlineBootstrapScript nonce={nonce} html={BOOTSTRAP} />
       </head>
       <body
         suppressHydrationWarning
-        className={`${readex.variable} ${dmMono.variable} h-full antialiased`}
+        className={`${plexLatin.variable} ${plexArabic.variable} ${plexMono.variable} h-full antialiased`}
       >
         <ThemeProvider>
           <DensityProvider>

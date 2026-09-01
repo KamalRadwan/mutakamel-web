@@ -78,6 +78,7 @@ export function ExtensionsSection({ state }: { state: WebphoneSettingsState }) {
 
       {state.canUpdate ? (
         <form
+          method="post"
           aria-label={copy.addExtension}
           onSubmit={(event) => {
             event.preventDefault();

@@ -74,7 +74,7 @@ export function PageHeader({
               <h1 className="text-xl font-semibold text-foreground">{title}</h1>
               {titleAdornment}
             </div>
-            {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
+            {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">

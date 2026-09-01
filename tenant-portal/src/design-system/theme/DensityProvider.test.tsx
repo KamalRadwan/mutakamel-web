@@ -36,20 +36,23 @@ afterEach(() => {
 });
 
 describe("DensityProvider", () => {
-  it("defaults to compact and writes no inline scale, leaving globals.css authoritative", () => {
+  it("defaults to standard and writes no inline scale, leaving globals.css authoritative", () => {
     render(
       <DensityProvider>
         <Harness />
       </DensityProvider>,
     );
 
-    expect(screen.getByTestId("current")).toHaveTextContent("compact");
-    // Not "0.9" — compact is the stylesheet's own value. Writing it back would
+    // The default moved from compact to standard when the admin portal's
+    // geometry was adopted: 0.9 was the single reason the tenant chrome
+    // rendered ~10% smaller than admin's at every control, row and edge.
+    expect(screen.getByTestId("current")).toHaveTextContent("standard");
+    // Not "1" — standard is the stylesheet's own value. Writing it back would
     // make the same number live in two places.
     expect(inlineScale()).toBe("");
   });
 
-  it("applies standard and comfortable to the document element", () => {
+  it("applies compact and comfortable to the document element", () => {
     render(
       <DensityProvider>
         <Harness />
@@ -60,11 +63,12 @@ describe("DensityProvider", () => {
     expect(inlineScale()).toBe("1.1");
     expect(window.localStorage.getItem("tenant_density")).toBe("comfortable");
 
-    fireEvent.click(screen.getByRole("button", { name: "standard" }));
-    expect(inlineScale()).toBe("1");
+    fireEvent.click(screen.getByRole("button", { name: "compact" }));
+    expect(inlineScale()).toBe("0.9");
+    expect(window.localStorage.getItem("tenant_density")).toBe("compact");
   });
 
-  it("clears both the inline scale and the stored value on the way back to compact", () => {
+  it("clears both the inline scale and the stored value on the way back to standard", () => {
     render(
       <DensityProvider>
         <Harness />
@@ -72,7 +76,7 @@ describe("DensityProvider", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "comfortable" }));
-    fireEvent.click(screen.getByRole("button", { name: "compact" }));
+    fireEvent.click(screen.getByRole("button", { name: "standard" }));
 
     expect(inlineScale()).toBe("");
     expect(window.localStorage.getItem("tenant_density")).toBeNull();
@@ -100,7 +104,7 @@ describe("DensityProvider", () => {
       </DensityProvider>,
     );
 
-    expect(screen.getByTestId("current")).toHaveTextContent("compact");
+    expect(screen.getByTestId("current")).toHaveTextContent("standard");
     expect(inlineScale()).toBe("");
   });
 
@@ -112,12 +116,12 @@ describe("DensityProvider", () => {
     );
 
     act(() => {
-      window.localStorage.setItem("tenant_density", "standard");
+      window.localStorage.setItem("tenant_density", "compact");
       window.dispatchEvent(new StorageEvent("storage", { key: "tenant_density" }));
     });
 
-    expect(screen.getByTestId("current")).toHaveTextContent("standard");
-    expect(inlineScale()).toBe("1");
+    expect(screen.getByTestId("current")).toHaveTextContent("compact");
+    expect(inlineScale()).toBe("0.9");
   });
 });
 
@@ -138,7 +142,7 @@ describe("the bootstrap script and the provider agree", () => {
     expect(layout).toContain(`"--ui-scale","${scale}"`);
   });
 
-  it("never writes the compact value, matching applyDensity's removeProperty path", () => {
-    expect(layout).not.toContain('"--ui-scale","0.9"');
+  it("never writes the standard value, matching applyDensity's removeProperty path", () => {
+    expect(layout).not.toContain('"--ui-scale","1"');
   });
 });

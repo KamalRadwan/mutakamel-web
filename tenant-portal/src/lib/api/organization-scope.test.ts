@@ -7,11 +7,13 @@ import {
   resolveCompanyForBranch,
   resolveOrganizationScope,
   type OrganizationScopeMode,
+  type TenantScopeSource,
 } from "./organization-scope";
 
 const COMPANY = "0192f3a0-0000-7000-8000-000000000001";
 const BRANCH = "0192f3a0-0000-7000-8000-000000000002";
 const OTHER_BRANCH = "0192f3a0-0000-7000-8000-000000000003";
+const OTHER_COMPANY = "0192f3a0-0000-7000-8000-000000000004";
 
 describe("organization scope resolver", () => {
   it("sends nothing at all on a NONE route, even with a branch selected", () => {
@@ -65,6 +67,7 @@ describe("organization scope resolver", () => {
 
   it("pairs a branch with its owning company from team memberships", () => {
     const source = {
+      accessibleBranches: [BRANCH, OTHER_BRANCH],
       accessibleCompanies: [COMPANY],
       teamMemberships: [
         { companyId: COMPANY, branchId: BRANCH, isPrimary: true },
@@ -75,6 +78,83 @@ describe("organization scope resolver", () => {
     // A branch the user has no membership in must not be paired with a
     // guessed company — BRANCH_REQUIRED needs the *right* company.
     expect(resolveCompanyForBranch(source, OTHER_BRANCH)).toBeNull();
+  });
+});
+
+describe("authoritative branch company scope", () => {
+  const source = {
+    accessibleBranches: [BRANCH],
+    accessibleCompanies: [COMPANY, OTHER_COMPANY],
+    teamMemberships: [{ companyId: OTHER_COMPANY, branchId: BRANCH, isPrimary: true }],
+  };
+
+  it("resolves an accessible branch for an owner without team memberships", () => {
+    expect(resolveCompanyForBranch({
+      ...source,
+      accessibleBranchCompanies: [{ branchId: BRANCH, companyId: COMPANY }],
+      teamMemberships: [],
+    }, BRANCH)).toBe(COMPANY);
+  });
+
+  it("prefers Core's branch ownership map over team memberships", () => {
+    expect(resolveCompanyForBranch({
+      ...source,
+      accessibleBranchCompanies: [{ branchId: BRANCH, companyId: COMPANY }],
+    }, BRANCH)).toBe(COMPANY);
+  });
+
+  it("uses legacy memberships only when the map is absent", () => {
+    expect(resolveCompanyForBranch(source, BRANCH)).toBe(OTHER_COMPANY);
+    expect(resolveCompanyForBranch({ ...source, accessibleBranchCompanies: [] }, BRANCH)).toBeNull();
+  });
+
+  it("never resolves a branch outside the accessible branch set", () => {
+    expect(resolveCompanyForBranch({ ...source, accessibleBranches: [] }, BRANCH)).toBeNull();
+    expect(resolveCompanyForBranch({
+      ...source,
+      accessibleBranches: [],
+      accessibleBranchCompanies: [{ branchId: BRANCH, companyId: COMPANY }],
+    }, BRANCH)).toBeNull();
+  });
+
+  it.each([
+    { name: "null map", mapping: null },
+    { name: "object instead of array", mapping: { branchId: BRANCH, companyId: COMPANY } },
+    { name: "null entry", mapping: [null] },
+    { name: "missing company", mapping: [{ branchId: BRANCH }] },
+    { name: "invalid UUID", mapping: [{ branchId: BRANCH, companyId: "company" }] },
+    { name: "inaccessible branch", mapping: [{ branchId: OTHER_BRANCH, companyId: COMPANY }] },
+    { name: "conflicting ownership", mapping: [
+      { branchId: BRANCH, companyId: COMPANY },
+      { branchId: BRANCH, companyId: OTHER_COMPANY },
+    ] },
+  ])("fails closed for $name without falling back to memberships", ({ mapping }) => {
+    expect(resolveCompanyForBranch({
+      ...source,
+      accessibleBranchCompanies: mapping,
+    } as unknown as TenantScopeSource, BRANCH)).toBeNull();
+  });
+
+  it("rejects a mapped company outside the accessible company set", () => {
+    expect(resolveCompanyForBranch({
+      ...source,
+      accessibleCompanies: [OTHER_COMPANY],
+      accessibleBranchCompanies: [{ branchId: BRANCH, companyId: COMPANY }],
+    }, BRANCH)).toBeNull();
+  });
+
+  it("keeps a resolvable branch when other companies were truncated from the projection", () => {
+    const partialCompanies = {
+      ...source,
+      accessibleBranches: [BRANCH, OTHER_BRANCH],
+      accessibleCompanies: [COMPANY],
+      accessibleBranchCompanies: [
+        { branchId: BRANCH, companyId: COMPANY },
+        { branchId: OTHER_BRANCH, companyId: OTHER_COMPANY },
+      ],
+    };
+    expect(resolveCompanyForBranch(partialCompanies, BRANCH)).toBe(COMPANY);
+    expect(resolveCompanyForBranch(partialCompanies, OTHER_BRANCH)).toBeNull();
   });
 });
 

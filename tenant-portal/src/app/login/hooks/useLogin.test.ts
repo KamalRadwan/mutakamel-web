@@ -2,15 +2,20 @@
 
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TenantApiClientError } from "@/lib/api/axiosClient";
 import { classifyLoginFailure, useLogin } from "./useLogin";
 
 const postMock = vi.fn().mockResolvedValue(undefined);
 const loginMock = vi.fn().mockResolvedValue(undefined);
 const toastMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn(), errorFromApi: vi.fn() };
 
-vi.mock("@/lib/api/axiosClient", () => ({
-  axiosClient: { post: (...args: unknown[]) => postMock(...args) },
-}));
+vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
+  const { TenantApiClientError } = await importOriginal<typeof import("@/lib/api/axiosClient")>();
+  return {
+    TenantApiClientError,
+    axiosClient: { post: (...args: unknown[]) => postMock(...args) },
+  };
+});
 
 vi.mock("@/context/AuthContext", () => ({
   useTenantAuth: () => ({ login: loginMock }),
@@ -75,10 +80,37 @@ describe("useLogin — D1 (docs/build/DEFECTS.md#d1)", () => {
   });
 });
 
-// 4.31 — every branch is a status + errorCode pair read from core-app source.
+// 4.31 — each branch uses a stable server or session transport error code.
 // One shared toast made these indistinguishable, and each one needs a different
 // next action from the user.
 describe("classifyLoginFailure", () => {
+  it("preserves the actual browser coordination failure through the submit catch", async () => {
+    loginMock.mockRejectedValueOnce(new TenantApiClientError(
+      "AUTH_SESSION_COORDINATION_UNAVAILABLE",
+      {
+        status: 503,
+        statusText: "",
+        headers: new Headers(),
+        data: {
+          errorCode: "AUTH_SESSION_COORDINATION_UNAVAILABLE",
+          correlationId: "",
+        },
+      },
+    ));
+    const { result } = renderHook(() => useLogin());
+
+    await act(async () => {
+      await result.current.handleSubmit(submitEvent());
+    });
+
+    expect(result.current.failure).toMatchObject({
+      status: 503,
+      code: "AUTH_SESSION_COORDINATION_UNAVAILABLE",
+    });
+    expect(result.current.failureKind).toBe("coordinationUnavailable");
+    expect(result.current.isSubmitting).toBe(false);
+  });
+
   it.each([
     [{ status: 401, code: "INVALID_CREDENTIALS" }, "invalidCredentials"],
     [{ status: 403, code: "ACCOUNT_NOT_ACTIVE" }, "accountNotActive"],
@@ -86,6 +118,7 @@ describe("classifyLoginFailure", () => {
     [{ status: 503, code: "TENANT_INACTIVE" }, "tenantInactive"],
     [{ status: 429, code: "GW.RATE.LIMIT_EXCEEDED" }, "rateLimited"],
     [{ status: 0 }, "offline"],
+    [{ status: 503, code: "GW.RATE.UNAVAILABLE" }, "unknown"],
     [{ status: 500 }, "unknown"],
   ])("maps %o to its own screen state", (error, expected) => {
     expect(classifyLoginFailure(error)).toBe(expected);

@@ -12,7 +12,7 @@ Resolves [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md) Q1.
 
 | Header | Owner | Why |
 | --- | --- | --- |
-| `Strict-Transport-Security` | **NPM** | NPM terminates TLS. The app never sees the scheme |
+| `Strict-Transport-Security` | **NPM, only for an HTTPS deployment** | Omit it for the selected HTTP deployment |
 | `X-Content-Type-Options` | **NPM** | Static, transport-level |
 | `X-Frame-Options` | **NPM** | Static, transport-level |
 | `Referrer-Policy` | **NPM** | Static, transport-level |
@@ -24,7 +24,7 @@ config.
 
 ### The nonce problem
 
-`src/app/layout.tsx` renders an inline `beforeInteractive` script — the
+`src/app/layout.tsx` renders an inline `<script>` — the
 theme/direction bootstrap that prevents the wrong-theme flash
 ([theming.md](../design/theming.md#no-flash--the-mechanism)). Next.js also
 emits its own inline bootstrap.
@@ -53,7 +53,6 @@ Per proxy host, **Advanced → Custom Nginx Configuration**:
 # `always` is required: without it nginx drops the header on 4xx/5xx
 # responses, so an error page ships unprotected.
 
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 add_header X-Content-Type-Options    "nosniff" always;
 add_header X-Frame-Options           "DENY" always;
 add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
@@ -75,10 +74,10 @@ proxy_set_header X-Forwarded-Proto $scheme;
    header goes missing, this is why: re-declare the full set inside that
    location.
 
-2. **`preload` is not in the HSTS value above, on purpose.** Submitting to the
-   preload list is effectively irreversible and applies to every subdomain.
-   Add it only after the tenant domain strategy is settled and you are certain
-   no subdomain will ever need plain HTTP.
+2. **Keep HSTS and preload disabled for the HTTP deployment.** They instruct
+   browsers to upgrade to HTTPS and conflict with this transport choice.
+   Previously cached HSTS policies can also upgrade a URL before it reaches
+   the application.
 
 3. **NPM's "Block Common Exploits" toggle is fine to leave on**, but it is not
    a substitute for any header above. It filters a small set of known-bad
@@ -86,10 +85,9 @@ proxy_set_header X-Forwarded-Proto $scheme;
 
 ### SSL tab
 
-- **Force SSL** — on.
-- **HTTP/2 Support** — on.
-- **HSTS Enabled** — **leave off.** You are setting HSTS in the custom config
-  above; enabling both emits the header twice.
+- **Force SSL** — off for the selected HTTP deployment.
+- **HTTP/2 Support** — only relevant if TLS is enabled later.
+- **HSTS Enabled** — off; no HSTS header is set in the HTTP configuration.
 
 ## The app's CSP — built
 
@@ -101,7 +99,7 @@ recorded and MASTER-PLAN 13.1 closed.
 
 ```ts
 default-src 'self'
-script-src 'self' 'nonce-<n>' 'strict-dynamic'   // + 'unsafe-eval' in dev only
+script-src 'nonce-<n>' 'strict-dynamic'          // + 'unsafe-eval' in dev only
 style-src 'self' 'unsafe-inline'
 img-src 'self' data: blob:
 font-src 'self'
@@ -112,8 +110,26 @@ form-action 'self'
 object-src 'none'
 ```
 
-Five values are deliberate and worth not "simplifying":
+Six values are deliberate and worth not "simplifying":
 
+- **`script-src` has no `'self'`** — and that absence is the deliberate part.
+  `'strict-dynamic'` makes a browser ignore `'self'`, every host-source
+  expression and `'unsafe-inline'` in that directive, so the two together
+  state one policy and enforce another; Firefox reports it on every page load
+  as `Ignoring "'self'" within script-src: 'strict-dynamic' specified`. The
+  usual reason to keep it anyway is as a CSP2 fallback for a browser that does
+  not know `'strict-dynamic'`, which would otherwise refuse webpack's lazily
+  injected chunks. **That reason does not apply here**: Next 16 compiles for
+  `chrome 111`, `edge 111`, `firefox 111`, `safari 16.4`, and Safari 15.4 was
+  the last of those engines to gain `'strict-dynamic'`. Nothing needs a host
+  allowance either — every `<script>` Next emits carries the nonce, lazy
+  chunks are injected with `createElement("script")` and inherit trust, and
+  the app loads no third-party script and constructs no Worker. `default-src
+  'self'` is unaffected; this is only about the directive `'strict-dynamic'`
+  governs. Added 2026-09-01, restoring what
+  [D16](../build/DECISIONS.md#d16--the-csp-policy-decided-against-what-actually-exists--assumed)
+  decided — `script-src 'nonce-<n>' 'strict-dynamic'`, with no `'self'` — from
+  which the 13.1 implementation had drifted.
 - **`font-src 'self'`** — no `fonts.gstatic.com`. `next/font` downloads Readex
   Pro and DM Mono at build time and serves them same-origin
   ([typography.md](../design/typography.md)). If you ever switch to a `<link>`
@@ -208,7 +224,7 @@ enforcing. What each check proves, and what it does not:
 | Check | Result |
 | --- | --- |
 | Header on the wire | One `Content-Security-Policy`, enforcing, on `/login` and on a `404` |
-| Nonce reaches the renderer | Every `<script>` in the document — framework, bundle, flight — carries the **same** nonce as the header, and so does the `beforeInteractive` bootstrap descriptor in `<head>` |
+| Nonce reaches the renderer | Every `<script>` in the document — framework, bundle, flight — carries the **same** nonce as the header, and so does the inline theme bootstrap in `<head>` |
 | Fresh per request | Two requests, two different nonces |
 | The app runs at all | React hydrated and rendered the screen, so `'strict-dynamic'` admits the whole bundle graph |
 | **The theme bootstrap executes** | With `tenant_lang=ar`, `tenant_theme=light`, `tenant_density=comfortable` stored, the document came back with `lang="ar" dir="rtl"`, no `.dark`, and `style="--ui-scale: 1.1;"` on `<html>` — and **zero** `securitypolicyviolation` events |
@@ -217,8 +233,158 @@ enforcing. What each check proves, and what it does not:
 | `img-src` | The branding logo path was requested, not refused |
 | Inline script with no nonce | Did not execute |
 
+This run still stands after the 2026-09-01 removal of `script-src 'self'`, and
+is in fact the evidence for it: the header carried `'self'` at the time, but
+every browser that honours `'strict-dynamic'` had already discarded it, so what
+hydrated with zero violations was the policy that ships today.
+
 Two honest limits. The run had no Gateway behind it, so `applyBrandingTokens`
 was driven through its CSP-relevant mechanism — the `setProperty` write on
 `:root` — rather than from a live `/branding/public` response; and the served
 `404` page carried no `style` attributes, so `style-src 'unsafe-inline'` was
 not *exercised* here, only justified from the eight components that emit them.
+
+## SD-02 · `allowedDevOrigins` accepts any host (development only)
+
+**Status: ACCEPTED · decided 2026-08-31 · owner: Kamal Radwan**
+
+**Do not change this without an explicit decision.** In particular, do not
+"simplify" the pattern — see the trap below, which is the whole reason this
+section exists.
+
+### What was decided
+
+`next.config.ts` sets:
+
+```ts
+const ALLOWED_DEV_ORIGINS = ["**.*"];
+```
+
+Any multi-label host may load `/_next/*` and open the hot-reload WebSocket from
+`next dev`.
+
+### Why
+
+Tenant workspaces are reached through customer-owned domains. The dev server is
+loaded from whichever tenant host is being worked on — `mersany.mutakamel.ai`
+today, others tomorrow — so the set cannot be enumerated in advance.
+
+### The trap — read this before editing
+
+`allowedDevOrigins: ["*"]` **does not work.** It is accepted by the config
+schema, it reads as "allow everything", and it blocks every cross-origin host.
+Next rejects a bare wildcard on purpose, in
+`next/dist/server/app-render/csrf-protection.js`:
+
+```js
+// Prevent wildcards from matching entire domains (e.g. '**' or '*.com')
+if (patternParts.length === 1 && (parts[0] === '*' || parts[0] === '**')) return false;
+```
+
+Measured against that matcher, not assumed:
+
+| Pattern | `mersany.mutakamel.ai` |
+| --- | --- |
+| `"*"` | **blocked** |
+| `"**"` | **blocked** |
+| `"*.mutakamel.ai"` | allowed — but only this one domain |
+| `"**.*"` | allowed, and any other multi-label host |
+
+`localhost` and `*.localhost` are omitted deliberately: `blockCrossSiteDEV`
+prepends both, plus the bound hostname, before consulting this list.
+
+### Why it is guarded
+
+Next has already tightened this matcher once. If a release rejects `"**.*"` too,
+the failure is **silent** — HMR stops connecting and the app renders blank,
+which is the exact symptom this setting was added to cure. So
+`assertDevOriginsAreNotInert()` in `next.config.ts` checks the shipped pattern
+against Next's own matcher at dev startup and throws with the reason if it has
+gone inert. A missing internal module means the path moved and the check cannot
+run; that degrades quietly rather than refusing to boot.
+
+### What it costs — stated plainly
+
+Almost nothing, and far less than backend SD-01, which it is often confused
+with. They are different mechanisms on different sides:
+
+| | SD-01 (Gateway) | SD-02 (this) |
+| --- | --- | --- |
+| Guards | tenant **API** requests | `next dev` internal assets + HMR socket |
+| Runs in production | yes | **no** — `blockCrossSiteDEV` is dev-only |
+| Gives up | one of three CSRF layers | a dev-machine-only origin check |
+
+The exposure is that a page open in the same browser could read dev bundle
+source or attach to the HMR socket of a developer's local server. There is no
+production effect: `next build` / `next start` never call this code path.
+
+### Revisit when
+
+- Next's matcher changes and the startup assertion fires.
+- A stable, small set of dev hosts emerges — then list them exactly and delete
+  the wildcard.
+
+### Related
+
+- `next.config.ts` — `ALLOWED_DEV_ORIGINS`, `assertDevOriginsAreNotInert`
+- Backend [SECURITY_DECISIONS.md](../../../../backend/docs/SECURITY_DECISIONS.md) — SD-01, the API-side origin decision
+
+## SD-03 · HTTP deployment and cookie profiles
+
+**Status: ACCEPTED · decided 2026-08-31 · owner: Kamal Radwan**
+
+The user explicitly selected HTTP for the application, including deployments
+beyond development. This supersedes the earlier HTTPS-only requirement.
+
+### Cookie configuration
+
+Gateway and Core must use the same `AUTH_COOKIE_SECURE` value. It defaults to
+`true`; the selected HTTP deployment sets it to `false` in every environment.
+No browser header selects the cookie profile.
+
+| Profile | Tenant cookies | Secure attribute |
+| --- | --- | --- |
+| `true` (default) | `__Host-mutakamel-tenant-access`, `__Host-mutakamel-tenant-session`, `__Host-mutakamel-tenant-csrf` | yes |
+| `false` (HTTP) | `mutakamel-http-tenant-access`, `mutakamel-http-tenant-session`, `mutakamel-http-tenant-csrf` | no |
+
+Both profiles retain HttpOnly access/session credentials, host-only cookies,
+`Path=/`, and session-bound double-submit CSRF. The browser reads only the CSRF
+proof, preferring its page transport's profile and falling back when that proof
+is absent. It never reads or stores bearer credentials. The HTTP profile uses
+different names because browsers reject a `__Host-` cookie without `Secure`.
+
+### Browser coordination and forms
+
+The tenant client uses Web Locks when available. On HTTP hosts where the API
+is unavailable, a per-tab queue serializes auth operations with the existing
+10-second abort budget. A queued operation that expires never starts, and a
+running operation retains its place until it settles. Existing refresh
+single-flight, session-generation fences and cross-tab events remain enabled.
+The fallback does not provide cross-tab mutual exclusion.
+
+Login sends credentials in a same-origin JSON POST body. Credential forms also
+declare `method="post"`: if JavaScript has not hydrated, native submission
+must not serialize email/password fields into the address bar. This native
+fallback does not replace the JavaScript authentication flow.
+
+### Running the portal
+
+Use `pnpm dev` on port `5002`, for example
+`http://mersany.mutakamel.ai:5002`. Tenant host admission still applies. The
+existing `DEV_TENANT_HOST` override only substitutes a configured tenant for a
+loopback host during development; it does not bypass production host admission.
+
+The optional `pnpm dev:https` script remains available with explicit certificate
+and key files. Because both are supplied, Next uses them without generating or
+installing a local certificate authority. No HTTPS redirect, HSTS policy, or
+certificate installation is required for the HTTP deployment.
+
+`DEV_API_TARGET` remains a server-side rewrite target. Production ingress must
+route the same-origin `/api/*` namespace to Gateway and preserve the public
+tenant Host.
+
+### Transport risk
+
+HTTP does not encrypt passwords or cookies and permits interception or
+modification by someone on the network path. POST keeps credentials out of URLs;
+HttpOnly and CSRF address other threats and do not provide transport encryption.

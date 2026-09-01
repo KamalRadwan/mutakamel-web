@@ -278,16 +278,6 @@ export function getFirstPermittedCrmRoute(
   );
 }
 
-// WebPhone settings are reachable even for a workspace that has not subscribed:
-// the screen renders disabled and states why, so the capability stays
-// discoverable instead of vanishing behind a redirect.
-const CORE_EXACT_PATHS = new Set<string>([
-  TENANT_ROUTES.core,
-  TENANT_ROUTES.coreSessions,
-  TENANT_ROUTES.coreWebphoneSettings,
-]);
-export function isSupportedCorePath(pathname: string): boolean {
-  return CORE_EXACT_PATHS.has(pathname);
 // Every Core screen requires exactly one read permission, and each one is
 // copied from its controller's @RequirePermissions decorator in core-app —
 // see docs/api/core-settings.md for the route-by-route table.
@@ -323,7 +313,9 @@ const CORE_ENTRY_ROUTES = [
   // billing and subscription carry no permission strings at all.
   { href: TENANT_ROUTES.coreSettingsBranding, permission: "branding.read" },
 ] as const;
+
 export type CoreEntryRoute = (typeof CORE_ENTRY_ROUTES)[number]["href"];
+
 /**
  * Core permissions carry no `.own`/`.team`/`.all` scope suffix — the CRM
  * scoping model does not apply here, so this is an exact match, never the
@@ -383,6 +375,10 @@ export function canAccessCoreOwnerRoute(isTenantOwner: boolean): boolean {
 const CORE_EXACT_PATHS = new Set<string>([
   TENANT_ROUTES.core,
   TENANT_ROUTES.coreSessions,
+  // WebPhone settings stay reachable for a workspace that has not subscribed:
+  // the screen renders disabled and states why, so the capability stays
+  // discoverable instead of vanishing behind a redirect.
+  TENANT_ROUTES.coreWebphoneSettings,
   TENANT_ROUTES.coreSettings,
   // Own preferences: GET/PUT /users/me/profile carry no @RequirePermissions, so
   // this is reachable by any authenticated tenant user and is not an entry route.

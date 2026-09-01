@@ -7,42 +7,48 @@ Written: **2026-08-27**
 Source of truth once implemented: `src/app/globals.css`.
 
 > **Superseded on palette and density.** [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) is authoritative for colors, fonts,
-> sizes and per-page UI/UX: the neutral ramp is **cold blue** (hue 240), not warm
-> graphite, and controls/rows are **32px/36px**, not 36px/40px. This page keeps the
-> longer reasoning and the exhaustive status mapping.
+> sizes and per-page UI/UX: every ramp value, the fonts and the whole shell
+> geometry are now the **admin portal's**, and `--ui-scale` ships at **1**, not
+> 0.9. This page keeps the longer reasoning and the exhaustive status mapping.
 
 ## The four roles
 
-| Role | Ramp | Hue | Meaning |
-| --- | --- | --- | --- |
-| Brand | `brand` | **258** (blue) | Primary actions, active nav, focus rings, links |
-| Positive | `positive` | **168 → 160** (teal-green) | Won, converted, active, healthy |
-| Caution | `caution` | 82 → 56 (amber) | On hold, nurturing, degraded, needs attention |
-| Negative | `negative` | **20 → 13** (crimson) | Lost, disqualified, blacklisted, destructive, error |
-| Neutral | `ink` | **240** (cold blue) | Text, borders, surfaces, and **every in-progress state** |
+| Role | Ramp | Admin's name | Hue | Meaning |
+| --- | --- | --- | --- | --- |
+| Brand | `brand` | `action` | cobalt, ~254 → 267 | Primary actions, active nav, focus rings, links |
+| Positive | `positive` | `success` | 149–164 (green) | Won, converted, active, healthy |
+| Caution | `caution` | `warn` | 92 → 44 (amber) | On hold, nurturing, degraded, needs attention |
+| Negative | `negative` | `danger` | 30 → 26 (vermilion) | Lost, disqualified, blacklisted, destructive, error |
+| Neutral | `ink` | `ink` / `surface` | 232 → 245 (cold blue) | Text, borders, surfaces, and **every in-progress state** |
 
-> The earlier version of this table specified a petrol brand (hue 216–226) on a
-> **warm graphite** neutral, and argued at length for both. That palette is
-> superseded — the product direction is a **cold blue** light theme. The
-> rationale for the current hues, including why `positive` moved to teal-green
-> and `negative` to crimson to stay coherent against a cold ground, is in
+> **The role names are the only thing that did not move.** The values are the
+> admin portal's; `brand` / `positive` / `caution` / `negative` / `ink` stay
+> because `src/lib/branding/apply-branding.ts` writes `--color-brand-*` on
+> `:root` at runtime for a white-labelled tenant, and because ~360 feature call
+> sites, the theme flip below and `scripts/design/contrast.mjs` all key off
+> these spellings. Admin's own names are declared as **aliases**
+> (`--color-action-*`, `--color-success-*`, `--color-warn-*`, `--color-danger-*`,
+> `--color-surface-*`), so markup lifted from the admin portal resolves here
+> unedited. The rationale for the current hues is in
 > [DESIGN-SYSTEM.md § Color](DESIGN-SYSTEM.md#1--color).
 
 `ink` has **13 steps**. `ink-25` exists because a dense table needs a zebra
 row one step above `50`; `ink-1000` exists because the dark canvas must sit
 below the darkest card surface. Tailwind's stock 11-step families have neither.
+Steps `25`–`300` do double duty as the light surface ramp — that is the range
+admin spells `--color-surface-*`.
 
 ## Ramps
 
-> **The ramp values that were here are superseded and have been removed.**
-> They specified the earlier petrol/warm-graphite palette (brand hue 221, ink
-> hue ~75). The implemented palette is **cold blue** — brand hue 258, ink hue
-> 240 — and its 57 exact OKLCH values live in one place only:
-> **[DESIGN-SYSTEM.md § Ramps](DESIGN-SYSTEM.md#ramps--exact-values)**.
+> **The exact values are not duplicated here.** All 57 OKLCH steps live in one
+> place only: **[DESIGN-SYSTEM.md § Ramps](DESIGN-SYSTEM.md#ramps--exact-values)**,
+> mirroring `src/app/globals.css`.
 >
-> They were deleted rather than left with a warning because they were valid,
-> copyable CSS: an agent skimming for "the ramps" would have implemented the
-> wrong palette and every contrast number in this file with it.
+> This page has twice carried a full, copyable ramp block that later went
+> stale — first the petrol/warm-graphite palette, then the cold-blue one the
+> admin port replaced. Both times an agent skimming for "the ramps" would have
+> implemented the wrong palette and every contrast number with it. The values
+> stay in one file.
 
 The structural decisions behind the ramps **do** still hold, and are why the
 current palette is shaped the way it is:
@@ -52,12 +58,19 @@ current palette is shaped the way it is:
   Tailwind's stock families have neither, so `ink-25` and `ink-1000` are
   additions.
 - **Amber's hue torsion is physics, not taste.** The `caution` ramp travels
-  from hue 82 down to 56 as it darkens; without that drift the 700–950 steps
-  read olive rather than amber.
+  from hue 92 down to 44 as it darkens; without that drift the 700–950 steps
+  read olive rather than amber. The port widened the torsion — it did not
+  invent it.
 - **Each role peaks its chroma mid-ramp.** The 50 and 950 ends stay low-chroma
   so tints and dark fills do not turn muddy.
 - **Matching numeric steps across roles are near-luminance matched**, which is
   what lets the theme flip swap a family without anything going unreadable.
+- **Nine steps are written in-gamut rather than as admin wrote them.** In the
+  admin file those nine sit fractionally outside sRGB and the browser clips
+  them. Here they carry the in-gamut OKLCH that round-trips to the exact hex the
+  browser already paints — pixel-identical output, and the out-of-gamut check in
+  `contrast.mjs` stays meaningful instead of failing on nine known-clipped
+  values.
 
 
 ## Contrast resolution
@@ -69,33 +82,50 @@ reproduces them and fails if any token falls outside the sRGB gamut.
 It is not duplicated here: two copies of a number that must match the running
 CSS is exactly how one of them goes quietly wrong.
 
-Two facts worth carrying in your head:
+Three facts worth carrying in your head:
 
 - The brand fill uses **different ramp steps per theme** — a single step cannot
   clear 4.5:1 against both a light and a dark ground.
-- The **focus ring is the tightest value in the system** (3.40 against a 3.0
-  bar for non-text). Do not lighten `ink-50` or lower `brand-500`'s chroma
+- The **tightest value in the system is now positive text in light mode**, at
+  5.02 against a 4.5 bar (`positive-700` on white). The focus ring used to hold
+  that position at 3.40; the ported palette lifted it to 4.86 against a 3.0
+  non-text bar. Do not darken `--card` or lower `positive-700`'s lightness
   without re-running the script.
+- The gate also carries a **negative control**: `ink-500` as muted text on
+  white measures 4.12 and has to keep failing. A palette edit that makes that
+  pass has flattened the neutral ramp.
 
-### Two rules whose original justification was wrong
+### Three rules whose original justification was wrong
 
-Both rules stand. The reasons first given for them did not survive measurement,
-and are corrected here rather than quietly left in place:
+All three rules stand. The reasons first given for them did not survive
+measurement, and are corrected here rather than quietly left in place. The
+figures below are the ported palette's, recomputed after the port:
 
-- **`--muted-foreground` is `ink-600`, not `ink-500`.** Correct as stated:
-  `ink-500` measures **4.07** on white, below the 4.5 bar.
+- **`--muted-foreground` is not `ink-500`.** Correct as stated: `ink-500`
+  measures **4.12** on white, below the 4.5 bar. (The light value is now a
+  dedicated `oklch(0.518211 0.050915 249.823)` rather than a ramp step; it
+  measures 6.31.)
 - **Destructive is `negative-700`, not `negative-600`.** The original claim was
-  that `negative-600` *fails* contrast. It does not — it measures **5.03** with
+  that `negative-600` *fails* contrast. It does not — it measures **5.01** with
   a white label and would be acceptable. `negative-700` (7.02) is kept as a
-  **margin choice**, not a compliance requirement.
+  **margin choice**, not a compliance requirement. This survived the port
+  intact: the numbers moved by 0.02, the conclusion did not.
 - **Amber is never a filled button.** The original claim was that no `caution`
   step clears 4.5:1 against both label colors. That is false:
-  `caution-500` with an `ink-950` label measures **8.78**. The rule stands on
+  `caution-500` with an `ink-950` label measures **8.35**. The rule stands on
   **semantic** grounds instead — a filled button reads as *the* action on a
   screen, and "caution" is not an action; a second filled hue also competes
   with the brand fill for the one-primary-per-screen rule in
   [geometry.md](geometry.md#the-one-filled-action-rule-as-geometry). Caution
   stays border, tint, dot, or text.
+
+> `globals.css`'s comment beside `--destructive` still reads "`-600` fails
+> contrast (~3.4:1) with white text". That figure came across with the port and
+> is wrong for the values this portal ships — `negative-600` on white measures
+> 5.01 here. The **choice** of `negative-700` is right; only the stated reason
+> is not. `contrast.mjs` agrees with this page: it lists `ink-500` as the one
+> genuine contrast-driven exclusion and explicitly warns against re-adding
+> `negative-600` as a contrast claim.
 
 ## Semantic tokens
 
@@ -107,36 +137,35 @@ in with no edits. Declared on `:root` and overridden in `.dark`.
 Wiring a new component's hover to `--accent` expecting brand blue is the single
 most common way to reintroduce the "everything glows the accent color" look.
 
-| Token | Light | Dark |
-| --- | --- | --- |
-| `--background` | `ink-50` | `ink-1000` |
-| `--foreground` | `ink-900` | `ink-100` |
-| `--canvas` | `ink-100` | `ink-1000` |
-| `--card` | `white` | `ink-950` |
-| `--card-foreground` | `ink-900` | `ink-100` |
-| `--popover` | `white` | `ink-900` |
-| `--popover-foreground` | `ink-900` | `ink-100` |
-| `--primary` | `brand-600` | `brand-400` |
-| `--primary-foreground` | `white` | `ink-950` |
-| `--secondary` | `ink-100` | `ink-800` |
-| `--secondary-foreground` | `ink-800` | `ink-100` |
-| `--muted` | `ink-100` | `ink-900` |
-| `--muted-foreground` | `ink-600` | `ink-400` |
-| `--accent` | `ink-100` | `ink-800` |
-| `--accent-foreground` | `ink-900` | `ink-100` |
-| `--destructive` | `negative-700` | `negative-700` |
-| `--destructive-foreground` | `white` | `white` |
-| `--border` | `ink-200` | `ink-800` |
-| `--input` | `ink-200` | `ink-800` |
-| `--ring` | `brand-500` | `brand-400` |
-| `--row-zebra` | `ink-25` | `ink-950` |
-| `--sidebar` | `white` | `ink-950` |
-| `--sidebar-foreground` | `ink-800` | `ink-200` |
-| `--sidebar-active` | `brand-700` | `brand-300` |
+The full table is in
+[DESIGN-SYSTEM.md § Semantic tokens](DESIGN-SYSTEM.md#semantic-tokens); this
+page records only what is worth explaining. Four groups arrived with the port
+and did not exist before:
 
-The sidebar is a light surface in light mode. It is **not** permanently dark —
-a permanently dark chrome around a light body is one of the tells listed in
-[anti-patterns.md](anti-patterns.md).
+| Group | Members | What it is for |
+| --- | --- | --- |
+| Selection | `--selected`, `--selected-foreground` | The selected-row tint, a surface `--accent` was being overloaded to do |
+| Status roles | `--info-*`, `--success-*`, `--warning-*`, and `--destructive-subtle` / `-vivid` | A named role per outcome, each with a filled, a subtle and a vivid form |
+| Charts | `--chart-1…5`, `--chart-qualitative-1…6`, `--chart-grid`, `--chart-axis` | See [§ Charts](#charts) |
+| Sidebar | `--sidebar-primary`, `-accent`, `-selected`, `-border`, `-ring` | The shell's own copies, so re-theming chrome does not disturb the body |
+
+Two distinctions inside the status roles decide how the product reads:
+
+- **`*-subtle` is the `100` step, never the `50`.** The 50 steps carry chroma
+  0.014–0.019, which on a 20px status pill is indistinguishable from white — and
+  `*-subtle` is the most-used coloured surface in the app, so it single-handedly
+  decides whether the portal reads as coloured at all. The 100 step is 2.1–2.4×
+  the chroma and every pair still clears AA against its `-700`/`-800` label.
+- **`*-vivid` is the non-text accent** — status dots and indicator marks, which
+  a text label already names. It answers to the **3:1** graphics bar rather than
+  4.5:1, so it can sit far brighter than the dark steps a filled role needs.
+  Those dark steps are exactly what made every badge read grey-green instead of
+  green.
+
+The sidebar is a light surface in light mode — `ink-25`, the lightest step in
+the ramp, one notch off the `--background` it sits beside. It is **not**
+permanently dark; a permanently dark chrome around a light body is one of the
+tells listed in [anti-patterns.md](anti-patterns.md).
 
 ## Status mapping
 
@@ -272,14 +301,25 @@ a family has zero references, delete its override block.
 
 ## Elevation and control tokens
 
-> **Superseded.** The control scale that was here specified 28/32/36/40/44px
-> and a warm-hue shadow. Both are wrong: the implemented scale is
-> **24/28/32/36/40px** at `--ui-scale` 1.0 (and 21.6/25.2/28.8/32.4/36px at the
-> shipped 0.9), and the shadow is hue 240, derived from the `ink-950` token via
-> `color-mix()` rather than copied. The live block is in
+> **Superseded.** The control scale that was here specified 28/32/36/40/44px.
+> The implemented scale is **24/28/32/36/40px**, and since the admin port those
+> are the pixel sizes that actually render: `--ui-scale` ships at **1**, so the
+> `rem` values are no longer multiplied down. The live block is in
 > [DESIGN-SYSTEM.md § Sizing & density](DESIGN-SYSTEM.md#3--sizing--density).
 >
 > Removed rather than annotated, because it was copyable CSS.
+
+The two elevation values are admin's, and they are **literal `rgb()` shadows**,
+not derived from a ramp step: `0 4px 6px -1px rgb(15 23 32 / 0.08)` plus a
+tighter second layer for `pop`, and a 20px/8px pair at 0.12/0.08 for `overlay`.
+An earlier revision of this page had them mixed from `ink-950` via
+`color-mix()`; the port replaced that with admin's fixed values so both portals
+cast the same shadow. `rgb(15 23 32)` sits a little above `ink-950` (`#091219`)
+and is not derived from it — at 6–12 % opacity the two are near enough that the
+loss of the derivation costs nothing but the guarantee. In dark mode both become
+a **top inset hairline**
+(`inset 0 1px 0 0 rgb(255 255 255 / 0.06 | 0.08)`) — a drop shadow on an
+already-dark canvas reads as mud.
 
 Both must be bridged into Tailwind through `@theme inline` as `--shadow-pop`
 and `--shadow-overlay`, or the `shadow-pop` / `shadow-overlay` utilities
@@ -291,16 +331,33 @@ See [geometry.md](geometry.md) for how these are consumed.
 
 ## Charts
 
-There is no generic 5-slot categorical chart palette, and one must not be
-invented. The system has four hues; four hues cannot encode an arbitrary
-categorical breakdown, and cycling or generating hues produces exactly the
-unvalidated rainbow this system exists to prevent.
+The port brought admin's chart tokens across: `--chart-action` / `-success` /
+`-warning` / `-danger`, six `--chart-qualitative-*` slots, `--chart-grid`,
+`--chart-axis`, and the shadcn-shaped `--chart-1…5` aliases over them. Every
+qualitative slot is held inside L 0.625–0.681 so no series reads as more
+important than another before the data says so — hue does the separating — and
+the marks sit just above WCAG's 3:1 floor for non-text graphics while the axis,
+which is text, keeps 4.5:1.
+
+**No chart in this portal consumes the qualitative slots, and that is the
+rule, not an omission.** `src/design-system/patterns/chart/chart-palette.ts`
+offers exactly two ways to colour a series, and every chart takes one:
 
 - A breakdown that **is** a status (`byStatus`, win/loss, stage outcome) uses
-  the four roles directly. This covers most CRM charts.
+  the four roles directly, at the `600` step. This covers most CRM charts.
 - A genuinely qualitative breakdown (`bySource`, `byOwner`, `byCountry`) uses
-  **top-N plus "Other" in a single-hue sequential ramp** — `brand-200` through
-  `brand-800`. Order carries the meaning, not hue.
+  **top-N plus "Other" in a single-hue sequential ramp** — `brand-800` down to
+  `brand-200`, darkest slice first. Order carries the meaning, not hue; a
+  reader who cannot separate two adjacent blues can still read the ranking.
+  Seven steps means six real categories plus "Other", and past that the answer
+  is a table, not more colours.
 - Never place `caution` and `negative` adjacent as fills. They sit ~30° apart
   and fail the perceptual-distance floor for normal vision, which secondary
-  encoding does not excuse.
+  encoding does not excuse. `STATUS_DRAW_ORDER` puts `brand` between them by
+  construction; a two-role `{caution, negative}` breakdown, which reordering
+  cannot fix, gets a background-coloured stroke between segments instead.
+
+So the six-slot palette exists as a token, because a page copied from the admin
+portal has to resolve. Reaching for it from tenant chart code is still the
+unvalidated rainbow this system exists to prevent — take one of the two routes
+above.

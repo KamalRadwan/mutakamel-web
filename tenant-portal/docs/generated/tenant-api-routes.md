@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-08-30T23:50:14.793Z**
+Generated at: **2026-08-31T05:39:47.934Z**
 
-Frontend revision: `9ee533219112+dirty`
+Frontend revision: `599199821d5c+dirty`
 
-Backend revision: `68fef9f8c0d2+dirty`
+Backend revision: `6f7af078b871`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -20,7 +20,8 @@ canonical Gateway path mappings.
 | core | 195 |
 | crm | 143 |
 | trade | 231 |
-| **Total** | **569** |
+| webphone | 18 |
+| **Total** | **587** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -604,3 +605,21 @@ Machine-readable source:
 | trade | GET | `/api/tenant/trade/v1/workflows` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.workflows.get` |
 | trade | POST | `/api/tenant/trade/v1/workflows` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.workflows.post` |
 | trade | POST | `/api/tenant/trade/v1/workflows/:id/versions` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.workflows.by-id.versions.post` |
+| webphone | GET | `/api/tenant/webphone/v1/config` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.config.get` |
+| webphone | PATCH | `/api/tenant/webphone/v1/config` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.update` |
+| webphone | GET | `/api/tenant/webphone/v1/config/endpoints` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.config.endpoints.list` |
+| webphone | POST | `/api/tenant/webphone/v1/config/endpoints` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.endpoints.create` |
+| webphone | DELETE | `/api/tenant/webphone/v1/config/endpoints/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.endpoints.delete` |
+| webphone | PATCH | `/api/tenant/webphone/v1/config/endpoints/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.endpoints.update` |
+| webphone | GET | `/api/tenant/webphone/v1/config/ice-servers` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.config.ice-servers.list` |
+| webphone | POST | `/api/tenant/webphone/v1/config/ice-servers` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.ice-servers.create` |
+| webphone | DELETE | `/api/tenant/webphone/v1/config/ice-servers/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.ice-servers.delete` |
+| webphone | PATCH | `/api/tenant/webphone/v1/config/ice-servers/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.config.ice-servers.update` |
+| webphone | GET | `/api/tenant/webphone/v1/extensions` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.extensions.list` |
+| webphone | POST | `/api/tenant/webphone/v1/extensions` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.extensions.create` |
+| webphone | DELETE | `/api/tenant/webphone/v1/extensions/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.extensions.delete` |
+| webphone | PATCH | `/api/tenant/webphone/v1/extensions/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `webphone.tenant.extensions.update` |
+| webphone | GET | `/api/tenant/webphone/v1/me` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.me.get` |
+| webphone | GET | `/api/tenant/webphone/v1/me/call-logs` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.me.call-logs.list` |
+| webphone | POST | `/api/tenant/webphone/v1/me/call-logs` | TENANT_PORTAL | WRITE_SENSITIVE | no | `webphone.tenant.me.call-logs.create` |
+| webphone | GET | `/api/tenant/webphone/v1/seats` | TENANT_PORTAL | AUTHENTICATED | yes | `webphone.tenant.seats.get` |

@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, Trash2, Users } from "lucide-react";
-import { Button } from "@/design-system";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { Plus, Trash2, Users } from "lucide-react";
+import { Button, ConfirmActionModal } from "@/design-system";
 import { WEBPHONE_COPY, webphoneErrorText } from "../webphone-copy";
 import type { TenantWebphoneSettingsState } from "../hooks/useTenantWebphoneSettings";
 import {
@@ -68,22 +67,19 @@ export function ExtensionsSection({
       title={copy.extensionsSection}
       help={copy.extensionsSectionHelp}
       describedBy={describedBy}
-      icon={<Users className="size-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />}
+      icon={<Users className="size-4 text-muted-foreground" aria-hidden="true" />}
     >
       {state.isSubscribed && !state.canManageExtensions ? (
         // Managing extensions is a separate permission from editing the SIP
         // configuration, so it gets its own explanation rather than leaving the
         // controls silently inert.
-        <p
-          role="note"
-          className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
-        >
+        <p role="note" className="max-w-prose text-xs text-muted-foreground">
           {copy.extensionsReadOnly}
         </p>
       ) : null}
 
       {state.extensions.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-[11px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <p className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
           {copy.extensionsEmpty}
         </p>
       ) : (
@@ -106,9 +102,9 @@ export function ExtensionsSection({
           event.preventDefault();
           void submitDraft();
         }}
-        className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950"
+        className="grid gap-4 rounded-lg border border-border p-4"
       >
-        <h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+        <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {copy.addExtension}
         </h3>
         <div className="grid gap-4 lg:grid-cols-3">
@@ -213,10 +209,14 @@ export function ExtensionsSection({
         ) : null}
 
         <div>
-          <Button type="submit" variant="primary" size="sm" disabled={disabled}>
-            {pending && state.mutation.target === "extension:new" ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
+          <Button
+            type="submit"
+            variant="secondary"
+            size="sm"
+            disabled={disabled}
+            loading={pending && state.mutation.target === "extension:new"}
+          >
+            {pending && state.mutation.target === "extension:new" ? null : (
               <Plus className="size-4" aria-hidden="true" />
             )}
             {pending && state.mutation.target === "extension:new"
@@ -226,17 +226,20 @@ export function ExtensionsSection({
         </div>
       </form>
 
-      <ConfirmModal
-        isOpen={pendingDeletion !== null}
-        onClose={() => setPendingDeletion(null)}
-        onConfirm={() => void confirmDeletion()}
+      {/* The design system's destructive confirmation: no dismiss-by-backdrop,
+          Escape only ever cancels, and the dialog stays open on failure so the
+          row-level error is what the user sees next. */}
+      <ConfirmActionModal
+        open={pendingDeletion !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeletion(null);
+        }}
         title={copy.deleteExtensionTitle}
-        message={copy.deleteExtensionMessage}
-        confirmText={copy.confirmDelete}
-        cancelText={copy.cancel}
-        loadingText={copy.deleting}
-        isSubmitting={pending}
-        closeOnConfirm={false}
+        description={copy.deleteExtensionMessage}
+        confirmLabel={pending ? copy.deleting : copy.confirmDelete}
+        cancelLabel={copy.cancel}
+        onConfirm={() => void confirmDeletion()}
+        loading={pending}
       />
     </SectionCard>
   );
@@ -259,30 +262,30 @@ function ExtensionRow({
   return (
     <article
       aria-label={`${copy.extensionRegion} ${extension.extension}`}
-      className="grid gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-800"
+      className="grid gap-3 rounded-lg border border-border p-4"
     >
       <div className="flex flex-wrap items-center gap-2">
         <strong dir="ltr" className="text-sm">
           {extension.extension}
         </strong>
-        <span dir="ltr" className="text-[11px] text-slate-500 dark:text-slate-400">
+        <span dir="ltr" className="text-xs text-muted-foreground">
           {extension.sipUsername}
           {extension.displayName ? ` · ${extension.displayName}` : ""}
         </span>
       </div>
-      <dl className="grid gap-2 text-[11px] sm:grid-cols-3">
+      <dl className="grid gap-2 text-xs sm:grid-cols-3">
         <div>
-          <dt className="font-semibold text-slate-500">{copy.transport}</dt>
+          <dt className="font-medium text-muted-foreground">{copy.transport}</dt>
           <dd dir="ltr">{extension.transport}</dd>
         </div>
         <div>
-          <dt className="font-semibold text-slate-500">{copy.passwordState}</dt>
+          <dt className="font-medium text-muted-foreground">{copy.passwordState}</dt>
           <dd>
             {extension.passwordConfigured ? copy.configured : copy.notConfigured}
           </dd>
         </div>
         <div>
-          <dt className="font-semibold text-slate-500">{copy.outboundCallerId}</dt>
+          <dt className="font-medium text-muted-foreground">{copy.outboundCallerId}</dt>
           <dd dir="ltr">{extension.outboundCallerId ?? "—"}</dd>
         </div>
       </dl>
@@ -306,6 +309,7 @@ function ExtensionRow({
           variant="secondary"
           size="sm"
           disabled={disabled}
+          loading={pending && state.mutation.target === target}
           aria-label={`${
             extension.enabled ? copy.toggleExtensionOff : copy.toggleExtensionOn
           }: ${extension.extension}`}
@@ -315,13 +319,10 @@ function ExtensionRow({
             })
           }
         >
-          {pending && state.mutation.target === target ? (
-            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-          ) : null}
           {extension.enabled ? copy.disable : copy.enable}
         </Button>
         <Button
-          variant="danger"
+          variant="destructive"
           size="sm"
           disabled={disabled}
           aria-label={`${copy.removeExtension}: ${extension.extension}`}

@@ -15,6 +15,19 @@ This version has breaking changes — APIs, conventions, and file structure may 
   A missing or wrong backend contract is recorded in
   `docs/build/OPEN-QUESTIONS.md`, never worked around.
 - **Never run this app on a port other than `5002`.**
+- **HTTP is the selected deployment mode.** Use `pnpm dev` on port `5002`
+  with `AUTH_COOKIE_SECURE=false` in Gateway and Core. This profile uses
+  distinct `mutakamel-http-tenant-*` cookies; the secure default retains
+  `__Host-mutakamel-tenant-*` cookies. Keep HttpOnly credentials out of browser
+  code and preserve the auth queue fallback when Web Locks are unavailable.
+  HTTPS is optional, not a prerequisite. See `docs/architecture/security-headers.md` SD-03.
+
+- **Never call `crypto.randomUUID()`.** This workspace issues **UUIDv7 only**.
+  `randomUUID()` emits a v4, and it is undefined outside a secure context — so
+  it throws on `http://<tenant-host>:5002`, which is how this app is developed.
+  Use `generateUUIDv7` / `uuidCrypto` from `src/lib/uuid.ts`. A CSP nonce is the
+  deliberate exception and is not a UUID at all: see `createNonce` in `src/proxy.ts`.
+
 - **Never invent** a DTO field, enum value, permission string, route, response
   shape, or error code. If source does not prove it, it does not exist.
 - **Never ship mock data or simulated success.** If a capability is not

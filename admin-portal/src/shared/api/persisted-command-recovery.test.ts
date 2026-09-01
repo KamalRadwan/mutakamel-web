@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { webcrypto } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash, webcrypto } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { safeSessionStorage } from "@/lib/safeStorage";
 
 const { generateUUIDv7Mock } = vi.hoisted(() => ({
@@ -30,6 +30,24 @@ describe("persisted command recovery", () => {
     sessionStorage.clear();
     generateUUIDv7Mock.mockReset().mockReturnValue(idempotencyKey);
     vi.stubGlobal("crypto", webcrypto);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("preserves canonical recovery hashes and exact retries without SubtleCrypto", async () => {
+    vi.stubGlobal("crypto", {});
+    const intent = { z: "متكامل ✅", a: [{ d: 4, c: 3 }], omitted: undefined };
+    const expected = createHash("sha256")
+      .update('{"a":[{"c":3,"d":4}],"z":"متكامل ✅"}', "utf8")
+      .digest("hex");
+    await expect(sha256CanonicalJson(intent)).resolves.toBe(expected);
+
+    const command = { storageKey, route, intent, resource: { kind: "DATABASE_SERVER", id: serverId } };
+    const first = await preparePersistedCommandAttempt(command);
+    const replay = await preparePersistedCommandAttempt({ ...command, intent: { a: [{ c: 3, d: 4 }], z: intent.z } });
+    expect(first.intentSha256).toBe(expected);
+    expect(replay).toEqual(first);
+    await expect(preparePersistedCommandAttempt({ ...command, intent: { ...intent, z: "changed" } }))
+      .rejects.toBeInstanceOf(PendingCommandIntentMismatchError);
   });
 
   it("persists only a digest, key, route, and safe resource identity", async () => {

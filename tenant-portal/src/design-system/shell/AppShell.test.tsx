@@ -24,6 +24,9 @@ vi.mock("@/i18n/I18nContext", () => ({
 }));
 
 vi.mock("./useNavTree", () => ({ useNavTree: () => [] }));
+// The app switcher reads the route to derive the active app. This test is
+// about focus order, so the route is stubbed rather than stood up.
+vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 vi.mock("./Topbar", () => ({ Topbar: () => <header /> }));
 vi.mock("./MobileNav", () => ({ MobileNav: () => null }));
 vi.mock("./Sidebar", () => ({ Sidebar: () => <nav /> }));
@@ -41,7 +44,7 @@ afterEach(cleanup);
 describe("AppShell", () => {
   it("renders the skip link as the first focusable element, targeting #main", () => {
     const { container } = render(
-      <AppShell initialSidebarState="expanded">
+      <AppShell initialSidebarState="expanded" initialApp="workspace">
         <p>Workspace</p>
       </AppShell>,
     );
@@ -58,7 +61,7 @@ describe("AppShell", () => {
 
   it("gives <main> the id the skip link points at, and a tabIndex so it can take focus", () => {
     render(
-      <AppShell initialSidebarState="expanded">
+      <AppShell initialSidebarState="expanded" initialApp="workspace">
         <p>Workspace</p>
       </AppShell>,
     );

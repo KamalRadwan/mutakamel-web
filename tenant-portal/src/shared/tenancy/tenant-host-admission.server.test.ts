@@ -3,7 +3,46 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   fetchTenantHostStatus,
   normalizeTenantRequestHost,
+  resolveTenantAdmissionHost,
 } from "./tenant-host-admission.server";
+
+describe("resolveTenantAdmissionHost — the development loopback override", () => {
+  const DEV = "mersany.mutakamel.ai";
+
+  it("asks about the tenant host when the browser is on loopback", () => {
+    for (const host of ["localhost:5002", "127.0.0.1:5002", "[::1]:5002", "LOCALHOST"]) {
+      expect(resolveTenantAdmissionHost(host, DEV, "development")).toBe(DEV);
+    }
+  });
+
+  // The bound that keeps one tenant from being served as another: a request
+  // that already names a real host is never rewritten.
+  it("never rewrites a non-loopback host", () => {
+    expect(resolveTenantAdmissionHost("other-tenant.example.com:5002", DEV, "development")).toBe(
+      "other-tenant.example.com",
+    );
+  });
+
+  // Outside development it must behave exactly as the old code did — return
+  // "localhost", which then names no tenant and fails admission closed.
+  it("does nothing in production, even on loopback", () => {
+    expect(resolveTenantAdmissionHost("localhost:5002", DEV, "production")).toBe("localhost");
+  });
+
+  it("does nothing when DEV_TENANT_HOST is unset", () => {
+    expect(resolveTenantAdmissionHost("localhost:5002", undefined, "development")).toBe("localhost");
+  });
+
+  it("still rejects a host that is not a valid authority", () => {
+    expect(resolveTenantAdmissionHost("erp.example.com:99999", DEV, "development")).toBeNull();
+  });
+
+  // A request with no Host header names nothing, loopback included, so it is
+  // not substituted — admission fails closed rather than guessing a tenant.
+  it("does not substitute when there is no host at all", () => {
+    expect(resolveTenantAdmissionHost(null, DEV, "development")).toBeNull();
+  });
+});
 
 describe("tenant host admission", () => {
   it("normalizes one DNS host and a valid port", () => {

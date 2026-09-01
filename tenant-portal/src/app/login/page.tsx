@@ -83,7 +83,16 @@ export default function LoginPage() {
             </div>
           ) : null}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {/* `method="post"` is a safety net, not decoration. A <form> with
+                no method defaults to GET, so any submit that reaches the
+                browser instead of `onSubmit` — a click before hydration, a
+                hydration failure — serialises these fields into the URL. That
+                is not hypothetical: a real sign-in attempt was found in the dev
+                server access log as
+                `GET /login?email=…&password=…`, which also puts the password in
+                browser history and every proxy log on the way. POSTing keeps it
+                out of the URL even when JavaScript never runs. */}
+          <form method="post" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Field label={t.auth.emailLabel} required>
               <Input
                 type="email"
@@ -164,7 +173,7 @@ export default function LoginPage() {
             <DialogTitle>{t.auth.resetTitle}</DialogTitle>
             <DialogDescription>{t.auth.resetDescription}</DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleForgotPassword} className="flex flex-col gap-4">
+          <form method="post" onSubmit={handleForgotPassword} className="flex flex-col gap-4">
             <Field label={t.auth.emailLabel} required>
               <Input
                 type="email"

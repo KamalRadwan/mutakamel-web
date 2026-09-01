@@ -14,6 +14,10 @@ import type {
   DashboardResponse,
 } from "@/types/dashboard";
 import type { AutoRefreshInterval } from "../components/DashboardHeader";
+import {
+  resolvePreset,
+  type DateRange,
+} from "../utils/date-range-presets";
 
 export type DashboardTabKey = "overview" | DashboardGroupKey;
 
@@ -101,14 +105,13 @@ export interface UseDashboardDataOptions {
 
 export function useDashboardData(options: UseDashboardDataOptions = {}) {
   const [activeTab, setActiveTab] = useState<DashboardTabKey>("overview");
-  const [rangePreset, setRangePresetState] =
-    useState<DateRangePreset>("thisMonth");
+  // Today, because the question an operator opens the dashboard with is
+   // almost always about now. Short ranges bucket by the hour on the server,
+   // so the trend charts stay drawable.
+  const [range, setRangeState] = useState<DateRange>(() => todayRange());
   const [autoRefreshInterval, setAutoRefreshInterval] =
     useState<AutoRefreshInterval>("off");
-  const [customRange, setCustomRangeState] = useState<{
-    from?: string;
-    to?: string;
-  }>({});
+
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -118,28 +121,18 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
   const loadedRangeRef = useRef<string | null>(null);
   const scopingSupportedRef = useRef(true);
   const activeTabRef = useRef<DashboardTabKey>("overview");
-  const rangePresetRef = useRef<DateRangePreset>("thisMonth");
-  const customRangeRef = useRef<{ from?: string; to?: string }>({});
-  const setRangePreset = useCallback((nextPreset: DateRangePreset) => {
-    if (nextPreset === rangePresetRef.current) return;
-    rangePresetRef.current = nextPreset;
+  const rangeRef = useRef<DateRange>(range);
+  const setRange = useCallback((next: DateRange) => {
+    if (
+      next.from.getTime() === rangeRef.current.from.getTime() &&
+      next.to.getTime() === rangeRef.current.to.getTime()
+    ) {
+      return;
+    }
+    rangeRef.current = next;
     requestGenerationRef.current += 1;
-    setRangePresetState(nextPreset);
+    setRangeState(next);
   }, []);
-  const setCustomRange = useCallback(
-    (nextRange: { from?: string; to?: string }) => {
-      if (
-        nextRange.from === customRangeRef.current.from &&
-        nextRange.to === customRangeRef.current.to
-      ) {
-        return;
-      }
-      customRangeRef.current = { ...nextRange };
-      requestGenerationRef.current += 1;
-      setCustomRangeState(nextRange);
-    },
-    [],
-  );
   const refreshGuard = useOperatorRefreshGuard({
     ownedRegionRefs: options.ownedRefreshRegionRefs,
     modalOrMenuOpen: options.modalOrMenuOpen,
@@ -160,7 +153,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
       }
       setError(null);
 
-      const query = buildDashboardQuery(rangePreset, customRange, new Date());
+      const query = buildDashboardQuery(range);
       const requestOnce = async (withGroups: boolean) => {
         const searchParams = new URLSearchParams();
         if (query.date) searchParams.set("date", query.date);
@@ -215,7 +208,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
         }
       }
     },
-    [customRange, rangePreset],
+    [range],
   );
 
   useEffect(() => {
@@ -240,10 +233,8 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
   return {
     activeTab,
     setActiveTab,
-    rangePreset,
-    setRangePreset,
-    customRange,
-    setCustomRange,
+    range,
+    setRange,
     autoRefreshInterval,
     setAutoRefreshInterval,
     operatorRefreshPaused,
@@ -272,29 +263,20 @@ function getAutoRefreshDelay(interval: AutoRefreshInterval): number | null {
   return 300_000;
 }
 
-export function buildDashboardQuery(
-  preset: DateRangePreset,
-  customRange: { from?: string; to?: string },
-  now: Date,
-): AdminDashboardQuery {
-  if (preset === "custom") {
-    return {
-      ...(customRange.from ? { from: customRange.from } : {}),
-      ...(customRange.to ? { to: customRange.to } : {}),
-    };
-  }
-  if (preset !== "lastMonth") return {};
+/**
+ * Full timestamps, not date-only strings.
+ *
+ * Core treats a bare `YYYY-MM-DD` as midnight-to-midnight UTC, which silently
+ * shifts the window for anyone not on UTC and throws away the time of day the
+ * picker now offers. Sending the instant the reader actually chose keeps both
+ * honest.
+ */
+export function buildDashboardQuery(range: DateRange): AdminDashboardQuery {
+  return { from: range.from.toISOString(), to: range.to.toISOString() };
+}
 
-  const firstDay = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1),
-  );
-  const lastDay = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0),
-  );
-  return {
-    from: firstDay.toISOString().slice(0, 10),
-    to: lastDay.toISOString().slice(0, 10),
-  };
+export function todayRange(): DateRange {
+  return resolvePreset("today", new Date())!;
 }
 
 function toDashboardHttpError(errorValue: unknown): DashboardHttpError {

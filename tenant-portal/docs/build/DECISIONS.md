@@ -563,7 +563,7 @@ revisited.
 the local change, and read only to seed a device that has no local value yet.
 
 **Why it cannot be the other way round.** The no-flash mechanism in
-`src/app/layout.tsx` is a `beforeInteractive` script that sets `lang`, `dir` and
+`src/app/layout.tsx` is an inline script that sets `lang`, `dir` and
 `.dark` from `localStorage` *before React exists*. A server round-trip cannot
 feed that frame. Making the profile row authoritative for rendering would mean
 either a flash on every load or a blocking request in front of first paint, and

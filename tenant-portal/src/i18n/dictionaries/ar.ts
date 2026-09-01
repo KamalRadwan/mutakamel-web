@@ -1204,7 +1204,10 @@ export const ar = {
     coreEmail: "البريد الإلكتروني",
     coreNotifications: "الإشعارات",
 
-    workspaceCenter: "Workspace center",
+    // Was the English string verbatim — the one untranslated value in this
+    // block, and a visible one: it labels the Workspace nav row, the
+    // sidebar's aria-label and the mobile sheet's title.
+    workspaceCenter: "مركز مساحة العمل",
     globalSearch: "البحث في السجلات",
     gettingStarted: "دليل البدء",
     dashboard: "الرئيسية",
@@ -1315,6 +1318,24 @@ export const ar = {
     tradePurchaseQuotations: "طلبات عروض الشراء",
     tradeInvoices: "الفواتير",
     tradeContracts: "العقود",
+
+    // Trade · foundation (Phase 10). These six shipped referenced but never
+    // defined: nav-config.ts's `tradeFoundation` section and all five of its
+    // items resolved to `undefined` through `t.nav[...]`, so the section
+    // rendered a blank heading over five icon-only rows in BOTH languages.
+    // nav-config.test.ts now fails if any labelKey goes undefined again.
+    tradeFoundation: "أساسيات التجارة",
+    tradeItems: "الأصناف",
+    tradeUoms: "وحدات القياس",
+    tradeChannels: "القنوات",
+    tradeCommercialAccounts: "الحسابات التجارية",
+    tradeConfiguration: "إعدادات التجارة",
+
+    // The app switcher at the head of the sidebar.
+    appSwitcher: "تبديل التطبيق",
+    appWorkspace: "مساحة العمل",
+    appCrm: "إدارة العملاء",
+    appTrade: "التجارة",
   },
   dashboard: {
     title: "لوحة القيادة",
@@ -2980,6 +3001,10 @@ export const ar = {
       rateLimited: {
         title: "محاولات دخول كثيرة",
         description: "انتظر قليلًا قبل إعادة المحاولة؛ التكرار الفوري سيفشل أيضًا."
+      },
+      coordinationUnavailable: {
+        title: "تعذّر إكمال تسجيل الدخول",
+        description: "أعد تحميل الصفحة ثم حاول مجددًا. إذا استمرّت المشكلة، أغلق علامات التبويب الأخرى لمساحة العمل وأعد المحاولة."
       },
       offline: {
         title: "تعذر الوصول إلى الخادم",

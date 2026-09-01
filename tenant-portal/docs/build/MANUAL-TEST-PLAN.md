@@ -3,6 +3,18 @@
 Written: **2026-08-30** · Status: **Run 1 partially executed** — section A done,
 B–H blocked on a usable login (see [DECISIONS.md#d13](DECISIONS.md))
 
+> **The token layer moved on 2026-09-01.** The design system was replaced with
+> the admin portal's, and the density default went from compact (`--ui-scale`
+> 0.9) to standard (1). The **steps above the "Recording results" heading have
+> been updated** to the sizes that now ship — 48px topbar, 240px sidebar, 52px
+> rail, 44px rows, 32px buttons, 36px fields, IBM Plex rather than Readex Pro.
+>
+> The **recorded runs below have not been rewritten.** They are the log of what
+> a person actually observed on the date given, and editing an observation to
+> agree with today's code destroys the only thing a run record is for. Where a
+> run measured a value the port has since changed, it carries a superseded
+> marker. Treat every figure below as historical.
+
 A green `pnpm verify` proves *type-validated, lint-validated, unit-tested*. It
 does **not** prove the app works in a real authenticated session. This is the
 script that does.
@@ -48,19 +60,20 @@ session, or accepting the invite from the email. See
 | # | Step | Expect |
 |---|---|---|
 | B1 | Sidebar | Only permitted items. Active item is a 2px logical bar + weight 500, **never a filled pill** |
-| B2 | `Ctrl/Cmd+B` | Collapses to the 43.2px rail; tooltips appear on the correct side per direction |
+| B2 | `Ctrl/Cmd+B` | Collapses to the 52px rail; tooltips appear on the correct side per direction |
 | B3 | Reload while collapsed | Still collapsed, **no flash** — the state is read server-side from a cookie |
-| B4 | Topbar | 39.6px at `--ui-scale` 0.9 |
+| B4 | Topbar | 48px at `--ui-scale` 1. Sidebar 240px expanded |
 | B5 | Below `lg` | Sidebar becomes a Sheet opening from the reading-start edge |
 | B6 | Notifications | Unread count announced to a screen reader (audit B13) |
 | B7 | `Tab` from the top | A skip link is the first focusable element (audit B6) |
-| B8 | Density control | Compact / Default / Comfortable change row height live and survive reload |
+| B8 | Density control | **Compact / Standard / Comfortable**. Standard is the default and writes no inline `--ui-scale`; compact writes `0.9`, comfortable `1.1`. All three change row height live and survive reload |
+| B9 | Side by side with the admin portal | A button, an input, a table row and the topbar are the **same physical size** in both portals. This is the check the geometry port exists to pass |
 
 ## C · CRM — leads
 
 | # | Step | Expect |
 |---|---|---|
-| C1 | `/crm/leads` | Table view. Rows 32.4px. **Count the rows visible at 1366×768 — expect 15** |
+| C1 | `/crm/leads` | Table view. Rows **44px**. **Count the rows visible at 1366×768 and record the number** — Run 1 measured 15 at the old 32.4px row, which the geometry port superseded. A derivation from that measurement lands near 10–11, but it compounds three assumptions (topbar +8.4px, `h-9` table header, `md:p-6`), so it is a sanity check, not the expectation. The count this run produces is the new baseline |
 | C2 | **Arabic, populated table** | Diacritics and dots are not clipped. Measured headroom is **1.42px** on a fully-vocalised worst case (Q4) — this is the step that confirms it |
 | C3 | Empty search | Empty state with a next action — **not** an error |
 | C4 | Break the network, reload | Error state **with a retry**, and the empty state does **not** also render (task 3.25) |
@@ -170,8 +183,8 @@ super-admin session, or activating the account through the invite email.
 | A7 forgot-password address | **PASS — and D1 is stale** | Typed `LOGIN-FIELD@…` into the login field and `DIALOG-FIELD@…` into the dialog, then captured the wire: the body carried `{"email":"DIALOG-FIELD@mersany.com"}`. The dialog's field **is** bound. `DEFECTS.md` D1 describes a bug that no longer exists |
 | A8–A11 session, cross-tab | **BLOCKED** | P4 |
 | B, C, D, E, F, H | **BLOCKED** | P4 |
-| Design tokens in situ | **PASS** | `--ui-scale` 0.9 live: control `lg` 32.4 px, input 32.4 px, Arabic `text-sm` 15 px, radius unchanged at 4 px. `--primary` resolves to `oklch(0.716 0.147 258)` in dark (brand-400) and `oklch(0.56 0.204 258)` in light (brand-600) |
-| Q4 Arabic at a 32.4 px row | **PASS** | Measured with the real face: 24.4 px available ink, 15 px for ordinary Arabic, 22.98 px fully vocalised — 1.42 px headroom |
+| Design tokens in situ | **PASS · superseded 2026-09-01** | As measured on the day: `--ui-scale` 0.9 live: control `lg` 32.4 px, input 32.4 px, Arabic `text-sm` 15 px, radius unchanged at 4 px. `--primary` resolves to `oklch(0.716 0.147 258)` in dark (brand-400) and `oklch(0.56 0.204 258)` in light (brand-600). **Every figure in this row was changed by the port**: scale 1, control `lg` 36 px, radius 4 px unchanged but `xs` 2→3 px, and `--primary` is now the admin cobalt (`oklch(0.488198 0.217165 264.376)` light, `brand-400` dark). Re-run this check |
+| Q4 Arabic at a 32.4 px row | **PASS · superseded 2026-09-01** | Measured with the real face: 24.4 px available ink, 15 px for ordinary Arabic, 22.98 px fully vocalised — 1.42 px headroom. **Two inputs changed**: the row is now 44 px, and the face is IBM Plex Sans Arabic, not Readex Pro. The headroom this bought can only have grown — a taller row with the same type — so nothing is at risk, but the 1.42 px number no longer describes anything. Re-measure against Plex Arabic before quoting it |
 
 ### Defects found by driving the app — Run 1
 
@@ -200,6 +213,12 @@ None of these was catchable from `pnpm verify`; all three were green throughout.
    forcing the family changed its width by 18 % before the fix, 0 % after.
    **Fixed.**
 
+   The face named here is gone — the 2026-09-01 port swapped Readex Pro for IBM
+   Plex — but the defect is not about a face, it is about `@theme inline`, and
+   that trap is still live in `globals.css`. The port kept the plain `@theme`
+   this fix installed, and the probe described above is still the way to prove
+   a font is drawn rather than merely downloaded.
+
 ### Confirmed live, still open
 
 - **`cursor: default` on the primary button** — audit B8, task 3.4.
@@ -221,9 +240,9 @@ unrunnable. Sections that need no session were run instead.
 | `GET /branding/public` (pre-auth) | **200** — the three `@Public()` branding routes the login screen needs do resolve from the host |
 | `GET /auth/me` unauthenticated | **401**, then the login form renders. Correct fail-closed path |
 | Login screen renders | Yes — heading, email, password, forgot-password, remember-session, submit, footer |
-| Readex Pro | Loads and applies (`"Readex Pro", "Readex Pro Fallback", …`) — D20 stays fixed |
-| Theme flip, light → dark | **Verified.** All 23 semantic tokens remap onto the new ramps; `--primary` is exactly D1's pair; `--card`'s literal `white` becomes `ink-950` |
-| Density, stored preference | **Verified.** `comfortable` → bootstrap writes `--ui-scale: 1.1` before hydration; row 32.4 px → **39.6 px**, sidebar 208.8 px → **255.2 px** |
+| Readex Pro | Loads and applies (`"Readex Pro", "Readex Pro Fallback", …`) — D20 stays fixed. **Superseded 2026-09-01:** the portal now loads IBM Plex Sans + Plex Sans Arabic + Plex Mono. What this row really verified — that the face reaches the page rather than silently falling back to the system stack — is still the check worth re-running, against the new family names |
+| Theme flip, light → dark | **Verified.** All 23 semantic tokens remap onto the new ramps; `--primary` is exactly D1's pair; `--card`'s literal `white` becomes `ink-950`. **Superseded 2026-09-01:** there are more than 23 roles now (the `info`/`success`/`warning` families, `-subtle`/`-vivid`, `selected`, the `chart-*` and `sidebar-*` sets all arrived with the port), and `--primary` is the admin cobalt. The mechanism is unchanged; the inventory is not |
+| Density, stored preference | **Verified.** `comfortable` → bootstrap writes `--ui-scale: 1.1` before hydration; row 32.4 px → **39.6 px**, sidebar 208.8 px → **255.2 px**. **Superseded 2026-09-01:** the base is now scale 1, so comfortable reads row 44 → **48.4 px**, sidebar 240 → **264 px**. Note the inverted case to re-test: *standard* is now the density that writes nothing, where compact used to be |
 | Density, live change with no reload | **Not verifiable in this harness** — see below |
 
 ### The harness cannot observe live style changes, and nearly cost two false defects

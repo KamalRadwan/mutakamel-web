@@ -1294,6 +1294,21 @@ export const en: Dictionary = {
     tradePurchaseQuotations: "Purchase quotations",
     tradeInvoices: "Invoices",
     tradeContracts: "Contracts",
+
+    // Trade · foundation (Phase 10) — see the note in ar.ts. Referenced by
+    // nav-config.ts since Phase 10, defined in neither dictionary until now.
+    tradeFoundation: "Trade foundation",
+    tradeItems: "Items",
+    tradeUoms: "Units of measure",
+    tradeChannels: "Channels",
+    tradeCommercialAccounts: "Commercial accounts",
+    tradeConfiguration: "Trade configuration",
+
+    // The app switcher at the head of the sidebar.
+    appSwitcher: "Switch app",
+    appWorkspace: "Workspace",
+    appCrm: "CRM",
+    appTrade: "Trade",
   },
   dashboard: {
     title: "Dashboard",
@@ -2963,6 +2978,10 @@ export const en: Dictionary = {
       rateLimited: {
         title: "Too many sign-in attempts",
         description: "Wait a moment before trying again. Repeating immediately will keep failing."
+      },
+      coordinationUnavailable: {
+        title: "Sign-in could not complete",
+        description: "Reload the page and try again. If it still fails, close other tabs for this workspace and retry."
       },
       offline: {
         title: "The server could not be reached",

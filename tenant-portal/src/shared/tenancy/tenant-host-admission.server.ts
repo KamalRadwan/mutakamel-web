@@ -31,6 +31,52 @@ export function normalizeTenantRequestHost(rawHost: string | null): string | nul
     : null;
 }
 
+const LOOPBACK_ADMISSION_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+/**
+ * Development-only escape hatch, and the reason it exists is a browser rule
+ * rather than a preference.
+ *
+ * Tenant auth cookies are `__Host-` prefixed, so the browser stores them only
+ * on a *potentially trustworthy* origin — https, or a loopback host. Serving
+ * the portal from `http://<tenant-host>:5002` is neither, so every auth cookie
+ * is silently discarded and sign-in can never complete. Measured on that exact
+ * origin: `isSecureContext` false, a `__Host-…; Secure` cookie not stored, a
+ * plain cookie stored.
+ *
+ * `http://localhost:5002` *is* trustworthy, but its `Host` names no tenant, so
+ * admission would fail closed and 404 every page — which is why "just use
+ * localhost, like admin-portal" does not work on its own. Admin has no
+ * admission layer; this app does.
+ *
+ * So when the browser is on loopback in development, admission asks about
+ * `DEV_TENANT_HOST` instead. The API calls need no equivalent: `next.config.ts`
+ * rewrites them to `DEV_API_TARGET`, which already carries the tenant `Host`
+ * upstream.
+ *
+ * Three bounds, and none of them is incidental:
+ *  - `NODE_ENV === 'development'` only.
+ *  - the incoming host must be loopback, so a real tenant host is never
+ *    rewritten to a different tenant.
+ *  - `DEV_TENANT_HOST` must be set; unset means the old behaviour exactly.
+ */
+export function resolveTenantAdmissionHost(
+  rawHost: string | null,
+  devTenantHost: string | undefined = process.env.DEV_TENANT_HOST,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): string | null {
+  if (nodeEnv === 'development' && devTenantHost) {
+    const authority = rawHost?.trim().toLowerCase() ?? '';
+    const hostname = authority.startsWith('[')
+      ? authority.slice(1, authority.indexOf(']'))
+      : authority.split(':')[0];
+    if (LOOPBACK_ADMISSION_HOSTS.has(hostname)) {
+      return normalizeTenantRequestHost(devTenantHost);
+    }
+  }
+  return normalizeTenantRequestHost(rawHost);
+}
+
 /**
  * Sends the host-status probe with the tenant's Host header actually on the
  * wire.

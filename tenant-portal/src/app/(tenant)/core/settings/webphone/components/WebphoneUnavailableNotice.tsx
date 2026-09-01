@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock, Lock, PauseCircle } from "lucide-react";
+import { Card } from "@/design-system";
 import { WEBPHONE_COPY } from "../webphone-copy";
 import type { WebphoneEntitlement } from "../hooks/useTenantWebphoneSettings";
 
@@ -10,7 +11,10 @@ import type { WebphoneEntitlement } from "../hooks/useTenantWebphoneSettings";
  * The screen is shown rather than hidden so the capability stays discoverable,
  * which only works if the reason is stated. Colour carries none of that meaning:
  * the reason is a heading and a sentence inside a `role="status"` region, and
- * every section points at this element through `aria-describedby`.
+ * every section points at this element through `aria-describedby`. The icon is
+ * decorative and takes the same muted tone in all three cases — tinting it per
+ * reason would put meaning in a hue that no screen reader reads and that a
+ * colour-blind user cannot separate.
  */
 export function WebphoneUnavailableNotice({
   entitlement,
@@ -27,44 +31,32 @@ export function WebphoneUnavailableNotice({
       title: copy.notPurchasedTitle,
       body: copy.notPurchasedBody,
       Icon: Lock,
-      tone: "text-slate-500 dark:text-slate-400",
     },
     PROVISIONING_PENDING: {
       title: copy.provisioningPendingTitle,
       body: copy.provisioningPendingBody,
       Icon: Clock,
-      tone: "text-blue-600 dark:text-blue-400",
     },
     SUSPENDED: {
       title: copy.suspendedTitle,
       body: copy.suspendedBody,
       Icon: PauseCircle,
-      tone: "text-amber-600 dark:text-amber-400",
     },
   }[entitlement];
   const { Icon } = reason;
 
   return (
-    <section
-      id={id}
-      role="status"
-      aria-label={copy.unavailableHeading}
-      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-    >
+    <Card id={id} role="status" aria-label={copy.unavailableHeading} className="p-4">
       <div className="flex items-start gap-3">
-        <Icon className={`mt-0.5 size-5 shrink-0 ${reason.tone}`} aria-hidden="true" />
+        <Icon className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <div>
-          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-            {reason.title}
-          </h2>
-          <p className="mt-1 max-w-3xl text-xs leading-6 text-slate-600 dark:text-slate-400">
-            {reason.body}
-          </p>
-          <p className="mt-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+          <h2 className="text-sm font-medium text-card-foreground">{reason.title}</h2>
+          <p className="mt-1 max-w-prose text-xs text-muted-foreground">{reason.body}</p>
+          <p className="mt-2 max-w-prose text-xs font-medium text-foreground">
             {copy.disabledControlsNote}
           </p>
         </div>
       </div>
-    </section>
+    </Card>
   );
 }

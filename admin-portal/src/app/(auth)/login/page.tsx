@@ -64,7 +64,7 @@ export default function LoginPage() {
         <p className="text-xs leading-relaxed text-muted-foreground">{t.login.subtitle}</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form method="post" onSubmit={handleSubmit} className="space-y-4" noValidate>
         {showValidationSummary ? (
           <div
             ref={errorSummaryRef}
@@ -197,7 +197,7 @@ export default function LoginPage() {
             </div>
           </DialogHeader>
 
-          <form onSubmit={handleForgotPassword} className="space-y-3" noValidate>
+          <form method="post" onSubmit={handleForgotPassword} className="space-y-3" noValidate>
             {forgotError ? (
               <div
                 ref={forgotErrorRef}

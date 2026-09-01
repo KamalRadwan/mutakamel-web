@@ -15,12 +15,12 @@ export interface InputProps
     ControlSizeProps {}
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, size = "md", ...props }, ref) => {
+  ({ className, size = "lg", ...props }, ref) => {
     return (
       <input
         ref={ref}
         className={cn(
-          "flex w-full rounded-sm border border-input bg-card text-foreground",
+          "flex w-full rounded-md border border-input bg-card text-foreground",
           "placeholder:text-muted-foreground",
           "disabled:cursor-not-allowed disabled:opacity-50",
           "aria-invalid:border-destructive aria-invalid:ring-destructive/20",

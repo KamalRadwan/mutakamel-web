@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-08-31**
 
 Verified against the current Core controller, DTOs, cookie helpers, and gateway
 route contracts.
@@ -35,7 +35,8 @@ require the external Origin and Host to match exactly.
 - Core stores both the short-lived access token and reusable session credential in
   HttpOnly cookies.
 - Core also sets a non-HttpOnly, session-bound
-  `__Host-mutakamel-admin-csrf` proof. The shared client copies its decoded
+  `__Host-mutakamel-admin-csrf` proof in the secure profile, or
+  `mutakamel-http-admin-csrf` with `AUTH_COOKIE_SECURE=false`. The shared client copies its decoded
   value to `x-csrf-token` on unsafe cookie-authenticated requests; feature code
   must not read or log it independently.
 - Browser JavaScript stores only non-secret session timing, the user's
@@ -49,6 +50,23 @@ require the external Origin and Host to match exactly.
   changes the 30-minute idle or 12-hour absolute deadline, and safe response
   JSON omits the stored flag.
 - Do not read, copy, or persist the refresh token in frontend JavaScript.
+
+The selected HTTP deployment uses `AUTH_COOKIE_SECURE=false` in Gateway and
+Core, in every environment. Its credentials use distinct
+`mutakamel-http-admin-access` and `mutakamel-http-admin-session` HttpOnly
+cookies. The shared CSRF reader prefers the HTTP cookie on HTTP pages and the
+`__Host-` cookie on HTTPS pages, falling back only when the preferred readable
+profile is absent. The default `true` profile remains secure; frontend code
+does not choose the server's cookie policy. Existing Web Locks and the Admin
+Portal's cross-tab fallback coordination are unchanged. HTTP exposes passwords
+and cookies to network interception even when credentials are sent in a POST
+body rather than the URL.
+
+Login credentials are sent as a JSON POST body through the shared auth client,
+never as URL parameters. Login, forgot-password, invitation, and password-reset
+forms also declare native `method="post"`: if JavaScript has not hydrated, the
+browser still cannot serialize credentials into a GET URL. This is a privacy
+safeguard; the normal API flow still requires the client submit handler.
 
 Cookie-mode token response:
 

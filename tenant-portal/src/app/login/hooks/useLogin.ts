@@ -11,14 +11,15 @@ import { classifyApiOutcome } from "@/lib/api/outcomes";
 /**
  * The distinguishable ways a sign-in attempt fails.
  *
- * Every branch is a status + `errorCode` pair read from core-app source, never
- * from message text:
+ * Branches use stable codes from Core, Gateway or the session transport,
+ * never message text:
  *
  *   401 INVALID_CREDENTIALS   tenant-auth.service.ts — wrong address or password
  *   403 ACCOUNT_NOT_ACTIVE    the tenant user is INVITED, SUSPENDED or DEACTIVATED
  *   403 SUBSCRIPTION_PAST_DUE assertSubscriptionAllowsLogin
  *   503 TENANT_INACTIVE       fqdn-tenant-resolver.guard.ts — the workspace itself
  *   429                       the Gateway rate limiter (GW.RATE.LIMIT_EXCEEDED)
+ *   503 AUTH_SESSION_COORDINATION_UNAVAILABLE axiosClient.ts — auth operation timeout
  *   status 0                  no HTTP response reached the browser at all
  *
  * They needed four different next actions from the user and produced one
@@ -30,11 +31,13 @@ export type LoginFailureKind =
   | "subscriptionPastDue"
   | "tenantInactive"
   | "rateLimited"
+  | "coordinationUnavailable"
   | "offline"
   | "unknown";
 
 export function classifyLoginFailure(error: NormalizedApiError): LoginFailureKind {
   if (classifyApiOutcome(error) === "rateLimited") return "rateLimited";
+  if (error.code === "AUTH_SESSION_COORDINATION_UNAVAILABLE") return "coordinationUnavailable";
   if (error.status === 0) return "offline";
   if (error.code === "INVALID_CREDENTIALS") return "invalidCredentials";
   if (error.code === "ACCOUNT_NOT_ACTIVE") return "accountNotActive";

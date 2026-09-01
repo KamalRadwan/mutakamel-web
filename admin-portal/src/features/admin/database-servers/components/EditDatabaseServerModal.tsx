@@ -87,7 +87,7 @@ function EditDatabaseServerModalContent({
           <DialogTitle className="text-base">{copy.title}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        <form method="post" onSubmit={handleSubmit} className="space-y-4 text-xs">
           {formError && (
             <p
               ref={errorRef}

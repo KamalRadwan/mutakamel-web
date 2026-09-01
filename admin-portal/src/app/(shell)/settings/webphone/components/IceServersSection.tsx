@@ -62,6 +62,7 @@ export function IceServersSection({ state }: { state: WebphoneSettingsState }) {
 
       {state.canUpdate ? (
         <form
+          method="post"
           aria-label={copy.addIceServer}
           onSubmit={(event) => {
             event.preventDefault();

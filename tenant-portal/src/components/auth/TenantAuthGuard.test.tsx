@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/i18n/I18nContext";
 import type { TenantAuthState } from "@/context/AuthContext";
@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   pathname: "/crm/leads",
   authState: "ENDED" as TenantAuthState,
   endedReason: null as string | null,
+  isLoading: false,
   replace: vi.fn(),
 }));
 
@@ -28,7 +29,7 @@ vi.mock("@/context/AuthContext", () => ({
     authState: state.authState,
     endedReason: state.endedReason,
     isAuthenticated: false,
-    isLoading: false,
+    isLoading: state.isLoading,
     retryBootstrap: async () => {},
   }),
 }));
@@ -38,6 +39,7 @@ afterEach(() => {
   state.pathname = "/crm/leads";
   state.authState = "ENDED";
   state.endedReason = null;
+  state.isLoading = false;
   state.replace.mockReset();
 });
 
@@ -50,6 +52,40 @@ function renderGuard() {
     </I18nProvider>,
   );
 }
+
+// The session spinner REPLACES its children, so rendering it over a public page
+// unmounts that page and destroys every useState in it.
+//
+// That is not theoretical. `AuthContext.login()` sets BOOTSTRAPPING before the
+// request, so pressing sign-in swapped the form for the spinner; the 401 then
+// set `failure` on a component that no longer existed, and the form returned
+// freshly mounted with no error and an empty email field. Driven in a real
+// browser: with the guard swapping, a failed sign-in left `[role=alert]` empty
+// and the typed email cleared; with it not swapping, the failure banner
+// rendered and the email survived.
+describe("TenantAuthGuard does not unmount a public page while auth is in flight", () => {
+  it("keeps a public page mounted", () => {
+    state.pathname = "/login";
+    state.authState = "BOOTSTRAPPING";
+    state.isLoading = true;
+    renderGuard();
+
+    expect(screen.getByText("screen")).toBeTruthy();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
+  // The control: on a private page the spinner is still the right answer, and
+  // if this ever stops passing the fix has been over-applied.
+  it("still shows the spinner on a private page", () => {
+    state.pathname = "/crm/leads";
+    state.authState = "BOOTSTRAPPING";
+    state.isLoading = true;
+    renderGuard();
+
+    expect(screen.queryByText("screen")).toBeNull();
+    expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+  });
+});
 
 // MASTER-PLAN 13.7, closing the first half of OPEN-QUESTIONS.md Q18.
 describe("TenantAuthGuard session-ending reason", () => {

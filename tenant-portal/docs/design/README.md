@@ -1,22 +1,42 @@
 # Design System
 
-Status: **Implemented** — Phases 1–5 shipped 2026-08-28. See
-[SKILL-AUDIT.md](SKILL-AUDIT.md) for the 17 refinements specified but not
-yet coded.
+Status: **Implemented** — Phases 1–5 shipped 2026-08-28; all 17
+[SKILL-AUDIT.md](SKILL-AUDIT.md#status--documentation-closed-code-landed)
+refinements landed 2026-08-31. The token layer was replaced with the admin
+portal's afterwards; the pages below describe the ported values.
 
 Written: **2026-08-27**
 
 Owner: **Tenant Portal**
 
-This is an **independent** design system. It shares no tokens, no fonts, no
-components and no visual identity with `admin-portal`. That is deliberate:
-`admin-portal` is an internal operations console, this is the product tenants
-pay for and live inside all day. Where a technique from `admin-portal` is worth
-reusing, this document says so explicitly and explains why — but nothing is
-inherited by default.
+This design system **shares its token layer with `admin-portal`**. Fonts, every
+ramp value, the semantic roles, the radius scale and the whole shell geometry
+were ported wholesale from `admin-portal/src/app/globals.css`, and the two
+products now draw the same palette at the same physical size.
+
+That reverses this page's original position, which was that the two systems
+should share nothing by default. The reasoning behind that position is worth
+keeping in view: `admin-portal` is an internal operations console and this is
+the product tenants pay for and live inside all day, so the two have different
+*jobs*. What did not survive contact is the conclusion — different jobs do not
+benefit from different blues, different row heights or different type. The
+things tenants need that admin does not are white-labelling and Arabic-first
+layout, and neither of those is a reason for a second palette.
+
+The split now runs one level down:
+
+- **Shared with admin** — token values, fonts, geometry, and the alias
+  spellings (`--color-action-*`, `--color-surface-*`, …) that let markup move
+  between the portals unedited.
+- **This portal's own** — the role *names* (`brand` / `positive` / `caution` /
+  `negative` / `ink`, kept because `src/lib/branding/apply-branding.ts`
+  overwrites `--color-brand-*` on `:root` at runtime for a white-labelled
+  tenant), every component, the RTL rules, the toast rule, and all of the
+  per-screen work from [DESIGN-SYSTEM.md § 7](DESIGN-SYSTEM.md#7--page-by-page-uiux)
+  onward.
 
 > **Start here: [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)** — the complete
-> specification in one file: cold-blue palette, fonts, sizes, libraries,
+> specification in one file: the palette, fonts, sizes, libraries,
 > the toast rule, and per-page UI/UX. The pages below expand on it.
 
 ## Who this is for
@@ -30,8 +50,9 @@ Three consequences run through every decision below:
 
 - **Density serves them, microscopic type does not.** The floor is 13px, and
   Arabic gets a lift above that.
-- **Controls are touched constantly.** 36px default control height, larger than
-  a developer tool would need.
+- **Controls are touched constantly.** 32px default control height, and since
+  the token port that is 32 real pixels rather than the 28.8 a 0.9 scale used
+  to produce. Compact and comfortable remain a user setting.
 - **Arabic is the default, not a translation.** Direction is a first-class
   layout concern, never a post-processing step.
 
@@ -39,9 +60,11 @@ Three consequences run through every decision below:
 
 ### 1. Four hues — and a stage is never one of them
 
-Every color in this app is `brand` (petrol), `positive` (moss), `caution`
-(amber), `negative` (clay), or `ink` (the warm neutral ramp). There is no
-fifth hue.
+Every color in this app is `brand` (cobalt), `positive` (green), `caution`
+(amber), `negative` (warm vermilion), or `ink` (the cold-blue neutral ramp).
+There is no fifth hue. Those five names are this portal's; the values behind
+them are the admin portal's `action` / `success` / `warn` / `danger` / `ink`,
+declared here under both spellings.
 
 The critical corollary, and the law most specific to this product: **pipeline
 and lifecycle stages are not colors.** `LeadStageFlagEnum` has 8 values.
@@ -62,15 +85,17 @@ takes a hue:
 See [tokens.md](tokens.md#status-mapping) for the complete enum-to-role table.
 It is exhaustive; do not extend it by guessing.
 
-### 2. One family, two scripts
+### 2. One superfamily, two scripts
 
-Text is set in **Readex Pro**, a superfamily drawn for Latin and Arabic
-together. A status badge's Latin enum value sitting inside an Arabic sentence
-does not jump baseline or x-height, because it is the same family — not two
-families chosen to look similar.
+Text is set in **IBM Plex Sans** and **IBM Plex Sans Arabic** — two families
+drawn against each other by one team, ordered Latin-then-Arabic in a single
+stack. The browser resolves `font-family` per character, so a status badge's
+Latin enum value sitting inside an Arabic sentence renders in Plex Sans while
+the sentence renders in Plex Sans Arabic, on the same line, without jumping
+baseline or x-height.
 
 This removes an entire class of bug: no `:lang()` switching, no per-script font
-stack, no second set of vertical metrics to reconcile. See
+stack in components, no second set of vertical metrics to reconcile. See
 [typography.md](typography.md).
 
 ### 3. Three weights, physically enforced
@@ -140,10 +165,30 @@ src/design-system/
 `@/design-system`, never from a deep path — that single indirection is what
 lets every screen repaint from a handful of files.
 
-## Why an independent system, concretely
+## What comes from `admin-portal`, concretely
 
-`admin-portal` solved the same problems with different answers. Two techniques
-from it are worth reusing on their merits, and are reused here with attribution:
+This section used to be headed "Why an independent system" and listed the two
+techniques worth borrowing. The borrowing has since gone considerably further,
+so here is the current line.
+
+**Ported wholesale** — the values, not just the ideas:
+
+- **The ramps.** All five, every step, including the nine that sit outside sRGB
+  in the admin file and are written here as the in-gamut OKLCH that round-trips
+  to the same hex. See [DESIGN-SYSTEM.md § Ramps](DESIGN-SYSTEM.md#ramps--exact-values).
+- **The fonts.** IBM Plex Sans, Plex Sans Arabic, Plex Mono, at 400/500/600.
+- **The geometry.** 48px topbar, 240px sidebar, 52px rail, 44px row, the
+  control scale unscaled at `--ui-scale: 1`, admin's control paddings, and the
+  five-step radius scale.
+- **The semantic roles**, including everything that did not exist here before:
+  `--selected`, the `--info-*` / `--success-*` / `--warning-*` families with
+  their `-subtle` and `-vivid` forms, the `--chart-*` set, and the sidebar's own
+  `-primary` / `-accent` / `-selected` / `-border` / `-ring`.
+- **The pointer-target mechanism** — `ds-hit-area` / `ds-hit-target`, minimum
+  sizes that expand under `(pointer: coarse)`, replacing a hardcoded inset that
+  had been derived from the old 0.9 scale.
+
+**Borrowed earlier, as techniques**:
 
 - **The theme flip** — remapping Tailwind's own built-in color variables onto
   named roles inside `@theme`, so pre-existing `bg-slate-*` call sites repaint
@@ -152,5 +197,7 @@ from it are worth reusing on their merits, and are reused here with attribution:
 - **shadcn-compatible semantic names** — `--background`, `--card`, `--primary`,
   `--ring` and friends, so `npx shadcn add <x>` pastes in without edits.
 
-Everything else — hue, neutral temperature, type, geometry, density,
-components — is decided here from this product's own requirements.
+**Decided here, from this product's own requirements**: the role *names* and
+the runtime brand override they exist to serve, every component, RTL and the
+Arabic type lift, the toast rule, the status→role mapping, and all of the
+per-screen design.

@@ -16,6 +16,7 @@ import {
   clearLocalTenantAuthState,
   coordinateTenantSessionRefresh,
   getStoredTenantSessionMeta,
+  hasTenantSessionCookieHint,
   readWebAuthSessionResponse,
   startTenantActivityTracking,
   storeTenantSessionMetadata,
@@ -38,6 +39,10 @@ import {
   isMissingCredentialsFailure,
 } from "@/lib/auth/sessionErrors";
 import { startTenantSessionRefreshScheduler } from "@/lib/auth/sessionRefresh";
+import {
+  isAccessibleBranchCompanies,
+  type AccessibleBranchCompany,
+} from "@/lib/api/organization-scope";
 
 export interface TenantTeamMembership {
   id: string;
@@ -58,6 +63,8 @@ export interface TenantUserProfile {
   status: string;
   accessibleBranches: string[];
   accessibleCompanies: string[];
+  /** Absent only on older Core responses; never inferred from company order. */
+  accessibleBranchCompanies?: AccessibleBranchCompany[];
   permissions: string[];
   teamMemberships: TenantTeamMembership[];
 }
@@ -136,6 +143,16 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       );
     }
     try {
+      // Core pairs this readable proof with the HttpOnly session cookie.
+      // Stored metadata can outlive the cookies and cannot restore a session.
+      if (!hasTenantSessionCookieHint()) {
+        clearLocalTenantAuthState();
+        setUser(null);
+        setEndedReason(null);
+        setRealtimeAuthGeneration(null);
+        setAuthState("UNAUTHENTICATED");
+        return;
+      }
       const response = await axiosClient.get(
         "/api/tenant/core/v1/auth/me",
         { cache: "no-store", signal: controller.signal },
@@ -243,7 +260,13 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       );
     }), [invalidatePendingAuthWork, router]);
 
-  useEffect(() => startTenantActivityTracking(), []);
+  useEffect(() => {
+    // Public and bootstrapping screens can still have stale tab metadata. Do
+    // not let a click on /login race the session check and start an obsolete
+    // activity/refresh chain.
+    if (authState !== "AUTHENTICATED" || user === null) return;
+    return startTenantActivityTracking();
+  }, [authState, user]);
 
   useEffect(() => {
     if (!user && !getStoredTenantSessionMeta()) return;
@@ -493,6 +516,23 @@ function readTenantUserProfile(payload: unknown): TenantUserProfile {
   ) {
     throw new Error("INVALID_AUTH_PROFILE");
   }
+  const accessScope = candidate.accessScope;
+  const companiesTruncated =
+    accessScope !== null &&
+    typeof accessScope === "object" &&
+    !Array.isArray(accessScope) &&
+    "companiesTruncated" in accessScope &&
+    accessScope.companiesTruncated === true;
+  if (
+    "accessibleBranchCompanies" in candidate &&
+    !isAccessibleBranchCompanies(
+      candidate.accessibleBranchCompanies,
+      candidate.accessibleBranches,
+      companiesTruncated ? null : candidate.accessibleCompanies,
+    )
+  ) {
+    throw new Error("INVALID_AUTH_PROFILE");
+  }
   return candidate as unknown as TenantUserProfile;
 }
 
@@ -567,6 +607,7 @@ function canRefreshTenantSession(): boolean {
   return (
     document.visibilityState === "visible" &&
     navigator.onLine &&
+    hasTenantSessionCookieHint() &&
     getStoredTenantSessionMeta() !== null
   );
 }

@@ -46,7 +46,7 @@ export function DatePicker({
   onBlur,
   language,
   id,
-  size = "md",
+  size = "lg",
   className,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);

@@ -1,3 +1,4 @@
+import { sha256 } from "@noble/hashes/sha2.js";
 import type { CorePath } from "@/lib/api/envelope";
 import { coreDelete, coreGet, corePost } from "../core-api";
 import {
@@ -138,8 +139,9 @@ export interface AssetUploadMetadata {
 
 /** SHA-256 of the exact bytes; the server recomputes it and refuses a mismatch. */
 export async function sha256Hex(file: File): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-  return Array.from(new Uint8Array(digest))
+  // SubtleCrypto is unavailable on custom HTTP origins; hash the same bytes in JS.
+  const digest = sha256(new Uint8Array(await file.arrayBuffer()));
+  return Array.from(digest)
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 }

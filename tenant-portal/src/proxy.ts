@@ -35,7 +35,8 @@ function isReportOnly(): boolean {
  *
  * - `script-src` carries the nonce and `'strict-dynamic'`, and **no**
  *   `'unsafe-inline'`. The one inline script in the app is the theme bootstrap
- *   in `src/app/layout.tsx`, which takes the nonce.
+ *   in `src/app/layout.tsx`, which takes the nonce. It also carries no
+ *   `'self'` — see below, and do not re-add it.
  * - `style-src` needs `'unsafe-inline'`, but **not** for the reason
  *   security-headers.md originally gave. Tenant branding and density write
  *   through `element.style.setProperty` — a CSSOM mutation `style-src` never
@@ -51,25 +52,60 @@ function isReportOnly(): boolean {
  *   paths (`PUBLIC_BRANDING_LOGO_PATH`, `PUBLIC_BRANDING_ICON_PATH`), never a
  *   CDN URL.
  *
- * `upgrade-insecure-requests` is absent on purpose: NPM forces SSL and sets
- * HSTS, and the app loads no external subresource, so there is nothing to
- * upgrade — while including it would break a plain-HTTP `next start` used to
- * verify the policy.
+ * `upgrade-insecure-requests` is absent to support the selected HTTP browser
+ * deployment as well as HTTPS. Browser-facing TLS/HSTS is a separate ingress
+ * choice; including this directive would force HTTP subresources to HTTPS.
  */
 function buildContentSecurityPolicy(nonce: string): string {
   // React reconstructs server error stacks through `eval` in development, and
   // `next dev --webpack` serves eval-wrapped modules. Neither is true of a
   // production build.
-  const developmentScriptSources =
-    process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+  const isDevelopment = process.env.NODE_ENV === "development";
+  const developmentScriptSources = isDevelopment ? " 'unsafe-eval'" : "";
+
+  // `next dev` opens a hot-reload WebSocket at `ws://<host>/_next/webpack-hmr`.
+  // CSP3 says `'self'` should cover a same-origin `ws:`, and Firefox does not
+  // honour that — it blocks the socket, the dev client never connects, and the
+  // page renders nothing. Added for development only; a production build opens
+  // no WebSocket, so shipping this there would widen the policy for a
+  // connection that is never made.
+  //
+  // This is exactly the gap the 13.1 verification had: the policy was driven
+  // against `next build` + `next start` and proven there, and dev mode was
+  // never exercised. Production was right; development was untested.
+  const developmentConnectSources = isDevelopment ? " ws: wss:" : "";
 
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${developmentScriptSources}`,
+    // No `'self'` here, and this is not an oversight — D16 decided
+    // `script-src 'nonce-<n>' 'strict-dynamic'` and the implementation had
+    // drifted from it. CSP3 §6.6.2.2 says that when `'strict-dynamic'` is
+    // present the browser ignores `'self'`, every host-source expression and
+    // `'unsafe-inline'` in this directive, so the pair states two policies and
+    // enforces one. Firefox says so out loud on every page load: `Ignoring
+    // "'self'" within script-src: 'strict-dynamic' specified`.
+    //
+    // `'self'` is the usual CSP2 fallback for a browser that does not know
+    // `'strict-dynamic'` and would otherwise refuse the lazily injected chunks.
+    // There is no such browser here: Next 16 compiles for `chrome 111`,
+    // `edge 111`, `firefox 111`, `safari 16.4`
+    // (`next/dist/shared/lib/modern-browserslist-target`), and the last of
+    // those to gain `'strict-dynamic'` was Safari 15.4. Adding a fallback for
+    // browsers the bundle already refuses to run in buys nothing.
+    //
+    // Nothing needs a host allowance either. Every `<script>` Next emits —
+    // framework, bundle, flight, and the inline bootstrap — carries this
+    // nonce; webpack injects lazy chunks with `createElement("script")`, which
+    // is exactly what `'strict-dynamic'` propagates trust to; and the app
+    // loads no third-party script and constructs no Worker. The 2026-08-31
+    // driving run recorded in security-headers.md is the proof rather than the
+    // argument: it observed a full hydrate with zero violations under a policy
+    // whose `'self'` the browser was already discarding.
+    `script-src 'nonce-${nonce}' 'strict-dynamic'${developmentScriptSources}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    "connect-src 'self'",
+    `connect-src 'self'${developmentConnectSources}`,
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -77,8 +113,22 @@ function buildContentSecurityPolicy(nonce: string): string {
   ].join("; ");
 }
 
+/**
+ * 16 random bytes as hex — deliberately **not** a UUID.
+ *
+ * AGENTS.md limits this workspace to UUIDv7 for identifiers, and a v7 spends
+ * its first 48 bits on a timestamp, leaving roughly 74 unpredictable. A CSP
+ * nonce is not an identifier: its only job is to be unguessable for the
+ * lifetime of one response, so it wants every bit random. `getRandomValues`
+ * gives a full 128, and the emitted shape — 32 lowercase hex characters — is
+ * unchanged from the `randomUUID().replaceAll("-", "")` this replaces.
+ */
 function createNonce(): string {
-  return crypto.randomUUID().replaceAll("-", "");
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let nonce = "";
+  for (const byte of bytes) nonce += byte.toString(16).padStart(2, "0");
+  return nonce;
 }
 
 function readTenantModule(pathname: string): TenantModule | null {

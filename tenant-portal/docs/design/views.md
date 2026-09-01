@@ -250,7 +250,7 @@ The body is a plain `overflow-y-auto` element, **not** a Radix `ScrollArea`.
 
 <a id="virtualization"></a>
 
-**Virtualization is not shipped here yet.** See the section below.
+**Above 50 cards the body windows itself.** See the section below.
 
 **Drag and drop** via `@hello-pangea/dnd` (already a dependency, already used).
 
@@ -304,7 +304,7 @@ capability gate as dragging, and a terminal destination confirms the same way.
 | --- | --- | --- |
 | `DataTable` rows | 100 | **Shipped.** Rows are uniform by construction at `h-(--size-row)`, so the window is exact |
 | `CardView` grid | 100 | **Shipped.** Grid rows stretch to a common height; the column count is read back from the laid-out element rather than duplicated in JS |
-| Board column body | 50 | **Not shipped.** See below |
+| Board column body | 50 | **Shipped, unverified in a browser.** A different library and a different shape — see below |
 
 The mechanism is `useVirtualWindow` in `src/design-system/views/`, built on
 `@tanstack/react-virtual`. It expresses the window as a **slice plus two
@@ -315,26 +315,68 @@ paint is a safe prefix of `threshold` items, never the whole list and never a
 blank box: the scroll element is only known after the first commit. A
 container that never lays out — SSR, jsdom — simply stays at that prefix.
 
-**The board is deliberately not windowed here.**
+**The board does not use that mechanism.**
 [D9](../build/DECISIONS.md#d9--virtualization--assumed-split-by-surface-on-2026-08-31)
 is split by surface: board columns get **`react-window`**, the only pairing
-`@hello-pangea/dnd`'s virtual mode is actually exercised against, and it is
-**deliberately not installed yet** because an unused dependency fails `knip`
-and task 2.8 is what earns it. 2.8 also does not close until a real drag
-across a 200-card column has been performed in a browser, in both directions
-and both languages. Windowing the two surfaces that carry no drag interaction
-takes none of that risk, and — per 2.18 — the WCAG AA fix above does not share
-a gate with any of it.
+`@hello-pangea/dnd`'s virtual mode is actually exercised against. It is now a
+direct dependency, earned by task 2.8. Windowing the two surfaces that carry
+no drag interaction takes none of that risk, and — per 2.18 — the WCAG AA
+"Move to…" fix above does not share a gate with any of it.
 
-**How it will compose with the column body when it lands.** The body is a
-plain `overflow-y-auto` element and **not** a Radix `ScrollArea`. That matters:
-`ScrollArea` moves the scroll onto an inner `Viewport` element and wraps the
-content in a `display: table` child, so a virtualizer handed the `Root` (the
-obvious element to reach for) measures a box that never scrolls and computes a
-window of zero rows — the classic broken-measurement pairing. If a board
-column ever gains a `ScrollArea`, the virtualizer's scroll element must be the
-**viewport**, not the root, and the spacer must sit inside the viewport's
-content wrapper. Keeping the plain element avoids the question entirely.
+**`react-window` v1, not v2, and the version is load-bearing.** D9 chose this
+library because it hands the row renderer a `style` object to merge and
+positions with `top`, leaving `transform` free for the drag library to displace
+a card with. `react-window@2.x` positions with `transform: translateY(…)` — the
+exact collision D9 moved away from. It also drops `outerRef` for an imperative
+handle whose DOM node has to be bridged out before the droppable can attach to
+it, and it renders rows as direct children of the scroller with a trailing
+sizer sibling — a shape the drag library has never been exercised against. Do
+not bump the major without re-reading D9.
+
+**The board's shape: absolutely-positioned rows, measured per card.**
+`VirtualColumnBody` in `src/design-system/views/board/`. Board cards are *not*
+uniform — a lead card drops its email and phone rows when the lead has neither
+— so heights are measured per card into an id-keyed cache and fed back through
+`VariableSizeList`, with an estimate standing in until a card has been laid
+out. `BoardColumn` picks between the windowed body and the plain one by card
+count, so at or below 50 the column renders exactly as it always did, keeps its
+flex `gap`, and keeps the dashed drop zone that an empty column needs and a
+windowed body has no row to hang.
+
+**The four parts of the `@hello-pangea/dnd` virtual contract**, all
+load-bearing: `mode="virtual"` (without it, a scroll mid-drag warns and drops
+the update); a mandatory `renderClone`, because the dragged card is *unmounted*
+from the list and a portalled clone is what follows the pointer; **no**
+`provided.placeholder`, which virtual mode throws on — space for an incoming
+card is made by adding a row while `snapshot.isUsingPlaceholder`; and
+`overscanCount ≥ 1`, without which the library cannot tell whether a card
+exists past the last visible one.
+
+**How it composes with the column body.** The scroll element is react-window's
+own outer `div`, a plain `overflow: auto` element and **not** a Radix
+`ScrollArea`. That matters: `ScrollArea` moves the scroll onto an inner
+`Viewport` element and wraps the content in a `display: table` child, so a
+virtualizer handed the `Root` (the obvious element to reach for) measures a box
+that never scrolls and computes a window of zero rows — the classic
+broken-measurement pairing. If a board column ever gains a `ScrollArea`, the
+virtualizer's scroll element must be the **viewport**, not the root. Keeping
+the plain element avoids the question entirely.
+
+**What windowing costs, stated rather than glossed.** The drag library's own
+virtual-list guide names two: a screen reader cannot reach a card that is not
+in the DOM, and neither can the browser's find-in-page. It suggests windowing
+above ~500 items; the board's threshold is 50, so the board pays those costs
+ten times sooner. Keyboard `Tab` past the window's edge works only because the
+browser scrolls the focused card into view and the scroll mounts the next one —
+real-browser behaviour that jsdom cannot exercise. Every card's "Move to…"
+menu is reachable once its card is mounted, and 2.7 is pinned by test inside a
+windowed column, but a card outside the window is reachable only by scrolling
+to it.
+
+**A real 200-card drag in a browser has not been performed** — mouse and
+keyboard, both directions, both languages, which is what D9 requires and what
+keeps task 2.8 at `[/]`. What exists is `BoardVirtualization.test.tsx` and
+`virtual-dnd.probe.test.tsx`: structure, indices and invariants, not behaviour.
 
 ## Card view
 

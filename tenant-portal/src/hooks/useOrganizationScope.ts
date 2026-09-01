@@ -12,8 +12,8 @@ import {
 // The single place a screen turns "the branch the user picked" into the
 // Gateway scope headers a route's policy requires — S2 / L4-3. The company
 // half is never asked for in the UI: it is derived from the branch through
-// the user's own team memberships, because `/auth/me` is the only place the
-// branch → company pairing is stated.
+// the access-scoped branch ownership returned by `/auth/me` (or the user's
+// team memberships when an older Core response omits that ownership map).
 function useOrganizationScope(branchId: string | null): OrganizationScope {
   const { user } = useTenantAuth();
   const companyId = useMemo(() => resolveCompanyForBranch(user, branchId), [user, branchId]);
@@ -33,9 +33,9 @@ export function useOrganizationScopeHeaders(
   mode: OrganizationScopeMode,
   branchId: string | null,
 ): Record<string, string> {
-  const scope = useOrganizationScope(branchId);
+  const { companyId } = useOrganizationScope(branchId);
   return useMemo(() => {
-    const resolution = resolveOrganizationScope(mode, scope);
+    const resolution = resolveOrganizationScope(mode, { companyId, branchId });
     return resolution.ok ? resolution.headers : {};
-  }, [mode, scope]);
+  }, [mode, companyId, branchId]);
 }

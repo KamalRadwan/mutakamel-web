@@ -25,6 +25,7 @@ import {
   resyncTenantNotifications,
   tenantNotificationRuntime,
 } from "@/lib/notifications/tenant-notification-runtime";
+import { uuidCrypto } from "@/lib/uuid";
 
 export interface TenantRealtimeCoordinator extends RealtimeApplicationConnection {
   getSnapshot(): { readonly generation: string | null };
@@ -305,7 +306,7 @@ export function TenantRealtimeBinding({
 
 export function createTenantRealtimeCoordinator(): TenantRealtimeCoordinator {
   const identifiers = createBrowserClientIdentifiers({
-    crypto: window.crypto,
+    crypto: uuidCrypto,
     storage: {
       getItem: (key) => window.localStorage.getItem(key),
       setItem: (key, value) => window.localStorage.setItem(key, value),

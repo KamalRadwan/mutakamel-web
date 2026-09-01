@@ -57,6 +57,7 @@ describe("public admin password actions", () => {
 
     const password = await screen.findByLabelText("New password");
     const confirmation = screen.getByLabelText("Confirm new password");
+    expect(password.closest("form")?.method).toBe("post");
     expect(window.location.hash).toBe("");
 
     fireEvent.change(password, { target: { value: "weak" } });
@@ -87,7 +88,9 @@ describe("public admin password actions", () => {
     );
     render(<AdminPasswordActionScreen mode="resetPassword" />);
 
-    fireEvent.change(await screen.findByLabelText("New password"), {
+    const password = await screen.findByLabelText("New password");
+    expect(password.closest("form")?.method).toBe("post");
+    fireEvent.change(password, {
       target: { value: "AnotherStrong2@" },
     });
     fireEvent.change(screen.getByLabelText("Confirm new password"), {

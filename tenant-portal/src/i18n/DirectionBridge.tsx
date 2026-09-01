@@ -8,7 +8,7 @@ import { useDirection, useLanguage } from "./useLanguage";
 // LTR regardless of what is on screen unless the tree is wrapped once here.
 //
 // Also keeps <html lang>/<html dir> in sync after the first paint. The
-// beforeInteractive bootstrap script in src/app/layout.tsx only sets them
+// inline bootstrap script in src/app/layout.tsx only sets them
 // once, before hydration — Tailwind's rtl:/ltr: variants (e.g. Switch's
 // thumb travel) read the live dir attribute, so a runtime language toggle
 // needs this effect or they go stale.

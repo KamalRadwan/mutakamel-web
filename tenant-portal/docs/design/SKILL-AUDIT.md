@@ -88,6 +88,12 @@ Nothing in the audit invalidates the cold-blue palette, the density decisions,
 or the toast rule. The gaps are almost entirely **accessibility mechanics the
 docs never specified**, not visual-design disagreements.
 
+> **Read after the admin-portal token port.** The audit's *findings* all still
+> hold — none of them turned on a specific hue, size or face. Its *figures* do
+> not: this page quoted the pre-port palette's contrast ratios and the pre-port
+> font choice, and both have been corrected in place below. Sections C and D5
+> are unaffected; D2 and E are the two that had to be rewritten.
+
 ---
 
 ## A · Where the docs already match the skill
@@ -105,8 +111,8 @@ No action needed. Recorded so a future pass does not "fix" what is correct.
 | `number-tabular` | `tabular-nums` on every numeric column |
 | `reduced-motion` | Ships in the foundation commit, not a polish pass |
 | `virtualize-lists` (50+) | Board columns virtualize above 50 cards |
-| `focus-states` (2–4px visible ring) | `focusRing`, `focus-visible`, measured 3.74:1 |
-| `color-accessible-pairs` (4.5:1 / 3:1) | All 14 pairings computed by `design:contrast` |
+| `focus-states` (2–4px visible ring) | `focusRing`, `focus-visible`, measured **4.86:1** |
+| `color-accessible-pairs` (4.5:1 / 3:1) | Every pairing computed by `design:contrast`, plus a negative control that has to keep failing |
 | `exit-faster-than-enter` (~60–70%) | Enter 120ms / exit 90ms = 75% |
 | `toast-dismiss` (3–5s) | 4000ms default |
 | `adaptive-navigation` (≥1024px sidebar) | Sidebar at `lg`, sheet below |
@@ -170,9 +176,10 @@ existing move mutation, satisfies AA.
 ### B4 · Sticky chrome can obscure the keyboard-focused control
 **Rule:** `focus-not-obscured` (WCAG 2.2 AA)
 
-We stack four sticky layers: 44px topbar, sticky table header, sticky
-inline-start first column, sticky inline-end action column. A `Tab` into a row
-action near a viewport edge can land behind one of them, with no visible focus.
+We stack four sticky layers: the topbar (44px when this was written, 48px since
+the admin port), sticky table header, sticky inline-start first column, sticky
+inline-end action column. A `Tab` into a row action near a viewport edge can
+land behind one of them, with no visible focus.
 
 **Fix:** add `scroll-margin` on focusable row content sized to the sticky
 offsets, and add a check to the a11y checklist: tab to the first and last
@@ -190,7 +197,7 @@ Add to the `DataTable` test list.
 ### B6 · No skip link
 **Rule:** `skip-links` — "Skip to main content for keyboard users"
 
-With a 232px sidebar of up to 11 nav items, a keyboard user tabs through the
+With a 240px sidebar of up to 11 nav items, a keyboard user tabs through the
 entire nav on every page load before reaching content.
 
 **Fix:** visually-hidden "Skip to content" as the first focusable element in
@@ -312,7 +319,7 @@ them later.
 
 | Skill rule | Our decision | Why |
 | --- | --- | --- |
-| `truncation-strategy` — prefer wrapping | **Truncate + `title`** in table cells | A wrapping cell breaks the fixed 36px row and shifts every row below it. Wrapping applies to prose, which we do wrap |
+| `truncation-strategy` — prefer wrapping | **Truncate + `title`** in table cells | A wrapping cell breaks the fixed row height (36px then, 44px now) and shifts every row below it. Wrapping applies to prose, which we do wrap |
 | `empty-nav-state` — explain unavailable destinations | **Hide** unpermitted routes | Enumerating capabilities a user lacks is an information leak. Our unavailable boundary already explains *sealed* routes, which is the case the rule is really about |
 | `undo-support` — undo for destructive actions | **`AlertDialog` confirm** | No backend undo endpoint exists. A fake undo that cannot restore the record is worse than a confirm |
 | Checklist "hover 150–300ms" | **120ms** | The skill's own `duration-timing` rule supersedes the flat number: "choose tokens by distance, complexity… instead of treating one duration range as universal". 120ms on a dense table reads as instant |
@@ -339,9 +346,13 @@ Of 74 curated font pairings, **exactly one** supports Arabic (Noto Naskh Arabic
 Jakarta Sans, Fira Code/Fira Sans, Exo/Roboto Mono — has **no Arabic subset**
 and would fall back mid-sentence.
 
-Worth noting: its own `google-fonts.csv` **does** contain Readex Pro and Zain —
-our chosen face and its documented fallback. The catalogue knows them; the
-pairing database just has no entry. Our choice stands.
+The finding holds; the example moved. At the time of the audit the chosen face
+was Readex Pro with Zain as its documented fallback, and the skill's own
+`google-fonts.csv` contained both while its pairing database had no entry for
+either. The faces are now **IBM Plex Sans + IBM Plex Sans Arabic + IBM Plex
+Mono**, ported from the admin portal — a pairing the skill likewise does not
+list. The type decision in this product is driven by Arabic coverage and by
+consistency with the sibling portal, neither of which this tool models.
 
 ### D3 · `--design-system` returns landing pages for an internal app
 Its PATTERN axis reads from `landing.csv` — **35 rows, all marketing-page
@@ -383,13 +394,20 @@ direction:
 | --- | --- |
 | Skill · "SaaS (General)" | `#2563EB` |
 | Skill · "Analytics Dashboard" | `#1E40AF` |
-| **Ours · `brand-600`** | **`#1364CE`** |
+| **Ours · `brand-600`** | **`#1d4ed8`** |
 
-Same family, and ours is the only one with **measured** contrast (fill 5.64:1,
-link 7.87:1, ring 3.74:1, all verified in-gamut by `design:contrast`). The
-skill supplies flat hex values with no ramp and no contrast proof.
+The convergence got closer, not weaker: since the admin-portal token port
+`brand-600` is `#1d4ed8` and `brand-500` is `#2563eb`, which is the skill's own
+"SaaS (General)" value exactly, and `brand-700` is `#1e40af`, which is its
+"Analytics Dashboard" value exactly. Two independent routes to the same ramp.
 
-Keeping our palette. No change.
+Ours remains the only one with **measured** contrast — fill 6.70:1, link
+8.72:1, ring 4.86:1, every step verified in-gamut by `design:contrast`, which
+parses `globals.css` rather than a hand-copied table. The skill supplies flat
+hex values with no ramp and no contrast proof.
+
+Keeping our palette. The values are now the admin portal's, and the audit's
+conclusion is unaffected.
 
 ---
 
@@ -402,8 +420,8 @@ fixed.
 | # | Defect | Why it mattered |
 | --- | --- | --- |
 | 1 | `tokens.md` still carried **64 lines of copyable OKLCH** for the superseded warm palette (brand hue 221) | An agent reading "the ramps" would have implemented the wrong palette and every contrast number with it. Values removed; the structural reasoning kept |
-| 2 | `tokens.md`'s roles table, rationale and **contrast numbers** were all the old palette | It argued "why petrol and not blue" — for a system that is now blue. Corrected, with the supersession stated rather than silently overwritten |
-| 3 | `geometry.md` carried **12 superseded size values** (36px/40px vs the implemented 32px/36px) | Same trap, one file over. Values removed; `controlSize` and hit-area mechanisms kept |
+| 2 | `tokens.md`'s roles table, rationale and **contrast numbers** were all the old palette | It argued "why petrol and not blue" — for a system that was blue by then. Corrected, with the supersession stated rather than silently overwritten |
+| 3 | `geometry.md` carried **12 superseded size values** (36px/40px vs the 32px/36px implemented at the time) | Same trap, one file over. Values removed; `controlSize` and hit-area mechanisms kept |
 | 4 | Four files opened with "**The current state this replaces**" in present tense | Described a codebase that no longer exists; read as current. Retitled to "What this replaced (pre-rebuild, for context)" |
 | 5 | `design/README.md` still said **"not yet implemented"** | Phases 1–5 shipped |
 | 6 | The **bilingual data-field ternary** question was never answered | `lang === "ar" ? item.nameAr : item.nameEn` is data selection, not UI copy — but `i18n.md` did not say so, which made the census's `languageTernaries` counter meaningless. Now exempt **via a mandatory `localizedName()` helper**, which removes the syntax from feature code and restores the counter as a real gate |

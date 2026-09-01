@@ -11,7 +11,7 @@ import { cn } from "../lib/cn";
 export const Table = forwardRef<HTMLTableElement, React.TableHTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
     <div className="relative w-full overflow-x-auto">
-      <table ref={ref} className={cn("w-full caption-bottom text-xs", className)} {...props} />
+      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
     </div>
   ),
 );
@@ -21,7 +21,7 @@ export const TableHeader = forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("border-b border-border bg-card [&_tr]:border-b-0", className)} {...props} />
+  <thead ref={ref} className={cn("border-b border-border bg-muted [&_tr]:border-b-0", className)} {...props} />
 ));
 TableHeader.displayName = "TableHeader";
 
@@ -54,7 +54,8 @@ export const TableHead = forwardRef<
   <th
     ref={ref}
     className={cn(
-      "px-3 text-start align-middle text-xs font-semibold text-foreground [&:has([role=checkbox])]:pe-0",
+      "h-9 px-4 text-start align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+      "rtl:normal-case rtl:tracking-normal [&:has([role=checkbox])]:pe-0",
       className,
     )}
     {...props}
@@ -68,7 +69,7 @@ export const TableCell = forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("px-3 align-middle text-xs font-normal text-foreground [&:has([role=checkbox])]:pe-0", className)}
+    className={cn("px-4 py-3 align-middle font-normal text-foreground [&:has([role=checkbox])]:pe-0", className)}
     {...props}
   />
 ));

@@ -68,6 +68,10 @@ export function ActionTokenScreen({ flow }: { flow: ActionTokenFlow }) {
             </div>
           ) : (
             <form
+              // See the note on the sign-in form in src/app/login/page.tsx: a
+              // form with no method defaults to GET, and this one carries a new
+              // password and an action token.
+              method="post"
               className="flex flex-col gap-4"
               onSubmit={(event) => {
                 event.preventDefault();

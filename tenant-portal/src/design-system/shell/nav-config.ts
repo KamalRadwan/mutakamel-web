@@ -89,8 +89,24 @@ export interface NavItem {
   requiresTenantOwner?: boolean;
 }
 
+/**
+ * The three apps the sidebar can be scoped to.
+ *
+ * A union rather than a string, and a **required** field on `NavSection`, so
+ * a new section cannot be added without deciding which app owns it — the
+ * compiler asks the question at the only moment anyone knows the answer.
+ *
+ * Deliberately NOT inferred from the section id at runtime. An
+ * `id.startsWith("crm")` test reads as if it works and then silently
+ * mis-files a section the day one is renamed, which is precisely the class of
+ * coupling this file's `hasAccess` predicates were written to avoid.
+ */
+export type NavAppId = "workspace" | "crm" | "trade";
+
 export interface NavSection {
   id: string;
+  /** The app whose sidebar this section belongs to. Exactly one. */
+  app: NavAppId;
   labelKey: string | null; // null: no section heading (Workspace)
   items: NavItem[];
 }
@@ -101,6 +117,7 @@ export interface NavSection {
 export const NAV_SECTIONS: NavSection[] = [
   {
     id: "workspace",
+    app: "workspace",
     labelKey: null,
     items: [
       {
@@ -134,6 +151,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "crm",
+    app: "crm",
     labelKey: "crm",
     items: [
       {
@@ -167,6 +185,7 @@ export const NAV_SECTIONS: NavSection[] = [
   // `crm.widgets.read`.
   {
     id: "crmAnalytics",
+    app: "crm",
     labelKey: "crmDashboardBuilder",
     items: [
       {
@@ -195,6 +214,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "crmSetup",
+    app: "crm",
     labelKey: "crmSetup",
     items: [
       {
@@ -243,6 +263,7 @@ export const NAV_SECTIONS: NavSection[] = [
   // a tenant without the Trade module correctly sees no Trade nav at all.
   {
     id: "tradeFoundation",
+    app: "trade",
     labelKey: "tradeFoundation",
     items: [
       {
@@ -294,6 +315,7 @@ export const NAV_SECTIONS: NavSection[] = [
   // referenced nowhere — so they appear on the same terms as the rest.
   {
     id: "tradeDocuments",
+    app: "trade",
     labelKey: "tradeDocuments",
     items: [
       {
@@ -353,6 +375,7 @@ export const NAV_SECTIONS: NavSection[] = [
   // screen the server would have admitted.
   {
     id: "tradeInventory",
+    app: "trade",
     labelKey: "tradeInventoryNodes",
     items: [
       {
@@ -415,6 +438,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "tradeGovernance",
+    app: "trade",
     labelKey: "policyStudio",
     items: [
       {
@@ -458,6 +482,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "tradeAutomation",
+    app: "trade",
     labelKey: "importsWebhooks",
     items: [
       {
@@ -502,6 +527,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "tradeAnalytics",
+    app: "trade",
     labelKey: "tradeDashboard",
     items: [
       {
@@ -522,6 +548,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "coreIdentity",
+    app: "workspace",
     labelKey: "staff",
     items: [
       {
@@ -585,6 +612,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     // Directory, templates, activities and audit — MASTER-PLAN Phase 7.
     id: "coreOperations",
+    app: "workspace",
     labelKey: "operationsAndContent",
     items: [
       {
@@ -646,6 +674,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "coreSettings",
+    app: "workspace",
     labelKey: "coreSettings",
     items: [
       {
@@ -709,6 +738,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "coreBilling",
+    app: "workspace",
     labelKey: "coreBillingSection",
     items: [
       {
@@ -739,6 +769,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "account",
+    app: "workspace",
     labelKey: null,
     items: [
       {
@@ -768,6 +799,61 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ];
+
+// ---- The three app sidebars -----------------------------------------------
+//
+// Three concrete section lists, one per app. Each is DERIVED from the single
+// `NAV_SECTIONS` array above by its `app` field rather than being a
+// hand-written second copy: a duplicated list is a list that drifts, and the
+// `app` field already carries the answer. Order within an app is the order in
+// NAV_SECTIONS, so the sidebar a user sees is a contiguous slice of the nav
+// map they had before — nothing is reordered by being scoped.
+//
+// The invariant these rest on — every section lands in exactly one app, and
+// the three lists together are all 15 sections — is asserted in
+// nav-config.test.ts rather than trusted.
+
+const sectionsForApp = (app: NavAppId): NavSection[] =>
+  NAV_SECTIONS.filter((section) => section.app === app);
+
+/** Workspace: the portal itself — home, search, org, settings, billing, account. */
+export const WORKSPACE_NAV_SECTIONS: NavSection[] = sectionsForApp("workspace");
+
+/** CRM: leads and customers, the dashboard builder, and CRM's own setup. */
+export const CRM_NAV_SECTIONS: NavSection[] = sectionsForApp("crm");
+
+/** Trade: catalogue foundation, commercial documents, inventory, governance,
+ *  automation and analytics. */
+export const TRADE_NAV_SECTIONS: NavSection[] = sectionsForApp("trade");
+
+/**
+ * An app as the switcher offers it: an identity plus the sidebar it shows.
+ *
+ * `labelKey` resolves under `t.nav` like every other label in this file, so
+ * the app names are translated by the same mechanism as the sections they
+ * head — there is no second dictionary namespace to keep in sync.
+ */
+export interface NavApp {
+  id: NavAppId;
+  labelKey: string;
+  icon: LucideIcon;
+  sections: NavSection[];
+}
+
+/** The switcher's options, in the order it lists them. */
+export const NAV_APPS: NavApp[] = [
+  {
+    id: "workspace",
+    labelKey: "appWorkspace",
+    icon: LayoutDashboard,
+    sections: WORKSPACE_NAV_SECTIONS,
+  },
+  { id: "crm", labelKey: "appCrm", icon: Contact, sections: CRM_NAV_SECTIONS },
+  { id: "trade", labelKey: "appTrade", icon: Store, sections: TRADE_NAV_SECTIONS },
+];
+
+/** The app that owns a route no `isSupported*Path` allowlist claims. */
+export const DEFAULT_NAV_APP: NavAppId = "workspace";
 
 /** The section a settings screen renders as its `SubNav`. */
 export const CORE_SETTINGS_NAV_ITEMS: NavItem[] =

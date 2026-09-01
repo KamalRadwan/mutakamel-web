@@ -106,7 +106,7 @@ export function DateRangePicker({
   language,
   now,
   id,
-  size = "md",
+  size = "lg",
   className,
 }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);

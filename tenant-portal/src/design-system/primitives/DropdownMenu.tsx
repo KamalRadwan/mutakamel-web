@@ -21,7 +21,7 @@ export const DropdownMenuContent = forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        "z-(--z-dropdown) min-w-32 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-pop",
+        "z-(--z-dropdown) min-w-32 overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-pop",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         className,
       )}
@@ -38,7 +38,7 @@ export const DropdownMenuItem = forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center gap-2 rounded-xs px-2 py-1.5 text-sm outline-none",
+      "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none",
       "focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       variant === "destructive" && "text-destructive focus:bg-destructive/10 focus:text-destructive",
       className,
@@ -56,7 +56,7 @@ export const DropdownMenuCheckboxItem = forwardRef<
     ref={ref}
     checked={checked}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-xs py-1.5 ps-8 pe-2 text-sm outline-none",
+      "relative flex cursor-default select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none",
       "focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className,
     )}
@@ -79,7 +79,7 @@ export const DropdownMenuRadioItem = forwardRef<
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-xs py-1.5 ps-8 pe-2 text-sm outline-none",
+      "relative flex cursor-default select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none",
       "focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className,
     )}

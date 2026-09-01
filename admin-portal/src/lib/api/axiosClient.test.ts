@@ -2316,6 +2316,31 @@ describe("admin cookie refresh retry", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    ["http:", "mutakamel-http-admin-csrf=http-proof; __Host-mutakamel-admin-csrf=secure-proof", "http-proof"],
+    ["https:", "mutakamel-http-admin-csrf=http-proof; __Host-mutakamel-admin-csrf=secure-proof", "secure-proof"],
+    ["http:", "__Host-mutakamel-admin-csrf=secure-proof", "secure-proof"],
+    ["https:", "mutakamel-http-admin-csrf=http-proof", "http-proof"],
+  ])("selects the available %s admin CSRF cookie profile", async (protocol, cookie, expected) => {
+    stubBrowserStorage("/settings/auth", new MemoryStorage());
+    window.location.protocol = protocol;
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("document", { cookie });
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const headers = new Headers(init.headers);
+      expect(headers.get("x-csrf-token")).toBe(expected);
+      expect(headers.has("Authorization")).toBe(false);
+      expect(init.credentials).toBe("include");
+      return new Response(null, { status: 204 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await customFetch("/api/admin/core/v1/auth/sessions/session-1", {
+      method: "DELETE",
+      skipAutoIdempotency: true,
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("rejects cross-origin and protocol-relative API targets before sending CSRF proof", async () => {
     const storage = new MemoryStorage();
     stubBrowserStorage("/settings/auth", storage);

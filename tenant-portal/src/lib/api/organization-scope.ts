@@ -100,8 +100,15 @@ export function resolveOrganizationScope(
   }
 }
 
+export interface AccessibleBranchCompany {
+  branchId: string;
+  companyId: string;
+}
+
 export interface TenantScopeSource {
+  accessibleBranches: readonly string[];
   accessibleCompanies: readonly string[];
+  accessibleBranchCompanies?: readonly AccessibleBranchCompany[];
   teamMemberships: ReadonlyArray<{
     companyId: string;
     branchId: string | null;
@@ -109,11 +116,38 @@ export interface TenantScopeSource {
   }>;
 }
 
+/** A null company set permits Core's truncated company projection, never malformed pairs. */
+export function isAccessibleBranchCompanies(
+  value: unknown,
+  accessibleBranches: readonly string[],
+  accessibleCompanies: readonly string[] | null,
+): value is AccessibleBranchCompany[] {
+  if (!Array.isArray(value)) return false;
+  const branches = new Set(accessibleBranches);
+  const companies = accessibleCompanies === null ? null : new Set(accessibleCompanies);
+  const owners = new Map<string, string>();
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+    const pair = entry as Record<string, unknown>;
+    if (
+      !isUUIDv7(pair.branchId) ||
+      !isUUIDv7(pair.companyId) ||
+      !branches.has(pair.branchId) ||
+      (companies !== null && !companies.has(pair.companyId))
+    ) return false;
+    const owner = owners.get(pair.branchId);
+    if (owner !== undefined && owner !== pair.companyId) return false;
+    owners.set(pair.branchId, pair.companyId);
+  }
+  return true;
+}
+
 /**
- * The company that owns a selected branch, taken from the user's own team
- * memberships — the only place `/auth/me` states the pairing.
+ * The company that owns a selected branch, taken from Core's access-scoped
+ * branch ownership map. Older Core responses can use team memberships only
+ * when that map is absent; an empty or malformed map never falls back.
  *
- * Returns null rather than guessing when the branch is not in a membership:
+ * Returns null rather than guessing when ownership cannot be established:
  * `BRANCH_REQUIRED` needs the matching company, and pairing a branch with the
  * wrong company is a scope error the Gateway cannot catch for us.
  */
@@ -121,7 +155,16 @@ export function resolveCompanyForBranch(
   source: TenantScopeSource | null | undefined,
   branchId: string | null,
 ): string | null {
-  if (!source || !validId(branchId)) return null;
+  if (!source || !validId(branchId) || !source.accessibleBranches.includes(branchId)) return null;
+  if ("accessibleBranchCompanies" in source) {
+    if (!isAccessibleBranchCompanies(
+      source.accessibleBranchCompanies,
+      source.accessibleBranches,
+      null,
+    )) return null;
+    const companyId = source.accessibleBranchCompanies.find((pair) => pair.branchId === branchId)?.companyId;
+    return companyId && source.accessibleCompanies.includes(companyId) ? companyId : null;
+  }
   const accessible = new Set(source.accessibleCompanies.filter(isUUIDv7));
   const owning = source.teamMemberships
     .filter((membership) => membership.branchId === branchId)

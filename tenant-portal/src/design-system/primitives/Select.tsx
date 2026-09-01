@@ -17,11 +17,11 @@ export interface SelectTriggerProps
 export const SelectTrigger = forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
   SelectTriggerProps
->(({ className, size = "md", children, ...props }, ref) => (
+>(({ className, size = "lg", children, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex w-full cursor-pointer items-center justify-between gap-2 rounded-sm border border-input bg-card text-foreground",
+      "flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-card text-foreground",
       "disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       "data-[placeholder]:text-muted-foreground",
       focusRing,
@@ -51,7 +51,7 @@ export const SelectContent = forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        "relative z-(--z-dropdown) max-h-96 min-w-32 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-pop",
+        "relative z-(--z-dropdown) max-h-96 min-w-32 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-pop",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         position === "popper" &&
           "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
@@ -79,7 +79,7 @@ export const SelectItem = forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-xs py-1.5 ps-8 pe-2 text-sm outline-none",
+      "relative flex w-full cursor-default select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none",
       "focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className,
     )}

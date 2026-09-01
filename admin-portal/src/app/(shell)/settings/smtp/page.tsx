@@ -241,7 +241,7 @@ function SmtpForm({ form, password, errors, lang, disabled, showPassword, onTogg
 }) {
   const copy = dict(lang).form;
   return (
-    <form aria-label={copy.ariaLabel} onSubmit={(event) => event.preventDefault()} className="grid gap-5 rounded-lg border border-border bg-card p-5 lg:grid-cols-2">
+    <form method="post" aria-label={copy.ariaLabel} onSubmit={(event) => event.preventDefault()} className="grid gap-5 rounded-lg border border-border bg-card p-5 lg:grid-cols-2">
       <TextField id="smtp-from-address" label={copy.fromAddress} type="email" value={form.fromAddress} maxLength={320} disabled={disabled} error={errors.fromAddress} lang={lang} onChange={(value) => onUpdate("fromAddress", value)} />
       <TextField id="smtp-from-name" label={copy.fromName} value={form.fromName} maxLength={200} disabled={disabled} error={errors.fromName} lang={lang} onChange={(value) => onUpdate("fromName", value)} />
       <TextField id="smtp-sender-domain" label={copy.senderDomain} value={form.senderDomain} maxLength={253} disabled={disabled} error={errors.senderDomain} lang={lang} onChange={(value) => onUpdate("senderDomain", value)} />

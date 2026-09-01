@@ -62,20 +62,18 @@ describe("grouped admin dashboard contract", () => {
     ).toBe("USD not-a-number");
   });
 
-  it("builds the previous UTC month without timestamp query values", () => {
+  it("sends the chosen instants, not date-only strings", () => {
+    // A bare YYYY-MM-DD is midnight UTC, which shifts the window for anyone
+    // off UTC and discards the time of day the picker now offers.
     expect(
-      buildDashboardQuery("lastMonth", {}, new Date("2026-08-02T12:00:00Z")),
-    ).toEqual({ from: "2026-07-01", to: "2026-07-31" });
-  });
-
-  it("sends only supplied custom date boundaries", () => {
-    expect(
-      buildDashboardQuery(
-        "custom",
-        { from: "2026-08-01" },
-        new Date("2026-08-02T12:00:00Z"),
-      ),
-    ).toEqual({ from: "2026-08-01" });
+      buildDashboardQuery({
+        from: new Date("2026-09-01T09:00:00.000Z"),
+        to: new Date("2026-09-01T17:30:00.000Z"),
+      }),
+    ).toEqual({
+      from: "2026-09-01T09:00:00.000Z",
+      to: "2026-09-01T17:30:00.000Z",
+    });
   });
 
   it("humanizes nested backend keys for report facts", () => {

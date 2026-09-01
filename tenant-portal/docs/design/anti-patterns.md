@@ -35,9 +35,12 @@ reasonable. That is exactly how the generated look happens.
 ### 1. Oversized corner radius
 
 `rounded-2xl` (16px) and `rounded-3xl` (24px) are the single loudest signal.
-The scale stops at 8px — see [geometry.md](geometry.md#radius--4-steps).
+The scale stops at 10px, and the ceiling you may actually write in markup is
+`rounded-lg` (8px) — see [geometry.md](geometry.md#radius--5-steps).
 
-**Lint: error.**
+**Lint: error** on `rounded-xl` and above. That includes the 10px
+`--radius-xl` token: it exists for parity with the admin portal, and no
+component in this portal consumes it.
 
 ### 2. Decorative gradients
 
@@ -96,8 +99,9 @@ at all — the only two shadows are `shadow-pop` and `shadow-overlay`.
 ### 8. Permanently dark chrome
 
 The current navbar is dark regardless of theme. The sidebar in this system is
-`bg-sidebar`, which is **white in light mode**. A dark chrome wrapped around a
-light body is a tell.
+`bg-sidebar`, which is **`ink-25` in light mode** — the lightest step in the
+neutral ramp, a single notch off the page background it sits beside. A dark
+chrome wrapped around a light body is a tell.
 
 ### 9. Emoji as UI
 
@@ -152,12 +156,12 @@ existing choices already avoid each one; do not reintroduce them.
 | Cliché | What this system does instead |
 | --- | --- |
 | Purple-to-blue gradient hero | No hero. A CRM opens on data |
-| Warm cream `#F4F1EA` + serif + terracotta | Cold-blue `ink` + Readex Pro + blue brand |
+| Warm cream `#F4F1EA` + serif + terracotta | Cold-blue `ink` + IBM Plex Sans + cobalt brand |
 | Near-black with one acid-green pop | Four roles, none acid |
-| Inter / Geist / Space Grotesk / Cairo as the "safe" face | Readex Pro, a bilingual superfamily |
-| Generic SaaS blue at hue 250 | Blue at **258**, on a cold-blue neutral at 240 — same family, deliberately not the Bootstrap default |
+| Inter / Geist / Space Grotesk / Cairo as the "safe" face | IBM Plex Sans + Plex Sans Arabic, drawn against each other by one team |
+| Generic SaaS blue picked off a palette site | Cobalt anchored at `brand-600` `#1d4ed8`, on a cold-blue neutral running hue 232→245 — same family, and every step contrast-measured rather than eyeballed |
 | Glassmorphism panels | Border + background step |
-| Big rounded stat cards with an accent bar | 36px rows and `StatCard` at `rounded-md` |
+| Big rounded stat cards with an accent bar | 44px rows and `StatCard` at `rounded-md` |
 | Floating action button | Actions live in `PageHeader` |
 | Illustrated empty states | One icon, one line, one action |
 | Animated page transitions | See [motion.md](motion.md#the-budget) |
@@ -167,10 +171,16 @@ existing choices already avoid each one; do not reintroduce them.
 Reviewers sometimes justify a violation with "it's a dense admin UI". Density
 is achieved by:
 
-- 36px rows, 32px controls, tight `gap` values
+- 44px rows, 32px controls, tight `gap` values
 - A 13px workhorse type size — not 10px
 - Short labels — not smaller labels
 - Fewer columns — not narrower columns
+
+And by the **compact** density setting, which is a user's choice to make. Since
+the admin-portal token port the shipped default is standard, not compact:
+matching the sibling portal's physical size was judged worth roughly three rows
+of a 1366×768 screen. Shrinking a component to win those rows back for
+everyone is the violation this section exists to refuse.
 
 Density is **never** achieved by shrinking text below the floor, removing focus
 rings, dropping labels to icon-only without tooltips, or cramming actions into

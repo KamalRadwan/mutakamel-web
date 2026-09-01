@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, Radio, Save, Trash2 } from "lucide-react";
-import { Button } from "@/design-system";
+import { Plus, Radio, Save, Trash2 } from "lucide-react";
+import { Badge, Button } from "@/design-system";
 import { WEBPHONE_COPY, webphoneErrorText } from "../webphone-copy";
 import type { TenantWebphoneSettingsState } from "../hooks/useTenantWebphoneSettings";
 import {
@@ -59,10 +59,10 @@ export function IceServersSection({
       title={copy.iceSection}
       help={copy.iceSectionHelp}
       describedBy={describedBy}
-      icon={<Radio className="size-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />}
+      icon={<Radio className="size-4 text-muted-foreground" aria-hidden="true" />}
     >
       {state.iceServers.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-[11px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <p className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
           {copy.iceEmpty}
         </p>
       ) : (
@@ -81,9 +81,9 @@ export function IceServersSection({
           event.preventDefault();
           void submitDraft();
         }}
-        className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950"
+        className="grid gap-4 rounded-lg border border-border p-4"
       >
-        <h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+        <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {copy.addIceServer}
         </h3>
         <div className="grid gap-4 lg:grid-cols-3">
@@ -175,10 +175,14 @@ export function IceServersSection({
         ) : null}
 
         <div>
-          <Button type="submit" variant="primary" size="sm" disabled={disabled}>
-            {pending && state.mutation.target === "ice:new" ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
+          <Button
+            type="submit"
+            variant="secondary"
+            size="sm"
+            disabled={disabled}
+            loading={pending && state.mutation.target === "ice:new"}
+          >
+            {pending && state.mutation.target === "ice:new" ? null : (
               <Plus className="size-4" aria-hidden="true" />
             )}
             {pending && state.mutation.target === "ice:new"
@@ -243,7 +247,7 @@ function IceServerRow({
   return (
     <article
       aria-label={`${copy.iceRegion}: ${server.urls.join(", ")}`}
-      className="grid gap-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800"
+      className="grid gap-4 rounded-lg border border-border p-4"
     >
       <div className="grid gap-4 lg:grid-cols-3">
         <SelectField<WebphoneIceServerKind>
@@ -324,22 +328,19 @@ function IceServerRow({
           inactiveLabel={copy.disabled}
         />
         {server.kind === "TURN" ? (
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          <Badge tone={server.credentialConfigured ? "positive" : "neutral"}>
             {copy.iceCredentialState}:{" "}
             {server.credentialConfigured ? copy.configured : copy.notConfigured}
-          </span>
+          </Badge>
         ) : null}
         <Button
           variant="secondary"
           size="sm"
           onClick={() => void save()}
           disabled={disabled || !dirty}
+          loading={rowPending}
         >
-          {rowPending ? (
-            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-          ) : (
-            <Save className="size-3.5" aria-hidden="true" />
-          )}
+          {rowPending ? null : <Save className="size-3.5" aria-hidden="true" />}
           {copy.save}
         </Button>
         <Button
@@ -354,7 +355,7 @@ function IceServerRow({
           {server.enabled ? copy.disable : copy.enable}
         </Button>
         <Button
-          variant="danger"
+          variant="destructive"
           size="sm"
           disabled={disabled}
           aria-label={`${copy.removeIceServer}: ${server.urls.join(", ")}`}

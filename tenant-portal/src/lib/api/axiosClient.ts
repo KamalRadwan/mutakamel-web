@@ -21,6 +21,7 @@ const API_BASE_URL = "";
 const SESSION_META_KEY = "tenant_session_meta";
 const REMEMBER_PREFERENCE_KEY = "tenant_auth_remember";
 const TENANT_CSRF_COOKIE = "__Host-mutakamel-tenant-csrf";
+const TENANT_HTTP_CSRF_COOKIE = "mutakamel-http-tenant-csrf";
 const RECENT_USER_ACTIVITY_MS = 60_000;
 const ACTIVITY_RETRY_MS = 15_000;
 const AUTH_REQUEST_TIMEOUT_MS = 10_000;
@@ -136,6 +137,7 @@ let activityTouchInFlight: {
   promise: Promise<void>;
 } | null = null;
 let lastActivityTouchAt = 0;
+let fallbackTenantAuthQueue: Promise<void> = Promise.resolve();
 
 export function readWebAuthSessionResponse(
   payload: unknown,
@@ -174,8 +176,7 @@ export async function withTenantAuthLock<T>(
 ): Promise<T> {
   if (
     typeof window === "undefined" ||
-    typeof navigator === "undefined" ||
-    typeof navigator.locks?.request !== "function"
+    typeof navigator === "undefined"
   ) {
     throw createLocalApiError(503, "AUTH_SESSION_COORDINATION_UNAVAILABLE");
   }
@@ -183,6 +184,9 @@ export async function withTenantAuthLock<T>(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AUTH_REQUEST_TIMEOUT_MS);
   try {
+    if (typeof navigator.locks?.request !== "function") {
+      return await withFallbackTenantAuthLock(callback, controller.signal);
+    }
     return await navigator.locks.request(
       "tenant_auth_mutex",
       { mode: "exclusive", signal: controller.signal },
@@ -196,6 +200,21 @@ export async function withTenantAuthLock<T>(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function withFallbackTenantAuthLock<T>(
+  callback: (signal: AbortSignal) => Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  // HTTP has no Web Locks. Keep mutations serialized within this tab while
+  // the existing auth events and generation fences continue coordinating tabs.
+  const operation = fallbackTenantAuthQueue.then(() => {
+    signal.throwIfAborted();
+    return callback(signal);
+  });
+  // A timed-out caller must not release an operation that is still settling.
+  fallbackTenantAuthQueue = operation.then(() => undefined, () => undefined);
+  return waitForOperation(operation, signal);
 }
 
 export function getStoredTenantSessionMeta(): TenantSessionMetadata | null {
@@ -306,7 +325,7 @@ export async function refreshTenantCookieSession(
     rememberOverride ??
     storedMeta?.remember ??
     safeStorage.getItem(REMEMBER_PREFERENCE_KEY) === "1";
-  const csrfToken = readBrowserCookie(TENANT_CSRF_COOKIE);
+  const csrfToken = readTenantCsrfCookie();
   const controller = new AbortController();
   const abortFromCaller = () => controller.abort();
   if (signal?.aborted) controller.abort();
@@ -414,6 +433,19 @@ async function sendPreparedRequest<T>(
     if (
       response.status === 401 &&
       disposition === "refresh" &&
+      request.hadSessionMetadata &&
+      !hasTenantSessionCookieHint()
+    ) {
+      // The readable CSRF proof and HttpOnly session credential are one web
+      // channel. If the proof disappeared while this request was in flight,
+      // refresh cannot succeed and stale tab metadata must not cause a second
+      // guaranteed 401.
+      endTenantBrowserSession(request.sessionId);
+      throw error;
+    }
+    if (
+      response.status === 401 &&
+      disposition === "refresh" &&
       !isRetry &&
       !request.skipAuthRefresh &&
       !request.publicAuthEndpoint &&
@@ -499,6 +531,10 @@ function checkpointTenantActivityIfDue(): void {
 function runActivityCheckpoint(): Promise<void> {
   const sessionId = getStoredTenantSessionMeta()?.sessionId;
   if (!sessionId) return Promise.resolve();
+  if (!hasTenantSessionCookieHint()) {
+    endTenantBrowserSession(sessionId);
+    return Promise.resolve();
+  }
   if (activityTouchInFlight?.sessionId === sessionId) {
     return activityTouchInFlight.promise;
   }
@@ -527,6 +563,13 @@ function runActivityCheckpoint(): Promise<void> {
       );
       lastActivityTouchAt = Date.now();
     } catch (error) {
+      if (
+        getStoredTenantSessionMeta()?.sessionId !== sessionId ||
+        isDefinitiveAuthFailure(error) ||
+        getAuthErrorCode(error) === "AUTH_SESSION_CHANGED"
+      ) {
+        return;
+      }
       console.warn("Tenant activity checkpoint failed.", {
         status: getAuthErrorStatus(error),
         code: getAuthErrorCode(error) ?? "ACTIVITY_CHECKPOINT_UNAVAILABLE",
@@ -719,7 +762,7 @@ function prepareRequest(
   ) {
     headers.set("x-idempotency-key", generateUUIDv7());
   }
-  const csrfToken = readBrowserCookie(TENANT_CSRF_COOKIE);
+  const csrfToken = readTenantCsrfCookie();
   if (
     csrfToken &&
     ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
@@ -878,6 +921,18 @@ function removeLegacyBrowserTokens(): void {
     safeSessionStorage.removeItem(key);
     safeStorage.removeItem(key);
   }
+}
+
+/** A readable cookie permits a server check; it never proves authentication. */
+export function hasTenantSessionCookieHint(): boolean {
+  return Boolean(readTenantCsrfCookie());
+}
+
+function readTenantCsrfCookie(): string | undefined {
+  const names = typeof window !== "undefined" && window.location?.protocol === "http:"
+    ? [TENANT_HTTP_CSRF_COOKIE, TENANT_CSRF_COOKIE]
+    : [TENANT_CSRF_COOKIE, TENANT_HTTP_CSRF_COOKIE];
+  return readBrowserCookie(names[0]) || readBrowserCookie(names[1]);
 }
 
 function readBrowserCookie(name: string): string | undefined {

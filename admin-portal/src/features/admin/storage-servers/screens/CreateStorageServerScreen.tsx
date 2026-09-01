@@ -92,7 +92,7 @@ export function CreateStorageServerScreen() {
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{c.subtitle}</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <form method="post" onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           {storageRuntimeSetupRequired && (
             <div role="alert" className="rounded-lg border border-warning/30 bg-warning-subtle p-4 text-warning-subtle-foreground">

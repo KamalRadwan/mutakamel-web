@@ -1,7 +1,6 @@
 "use client";
 
-import { Loader2, Save, ServerCog } from "lucide-react";
-import { Button } from "@/design-system";
+import { ServerCog } from "lucide-react";
 import { WEBPHONE_COPY, webphoneErrorText } from "../webphone-copy";
 import type { TenantWebphoneSettingsState } from "../hooks/useTenantWebphoneSettings";
 import type { WebphoneIceTransportPolicy } from "../webphone-contract";
@@ -13,20 +12,22 @@ import {
   TextField,
 } from "./WebphoneFields";
 
+/**
+ * Saving lives in `PageHeader`, not here: it is the screen's single filled
+ * action and `PageHeader` is the only place one may appear. This section keeps
+ * the dirty notice and the config-scoped failure, both of which belong beside
+ * the fields they describe.
+ */
 export function ServerConfigSection({
   state,
   describedBy,
-  onSave,
 }: {
   state: TenantWebphoneSettingsState;
   describedBy?: string;
-  onSave: () => void;
 }) {
   const copy = WEBPHONE_COPY[state.lang];
   const { form, fieldErrors, lang } = state;
-  const pending = state.mutation.phase === "PENDING";
-  const disabled = !state.canUpdateConfig || pending;
-  const savePending = pending && state.mutation.target === "config";
+  const disabled = !state.canUpdateConfig || state.mutation.phase === "PENDING";
   if (!form) return null;
 
   return (
@@ -34,28 +35,10 @@ export function ServerConfigSection({
       title={copy.serverSection}
       help={copy.serverSectionHelp}
       describedBy={describedBy}
-      icon={<ServerCog className="size-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />}
-      actions={
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={onSave}
-          disabled={disabled || !state.hasUnsavedChanges}
-        >
-          {savePending ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <Save className="size-4" aria-hidden="true" />
-          )}
-          {savePending ? copy.saving : copy.save}
-        </Button>
-      }
+      icon={<ServerCog className="size-4 text-muted-foreground" aria-hidden="true" />}
     >
       {state.hasUnsavedChanges ? (
-        <p
-          role="status"
-          className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] font-semibold text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
-        >
+        <p role="status" className="max-w-prose text-xs font-medium text-foreground">
           {copy.unsavedChanges}
         </p>
       ) : null}

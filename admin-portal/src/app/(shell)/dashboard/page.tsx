@@ -27,10 +27,8 @@ export default function DashboardPage() {
   const {
     activeTab,
     setActiveTab,
-    rangePreset,
-    setRangePreset,
-    customRange,
-    setCustomRange,
+    range,
+    setRange,
     autoRefreshInterval,
     setAutoRefreshInterval,
     operatorRefreshPaused,
@@ -110,10 +108,8 @@ export default function DashboardPage() {
         <DashboardHeader
           isRefreshing={isRefreshing || isLoading}
           onRefresh={handleRefresh}
-          rangePreset={rangePreset}
-          onRangeChange={setRangePreset}
-          customRange={customRange}
-          onCustomRangeChange={setCustomRange}
+          range={range}
+          onRangeChange={setRange}
           autoRefreshInterval={autoRefreshInterval}
           autoRefreshPaused={isAutoRefreshPaused}
           onAutoRefreshChange={setAutoRefreshInterval}

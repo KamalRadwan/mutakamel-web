@@ -1,6 +1,6 @@
 # Tenant Portal — Master Plan
 
-Written: **2026-08-30** · Owner: **Kamal Radwan** · Status: **not started**
+Written: **2026-08-30** · Owner: **Kamal Radwan** · Status: **in progress — 327 `[x]`, 385 / 393 resolved**
 
 The single tracking document for building the tenant portal into the full
 product. It covers **every page, colour, control, modal, card, view and state**
@@ -55,7 +55,7 @@ What is genuinely good and must not be thrown away:
 | Enforcement is real where it can see | 10 ESLint selectors (11 now), an RTL guard at limit 0, a 12-counter census ratchet, and a contrast script that **computes** WCAG rather than asserting it. The caveat matters: the census **does not scan `src/design-system/`**, so the ratchet is blind to its own subject — see L3 |
 | The contrast script has a negative control | `ink-500` on white *must fail* 4.5:1. Very few design systems test that their test can fail |
 | RTL is first-class | Direction is computed, never branched on; `translateX` gets its own mirrored keyframe; Radix `DirectionProvider` wraps the tree |
-| No-flash theme and direction | A pre-hydration `beforeInteractive` script sets `lang`, `dir` and `.dark` before React runs |
+| No-flash theme and direction | A pre-hydration inline `<script>` sets `lang`, `dir` and `.dark` before React runs |
 | One superfamily, two scripts | Readex Pro removes an entire class of Latin-inside-Arabic baseline bugs |
 | Status semantics are honest | An unmapped enum renders neutral **with the raw wire value in monospace**, so a backend enum addition is visible instead of silently swallowed |
 | The view invariants | "never fetches, never reads the dictionary, never knows which entity it renders, never owns the mutation" — held exactly in `BoardView` and `CardView` |
@@ -352,9 +352,9 @@ gate red.
 | 10 | Trade · foundation | 21 | 21 |
 | 11 | Trade · commercial documents | 22 | 22 |
 | 12 | Trade · advanced and analytics | 28 | 28 |
-| 13 | Hardening and release | 27 | 19 |
-| 14 | Absorbing the CRM audit | 14 | 0 |
-| | **Total** | **393** | **367** |
+| 13 | Hardening and release | 27 | 23 |
+| 14 | Absorbing the CRM audit | 14 | 14 |
+| | **Total** | **393** | **385** |
 
 ---
 
@@ -383,7 +383,7 @@ the mechanism.
 
 ## Phase 0 — Design system correction
 
-**27 / 34 done.** Fixes the user-facing complaints and the broken foundations
+**30 / 34 done, 1 partial, 3 open.** Fixes the user-facing complaints and the broken foundations
 everything else stands on. Nothing else starts until this gate is green.
 
 ### Unblock the environment
@@ -521,7 +521,7 @@ one is generic, prop-driven, bilingual and themed — no entity knowledge.
 
 ## Phase 2 — The three views, properly
 
-**16 / 18 done.** Fixes V1, V2, V3 and V5 in full, and V4 on the two surfaces that carry no drag. 2.4 is built but cannot be enabled by any screen yet; 2.8 is blocked on D9's `react-window` decision and a real browser drag.
+**16 / 18 done.** Fixes V1, V2, V3 and V5 in full, and V4 on the two surfaces that carry no drag. Both remaining halves are `[/]`, built but unproven rather than unstarted: 2.4 cannot be enabled by any screen yet, and 2.8 is shipped on `react-window@1.8.11` with only D9's real 200-card browser drag outstanding — which needs an authenticated session (P4).
 
 - [x] **2.1** Define `WorkspaceViewProps<T>` — one generic contract: `items`, `itemKey`, `isLoading`, `error`, `onRetry`, `emptyState`, `page`, `onPageChange`, `sort`, `onSortChange`, `selection`, `onActivate`, `labels`. All three views implement it (V1)
 - [x] **2.2** Adapt `TableView` to the shared contract while keeping `DataTable` as its engine
@@ -530,7 +530,7 @@ one is generic, prop-driven, bilingual and themed — no entity knowledge.
 - [x] **2.5** Add selection to `CardView` and `BoardView` — a checkbox affordance on the card, driven by the same `SelectionState`
 - [x] **2.6** Preserve page, sort, filters and selection **across a view switch** (V2). The URL already carries `?view=`; extend it to carry the rest
 - [x] **2.7** **Add a "Move to…" action on every board card** (V3, audit B3). A `DropdownMenu` listing every permitted target column. This is the WCAG AA fix and the single highest-severity item in the plan
-- [ ] **2.8** Virtualize board columns above 50 cards (V4) — the behaviour `SKILL-AUDIT` already claims exists. **Deliberately not started.** D9 was split by surface on 2026-08-31: board columns get **`react-window`**, not `@tanstack/react-virtual`, and `react-window` is not installed (an unused dependency fails `knip`; this task earns it). D9 also requires a real 200-card drag in a browser before it closes, and no authenticated session is reachable (D13). Per 2.18 the WCAG AA fix shipped without it. The column body is a plain `overflow-y-auto` element, **not** a Radix `ScrollArea` — see 2.17
+- [/] **2.8** Virtualize board columns above 50 cards (V4) — the behaviour `SKILL-AUDIT` already claims exists. **Built; the browser drag D9 requires is the outstanding half.** `react-window@1.8.11` is now a direct dependency — earned, so `knip` is green. **v1 deliberately, not v2:** D9 picked this library because it hands the row a `style` to merge and positions with `top`, leaving `transform` to the drag library; `react-window@2.x` positions with `transform: translateY(…)` and so carries the exact collision D9 moved away from, and it drops `outerRef` for an imperative handle the droppable ref has to be bridged out of. `BoardColumn` picks between two bodies by card count; above the threshold `VirtualColumnBody` wires all four parts of the dnd virtual contract — `mode="virtual"`, a mandatory `renderClone` (the dragged card is unmounted from the list), no `provided.placeholder` (virtual mode throws on one), and manual space via `snapshot.isUsingPlaceholder`, with `overscanCount ≥ 1` which the library requires. Card heights are measured per card, not assumed: board cards are not uniform. The scroll element is react-window's own plain `overflow: auto` div, **not** a Radix `ScrollArea` — 2.17. 2.7's "Move to…" menu is pinned working inside a windowed column. **What is not done:** D9's real 200-card drag in a browser — mouse and keyboard, both directions, both languages — which no authenticated session can reach (D13, and P4 in `MANUAL-TEST-PLAN`). 9 jsdom tests cover the structural half; jsdom has no layout, so every box the dnd library measures is 0×0 and no sensor can produce a drag. **Do not mark `[x]` on the strength of them.** Also unproven in jsdom: keyboard `Tab` past the window's edge depends on the browser scrolling the focused card into view and remounting the next — and the dnd library's own virtual-list guide names the standing cost, that a screen reader and find-in-page cannot reach a card outside the DOM at all
 - [x] **2.9** Virtualize `CardView` above 100 items, and `DataTable` above 100 rows
 - [x] **2.10** Give `BoardCard` `role="button"` and disambiguate click from drag with a movement threshold (V5)
 - [x] **2.11** Remove the `EmptyState title=""` and `ErrorState title=""` fallbacks (G24). Make the label props required so a blank heading cannot compile
@@ -623,7 +623,7 @@ until a person has run them.
 
 ## Phase 4 — Core · identity and organization
 
-**33 / 34 done.** **50** Gateway routes — organization 21, users 22, roles 6, permissions 1 — plus the auth completion in 4.1–4.4. Every one of the 50 is now called from a screen and runtime-validated.
+**30 / 34 done, 3 partial, 1 not buildable.** **50** Gateway routes — organization 21, users 22, roles 6, permissions 1 — plus the auth completion in 4.1–4.4. Every one of the 50 is now called from a screen and runtime-validated.
 
 ### Auth completion
 
@@ -798,7 +798,7 @@ addresses, roles and an image ·
 
 ## Phase 8 — CRM · completion
 
-**1 / 27 done.** Finishes the module that is already 17 % built.
+**21 / 27 done, 5 partial, 1 already done elsewhere.** Finishes the module that is already 17 % built.
 
 - [x] **8.1** `/crm/leads/[id]` — lead detail. Built to `detail-screens.md`: two columns, no tabs, capabilities-gated actions, notes and attachments embedded, custom-fields rail. **Route admission fixed 2026-08-31 (Q40).** `isSupportedCrmPath()` matched only `/crm/customer-profiles/[id]`, so the proxy redirected a browser to `/unavailable` before the page ran — **six** built detail screens were unreachable, not two. Replaced with a `CRM_DETAIL_PATHS` pattern mirroring the `CORE_DETAIL_PATHS` that had already solved this, and pinned by tests for all six plus two negatives
 - [x] **8.2** Lead conversion — the three-step flow on `Stepper`, prefilled from the lead, terminal stages filtered out of the selector, a read-only review step, and a persistent success panel with both new-record links rather than a toast. **One idempotency key per attempt**, minted when the drawer opens and replayed by the ambiguous-outcome retry — a fresh key would convert the lead twice
@@ -1005,7 +1005,7 @@ retried ·
 
 ## Phase 13 — Hardening and release
 
-**0 / 27 done.** Everything that must be true before this is a product.
+**10 / 27 done, 13 partial, 4 open.** Everything that must be true before this is a product.
 
 - [/] **13.1** Security headers and CSP — Nginx Proxy Manager owns transport headers; the app owns CSP because the theme bootstrap script needs a per-request nonce. **The app half is built and driven; the Nginx half is a config change on a host I cannot reach, so this stays `[/]`.** D16 decided the policy, and 13.25 had already recorded that `security-headers.md` described a mechanism nobody built — there was no CSP string and no nonce in `src/proxy.ts` at all. There is now: a per-request nonce, the ten directives D16 settled, and `TENANT_CSP_REPORT_ONLY=1` so the rollout's non-optional report-only soak is a flag rather than a code edit. **Three things the spec got wrong, found by building it.** (1) It said to set the nonce on the **response** (`response.headers.set("x-nonce", …)`); Next reads it from the **request**, so that arrangement leaves `headers()` in the layout with nothing and blocks the bootstrap — silently. (2) It justified `style-src 'unsafe-inline'` as "Tailwind emits inline styles"; Tailwind v4 compiles to an external stylesheet and needs nothing. What forces it is `style` **attributes in server-rendered markup** — React `style={{…}}` in eight components plus Radix's positioning — which no nonce can ever whitelist. (3) The matcher only covered `/core`, `/crm`, `/trade`, so `/login` — the one screen handling a password — would have shipped with no policy. Widening it is the one genuinely load-bearing change: `proxy.test.ts` deliberately pinned those paths as *unmatched*, because a matched path with no allowlist entry redirected to `/unavailable` and shipped six screens unreachable (D22, Q40). Both module rules are therefore now gated on the module segment rather than on the matcher, and the test pins the behaviour instead. **Verified against a real `next build` + `next start`, not reasoned about**, because D16 asks for exactly that: every script carries the header's nonce including the bootstrap descriptor, React hydrates under `'strict-dynamic'`, the bootstrap's `lang`/`dir`/`--ui-scale` writes all land, a `setProperty` on `--color-brand-600` moves the token — the CSSOM claim D16 said to confirm rather than trust — and there were **zero** `securitypolicyviolation` events. Table of what each check does and does not prove in [security-headers.md](../architecture/security-headers.md#what-was-actually-driven-2026-08-31)
 - [x] **13.2** Error boundaries — Next `error.tsx` and `global-error.tsx`. **There are none today** — there are now **six**. `global-error.tsx` re-declares everything the root layout would have provided (html/body, fonts, token stylesheet, providers), and four `(tenant)/**/error.tsx` boundaries share one `SegmentErrorScreen` so the shell and navigation survive a failed screen. The gap I closed on 2026-08-31 was the **root** `src/app/error.tsx`: every route outside `(tenant)` — `/login`, `/tenant/accept-invite`, `/tenant/reset-password`, the `(fence)` screens — had no boundary and unwound all the way to `global-error`, which *replaces* the root layout. A failed render on the login screen does not warrant losing the document. **The subtle part, and what its test pins:** `I18nProvider` is mounted by `TenantPortalRuntime`, not by the root layout, so a root boundary calling `useI18n()` throws and escalates one failure into two. Proven by removing the local provider — all five tests fail with `useI18n must be used within an I18nProvider`
@@ -1139,7 +1139,14 @@ through an explicit alias table.
 against the regenerated inventory.)
 
 Task-count integrity was checked in the same pass: all 14 declared phase counts
-match the actual checkbox count exactly. **278 tasks.**
+matched the actual checkbox count exactly, at **278 tasks**.
+
+Re-checked **2026-08-31**, after the design-system merge: the plan now carries
+**393 tasks**, and the claim above no longer held — four phase headers had
+drifted from their own checkboxes (Phases 0, 4, 8 and 13), as had the summary
+table's resolved counts for Phases 13 and 14. All six were recomputed from the
+checkboxes and corrected. Phases 1, 2, 3, 5, 6, 7, 9, 10, 11, 12 and 14 were
+verified to already agree.
 
 ### Findings
 

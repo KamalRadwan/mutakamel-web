@@ -9,7 +9,7 @@ import { Pagination } from "../../patterns/pagination/Pagination";
 import { cn } from "../../lib/cn";
 import { useScrollRestoration } from "../useScrollRestoration";
 import type { WorkspaceViewLabels, WorkspaceViewProps } from "../types";
-import { BoardCard } from "./BoardCard";
+import type { BoardCardModel } from "./BoardCard";
 import { BoardColumn } from "./BoardColumn";
 import type { MoveToTarget } from "./MoveToMenu";
 import type { BoardColumnDef } from "./types";
@@ -126,6 +126,35 @@ export function BoardView<T>({
     selection.onSelectionChange(next);
   }
 
+  // Every card in a column, as data rather than as elements. A windowed
+  // column decides for itself which of these reach the DOM, so the board must
+  // not have already turned them into mounted <BoardCard>s — that is the whole
+  // difference between a list of 200 cards and 200 rendered cards.
+  function cardsFor(columnId: string): BoardCardModel[] {
+    return (grouped.get(columnId) ?? []).map((item) => {
+      const id = itemKey(item);
+      return {
+        id,
+        isDragDisabled: canDrag ? !canDrag(item) : false,
+        onActivate: onActivate ? () => onActivate(item) : undefined,
+        isSelected: selection?.selectedIds.has(id) ?? false,
+        onSelectedChange: selection ? (next: boolean) => toggleSelected(id, next) : undefined,
+        selectLabel: labels.selectRow,
+        moveTargets: moveTargetsFor(item, columnId),
+        onMoveTo: (toColumnId: string) =>
+          void commitMove({
+            itemId: id,
+            fromColumnId: columnId,
+            toColumnId,
+            toIndex: grouped.get(toColumnId)?.length ?? 0,
+          }),
+        moveToLabel: labels.moveTo,
+        actions: renderActions?.(item),
+        content: renderCard(item),
+      };
+    });
+  }
+
   if (isLoading) {
     return (
       <div className={cn("flex gap-2 overflow-x-auto", className)}>
@@ -147,57 +176,21 @@ export function BoardView<T>({
   return (
     <div className={cn("flex h-full min-h-0 flex-col gap-3", className)}>
       <DragDropContext onDragEnd={handleDragEnd}>
-        {/* Windowing a column body above 50 cards is task 2.8, and D9 assigns
-            it react-window — not the @tanstack/react-virtual the two non-dnd
-            surfaces use — because that is the only pairing this dnd library's
-            virtual mode is exercised against. react-window is deliberately
-            not installed until 2.8 earns it, and 2.8 does not close without a
-            real 200-card drag in a browser. The column body is a plain
-            overflow-y-auto element and NOT a Radix ScrollArea, whose scroll
-            lives on an inner Viewport — hand a virtualizer the Root and it
-            measures a box that never scrolls. See
+        {/* A column body windows itself above 50 cards — react-window, per D9,
+            because that is the only pairing @hello-pangea/dnd's virtual mode
+            is exercised against. The column owns that switch, not this row:
+            the board hands each column a flat list of card models and stays
+            out of how many of them reach the DOM. See BoardColumn and
             docs/design/views.md#virtualization. */}
         <div ref={setScrollElement} className="flex min-h-0 flex-1 gap-2 overflow-x-auto pb-2">
-          {columns.map((column) => {
-            const cards = grouped.get(column.id) ?? [];
-            return (
-              <BoardColumn
-                key={column.id}
-                column={column}
-                emptyLabel={labels.emptyColumn}
-                isEmpty={cards.length === 0}
-              >
-                {cards.map((item, index) => {
-                  const id = itemKey(item);
-                  return (
-                    <BoardCard
-                      key={id}
-                      draggableId={id}
-                      index={index}
-                      isDragDisabled={canDrag ? !canDrag(item) : false}
-                      onActivate={onActivate ? () => onActivate(item) : undefined}
-                      isSelected={selection?.selectedIds.has(id) ?? false}
-                      onSelectedChange={selection ? (next) => toggleSelected(id, next) : undefined}
-                      selectLabel={labels.selectRow}
-                      moveTargets={moveTargetsFor(item, column.id)}
-                      onMoveTo={(toColumnId) =>
-                        void commitMove({
-                          itemId: id,
-                          fromColumnId: column.id,
-                          toColumnId,
-                          toIndex: grouped.get(toColumnId)?.length ?? 0,
-                        })
-                      }
-                      moveToLabel={labels.moveTo}
-                      actions={renderActions?.(item)}
-                    >
-                      {renderCard(item)}
-                    </BoardCard>
-                  );
-                })}
-              </BoardColumn>
-            );
-          })}
+          {columns.map((column) => (
+            <BoardColumn
+              key={column.id}
+              column={column}
+              emptyLabel={labels.emptyColumn}
+              cards={cardsFor(column.id)}
+            />
+          ))}
         </div>
       </DragDropContext>
 

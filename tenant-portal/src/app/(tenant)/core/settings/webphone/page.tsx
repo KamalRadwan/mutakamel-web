@@ -1,9 +1,7 @@
 "use client";
 
 import { RotateCw } from "lucide-react";
-import { Button } from "@/design-system";
-import { PageHeader } from "@/design-system";
-import { useToast } from "@/components/ui/ToastContext";
+import { Button, Card, ErrorState, PageHeader, useToast } from "@/design-system";
 import { useTenantWebphoneSettings } from "./hooks/useTenantWebphoneSettings";
 import { WEBPHONE_COPY, webphoneErrorText } from "./webphone-copy";
 import { WebphoneUnavailableNotice } from "./components/WebphoneUnavailableNotice";
@@ -30,6 +28,8 @@ export default function TenantWebphoneSettingsPage() {
   const toast = useToast();
   const copy = WEBPHONE_COPY[state.lang];
   const describedBy = state.isSubscribed ? undefined : UNAVAILABLE_NOTICE_ID;
+  const pending = state.mutation.phase === "PENDING";
+  const savePending = pending && state.mutation.target === "config";
 
   const save = async () => {
     if (await state.saveConfig()) {
@@ -47,46 +47,59 @@ export default function TenantWebphoneSettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <PageHeader title={copy.title} subtitle={copy.subtitle}>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void state.refetch()}
-          disabled={state.loadState === "LOADING"}
-        >
-          <RotateCw
-            className={`size-4 ${state.loadState === "LOADING" ? "animate-spin" : ""}`}
-            aria-hidden="true"
-          />
-          {copy.reload}
-        </Button>
-      </PageHeader>
+    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      {/* The screen's one filled action lives here and nowhere else — every
+          "Add" submit below is `secondary`. See docs/design/patterns.md#pageheader. */}
+      <PageHeader
+        title={copy.title}
+        description={copy.subtitle}
+        primaryAction={
+          state.form
+            ? {
+                label: savePending ? copy.saving : copy.save,
+                onClick: () => void save(),
+                disabled:
+                  !state.canUpdateConfig || pending || !state.hasUnsavedChanges,
+                loading: savePending,
+              }
+            : undefined
+        }
+        secondaryActions={
+          <Button
+            variant="outline"
+            onClick={() => void state.refetch()}
+            disabled={state.loadState === "LOADING"}
+          >
+            <RotateCw
+              className={
+                state.loadState === "LOADING" ? "size-4 animate-spin" : "size-4"
+              }
+              aria-hidden="true"
+            />
+            {copy.reload}
+          </Button>
+        }
+      />
 
       {state.loadState === "LOADING" ? (
-        <p
-          role="status"
-          className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900"
-        >
+        <Card role="status" className="p-8 text-center text-xs text-muted-foreground">
           {copy.loading}
-        </p>
+        </Card>
       ) : state.loadState === "FORBIDDEN" ? (
-        <p
+        <Card
           role="note"
-          className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+          level="sunken"
+          className="max-w-prose p-4 text-xs text-muted-foreground"
         >
           {copy.noReadPermission}
-        </p>
+        </Card>
       ) : state.loadState === "ERROR" ? (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
-        >
-          <span>{copy.loadFailed}</span>
-          <Button variant="outline" size="sm" onClick={() => void state.refetch()}>
-            <RotateCw className="size-4" aria-hidden="true" />
-            {copy.retry}
-          </Button>
+        <div role="alert">
+          <ErrorState
+            title={copy.loadFailed}
+            onRetry={() => void state.refetch()}
+            retryLabel={copy.retry}
+          />
         </div>
       ) : (
         <>
@@ -99,23 +112,20 @@ export default function TenantWebphoneSettingsPage() {
           )}
 
           {state.isSubscribed && !state.canUpdateConfig ? (
-            <p
+            <Card
               role="note"
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+              level="sunken"
+              className="max-w-prose p-4 text-xs text-muted-foreground"
             >
               {copy.readOnly}
-            </p>
+            </Card>
           ) : null}
 
           <TenantSeatCounter seats={state.seats} lang={state.lang} />
 
           {state.form ? (
             <>
-              <ServerConfigSection
-                state={state}
-                describedBy={describedBy}
-                onSave={() => void save()}
-              />
+              <ServerConfigSection state={state} describedBy={describedBy} />
               <EndpointsSection state={state} describedBy={describedBy} />
               <IceServersSection state={state} describedBy={describedBy} />
               <TurnRestSection state={state} describedBy={describedBy} />

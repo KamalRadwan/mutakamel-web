@@ -72,12 +72,27 @@ Session material is HttpOnly cookies set by Core. The browser never reads or
 attaches a JWT. Every request goes out with `credentials: "include"`.
 
 CSRF is double-submit: `axiosClient` reads the
-`__Host-mutakamel-tenant-csrf` cookie and echoes it as `x-csrf-token` on every
-unsafe method.
+`mutakamel-http-tenant-csrf` cookie for the HTTP profile or
+`__Host-mutakamel-tenant-csrf` for the secure profile and echoes it as
+`x-csrf-token` on every unsafe method. The reader prefers the page's transport
+profile and accepts the other readable profile when the preferred one is
+absent, including secure-default localhost use. Gateway and Core must agree on
+`AUTH_COOKIE_SECURE`: `false` enables the HTTP profile in every environment;
+`true` remains the secure default. JavaScript does not select that setting.
 
 **Never** put a token in `localStorage`, a URL, a log, or analytics.
 
 ## GET /auth/me
+
+Bootstrap first checks for the readable HTTP or secure CSRF cookie. Core issues
+that proof with the HttpOnly session cookie and the same lifetime. Without a
+usable proof, the portal settles as signed out, drops stale local metadata,
+and sends neither `/auth/me` nor a scheduled refresh. A proof only permits the
+server check: saved metadata or a cookie alone never authenticates the user.
+Existing cookie sessions still load `/auth/me`, with the normal coordinated
+refresh path when access expires. Selectively deleting only the CSRF cookie
+requires signing in again; the portal never inspects HttpOnly credentials to
+guess whether a partial cookie set is usable.
 
 The identity and permission bootstrap. Response shape as validated by
 `AuthContext.readTenantUserProfile`:
@@ -92,6 +107,7 @@ The identity and permission bootstrap. Response shape as validated by
   status: string;
   accessibleBranches: string[];    // drives TenantBranchSelect
   accessibleCompanies: string[];
+  accessibleBranchCompanies?: { branchId: string; companyId: string }[];
   permissions: string[];           // drives route admission
   teamMemberships: TenantTeamMembership[];
 }
@@ -101,6 +117,17 @@ The identity and permission bootstrap. Response shape as validated by
 requires one of them as `branchId`. `permissions` drives **route** admission;
 **action** admission uses the CRM capabilities endpoints instead — see
 [README.md](README.md#capabilities-endpoints).
+
+Core supplies `accessibleBranchCompanies` from the same scoped branch query as
+`accessibleBranches`. The portal uses these explicit ownership pairs to build
+organization headers, including for owners or role grants without team
+memberships. Pair IDs must be UUIDv7, reference an accessible branch and company,
+and cannot assign one branch to conflicting companies. If Core declares
+`accessScope.companiesTruncated: true`, mapped companies may fall outside the
+bounded company projection without invalidating the session, but a request
+still needs its selected company in `accessibleCompanies`. Older Core responses
+may omit the map and use branch-specific team memberships; an empty or invalid
+map never permits that fallback or a guess from company order.
 
 ## GET /auth/sessions
 
@@ -157,6 +184,15 @@ the reason that code is off-limits during the rebuild:
   a double-apply.
 - Public action tokens (invite, reset) are never persisted.
 
+Web Locks serialize authentication across tabs when the browser provides them.
+Without Web Locks, including HTTP tenant origins, a per-tab promise queue
+serializes login, refresh and logout with the same 10-second abort budget.
+Expired queued work never starts, and a timed-out running operation holds its
+place until it settles. Existing session-generation fences, single-flight
+refresh and cross-tab events remain active. This fallback does **not** provide
+cross-tab mutual exclusion; the server remains authoritative for session
+rotation and validation.
+
 ## Errors
 
 | Status | Meaning |
@@ -168,6 +204,25 @@ the reason that code is off-limits during the rebuild:
 
 Branch on status and `errorCode`, never message text — see
 [../reference/errors.md](../reference/errors.md).
+
+The login form also recognizes the **local**
+`AUTH_SESSION_COORDINATION_UNAVAILABLE` error (status `503`) from
+`axiosClient.withTenantAuthLock`.
+It occurs when the session operation's 10-second budget expires. The form
+offers reload/retry guidance in Arabic and English, without requiring HTTPS.
+Other `503` failures keep their existing handling; this does not change server
+error contracts.
+
+Use `pnpm dev` for the selected HTTP deployment on port `5002`, with
+`AUTH_COOKIE_SECURE=false` in Gateway and Core. `pnpm dev:https` remains an
+optional secure transport using the existing certificate and key.
+
+Login sends `{ email, password }` only as a JSON **POST body** to
+`/api/tenant/core/v1/auth/login`. Credential forms also declare `method="post"`
+so a native submit before hydration cannot put fields in the URL. The native
+fallback alone does not perform the JavaScript login flow. HTTP still sends
+request bodies and cookies without encryption: POST prevents URL disclosure,
+not interception on the network.
 
 ## Portal status
 

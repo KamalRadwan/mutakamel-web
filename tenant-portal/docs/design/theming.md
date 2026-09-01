@@ -33,26 +33,41 @@ All four are fixed in the foundation phase, before any screen is converted.
 Direction is **derived** from language and never stored separately:
 `ar → rtl`, `en → ltr`.
 
-Defaults for a first-ever visitor: **Arabic, RTL, system theme, compact
-density.** Arabic is a product decision, not a fallback, and so is compact —
-see [DECISIONS.md](../build/DECISIONS.md).
+Defaults for a first-ever visitor: **Arabic, RTL, system theme, standard
+density.** Arabic is a product decision, not a fallback. Standard is the
+decision the admin-portal token port made — `--ui-scale` moved from 0.9 to 1,
+so the shipped default is no longer compact. See
+[DECISIONS.md](../build/DECISIONS.md).
 
 ### Density is the absence of a value, not a value
 
 The other two axes store a default that means something. Density does not.
-`compact` is what `globals.css` already declares (`--ui-scale: 0.9`), so
+Whichever density `globals.css` already declares is written **nowhere else**:
 choosing it **removes** the stored key and **removes** the inline property
-rather than writing `0.9` a second time:
+rather than writing the same number a second time. Since the port, the value
+`globals.css` declares is `--ui-scale: 1`, so the row carrying no override is
+`standard`:
 
 | Choice | `localStorage` | `<html style>` |
 | --- | --- | --- |
-| `compact` | key removed | `--ui-scale` removed |
-| `standard` | `"standard"` | `--ui-scale: 1` |
+| `compact` | `"compact"` | `--ui-scale: 0.9` |
+| `standard` | key removed | `--ui-scale` removed |
 | `comfortable` | `"comfortable"` | `--ui-scale: 1.1` |
 
-One number, one home. A second copy of `0.9` is a number that can drift from
-the stylesheet, and no gate would catch the drift — which is close to how the
-first `--ui-scale` implementation shipped **inverted** with every gate green.
+**The top two rows swapped when the default moved.** It used to be `compact`
+that was the absence. The *rule* did not change — one number, one home — only
+which choice the stylesheet happens to be spelling. A second copy of the
+default is a number that can drift from the stylesheet, and no gate would catch
+the drift: that is close to how the first `--ui-scale` implementation shipped
+**inverted** with every gate green. `DensityProvider.applyDensity` and the
+inline bootstrap in `layout.tsx` perform the identical write, and a test pins
+them against each other so they cannot drift apart either.
+
+Why the default moved at all: 0.9 was the single reason the tenant portal
+rendered about 10 % smaller than the admin portal at every control, row and
+chrome edge. Admin has no density multiplier, so scale 1 is what "the same size
+as admin" means. Compact stays one click away in the user menu for the operator
+who wants more rows on a 1366×768 laptop.
 
 Only the geometry tokens multiply by it. **Type does not**, and neither does
 radius: the 13 px Latin / 14 px Arabic floor is absolute, and radius is a shape
@@ -60,13 +75,13 @@ constant. Comfortable makes rows taller, not letters bigger.
 
 ## No flash — the mechanism
 
-Both axes must be correct in the **first painted frame**. Since neither can be
-resolved on the server without a cookie, and this app does not use one, an
-inline `beforeInteractive` script writes the DOM before React hydrates.
+All three axes must be correct in the **first painted frame**. Since none can
+be resolved on the server without a cookie, and this app does not use one, an
+inline script writes the DOM before React hydrates.
 
 ```tsx
 // src/app/layout.tsx
-import Script from "next/script";
+import { InlineBootstrapScript } from "./InlineBootstrapScript";
 
 const BOOTSTRAP = `(function(){try{
   var d=document.documentElement;
@@ -75,23 +90,79 @@ const BOOTSTRAP = `(function(){try{
   var t=localStorage.getItem("tenant_theme");
   var dark=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);
   d.classList.toggle("dark",dark);
+  var s=localStorage.getItem("tenant_density");
+  if(s==="compact")d.style.setProperty("--ui-scale","0.9");
+  else if(s==="comfortable")d.style.setProperty("--ui-scale","1.1");
 }catch(e){}})();`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Minted per request by src/proxy.ts — see
+  // ../architecture/security-headers.md#the-nonce-problem.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang="ar" dir="rtl" className="h-full" suppressHydrationWarning>
       <head>
-        <Script id="theme-bootstrap" strategy="beforeInteractive">
-          {BOOTSTRAP}
-        </Script>
+        <InlineBootstrapScript nonce={nonce} html={BOOTSTRAP} />
       </head>
-      <body className={`${readex.variable} ${dmMono.variable} antialiased`}>
+      <body
+        suppressHydrationWarning
+        className={`${plexLatin.variable} ${plexArabic.variable} ${plexMono.variable} h-full antialiased`}
+      >
         {children}
       </body>
     </html>
   );
 }
 ```
+
+Note the density branch writes **nothing** for `standard`. That is the table
+above expressed in the one place it has to be: the absence of an override *is*
+the default, so the bootstrap has no `else` and never needs to know what number
+`globals.css` carries.
+
+```tsx
+// src/app/InlineBootstrapScript.tsx
+"use client";
+
+export function InlineBootstrapScript({
+  nonce,
+  html,
+}: {
+  nonce?: string;
+  html: string;
+}) {
+  return (
+    <script
+      id="theme-bootstrap"
+      type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
+      nonce={nonce}
+      suppressHydrationWarning
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+```
+
+`suppressHydrationWarning` on that tag is not optional and not cosmetic.
+Browsers blank a `nonce` **content attribute** once the document is parsed —
+CSP3 nonce hiding, so the value cannot be read back out of the DOM — while
+React compares that attribute during hydration and sees `""` against the value
+it rendered. Without the suppression every page load reports a mismatch on a
+security-critical element, which is exactly the noise that teaches a reader to
+scroll past hydration warnings.
+
+This is also why it is a plain `<script>` rather than `next/script` with
+`strategy="beforeInteractive"`: that component applies only `nonce` and
+`dangerouslySetInnerHTML` to the emitted tag and serialises every other prop
+into its `self.__next_s` queue, so the suppression could never reach the
+element — and queueing would run the bootstrap when Next's runtime drains the
+queue rather than at parse time, which is later than a no-flash script can
+afford. The helper follows Next 16's inline-script guidance: its server render
+is executable `text/javascript`, while a client render is an inert
+`text/plain` data block. That keeps the hard-navigation, before-paint bootstrap
+and prevents React from warning or trying to create an executable script during
+Fast Refresh and client reconciliation.
 
 Notes that matter:
 

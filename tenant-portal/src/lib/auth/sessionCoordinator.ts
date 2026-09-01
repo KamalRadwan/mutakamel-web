@@ -1,4 +1,5 @@
 import { safeStorage } from "../safeStorage";
+import { generateUUIDv7 } from "../uuid";
 
 export type TenantAuthEventKind = "session-updated" | "session-ended";
 
@@ -245,8 +246,10 @@ function positiveInteger(value: unknown): value is number {
 }
 
 function createOpaqueId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  // UUIDv7 only, per AGENTS.md. This previously preferred `crypto.randomUUID()`
+  // — a v4 — and fell back to `Date.now()`/`Math.random()`, which is neither a
+  // UUID nor cryptographically random. `generateUUIDv7` is built on
+  // `crypto.getRandomValues`, which unlike `randomUUID` is defined outside a
+  // secure context, so the fallback it replaces is unreachable anyway.
+  return generateUUIDv7();
 }
