@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-01T04:26:21.725Z",
-  "fileCount": 854,
-  "designSystemFileCount": 197,
+  "generatedAt": "2026-09-01T05:39:03.848Z",
+  "fileCount": 855,
+  "designSystemFileCount": 199,
   "counts": {
     "colorUtilityTotal": 0,
     "roleRampUtilities": 164,
@@ -45,7 +45,7 @@
   },
   "designSystemCounts": {
     "colorUtilityTotal": 0,
-    "roleRampUtilities": 173,
+    "roleRampUtilities": 171,
     "arbitraryTypeSize": 0,
     "fontBoldOrHeavier": 0,
     "fontNormalOrMedium": 53,

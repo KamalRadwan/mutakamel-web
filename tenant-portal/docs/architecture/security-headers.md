@@ -134,6 +134,10 @@ Six values are deliberate and worth not "simplifying":
   Pro and DM Mono at build time and serves them same-origin
   ([typography.md](../design/typography.md)). If you ever switch to a `<link>`
   to Google Fonts, this line has to change — which is a useful tripwire.
+  **Superseded 2026-09-01:** the faces are now IBM Plex Sans, IBM Plex Sans
+  Arabic and IBM Plex Mono. The directive and the reasoning are untouched —
+  `next/font` still self-hosts at build time, so `'self'` still covers it and
+  the tripwire still works; only the family names in this sentence aged.
 - **`connect-src 'self'`** — the Gateway is same-origin (`/api/tenant/...`) and
   the realtime socket rides the same origin: `createSocketIoTransportFactory`
   documents that it "always uses the current browser origin", and `'self'`
@@ -179,6 +183,13 @@ request, so every page is now dynamically rendered. That costs nothing here —
 CSP belongs on every document, `/login` most of all — it is the one screen that
 handles a password. So the matcher covers everything except `api`,
 `_next/static`, `_next/image` and `favicon.ico`.
+
+**Superseded 2026-09-01:** `favicon.ico` was a hole in the matcher covering
+nothing when this was written; it is now a real route handler
+(`src/app/favicon.ico/route.ts`) that 308-redirects to `src/app/icon.svg`. The
+exclusion is still right and the sentence still describes the matcher
+accurately — that handler returns an empty body, so it has nothing for a policy
+to protect. Its own header comment records the reasoning.
 
 That is a real widening, and `proxy.test.ts` had pinned the opposite: a matched
 path with no entry in an `isSupported*Path` allowlist used to redirect to

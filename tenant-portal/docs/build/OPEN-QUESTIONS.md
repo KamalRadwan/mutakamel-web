@@ -116,6 +116,16 @@ table in Arabic and look. This is the last unverified visual assumption in the
 system. If rows overflow, switch to **Zain** and record the change in
 [typography.md](../design/typography.md).
 
+**Do not follow — superseded 2026-09-01:** this question is closed twice over.
+It was answered by measurement on 2026-08-30 (see the Q4 entry further down),
+and the port has since removed everything it asked about: the Latin face is IBM
+Plex Sans, the Arabic face is IBM Plex Sans Arabic, the mono is IBM Plex Mono,
+and the table row is 44px rather than 36. **Zain is not a fallback any more** —
+it was only ever the escape hatch if Readex's Arabic proved too wide, and there
+is no Readex to escape from. Do not switch to it, and do not treat the survey
+above as the current font inventory. The heading still says "partially closed"
+because other documents link to that anchor.
+
 ---
 
 ## Q8 — Palette · closed, and it caught three real defects
@@ -201,6 +211,19 @@ implemented in `globals.css`'s Phase 2 commit (`--size-topbar`,
 `--size-sidebar`, `--size-rail`). Use these same token names and values when
 building `AppShell` in Phase 3 — do not reintroduce shell.md's
 `--size-sidebar-rail` name or its 48/240/52 values.
+
+**Do not follow — superseded 2026-09-01:** the values half of that instruction
+is now backwards. The admin port landed on **48px topbar / 240px sidebar /
+52px rail** — precisely the 48/240/52 this entry ruled against — because those
+are the admin portal's figures, arrived at independently rather than by
+reopening this question. Do not "correct" the shell back to 44/232/48.
+
+The **names** half still holds and is why this entry is worth keeping:
+`globals.css` declares `--size-topbar`, `--size-sidebar` and `--size-rail`, not
+`--size-sidebar-rail`. So the naming decision recorded here survived the port
+intact while the numbers it was bundled with did not — and the two were always
+separable. D2a in [DECISIONS.md](DECISIONS.md) records the intermediate state,
+where `--ui-scale: 0.9` had these tokens at 39.6 / 208.8 / 43.2.
 
 ## Q12 — Customer detail's full action cluster and custom fields · deferred, not resolved
 
@@ -336,6 +359,17 @@ Arabic floor stays.
 
 **Zain is not needed.** The recorded fallback stands unused; do not switch
 without re-running this measurement.
+
+**Superseded 2026-09-01:** the measurement above stands exactly as taken — it
+was a real reading of Readex Pro Arabic ink extents at a 32.4px row — but the
+combination it measured no longer exists. The Arabic face is **IBM Plex Sans
+Arabic** and the row is **44px**, so the 24.40px available-ink figure and the
+1.42px worst-case headroom both describe a build the app has moved off. The
+padding caveat lapses with them, and it would have far more room to find at
+44px. Zain is closed permanently rather than merely unused: it was the fallback
+for Readex specifically, and Readex is gone. The method here — measure true ink
+extents including diacritics, never the line box — is the part worth reusing if
+anyone re-runs this against Plex Sans Arabic, which has not been done.
 
 ---
 

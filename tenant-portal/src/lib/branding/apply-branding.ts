@@ -27,16 +27,47 @@ export type BrandingOutcome =
   | { kind: "rejectedContrast"; failures: BrandContrastPairId[] };
 
 /**
+ * Points the tab icon at the tenant's own, when they have uploaded one.
+ *
+ * `iconUrl` is not a free-form string: `parsePublicBranding` rejects anything
+ * that is not exactly `PUBLIC_BRANDING_ICON_PATH`, so this can only ever be a
+ * same-origin path served by Core. `img-src 'self'` already covers it, and a
+ * compromised upstream cannot aim it off-origin.
+ *
+ * The `type` attribute is REMOVED rather than updated. Next's app-dir
+ * convention emits `type="image/svg+xml"` for `src/app/icon.svg`, and the
+ * tenant's upload may be a PNG or an ICO; leaving a contradicting type on the
+ * element is worse than leaving the browser to sniff the bytes it fetched.
+ *
+ * A tenant whose icon 404s degrades to `/favicon.ico`, which redirects to the
+ * system `icon.svg` — the same place they started.
+ */
+function applyBrandingIcon(iconUrl: string): void {
+  const existing = document.querySelector<HTMLLinkElement>('link[rel~="icon"]');
+  const link = existing ?? document.createElement("link");
+  link.rel = "icon";
+  link.href = iconUrl;
+  link.removeAttribute("type");
+  if (!existing) document.head.appendChild(link);
+}
+
+/**
  * Applies what is safe to apply and reports what was refused.
  *
- * `fontFamily` is deliberately **not** applied. The portal loads exactly two
- * webfonts (`src/app/fonts.ts`); assigning an arbitrary family name would
- * silently resolve to a system fallback and read as a rendering bug rather than
- * a brand. Shipping the tenant's font needs a font-delivery route that does not
- * exist yet.
+ * `fontFamily` is deliberately **not** applied. The portal loads exactly three
+ * webfonts (`src/app/fonts.ts` — Plex Sans, Plex Sans Arabic, Plex Mono);
+ * assigning an arbitrary family name would silently resolve to a system
+ * fallback and read as a rendering bug rather than a brand. Shipping the
+ * tenant's font needs a font-delivery route that does not exist yet.
+ *
+ * Note the ordering: title and icon are applied BEFORE the `primaryColor`
+ * guard. They are independent of the colour, and a tenant who uploaded an icon
+ * but never set a brand colour must still get their icon — returning
+ * `systemDefault` first would have silently skipped both.
  */
 export function applyBrandingTokens(branding: PublicBranding): BrandingOutcome {
   if (branding.tabTitle) document.title = branding.tabTitle;
+  if (branding.iconUrl) applyBrandingIcon(branding.iconUrl);
   if (!branding.primaryColor) return { kind: "systemDefault" };
 
   const verdict = evaluateBrandColor(branding.primaryColor);

@@ -498,6 +498,16 @@ one-superfamily premise, the Arabic lift, the 13px floor, `font-synthesis-weight
 — had never actually been exercised. Q4's measurement was taken with the real
 face loaded manually, so its answer stands.
 
+**Superseded 2026-09-01:** the faces are now IBM Plex Sans, IBM Plex Sans
+Arabic and IBM Plex Mono, so `--font-readex` no longer exists — `body`
+references `var(--font-plex-latin), var(--font-plex-arabic), …` directly. The
+fix survived the port unchanged in shape, and deliberately: `globals.css` still
+declines to route `body` through `--font-sans`, and carries a comment recording
+this defect as the reason. The lesson is the durable part — Tailwind v4
+tree-shakes a theme variable no generated utility uses, so a font bridge
+declared with `@theme inline` alone is inert at runtime. Q4's answer is itself
+superseded on other grounds; see OPEN-QUESTIONS.md.
+
 ---
 
 ## D21 — The zebra contrast check could never fail · **fixed 2026-08-31**

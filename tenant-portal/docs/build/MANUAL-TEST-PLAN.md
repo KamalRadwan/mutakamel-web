@@ -45,7 +45,7 @@ session, or accepting the invite from the email. See
 |---|---|---|
 | A1 | Load `/login` | Renders in Arabic RTL by default. No layout flash, no theme flash — the pre-hydration script sets `lang`, `dir` and `.dark` before React |
 | A2 | Toggle language | Every string switches. **Zero** untranslated strings. Direction mirrors: sidebar side, chevrons, toast corner |
-| A3 | Toggle theme | Light ⇄ dark. The new primary `#066de9` reads as a bright cold blue, not navy |
+| A3 | Toggle theme | Light ⇄ dark. The primary `#1d4ed8` (`--color-brand-600`) reads as a saturated cobalt, not navy and not violet |
 | A4 | Submit an empty form | Inline field errors, focus moves to the first invalid field. **Not** a toast |
 | A5 | Wrong password | A message distinguishable from a suspended account, a suspended tenant, a 429 and an offline failure (task 4.31) |
 | A6 | Rate-limit — 6 failed logins in a minute | A 429 surface distinct from "wrong password". Login is throttled 5/min |

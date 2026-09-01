@@ -2,6 +2,20 @@
 
 Started: **2026-08-30**
 
+> **The token layer moved on 2026-09-01.** The design system was replaced
+> wholesale with the admin portal's, and several decisions below were taken
+> against values that no longer exist — most of all the density default, which
+> went from compact (`--ui-scale` 0.9) to standard (1), and the fonts, which
+> went from Readex Pro + DM Mono to the IBM Plex trio.
+>
+> **The entries have not been rewritten.** Each one records what was decided on
+> a date, by whom, and on what evidence; editing a decision to agree with
+> today's code destroys the only thing a decision log is for. Where the port
+> overtook an entry, it carries a superseded marker giving the value that now
+> ships. Where an entry ends in an instruction that would undo the port, the
+> instruction is marked do-not-follow and left visible. Read every figure below
+> as the state at the date on the entry.
+
 Every question this build raised, the answer taken, and **who decided it**.
 
 Standing instruction from the owner: *"use recommendations if I didn't reply."*
@@ -60,6 +74,19 @@ rather than washing to grey. The three deliberate hue choices in
 warm amber caution at ~64 — are all preserved for the same reason they were
 chosen: they sit correctly against a cold ground.
 
+**Superseded 2026-09-01:** every hue on this page moved when the palette was
+replaced with the admin portal's. Brand went from ~258 to ~267 (cobalt;
+`brand-600` is `#1d4ed8`), `ink` from 240 to 245, caution from 92 to 44,
+negative from 26 to 30, and positive sits in the 149–164 band. So neither
+"the hue does not move" nor "`ink` stays at hue 240" describes what ships.
+What did survive is the part this entry was really about: the role **names**
+are unchanged — `brand` / `positive` / `caution` / `negative` / `ink` — which
+was deliberate, because `apply-branding.ts` writes `--color-brand-*` at runtime
+for white-labelled tenants and roughly 360 call sites plus the contrast gate
+key off those names. Admin's spellings (`action`, `success`, `warn`, `danger`,
+`surface`) exist alongside them as aliases. The decision recorded here is why
+a *rename* was never on the table; it is not a claim about today's values.
+
 ---
 
 ## D2 · UI scale — `confirmed` with an `assumed` sub-decision
@@ -69,6 +96,13 @@ chosen: they sit correctly against a cold ground.
 **Owner said:** *"انا افضل ان ال Size يكون 90% من ال Web View بشوفه افضل من ال 100%"*
 
 **Decision.** `--ui-scale: 0.9` on `:root`, driving every `rem` token.
+
+**Superseded 2026-09-01:** `:root` now carries `--ui-scale: 1`. The mechanism
+this entry chose is untouched and still shipping — geometry tokens multiply
+themselves by the variable, no root font-size, type floor held by construction
+— but the default it was set to is standard, not compact. Compact (0.9) and
+comfortable (1.1) remain selectable; see D3 for the inversion that came with
+it.
 
 **Sub-question (not asked back, answered by recommendation).** A naive 0.9
 puts Arabic `text-xs` at 12.6 px, below the 13 px floor `typography.md` calls
@@ -104,6 +138,14 @@ No element selector, no root font-size, and the type floor is untouched **by
 construction** rather than by a compensating division. Radius stays fixed at
 2/4/6/8 — it is a shape constant, not a density one.
 
+**Superseded 2026-09-01:** the *principle* holds — radius is still a shape
+constant that density does not touch — but the scale is no longer 2/4/6/8. It
+is five steps: `xs` 3px, `sm` 4px, `md` 6px, `lg` 8px, `xl` 10px. The old
+scale's squash of `xl`/`2xl`/`3xl` down to `lg` is gone with it; the census
+baseline records zero call sites for those, so nothing had to be rewritten.
+The code block above also shows the scale at `0.9` and the control/row values
+that follow from it — see the table below for what those figures are now.
+
 **Measured live, not asserted** (driving `--ui-scale` in the running app at
 1366×768 with this app's real chrome):
 
@@ -117,11 +159,33 @@ construction** rather than by a compensating division. Radius stays fixed at
 16 rows at the current density; it counts a barer screen with no filter bar and
 no pager. Both numbers now carry their chrome budget.
 
+**Superseded 2026-09-01:** the table above is a live measurement taken at
+1366×768 against the geometry of the day, and it stays as measured. The
+geometry it measured is gone: the base row is now 44px, the topbar 48px and
+the default control 32px, so the `1.00` line no longer describes the current
+scale either. Control sizes went 21.6 / 25.2 / 28.8 / 32.4 / 36 to
+**24 / 28 / 32 / 36 / 40** for `xs`–`xl`, and the sidebar 208.8 to **240px**
+with a 43.2 to **52px** rail. Rows-visible was never re-counted after the port.
+
 **Consequence accepted:** `hitArea` widened from 6 px to 8 px, because a
 28.8 px control with 6 px expansion reaches only 40.8 px — under the 44 px touch
 floor the helper exists to clear.
 
+**Superseded 2026-09-01:** that arithmetic is exactly why the approach was
+replaced. The 8px inset was derived from `--ui-scale` 0.9 — "28.8px + 8px per
+side = 44.8px" — so it silently stopped being the right number the moment the
+default moved to 1. `hitArea` is now the `ds-hit-area` class in `globals.css`,
+expressed as a **minimum size** (`min-block-size`/`min-inline-size` 24px,
+44px under `(pointer: coarse)`) rather than an inset, which cannot go stale
+with the scale. A companion `hitTarget` (`ds-hit-target`) was added for
+controls whose visible box has to stay small.
+
 **Reverse it by:** setting `--ui-scale: 1`. One line.
+
+**Superseded 2026-09-01:** this is no longer a reversal to consider — it is
+what shipped. `--ui-scale: 1` is the value on `:root` today, and it arrived
+with the admin port rather than by anyone invoking this line. The estimate was
+accurate: it was one line.
 
 ---
 
@@ -137,6 +201,13 @@ the absolute density, which is the thing the owner asked for.
 
 **Reopen if:** the 44 px touch floor turns out to matter for the topbar itself
 rather than for the controls inside it.
+
+**Superseded 2026-09-01:** the overturning was itself overturned. With
+`--ui-scale` back at 1 the shell tokens no longer sit at 39.6 / 208.8 / 43.2;
+they are **48px topbar, 240px sidebar, 52px rail**, and the row is 44px. That
+is not a return to Q11's 44 / 232 / 48 either — the admin portal's figures are
+their own. The proportion argument recorded here is unaffected, since every
+token still moves by the same factor.
 
 ---
 
@@ -157,6 +228,16 @@ headroom**. It fits. Full numbers in
 mitigation for any future tightening is *padding*, never a smaller Arabic
 font.
 
+**Superseded 2026-09-01:** the measurement above stands as taken — it was a
+real reading of Readex Pro Arabic at a 32.4px row — but neither the face nor
+the row survives. The Arabic face is **IBM Plex Sans Arabic** and the row is
+**44px**, so the 1.42px headroom figure describes a combination the app no
+longer renders, and the thinness caveat lapses with it. Zain is closed for
+good: it was only ever the fallback if Readex's Arabic proved too wide, and
+Readex is gone. Any instruction elsewhere to "switch to Zain" is dead. The
+equivalent check against Plex Sans Arabic at 44px has not been re-run, and
+would have far more headroom to find.
+
 ---
 
 ## D3 · Density as a user preference — `assumed`
@@ -166,6 +247,10 @@ font.
 **Assumed.** A three-step preference — Compact 0.9 / Default 1.0 /
 Comfortable 1.1 — defaulting to **Compact**, persisted like the theme and
 applied in the same pre-hydration bootstrap so there is no flash.
+
+**Superseded 2026-09-01:** the three steps and the bootstrap are unchanged;
+the default is now **Standard** (1). Compact 0.9 and comfortable 1.1 are still
+the other two options.
 
 **Why.** The owner stated a personal preference. Tenant staff on other hardware
 may not share it, and this costs one token plus one menu item.
@@ -182,6 +267,12 @@ force would be telling the user something untrue about their own settings, and
 the point of showing three choices is that the user can see which one they are
 on. The plan's wording is corrected here rather than in the UI.
 
+**Superseded 2026-09-01:** 1.0 **is** the default now, so the premise has
+flipped. The label is still right, and for a better reason than the one given
+here: "Standard" is now both the name and the state, and it would have been
+accurate to call it "Default" too. The reasoning — never label an option in a
+way that misdescribes the user's own setting — is the part worth keeping.
+
 **Compact writes nothing.** The obvious implementation stores `"compact"` and
 sets `--ui-scale: 0.9` inline. That puts 0.9 in two places — `globals.css`
 and a TypeScript constant — with nothing to keep them equal. Instead compact
@@ -190,10 +281,25 @@ stylesheet stay the single source. Given that this very decision's parent (D2)
 records a `--ui-scale` implementation that shipped **inverted** with every
 gate green, a second uncheckable copy of the number was not worth the symmetry.
 
+**Superseded 2026-09-01:** **standard** is now the density that writes nothing.
+The mechanism is untouched and the argument for it was sound enough to survive
+the port unchanged — `applyDensity` still removes the stored key and the inline
+property for whichever density matches the stylesheet, and now that is
+`"standard"`. Compact writes `--ui-scale: 0.9` inline like any other non-default
+choice. This is the inversion to keep in mind when reading any "writes nothing"
+claim in these records, and the case worth re-testing first.
+
 Consequence recorded rather than fixed: `DataTable`'s `ESTIMATED_ROW_PX = 32`
 is `--size-row` at compact. It is now wrong for the other two densities for
 exactly one frame, because the first laid-out row replaces the estimate. The
 comment says so instead of implying the constant is universal.
+
+**Superseded 2026-09-01:** the constant is still `32` in
+`src/design-system/patterns/data-table/DataTable.tsx`, but it no longer matches
+any density — `--size-row` is 44px at standard, 39.6px at compact and 48.4px at
+comfortable. The one-frame reasoning is unchanged and still the reason this is
+recorded rather than fixed; it is simply now wrong for three densities instead
+of two.
 
 ### Verified live — and the instrument lied first
 
@@ -209,6 +315,14 @@ green, so unit tests were not going to be enough. Driving the running app with
 
 The bootstrap writes the property before hydration and the geometry follows.
 **That is the path a real user takes, and it works.**
+
+**Superseded 2026-09-01:** the run stands as observed; the column headings are
+what aged. Compact is no longer the default, so the *no override* cell now
+belongs to standard, and the geometry it produces is `--size-row` **44px** and
+`--size-sidebar` **240px**. Driving `comfortable` from there gives row
+**48.4px** and sidebar **264px**. The mechanism the run verified — bootstrap
+writes before hydration, geometry follows — is exactly what still ships, which
+is why the inverted default did not break it.
 
 **What could not be verified, and why the failure to verify was nearly recorded
 as two defects.** Changing the density *without* a reload appeared to do

@@ -17,9 +17,22 @@ Create `src/app/fonts.ts` exactly as specified in
 [../design/typography.md](../design/typography.md#pairing-readex-pro--dm-mono),
 and apply both `.variable` classNames to `<html>` in `src/app/layout.tsx`.
 
+**Do not follow — superseded 2026-09-01:** that section is now the historical
+record of the retired pairing, not a spec to build from. The faces are IBM Plex
+Sans (latin, latin-ext), IBM Plex Sans Arabic (arabic) and IBM Plex Mono at
+weights 400/500/600, `display: swap`, `preload: false`, exposed as
+`--font-plex-latin` / `--font-plex-arabic` / `--font-plex-mono` rather than
+`--font-readex` / `--font-dm-mono` — three `.variable` classNames on `<html>`,
+not two. The step as written records what this phase actually installed.
+
 **Look at the result before continuing.** If Readex Pro's Arabic proves too
 wide for a **36px** row at `text-xs`, switch to Zain and record it — see
 [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md#q4--font-validation--partially-closed).
+
+**Do not follow — superseded 2026-09-01:** the Zain fallback is closed, not
+pending. The Arabic face is Plex Sans Arabic, and the row it would have been
+measured against is 44px now, not 36. There is no condition under which this
+step should still be executed.
 
 ## 3. globals.css
 
@@ -78,6 +91,13 @@ defined, `prefers-reduced-motion` block present. See
 `src/design-system/lib/cn.ts` and `variants.ts` — `focusRing`, `controlSize`,
 `surface`, `hitArea`. Exact source in
 [../design/geometry.md](../design/geometry.md).
+
+**Superseded 2026-09-01:** the list is now `focusRing`, `controlSize`,
+`surface`, `hitArea` **and `hitTarget`**. `hitArea` is no longer the
+`after:-inset-2` expansion this phase shipped — both it and the new `hitTarget`
+resolve to `ds-hit-area` / `ds-hit-target` classes in `globals.css`, written as
+a minimum size (24px, 44px under `(pointer: coarse)`). The linked source stays
+correct because it tracks the current system.
 
 ## Gate
 

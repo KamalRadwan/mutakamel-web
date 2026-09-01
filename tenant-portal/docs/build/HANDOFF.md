@@ -237,7 +237,7 @@ both are deliberate:
 
 | Gap | Why, and what to do |
 | --- | --- |
-| **Readex Pro has not been rendered** | Availability and the Arabic subset are verified; whether its Arabic fits a **36px** row at `text-xs` needs a look — the app now renders, so open a populated table in Arabic. Fallback is Zain |
+| **Readex Pro has not been rendered** | Availability and the Arabic subset are verified; whether its Arabic fits a **36px** row at `text-xs` needs a look — the app now renders, so open a populated table in Arabic. Fallback is Zain. **Do not follow — superseded 2026-09-01:** this gap closed by replacement, not by measurement. The Arabic face is IBM Plex Sans Arabic and the row is 44px, so there is no width question left and no Zain to fall back to. Reading the new face on a populated Arabic table is still worth a look, but it is not this open item. Of the two gaps named above, only the 412-route one remains |
 | **Semantic detail for 412 routes** | Core beyond auth/notifications, and all of Trade. Route-level tables cover them. No screen uses them — documenting a contract nobody builds against rots before it is read |
 
 Everything else is specified to a value, not a principle: tokens (with

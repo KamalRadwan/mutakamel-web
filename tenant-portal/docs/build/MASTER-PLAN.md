@@ -2,6 +2,19 @@
 
 Written: **2026-08-30** · Owner: **Kamal Radwan** · Status: **in progress — 327 `[x]`, 385 / 393 resolved**
 
+> **The token layer moved on 2026-09-01.** The design system was replaced
+> wholesale with the admin portal's: the density default went from compact
+> (`--ui-scale` 0.9) to standard (1), the control and shell sizes were rebased,
+> radius went to five steps, the palette took admin's values under the same role
+> names, and Readex Pro + DM Mono gave way to the IBM Plex trio.
+>
+> **The tasks and findings below have not been rewritten.** A completed task
+> records what was built on a date, and a measurement records what was seen;
+> editing either to agree with today's code destroys what the record is for.
+> Entries the port overtook carry a superseded marker with the value that now
+> ships, and the few that end in an instruction which would undo the port are
+> marked do-not-follow. Treat the figures below as the state at the date given.
+
 The single tracking document for building the tenant portal into the full
 product. It covers **every page, colour, control, modal, card, view and state**
 in the application.
@@ -56,7 +69,7 @@ What is genuinely good and must not be thrown away:
 | The contrast script has a negative control | `ink-500` on white *must fail* 4.5:1. Very few design systems test that their test can fail |
 | RTL is first-class | Direction is computed, never branched on; `translateX` gets its own mirrored keyframe; Radix `DirectionProvider` wraps the tree |
 | No-flash theme and direction | A pre-hydration inline `<script>` sets `lang`, `dir` and `.dark` before React runs |
-| One superfamily, two scripts | Readex Pro removes an entire class of Latin-inside-Arabic baseline bugs |
+| One superfamily, two scripts | Readex Pro removes an entire class of Latin-inside-Arabic baseline bugs. **Superseded 2026-09-01:** the superfamily is now IBM Plex — Plex Sans for latin/latin-ext, Plex Sans Arabic for arabic, Plex Mono for identifiers. The strength this row names is unchanged and is the reason the replacement was chosen the same way; only the family is different |
 | Status semantics are honest | An unmapped enum renders neutral **with the raw wire value in monospace**, so a backend enum addition is visible instead of silently swallowed |
 | The view invariants | "never fetches, never reads the dictionary, never knows which entity it renders, never owns the mutation" — held exactly in `BoardView` and `CardView` |
 
@@ -172,6 +185,18 @@ construction** rather than by a compensating division. Radius stays fixed at
 | `--size-sidebar` | 232 px | 208.8 px |
 | `--size-rail` | 48 px | 43.2 px |
 
+**Superseded 2026-09-01:** density is still not allowed to touch radius, but
+the scale is five steps now — `xs` 3px, `sm` 4px, `md` 6px, `lg` 8px, `xl` 10px
+— not 2/4/6/8, and the old squash of `xl`/`2xl`/`3xl` onto `lg` is gone. The
+"at 0.9" column is no longer the shipping density: `:root` carries
+`--ui-scale: 1`, and the base figures in the "now" column moved with the port
+as well. What ships today is `--size-row` **44px**, `--size-topbar` **48px**,
+`--size-sidebar` **240px**, `--size-rail` **52px**, and controls `xs`–`xl` at
+**24 / 28 / 32 / 36 / 40px**. One consequence worth carrying forward: form
+fields (Input, Select, Combobox, MultiSelect, DatePicker, DateRangePicker) now
+default to `lg` (36px) while buttons stay `md` (32px), so "the default control"
+is no longer a single number.
+
 **Payoff, measured in the running app on 2026-08-30** — not asserted. Driving
 `--ui-scale` live at 1366×768 with this app's real chrome (topbar + page gutter
 + `PageHeader` + `FilterBar` + table header + pager):
@@ -199,6 +224,15 @@ is exactly the density a 90 % browser zoom produces, without illegible Arabic.
 The scale ships as a three-step user preference — Compact 0.9 / Default 1.0 /
 Comfortable 1.1 — defaulting to **Compact**, so it is reversible per user and
 is one token to retune.
+
+**Superseded 2026-09-01:** the default is **Standard** (1); compact and
+comfortable are still the other two steps. The conflict this section resolves
+went with it — at scale 1 there is no `1/0.9` rebase, because nothing divides
+the type tokens and the 13px Latin / 14px Arabic floor is simply the scale. The
+floor itself and the `html[lang="ar"]` lift are unchanged. Only two type steps
+moved in the port: `--text-2xs` 12px to **13px** (now a compatibility alias for
+`text-xs`) and `--text-2xl` 24px to **25px**, with `--text-xs` gaining an
+explicit `letter-spacing: 0em`.
 
 ## 0.4 What is missing — the honest gap list
 
@@ -404,10 +438,10 @@ everything else stands on. Nothing else starts until this gate is green.
 
 ### Scale — 90 %
 
-- [x] **0.11** Add `--ui-scale` to `:root`, default `0.9`, and `html { font-size: calc(100% * var(--ui-scale)) }`
-- [x] **0.12** Rebase the seven type tokens by `1/0.9` so effective rendered size is unchanged, and rebase the Arabic lift in `html[lang="ar"]` in lockstep
+- [x] **0.11** Add `--ui-scale` to `:root`, default `0.9`, and `html { font-size: calc(100% * var(--ui-scale)) }`. **Superseded 2026-09-01:** the default on `:root` is now `1`. (The `html { font-size }` half of this task never shipped at all — it is a banned selector and Tailwind v4 stripped it; see §0.3 and D2 for the inversion that caused.)
+- [x] **0.12** Rebase the seven type tokens by `1/0.9` so effective rendered size is unchanged, and rebase the Arabic lift in `html[lang="ar"]` in lockstep. **Superseded 2026-09-01:** there is no rebase any more — at scale 1 the type tokens are their own rendered size. The Arabic lift and the 13px/14px floors survive unchanged; the only two steps the port moved are `--text-2xs` 12px → **13px** (now an alias for `text-xs`) and `--text-2xl` 24px → **25px**
 - [x] **0.13** Verify every geometry token lands where §0.3 predicts, and that the 13 px Latin / 14 px Arabic floors still hold at the rendered size
-- [x] **0.14** Add the density preference — Compact 0.9 / Default 1.0 / Comfortable 1.1 — persisted like the theme, applied in the same pre-hydration bootstrap script so there is no flash. **Shipped as `DensityProvider`**, beside `ThemeProvider` and reading its own key through the same `useSyncExternalStore` shape, with the write duplicated into the bootstrap and a test that pins the two against each other by reading `layout.tsx` itself. **Two deviations, both recorded in D3:** the middle option is labelled **Standard**, not "Default", because 1.0 is not the default and a menu must not misdescribe the setting in force; and **compact writes nothing** — it removes the stored key and the inline property, leaving `globals.css` the only place 0.9 exists, because D2's parent failure was a `--ui-scale` change that shipped inverted with every gate green
+- [x] **0.14** Add the density preference — Compact 0.9 / Default 1.0 / Comfortable 1.1 — persisted like the theme, applied in the same pre-hydration bootstrap script so there is no flash. **Shipped as `DensityProvider`**, beside `ThemeProvider` and reading its own key through the same `useSyncExternalStore` shape, with the write duplicated into the bootstrap and a test that pins the two against each other by reading `layout.tsx` itself. **Two deviations, both recorded in D3:** the middle option is labelled **Standard**, not "Default", because 1.0 is not the default and a menu must not misdescribe the setting in force; and **compact writes nothing** — it removes the stored key and the inline property, leaving `globals.css` the only place 0.9 exists, because D2's parent failure was a `--ui-scale` change that shipped inverted with every gate green. **Superseded 2026-09-01:** both deviations still hold, but they now attach to a different option. The default is **Standard** (1), so "1.0 is not the default" has flipped; and it is **standard** that writes nothing — `applyDensity` removes the stored key and the inline property for `"standard"`, while compact writes `--ui-scale: 0.9` inline like any other non-default choice. The mechanism and the reasoning for it came through the port unchanged
 - [x] **0.15** Add the density control to the user menu, with both dictionary keys — a `DropdownMenuRadioGroup` under its own label, so the current density is visible rather than inferred. Labels resolve through a `Record<Density, string>` lookup, not a ternary chain: the language gate only recently began catching **nested** ternaries, and this is exactly the shape that slipped past it once
 - [x] **0.16** Re-measure rows-visible at 1366×768 and record the real number in `geometry.md`
 
@@ -429,13 +463,13 @@ everything else stands on. Nothing else starts until this gate is green.
 - [x] **0.26** Extend the 0.8 doc sweep to `tokens.md#contrast-resolution` — five measured numbers there all move
 - [x] **0.27** Reconcile `tokens.md#elevation-and-control-tokens`: it still declares the superseded 28/32/36/40/44 px control scale and a warm-hue shadow. Not colour, so 0.8 misses it
 - [ ] **0.28** ★ Replace 0.10's five-item eyeball list with the full L3 consumer table — `secondary`/`outline`/`ghost`/`destructive`/`link` hovers, the modal scrim, the toast tones, the board column borders, the SubNav underline
-- [x] **0.29** Record what `--ui-scale` does to `--radius-*` — **nothing**. The reworked scale multiplies only the size tokens, so radius stays 2/4/6/8 and the px-based elevation offsets stay fixed. Verified live. (The earlier root-font-size approach *would* have shrunk radius to 1.8/3.6/5.4/7.2 px silently; that is one more reason it was wrong.)
+- [x] **0.29** Record what `--ui-scale` does to `--radius-*` — **nothing**. The reworked scale multiplies only the size tokens, so radius stays 2/4/6/8 and the px-based elevation offsets stay fixed. Verified live. (The earlier root-font-size approach *would* have shrunk radius to 1.8/3.6/5.4/7.2 px silently; that is one more reason it was wrong.) **Superseded 2026-09-01:** the finding this task recorded is intact — `--ui-scale` still does nothing to `--radius-*` — but the scale it protected is no longer 2/4/6/8. It is five steps: `xs` 3px, `sm` 4px, `md` 6px, `lg` 8px, `xl` 10px, and the `xl`/`2xl`/`3xl`-squashed-to-`lg` rule is gone, the census baseline recording zero call sites for those
 - [x] **0.30** Before 0.18: `DataTable`'s sticky z-indices are **inverted** against the documented ladder — `z-10` header, `z-20` cells. Swap them, do not transcribe the bug
 ### Added by L5
 
-- [x] **0.31** ★ **Blocking prerequisite of the scale change (Q4).** Open a populated table in **Arabic** and look at `text-xs` in a 32.4 px row. This is the repo's own named "last unverified visual assumption", it was never checked at 36 px, and 0.11 shrinks the row. **Resolved: it fits** — 24.4px available ink, 15px for ordinary Arabic, 22.98px for a fully-vocalised worst case (1.42px headroom). Zain not needed. See OPEN-QUESTIONS.md#q4
-- [x] **0.32** Widen `hitArea` from 6 px to 8 px — at 0.9 the default control is 28.8 px and 6 px reached only 40.8 px, under the 44 px floor the helper exists to clear
-- [/] **0.33** Record the `--ui-scale` breakpoint consequence: content shrinks, `sm:`/`md:` reflow points do not move, so every responsive boundary now fires at a different content density. Check the shell and one dense table at each breakpoint. **Recorded** in [geometry.md](../design/geometry.md#density-does-not-move-the-breakpoints) with the real numbers — and the task understated it: since 0.14 made density a *preference*, each boundary now fires at **three** densities, not one. The sidebar swings 46.4 px across them, ≈9 % of the content column at `md`, invisible to every `md:` rule. **The eyes-on pass at each breakpoint is not done** — it needs an authenticated session, blocked on P4
+- [x] **0.31** ★ **Blocking prerequisite of the scale change (Q4).** Open a populated table in **Arabic** and look at `text-xs` in a 32.4 px row. This is the repo's own named "last unverified visual assumption", it was never checked at 36 px, and 0.11 shrinks the row. **Resolved: it fits** — 24.4px available ink, 15px for ordinary Arabic, 22.98px for a fully-vocalised worst case (1.42px headroom). Zain not needed. See OPEN-QUESTIONS.md#q4. **Superseded 2026-09-01:** the measurement stands as taken, but it measured Readex Pro Arabic at a 32.4px row and neither survives — the face is **IBM Plex Sans Arabic** and the row is **44px**. Zain is closed permanently rather than "not needed for now": it existed only as the fallback if Readex's Arabic proved too wide. The equivalent check against Plex Sans Arabic at 44px has not been re-run
+- [x] **0.32** Widen `hitArea` from 6 px to 8 px — at 0.9 the default control is 28.8 px and 6 px reached only 40.8 px, under the 44 px floor the helper exists to clear. **Superseded 2026-09-01:** this arithmetic is why the approach was replaced. The 8px inset was derived from `--ui-scale` 0.9 ("28.8px + 8px per side = 44.8px"), so it stopped being the right number the moment the default moved to 1. `hitArea` is now the `ds-hit-area` class in `globals.css`, written as a **minimum size** — 24px, and 44px under `(pointer: coarse)` — which cannot go stale with the scale. A companion `hitTarget` (`ds-hit-target`) was added for controls whose visible box must stay small
+- [/] **0.33** Record the `--ui-scale` breakpoint consequence: content shrinks, `sm:`/`md:` reflow points do not move, so every responsive boundary now fires at a different content density. Check the shell and one dense table at each breakpoint. **Recorded** in [geometry.md](../design/geometry.md#density-does-not-move-the-breakpoints) with the real numbers — and the task understated it: since 0.14 made density a *preference*, each boundary now fires at **three** densities, not one. The sidebar swings 46.4 px across them, ≈9 % of the content column at `md`, invisible to every `md:` rule. **The eyes-on pass at each breakpoint is not done** — it needs an authenticated session, blocked on P4. **Superseded 2026-09-01:** the swing is **48px** now that the sidebar bases at 240px, and the middle density is standard rather than compact. The consequence this task records is unchanged in kind, and the eyes-on pass is still outstanding — when it happens it should be run against the new figures, and against `<main>`'s padding, which went from `p-4` to `p-4 md:p-6` and so now changes at a breakpoint too
 - [x] **0.34** Record Q11's reversal in `DECISIONS.md` — the shell tokens 44/232/48 were settled by human decision on 2026-08-28 and this phase changes all three
 
 **Gate:** `pnpm verify` green · one real page load in ar/en × light/dark ·
@@ -600,7 +634,7 @@ listed on the task.
 - [x] **3.31** `Button`'s `disabled:pointer-events-none` makes the documented `disabled:cursor-not-allowed` unrenderable. Resolve as part of 3.4
 - [x] **3.32** Add the **spinner** reduced-motion carve-out — `motion.md` requires two survivors, the pending dot and the spinner; only the dot is carved out
 - [x] **3.33** Delete `animate-bell-ring` and its keyframe, per the standing instruction in `globals.css`. It is outside the motion budget and no task removed it
-- [x] **3.34** Give `surface` and `hitArea` a consumer or delete them
+- [x] **3.34** Give `surface` and `hitArea` a consumer or delete them. **Superseded 2026-09-01:** `hitArea` is consumed — `Button` applies it at `size="xs"` and nowhere else, since the 24px `xs` control sits exactly at the 24×24 WCAG floor. The variant this task's rule now points at is the **new** `hitTarget` (`ds-hit-target`), which is exported with no consumer yet; it exists for controls whose visible box must stay small, such as a 16px checkbox, so "delete it" is the wrong half of the choice here
 - [x] **3.35** Cite **B7** by name so 13.19's "all 17 B-items implemented" has traceable evidence
 ### Added by L5
 
@@ -1372,6 +1406,10 @@ The plan never separated them, and the three defects that hides:
   header pattern beside it and never reconciles the two.
 - `--radius-*` is in `rem`, so `--ui-scale` silently rescales it to
   1.8/3.6/5.4/7.2 px. §0.3's table omitted radius entirely.
+  **Superseded 2026-09-01:** this finding was answered by 0.29 — the reworked
+  scale multiplies only the size tokens, so radius never did rescale — and the
+  scale it names is gone regardless. Radius is five px-valued steps now:
+  3/4/6/8/10.
 - **`StatusBadge` calls `useI18n()` with no `"use client"`** — the one genuine
   unguarded client dependency in the design system, and task 0.2 covered only
   primitives. **Fixed, along with four other missed files.**
@@ -1538,6 +1576,10 @@ fits a **36 px** row at `text-xs` is the repo's own named "last unverified
 visual assumption" — and 0.11 takes the row to **32.4 px** without mentioning
 it. Now a blocking prerequisite of the scale change.
 
+**Superseded 2026-09-01:** Q4 was closed by measurement on 2026-08-30 (see
+0.31), and the port has since removed its subject entirely — Readex Pro is not
+the Arabic face and 32.4px is not the row. Nothing here is still blocking.
+
 **Q11 was silently overturned** — the shell tokens 44/232/48 were settled by
 human decision on 2026-08-28 and 0.11 changes all three. Recorded as a
 deliberate reversal in `DECISIONS.md`, not a silent one.
@@ -1570,6 +1612,10 @@ Also dropped and now scheduled: **G13** (`sortDir` vs `sortDirection`, blocking
 2. **`--ui-scale` vs the 44 px touch floor** — at 0.9 the default control is
    28.8 px, and `hitArea`'s 6 px expansion reached only 40.8 px. **Fixed:**
    widened to 8 px → 44.8 px.
+   **Superseded 2026-09-01:** fixed differently, and permanently. Any inset
+   derived from a particular scale goes stale when the scale moves, which is
+   what happened when the default became 1. `hitArea` is now `ds-hit-area`, a
+   minimum size of 24px rising to 44px under `(pointer: coarse)`.
 3. **`--ui-scale` does not move breakpoints** — content shrinks, reflow points
    do not, so every `sm:`/`md:` boundary now fires at a different density.
 4. **Virtualization vs `@hello-pangea/dnd`** — the library supports windowing

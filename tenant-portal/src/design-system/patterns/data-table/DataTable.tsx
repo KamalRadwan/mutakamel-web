@@ -17,11 +17,17 @@ import type { ColumnDef, DataTableLabels, PageInfo, SelectionState, SortState } 
 
 // Above this many rows the body renders a window plus two spacer rows instead
 // of the whole page — task 2.9. Rows are uniform by construction, so the
-// window is exact. The estimate is --size-row at the DEFAULT --ui-scale --
-// density is user-selectable, so this constant is right for compact and wrong
+// window is exact. The estimate is --size-row at the DEFAULT --ui-scale —
+// density is user-selectable, so this constant is right for standard and wrong
 // for the other two; one laid-out row replaces it immediately either way.
+//
+// 44, not 32. It tracked the old compact default (2.25rem x 0.9 = 32.4px) and
+// went stale when the admin geometry port made standard the default and the row
+// 2.75rem. It then matched no density at all — compact 39.6, standard 44,
+// comfortable 48.4 — and was short by 37%, which is a visible scroll-height
+// jump on the first frame of a 100+ row table rather than a rounding error.
 const VIRTUALIZE_ABOVE = 100;
-const ESTIMATED_ROW_PX = 32;
+const ESTIMATED_ROW_PX = 44;
 
 export interface DataTableProps<T> {
   columns: ColumnDef<T>[];
