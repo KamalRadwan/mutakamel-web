@@ -12,7 +12,7 @@ export function Skeleton({ className, ...props }: SkeletonProps) {
 
   return (
     <div
-      className={cn("relative overflow-hidden rounded-sm bg-muted", className)}
+      className={cn("relative overflow-hidden rounded-md bg-muted", className)}
       {...props}
     >
       <div

@@ -5,6 +5,7 @@ import { Check, ChevronsUpDown, Loader2, X } from "lucide-react";
 import { cn } from "../lib/cn";
 import { textEntrySize, type ControlSizeProps } from "../lib/variants";
 import { Button } from "./Button";
+import { FieldControlBoundary, useFieldControlContext } from "./field-control";
 import { Input } from "./Input";
 import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
 
@@ -78,7 +79,14 @@ export function Combobox({
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const listId = useId();
-  const editable = !disabled && !readOnly;
+  // A composite reads the field rather than spreading it: `invalid` and
+  // `readOnly` are behaviour here (whether the popover may open, how the
+  // trigger paints), not only ARIA.
+  const field = useFieldControlContext();
+  const controlId = id ?? field?.controlId;
+  const isInvalid = invalid ?? field?.invalid;
+  const isReadOnly = readOnly ?? field?.readOnly;
+  const editable = !disabled && !isReadOnly;
   const clearable = Boolean(clearLabel) && value !== undefined && editable;
 
   // Latest-ref, so a parent that re-creates onSearch every render does not
@@ -142,7 +150,10 @@ export function Combobox({
   }
 
   return (
-    <div className={cn("relative flex w-full items-center", className)}>
+    // The trigger has already taken the field above; everything below is inside
+    // the boundary so the popover's own search box cannot claim the same id.
+    <FieldControlBoundary>
+      <div className={cn("relative flex w-full items-center", className)}>
       <Popover
         open={open}
         onOpenChange={(next) => {
@@ -154,16 +165,18 @@ export function Combobox({
           <Button
             variant="outline"
             size={size}
-            id={id}
+            id={controlId}
             disabled={disabled}
             onBlur={onBlur}
-            aria-invalid={invalid || undefined}
-            aria-readonly={readOnly || undefined}
+            aria-describedby={field?.describedBy}
+            aria-invalid={isInvalid || undefined}
+            aria-required={field?.required}
+            aria-readonly={isReadOnly || undefined}
             className={cn(
               "w-full cursor-pointer justify-between gap-1.5 bg-card font-normal",
               !value && "text-muted-foreground",
-              invalid && "border-destructive",
-              readOnly && "cursor-default bg-muted text-foreground",
+              isInvalid && "border-destructive",
+              isReadOnly && "cursor-default bg-muted text-foreground",
               clearable && "pe-8",
             )}
           >
@@ -217,7 +230,7 @@ export function Combobox({
                   onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => commit(option)}
                   className={cn(
-                    "flex cursor-pointer items-start gap-2 rounded-xs px-2 py-1.5 text-sm",
+                    "flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm",
                     index === activeIndex && "bg-accent text-accent-foreground",
                     option.disabled && "pointer-events-none opacity-50",
                   )}
@@ -244,11 +257,12 @@ export function Combobox({
           size="xs"
           aria-label={clearLabel}
           onClick={() => onValueChange(undefined)}
-          className="absolute end-1 size-5 shrink-0 cursor-pointer rounded-xs p-0!"
+          className="absolute end-1 size-5 shrink-0 cursor-pointer rounded-md p-0!"
         >
           <X className="size-3" aria-hidden="true" />
         </Button>
       )}
-    </div>
+      </div>
+    </FieldControlBoundary>
   );
 }

@@ -4,6 +4,7 @@ import { forwardRef } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
+import { useDictionary } from "@/i18n/useLanguage";
 import { cn } from "../lib/cn";
 import { focusRing } from "../lib/variants";
 
@@ -48,12 +49,19 @@ export interface DialogContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
     VariantProps<typeof dialogContentVariants> {
   showCloseButton?: boolean;
+  /**
+   * Overrides the close button's screen-reader label. Defaults to
+   * `t.common.close` — NOT to an English string. A primitive that carries an
+   * English fallback renders English to an Arabic screen-reader user on every
+   * call site that forgets the prop, which is most of them.
+   */
+  closeLabel?: string;
 }
 
 export const DialogContent = forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, size, showCloseButton = true, children, ...props }, ref) => (
+>(({ className, size, showCloseButton = true, closeLabel, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -66,21 +74,28 @@ export const DialogContent = forwardRef<
       {...props}
     >
       {children}
-      {showCloseButton && (
-        <DialogPrimitive.Close
-          className={cn(
-            "absolute end-4 top-4 rounded-md text-muted-foreground opacity-70 hover:opacity-100 disabled:pointer-events-none",
-            focusRing,
-          )}
-        >
-          <X className="size-4" aria-hidden="true" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      )}
+      {showCloseButton && <DialogCloseButton label={closeLabel} />}
     </DialogPrimitive.Content>
   </DialogPortal>
 ));
 DialogContent.displayName = "DialogContent";
+
+// Its own component so `DialogContent` keeps an expression body: the label has
+// to come from a hook, and a hook cannot be called from one.
+function DialogCloseButton({ label }: { label?: string }) {
+  const t = useDictionary();
+  return (
+    <DialogPrimitive.Close
+      className={cn(
+        "absolute end-4 top-4 rounded-md text-muted-foreground opacity-70 hover:opacity-100 disabled:pointer-events-none",
+        focusRing,
+      )}
+    >
+      <X className="size-4" aria-hidden="true" />
+      <span className="sr-only">{label ?? t.common.close}</span>
+    </DialogPrimitive.Close>
+  );
+}
 
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("flex flex-col gap-1.5 text-start", className)} {...props} />;
@@ -113,7 +128,7 @@ export const DialogDescription = forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-base text-muted-foreground", className)}
     {...props}
   />
 ));
