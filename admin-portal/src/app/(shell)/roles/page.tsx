@@ -36,6 +36,9 @@ export default function RolesDirectoryPage() {
     page,
     pageSize,
     setPage,
+    sortBy,
+    sortDir,
+    changeSort,
     isCreateModalOpen,
     setIsCreateModalOpen,
     activeModalRole,
@@ -60,6 +63,7 @@ export default function RolesDirectoryPage() {
   const columns: ColumnDef<AdminRole>[] = [
     {
       key: "name",
+      sortable: true,
       headerEn: t.roles.roleName,
       headerAr: t.roles.roleName,
       cell: (role) => (
@@ -89,6 +93,7 @@ export default function RolesDirectoryPage() {
     },
     {
       key: "createdAt",
+      sortable: true,
       headerEn: t.roles.createdAt,
       headerAr: t.roles.createdAt,
       cell: (role) =>
@@ -201,6 +206,7 @@ export default function RolesDirectoryPage() {
             data={roles}
             isLoading={isLoading}
             getRowId={(role) => role.id}
+            sort={{ sortBy, sortDir, onSortChange: changeSort }}
             pagination={{ page, limit: pageSize, totalItems, totalPages, onPageChange: setPage }}
             emptyState={{
               titleEn: "No roles match your search.",

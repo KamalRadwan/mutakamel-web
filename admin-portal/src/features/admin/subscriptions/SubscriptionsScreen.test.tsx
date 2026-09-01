@@ -37,6 +37,7 @@ function baseView(): SubscriptionsViewModel {
     page: 1,
     limit: 20,
     activeFilterCount: 0,
+    changeSort: vi.fn(),
     setDraftField: vi.fn(),
     applyFilters: vi.fn(() => true),
     clearFilters: vi.fn(),

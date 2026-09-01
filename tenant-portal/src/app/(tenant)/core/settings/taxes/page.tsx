@@ -60,6 +60,8 @@ export default function TaxesPage() {
     update,
     deactivate,
     reload,
+    sort,
+    setSort,
   } = useTaxes();
 
   const filterValues: FilterValues = {
@@ -70,10 +72,11 @@ export default function TaxesPage() {
   const columns: ColumnDef<Tax>[] = [
     {
       id: "code",
+      sortable: true,
       header: t.coreSettings.taxCode,
       cell: (tax) => <span className="font-medium text-foreground">{tax.code}</span>,
     },
-    { id: "name", header: t.coreSettings.taxName, cell: (tax) => tax.name },
+    { id: "name", sortable: true, header: t.coreSettings.taxName, cell: (tax) => tax.name },
     {
       id: "scope",
       header: t.coreSettings.taxScope,
@@ -81,6 +84,7 @@ export default function TaxesPage() {
     },
     {
       id: "rate",
+      sortable: true,
       header: t.coreSettings.taxRate,
       numeric: true,
       // `numeric(7,4)` arrives as an exact string and is already a percentage
@@ -216,6 +220,8 @@ export default function TaxesPage() {
           onRetry={() => void reload()}
           page={pageInfo}
           onPageChange={setPage}
+          sort={sort}
+          onSortChange={setSort}
           rowKey={(tax) => tax.id}
           labels={{
             retry: t.common.retry,

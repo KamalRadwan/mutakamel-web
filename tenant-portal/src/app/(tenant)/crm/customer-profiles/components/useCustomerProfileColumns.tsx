@@ -14,6 +14,8 @@ export function useCustomerProfileColumns(): ColumnDef<CustomerProfileItem>[] {
   return [
     {
       id: "name",
+      sortable: true,
+      sortField: "displayName",
       header: t.crmCustomerProfiles.name,
       cell: (item) => {
         const ProfileIcon = item.profileType === "CORPORATE" ? Building2 : UserRound;

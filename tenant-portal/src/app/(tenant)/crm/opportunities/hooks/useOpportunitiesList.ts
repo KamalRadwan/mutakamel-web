@@ -28,7 +28,10 @@ export interface OpportunitiesListPageInfo {
   total: number;
 }
 
-export type OpportunitiesSort = { id: "createdAt" | "expectedCloseDate"; direction: "asc" | "desc" };
+export type OpportunitiesSort = {
+  id: "title" | "amount" | "probabilityPercent" | "expectedCloseDate" | "createdAt";
+  direction: "asc" | "desc";
+};
 
 const STAGE_FLAGS: StageFlag[] = [
   "NEW",
@@ -208,7 +211,14 @@ export function useOpportunitiesList(branchId: string | null, pipelineId: string
     return () => controller.abort();
   }, [fetchList]);
 
-  const SORTABLE_IDS = ["createdAt", "expectedCloseDate"] as const;
+  // Mirrors OPPORTUNITY_SORT_FIELDS on the server; anything else is a 400.
+  const SORTABLE_IDS = [
+    "title",
+    "amount",
+    "probabilityPercent",
+    "expectedCloseDate",
+    "createdAt",
+  ] as const;
 
   // MASTER-PLAN 13.6: one line, and this list reconciles with the server on
   // an ALL-scoped resync, a realtime reconnect, and a return from offline.

@@ -56,6 +56,7 @@ export default function LeadsPage() {
     setSearchQuery,
     pageInfo,
     setPage,
+    setSort,
     isCreateOpen,
     setIsCreateOpen,
     openCreate,
@@ -75,7 +76,15 @@ export default function LeadsPage() {
     (lead: LeadItem) => router.push(`/crm/leads/${lead.id}`),
     [router],
   );
-  const workspace = useWorkspaceState("leads", { defaultView: "board", onPageChange: applyPage });
+  const applySort = useCallback(
+    (next: { id: string; direction: "asc" | "desc" }) => setSort(next),
+    [setSort],
+  );
+  const workspace = useWorkspaceState("leads", {
+    defaultView: "board",
+    onPageChange: applyPage,
+    onSortChange: applySort,
+  });
   const { view, setView } = workspace;
 
   const stageById = useMemo(() => new Map(stages.map((stage) => [stage.id, stage])), [stages]);
@@ -244,6 +253,7 @@ export default function LeadsPage() {
               page={pageInfo}
               onPageChange={workspace.setPage}
               sort={workspace.sort}
+              onSortChange={workspace.setSort}
               emptyState={branchEmptyState}
               labels={viewLabels}
             />

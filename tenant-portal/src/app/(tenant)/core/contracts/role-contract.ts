@@ -149,16 +149,23 @@ function rolePath(id: string, suffix = ""): CorePath {
   return `${ROLES_PATH}/${encodeURIComponent(id)}${suffix}`;
 }
 
+/** The only sort fields GET /tenant-roles accepts; anything else is a 400. */
+export const TENANT_ROLE_SORT_FIELDS = ["name", "createdAt"] as const;
+export type TenantRoleSortField = (typeof TENANT_ROLE_SORT_FIELDS)[number];
+
 export async function fetchTenantRoles(options: {
   page: number;
   search: string;
   isSystem?: boolean;
+  sortBy?: TenantRoleSortField;
+  sortDir?: "ASC" | "DESC";
   signal?: AbortSignal;
 }): Promise<CorePage<TenantRole>> {
   const query = buildCoreListQuery({
     page: options.page,
     search: options.search,
-    sortBy: "name",
+    sortBy: options.sortBy ?? "name",
+    sortDir: options.sortDir ?? "ASC",
     filters: {
       isSystem: options.isSystem === undefined ? undefined : String(options.isSystem),
     },

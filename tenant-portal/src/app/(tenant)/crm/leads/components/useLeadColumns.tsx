@@ -28,6 +28,8 @@ export function useLeadColumns({ stageById, canDelete, onDelete }: LeadColumnOpt
   return [
     {
       id: "name",
+      sortable: true,
+      sortField: "displayName",
       header: t.crmLeads.name,
       // The first column is the route into the detail screen — see
       // docs/design/detail-screens.md#routes. A real `<Link>` rather than a

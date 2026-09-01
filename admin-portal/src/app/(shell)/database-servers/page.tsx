@@ -69,6 +69,9 @@ function DatabaseServersContent() {
     setDeletionFilter,
     page,
     setPage,
+    sortBy,
+    sortDir,
+    changeSort,
     servers,
     summaryMetrics,
     isLoading,
@@ -97,6 +100,7 @@ function DatabaseServersContent() {
   const columns: ColumnDef<DatabaseServerView>[] = [
     {
       key: "name",
+      sortable: true,
       headerEn: "Server Name",
       headerAr: "اسم الخادم",
       cell: (srv) =>
@@ -110,6 +114,7 @@ function DatabaseServersContent() {
     },
     {
       key: "host",
+      sortable: true,
       headerEn: "Host & Port",
       headerAr: "المضيف والمنفذ",
       cell: (srv) => (
@@ -130,6 +135,8 @@ function DatabaseServersContent() {
     },
     {
       key: "capacity",
+      sortable: true,
+      sortField: "currentTenants",
       headerEn: "Tenant Capacity",
       headerAr: "سعة المستأجرين",
       cell: (srv) => (
@@ -280,6 +287,7 @@ function DatabaseServersContent() {
               data={servers}
               isLoading={isLoading}
               getRowId={(srv) => srv.id}
+              sort={{ sortBy, sortDir, onSortChange: changeSort }}
               pagination={{ page, limit: 20, totalItems: meta.total, totalPages: meta.totalPages, onPageChange: (p) => setPage(() => p) }}
               emptyState={{ titleEn: "No database servers found", titleAr: "لا توجد خوادم قواعد بيانات" }}
             />

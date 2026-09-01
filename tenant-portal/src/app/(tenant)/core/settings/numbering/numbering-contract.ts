@@ -109,16 +109,22 @@ export function numberingPeekPath(code: string, companyId: string | null): CoreP
   return `${NUMBERING_PATH}/${encodeURIComponent(normalized)}/peek${suffix ? `?${suffix}` : ""}` as CorePath;
 }
 
+/** The only sort fields GET /numbering-sequences accepts; else a 400. */
+export const NUMBERING_SORT_FIELDS = ["code", "nextValue", "createdAt"] as const;
+export type NumberingSortField = (typeof NUMBERING_SORT_FIELDS)[number];
+
 export function numberingListPath(
   page: number,
   companyId: string | undefined,
   search: string,
+  sortBy: NumberingSortField = "code",
+  sortDir: "ASC" | "DESC" = "ASC",
 ): CorePath {
   const query = new URLSearchParams({
     page: String(page),
     limit: String(NUMBERING_PAGE_SIZE),
-    sortBy: "code",
-    sortDir: "ASC",
+    sortBy,
+    sortDir,
   });
   if (companyId) query.set("companyId", companyId);
   if (search) query.set("search", search);

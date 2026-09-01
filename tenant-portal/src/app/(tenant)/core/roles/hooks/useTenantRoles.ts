@@ -10,6 +10,8 @@ import {
   deleteTenantRole,
   fetchTenantRoles,
   type TenantRole,
+  TENANT_ROLE_SORT_FIELDS,
+  type TenantRoleSortField,
 } from "../../contracts/role-contract";
 
 export function useTenantRoles() {
@@ -21,6 +23,10 @@ export function useTenantRoles() {
   const [searchQuery, setSearchQuery] = useState("");
   const [serverSearch, setServerSearch] = useState("");
   const [isSystemFilter, setIsSystemFilter] = useState<boolean | undefined>(undefined);
+  const [sort, setSortState] = useState<{ id: TenantRoleSortField; direction: "asc" | "desc" }>({
+    id: "name",
+    direction: "asc",
+  });
   const [rows, setRows] = useState<TenantRole[]>([]);
   const [pageInfo, setPageInfo] = useState({ page: 1, limit: 25, total: 0 });
   const [isLoading, setIsLoading] = useState(true);
@@ -53,6 +59,8 @@ export function useTenantRoles() {
         page,
         search: serverSearch,
         isSystem: isSystemFilter,
+        sortBy: sort.id,
+        sortDir: sort.direction === "asc" ? "ASC" : "DESC",
         signal: controller.signal,
       })
         .then((result) => {
@@ -70,9 +78,16 @@ export function useTenantRoles() {
         });
     });
     return () => controller.abort();
-  }, [isSystemFilter, page, serverSearch, reloadToken]);
+  }, [isSystemFilter, page, serverSearch, reloadToken, sort]);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+
+  const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
+    const field = TENANT_ROLE_SORT_FIELDS.find((allowed) => allowed === next.id);
+    if (!field) return;
+    setSortState({ id: field, direction: next.direction });
+    setPage(1);
+  }, []);
 
   // MASTER-PLAN 13.6: one line, and this list reconciles with the server on
   // an ALL-scoped resync, a realtime reconnect, and a return from offline.
@@ -135,6 +150,8 @@ export function useTenantRoles() {
         setIsSystemFilter(next);
       },
       reload,
+      sort,
+      setSort,
       isCreateOpen,
       openCreate: () => {
         setMutationError(null);
@@ -152,7 +169,7 @@ export function useTenantRoles() {
     [
       handleCreate, handleDelete, isCreateOpen, isLoading, isSubmitting, isSystemFilter,
       lang, mutationError, page, pageInfo, pendingDelete, permissions, queryError,
-      reload, rows, searchQuery, t,
+      reload, rows, searchQuery, setSort, sort, t,
     ],
   );
 }

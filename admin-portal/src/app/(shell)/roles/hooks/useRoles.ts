@@ -35,6 +35,10 @@ export function useRoles() {
   const [search, setSearch] = useState("");
   const [isSystemFilter, setSystemFilter] = useState("ALL");
   const [page, setPage] = useState(1);
+  // `GET /admin/roles` accepts only these two sort fields and answers 400 for
+  // anything else, so the header controls are checked against the list.
+  const [sortBy, setSortBy] = useState<"name" | "createdAt">("createdAt");
+  const [sortDir, setSortDir] = useState<"ASC" | "DESC">("DESC");
   const [rolesOnPage, setRolesOnPage] = useState<AdminRole[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -44,7 +48,7 @@ export function useRoles() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [listError, setListError] = useState<NormalizedApiError | null>(null);
   const [revision, setRevision] = useState(0);
-  const loadedQueryRef = useRef<{ page: number; isSystemFilter: string } | null>(
+  const loadedQueryRef = useRef<{ page: number; isSystemFilter: string; sortBy: string; sortDir: string } | null>(
     null,
   );
 
@@ -62,7 +66,9 @@ export function useRoles() {
     const load = async () => {
       const sameQuery =
         loadedQueryRef.current?.page === page &&
-        loadedQueryRef.current.isSystemFilter === isSystemFilter;
+        loadedQueryRef.current.isSystemFilter === isSystemFilter &&
+        loadedQueryRef.current.sortBy === sortBy &&
+        loadedQueryRef.current.sortDir === sortDir;
       setIsLoading(!sameQuery || rolesOnPage.length === 0);
       setIsRefreshing(sameQuery && rolesOnPage.length > 0);
       if (!sameQuery) {
@@ -78,6 +84,8 @@ export function useRoles() {
           {
             page,
             limit: PAGE_SIZE,
+            sortBy,
+            sortDir,
             ...(isSystemFilter === "ALL"
               ? {}
               : { isSystem: isSystemFilter === "TRUE" }),
@@ -85,7 +93,7 @@ export function useRoles() {
           controller.signal,
         );
         if (disposed) return;
-        loadedQueryRef.current = { page, isSystemFilter };
+        loadedQueryRef.current = { page, isSystemFilter, sortBy, sortDir };
         setRolesOnPage(result.items);
         setTotalItems(result.total);
         setTotalPages(result.totalPages);
@@ -108,7 +116,7 @@ export function useRoles() {
     };
     // The previous page is intentionally retained while a refresh is pending.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSystemFilter, page, revision]);
+  }, [isSystemFilter, page, revision, sortBy, sortDir]);
 
   const roles = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -126,6 +134,13 @@ export function useRoles() {
 
   const refreshRoles = useCallback(() => {
     setRevision((current) => current + 1);
+  }, []);
+
+  const changeSort = useCallback((nextSortBy: string, nextSortDir: "ASC" | "DESC") => {
+    if (nextSortBy !== "name" && nextSortBy !== "createdAt") return;
+    setSortBy(nextSortBy);
+    setSortDir(nextSortDir);
+    setPage(1);
   }, []);
 
   const activeModalRole = rolesOnPage.find(
@@ -216,6 +231,9 @@ export function useRoles() {
   return {
     t,
     lang,
+    sortBy,
+    sortDir,
+    changeSort,
     search,
     setSearch,
     isSystemFilter,

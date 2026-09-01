@@ -124,8 +124,9 @@ export function DataTable<T>({
 
   function handleSort(column: ColumnDef<T>) {
     if (!column.sortable || !onSortChange) return;
-    const nextDirection = sort?.id === column.id && sort.direction === "asc" ? "desc" : "asc";
-    onSortChange({ id: column.id, direction: nextDirection });
+    const field = column.sortField ?? column.id;
+    const nextDirection = sort?.id === field && sort.direction === "asc" ? "desc" : "asc";
+    onSortChange({ id: field, direction: nextDirection });
   }
 
   if (isLoading) {

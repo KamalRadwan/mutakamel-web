@@ -27,6 +27,7 @@ export function useOpportunityColumns({
   const columns: ColumnDef<OpportunityListItem>[] = [
     {
       id: "title",
+      sortable: true,
       header: t.crmOpportunities.title,
       // The first column routes into the detail screen — a real link, so the
       // address stays copyable. See docs/design/detail-screens.md#routes.
@@ -76,6 +77,7 @@ export function useOpportunityColumns({
       id: "expectedClose",
       header: t.crmOpportunities.expectedClose,
       sortable: true,
+      sortField: "expectedCloseDate",
       cell: (item) => (item.expectedCloseDate ? formatDate(item.expectedCloseDate, lang) : t.crmOpportunities.notProvided),
     },
     {

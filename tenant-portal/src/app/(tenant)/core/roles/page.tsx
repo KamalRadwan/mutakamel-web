@@ -32,6 +32,7 @@ export default function TenantRolesPage() {
   const columns: ColumnDef<TenantRole>[] = [
     {
       id: "name",
+      sortable: true,
       header: copy.name,
       cell: (role) => (
         <div className="flex items-center gap-1.5">
@@ -148,6 +149,8 @@ export default function TenantRolesPage() {
           onRetry={screen.reload}
           page={screen.pageInfo}
           onPageChange={screen.setPage}
+          sort={screen.sort}
+          onSortChange={screen.setSort}
           rowKey={(role) => role.id}
           labels={{
             retry: t.common.retry,

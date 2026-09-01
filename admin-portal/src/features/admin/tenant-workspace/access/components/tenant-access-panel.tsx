@@ -110,6 +110,8 @@ export function TenantAccessPanel({
   const columns: ColumnDef<TenantUserView>[] = [
     {
       key: "name",
+      sortable: true,
+      sortField: "firstName",
       headerEn: copy.name,
       headerAr: copy.name,
       cell: (tenantUser) => (
@@ -162,6 +164,7 @@ export function TenantAccessPanel({
     },
     {
       key: "status",
+      sortable: true,
       headerEn: copy.status,
       headerAr: copy.status,
       cell: (tenantUser) => <StatusBadge user={tenantUser} locale={locale} />,
@@ -293,6 +296,29 @@ export function TenantAccessPanel({
             data={users}
             isLoading={directory.status === "loading" && !page}
             getRowId={(tenantUser) => tenantUser.id}
+            sort={{
+              sortBy: controller.query.sortBy ?? "createdAt",
+              sortDir: controller.query.sortDir === "ASC" ? "ASC" : "DESC",
+              onSortChange: (nextSortBy, nextSortDir) => {
+                const allowed = [
+                  "email",
+                  "firstName",
+                  "lastName",
+                  "employeeCode",
+                  "status",
+                  "lastLoginAt",
+                  "createdAt",
+                ] as const;
+                const field = allowed.find((candidate) => candidate === nextSortBy);
+                if (!field) return;
+                controller.setQuery((current) => ({
+                  ...current,
+                  page: 1,
+                  sortBy: field,
+                  sortDir: nextSortDir,
+                }));
+              },
+            }}
             pagination={
               page
                 ? {

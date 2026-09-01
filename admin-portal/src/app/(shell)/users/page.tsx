@@ -76,6 +76,8 @@ export default function UsersDirectoryPage() {
   const columns: ColumnDef<AdminUser>[] = [
     {
       key: "staffMember",
+      sortable: true,
+      sortField: "firstName",
       headerEn: t.users.staffMember,
       headerAr: t.users.staffMember,
       cell: (usr) => {
@@ -334,6 +336,15 @@ export default function UsersDirectoryPage() {
               data={users}
               isLoading={isLoading}
               getRowId={(usr) => usr.id}
+              sort={{
+                sortBy,
+                sortDir: sortDir === "ASC" ? "ASC" : "DESC",
+                onSortChange: (nextSortBy, nextSortDir) => {
+                  setSortBy(nextSortBy);
+                  setSortDir(nextSortDir);
+                  setPage(1);
+                },
+              }}
               pagination={{
                 page,
                 limit,

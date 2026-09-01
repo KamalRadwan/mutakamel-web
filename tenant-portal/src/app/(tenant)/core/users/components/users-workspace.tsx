@@ -158,6 +158,8 @@ export function UsersWorkspace() {
           onRetry={screen.reload}
           page={screen.pageInfo}
           onPageChange={screen.setPage}
+          sort={screen.sort}
+          onSortChange={screen.setSort}
           rowKey={(user) => user.id}
           labels={{
             retry: t.common.retry,

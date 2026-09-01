@@ -342,6 +342,14 @@ export function useLeads() {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
+  // GET /crm/leads accepts displayName and createdAt only; else a 400.
+  const sortRef = useRef<{ id: "displayName" | "createdAt"; direction: "asc" | "desc" }>({
+    id: "createdAt",
+    direction: "desc",
+  });
+  const [sort, setSortState] = useState<{ id: "displayName" | "createdAt"; direction: "asc" | "desc" }>(
+    sortRef.current,
+  );
   const searchQueryRef = useRef("");
   const pageRef = useRef(1);
   const requestEpochRef = useRef(0);
@@ -385,6 +393,14 @@ export function useLeads() {
   const changePage = useCallback((nextPage: number) => {
     pageRef.current = nextPage;
     setPage(nextPage);
+  }, []);
+
+  const changeSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
+    if (next.id !== "displayName" && next.id !== "createdAt") return;
+    sortRef.current = { id: next.id, direction: next.direction };
+    setSortState(sortRef.current);
+    pageRef.current = 1;
+    setPage(1);
   }, []);
 
   const changeSearchQuery = useCallback(
@@ -434,6 +450,8 @@ export function useLeads() {
             branchId,
             page: String(requestedPageNumber),
             limit: "50",
+            sortBy: sortRef.current.id,
+            sortDir: sortRef.current.direction === "asc" ? "ASC" : "DESC",
           });
           const search = requestedSearch.trim();
           if (search) query.set("search", search);
@@ -745,6 +763,8 @@ export function useLeads() {
     setSearchQuery: changeSearchQuery,
     pageInfo,
     setPage: changePage,
+    sort,
+    setSort: changeSort,
     isCreateOpen,
     setIsCreateOpen,
     openCreate: () => {

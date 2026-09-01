@@ -75,7 +75,7 @@ describe("useRoles", () => {
     expect(result.current.totalItems).toBe(21);
     expect(result.current.totalPages).toBe(2);
     expect(rolesApi.list).toHaveBeenCalledWith(
-      { page: 1, limit: 20 },
+      { page: 1, limit: 20, sortBy: "createdAt", sortDir: "DESC" },
       expect.any(AbortSignal),
     );
 
@@ -83,7 +83,7 @@ describe("useRoles", () => {
     await waitFor(() => expect(result.current.page).toBe(2));
     await waitFor(() =>
       expect(rolesApi.list).toHaveBeenLastCalledWith(
-        { page: 2, limit: 20 },
+        { page: 2, limit: 20, sortBy: "createdAt", sortDir: "DESC" },
         expect.any(AbortSignal),
       ),
     );

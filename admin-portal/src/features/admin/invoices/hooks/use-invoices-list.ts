@@ -7,6 +7,7 @@ import { invoicesApi } from "../api/invoices-api";
 import { classifyInvoiceReadError } from "../model/invoice-errors";
 import { readInvoicePermissions } from "../model/invoice-permissions";
 import { buildInvoiceListQuery, validateInvoiceFilters } from "../model/invoice-validation";
+import { INVOICE_SORT_FIELDS } from "../types/invoices";
 import type {
   CoreSnapshot,
   InvoiceListFilterDraft,
@@ -125,6 +126,22 @@ export function useInvoicesList() {
     setRevision((current) => current + 1);
   }, []);
 
+  // Sorting applies straight away rather than staging in the draft: a click on
+  // a column header is the request itself, not a filter the user still has to
+  // submit. The page resets because row 1 of the new order is a different row.
+  //
+  // The field is checked against the list the endpoint accepts before it is
+  // applied. `sortBy` outside that list is a 400 from the server, so a column
+  // wired up by mistake is dropped here instead of breaking the table.
+  const changeSort = useCallback((sortBy: string, sortDir: "ASC" | "DESC") => {
+    const field = INVOICE_SORT_FIELDS.find((allowed) => allowed === sortBy);
+    if (!field) return;
+    setDraft((current) => ({ ...current, sortBy: field, sortDir }));
+    setApplied((current) => ({ ...current, sortBy: field, sortDir }));
+    setPage(1);
+    setRevision((current) => current + 1);
+  }, []);
+
   const visibleState: InvoiceResourceState = isAuthLoading
     ? "LOADING"
     : !permissions.canRead
@@ -134,6 +151,9 @@ export function useInvoicesList() {
   return {
     permissions,
     draft,
+    sortBy: applied.sortBy,
+    sortDir: applied.sortDir,
+    changeSort,
     validationErrors,
     page,
     state: visibleState,

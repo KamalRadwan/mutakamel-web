@@ -84,17 +84,23 @@ export function taxPath(id: string): CorePath {
   return `${TAXES_PATH}/${encodeURIComponent(id)}` as CorePath;
 }
 
+/** The only sort fields GET /taxes accepts; anything else is a 400. */
+export const TAX_SORT_FIELDS = ["code", "name", "rate", "createdAt"] as const;
+export type TaxSortField = (typeof TAX_SORT_FIELDS)[number];
+
 export function taxesListPath(
   page: number,
   status: ActiveStatus | undefined,
   companyId: string | undefined,
   search: string,
+  sortBy: TaxSortField = "code",
+  sortDir: "ASC" | "DESC" = "ASC",
 ): CorePath {
   const query = new URLSearchParams({
     page: String(page),
     limit: String(TAX_PAGE_SIZE),
-    sortBy: "code",
-    sortDir: "ASC",
+    sortBy,
+    sortDir,
   });
   if (status) query.set("status", status);
   if (companyId) query.set("companyId", companyId);

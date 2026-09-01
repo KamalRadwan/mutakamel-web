@@ -161,6 +161,8 @@ export function OrganizationLevelWorkspace<L extends OrgLevel>({ level }: { leve
           onRetry={screen.reload}
           page={screen.pageInfo}
           onPageChange={screen.setPage}
+          sort={screen.sort}
+          onSortChange={screen.setSort}
           rowKey={(node) => node.id}
           labels={{
             retry: t.common.retry,

@@ -14,6 +14,8 @@ import {
   type OrgLevel,
   type OrgNodeOf,
   type OrgNodeStatus,
+  ORG_NODE_SORT_FIELDS,
+  type OrgNodeSortField,
 } from "../../contracts/organization-contract";
 import { ORG_LEVEL_CONFIG, ORG_PARENT_BODY_KEY } from "../level-config";
 
@@ -109,6 +111,10 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
   const [serverSearch, setServerSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrgNodeStatus | undefined>(undefined);
   const [parentFilter, setParentFilter] = useState<string | undefined>(undefined);
+  const [sort, setSortState] = useState<{ id: OrgNodeSortField; direction: "asc" | "desc" }>({
+    id: "name",
+    direction: "asc",
+  });
   const [rows, setRows] = useState<OrgNodeOf<L>[]>([]);
   const [pageInfo, setPageInfo] = useState({ page: 1, limit: 25, total: 0 });
   const [isLoading, setIsLoading] = useState(true);
@@ -145,6 +151,8 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
         search: serverSearch,
         status: statusFilter,
         parentId: parentFilter,
+        sortBy: sort.id,
+        sortDir: sort.direction === "asc" ? "ASC" : "DESC",
         signal: controller.signal,
       })
         .then((result) => {
@@ -162,7 +170,7 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
         });
     });
     return () => controller.abort();
-  }, [level, page, serverSearch, statusFilter, parentFilter, reloadToken]);
+  }, [level, page, serverSearch, statusFilter, parentFilter, reloadToken, sort]);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 
@@ -233,10 +241,19 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
     }
   }, [level, pendingDelete, reload]);
 
+  const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
+    const field = ORG_NODE_SORT_FIELDS.find((allowed) => allowed === next.id);
+    if (!field) return;
+    setSortState({ id: field, direction: next.direction });
+    setPage(1);
+  }, []);
+
   return useMemo(
     () => ({
       t,
       lang,
+      sort,
+      setSort,
       config,
       canManage,
       rows,
@@ -275,7 +292,7 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
       blockedNode, blockers, canManage, config, editing, handleCreate, handleDelete,
       handleUpdate, isCreateOpen, isLoading, isSubmitting, lang, mutationError, page,
       pageInfo, parentFilter, pendingDelete, queryError, reload, rows, searchQuery,
-      statusFilter, t,
+      setSort, sort, statusFilter, t,
     ],
   );
 }

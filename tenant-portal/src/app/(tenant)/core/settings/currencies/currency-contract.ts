@@ -103,12 +103,22 @@ export function setDefaultCurrencyPath(id: string): CorePath {
   return `${currencyPath(id)}/set-default` as CorePath;
 }
 
-export function currenciesListPath(page: number, status?: ActiveStatus, search?: string): CorePath {
+/** The only sort fields GET /currencies accepts; anything else is a 400. */
+export const CURRENCY_SORT_FIELDS = ["code", "name", "exchangeRate", "createdAt"] as const;
+export type CurrencySortField = (typeof CURRENCY_SORT_FIELDS)[number];
+
+export function currenciesListPath(
+  page: number,
+  status?: ActiveStatus,
+  search?: string,
+  sortBy: CurrencySortField = "code",
+  sortDir: "ASC" | "DESC" = "ASC",
+): CorePath {
   const query = new URLSearchParams({
     page: String(page),
     limit: String(CURRENCY_PAGE_SIZE),
-    sortBy: "code",
-    sortDir: "ASC",
+    sortBy,
+    sortDir,
   });
   if (status) query.set("status", status);
   if (search) query.set("search", search);

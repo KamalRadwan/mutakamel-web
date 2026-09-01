@@ -56,6 +56,9 @@ export default function TenantsDirectoryPage() {
     retryDatabaseServerOptions,
     page,
     setPage,
+    sortBy,
+    sortDir,
+    changeSort,
     limit,
     tenants,
     totalItems,
@@ -82,6 +85,8 @@ export default function TenantsDirectoryPage() {
   const columns: ColumnDef<TenantRecord>[] = [
     {
       key: "tenant",
+      sortable: true,
+      sortField: "name",
       headerEn: "Tenant",
       headerAr: "المستأجر",
       cell: (tenant) => (
@@ -151,6 +156,7 @@ export default function TenantsDirectoryPage() {
     },
     {
       key: "status",
+      sortable: true,
       headerEn: "Status",
       headerAr: "الحالة",
       cell: (tenant) => <StatusBadge status={tenant.status} enumType="tenant" />,
@@ -299,6 +305,7 @@ export default function TenantsDirectoryPage() {
           columns={columns}
           data={tenants}
           isLoading={isLoading && tenants.length === 0}
+          sort={{ sortBy, sortDir, onSortChange: changeSort }}
           pagination={{
             page,
             limit,

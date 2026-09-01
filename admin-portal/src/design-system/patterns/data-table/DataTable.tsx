@@ -148,8 +148,9 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   const handleSort = (column: ColumnDef<T>) => {
     if (!sort) return;
-    const nextDir = sort.sortBy === column.key && sort.sortDir === "ASC" ? "DESC" : "ASC";
-    sort.onSortChange(column.key, nextDir);
+    const field = column.sortField ?? column.key;
+    const nextDir = sort.sortBy === field && sort.sortDir === "ASC" ? "DESC" : "ASC";
+    sort.onSortChange(field, nextDir);
     const columnLabel = lang === "ar" ? column.headerAr : column.headerEn;
     setAnnouncement(
       lang === "ar"
@@ -382,7 +383,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                 </TableHead>
               )}
               {columns.map((column) => {
-                const activeSort = sort?.sortBy === column.key;
+                const activeSort = sort?.sortBy === (column.sortField ?? column.key);
                 return (
                   <TableHead
                     key={column.key}

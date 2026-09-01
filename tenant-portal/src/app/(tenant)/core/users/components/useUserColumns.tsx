@@ -51,6 +51,8 @@ export function useUserColumns({
   const columns: ColumnDef<TenantUser>[] = [
     {
       id: "name",
+      sortable: true,
+      sortField: "firstName",
       header: copy.users.name,
       cell: (user) => (
         <div className="flex flex-col">
@@ -83,6 +85,7 @@ export function useUserColumns({
     },
     {
       id: "employeeCode",
+      sortable: true,
       header: copy.users.employeeCode,
       cell: (user) => <span className="font-mono text-2xs">{user.employeeCode ?? ""}</span>,
     },

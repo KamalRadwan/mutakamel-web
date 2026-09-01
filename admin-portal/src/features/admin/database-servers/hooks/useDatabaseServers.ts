@@ -13,6 +13,9 @@ import {
   DatabaseServerStatus,
 } from "../types";
 
+const DATABASE_SERVER_SORT_FIELDS = ["name", "host", "currentTenants", "createdAt"] as const;
+type DatabaseServerSortField = (typeof DATABASE_SERVER_SORT_FIELDS)[number];
+
 export function useDatabaseServers() {
   const toast = useToast();
   const { lang } = useI18n();
@@ -35,6 +38,9 @@ export function useDatabaseServers() {
   const [statusFilter, setStatusFilter] = useState<DatabaseServerStatus | "ALL">("ALL");
   const [countryFilter, setCountryFilter] = useState<string>("ALL");
   const [deletionFilter, setDeletionFilter] = useState<"CURRENT" | "DELETED">("CURRENT");
+  // The endpoint accepts these four sort fields only; anything else is a 400.
+  const [sortBy, setSortBy] = useState<DatabaseServerSortField>("createdAt");
+  const [sortDir, setSortDir] = useState<"ASC" | "DESC">("DESC");
   const [serverPendingDelete, setServerPendingDelete] = useState<DatabaseServerView | null>(null);
   const [deletingServerId, setDeletingServerId] = useState<string | null>(null);
   const [serverPendingDestroy, setServerPendingDestroy] = useState<DatabaseServerView | null>(null);
@@ -43,6 +49,8 @@ export function useDatabaseServers() {
   const currentQueryIdentity = JSON.stringify({
     page,
     limit,
+    sortBy,
+    sortDir,
     search,
     statusFilter,
     countryFilter,
@@ -69,6 +77,14 @@ export function useDatabaseServers() {
 
   // `search` already arrives debounced from FilterBar (see useFilterBar);
   // resetting the page here keeps pagination in sync with a new search term.
+  const changeSort = useCallback((nextSortBy: string, nextSortDir: "ASC" | "DESC") => {
+    const field = DATABASE_SERVER_SORT_FIELDS.find((allowed) => allowed === nextSortBy);
+    if (!field) return;
+    setSortBy(field);
+    setSortDir(nextSortDir);
+    setPage(1);
+  }, []);
+
   const setSearch = useCallback((value: string) => {
     setSearchState(value);
     setPage(1);
@@ -102,6 +118,8 @@ export function useDatabaseServers() {
       const query: DatabaseServerQueryDto = {
         page,
         limit,
+        sortBy,
+        sortDir,
         ...(search ? { search } : {}),
         ...(statusFilter !== "ALL" ? { status: statusFilter } : {}),
         ...(countryFilter !== "ALL" ? { countryIsoCode: countryFilter } : {}),
@@ -246,6 +264,9 @@ export function useDatabaseServers() {
     error,
     page,
     setPage,
+    sortBy,
+    sortDir,
+    changeSort,
     search,
     setSearch,
     statusFilter,

@@ -24,6 +24,8 @@ import {
   setDefaultCurrencyPath,
   type Currency,
   type CurrencyFormValues,
+  CURRENCY_SORT_FIELDS,
+  type CurrencySortField,
 } from "../currency-contract";
 
 const LIST_RESPONSE_LIMIT_BYTES = 400_000;
@@ -40,6 +42,10 @@ export function useCurrencies() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<ActiveStatus | undefined>(undefined);
   const [search, setSearch] = useState("");
+  const [sort, setSortState] = useState<{ id: CurrencySortField; direction: "asc" | "desc" }>({
+    id: "code",
+    direction: "asc",
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
@@ -55,10 +61,19 @@ export function useCurrencies() {
       setIsLoading(true);
       setQueryError(null);
       try {
-        const result = await coreGet(currenciesListPath(page, statusFilter, search.trim()), {
-          signal,
-          maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
-        });
+        const result = await coreGet(
+          currenciesListPath(
+            page,
+            statusFilter,
+            search.trim(),
+            sort.id,
+            sort.direction === "asc" ? "ASC" : "DESC",
+          ),
+          {
+            signal,
+            maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+          },
+        );
         const parsed = parseCurrenciesResponse(result.data);
         setItems(parsed.items);
         setTotal(parsed.total);
@@ -70,7 +85,7 @@ export function useCurrencies() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [page, statusFilter, search],
+    [page, statusFilter, search, sort],
   );
 
   useEffect(() => {
@@ -190,9 +205,18 @@ export function useCurrencies() {
     await load();
   }, [canManage, deactivating, pendingId, runWrite, toast, t, load]);
 
+  const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
+    const field = CURRENCY_SORT_FIELDS.find((allowed) => allowed === next.id);
+    if (!field) return;
+    setSortState({ id: field, direction: next.direction });
+    setPage(1);
+  }, []);
+
   return {
     t,
     lang,
+    sort,
+    setSort,
     canManage,
     items,
     pageInfo: { page, limit: CURRENCY_PAGE_SIZE, total },

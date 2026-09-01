@@ -5,6 +5,15 @@ export interface ColumnDef<T> {
   headerEn: string;
   headerAr: string;
   sortable?: boolean;
+  /**
+   * Field name sent to the API as `sortBy`, when it differs from `key`.
+   *
+   * `key` names the column for the UI ("period", "lifecycle"); the server
+   * accepts only the fields on that endpoint's whitelist ("currentPeriodEnd",
+   * "status") and answers 400 for anything else. Set this wherever the two
+   * names diverge; `key` is used when it is omitted.
+   */
+  sortField?: string;
   align?: "start" | "center" | "end";
   width?: string;
   priority?: "essential" | "supporting" | "detail";

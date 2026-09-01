@@ -63,6 +63,8 @@ export function StorageServersScreen() {
   const columns: ColumnDef<StorageServerView>[] = [
     {
       key: "server",
+      sortable: true,
+      sortField: "name",
       headerEn: "Server",
       headerAr: "الخادم",
       cell: (server) => (
@@ -222,6 +224,21 @@ export function StorageServersScreen() {
             isRefreshing={view.isLoading && view.servers.length > 0}
             getRowId={(server) => server.id}
             getRowLabel={(server) => server.name}
+            sort={{
+              sortBy: view.sortBy,
+              sortDir: view.sortDir,
+              onSortChange: (nextSortBy, nextSortDir) => {
+                if (
+                  nextSortBy !== "name" &&
+                  nextSortBy !== "createdAt" &&
+                  nextSortBy !== "updatedAt" &&
+                  nextSortBy !== "lastConnectionTestedAt"
+                ) return;
+                view.setSortBy(nextSortBy);
+                view.setSortDir(nextSortDir);
+                view.setPage(1);
+              },
+            }}
             responsiveMode="record-cards"
             pagination={{
               page: view.page,

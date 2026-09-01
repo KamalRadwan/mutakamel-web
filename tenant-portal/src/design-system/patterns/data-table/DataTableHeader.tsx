@@ -70,7 +70,7 @@ export function DataTableHeader<T>({
           </TableHead>
         )}
         {columns.map((column) => {
-          const isSorted = sort?.id === column.id;
+          const isSorted = sort?.id === (column.sortField ?? column.id);
           const layoutIndex = layout ? layout.order.indexOf(column.id) : -1;
           const showLayoutControls = Boolean(columnLayout && layoutLabels && layoutIndex >= 0);
           const SortIcon = isSorted ? (sort!.direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;

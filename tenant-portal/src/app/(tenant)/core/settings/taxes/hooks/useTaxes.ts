@@ -22,6 +22,8 @@ import {
   taxesListPath,
   type Tax,
   type TaxFormValues,
+  TAX_SORT_FIELDS,
+  type TaxSortField,
 } from "../tax-contract";
 
 const LIST_RESPONSE_LIMIT_BYTES = 400_000;
@@ -40,6 +42,10 @@ export function useTaxes() {
   const [statusFilter, setStatusFilter] = useState<ActiveStatus | undefined>(undefined);
   const [companyFilter, setCompanyFilter] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState("");
+  const [sort, setSortState] = useState<{ id: TaxSortField; direction: "asc" | "desc" }>({
+    id: "code",
+    direction: "asc",
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
@@ -56,7 +62,14 @@ export function useTaxes() {
       setQueryError(null);
       try {
         const result = await coreGet(
-          taxesListPath(page, statusFilter, companyFilter, search.trim()),
+          taxesListPath(
+            page,
+            statusFilter,
+            companyFilter,
+            search.trim(),
+            sort.id,
+            sort.direction === "asc" ? "ASC" : "DESC",
+          ),
           { signal, maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES },
         );
         const parsed = parseTaxesResponse(result.data);
@@ -70,7 +83,7 @@ export function useTaxes() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [page, statusFilter, companyFilter, search],
+    [page, statusFilter, companyFilter, search, sort],
   );
 
   useEffect(() => {
@@ -181,7 +194,16 @@ export function useTaxes() {
     }
   }, [canManage, deactivating, pendingId, reportWriteError, toast, t, load]);
 
+  const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
+    const field = TAX_SORT_FIELDS.find((allowed) => allowed === next.id);
+    if (!field) return;
+    setSortState({ id: field, direction: next.direction });
+    setPage(1);
+  }, []);
+
   return {
+    sort,
+    setSort,
     t,
     lang,
     canManage,

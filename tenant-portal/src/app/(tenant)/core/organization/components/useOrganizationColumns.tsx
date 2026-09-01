@@ -35,6 +35,7 @@ export function useOrganizationColumns<L extends OrgLevel>({
   const columns: ColumnDef<OrgNodeOf<L>>[] = [
     {
       id: "name",
+      sortable: true,
       header: levelCopy.nameLabel,
       cell: (node) => (
         <Link href={`${config.href}/${node.id}`} className="hover:underline">
@@ -44,6 +45,7 @@ export function useOrganizationColumns<L extends OrgLevel>({
     },
     {
       id: "code",
+      sortable: true,
       header: copy.fields.code,
       cell: (node) => <span className="font-mono text-2xs">{node.code}</span>,
     },

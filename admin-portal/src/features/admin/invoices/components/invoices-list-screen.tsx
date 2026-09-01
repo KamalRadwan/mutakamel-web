@@ -236,6 +236,7 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
   const columns: ColumnDef<Invoice>[] = [
     {
       key: "number",
+      sortable: true,
       headerEn: copy.number,
       headerAr: copy.number,
       cell: (invoice) => (
@@ -244,7 +245,7 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
         </Link>
       ),
     },
-    { key: "status", headerEn: copy.status, headerAr: copy.status, cell: (invoice) => <StatusBadge status={invoice.status} enumType="invoice" /> },
+    { key: "status", sortable: true, headerEn: copy.status, headerAr: copy.status, cell: (invoice) => <StatusBadge status={invoice.status} enumType="invoice" /> },
     { key: "purpose", headerEn: copy.purpose, headerAr: copy.purpose, cell: (invoice) => <span className="text-sm font-semibold">{invoicePurposeLabel(invoice.purpose, lang)}</span> },
     {
       key: "tenant",
@@ -265,6 +266,7 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
     },
     {
       key: "total",
+      sortable: true,
       headerEn: copy.total,
       headerAr: copy.total,
       cell: (invoice) => <span dir="ltr" className="font-mono font-semibold">{formatInvoiceMoney(invoice.total, invoice.currencyCode)}</span>,
@@ -279,7 +281,7 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
         </bdi>
       ),
     },
-    { key: "dueAt", headerEn: copy.dueAt, headerAr: copy.dueAt, cell: (invoice) => <span className="whitespace-nowrap">{formatInvoiceDate(invoice.dueAt, lang)}</span> },
+    { key: "dueAt", sortable: true, headerEn: copy.dueAt, headerAr: copy.dueAt, cell: (invoice) => <span className="whitespace-nowrap">{formatInvoiceDate(invoice.dueAt, lang)}</span> },
     { key: "updatedAt", headerEn: copy.updatedAt, headerAr: copy.updatedAt, cell: (invoice) => <span className="whitespace-nowrap">{formatInvoiceDate(invoice.updatedAt, lang)}</span> },
     {
       key: "actions",
@@ -303,6 +305,11 @@ function InvoiceListBody({ invoices, copy, lang }: { invoices: ReturnType<typeof
         data={data.items}
         isRefreshing={invoices.isRefreshing}
         getRowId={(invoice) => invoice.id}
+        sort={{
+          sortBy: invoices.sortBy,
+          sortDir: invoices.sortDir === "ASC" ? "ASC" : "DESC",
+          onSortChange: invoices.changeSort,
+        }}
         pagination={{
           page: data.page,
           limit: data.limit,

@@ -115,17 +115,29 @@ export function userPath(id: string, suffix = ""): CorePath {
   return `${USERS_PATH}/${encodeURIComponent(id)}${suffix}`;
 }
 
+/** The only sort fields GET /tenant-users accepts; anything else is a 400. */
+export const TENANT_USER_SORT_FIELDS = [
+  "email",
+  "firstName",
+  "lastName",
+  "employeeCode",
+  "createdAt",
+] as const;
+export type TenantUserSortField = (typeof TENANT_USER_SORT_FIELDS)[number];
+
 export async function fetchTenantUsers(options: {
   page: number;
   search: string;
   filters: TenantUserFilters;
+  sortBy?: TenantUserSortField;
+  sortDir?: "ASC" | "DESC";
   signal?: AbortSignal;
 }): Promise<CorePage<TenantUser>> {
   const query = buildCoreListQuery({
     page: options.page,
     search: options.search,
-    sortBy: "createdAt",
-    sortDir: "DESC",
+    sortBy: options.sortBy ?? "createdAt",
+    sortDir: options.sortDir ?? "DESC",
     filters: { ...options.filters },
   });
   const envelope = await readCorePage(USERS_PATH, query, {

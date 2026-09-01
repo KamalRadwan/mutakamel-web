@@ -57,6 +57,8 @@ export default function CurrenciesPage() {
     setDefault,
     deactivate,
     reload,
+    sort,
+    setSort,
   } = useCurrencies();
 
   const filterValues: FilterValues = statusFilter
@@ -66,6 +68,7 @@ export default function CurrenciesPage() {
   const columns: ColumnDef<Currency>[] = [
     {
       id: "code",
+      sortable: true,
       header: t.coreSettings.currencyCode,
       cell: (currency) => (
         <span className="flex items-center gap-2">
@@ -74,7 +77,7 @@ export default function CurrenciesPage() {
         </span>
       ),
     },
-    { id: "name", header: t.coreSettings.currencyName, cell: (currency) => currency.name },
+    { id: "name", sortable: true, header: t.coreSettings.currencyName, cell: (currency) => currency.name },
     {
       id: "symbol",
       header: t.coreSettings.currencySymbol,
@@ -82,6 +85,7 @@ export default function CurrenciesPage() {
     },
     {
       id: "rate",
+      sortable: true,
       header: t.coreSettings.currencyExchangeRate,
       numeric: true,
       // `numeric(18,8)` arrives as an exact string and is formatted, never parsed.
@@ -202,6 +206,8 @@ export default function CurrenciesPage() {
           onRetry={() => void reload()}
           page={pageInfo}
           onPageChange={setPage}
+          sort={sort}
+          onSortChange={setSort}
           rowKey={(currency) => currency.id}
           labels={{
             retry: t.common.retry,

@@ -77,6 +77,9 @@ export interface TenantDirectoryPage {
 const DEFAULT_PAGE_SIZE = 10;
 const UUID_V7_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TENANT_SORT_FIELDS = ["name", "status", "createdAt"] as const;
+type TenantSortField = (typeof TENANT_SORT_FIELDS)[number];
+
 const EMPTY_META: TenantDirectoryMeta = {
   page: 1,
   limit: DEFAULT_PAGE_SIZE,
@@ -131,6 +134,10 @@ export function useTenants() {
     useState<TenantStatusFilter>("ALL");
   const [serverFilter, setServerFilterValue] = useState<string>("ALL");
   const [page, setPage] = useState(1);
+  // GET /admin/tenants accepts name, status and createdAt only; any other
+  // sortBy is a 400, so changeSort checks the value before applying it.
+  const [sortBy, setSortBy] = useState<TenantSortField>("createdAt");
+  const [sortDir, setSortDir] = useState<"ASC" | "DESC">("DESC");
   const [tenants, setTenants] = useState<TenantRecord[]>([]);
   const [pagination, setPagination] = useState<TenantDirectoryMeta>(EMPTY_META);
   const [databaseServerOptions, setDatabaseServerOptions] = useState<
@@ -195,8 +202,8 @@ export function useTenants() {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(DEFAULT_PAGE_SIZE),
-        sortBy: "createdAt",
-        sortDir: "DESC",
+        sortBy,
+        sortDir,
       });
       if (appliedSearch) params.set("search", appliedSearch);
       if (statusFilter !== "ALL") params.set("status", statusFilter);
@@ -245,8 +252,18 @@ export function useTenants() {
     page,
     permissions.canRead,
     serverFilter,
+    sortBy,
+    sortDir,
     statusFilter,
   ]);
+
+  const changeSort = useCallback((nextSortBy: string, nextSortDir: "ASC" | "DESC") => {
+    const field = TENANT_SORT_FIELDS.find((allowed) => allowed === nextSortBy);
+    if (!field) return;
+    setSortBy(field);
+    setSortDir(nextSortDir);
+    setPage(1);
+  }, []);
 
   const fetchDatabaseServerOptions = useCallback(async () => {
     const requestedActorId = actorId;
@@ -566,6 +583,9 @@ export function useTenants() {
     retryDatabaseServerOptions: fetchDatabaseServerOptions,
     page,
     setPage,
+    sortBy,
+    sortDir,
+    changeSort,
     limit: DEFAULT_PAGE_SIZE,
     tenants,
     totalItems: pagination.total,

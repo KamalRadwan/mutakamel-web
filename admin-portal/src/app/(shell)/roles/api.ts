@@ -15,10 +15,16 @@ import {
 const ADMIN_ROLES_URL = "/api/admin/core/v1/roles";
 const ADMIN_PERMISSIONS_URL = "/api/admin/core/v1/permissions";
 
+/** The only sort fields `GET /admin/roles` accepts; anything else is a 400. */
+export const ROLE_SORT_FIELDS = ["name", "createdAt"] as const;
+export type RoleSortField = (typeof ROLE_SORT_FIELDS)[number];
+
 export interface RoleListQuery {
   page: number;
   limit: number;
   isSystem?: boolean;
+  sortBy?: RoleSortField;
+  sortDir?: "ASC" | "DESC";
 }
 
 export const rolesApi = {
@@ -103,15 +109,17 @@ export function serializeRoleListQuery(query: RoleListQuery): string {
     !Number.isSafeInteger(query.limit) ||
     query.limit < 1 ||
     query.limit > 100 ||
-    (query.isSystem !== undefined && typeof query.isSystem !== "boolean")
+    (query.isSystem !== undefined && typeof query.isSystem !== "boolean") ||
+    (query.sortBy !== undefined && !ROLE_SORT_FIELDS.includes(query.sortBy)) ||
+    (query.sortDir !== undefined && query.sortDir !== "ASC" && query.sortDir !== "DESC")
   ) {
     throw new TypeError("INVALID_ROLE_LIST_QUERY");
   }
   const params = new URLSearchParams({
     page: String(query.page),
     limit: String(query.limit),
-    sortBy: "createdAt",
-    sortDir: "DESC",
+    sortBy: query.sortBy ?? "createdAt",
+    sortDir: query.sortDir ?? "DESC",
   });
   if (query.isSystem !== undefined) {
     params.set("isSystem", query.isSystem ? "true" : "false");

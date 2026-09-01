@@ -57,6 +57,15 @@ export interface ColumnDef<T> {
   align?: "start" | "end";
   width?: string;
   sortable?: boolean;
+  /**
+   * Field name sent to the API as `sortBy`, when it differs from `id`.
+   *
+   * `id` names the column for the UI ("next", "period"); the server accepts
+   * only the fields on that endpoint's whitelist ("nextValue",
+   * "currentPeriodEnd") and answers 400 for anything else. `id` is used when
+   * this is omitted.
+   */
+  sortField?: string;
   numeric?: boolean;
   sticky?: "start" | "end";
 }

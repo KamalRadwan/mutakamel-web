@@ -119,6 +119,8 @@ export interface SubscriptionsViewModel {
   applyFilters: () => boolean;
   clearFilters: () => void;
   refresh: () => void;
+  /** Applies a header-click sort. Fields outside the whitelist are ignored. */
+  changeSort: (sortBy: string, sortDir: "ASC" | "DESC") => void;
   setPage: (page: number) => void;
   setLimit: (limit: number) => void;
 }

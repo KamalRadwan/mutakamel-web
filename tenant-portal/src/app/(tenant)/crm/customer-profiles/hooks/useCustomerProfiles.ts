@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useRealtimeResync } from "@/design-system";
 import {
@@ -220,14 +220,22 @@ export function resolveCustomerProfilesBranchId(
   return resolveDefaultTenantBranchId(source);
 }
 
+/** GET /crm/customer-profiles accepts these two fields only; else a 400. */
+export const CUSTOMER_PROFILE_SORT_FIELDS = ["displayName", "createdAt"] as const;
+export type CustomerProfileSortField = (typeof CUSTOMER_PROFILE_SORT_FIELDS)[number];
+
 export function buildCustomerProfilesListPath({
   branchId,
   page,
   search,
+  sortBy = "createdAt",
+  sortDir = "DESC",
 }: {
   branchId: string;
   page: number;
   search: string;
+  sortBy?: CustomerProfileSortField;
+  sortDir?: "ASC" | "DESC";
 }): string {
   if (!isUUIDv7(branchId)) {
     throw new Error("A valid branch is required to load customer profiles.");
@@ -244,8 +252,8 @@ export function buildCustomerProfilesListPath({
     branchId,
     page: String(page),
     limit: String(CUSTOMER_PROFILES_PAGE_SIZE),
-    sortBy: "createdAt",
-    sortDir: "DESC",
+    sortBy,
+    sortDir,
   });
   if (normalizedSearch) query.set("search", normalizedSearch);
   return CUSTOMER_PROFILES_PATH + "?" + query.toString();
@@ -266,6 +274,11 @@ export function useCustomerProfiles() {
   const [searchQuery, setSearchQuery] = useState("");
   const [serverSearch, setServerSearch] = useState("");
   const [page, setPage] = useState(1);
+  const sortRef = useRef<{ id: CustomerProfileSortField; direction: "asc" | "desc" }>({
+    id: "createdAt",
+    direction: "desc",
+  });
+  const [sort, setSortState] = useState(sortRef.current);
   const [reloadToken, setReloadToken] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   // A precondition that stops the request being made at all — no session, or
@@ -306,7 +319,13 @@ export function useCustomerProfiles() {
 
       try {
         const response = await axiosClient.get<unknown>(
-          buildCustomerProfilesListPath({ branchId, page, search: serverSearch }),
+          buildCustomerProfilesListPath({
+            branchId,
+            page,
+            search: serverSearch,
+            sortBy: sortRef.current.id,
+            sortDir: sortRef.current.direction === "asc" ? "ASC" : "DESC",
+          }),
           {
             signal,
             cache: "no-store",
@@ -329,7 +348,7 @@ export function useCustomerProfiles() {
         if (!signal.aborted) setIsLoading(false);
       }
     },
-    [branchId, page, serverSearch, t, userId],
+    [branchId, page, serverSearch, sort, t, userId],
   );
 
   useEffect(() => {
@@ -354,9 +373,19 @@ export function useCustomerProfiles() {
   const reload = useCallback(() => setReloadToken((current) => current + 1), []);
   useRealtimeResync(reload);
 
+  const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
+    const field = CUSTOMER_PROFILE_SORT_FIELDS.find((allowed) => allowed === next.id);
+    if (!field) return;
+    sortRef.current = { id: field, direction: next.direction };
+    setSortState(sortRef.current);
+    setPage(1);
+  }, []);
+
   return {
     t,
     lang,
+    sort,
+    setSort,
     items: result?.items ?? [],
     branchIds,
     branchId,

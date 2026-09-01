@@ -199,6 +199,10 @@ const ORG_PARENT_QUERY_KEY = {
   teams: "departmentId",
 } as const;
 
+/** The only sort fields the org-node endpoints accept; else a 400. */
+export const ORG_NODE_SORT_FIELDS = ["name", "code", "createdAt"] as const;
+export type OrgNodeSortField = (typeof ORG_NODE_SORT_FIELDS)[number];
+
 export async function fetchOrgNodes<L extends OrgLevel>(
   level: L,
   options: {
@@ -207,6 +211,8 @@ export async function fetchOrgNodes<L extends OrgLevel>(
     status?: OrgNodeStatus;
     parentId?: string;
     limit?: number;
+    sortBy?: OrgNodeSortField;
+    sortDir?: "ASC" | "DESC";
     signal?: AbortSignal;
   },
 ): Promise<CorePage<OrgNodeOf<L>>> {
@@ -215,7 +221,8 @@ export async function fetchOrgNodes<L extends OrgLevel>(
   const query = buildCoreListQuery({
     page: options.page,
     search: options.search,
-    sortBy: "name",
+    sortBy: options.sortBy ?? "name",
+    sortDir: options.sortDir ?? "ASC",
     limit: options.limit,
     filters: {
       status: options.status,

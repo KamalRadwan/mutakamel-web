@@ -22,6 +22,8 @@ import {
   parseNumberingSequencesResponse,
   type NumberingFormValues,
   type NumberingSequence,
+  NUMBERING_SORT_FIELDS,
+  type NumberingSortField,
 } from "../numbering-contract";
 
 const LIST_RESPONSE_LIMIT_BYTES = 400_000;
@@ -46,6 +48,10 @@ export function useNumberingSequences() {
   const [page, setPage] = useState(1);
   const [companyFilter, setCompanyFilter] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState("");
+  const [sort, setSortState] = useState<{ id: NumberingSortField; direction: "asc" | "desc" }>({
+    id: "code",
+    direction: "asc",
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
@@ -59,10 +65,19 @@ export function useNumberingSequences() {
       setIsLoading(true);
       setQueryError(null);
       try {
-        const result = await coreGet(numberingListPath(page, companyFilter, search.trim()), {
-          signal,
-          maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
-        });
+        const result = await coreGet(
+          numberingListPath(
+            page,
+            companyFilter,
+            search.trim(),
+            sort.id,
+            sort.direction === "asc" ? "ASC" : "DESC",
+          ),
+          {
+            signal,
+            maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+          },
+        );
         const parsed = parseNumberingSequencesResponse(result.data);
         setItems(parsed.items);
         setTotal(parsed.total);
@@ -74,7 +89,7 @@ export function useNumberingSequences() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [page, companyFilter, search],
+    [page, companyFilter, search, sort],
   );
 
   useEffect(() => {
@@ -187,7 +202,16 @@ export function useNumberingSequences() {
     [canManage, editing, isSubmitting, reportWriteError, toast, t, load],
   );
 
+  const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
+    const field = NUMBERING_SORT_FIELDS.find((allowed) => allowed === next.id);
+    if (!field) return;
+    setSortState({ id: field, direction: next.direction });
+    setPage(1);
+  }, []);
+
   return {
+    sort,
+    setSort,
     t,
     lang,
     canManage,

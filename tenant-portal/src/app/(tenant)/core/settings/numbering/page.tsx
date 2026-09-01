@@ -48,6 +48,8 @@ export default function NumberingPage() {
     create,
     update,
     reload,
+    sort,
+    setSort,
   } = useNumberingSequences();
 
   const filterValues: FilterValues = companyFilter
@@ -57,6 +59,7 @@ export default function NumberingPage() {
   const columns: ColumnDef<NumberingSequence>[] = [
     {
       id: "code",
+      sortable: true,
       header: t.coreSettings.numberingCode,
       cell: (sequence) => <span className="font-medium text-foreground">{sequence.code}</span>,
     },
@@ -68,6 +71,8 @@ export default function NumberingPage() {
     },
     {
       id: "next",
+      sortable: true,
+      sortField: "nextValue",
       header: t.coreSettings.numberingNextNumber,
       // The counter is a bigint string; `formatNumberingValue` pads text and
       // never converts it to a number.
@@ -173,6 +178,8 @@ export default function NumberingPage() {
           onRetry={() => void reload()}
           page={pageInfo}
           onPageChange={setPage}
+          sort={sort}
+          onSortChange={setSort}
           rowKey={(sequence) => sequence.id}
           labels={{
             retry: t.common.retry,

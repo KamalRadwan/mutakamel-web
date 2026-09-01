@@ -15,6 +15,8 @@ import {
   type TenantUser,
   type TenantUserFilters,
   type UserStatus,
+  TENANT_USER_SORT_FIELDS,
+  type TenantUserSortField,
 } from "../../contracts/user-contract";
 
 export type UserRowAction = "suspend" | "activate" | "delete";
@@ -52,6 +54,10 @@ export function useTenantUsers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [serverSearch, setServerSearch] = useState("");
   const [filters, setFilters] = useState<TenantUserFilters>({});
+  const [sort, setSortState] = useState<{ id: TenantUserSortField; direction: "asc" | "desc" }>({
+    id: "createdAt",
+    direction: "desc",
+  });
   const [rows, setRows] = useState<TenantUser[]>([]);
   const [pageInfo, setPageInfo] = useState({ page: 1, limit: 25, total: 0 });
   const [isLoading, setIsLoading] = useState(true);
@@ -84,7 +90,14 @@ export function useTenantUsers() {
       if (controller.signal.aborted) return;
       setIsLoading(true);
       setQueryError(null);
-      fetchTenantUsers({ page, search: serverSearch, filters, signal: controller.signal })
+      fetchTenantUsers({
+        page,
+        search: serverSearch,
+        filters,
+        sortBy: sort.id,
+        sortDir: sort.direction === "asc" ? "ASC" : "DESC",
+        signal: controller.signal,
+      })
         .then((result) => {
           if (controller.signal.aborted) return;
           setRows(result.items);
@@ -100,7 +113,7 @@ export function useTenantUsers() {
         });
     });
     return () => controller.abort();
-  }, [filters, page, serverSearch, reloadToken]);
+  }, [filters, page, serverSearch, reloadToken, sort]);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 
@@ -161,10 +174,19 @@ export function useTenantUsers() {
     });
   }, []);
 
+  const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
+    const field = TENANT_USER_SORT_FIELDS.find((allowed) => allowed === next.id);
+    if (!field) return;
+    setSortState({ id: field, direction: next.direction });
+    setPage(1);
+  }, []);
+
   return useMemo(
     () => ({
       t,
       lang,
+      sort,
+      setSort,
       actingUserId: actor?.id ?? null,
       canInvite,
       canDeactivate,
@@ -208,7 +230,7 @@ export function useTenantUsers() {
       actor?.id, canDeactivate, canDelete, canInvite, confirmPendingAction, filters,
       handleInvite, isInviteOpen, isLoading, isSeatLimitReached, isSubmitting, lang,
       mutationError, page, pageInfo, pendingAction, queryError, reload, rows,
-      searchQuery, setFilter, t,
+      searchQuery, setFilter, setSort, sort, t,
     ],
   );
 }

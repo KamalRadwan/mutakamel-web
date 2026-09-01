@@ -9,6 +9,7 @@ import {
 } from "@/shared/api/normalized-api-error";
 import { subscriptionsApi } from "./api";
 import { isUuidV7 } from "./readers";
+import { SUBSCRIPTION_SORT_FIELDS } from "./types";
 import type {
   SubscriptionFilterDraft,
   SubscriptionListQuery,
@@ -146,6 +147,21 @@ export function useSubscriptions(): SubscriptionsViewModel {
     setRevision((current) => current + 1);
   }, []);
 
+  // Header sorting bypasses the draft/apply cycle the filter form uses: the
+  // click is the request. The field is checked against the endpoint's list
+  // first, since `sortBy` outside it is a 400 rather than an ignored value.
+  const changeSort = useCallback((sortBy: string, sortDir: "ASC" | "DESC") => {
+    const field = SUBSCRIPTION_SORT_FIELDS.find((allowed) => allowed === sortBy);
+    if (!field) return;
+    setDraft((current) => ({ ...current, sortBy: field, sortDir }));
+    setApplied((current) => ({ ...current, sortBy: field, sortDir }));
+    dataRef.current = null;
+    setResponseOwnerId(null);
+    setData(null);
+    setPageState(1);
+    setRevision((current) => current + 1);
+  }, []);
+
   const setPage = useCallback((nextPage: number) => {
     if (!Number.isSafeInteger(nextPage) || nextPage < 1) return;
     setPageState(nextPage);
@@ -194,6 +210,7 @@ export function useSubscriptions(): SubscriptionsViewModel {
     applyFilters,
     clearFilters,
     refresh,
+    changeSort,
     setPage,
     setLimit,
   };

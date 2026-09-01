@@ -58,6 +58,7 @@ export default function CustomerProfilesPage() {
     previousPage,
     nextPage,
     reload,
+    setSort,
   } = useCustomerProfiles();
   const { capabilities, error: capabilitiesError } =
     useCustomerProfilesCapabilities(branchId);
@@ -73,7 +74,15 @@ export default function CustomerProfilesPage() {
     },
     [nextPage, pagination?.page, previousPage],
   );
-  const workspace = useWorkspaceState("customerProfiles", { defaultView: "table", onPageChange: applyPage });
+  const applySort = useCallback(
+    (next: { id: string; direction: "asc" | "desc" }) => setSort(next),
+    [setSort],
+  );
+  const workspace = useWorkspaceState("customerProfiles", {
+    defaultView: "table",
+    onPageChange: applyPage,
+    onSortChange: applySort,
+  });
   const { view, setView } = workspace;
   // BLACKLISTED is terminal in practice — confirms via a real modal, not
   // window.confirm. confirmMove needs a Promise<boolean>, so the pending
@@ -246,6 +255,7 @@ export default function CustomerProfilesPage() {
               page={pageInfo}
               onPageChange={workspace.setPage}
               sort={workspace.sort}
+              onSortChange={workspace.setSort}
               emptyState={preconditionState}
               labels={viewLabels}
             />

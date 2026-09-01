@@ -270,6 +270,8 @@ function SubscriptionResults({
     },
     {
       key: "lifecycle",
+      sortable: true,
+      sortField: "status",
       headerEn: copy.lifecycle,
       headerAr: copy.lifecycle,
       cell: (item) => (
@@ -359,6 +361,8 @@ function SubscriptionResults({
     },
     {
       key: "period",
+      sortable: true,
+      sortField: "currentPeriodEnd",
       headerEn: copy.period,
       headerAr: copy.period,
       cell: (item) => (
@@ -380,6 +384,11 @@ function SubscriptionResults({
   return (
     <div className="space-y-3">
       <DataTable
+        sort={{
+          sortBy: view.draft.sortBy,
+          sortDir: view.draft.sortDir === "ASC" ? "ASC" : "DESC",
+          onSortChange: view.changeSort,
+        }}
         labelEn={SUBSCRIPTIONS_COPY.en.title}
         labelAr={SUBSCRIPTIONS_COPY.ar.title}
         columns={columns}
