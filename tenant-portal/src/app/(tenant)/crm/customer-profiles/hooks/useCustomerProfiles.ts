@@ -220,8 +220,15 @@ export function resolveCustomerProfilesBranchId(
   return resolveDefaultTenantBranchId(source);
 }
 
-/** GET /crm/customer-profiles accepts these two fields only; else a 400. */
-export const CUSTOMER_PROFILE_SORT_FIELDS = ["displayName", "createdAt"] as const;
+/**
+ * GET /crm/customer-profiles accepts these two fields only; else a 400.
+ *
+ * Not exported: the allowlist is consumed by `setSort` below and by the type on
+ * the next line, both in this file, and nothing outside imports it. `knip`
+ * flags the unused export, and it is right to — an export is a claim that
+ * something else needs the value.
+ */
+const CUSTOMER_PROFILE_SORT_FIELDS = ["displayName", "createdAt"] as const;
 export type CustomerProfileSortField = (typeof CUSTOMER_PROFILE_SORT_FIELDS)[number];
 
 export function buildCustomerProfilesListPath({
