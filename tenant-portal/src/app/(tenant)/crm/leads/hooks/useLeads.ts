@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
-import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import {
+  SCOPE_UNRESOLVED_ERROR,
+  useOrganizationScopeHeaders,
+} from "@/hooks/useOrganizationScope";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -331,6 +334,22 @@ function isAmbiguousMutationError(error: unknown): boolean {
   );
 }
 
+// GET /crm/leads accepts displayName and createdAt only; else a 400.
+//
+// Module-level so the ref and the state can start from the same value without
+// one reading the other. `useState(sortRef.current)` is a ref read during
+// render, which React flags: a ref is not render input, and a component that
+// derives rendered state from one can miss an update. Both now initialise from
+// this constant instead. Nothing else changes — the ref still exists to give
+// the async fetch below a non-stale sort, which is what it was always for.
+//
+// Never mutated in place: `setSort` assigns a fresh object to `sortRef.current`
+// rather than writing through it, so sharing this one object at init is safe.
+const DEFAULT_LEADS_SORT: { id: "displayName" | "createdAt"; direction: "asc" | "desc" } = {
+  id: "createdAt",
+  direction: "desc",
+};
+
 export function useLeads() {
   const { t } = useI18n();
   const { user } = useTenantAuth();
@@ -342,14 +361,8 @@ export function useLeads() {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
-  // GET /crm/leads accepts displayName and createdAt only; else a 400.
-  const sortRef = useRef<{ id: "displayName" | "createdAt"; direction: "asc" | "desc" }>({
-    id: "createdAt",
-    direction: "desc",
-  });
-  const [sort, setSortState] = useState<{ id: "displayName" | "createdAt"; direction: "asc" | "desc" }>(
-    sortRef.current,
-  );
+  const sortRef = useRef(DEFAULT_LEADS_SORT);
+  const [sort, setSortState] = useState(DEFAULT_LEADS_SORT);
   const searchQueryRef = useRef("");
   const pageRef = useRef(1);
   const requestEpochRef = useRef(0);
@@ -385,7 +398,7 @@ export function useLeads() {
   // api-gateway-app/src/common/middleware/route-context.middleware.ts — and
   // every action control on this screen silently degraded to "unavailable"
   // for a reason that had nothing to do with permissions (D11 / 8.5).
-  const capabilityScopeHeaders = useOrganizationScopeHeaders(
+  const capabilityScope = useOrganizationScopeHeaders(
     "BRANCH_REQUIRED",
     branchId,
   );
@@ -476,15 +489,21 @@ export function useLeads() {
               cache: "no-store",
               maxResponseBytes: 256 * 1024,
             }),
-            axiosClient.get<unknown>(
-              `/api/tenant/crm/v1/leads/capabilities?branchId=${encodeURIComponent(branchId)}`,
-              {
-                signal,
-                cache: "no-store",
-                maxResponseBytes: 256 * 1024,
-                headers: capabilityScopeHeaders,
-              },
-            ),
+            // D4: with no resolved scope the request is not sent at all. A
+            // rejected source is already how this batch says "capabilities
+            // unknown", and it degrades the action controls honestly instead
+            // of firing an unscoped request the Gateway answers 400 to.
+            capabilityScope.ready
+              ? axiosClient.get<unknown>(
+                  `/api/tenant/crm/v1/leads/capabilities?branchId=${encodeURIComponent(branchId)}`,
+                  {
+                    signal,
+                    cache: "no-store",
+                    maxResponseBytes: 256 * 1024,
+                    headers: capabilityScope.headers,
+                  },
+                )
+              : Promise.reject(new Error(SCOPE_UNRESOLVED_ERROR.code)),
           ]);
 
         // One aborted source means the whole request was cancelled — a newer
@@ -561,7 +580,7 @@ export function useLeads() {
         }
       }
     },
-    [branchId, capabilityScopeHeaders, changePage, page, searchQuery],
+    [branchId, capabilityScope, changePage, page, searchQuery],
   );
 
   useEffect(() => {

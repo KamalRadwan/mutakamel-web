@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-08-31T05:39:47.934Z**
+Generated at: **2026-09-01T23:45:13.485Z**
 
-Frontend revision: `599199821d5c+dirty`
+Frontend revision: `df16995b995b+dirty`
 
-Backend revision: `6f7af078b871`
+Backend revision: `d9373e1059c9`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -237,17 +237,17 @@ Machine-readable source:
 | crm | GET | `/api/tenant/crm/v1/acquisition-sources/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.acquisition.sources.by.id.get` |
 | crm | PATCH | `/api/tenant/crm/v1/acquisition-sources/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.acquisition.sources.by.id.patch` |
 | crm | GET | `/api/tenant/crm/v1/acquisition-sources/:id/icon` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.acquisition.sources.by.id.icon.get` |
-| crm | POST | `/api/tenant/crm/v1/acquisition-sources/:id/icon` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.acquisition.sources.by.id.icon.post` |
+| crm | POST | `/api/tenant/crm/v1/acquisition-sources/:id/icon` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.acquisition.sources.by.id.icon.post` |
 | crm | PATCH | `/api/tenant/crm/v1/acquisition-sources/reorder` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.acquisition.sources.reorder.patch` |
 | crm | GET | `/api/tenant/crm/v1/activities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.activities.get` |
-| crm | POST | `/api/tenant/crm/v1/activities` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.activities.post` |
+| crm | POST | `/api/tenant/crm/v1/activities` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.activities.post` |
 | crm | GET | `/api/tenant/crm/v1/attachments` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.attachments.get` |
-| crm | POST | `/api/tenant/crm/v1/attachments` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.attachments.post` |
+| crm | POST | `/api/tenant/crm/v1/attachments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.attachments.post` |
 | crm | DELETE | `/api/tenant/crm/v1/attachments/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.attachments.by.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/attachments/:id/download` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.attachments.by.id.download.get` |
-| crm | POST | `/api/tenant/crm/v1/attachments/upload` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.attachments.upload.post` |
+| crm | POST | `/api/tenant/crm/v1/attachments/upload` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.attachments.upload.post` |
 | crm | GET | `/api/tenant/crm/v1/calendar/events` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.calendar.events.get` |
-| crm | POST | `/api/tenant/crm/v1/calendar/events` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.calendar.events.post` |
+| crm | POST | `/api/tenant/crm/v1/calendar/events` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.calendar.events.post` |
 | crm | PATCH | `/api/tenant/crm/v1/calendar/events/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.calendar.events.by.id.patch` |
 | crm | GET | `/api/tenant/crm/v1/custom-fields` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.custom.fields.get` |
 | crm | POST | `/api/tenant/crm/v1/custom-fields` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.custom.fields.post` |
@@ -256,11 +256,11 @@ Machine-readable source:
 | crm | GET | `/api/tenant/crm/v1/custom-fields/values` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.custom.fields.values.get` |
 | crm | POST | `/api/tenant/crm/v1/custom-fields/values` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.custom.fields.values.post` |
 | crm | GET | `/api/tenant/crm/v1/customer-profiles` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.customer.profiles.get` |
-| crm | POST | `/api/tenant/crm/v1/customer-profiles` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.post` |
+| crm | POST | `/api/tenant/crm/v1/customer-profiles` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.customer.profiles.post` |
 | crm | DELETE | `/api/tenant/crm/v1/customer-profiles/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.by.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/customer-profiles/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.customer.profiles.by.id.get` |
 | crm | PATCH | `/api/tenant/crm/v1/customer-profiles/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.by.id.patch` |
-| crm | POST | `/api/tenant/crm/v1/customer-profiles/:id/contacts` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.contacts.post` |
+| crm | POST | `/api/tenant/crm/v1/customer-profiles/:id/contacts` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.customer.profiles.contacts.post` |
 | crm | GET | `/api/tenant/crm/v1/customer-profiles/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.customer.profiles.capabilities.get` |
 | crm | GET | `/api/tenant/crm/v1/dashboards` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.dashboard.builder.list.get` |
 | crm | POST | `/api/tenant/crm/v1/dashboards` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.dashboard.builder.create.post` |
@@ -298,21 +298,21 @@ Machine-readable source:
 | crm | POST | `/api/tenant/crm/v1/lead-stages/:id/default` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.lead.stages.by.id.default.post` |
 | crm | PATCH | `/api/tenant/crm/v1/lead-stages/reorder` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.lead.stages.reorder.patch` |
 | crm | GET | `/api/tenant/crm/v1/leads` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.get` |
-| crm | POST | `/api/tenant/crm/v1/leads` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.post` |
+| crm | POST | `/api/tenant/crm/v1/leads` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.leads.post` |
 | crm | DELETE | `/api/tenant/crm/v1/leads/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/leads/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.by.id.get` |
 | crm | PATCH | `/api/tenant/crm/v1/leads/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.patch` |
-| crm | POST | `/api/tenant/crm/v1/leads/:id/convert` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.convert.post` |
+| crm | POST | `/api/tenant/crm/v1/leads/:id/convert` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.leads.by.id.convert.post` |
 | crm | POST | `/api/tenant/crm/v1/leads/:id/stage` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.stage.post` |
 | crm | GET | `/api/tenant/crm/v1/leads/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.capabilities.get` |
 | crm | GET | `/api/tenant/crm/v1/leads/company-options` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.company.options.get` |
 | crm | GET | `/api/tenant/crm/v1/leads/company-options/:companyPartyId/contacts` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.company.options.contacts.get` |
 | crm | GET | `/api/tenant/crm/v1/notes` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.notes.get` |
-| crm | POST | `/api/tenant/crm/v1/notes` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.notes.post` |
+| crm | POST | `/api/tenant/crm/v1/notes` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.notes.post` |
 | crm | DELETE | `/api/tenant/crm/v1/notes/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.notes.by.id.delete` |
 | crm | PATCH | `/api/tenant/crm/v1/notes/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.notes.by.id.patch` |
 | crm | GET | `/api/tenant/crm/v1/opportunities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunities.get` |
-| crm | POST | `/api/tenant/crm/v1/opportunities` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunities.post` |
+| crm | POST | `/api/tenant/crm/v1/opportunities` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.opportunities.post` |
 | crm | DELETE | `/api/tenant/crm/v1/opportunities/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunities.by.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/opportunities/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunities.by.id.get` |
 | crm | PATCH | `/api/tenant/crm/v1/opportunities/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunities.by.id.patch` |
@@ -349,7 +349,7 @@ Machine-readable source:
 | crm | GET | `/api/tenant/crm/v1/pipelines/assignment-options` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.pipelines.assignment.options.get` |
 | crm | GET | `/api/tenant/crm/v1/pipelines/configuration` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.pipelines.configuration.get` |
 | crm | GET | `/api/tenant/crm/v1/reminders` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.reminders.get` |
-| crm | POST | `/api/tenant/crm/v1/reminders` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.reminders.post` |
+| crm | POST | `/api/tenant/crm/v1/reminders` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.reminders.post` |
 | crm | PATCH | `/api/tenant/crm/v1/reminders/:id/cancel` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.reminders.by.id.cancel.patch` |
 | crm | GET | `/api/tenant/crm/v1/settings` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.settings.get` |
 | crm | PUT | `/api/tenant/crm/v1/settings` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.settings.put` |
@@ -361,7 +361,7 @@ Machine-readable source:
 | crm | POST | `/api/tenant/crm/v1/settings/custom-fields/values` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.settings.custom.fields.values.post` |
 | crm | GET | `/api/tenant/crm/v1/static-data` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.static.data.get` |
 | crm | GET | `/api/tenant/crm/v1/tasks` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.tasks.get` |
-| crm | POST | `/api/tenant/crm/v1/tasks` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.tasks.post` |
+| crm | POST | `/api/tenant/crm/v1/tasks` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.tasks.post` |
 | crm | PATCH | `/api/tenant/crm/v1/tasks/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.tasks.by.id.patch` |
 | crm | GET | `/api/tenant/crm/v1/widgets` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.dashboard.widgets.list.get` |
 | crm | POST | `/api/tenant/crm/v1/widgets` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.dashboard.widgets.create.post` |

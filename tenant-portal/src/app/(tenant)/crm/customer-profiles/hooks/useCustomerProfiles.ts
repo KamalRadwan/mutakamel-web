@@ -267,6 +267,20 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
+// Module-level so the ref and the state can start from the same value without
+// one reading the other. `useState(sortRef.current)` is a ref read during
+// render, which React flags: a ref is not render input, and a component that
+// derives rendered state from one can miss an update. Both now initialise from
+// this constant instead. The ref itself stays — it is what gives the async
+// fetch below a non-stale sort.
+//
+// Never mutated in place: `setSort` assigns a fresh object to `sortRef.current`
+// rather than writing through it, so sharing this one object at init is safe.
+const DEFAULT_CUSTOMER_PROFILES_SORT: {
+  id: CustomerProfileSortField;
+  direction: "asc" | "desc";
+} = { id: "createdAt", direction: "desc" };
+
 export function useCustomerProfiles() {
   const { lang, t } = useI18n();
   const { user, isLoading: isAuthLoading } = useTenantAuth();
@@ -274,11 +288,8 @@ export function useCustomerProfiles() {
   const [searchQuery, setSearchQuery] = useState("");
   const [serverSearch, setServerSearch] = useState("");
   const [page, setPage] = useState(1);
-  const sortRef = useRef<{ id: CustomerProfileSortField; direction: "asc" | "desc" }>({
-    id: "createdAt",
-    direction: "desc",
-  });
-  const [sort, setSortState] = useState(sortRef.current);
+  const sortRef = useRef(DEFAULT_CUSTOMER_PROFILES_SORT);
+  const [sort, setSortState] = useState(DEFAULT_CUSTOMER_PROFILES_SORT);
   const [reloadToken, setReloadToken] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   // A precondition that stops the request being made at all — no session, or
