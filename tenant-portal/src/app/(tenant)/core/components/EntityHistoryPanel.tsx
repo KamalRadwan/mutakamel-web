@@ -4,6 +4,7 @@ import { CircleCheck, CircleX, History } from "lucide-react";
 import {
   DetailSection,
   ErrorState,
+  IdentifierText,
   PermissionGate,
   Timeline,
   type TimelineEvent,
@@ -98,9 +99,9 @@ function toTimelineEvent(
           </span>
         ) : null}
         {event.correlationId ? (
-          <span className="font-mono text-xs text-muted-foreground">
+          <IdentifierText className="text-xs text-muted-foreground">
             {formatTemplate(copy.referenceLine, { reference: event.correlationId })}
-          </span>
+          </IdentifierText>
         ) : null}
       </span>
     ),

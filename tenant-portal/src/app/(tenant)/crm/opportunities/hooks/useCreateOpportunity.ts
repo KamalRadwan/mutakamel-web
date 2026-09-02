@@ -5,6 +5,7 @@ import type { NormalizedApiError } from "@/lib/api/errors";
 import {
   createCrmWriteAttempt,
   runCrmWrite,
+  type CrmAppliedUnreadable,
   type CrmWriteAttempt,
 } from "../../shared/crm-write";
 import {
@@ -40,11 +41,22 @@ export function useCreateOpportunity(
   branchId: string | null,
   pipelines: OpportunityPipeline[],
   onCreated: (opportunityId: string) => void,
+  /**
+   * Re-read what the screen shows — defect D2. Called when a write applied but
+   * its response body could not be parsed, and offered again as the panel's own
+   * action, because refreshing is the only safe thing left to do.
+   */
+  onReconcile: () => void,
 ) {
   const [form, setForm] = useState<OpportunityForm | null>(null);
   const [customerLabel, setCustomerLabel] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  // D2: the write applied and its receipt could not be read. Its own state,
+  // because `error` invites a second Save and that is exactly what a
+  // non-idempotent route cannot take.
+  const [appliedUnreadable, setAppliedUnreadable] =
+    useState<CrmAppliedUnreadable | null>(null);
   const [ambiguity, setAmbiguity] = useState<CreateOpportunityAmbiguity | null>(
     null,
   );
@@ -96,9 +108,10 @@ export function useCreateOpportunity(
     try {
       body = buildCreateOpportunityRequest(form, branchId);
     } catch (caught) {
+      // The builder throws a code, not prose — `useCrmErrorText` owns the words.
       setError({
         status: 422,
-        message: caught instanceof Error ? caught.message : undefined,
+        code: caught instanceof Error ? caught.message : undefined,
       });
       return;
     }
@@ -126,6 +139,17 @@ export function useCreateOpportunity(
           setAmbiguity({ attempt, error: outcome.error, replay: send });
           return;
         }
+        if (outcome.kind === "applied_unreadable") {
+          // `POST /opportunities` is not idempotent across attempts: the deal
+          // exists, and a second Save makes two. The form is cleared so there
+          // is nothing left to press.
+          setAmbiguity(null);
+          setError(null);
+          setForm(null);
+          setAppliedUnreadable({ attempt, error: outcome.error });
+          onReconcile();
+          return;
+        }
         setError(outcome.error);
       } finally {
         setIsSubmitting(false);
@@ -133,7 +157,7 @@ export function useCreateOpportunity(
     };
 
     await send();
-  }, [branchId, form, isSubmitting, isValid, onCreated]);
+  }, [branchId, form, isSubmitting, isValid, onCreated, onReconcile]);
 
   return {
     open: form !== null,
@@ -145,6 +169,9 @@ export function useCreateOpportunity(
     error,
     ambiguity,
     dismissAmbiguity: () => setAmbiguity(null),
+    appliedUnreadable,
+    dismissAppliedUnreadable: () => setAppliedUnreadable(null),
+    reconcile: onReconcile,
     openDrawer,
     closeDrawer,
     setField,

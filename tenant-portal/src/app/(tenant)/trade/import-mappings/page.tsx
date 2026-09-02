@@ -7,6 +7,7 @@ import {
   Button,
   DataTable,
   FilterBar,
+  IdentifierText,
   PageHeader,
   PermissionGate,
   type ColumnDef,
@@ -71,19 +72,19 @@ export default function ImportMappingsPage() {
     {
       id: "targetCode",
       header: t.tradeAutomation.targetCode,
-      cell: (mapping) => tradeStatusLabel(t.tradeStatus, mapping.targetCode),
+      cell: (mapping) => tradeStatusLabel(t.tradeStatus, mapping.targetCode, t.common.unknownCode),
     },
     {
       id: "scopeTarget",
       header: t.tradeGovernance.scopeTarget,
-      cell: (mapping) => tradeStatusLabel(t.tradeStatus, mapping.scopeTarget),
+      cell: (mapping) => tradeStatusLabel(t.tradeStatus, mapping.scopeTarget, t.common.unknownCode),
     },
     {
       id: "status",
       header: t.common.status,
       cell: (mapping) => (
         <Badge tone={mapping.status === "ACTIVE" ? "positive" : "neutral"}>
-          {tradeStatusLabel(t.tradeStatus, mapping.status)}
+          {tradeStatusLabel(t.tradeStatus, mapping.status, t.common.unknownCode)}
         </Badge>
       ),
     },
@@ -92,7 +93,7 @@ export default function ImportMappingsPage() {
       // The runs screen takes a mapping id by hand, because listing mappings
       // and listing runs need different grants — so the id is shown here.
       header: t.tradeAutomation.mappingId,
-      cell: (mapping) => <span className="font-mono text-xs">{mapping.id}</span>,
+      cell: (mapping) => <IdentifierText className="text-xs">{mapping.id}</IdentifierText>,
     },
     {
       id: "updatedAt",
@@ -137,7 +138,7 @@ export default function ImportMappingsPage() {
             placeholder: t.tradeCommon.anyStatus,
             options: IMPORT_MAPPING_STATUSES.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
         ]}

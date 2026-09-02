@@ -122,11 +122,11 @@ export default function ImportMappingPage({
     <div className="flex flex-col gap-4">
       <DetailHeader
         title={mapping?.code ?? t.tradeAutomation.mappingDetailTitle}
-        subtitle={mapping ? tradeStatusLabel(t.tradeStatus, mapping.targetCode) : undefined}
+        subtitle={mapping ? tradeStatusLabel(t.tradeStatus, mapping.targetCode, t.common.unknownCode) : undefined}
         status={
           mapping ? (
             <Badge tone={mapping.status === "ACTIVE" ? "positive" : "neutral"}>
-              {tradeStatusLabel(t.tradeStatus, mapping.status)}
+              {tradeStatusLabel(t.tradeStatus, mapping.status, t.common.unknownCode)}
             </Badge>
           ) : undefined
         }
@@ -167,7 +167,7 @@ export default function ImportMappingPage({
             fields={[
               {
                 label: t.tradeGovernance.scopeTarget,
-                value: tradeStatusLabel(t.tradeStatus, mapping.scopeTarget),
+                value: tradeStatusLabel(t.tradeStatus, mapping.scopeTarget, t.common.unknownCode),
               },
               { label: t.tradeCommon.version, value: String(mapping.version) },
               { label: t.tradeAutomation.mappingId, value: mapping.id },

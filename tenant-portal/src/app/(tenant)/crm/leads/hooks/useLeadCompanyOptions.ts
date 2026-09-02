@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  SCOPE_UNRESOLVED_ERROR,
+  useOrganizationScopeHeaders,
+} from "@/hooks/useOrganizationScope";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -36,13 +39,23 @@ function isAbortError(error: unknown): boolean {
  * one route that requires them.
  */
 export function useLeadCompanyOptions(branchId: string | null, enabled: boolean) {
-  const scopeHeaders = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
+  const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   const [companies, setCompanies] = useState<LeadCompanyOption[]>([]);
   const [contacts, setContacts] = useState<LeadCompanyContactOption[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  // Defect D9, the same shape as D5. Picking company A then company B fired
+  // two contact reads with nothing ordering them: A could land last and fill
+  // the picker with A's people while B is the selected company, and the lead
+  // was then created against a contact who does not belong to it. The epoch is
+  // per selection, and a response is dropped unless it is still the one the
+  // user is waiting for.
+  const contactsEpochRef = useRef(0);
+  const contactsRequestRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => contactsRequestRef.current?.abort(), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -82,28 +95,50 @@ export function useLeadCompanyOptions(branchId: string | null, enabled: boolean)
 
   const selectCompany = useCallback(
     async (companyPartyId: string | null) => {
+      const epoch = contactsEpochRef.current + 1;
+      contactsEpochRef.current = epoch;
+      contactsRequestRef.current?.abort();
       setSelectedCompanyId(companyPartyId);
       setContacts([]);
-      if (!companyPartyId || !isUUIDv7(branchId)) return;
+      if (!companyPartyId || !isUUIDv7(branchId)) {
+        contactsRequestRef.current = null;
+        return;
+      }
+      if (!scope.ready) {
+        // D4: the contacts route is BRANCH_REQUIRED. With no scope this used
+        // to go out bare and come back 400.
+        contactsRequestRef.current = null;
+        setError(SCOPE_UNRESOLVED_ERROR);
+        return;
+      }
+      const controller = new AbortController();
+      contactsRequestRef.current = controller;
       setIsLoadingContacts(true);
       try {
         const response = await axiosClient.get<unknown>(
           leadCompanyContactsPath(companyPartyId, branchId),
           {
+            signal: controller.signal,
             cache: "no-store",
             maxResponseBytes: 512 * 1024,
-            headers: scopeHeaders,
+            headers: scope.headers,
           },
         );
-        setContacts(parseLeadCompanyContactOptions(response.data));
+        const parsed = parseLeadCompanyContactOptions(response.data);
+        if (epoch !== contactsEpochRef.current) return;
+        setContacts(parsed);
       } catch (caught) {
+        if (isAbortError(caught) || epoch !== contactsEpochRef.current) return;
         setContacts([]);
         setError(normalizeApiError(caught));
       } finally {
-        setIsLoadingContacts(false);
+        if (epoch === contactsEpochRef.current) {
+          contactsRequestRef.current = null;
+          setIsLoadingContacts(false);
+        }
       }
     },
-    [branchId, scopeHeaders],
+    [branchId, scope],
   );
 
   return {
@@ -115,9 +150,17 @@ export function useLeadCompanyOptions(branchId: string | null, enabled: boolean)
     error,
     selectCompany,
     reset: () => {
+      // A new epoch, so a contact read still in flight cannot repopulate the
+      // picker after the drawer was reset.
+      contactsEpochRef.current += 1;
+      contactsRequestRef.current?.abort();
+      contactsRequestRef.current = null;
       setSelectedCompanyId(null);
       setContacts([]);
       setError(null);
+      // The aborted read's `finally` sees a stale epoch and leaves the flag
+      // alone; nothing follows a reset, so it clears its own spinner.
+      setIsLoadingContacts(false);
     },
   };
 }

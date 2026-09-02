@@ -20,6 +20,7 @@ import {
   createCrmWriteAttempt,
   expectNoContent,
   runCrmWrite,
+  type CrmAppliedUnreadable,
   type CrmWriteAttempt,
 } from "../crm-write";
 
@@ -43,6 +44,7 @@ type SendWrite = () => Promise<
   | { kind: "success" }
   | { kind: "failed"; error: NormalizedApiError }
   | { kind: "ambiguous"; error: NormalizedApiError }
+  | { kind: "applied_unreadable"; error: NormalizedApiError }
 >;
 
 type SettleWrite = (
@@ -82,6 +84,11 @@ export function useCrmAttachments({
   const [ambiguity, setAmbiguity] = useState<CrmAttachmentsAmbiguity | null>(
     null,
   );
+  // D2: the write applied and its receipt could not be read. Kept apart from
+  // `writeError` and `uploadFailure` because both of those invite the user to
+  // do it again, which is the one thing this outcome forbids.
+  const [appliedUnreadable, setAppliedUnreadable] =
+    useState<CrmAppliedUnreadable | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const requestEpochRef = useRef(0);
 
@@ -168,6 +175,17 @@ export function useCrmAttachments({
         await load();
         return false;
       }
+      if (outcome.kind === "applied_unreadable") {
+        // D2: the file IS attached. Reporting this as an upload failure sent
+        // the user back to the file picker, and the second upload was a second
+        // attachment. The list is reloaded and the panel offers only that.
+        setWriteError(null);
+        setUploadFailure(null);
+        setAmbiguity(null);
+        setAppliedUnreadable({ attempt, error: outcome.error });
+        await load();
+        return false;
+      }
       setAmbiguity(null);
       if (operation === "upload") {
         setUploadFailure(classifyAttachmentUploadFailure(outcome.error));
@@ -250,6 +268,8 @@ export function useCrmAttachments({
     clearWriteError: () => setWriteError(null),
     ambiguity,
     dismissAmbiguity: () => setAmbiguity(null),
+    appliedUnreadable,
+    dismissAppliedUnreadable: () => setAppliedUnreadable(null),
     isUploading,
     pendingId,
     reload,

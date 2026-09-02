@@ -1,7 +1,7 @@
 "use client";
 
 import { Wrench } from "lucide-react";
-import { useConnectivity } from "@/design-system";
+import { IdentifierText, useConnectivity } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { FenceScreen } from "../components/FenceScreen";
 
@@ -36,7 +36,7 @@ export default function MaintenancePage() {
       detail={
         stopReason ? (
           <p className="text-xs text-muted-foreground">
-            {copy.reasonLabel}: <span className="font-mono">{stopReason}</span>
+            {copy.reasonLabel}: <IdentifierText>{stopReason}</IdentifierText>
           </p>
         ) : null
       }

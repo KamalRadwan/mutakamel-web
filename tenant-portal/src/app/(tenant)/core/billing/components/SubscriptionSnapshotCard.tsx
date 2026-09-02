@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FileText } from "lucide-react";
-import { Button, DateTime, DetailSection, EmptyState, Money } from "@/design-system";
+import { Button, DateTime, DetailSection, EmptyState, IdentifierText, Money } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { BillingBadge } from "../../components/BillingBadge";
@@ -81,7 +81,7 @@ export function SubscriptionSnapshotCard({
             ? [
                 {
                   label: t.coreBilling.invoiceNumber,
-                  value: <span className="font-mono">{outstandingInvoice.number}</span>,
+                  value: <IdentifierText>{outstandingInvoice.number}</IdentifierText>,
                 },
                 {
                   label: t.common.status,

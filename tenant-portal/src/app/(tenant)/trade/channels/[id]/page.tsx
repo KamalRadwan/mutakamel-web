@@ -9,6 +9,7 @@ import {
   DetailSection,
   EmptyState,
   ErrorState,
+  IdentifierText,
   NotFoundState,
   PermissionGate,
   Skeleton,
@@ -42,7 +43,7 @@ export default function TradeChannelDetailPage({ params }: { params: Promise<{ i
                 {isKnownStatus ? (
                   t.trade[`channelStatus_${channel.status as "ACTIVE" | "INACTIVE"}`]
                 ) : (
-                  <span className="font-mono">{channel.status}</span>
+                  <IdentifierText>{channel.status}</IdentifierText>
                 )}
               </Badge>
             ) : null
@@ -80,7 +81,7 @@ export default function TradeChannelDetailPage({ params }: { params: Promise<{ i
               fields={[
                 {
                   label: t.trade.channelCode,
-                  value: <span className="font-mono">{channel.code}</span>,
+                  value: <IdentifierText>{channel.code}</IdentifierText>,
                 },
                 { label: t.trade.channelName, value: channel.name },
                 {
@@ -91,7 +92,7 @@ export default function TradeChannelDetailPage({ params }: { params: Promise<{ i
                 },
                 {
                   label: t.trade.version,
-                  value: <span className="font-mono">{channel.version}</span>,
+                  value: <IdentifierText>{channel.version}</IdentifierText>,
                 },
                 { label: t.trade.updatedAt, value: formatDateTime(channel.updatedAt, lang) },
               ]}
@@ -131,9 +132,9 @@ export default function TradeChannelDetailPage({ params }: { params: Promise<{ i
                       key={branch.id}
                       className="flex items-center justify-between gap-3 rounded-sm border border-border p-2"
                     >
-                      <span className="min-w-0 font-mono text-xs text-foreground">
+                      <IdentifierText className="min-w-0 text-xs text-foreground">
                         {branch.branchId}
-                      </span>
+                      </IdentifierText>
                       <span className="flex items-center gap-2">
                         <Badge tone={branch.isActive ? "positive" : "neutral"}>
                           {branch.isActive ? t.common.active : t.common.inactive}

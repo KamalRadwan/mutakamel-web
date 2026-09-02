@@ -418,6 +418,32 @@ describe("TenantRealtimeBinding", () => {
     expect(coordinator.setDeploymentMode).toHaveBeenCalledWith("off");
   });
 
+  // This provider wraps every route, /login included. Building the coordinator
+  // before checking the generation gave anyone who merely opened the sign-in
+  // form a socket runtime and a device id persisted to localStorage, for a
+  // session that does not exist.
+  it("builds no coordinator, and no device identity, for a signed-out visitor", () => {
+    const written: string[] = [];
+    const setItem = window.localStorage.setItem.bind(window.localStorage);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(
+      function (key: string, value: string) {
+        written.push(key);
+        setItem(key, value);
+      },
+    );
+
+    render(
+      <TenantRealtimeBinding generation={null} mode="on">
+        <span>signed out</span>
+      </TenantRealtimeBinding>,
+    );
+
+    expect(written).toEqual([]);
+    expect(
+      window.localStorage.getItem(REALTIME_DEVICE_ID_STORAGE_KEY_V1),
+    ).toBeNull();
+  });
+
   it("creates its browser identity without reading token or session storage", () => {
     const reads: string[] = [];
     const originalGetItem = window.localStorage.getItem.bind(window.localStorage);

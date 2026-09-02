@@ -9,6 +9,7 @@ import {
   textEntrySize,
   type ControlSizeProps,
 } from "../lib/variants";
+import { useFieldControl } from "./field-control";
 
 export interface InputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
@@ -16,6 +17,10 @@ export interface InputProps
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, size = "lg", ...props }, ref) => {
+    // Claims the enclosing Field, however deep it sits — a password input
+    // inside `<div className="relative">` is still the field's control.
+    const field = useFieldControl(props, { nativeReadOnly: true });
+
     return (
       <input
         ref={ref}
@@ -34,6 +39,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           className,
         )}
         {...props}
+        {...field}
       />
     );
   },

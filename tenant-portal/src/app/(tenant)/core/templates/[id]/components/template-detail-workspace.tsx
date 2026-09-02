@@ -8,6 +8,7 @@ import {
   DetailHeader,
   DetailSection,
   ErrorState,
+  IdentifierText,
   NotFoundState,
   PermissionGate,
   Skeleton,
@@ -136,7 +137,7 @@ export function TemplateDetailWorkspace({ id }: { id: string }) {
               description={copy.definitionDescription}
               emptyValueLabel={t.detail.notRecorded}
               fields={[
-                { label: copy.code, value: <span className="font-mono">{template.code}</span> },
+                { label: copy.code, value: <IdentifierText>{template.code}</IdentifierText> },
                 { label: copy.name, value: template.name },
                 { label: copy.description, value: template.description, wide: true },
                 {

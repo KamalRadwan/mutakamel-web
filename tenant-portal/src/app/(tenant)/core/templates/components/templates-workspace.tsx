@@ -5,16 +5,17 @@ import { ChevronLeft, ChevronRight, RefreshCw, RotateCcw } from "lucide-react";
 import {
   Badge,
   Button,
+  CORE_TEMPLATE_NAV_ITEMS,
   DataTable,
   DegradedBanner,
   FilterBar,
+  IdentifierText,
   PageHeader,
   PermissionGate,
   SubNav,
-  UnavailableState,
-  CORE_TEMPLATE_NAV_ITEMS,
   type ColumnDef,
   type FilterValue,
+  UnavailableState,
 } from "@/design-system";
 import { formatDateTime } from "@/lib/format/date";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
@@ -55,7 +56,7 @@ export function TemplatesWorkspace() {
       cell: (template) => (
         <span className="flex flex-col">
           <span className="font-medium text-foreground">{template.name}</span>
-          <span className="font-mono text-xs text-muted-foreground">{template.code}</span>
+          <IdentifierText className="text-xs text-muted-foreground">{template.code}</IdentifierText>
         </span>
       ),
     },

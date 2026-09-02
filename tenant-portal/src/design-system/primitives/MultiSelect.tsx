@@ -8,6 +8,7 @@ import { textEntrySize, type ControlSizeProps } from "../lib/variants";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
 import type { ComboboxOption } from "./Combobox";
+import { FieldControlBoundary, useFieldControlContext } from "./field-control";
 import { Input } from "./Input";
 import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
 
@@ -60,7 +61,11 @@ export function MultiSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const listId = useId();
-  const editable = !disabled && !readOnly;
+  const field = useFieldControlContext();
+  const controlId = id ?? field?.controlId;
+  const isInvalid = invalid ?? field?.invalid;
+  const isReadOnly = readOnly ?? field?.readOnly;
+  const editable = !disabled && !isReadOnly;
 
   const selected = values.map(
     (value) => options.find((option) => option.value === value) ?? { value, label: value },
@@ -97,17 +102,20 @@ export function MultiSelect({
   }
 
   return (
+    // The trigger below has already claimed the field; the search box in the
+    // popover must not claim it a second time.
+    <FieldControlBoundary>
     <div
       className={cn(
         "flex w-full flex-wrap items-center gap-1 rounded-sm border border-input bg-card p-1",
         "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
         "min-h-(--size-control-md)",
-        invalid && "border-destructive",
+        isInvalid && "border-destructive",
         disabled && "cursor-not-allowed opacity-50",
-        readOnly && "bg-muted",
+        isReadOnly && "bg-muted",
         className,
       )}
-      aria-readonly={readOnly || undefined}
+      aria-readonly={isReadOnly || undefined}
     >
       {visible.map(renderChip)}
 
@@ -140,17 +148,21 @@ export function MultiSelect({
           <Button
             variant="ghost"
             size={size}
-            id={id}
+            id={controlId}
             disabled={disabled}
             onBlur={onBlur}
-            aria-invalid={invalid || undefined}
-            // The chips sit beside this button, not inside it, so once
-            // anything is selected the button has no text of its own. Without
-            // this it would announce as an unnamed control.
-            aria-label={placeholder}
+            aria-describedby={field?.describedBy}
+            aria-invalid={isInvalid || undefined}
+            aria-required={field?.required}
+            // The chips sit beside this button, not inside it, so once anything
+            // is selected the button has no text of its own. Standalone it takes
+            // the placeholder; inside a Field the label names it, and an
+            // aria-label here would OUTRANK that label and announce the
+            // placeholder in its place.
+            aria-label={field ? undefined : placeholder}
             className={cn(
               "min-w-24 flex-1 cursor-pointer justify-between gap-1.5 bg-transparent font-normal",
-              readOnly && "cursor-default",
+              isReadOnly && "cursor-default",
             )}
           >
             {selected.length === 0 && <span className="text-muted-foreground">{placeholder}</span>}
@@ -219,5 +231,6 @@ export function MultiSelect({
         </Button>
       )}
     </div>
+    </FieldControlBoundary>
   );
 }

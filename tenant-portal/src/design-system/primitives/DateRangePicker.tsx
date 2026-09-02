@@ -18,6 +18,7 @@ import { type ControlSizeProps } from "../lib/variants";
 import { Button } from "./Button";
 import { Calendar } from "./Calendar";
 import { DATE_TIME_OPTIONS } from "./DateTime";
+import { useFieldControlContext } from "./field-control";
 import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
 import { Separator } from "./Separator";
 
@@ -112,7 +113,11 @@ export function DateRangePicker({
   const [open, setOpen] = useState(false);
   const activeLanguage = useLanguage();
   const lang = language ?? activeLanguage;
-  const editable = !disabled && !readOnly;
+  const field = useFieldControlContext();
+  const controlId = id ?? field?.controlId;
+  const isInvalid = invalid ?? field?.invalid;
+  const isReadOnly = readOnly ?? field?.readOnly;
+  const editable = !disabled && !isReadOnly;
   const clearable = Boolean(clearLabel) && Boolean(value?.from) && editable;
 
   const formatter = new Intl.DateTimeFormat(INTL_LOCALE[lang], DATE_TIME_OPTIONS.date);
@@ -134,16 +139,18 @@ export function DateRangePicker({
           <Button
             variant="outline"
             size={size}
-            id={id}
+            id={controlId}
             disabled={disabled}
             onBlur={onBlur}
-            aria-invalid={invalid || undefined}
-            aria-readonly={readOnly || undefined}
+            aria-describedby={field?.describedBy}
+            aria-invalid={isInvalid || undefined}
+            aria-required={field?.required}
+            aria-readonly={isReadOnly || undefined}
             className={cn(
               "w-full cursor-pointer justify-start gap-1.5 bg-card font-normal",
               !value?.from && "text-muted-foreground",
-              invalid && "border-destructive",
-              readOnly && "cursor-default bg-muted text-foreground",
+              isInvalid && "border-destructive",
+              isReadOnly && "cursor-default bg-muted text-foreground",
               clearable && "pe-8",
             )}
           >

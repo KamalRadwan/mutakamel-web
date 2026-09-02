@@ -15,7 +15,10 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
-import { useAmbiguousOutcomeLabels } from "../../shared/hooks/useAmbiguousOutcomeLabels";
+import {
+  useAmbiguousOutcomeLabels,
+  useAppliedUnreadableLabels,
+} from "../../shared/hooks/useAmbiguousOutcomeLabels";
 import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import { fromIsoDate, toIsoDate } from "../../shared/iso-date";
 import type { OpportunityPipeline } from "../hooks/pipeline-types";
@@ -44,6 +47,7 @@ export function CreateOpportunityDrawer({
   const { t, lang } = useI18n();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
+  const appliedLabels = useAppliedUnreadableLabels();
   const customers = useCustomerProfileOptions(branchId, create.open);
   const form = create.form;
   const amountInvalid = form ? !isValidOpportunityAmount(form.amount) : false;
@@ -79,6 +83,18 @@ export function CreateOpportunityDrawer({
           onRetry={() => void create.ambiguity?.replay()}
           onDismiss={create.dismissAmbiguity}
           labels={ambiguousLabels}
+        />
+      )}
+
+      {create.appliedUnreadable && (
+        <AmbiguousOutcomePanel
+          operation={t.crmOpportunityDetail.createOperation}
+          idempotencyKey={create.appliedUnreadable.attempt.idempotencyKey}
+          description={t.crmShared.appliedUnreadableDescription}
+          correlationId={create.appliedUnreadable.error.correlationId}
+          onRetry={() => create.reconcile()}
+          onDismiss={create.dismissAppliedUnreadable}
+          labels={appliedLabels}
         />
       )}
 

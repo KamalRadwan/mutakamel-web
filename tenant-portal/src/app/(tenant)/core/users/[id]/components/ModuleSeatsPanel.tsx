@@ -6,6 +6,7 @@ import {
   ConfirmActionModal,
   DataTable,
   DetailSection,
+  IdentifierText,
   Input,
   type ColumnDef,
 } from "@/design-system";
@@ -37,7 +38,7 @@ export function ModuleSeatsPanel({
       header: copy.modules.moduleKey,
       // The module key is protocol, not copy — there is no localized module
       // catalogue on this route, so it renders as the value the server holds.
-      cell: (assignment) => <span className="font-mono text-xs">{assignment.moduleKey}</span>,
+      cell: (assignment) => <IdentifierText className="text-xs">{assignment.moduleKey}</IdentifierText>,
     },
     ...(canManage
       ? [

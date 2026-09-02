@@ -59,14 +59,14 @@ export default function InventoryNodesPage() {
     {
       id: "type",
       header: t.tradeInventory.nodeType,
-      cell: (node) => <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, node.nodeType)}</Badge>,
+      cell: (node) => <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, node.nodeType, t.common.unknownCode)}</Badge>,
     },
     {
       id: "status",
       header: t.common.status,
       cell: (node) => (
         <Badge tone={node.status === "ACTIVE" ? "positive" : "neutral"}>
-          {tradeStatusLabel(t.tradeStatus, node.status)}
+          {tradeStatusLabel(t.tradeStatus, node.status, t.common.unknownCode)}
         </Badge>
       ),
     },

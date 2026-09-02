@@ -10,6 +10,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
   DegradedBanner,
+  IdentifierText,
   Progress,
   StatCard,
 } from "@/design-system";
@@ -111,9 +112,9 @@ export function WidgetTile({
           </p>
           {/* The raw code is kept visible: it is the evidence a support ticket
               needs, and `safeWidgetError` already narrowed it to a safe set. */}
-          <code className="break-all font-mono text-2xs text-muted-foreground">
+          <IdentifierText className="text-2xs text-muted-foreground">
             {result.errorCode}
-          </code>
+          </IdentifierText>
         </div>
       ) : mode === "SCALAR" && result.value !== null ? (
         <div className="flex flex-col gap-1.5">

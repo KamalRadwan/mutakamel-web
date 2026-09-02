@@ -139,9 +139,24 @@ express, not a substitute for it.
 
 ### Bidirectional text
 
-Wrap bare identifiers — UUIDs, correlation IDs, phone numbers — in `<bdi>`.
-Without it, bidirectional reordering mangles a Latin ID inside an Arabic
-sentence, and the displayed value is wrong rather than merely ugly.
+Render every bare identifier — UUID, correlation id, idempotency key, cursor,
+wire code — through **`IdentifierText`**, which is `<bdi dir="ltr">` plus safe
+wrapping. Without the isolation, bidirectional reordering moves leading and
+trailing digits and punctuation to the wrong end: the id a user *reads*, and
+copies out of a screenshot into a support ticket, is not the id the system
+holds. That is a correctness bug, not a cosmetic one.
+
+`<bdi>` and `dir` are both load-bearing and neither substitutes for the other.
+`dir` sets the direction inside the run; `<bdi>` stops that run influencing the
+Arabic sentence around it. A `<span dir="ltr">` still leaks outward.
+
+For a form control holding a code — a `SelectTrigger` showing a branch id, an
+`Input` taking a pipeline code — set `dir="ltr"` on the control itself; there is
+no text node to wrap.
+
+`scripts/design/identifier-guard.mjs` fails the build on a monospace element
+that is neither, so this cannot decay one call site at a time again — which is
+how 98 of them accumulated with the rule already written here.
 
 ### Language and direction on the root
 
@@ -181,7 +196,7 @@ criterion.
 - [ ] Arrow keys work correctly in both directions
 - [ ] `prefers-reduced-motion` on — nothing animates, nothing is lost
 - [ ] Zoom to 200% — no content lost, no horizontal page scroll
-- [ ] Identifiers wrapped in `<bdi>`
+- [ ] Identifiers rendered through `IdentifierText` (or `dir` set, for a control)
 - [ ] **Skip link** is the first `Tab` stop and becomes visible on focus
 - [ ] **Tab to the first and last column of the top and bottom row** — the
       focus ring is never behind a sticky header or sticky column
@@ -201,6 +216,12 @@ criterion.
 `pnpm design:rtl` catches physical direction utilities. `pnpm design:contrast`
 catches contrast regressions. `pnpm lint` catches arbitrary type sizes.
 
-**Nothing mechanical catches** a missing accessible name, a broken keyboard
-path, a wrong announcement, or an Arabic label that reads as nonsense. Those
-need the checklist above, run by a person, per screen.
+One name check **is** mechanical now: in development, a `Field` whose generated
+id lands on no element in the DOM logs an error naming the label. That is the
+most common way a control ends up unnamed here — the label is written, it just
+points at nothing — and it used to be entirely silent. See
+[primitives.md](primitives.md#the-control-claims-the-field-the-field-does-not-push-at-the-control).
+
+**Nothing mechanical catches** a name that exists but is wrong, a broken
+keyboard path, a wrong announcement, or an Arabic label that reads as nonsense.
+Those need the checklist above, run by a person, per screen.

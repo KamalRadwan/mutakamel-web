@@ -5,6 +5,7 @@ import { ShieldOff, Trash2, UserCheck } from "lucide-react";
 import {
   Badge,
   Button,
+  IdentifierText,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -87,7 +88,7 @@ export function useUserColumns({
       id: "employeeCode",
       sortable: true,
       header: copy.users.employeeCode,
-      cell: (user) => <span className="font-mono text-2xs">{user.employeeCode ?? ""}</span>,
+      cell: (user) => <IdentifierText className="text-2xs">{user.employeeCode ?? ""}</IdentifierText>,
     },
   ];
 

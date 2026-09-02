@@ -58,13 +58,15 @@ describe("Trade advanced validation kernel", () => {
     expect(INVENTORY_CODE_PATTERN.test("1BAD")).toBe(false);
   });
 
-  it("renders an open enum as itself rather than dropping it", () => {
+  it("keeps an open enum visible, inside a translated frame", () => {
     // Control tower's severity and retryClass are not closed by source, so an
-    // unmapped value has to survive to the screen.
-    expect(tradeStatusLabel({ HIGH: "High" }, "HIGH")).toBe("High");
-    expect(tradeStatusLabel({ HIGH: "High" }, "PERMANENT_SOURCE_CORRECTION")).toBe(
-      "PERMANENT_SOURCE_CORRECTION",
-    );
+    // unmapped value has to survive to the screen — but as evidence inside a
+    // translated sentence, never as a bare English token in an Arabic UI (U11).
+    const unknown = "Unrecognized value ({code})";
+    expect(tradeStatusLabel({ HIGH: "High" }, "HIGH", unknown)).toBe("High");
+    expect(
+      tradeStatusLabel({ HIGH: "High" }, "PERMANENT_SOURCE_CORRECTION", unknown),
+    ).toBe("Unrecognized value (PERMANENT_SOURCE_CORRECTION)");
     expect(asOpenEnum("TRANSIENT")).toBe("TRANSIENT");
     expect(asOpenEnum(42)).toBeNull();
     expect(isMemberOf("A", ["A", "B"])).toBe(true);

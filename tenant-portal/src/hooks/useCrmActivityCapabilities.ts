@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import {
+  SCOPE_UNRESOLVED_ERROR,
+  useOrganizationScopeHeaders,
+} from "@/hooks/useOrganizationScope";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -34,7 +37,7 @@ export interface CrmActionCapability {
  * docs/build/OPEN-QUESTIONS.md.
  */
 export function useCrmActivityCapabilities(branchId: string | null) {
-  const scopeHeaders = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
+  const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   const [canCreate, setCanCreate] = useState<CrmActionCapability | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   // Set only when the question could not be ASKED. A 403 is an answer and
@@ -44,9 +47,12 @@ export function useCrmActivityCapabilities(branchId: string | null) {
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
-      if (!branchId || !isUUIDv7(branchId)) {
+      if (!branchId || !isUUIDv7(branchId) || !scope.ready) {
         setCanCreate(null);
-        setError(null);
+        // D4: an unresolved organization scope is a gap on THIS side, so the
+        // request is not sent at all. It used to go out with no headers and
+        // come back 400 from the Gateway, which reads as a server refusal.
+        setError(isUUIDv7(branchId) && !scope.ready ? SCOPE_UNRESOLVED_ERROR : null);
         return;
       }
       setIsLoading(true);
@@ -59,7 +65,7 @@ export function useCrmActivityCapabilities(branchId: string | null) {
             signal,
             cache: "no-store",
             maxResponseBytes: 50_000,
-            headers: scopeHeaders,
+            headers: scope.headers,
           },
         );
         setCanCreate(parseActivitiesCreate(response.data));
@@ -72,7 +78,7 @@ export function useCrmActivityCapabilities(branchId: string | null) {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [branchId, scopeHeaders],
+    [branchId, scope],
   );
 
   useEffect(() => {

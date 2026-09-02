@@ -34,7 +34,7 @@ export default function InventorySerialPage({
         subtitle={serial?.itemId}
         status={
           serial ? (
-            <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, serial.state)}</Badge>
+            <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, serial.state, t.common.unknownCode)}</Badge>
           ) : undefined
         }
         backLabel={t.tradeInventory.backToSerials}
@@ -81,7 +81,7 @@ export default function InventorySerialPage({
                 label={t.tradeInventory.serialLifecycle}
                 events={serial.lifecycle.map((entry) => ({
                   id: entry.id,
-                  title: tradeStatusLabel(t.tradeStatus, entry.eventType),
+                  title: tradeStatusLabel(t.tradeStatus, entry.eventType, t.common.unknownCode),
                   timestamp: formatDateTime(entry.occurredAt, lang),
                 }))}
               />

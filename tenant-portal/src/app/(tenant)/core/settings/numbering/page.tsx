@@ -3,15 +3,16 @@
 import { Pencil, RefreshCw } from "lucide-react";
 import {
   Button,
+  CORE_SETTINGS_NAV_ITEMS,
   DataTable,
   FilterBar,
+  IdentifierText,
   PageHeader,
   PermissionGate,
   SubNav,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-  CORE_SETTINGS_NAV_ITEMS,
   type ColumnDef,
   type FilterValues,
 } from "@/design-system";
@@ -77,16 +78,16 @@ export default function NumberingPage() {
       // The counter is a bigint string; `formatNumberingValue` pads text and
       // never converts it to a number.
       cell: (sequence) => (
-        <span className="font-mono text-foreground">
+        <IdentifierText className="text-foreground">
           {formatNumberingValue(sequence.prefix ?? "", sequence.padding, sequence.nextValue)}
-        </span>
+        </IdentifierText>
       ),
     },
     {
       id: "value",
       header: t.coreSettings.numberingNextValue,
       align: "end",
-      cell: (sequence) => <span className="font-mono">{sequence.nextValue}</span>,
+      cell: (sequence) => <IdentifierText>{sequence.nextValue}</IdentifierText>,
     },
     {
       id: "padding",

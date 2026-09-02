@@ -94,6 +94,20 @@ const CHECKS = {
   physicalRtlViolations:
     /\b(?:ml|mr|pl|pr)-[0-9.]+\b|\b(?:left|right)-[0-9.]+\b|\btext-(?:left|right)\b|\bborder-[lr]\b|\brounded-[lr]-/g,
   languageTernaries: /(?:lang === "ar"|isRtl|isArabic)\s*\?/g,
+  // U9. The numeral decision is settled and it is WESTERN digits, in both
+  // languages: `INTL_LOCALE.ar` is `ar-EG-u-nu-latn`, so every number this app
+  // formats renders 0-9 — while the Arabic dictionary carried 24 Arabic-Indic
+  // digits across 12 hand-written strings. One screen therefore showed both
+  // numeral systems at once, a formatted count beside a hardcoded limit. The
+  // rule has to hold on BOTH sides of the split or it is not a rule, and only
+  // the dictionary side can drift silently. See
+  // docs/design/typography.md#the-digit-decision--settled.
+  arabicIndicDigits: /[٠-٩۰-۹]/g,
+  // Same decision, formatter side. A locale-conversion call with no argument
+  // resolves to the RUNTIME's default locale, so its output differs between a
+  // developer's machine, a user's browser and CI — the attachment-size label
+  // (U10) was exactly this. Every formatter passes INTL_LOCALE explicitly.
+  localeUnawareFormatting: /\.toLocale(?:String|DateString|TimeString)\(\s*\)/g,
   // One mirror mechanism, counted two ways. Outliers ratchet at 0; the
   // canonical spelling is an informational census, so adopting it in more
   // places is not reported as a regression. See docs/design/icons.md#mirroring.

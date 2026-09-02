@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-01T05:39:03.848Z",
-  "fileCount": 855,
-  "designSystemFileCount": 199,
+  "generatedAt": "2026-09-02T15:25:18.433Z",
+  "fileCount": 870,
+  "designSystemFileCount": 202,
   "counts": {
     "colorUtilityTotal": 0,
     "roleRampUtilities": 164,
@@ -14,7 +14,9 @@
     "handRolledButtons": 2,
     "handRolledTables": 1,
     "physicalRtlViolations": 0,
-    "languageTernaries": 5,
+    "languageTernaries": 4,
+    "arabicIndicDigits": 0,
+    "localeUnawareFormatting": 0,
     "rtlMirrorOutliers": 0,
     "rtlMirrorCanonical": 11,
     "colorFamiliesInUse": 0
@@ -56,6 +58,8 @@
     "handRolledTables": 3,
     "physicalRtlViolations": 0,
     "languageTernaries": 0,
+    "arabicIndicDigits": 0,
+    "localeUnawareFormatting": 0,
     "rtlMirrorOutliers": 1,
     "rtlMirrorCanonical": 7,
     "colorFamiliesInUse": 0

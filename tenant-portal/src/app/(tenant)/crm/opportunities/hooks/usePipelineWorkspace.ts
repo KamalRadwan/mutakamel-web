@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTenantAuth } from "@/context/AuthContext";
-import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import {
+  SCOPE_UNRESOLVED_ERROR,
+  useOrganizationScopeHeaders,
+} from "@/hooks/useOrganizationScope";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -602,7 +605,7 @@ export function usePipelineWorkspace() {
   // api-gateway-app/src/common/middleware/route-context.middleware.ts — and
   // every capability-gated control degraded for a reason unrelated to
   // permissions (D11 / MASTER-PLAN 8.5).
-  const capabilityScopeHeaders = useOrganizationScopeHeaders(
+  const capabilityScope = useOrganizationScopeHeaders(
     "BRANCH_REQUIRED",
     branchId,
   );
@@ -650,15 +653,21 @@ export function usePipelineWorkspace() {
             cache: "no-store",
             maxResponseBytes: 512 * 1024,
           }),
-          axiosClient.get<unknown>(
-            `/api/tenant/crm/v1/opportunities/capabilities?branchId=${encodeURIComponent(branchId)}`,
-            {
-              signal,
-              cache: "no-store",
-              maxResponseBytes: 128 * 1024,
-              headers: capabilityScopeHeaders,
-            },
-          ),
+          // D4: with no resolved scope the request is not sent at all. A
+          // rejected source is already how this batch says "capabilities
+          // unknown", and it degrades the action controls honestly instead of
+          // firing an unscoped request the Gateway answers 400 to.
+          capabilityScope.ready
+            ? axiosClient.get<unknown>(
+                `/api/tenant/crm/v1/opportunities/capabilities?branchId=${encodeURIComponent(branchId)}`,
+                {
+                  signal,
+                  cache: "no-store",
+                  maxResponseBytes: 128 * 1024,
+                  headers: capabilityScope.headers,
+                },
+              )
+            : Promise.reject(new Error(SCOPE_UNRESOLVED_ERROR.code)),
         ]);
 
         if (
@@ -705,7 +714,7 @@ export function usePipelineWorkspace() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [branchId, capabilityScopeHeaders],
+    [branchId, capabilityScope],
   );
 
   const fetchBoardData = useCallback(

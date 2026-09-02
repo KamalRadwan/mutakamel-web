@@ -285,6 +285,22 @@ This is a deliberate product decision, made here so no one has to ask:
   Latin-digit strings. Rendering them as Arabic-Indic while an adjacent raw ID
   stays Latin is the inconsistency users actually notice.
 
+**The rule holds on both sides of the split, and only one side could drift.**
+`INTL_LOCALE.ar` pins every *formatted* number to Latin digits, but the Arabic
+dictionary is hand-written, and it carried **24 Arabic-Indic digits across 12
+strings** — so a single screen could show a formatted count in `0-9` beside a
+hardcoded limit in `\u0660-\u0669`. Both are now Latin, and two census counters
+hold the line:
+
+| Counter | Catches |
+| --- | --- |
+| `arabicIndicDigits` | a literal `\u0660-\u0669` / `\u06F0-\u06F9` anywhere under `src/` |
+| `localeUnawareFormatting` | a locale-conversion call with **no** argument, which resolves to the runtime's default and differs between a laptop, a browser and CI |
+
+Both ratchet at **0**. A test that must name the Arabic-Indic block writes it
+as code-point escapes, so the test pinning the rule is not the thing that
+trips it.
+
 Dates still use the Arabic locale's month names and ordering — only the
 *numerals* are Latin.
 
@@ -326,15 +342,35 @@ they push their container off-screen.
 overflow-wrap: anywhere;   /* on the mono / ID utility */
 ```
 
-Implemented as `identifierText` in `src/design-system/lib/variants.ts` —
-`font-mono wrap-anywhere`, Tailwind v4's `wrap-anywhere` being exactly
-`overflow-wrap: anywhere`. Wrap the value itself in `<bdi>` at the call site
-([accessibility.md](accessibility.md#bidirectional-text)): without it,
-bidirectional reordering mangles a Latin id inside Arabic chrome and the
-**displayed value is wrong**, not merely ugly.
+Both halves are supplied by one primitive: **`IdentifierText`**
+(`src/design-system/primitives/IdentifierText.tsx`), which renders
+`<bdi dir="ltr">` carrying `identifierText` (`font-mono wrap-anywhere`,
+Tailwind v4's `wrap-anywhere` being exactly `overflow-wrap: anywhere`).
+
+Wrapping was never the hard half. Isolation was: without `<bdi>`, bidirectional
+reordering mangles a Latin id inside Arabic chrome and the **displayed value is
+wrong**, not merely ugly. The rule was written down and then not followed —
+98 monospace call sites carried neither `<bdi>` nor `dir`, and there was not a
+single `<bdi>` in feature code, because every call site had to remember two
+things and a `<span>` was one keystroke. A primitive that cannot be written
+wrong is the fix; `scripts/design/identifier-guard.mjs` is what keeps it that
+way (see [enforcement.md](enforcement.md#identifier-guardmjs)).
+
+```tsx
+<IdentifierText>{correlationId}</IdentifierText>
+<IdentifierText selectAll>{idempotencyKey}</IdentifierText>
+```
+
+`selectAll` is for a key the user is expected to hand to support, where a
+partial copy is worse than none.
 
 **Never `word-break: break-all`** — it applies to ordinary prose as well and
-hyphenates normal Arabic and English words mid-syllable.
+hyphenates normal Arabic and English words mid-syllable. The guard rejects it.
+
+**A monospace figure is not an identifier.** `font-mono` beside `tabular-nums`
+marks a numeric column — a formatted amount, already `Intl`-formatted with an
+explicit locale — and is exempt. Only unformatted machine tokens need the
+isolation.
 
 ## Applying the scale
 

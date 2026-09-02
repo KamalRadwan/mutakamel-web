@@ -50,7 +50,7 @@ export function NodeDetailWorkspace({ nodeId }: { nodeId: string }) {
         status={
           node ? (
             <Badge tone={node.status === "ACTIVE" ? "positive" : "neutral"}>
-              {tradeStatusLabel(t.tradeStatus, node.status)}
+              {tradeStatusLabel(t.tradeStatus, node.status, t.common.unknownCode)}
             </Badge>
           ) : undefined
         }
@@ -88,7 +88,7 @@ export function NodeDetailWorkspace({ nodeId }: { nodeId: string }) {
             title={t.tradeCommon.overview}
             emptyValueLabel={t.tradeCommon.notSet}
             fields={[
-              { label: t.tradeInventory.nodeType, value: tradeStatusLabel(t.tradeStatus, node.nodeType) },
+              { label: t.tradeInventory.nodeType, value: tradeStatusLabel(t.tradeStatus, node.nodeType, t.common.unknownCode) },
               { label: t.tradeInventory.nodeTimezone, value: node.timezone },
               { label: t.tradeCommon.version, value: String(node.version) },
               { label: t.tradeCommon.updatedAt, value: formatDateTime(node.updatedAt, lang) },

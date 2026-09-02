@@ -19,7 +19,10 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
-import { useAmbiguousOutcomeLabels } from "../../../shared/hooks/useAmbiguousOutcomeLabels";
+import {
+  useAmbiguousOutcomeLabels,
+  useAppliedUnreadableLabels,
+} from "../../../shared/hooks/useAmbiguousOutcomeLabels";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import type { usePipelineTransfer } from "../hooks/usePipelineTransfer";
 
@@ -42,6 +45,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
   const { t, lang } = useI18n();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
+  const appliedLabels = useAppliedUnreadableLabels();
   const errorText = describeError(transfer.error);
 
   return (
@@ -69,6 +73,18 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
               onRetry={() => void transfer.ambiguity?.replay()}
               onDismiss={transfer.dismissAmbiguity}
               labels={ambiguousLabels}
+            />
+          )}
+
+          {transfer.appliedUnreadable && (
+            <AmbiguousOutcomePanel
+              operation={t.crmOpportunityDetail.transferOperation}
+              idempotencyKey={transfer.appliedUnreadable.attempt.idempotencyKey}
+              description={t.crmShared.appliedUnreadableDescription}
+              correlationId={transfer.appliedUnreadable.error.correlationId}
+              onRetry={() => transfer.reconcile()}
+              onDismiss={transfer.dismissAppliedUnreadable}
+              labels={appliedLabels}
             />
           )}
 

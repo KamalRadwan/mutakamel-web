@@ -24,6 +24,15 @@ export function useCrmErrorText() {
       const outcome = describeApiOutcome(error, t);
       if (outcome) return outcome.description;
 
+      // A refusal this client made before the request left, keyed by the code
+      // the request builder threw — defect D8. It comes before the status
+      // buckets because it is more specific than any of them, and because the
+      // raw constant is not something a user should ever read.
+      const refusal = error.code
+        ? t.crmShared.refusals[error.code as keyof typeof t.crmShared.refusals]
+        : undefined;
+      if (refusal) return refusal;
+
       if (error.status === 0) return t.crmShared.errorOffline;
       if (error.status === 403) return t.crmShared.errorForbidden;
       if (error.status === 404) return t.crmShared.errorNotFound;

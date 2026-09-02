@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
-import { axiosClient } from "@/lib/api/axiosClient";
+import {
+  axiosClient,
+  commitTenantSessionResponse,
+  readWebAuthSessionResponse,
+} from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 
 export type ActionTokenFlow = "accept-invite" | "reset-password";
@@ -53,11 +57,16 @@ export type ActionTokenState =
 function readTokenFromFragment(): string | null {
   const hash = window.location.hash.replace(/^#/u, "");
   if (!hash) return null;
+  // Cleared here, before the token is inspected, and not after it passes.
+  // A fragment that fails the DTO's bounds is still whatever arrived in a
+  // real invite email, and leaving it in the address bar is exactly what a
+  // shared screenshot or a back-button revisit carries away — the bounds
+  // decide whether it is worth sending, not whether it is worth hiding.
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
   const token = new URLSearchParams(hash).get("token");
   if (!token || token.length < ACTION_TOKEN_MIN_LENGTH || token.length > ACTION_TOKEN_MAX_LENGTH) {
     return null;
   }
-  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
   return token;
 }
 
@@ -92,7 +101,7 @@ export function useActionTokenPassword(flow: ActionTokenFlow) {
     setState("submitting");
     setError(null);
     try {
-      await axiosClient.post(
+      const response = await axiosClient.post(
         FLOW_PATH[flow],
         { token, newPassword },
         // A public action token is single-use: replaying it after a refresh
@@ -104,6 +113,20 @@ export function useActionTokenPassword(flow: ActionTokenFlow) {
       setConfirmPassword("");
       // Accepting an invite issues a session; a reset deliberately does not, so
       // one lands in the workspace and the other on the sign-in form.
+      if (flow === "accept-invite") {
+        // `acceptInvite` returns the same body sign-in does, and dropping it
+        // sent the new user into the workspace holding the cookies and no
+        // session metadata — the tab that cannot refresh itself. `remember` is
+        // false because nobody asked to be remembered: accepting an invite has
+        // no such choice, and the server owns cookie persistence either way.
+        const auth = readWebAuthSessionResponse(response.data);
+        if (auth) {
+          commitTenantSessionResponse(auth, {
+            remember: false,
+            notifyCurrentTab: true,
+          });
+        }
+      }
       router.replace(flow === "accept-invite" ? "/" : "/login");
     } catch (caught) {
       const normalized = normalizeApiError(caught);

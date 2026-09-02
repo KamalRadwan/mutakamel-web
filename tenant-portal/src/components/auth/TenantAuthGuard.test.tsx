@@ -95,7 +95,6 @@ describe("TenantAuthGuard session-ending reason", () => {
     "AUTH_SESSION_ABSOLUTE_EXPIRED",
     "AUTH_SECURITY_STALE",
     "AUTH_SESSION_STALE",
-    "SESSION_IDENTITY_INACTIVE",
     "INVALID_REFRESH_TOKEN",
   ])("carries %s through to the screen that renders it", async (code) => {
     state.endedReason = code;
@@ -105,6 +104,18 @@ describe("TenantAuthGuard session-ending reason", () => {
       expect(state.replace).toHaveBeenCalledWith(
         `/session-expired?reason=${code}`,
       ),
+    );
+  });
+
+  // The seventh code is the one that is not a session at all. It used to land
+  // on /session-expired, which offers to sign in again — the one thing that
+  // cannot help a suspended or deactivated account.
+  it("sends SESSION_IDENTITY_INACTIVE to its own screen", async () => {
+    state.endedReason = "SESSION_IDENTITY_INACTIVE";
+    renderGuard();
+
+    await waitFor(() =>
+      expect(state.replace).toHaveBeenCalledWith("/account-suspended"),
     );
   });
 

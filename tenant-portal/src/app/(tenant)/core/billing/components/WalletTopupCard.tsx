@@ -9,6 +9,7 @@ import {
   CardTitle,
   DegradedBanner,
   Field,
+  IdentifierText,
   Input,
   Money,
   Select,
@@ -87,7 +88,9 @@ export function WalletTopupCard({
               {topup.replayed ? t.coreBilling.topupReplayed : t.coreBilling.topupStarted}
             </p>
             <p className="text-xs text-muted-foreground">{t.coreBilling.topupCheckoutHint}</p>
-            <p className="font-mono text-xs text-muted-foreground">{topup.paymentId}</p>
+            <p className="text-xs text-muted-foreground">
+              <IdentifierText>{topup.paymentId}</IdentifierText>
+            </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" asChild>
                 <a href={topup.checkoutUrl} target="_blank" rel="noopener noreferrer">

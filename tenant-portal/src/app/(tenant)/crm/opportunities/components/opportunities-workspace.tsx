@@ -100,7 +100,15 @@ export function OpportunitiesWorkspace() {
     (opportunityId: string) => router.push(`/crm/opportunities/${opportunityId}`),
     [router],
   );
-  const create = useCreateOpportunity(branchId, pipelines, openOpportunity);
+  // The trailing argument is the D2 reconciliation: a create whose response
+  // could not be read has still created the deal, so the list re-reads instead
+  // of leaving a Save to press again.
+  const create = useCreateOpportunity(
+    branchId,
+    pipelines,
+    openOpportunity,
+    () => list.reload(),
+  );
 
   useEffect(() => {
     let cancelled = false;

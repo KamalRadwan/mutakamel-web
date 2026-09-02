@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { Badge, Button, cn, iconSize, mirrorInRtl } from "@/design-system";
+import { Badge, Button, cn, iconSize, IdentifierText, mirrorInRtl } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import type { OrgTreeNode } from "../../contracts/organization-contract";
@@ -77,7 +77,7 @@ export function OrganizationTreeNodes({
               <Link href={`${href}/${node.id}`} className="text-xs font-medium text-foreground hover:underline">
                 {node.name}
               </Link>
-              <span className="font-mono text-2xs text-muted-foreground">{node.code}</span>
+              <IdentifierText className="text-2xs text-muted-foreground">{node.code}</IdentifierText>
               <span className="text-2xs text-muted-foreground">{levelLabel}</span>
               {node.status === "INACTIVE" ? (
                 <Badge tone="neutral">{copy.orgStatus.INACTIVE}</Badge>

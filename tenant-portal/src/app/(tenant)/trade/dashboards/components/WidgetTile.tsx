@@ -45,10 +45,10 @@ export function WidgetTile({ title, visualizationType, result, lang }: WidgetTil
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <span className="flex items-center gap-2">
-          <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, visualizationType)}</Badge>
+          <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, visualizationType, t.common.unknownCode)}</Badge>
           {result ? (
             <Badge tone={statusTone(result.status)}>
-              {tradeStatusLabel(t.tradeStatus, result.status)}
+              {tradeStatusLabel(t.tradeStatus, result.status, t.common.unknownCode)}
             </Badge>
           ) : null}
         </span>

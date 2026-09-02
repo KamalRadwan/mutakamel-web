@@ -9,6 +9,7 @@ import {
   DegradedBanner,
   EmptyState,
   FilterBar,
+  IdentifierText,
   PageHeader,
   PermissionGate,
   SubNav,
@@ -72,7 +73,7 @@ export default function InventorySerialsPage() {
       header: t.tradeInventory.serialState,
       cell: (serial) => (
         <Badge tone={serialTone(serial.state)}>
-          {tradeStatusLabel(t.tradeStatus, serial.state)}
+          {tradeStatusLabel(t.tradeStatus, serial.state, t.common.unknownCode)}
         </Badge>
       ),
     },
@@ -81,7 +82,7 @@ export default function InventorySerialsPage() {
       header: t.tradeInventory.currentNode,
       cell: (serial) =>
         serial.currentFulfillmentNodeId ? (
-          <span className="font-mono text-xs">{serial.currentFulfillmentNodeId}</span>
+          <IdentifierText className="text-xs">{serial.currentFulfillmentNodeId}</IdentifierText>
         ) : (
           "—"
         ),
@@ -130,7 +131,7 @@ export default function InventorySerialsPage() {
                 placeholder: t.tradeCommon.anyStatus,
                 options: SERIAL_STATES.map((value) => ({
                   value,
-                  label: tradeStatusLabel(t.tradeStatus, value),
+                  label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
                 })),
               },
             ]}

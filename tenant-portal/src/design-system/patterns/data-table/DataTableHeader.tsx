@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { useDictionary } from "@/i18n/useLanguage";
 import { cn } from "../../lib/cn";
 import { Checkbox } from "../../primitives/Checkbox";
 import { TableHead, TableHeader, TableRow } from "../../primitives/Table";
@@ -52,6 +53,8 @@ export function DataTableHeader<T>({
   layoutLabels,
   labels,
 }: DataTableHeaderProps<T>) {
+  const t = useDictionary();
+
   return (
     <TableHeader className="sticky top-0 z-(--z-sticky-header)">
       <TableRow className="odd:bg-transparent hover:bg-transparent">
@@ -65,8 +68,14 @@ export function DataTableHeader<T>({
           </TableHead>
         )}
         {showRowNumbers && (
-          <TableHead scope="col" className="w-10 text-muted-foreground" title={labels.rowNumber ?? "Row number"}>
-            {labels.rowNumberShort ?? "N"}
+          <TableHead
+            scope="col"
+            className="w-10 text-muted-foreground"
+            // Defaulted through the dictionary, never through English: about 70
+            // Table and DataTable views pass neither key.
+            title={labels.rowNumber ?? t.common.rowNumber}
+          >
+            {labels.rowNumberShort ?? t.common.rowNumberShort}
           </TableHead>
         )}
         {columns.map((column) => {

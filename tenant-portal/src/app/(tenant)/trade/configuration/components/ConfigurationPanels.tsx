@@ -8,6 +8,7 @@ import {
   DetailSection,
   ErrorState,
   Field,
+  IdentifierText,
   Input,
   Select,
   SelectContent,
@@ -86,7 +87,7 @@ export function VersionsPanel({
                   {isVersionStatus(version.status) ? (
                     t.trade[`versionStatus_${version.status}`]
                   ) : (
-                    <span className="font-mono">{version.status}</span>
+                    <IdentifierText>{version.status}</IdentifierText>
                   )}
                 </Badge>
                 {canManage ? (
@@ -166,7 +167,7 @@ export function ResolvePanel() {
             <p className="text-xs text-muted-foreground">
               {t.trade.resolveEvaluatedAt}: {formatDateTime(resolve.resolved.evaluatedAt, lang)}
             </p>
-            <pre className="overflow-x-auto rounded-sm border border-border p-2 font-mono text-xs">
+            <pre dir="ltr" className="overflow-x-auto rounded-sm border border-border p-2 font-mono text-xs">
               {JSON.stringify(resolve.resolved.values, null, 2)}
             </pre>
           </div>

@@ -8,6 +8,7 @@ import {
   DetailSection,
   EmptyState,
   ErrorState,
+  IdentifierText,
   ReasonDialog,
   Skeleton,
 } from "@/design-system";
@@ -119,11 +120,11 @@ export function TemplateVersionsPanel({
                   at: formatDateTime(release.selected.publishedAt, lang),
                 })}
               </span>
-              <span className="font-mono text-muted-foreground">
+              <IdentifierText className="text-muted-foreground">
                 {formatTemplate(copy.versionChecksum, {
                   checksum: release.selected.templateContentChecksum,
                 })}
-              </span>
+              </IdentifierText>
               {release.selected.compilerVersion ? (
                 <span className="text-muted-foreground">
                   {formatTemplate(copy.versionCompiler, {

@@ -135,15 +135,24 @@ describe("authoritative branch company scope", () => {
     } as unknown as TenantScopeSource, BRANCH)).toBeNull();
   });
 
-  it("rejects a mapped company outside the accessible company set", () => {
+  // D4, corrected deliberately. This pair of cases used to assert that a
+  // company absent from `accessibleCompanies` made its branch unresolvable —
+  // which is the exact shape Core produces on purpose. The two collections are
+  // truncated INDEPENDENTLY at 500 (Core's
+  // tenant-access.postgres.integration.spec.ts asserts
+  // `accessibleCompanies` does NOT contain the first pair's company), so that
+  // assertion turned a valid branch into a 400 on every BRANCH_REQUIRED route.
+  // The map is the ownership authority; the company list is a separate,
+  // lossy projection and is no longer consulted.
+  it("resolves a mapped company that truncation left out of the company list", () => {
     expect(resolveCompanyForBranch({
       ...source,
       accessibleCompanies: [OTHER_COMPANY],
       accessibleBranchCompanies: [{ branchId: BRANCH, companyId: COMPANY }],
-    }, BRANCH)).toBeNull();
+    }, BRANCH)).toBe(COMPANY);
   });
 
-  it("keeps a resolvable branch when other companies were truncated from the projection", () => {
+  it("keeps every mapped branch resolvable when companies were truncated", () => {
     const partialCompanies = {
       ...source,
       accessibleBranches: [BRANCH, OTHER_BRANCH],
@@ -154,7 +163,18 @@ describe("authoritative branch company scope", () => {
       ],
     };
     expect(resolveCompanyForBranch(partialCompanies, BRANCH)).toBe(COMPANY);
-    expect(resolveCompanyForBranch(partialCompanies, OTHER_BRANCH)).toBeNull();
+    expect(resolveCompanyForBranch(partialCompanies, OTHER_BRANCH)).toBe(OTHER_COMPANY);
+  });
+
+  // The boundary that did NOT move: a branch outside the actor's reach stays
+  // unresolvable however the map describes it.
+  it("still refuses a pair whose branch the actor cannot reach", () => {
+    expect(resolveCompanyForBranch({
+      ...source,
+      accessibleBranches: [OTHER_BRANCH],
+      accessibleCompanies: [],
+      accessibleBranchCompanies: [{ branchId: BRANCH, companyId: COMPANY }],
+    }, BRANCH)).toBeNull();
   });
 });
 

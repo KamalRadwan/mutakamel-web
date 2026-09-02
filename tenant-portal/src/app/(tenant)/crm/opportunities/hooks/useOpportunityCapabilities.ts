@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import {
+  SCOPE_UNRESOLVED_ERROR,
+  useOrganizationScopeHeaders,
+} from "@/hooks/useOrganizationScope";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -35,16 +38,19 @@ function isAbortError(error: unknown): boolean {
  * one endpoint that carries them.
  */
 export function useOpportunityCapabilities(branchId: string | null) {
-  const scopeHeaders = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
+  const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   const [capabilities, setCapabilities] =
     useState<OpportunityCapabilities>(NO_CAPABILITIES);
   const [error, setError] = useState<NormalizedApiError | null>(null);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
-      if (!isUUIDv7(branchId)) {
+      if (!isUUIDv7(branchId) || !scope.ready) {
         setCapabilities(NO_CAPABILITIES);
-        setError(null);
+        // D4: an unresolved organization scope is a gap on THIS side, so the
+        // request is not sent at all. It used to go out with no headers and
+        // come back 400 from the Gateway, which reads as a server refusal.
+        setError(isUUIDv7(branchId) && !scope.ready ? SCOPE_UNRESOLVED_ERROR : null);
         return;
       }
       setError(null);
@@ -56,7 +62,7 @@ export function useOpportunityCapabilities(branchId: string | null) {
             signal,
             cache: "no-store",
             maxResponseBytes: 64 * 1024,
-            headers: scopeHeaders,
+            headers: scope.headers,
           },
         );
         setCapabilities(
@@ -69,7 +75,7 @@ export function useOpportunityCapabilities(branchId: string | null) {
         setError(normalized.status === 403 ? null : normalized);
       }
     },
-    [branchId, scopeHeaders],
+    [branchId, scope],
   );
 
   useEffect(() => {

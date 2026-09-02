@@ -16,7 +16,10 @@ import type { CrmActionCapability } from "../crm-capabilities";
 import { crmCapabilityAllowsOwner } from "../crm-capabilities";
 import { CRM_NOTE_BODY_MAX_LENGTH, type CrmNoteSourceType } from "../notes-contract";
 import { useCrmNotes } from "../hooks/useCrmNotes";
-import { useAmbiguousOutcomeLabels } from "../hooks/useAmbiguousOutcomeLabels";
+import {
+  useAmbiguousOutcomeLabels,
+  useAppliedUnreadableLabels,
+} from "../hooks/useAmbiguousOutcomeLabels";
 import { useCrmErrorText } from "../hooks/useCrmErrorText";
 import { CrmScopeGate } from "./CrmScopeGate";
 import { NoteRow } from "./NoteRow";
@@ -61,6 +64,7 @@ export function RecordNotesSection({
   const { t } = useI18n();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
+  const appliedLabels = useAppliedUnreadableLabels();
   const notes = useCrmNotes({ branchId, sourceType, sourceId });
   const [draft, setDraft] = useState("");
 
@@ -124,6 +128,18 @@ export function RecordNotesSection({
               onRetry={() => void notes.ambiguity?.replay()}
               onDismiss={notes.dismissAmbiguity}
               labels={ambiguousLabels}
+            />
+          )}
+
+          {notes.appliedUnreadable && (
+            <AmbiguousOutcomePanel
+              operation={t.crmNotes.operations.create}
+              idempotencyKey={notes.appliedUnreadable.attempt.idempotencyKey}
+              description={t.crmShared.appliedUnreadableDescription}
+              correlationId={notes.appliedUnreadable.error.correlationId}
+              onRetry={notes.reload}
+              onDismiss={notes.dismissAppliedUnreadable}
+              labels={appliedLabels}
             />
           )}
 

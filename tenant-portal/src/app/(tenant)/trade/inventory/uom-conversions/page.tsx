@@ -8,6 +8,7 @@ import {
   DegradedBanner,
   EmptyState,
   FilterBar,
+  IdentifierText,
   PageHeader,
   PermissionGate,
   ReasonDialog,
@@ -68,7 +69,7 @@ export default function UomConversionsPage() {
     {
       id: "profile",
       header: t.tradeInventory.itemCompanyProfileId,
-      cell: (row) => <span className="font-mono text-xs">{row.itemCompanyProfileId}</span>,
+      cell: (row) => <IdentifierText className="text-xs">{row.itemCompanyProfileId}</IdentifierText>,
     },
     {
       id: "factor",
@@ -89,7 +90,7 @@ export default function UomConversionsPage() {
       header: t.common.status,
       cell: (row) => (
         <Badge tone={row.status === "PUBLISHED" ? "positive" : row.status === "RETIRED" ? "neutral" : "caution"}>
-          {tradeStatusLabel(t.tradeStatus, row.status)}
+          {tradeStatusLabel(t.tradeStatus, row.status, t.common.unknownCode)}
         </Badge>
       ),
     },
@@ -176,7 +177,7 @@ export default function UomConversionsPage() {
                 placeholder: t.tradeCommon.anyStatus,
                 options: UOM_CONVERSION_STATUSES.map((value) => ({
                   value,
-                  label: tradeStatusLabel(t.tradeStatus, value),
+                  label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
                 })),
               },
             ]}

@@ -5,6 +5,7 @@ import {
   DetailHeader,
   DetailSection,
   ErrorState,
+  IdentifierText,
   NotFoundState,
   PermissionGate,
   Skeleton,
@@ -70,7 +71,7 @@ export function OrganizationNodeDetail<L extends OrgLevel>({
               emptyValueLabel={t.detail.notRecorded}
               fields={[
                 { label: levelCopy.nameLabel, value: node.name },
-                { label: copy.fields.code, value: <span className="font-mono">{node.code}</span> },
+                { label: copy.fields.code, value: <IdentifierText>{node.code}</IdentifierText> },
                 { label: copy.fields.status, value: copy.orgStatus[node.status] },
                 ...("legalName" in node
                   ? [{ label: copy.fields.legalName, value: node.legalName }]
@@ -135,5 +136,5 @@ export function OrganizationNodeDetail<L extends OrgLevel>({
  * second guess. Showing a fabricated label would be worse than showing the key.
  */
 function idValue(value: string | null): React.ReactNode {
-  return value ? <span className="font-mono text-2xs">{value}</span> : null;
+  return value ? <IdentifierText className="text-2xs">{value}</IdentifierText> : null;
 }

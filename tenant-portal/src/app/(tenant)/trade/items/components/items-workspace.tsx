@@ -9,6 +9,7 @@ import {
   CardView,
   DegradedBanner,
   FilterBar,
+  IdentifierText,
   PageHeader,
   PermissionGate,
   SubNav,
@@ -16,13 +17,13 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-  ViewSwitcher,
-  useWorkspaceView,
   TRADE_FOUNDATION_NAV_ITEMS,
   type BoardColumnDef,
   type ColumnDef,
   type FilterValues,
   type WorkspaceViewLabels,
+  useWorkspaceView,
+  ViewSwitcher,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatDate } from "@/lib/format/date";
@@ -97,7 +98,7 @@ export function ItemsWorkspace() {
     {
       id: "canonicalCode",
       header: t.trade.itemCode,
-      cell: (item) => <span className="font-mono">{item.canonicalCode}</span>,
+      cell: (item) => <IdentifierText>{item.canonicalCode}</IdentifierText>,
     },
     {
       id: "itemKind",
@@ -155,7 +156,7 @@ export function ItemsWorkspace() {
       <span className="text-sm font-medium text-foreground">
         {tradeLocalizedName(item.localizedNames, lang) || item.canonicalCode}
       </span>
-      <span className="font-mono text-xs text-muted-foreground">{item.canonicalCode}</span>
+      <IdentifierText className="text-xs text-muted-foreground">{item.canonicalCode}</IdentifierText>
       {statusBadge(item)}
     </div>
   );

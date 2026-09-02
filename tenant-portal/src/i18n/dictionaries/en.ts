@@ -40,6 +40,17 @@ export const en: Dictionary = {
     densityComfortable: "Comfortable",
     previousPage: "Previous page",
     nextPage: "Next page",
+    firstPage: "First page",
+    lastPage: "Last page",
+    pageNumber: "Page {n}",
+    rowNumber: "Row number",
+    // Script-neutral on purpose: an "N" for "number" is an English
+    // abbreviation, and this column header renders in an Arabic table too.
+    rowNumberShort: "#",
+    breadcrumb: "Breadcrumb",
+    close: "Close",
+    // Never renders a bare wire value — see src/lib/format/wire-label.ts.
+    unknownCode: "Unrecognized value ({code})",
     showingOf: "Showing {from}–{to} of {total}",
     discardTitle: "Discard unsaved changes?",
     discardDescription: "Your changes have not been saved. Closing now will lose them.",
@@ -1171,6 +1182,17 @@ export const en: Dictionary = {
     title: "This capability is not available yet",
     description: "The demo scaffold was disabled because it was not connected to a server contract. The portal will not show fabricated data or success states.",
     back: "Return to an available capability"
+  },
+  metadata: {
+    // The suffix on every page title. `{portal}` is the brand, kept last so a
+    // browser tab truncating from the end still shows the page.
+    title: "{portal} — {app}",
+    titleTemplate: "{page} · {portal}",
+    description: "Comprehensive SaaS operations and management portal for tenants.",
+    login: "Sign in",
+    actionToken: "Account access",
+    fence: "Access",
+    notFound: "Page not found"
   },
   nav: {
     // Core settings navigation items
@@ -3341,7 +3363,25 @@ export const en: Dictionary = {
     ambiguousTitle: "This operation may already have run",
     ambiguousOperation: "Operation",
     ambiguousKey: "Idempotency key",
-    ambiguousReference: "Reference"
+    ambiguousReference: "Reference",
+    // D2: the write applied on the server but its response is not something
+    // this client can read. Sending it again as a fresh intent creates a
+    // second record, so the action offered is a refresh.
+    appliedUnreadableTitle: "This went through, but the reply could not be read",
+    appliedUnreadableDescription: "The server accepted the request and applied it, but the body it sent back is not a shape this app knows how to read. Do not send it again — refresh to see what was actually saved.",
+    appliedUnreadableRefresh: "Refresh this screen",
+    // Refusals this client made before the request left, instead of dropping a
+    // field (D8) or sending an unscoped request the Gateway 400s (D4).
+    refusals: {
+      CRM_ORGANIZATION_SCOPE_UNRESOLVED: "The company that owns the selected branch could not be determined, so the request was not sent. Pick another branch, or reload the page.",
+      CRM_AMOUNT_OUT_OF_SAFE_RANGE: "This amount is larger than can be sent without losing cents. The largest accepted value is 9999999999999.99.",
+      CRM_VALUE_OUT_OF_RANGE: "That value is outside the range this field accepts.",
+      CRM_OPPORTUNITY_TITLE_REQUIRED: "The title cannot be emptied: the server refuses a blank one, and there is no way to clear it.",
+      CRM_OPPORTUNITY_IMPORTANCE_REQUIRED: "Importance cannot be left empty. Enter a number from 0 to 3.",
+      CRM_OPPORTUNITY_CURRENCY_INVALID: "The currency code must be three letters, or empty to clear it.",
+      CRM_OPPORTUNITY_AMOUNT_NOT_CLEARABLE: "The amount cannot be cleared from this screen: the server has no way to empty this field. Enter an amount, or put the previous one back.",
+      CRM_OPPORTUNITY_NOTHING_TO_SEND: "Nothing in these edits can be sent to the server, so nothing was saved."
+    }
   },
   crmNotes: {
     title: "Notes",

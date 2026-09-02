@@ -90,7 +90,7 @@ export function CreateImportMappingModal({
             <SelectContent>
               {IMPORT_MAPPING_TARGET_CODES.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -113,7 +113,7 @@ export function CreateImportMappingModal({
             <SelectContent>
               {IMPORT_MAPPING_SCOPE_TARGETS.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>

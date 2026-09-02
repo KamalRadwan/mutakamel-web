@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { TenantPortalRuntime } from "@/components/auth/TenantPortalRuntime";
+import { RouteTitle } from "@/components/tenant/RouteTitle";
 import { AppShell, NAV_APP_COOKIE, storedAppOrDefault, type SidebarState } from "@/design-system";
 
 export default async function TenantLayout({ children }: { children: React.ReactNode }) {
@@ -15,6 +16,8 @@ export default async function TenantLayout({ children }: { children: React.React
 
   return (
     <TenantPortalRuntime>
+      {/* Every route under the shell gets its own translated title. */}
+      <RouteTitle />
       <AppShell initialSidebarState={initialSidebarState} initialApp={initialApp}>
         {children}
       </AppShell>

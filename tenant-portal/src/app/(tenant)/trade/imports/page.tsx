@@ -74,7 +74,7 @@ export default function ImportRunsPage() {
     {
       id: "status",
       header: t.common.status,
-      cell: (run) => <Badge tone={runTone(run.status)}>{tradeStatusLabel(t.tradeStatus, run.status)}</Badge>,
+      cell: (run) => <Badge tone={runTone(run.status)}>{tradeStatusLabel(t.tradeStatus, run.status, t.common.unknownCode)}</Badge>,
     },
     {
       id: "total",
@@ -159,7 +159,7 @@ export default function ImportRunsPage() {
             placeholder: t.tradeCommon.anyStatus,
             options: IMPORT_RUN_STATUSES.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
         ]}

@@ -112,7 +112,7 @@ export function DashboardFilterBar({
                 as bare identifiers and no branch-name source is reachable
                 from CRM. Same treatment as `TenantBranchSelect`, which every
                 other CRM workspace uses. */}
-            <SelectTrigger id="dashboard-branch" className="font-mono">
+            <SelectTrigger id="dashboard-branch" dir="ltr" className="font-mono">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -68,12 +68,12 @@ export default function InventoryDecisionsPage() {
     {
       id: "decisionType",
       header: t.tradeInventory.decisionType,
-      cell: (decision) => tradeStatusLabel(t.tradeStatus, decision.decisionType),
+      cell: (decision) => tradeStatusLabel(t.tradeStatus, decision.decisionType, t.common.unknownCode),
     },
     {
       id: "aggregateType",
       header: t.tradeInventory.aggregateType,
-      cell: (decision) => tradeStatusLabel(t.tradeStatus, decision.aggregateType),
+      cell: (decision) => tradeStatusLabel(t.tradeStatus, decision.aggregateType, t.common.unknownCode),
     },
     {
       id: "outcome",
@@ -81,7 +81,7 @@ export default function InventoryDecisionsPage() {
       cell: (decision) =>
         decision.outcome ? (
           <Badge tone={decision.outcome === "ALLOW" ? "positive" : "caution"}>
-            {tradeStatusLabel(t.tradeStatus, decision.outcome)}
+            {tradeStatusLabel(t.tradeStatus, decision.outcome, t.common.unknownCode)}
           </Badge>
         ) : (
           "—"
@@ -126,7 +126,7 @@ export default function InventoryDecisionsPage() {
                 placeholder: t.tradeCommon.anyStatus,
                 options: INVENTORY_POLICY_KINDS.map((value) => ({
                   value,
-                  label: tradeStatusLabel(t.tradeStatus, value),
+                  label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
                 })),
               },
             ]}

@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import {
+  SCOPE_UNRESOLVED_ERROR,
+  useOrganizationScopeHeaders,
+} from "@/hooks/useOrganizationScope";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -40,7 +43,7 @@ export function useCrmTasks() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
   const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
-  const scopeHeaders = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
+  const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   // Update has no capabilities signal of its own: GET /leads/capabilities
   // reports `activities: { create }` only. Update stays on the scoped
   // permission string, and the backend re-checks owner scope on every write.
@@ -60,9 +63,13 @@ export function useCrmTasks() {
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
-      if (!branchId) {
+      if (!branchId || !scope.ready) {
         setItems([]);
         setHasLoaded(false);
+        // D4: an unresolved organization scope is a gap on THIS side. Sending
+        // the request without the headers made the Gateway answer 400 and the
+        // screen report a server rejection for a client-side condition.
+        setQueryError(branchId && !scope.ready ? SCOPE_UNRESOLVED_ERROR : null);
         return;
       }
       setIsLoading(true);
@@ -74,7 +81,7 @@ export function useCrmTasks() {
         });
         const response = await axiosClient.get<unknown>(
           `${TASKS_PATH}?${query}`,
-          { ...READ_CONFIG, signal, headers: scopeHeaders },
+          { ...READ_CONFIG, signal, headers: scope.headers },
         );
         const parsed = parseTasksPage(response.data);
         setItems(parsed.items);
@@ -88,7 +95,7 @@ export function useCrmTasks() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [branchId, page, scopeHeaders, search, status],
+    [branchId, page, scope, search, status],
   );
 
   useEffect(() => {
@@ -106,11 +113,16 @@ export function useCrmTasks() {
     } catch (error) {
       return { ok: false, replayed: false, error: localError(error) };
     }
+    if (!scope.ready) {
+      // D4: never send a scoped write with no scope — the Gateway 400 that
+      // came back read as a server refusal of a perfectly good record.
+      return { ok: false, replayed: false, error: SCOPE_UNRESOLVED_ERROR };
+    }
     setIsSubmitting(true);
     try {
       const response = await axiosClient.post<unknown>(TASKS_PATH, body, {
         ...WRITE_CONFIG,
-        headers: scopeHeaders,
+        headers: scope.headers,
       });
       // The 201 returns the full entity, but the list projection is narrower;
       // refetching keeps every row the same shape rather than splicing in a
@@ -138,6 +150,11 @@ export function useCrmTasks() {
     } catch (error) {
       return { ok: false, replayed: false, error: localError(error) };
     }
+    if (!scope.ready) {
+      // D4: never send a scoped write with no scope — the Gateway 400 that
+      // came back read as a server refusal of a perfectly good record.
+      return { ok: false, replayed: false, error: SCOPE_UNRESOLVED_ERROR };
+    }
     if (Object.keys(body).length === 0) {
       return { ok: true, replayed: false, error: null };
     }
@@ -152,7 +169,10 @@ export function useCrmTasks() {
               ...entry,
               title: input.title.trim() || entry.title,
               status: input.status,
-              dueAt: input.dueAt ? input.dueAt.toISOString() : entry.dueAt,
+              // A cleared picker is `null`, not "keep the old date": the drawer
+              // seeds `dueAt` from this same task, so null always means the
+              // user emptied it — defect D8.
+              dueAt: input.dueAt ? input.dueAt.toISOString() : null,
             }
           : entry,
       ),
@@ -161,7 +181,7 @@ export function useCrmTasks() {
       const response = await axiosClient.patch<unknown>(
         taskPath(task.id),
         body,
-        { ...WRITE_CONFIG, headers: scopeHeaders },
+        { ...WRITE_CONFIG, headers: scope.headers },
       );
       await load();
       return {

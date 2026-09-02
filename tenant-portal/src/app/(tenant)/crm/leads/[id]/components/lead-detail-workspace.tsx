@@ -52,7 +52,10 @@ export function LeadDetailWorkspace({ leadId }: { leadId: string }) {
   const sources = useCrmAcquisitionSources();
   const { canMutate } = useAccessMode();
 
-  const edit = useLeadEdit(lead, detail.setLead);
+  // The third argument is the D2 reconciliation: when a write applies and its
+  // body cannot be read, the record is re-read from the server rather than
+  // patched from a response nothing could parse.
+  const edit = useLeadEdit(lead, detail.setLead, detail.reload);
   const convert = useLeadConvert(lead, detail.reload);
 
   if (detail.isLoading) {

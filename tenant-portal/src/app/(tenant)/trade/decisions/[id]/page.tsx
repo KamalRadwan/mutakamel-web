@@ -29,11 +29,11 @@ export default function DecisionReceiptPage({
     <div className="flex flex-col gap-4">
       <DetailHeader
         title={t.tradeGovernance.decisionTitle}
-        subtitle={receipt ? tradeStatusLabel(t.tradeStatus, receipt.decisionType) : undefined}
+        subtitle={receipt ? tradeStatusLabel(t.tradeStatus, receipt.decisionType, t.common.unknownCode) : undefined}
         status={
           receipt?.outcome ? (
             <Badge tone={receipt.outcome === "ALLOW" ? "positive" : "caution"}>
-              {tradeStatusLabel(t.tradeStatus, receipt.outcome)}
+              {tradeStatusLabel(t.tradeStatus, receipt.outcome, t.common.unknownCode)}
             </Badge>
           ) : undefined
         }
@@ -64,12 +64,12 @@ export default function DecisionReceiptPage({
           fields={[
             {
               label: t.tradeInventory.aggregateType,
-              value: tradeStatusLabel(t.tradeStatus, receipt.aggregateType),
+              value: tradeStatusLabel(t.tradeStatus, receipt.aggregateType, t.common.unknownCode),
             },
             { label: t.tradeInventory.aggregateId, value: receipt.aggregateId },
             {
               label: t.tradeGovernance.scopeTarget,
-              value: tradeStatusLabel(t.tradeStatus, receipt.scopeTarget),
+              value: tradeStatusLabel(t.tradeStatus, receipt.scopeTarget, t.common.unknownCode),
             },
             { label: t.tradeInventory.explanation, value: receipt.explanation, wide: true },
             {

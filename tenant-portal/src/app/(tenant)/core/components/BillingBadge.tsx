@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, resolveStatusRole, type BadgeProps, type StatusRole } from "@/design-system";
+import { Badge, IdentifierText, resolveStatusRole, type BadgeProps, type StatusRole } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 
 /**
@@ -110,7 +110,7 @@ export function BillingBadge({ kind, value, className }: BillingBadgeProps) {
   if (!role || !label) {
     return (
       <Badge tone="neutral" className={className}>
-        <span className="font-mono">{label ?? value}</span>
+        <IdentifierText>{label ?? value}</IdentifierText>
       </Badge>
     );
   }

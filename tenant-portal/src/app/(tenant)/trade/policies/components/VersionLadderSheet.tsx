@@ -94,7 +94,7 @@ export function VersionLadderSheet({
                 >
                   {`v${version.versionNumber}`}
                   <Badge tone={version.status === "PUBLISHED" ? "positive" : "neutral"}>
-                    {tradeStatusLabel(t.tradeStatus, version.status)}
+                    {tradeStatusLabel(t.tradeStatus, version.status, t.common.unknownCode)}
                   </Badge>
                 </Button>
               ))}

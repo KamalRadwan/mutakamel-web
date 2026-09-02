@@ -82,6 +82,9 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [ambiguous, setAmbiguous] = useState<NormalizedApiError | null>(null);
+  // D2: the conversion applied and its receipt could not be read.
+  const [appliedUnreadable, setAppliedUnreadable] =
+    useState<NormalizedApiError | null>(null);
   const [result, setResult] = useState<LeadConversionResult | null>(null);
 
   const open = form !== null;
@@ -150,7 +153,22 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void)
   const stepValidity = useMemo(() => validateSteps(form), [form]);
 
   const submit = useCallback(async () => {
-    if (!lead || !form || !attempt || isSubmitting) return;
+    // `appliedUnreadable` blocks the submit outright — D2. Once a conversion is
+    // known to have applied, there is no second intent this drawer may send.
+    if (!lead || !form || !attempt || isSubmitting || appliedUnreadable) return;
+    let body;
+    try {
+      // Built before the request rather than inside its argument list: the
+      // amount guard throws, and the block below has a `finally` but no
+      // `catch`, so the rejection escaped `submit` and reached nobody.
+      body = buildConvertLeadRequest(form);
+    } catch (caught) {
+      setError({
+        status: 422,
+        code: caught instanceof Error ? caught.message : undefined,
+      });
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
     try {
@@ -158,7 +176,7 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void)
         attempt,
         method: "post",
         path: leadConvertPath(lead.id),
-        body: buildConvertLeadRequest(form),
+        body,
         parse: parseLeadConversionResponse,
         config: { maxResponseBytes: 512 * 1024 },
       });
@@ -172,6 +190,18 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void)
         setAmbiguous(outcome.error);
         return;
       }
+      if (outcome.kind === "applied_unreadable") {
+        // D2, and this is the write it matters most on: one conversion creates
+        // a customer, its contacts and an opportunity. Reported as a plain
+        // failure it invited a second conversion — three duplicate records a
+        // person then merges by hand. The drawer stops accepting a submit and
+        // the lead is refetched instead.
+        setAmbiguous(null);
+        setError(null);
+        setAppliedUnreadable(outcome.error);
+        onConverted();
+        return;
+      }
       setAmbiguous(null);
       setError(outcome.error);
       // A 409 means the lead changed underneath — most often it was already
@@ -181,7 +211,7 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void)
     } finally {
       setIsSubmitting(false);
     }
-  }, [attempt, form, isSubmitting, lead, onConverted]);
+  }, [appliedUnreadable, attempt, form, isSubmitting, lead, onConverted]);
 
   return {
     open,
@@ -197,6 +227,9 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void)
     error,
     ambiguous,
     dismissAmbiguous: () => setAmbiguous(null),
+    appliedUnreadable,
+    dismissAppliedUnreadable: () => setAppliedUnreadable(null),
+    reconcile: onConverted,
     result,
     openDrawer,
     closeDrawer,

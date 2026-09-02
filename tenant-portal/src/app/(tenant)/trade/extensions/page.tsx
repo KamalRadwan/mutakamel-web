@@ -80,19 +80,19 @@ export default function ExtensionProfilesPage() {
     {
       id: "targetCode",
       header: t.tradeAutomation.targetCode,
-      cell: (profile) => tradeStatusLabel(t.tradeStatus, profile.targetCode),
+      cell: (profile) => tradeStatusLabel(t.tradeStatus, profile.targetCode, t.common.unknownCode),
     },
     {
       id: "scopeTarget",
       header: t.tradeGovernance.scopeTarget,
-      cell: (profile) => tradeStatusLabel(t.tradeStatus, profile.scopeTarget),
+      cell: (profile) => tradeStatusLabel(t.tradeStatus, profile.scopeTarget, t.common.unknownCode),
     },
     {
       id: "status",
       header: t.common.status,
       cell: (profile) => (
         <Badge tone={profile.status === "ACTIVE" ? "positive" : "neutral"}>
-          {tradeStatusLabel(t.tradeStatus, profile.status)}
+          {tradeStatusLabel(t.tradeStatus, profile.status, t.common.unknownCode)}
         </Badge>
       ),
     },
@@ -169,7 +169,7 @@ export default function ExtensionProfilesPage() {
             placeholder: t.tradeCommon.anyStatus,
             options: EXTENSION_TARGET_CODES.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
           {
@@ -179,7 +179,7 @@ export default function ExtensionProfilesPage() {
             placeholder: t.tradeCommon.anyStatus,
             options: EXTENSION_PROFILE_STATUSES.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
         ]}

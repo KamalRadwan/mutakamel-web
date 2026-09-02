@@ -9,6 +9,7 @@ import {
   DataTable,
   EmptyState,
   FilterBar,
+  IdentifierText,
   PageHeader,
   PermissionGate,
   SubNav,
@@ -41,7 +42,7 @@ export default function TradeUomsPage() {
     {
       id: "code",
       header: t.trade.uomCode,
-      cell: (uom) => <span className="font-mono font-medium text-foreground">{uom.code}</span>,
+      cell: (uom) => <IdentifierText className="font-medium text-foreground">{uom.code}</IdentifierText>,
     },
     { id: "displayName", header: t.trade.uomDisplayName, cell: (uom) => uom.displayName },
     {
@@ -237,9 +238,9 @@ export default function TradeUomsPage() {
             uoms.conflict ? (
               <span className="block text-xs">
                 {uoms.conflict.displayName}
-                <span className="ms-2 font-mono text-muted-foreground">
+                <IdentifierText className="ms-2 text-muted-foreground">
                   v{uoms.conflict.version}
-                </span>
+                </IdentifierText>
               </span>
             ) : null
           }

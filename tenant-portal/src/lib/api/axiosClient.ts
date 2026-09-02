@@ -314,17 +314,9 @@ export function startTenantActivityTracking(): () => void {
   };
 }
 
-export async function refreshTenantCookieSession(
-  rememberOverride?: boolean,
-  expectedSessionId?: string,
+async function requestTenantSessionRefresh(
   signal?: AbortSignal,
 ): Promise<WebAuthSessionResponse> {
-  const storedMeta = getStoredTenantSessionMeta();
-  const eventBeforeRefresh = readLatestTenantAuthEvent();
-  const remember =
-    rememberOverride ??
-    storedMeta?.remember ??
-    safeStorage.getItem(REMEMBER_PREFERENCE_KEY) === "1";
   const csrfToken = readTenantCsrfCookie();
   const controller = new AbortController();
   const abortFromCaller = () => controller.abort();
@@ -356,6 +348,57 @@ export async function refreshTenantCookieSession(
 
   const auth = readWebAuthSessionResponse(payload);
   if (!auth) throw createLocalApiError(500, "INVALID_REFRESH_RESPONSE");
+  return auth;
+}
+
+/**
+ * Commits a freshly issued session to this tab: one `session-updated` event and
+ * the metadata keyed to its id, written in that order so the two can never
+ * disagree about which event the stored timing came from.
+ *
+ * `notifyCurrentTab` is the whole reason this is one function and not two
+ * call sites. A caller that goes on to set its own auth state — sign-in, the
+ * bootstrap adoption below — must not also re-enter this tab's cross-tab
+ * handler, which would abort the very work that is committing the session. A
+ * caller that has no such state to set — accepting an invite, which then
+ * navigates — needs exactly that handler to run, because it is what tells the
+ * provider a session now exists.
+ */
+export function commitTenantSessionResponse(
+  auth: WebAuthSessionResponse,
+  { remember, notifyCurrentTab }: {
+    remember: boolean;
+    notifyCurrentTab: boolean;
+  },
+): void {
+  const savedAt = Date.now();
+  const event = publishTenantAuthEvent(
+    "session-updated",
+    auth.session.id,
+    notifyCurrentTab,
+    {
+      savedAt,
+      expiresIn: auth.expiresIn,
+      sessionExpiresIn: auth.sessionExpiresIn,
+      authorizationVersion: auth.session.authorizationVersion,
+      profileVersion: auth.session.profileVersion,
+    },
+  );
+  storeTenantSessionMetadata(auth, remember, event.eventId, savedAt);
+}
+
+export async function refreshTenantCookieSession(
+  rememberOverride?: boolean,
+  expectedSessionId?: string,
+  signal?: AbortSignal,
+): Promise<WebAuthSessionResponse> {
+  const storedMeta = getStoredTenantSessionMeta();
+  const eventBeforeRefresh = readLatestTenantAuthEvent();
+  const remember =
+    rememberOverride ??
+    storedMeta?.remember ??
+    safeStorage.getItem(REMEMBER_PREFERENCE_KEY) === "1";
+  const auth = await requestTenantSessionRefresh(signal);
 
   const latestEvent = readLatestTenantAuthEvent();
   const currentMeta = getStoredTenantSessionMeta();
@@ -373,22 +416,53 @@ export async function refreshTenantCookieSession(
     throw createLocalApiError(409, "AUTH_SESSION_CHANGED");
   }
 
-  const savedAt = Date.now();
-  const event = publishTenantAuthEvent(
-    "session-updated",
-    auth.session.id,
-    true,
-    {
-      savedAt,
-      expiresIn: auth.expiresIn,
-      sessionExpiresIn: auth.sessionExpiresIn,
-      authorizationVersion: auth.session.authorizationVersion,
-      profileVersion: auth.session.profileVersion,
-    },
-  );
-  storeTenantSessionMetadata(auth, remember, event.eventId, savedAt);
+  commitTenantSessionResponse(auth, { remember, notifyCurrentTab: true });
   publishTenantAuthLifecycle("AUTHENTICATED");
   return auth;
+}
+
+/**
+ * Rebuilds this tab's session metadata from the cookies alone.
+ *
+ * `tenant_session_meta` lives in sessionStorage, so it belongs to the one tab
+ * that signed in. A second tab, a restored window, and the redirect after an
+ * accepted invite all hold the same HttpOnly credentials and none of it — and
+ * everything that keeps a session alive is keyed to that metadata: the refresh
+ * scheduler reads its timing, the 401 retry only refreshes when the request
+ * carried it, and the realtime generation is built from its session id. A tab
+ * without it is signed in until the access cookie expires and then simply
+ * stops working.
+ *
+ * So the tab adopts the session the only way a browser can: by spending one
+ * refresh. `POST /auth/refresh` answers from the session-credential cookie
+ * alone (`tenant-auth.controller.ts`), so no client-known session id is needed
+ * to ask, and the response is the same shape sign-in commits.
+ *
+ * Returns `null` when there is nothing to adopt, which is the common case.
+ */
+export async function adoptTenantCookieSession(): Promise<
+  WebAuthSessionResponse | null
+> {
+  if (typeof window === "undefined") return null;
+  if (!hasTenantSessionCookieHint() || getStoredTenantSessionMeta() !== null) {
+    return null;
+  }
+  return withTenantAuthLock(async (signal) => {
+    if (getStoredTenantSessionMeta() !== null) return null;
+    const auth = await requestTenantSessionRefresh(signal);
+    const latestEvent = readLatestTenantAuthEvent();
+    if (
+      latestEvent?.kind === "session-ended" &&
+      latestEvent.sessionId === auth.session.id
+    ) {
+      throw createLocalApiError(401, "AUTH_SESSION_ENDED");
+    }
+    commitTenantSessionResponse(auth, {
+      remember: safeStorage.getItem(REMEMBER_PREFERENCE_KEY) === "1",
+      notifyCurrentTab: false,
+    });
+    return auth;
+  });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -427,7 +501,7 @@ async function sendPreparedRequest<T>(
     const disposition = classifyAuthFailure(response.status, code);
 
     if (disposition === "end") {
-      endTenantBrowserSession(request.sessionId);
+      endTenantBrowserSession(request.sessionId, code);
       throw error;
     }
     if (
@@ -626,7 +700,7 @@ export async function coordinateTenantSessionRefresh(
     }
   } catch (error) {
     if (isDefinitiveAuthFailure(error)) {
-      endTenantBrowserSession(targetSessionId ?? null);
+      endTenantBrowserSession(targetSessionId ?? null, getAuthErrorCode(error));
     } else if (
       !isAbortError(error) &&
       getAuthErrorCode(error) !== "AUTH_SESSION_CHANGED" &&
@@ -907,12 +981,21 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-function endTenantBrowserSession(expectedSessionId: string | null): void {
+/**
+ * `reason` is the wire code the server ended the session with, when one was
+ * observed. It rides the in-tab lifecycle channel rather than the cross-tab
+ * event because a tombstone is read by tabs that never saw the failure, and a
+ * code they cannot verify is worse than no code at all.
+ */
+function endTenantBrowserSession(
+  expectedSessionId: string | null,
+  reason?: string,
+): void {
   const sessionId = getStoredTenantSessionMeta()?.sessionId ?? null;
   if (!expectedSessionId || sessionId !== expectedSessionId) return;
   clearLocalTenantAuthState();
   publishTenantAuthEvent("session-ended", sessionId, true);
-  publishTenantAuthLifecycle("ENDED");
+  publishTenantAuthLifecycle("ENDED", reason);
 }
 
 function removeLegacyBrowserTokens(): void {

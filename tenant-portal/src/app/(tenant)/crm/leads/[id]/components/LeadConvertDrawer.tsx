@@ -15,7 +15,10 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
-import { useAmbiguousOutcomeLabels } from "../../../shared/hooks/useAmbiguousOutcomeLabels";
+import {
+  useAmbiguousOutcomeLabels,
+  useAppliedUnreadableLabels,
+} from "../../../shared/hooks/useAmbiguousOutcomeLabels";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import {
   CONVERSION_STEPS,
@@ -49,6 +52,7 @@ export function LeadConvertDrawer({ convert }: LeadConvertDrawerProps) {
   const { t, lang } = useI18n();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
+  const appliedLabels = useAppliedUnreadableLabels();
   const { form, step, stepValidity, result } = convert;
 
   const stepIndex = CONVERSION_STEPS.indexOf(step);
@@ -128,6 +132,18 @@ export function LeadConvertDrawer({ convert }: LeadConvertDrawerProps) {
                 onRetry={() => void convert.submit()}
                 onDismiss={convert.dismissAmbiguous}
                 labels={ambiguousLabels}
+              />
+            )}
+
+            {convert.appliedUnreadable && (
+              <AmbiguousOutcomePanel
+                operation={t.crmLeadConvert.operation}
+                idempotencyKey={convert.attempt?.idempotencyKey ?? ""}
+                description={t.crmShared.appliedUnreadableDescription}
+                correlationId={convert.appliedUnreadable.correlationId}
+                onRetry={() => convert.reconcile()}
+                onDismiss={convert.dismissAppliedUnreadable}
+                labels={appliedLabels}
               />
             )}
 

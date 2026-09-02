@@ -593,37 +593,39 @@ read as "no devices".
 device registration is fire-and-forget and the panel should not offer revoke at
 all.
 
-## Q18 — the session-ending reason cannot reach `/session-expired`
+## Q18 — the session-ending reason cannot reach `/session-expired` · resolved 2026-09-01
 
 Found 2026-08-31 building MASTER-PLAN 4.24. **First half closed 2026-08-31 by
-13.7; second half still open, and narrower than it looked.**
+13.7; second half closed 2026-09-01.**
 
-> **Status.** The code now rides `endedReason` on `TenantAuthContextValue` and
-> the guard appends it to the `/session-expired` destination it already chose —
-> permitted by HANDOFF.md's second 2026-08-31 amendment. What remains is the
-> second problem below, and building the first half found the exact mechanism
-> that makes it bite.
+> **Status — closed.** The code rides `endedReason` on
+> `TenantAuthContextValue`, and `TenantAuthGuard` is now the only place a
+> terminal state picks a destination. `AuthContext`'s two
+> `router.replace("/login")` calls — the cross-tab tombstone handler and the
+> lifecycle `ENDED` handler — are gone, so a session that ends *while the user
+> is working* reaches the same screen a bootstrap failure does.
 >
-> `AuthContext`'s `router.replace("/login")` is not usually reached by a
-> deliberate sign-out. It is reached because the **transport** ends the session
-> first: on a definitive refresh failure `endTenantBrowserSession` publishes the
-> same cross-tab tombstone another tab would send, that tombstone carries a
-> session id and **no code**, and the handler for it here redirects to `/login`
-> and clears the reason. So the reason is not merely un-routed — on that path it
-> is destroyed before any component could read it.
+> **The decision the second half was waiting on:** the code does **not** ride
+> the cross-tab `session-ended` event. That event is read by tabs that never
+> observed the failure, and its payload is the spine the Tier-1 fence exists to
+> protect. It rides the in-tab lifecycle channel instead —
+> `publishTenantAuthLifecycle(state, reason?)`, where only `ENDED` may carry a
+> reason — which reaches exactly the tab that saw the 401, and which is the tab
+> whose `bootstrap` catch was being pre-empted by `invalidatePendingAuthWork()`.
+> A tombstone arriving from another tab still carries no reason, and the screen
+> still says so rather than guessing.
 >
-> That splits the remaining work in two, and only the first is a one-line edit:
-> re-point the two `router.replace("/login")` calls, **and** decide whether the
-> code should ride the cross-tab `session-ended` event at all. The second is a
-> change to the cross-tab session-sync payload, which is the spine behaviour the
-> Tier-1 fence exists to protect — so it wants its own review, not a ride on a
-> UX task.
+> `SESSION_IDENTITY_INACTIVE` now reaches `/account-suspended`. The choice lives
+> in one mapper — `tenantSessionEndedHref` in
+> `src/lib/auth/sessionDestination.ts` — beside the code set it validates
+> against, so a code the transport can produce and no destination knows about
+> cannot go unnoticed again.
 >
-> Still open alongside it: `SESSION_IDENTITY_INACTIVE` is one of the seven codes
-> and belongs on `/account-suspended`, but choosing a different destination is a
-> change to *which* destination the guard picks, which the amendment does not
-> permit. Today it reaches `/session-expired` and gets the honest generic
-> headline rather than an expiry message it does not deserve.
+> One thing closing this uncovered: a *completed* sign-out was answered by "your
+> session expired". `logout()` settled on `ENDED`, and once ENDED became the
+> guard's cue for a terminal screen, the guard's `/session-expired` redirect
+> landed after logout's own `/login`. A deliberate sign-out settles
+> `UNAUTHENTICATED` now.
 
 `/session-expired` is supposed to say *why* the session ended. The seven codes
 that end a session are listed in `SESSION_ENDING_AUTH_CODES` in

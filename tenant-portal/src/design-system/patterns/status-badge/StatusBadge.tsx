@@ -1,5 +1,6 @@
 "use client";
 
+import { IdentifierText } from "../../primitives/IdentifierText";
 import { useI18n } from "@/i18n/I18nContext";
 import { Badge, type BadgeProps } from "../../primitives/Badge";
 import { resolveStatusRole, type StatusKind } from "./tone-map";
@@ -31,7 +32,7 @@ export function StatusBadge({ value, kind, className }: StatusBadgeProps) {
   if (!role) {
     return (
       <Badge tone="neutral" className={className}>
-        <span className="font-mono">{value}</span>
+        <IdentifierText>{value}</IdentifierText>
       </Badge>
     );
   }

@@ -7,10 +7,11 @@ import {
   DataTable,
   DegradedBanner,
   FilterBar,
+  IdentifierText,
+  NAV_SECTIONS,
   PageHeader,
   PermissionGate,
   SubNav,
-  NAV_SECTIONS,
   type ColumnDef,
 } from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
@@ -34,7 +35,7 @@ export default function CrmStaticCataloguePage() {
           <span className="flex size-7 items-center justify-center rounded-sm bg-muted">
             <BookOpen className="size-4 text-muted-foreground" aria-hidden="true" />
           </span>
-          <code className="font-mono text-xs font-medium text-foreground">{item.key}</code>
+          <IdentifierText className="text-xs font-medium text-foreground">{item.key}</IdentifierText>
         </div>
       ),
     },

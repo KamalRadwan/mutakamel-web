@@ -10,6 +10,7 @@ import {
   DetailHeader,
   DetailSection,
   ErrorState,
+  IdentifierText,
   NotFoundState,
   PermissionGate,
   ReasonDialog,
@@ -153,7 +154,7 @@ export default function OutboundEmailDetailPage({
                 {
                   label: t.crmOutboundEmails.failureCode,
                   value: email.failure ? (
-                    <span className="font-mono text-xs">{email.failure.code}</span>
+                    <IdentifierText className="text-xs">{email.failure.code}</IdentifierText>
                   ) : null,
                 },
               ]}

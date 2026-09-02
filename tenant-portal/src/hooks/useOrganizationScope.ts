@@ -6,6 +6,7 @@ import {
   resolveCompanyForBranch,
   resolveOrganizationScope,
   type OrganizationScope,
+  type OrganizationScopeGap,
   type OrganizationScopeMode,
 } from "@/lib/api/organization-scope";
 
@@ -21,21 +22,41 @@ function useOrganizationScope(branchId: string | null): OrganizationScope {
 }
 
 /**
- * The headers for one request, ready to spread into a request config.
+ * The scope for one request: either the headers to spread into a request
+ * config, or the reason there are none.
  *
- * Returns `{}` rather than blocking when the scope cannot be resolved. The
- * Gateway is authoritative and will reject a malformed scope itself; refusing
- * to send the request here would turn a server-side contract question into a
- * silently blank screen. Screens that genuinely cannot proceed without a
- * branch already say so through their own empty state.
+ * `headers` is `null` — not `{}` — when the scope did not resolve, and that is
+ * the whole point of the shape. This hook used to hand back an empty object,
+ * which spread cleanly into a request that then went out with no scope at all
+ * and came back `400 GW.REQUEST.INVALID` from the Gateway on every
+ * `BRANCH_REQUIRED` route — a client-side gap reported to the user as a server
+ * rejection (defect D4). A caller now cannot send the request without first
+ * deciding what to do about `ready: false`.
  */
+export type OrganizationScopeHeaders =
+  | { ready: true; headers: Record<string, string>; gap: null }
+  | { ready: false; headers: null; gap: OrganizationScopeGap };
+
 export function useOrganizationScopeHeaders(
   mode: OrganizationScopeMode,
   branchId: string | null,
-): Record<string, string> {
+): OrganizationScopeHeaders {
   const { companyId } = useOrganizationScope(branchId);
   return useMemo(() => {
     const resolution = resolveOrganizationScope(mode, { companyId, branchId });
-    return resolution.ok ? resolution.headers : {};
+    return resolution.ok
+      ? { ready: true, headers: resolution.headers, gap: null }
+      : { ready: false, headers: null, gap: resolution.gap };
   }, [mode, companyId, branchId]);
 }
+
+/**
+ * The error a screen shows for a scope that never resolved.
+ *
+ * `status: 0` is this app's "no HTTP response at all", which is exactly true
+ * here: the request was never sent. The code is mapped by `useCrmErrorText`.
+ */
+export const SCOPE_UNRESOLVED_ERROR = {
+  status: 0,
+  code: "CRM_ORGANIZATION_SCOPE_UNRESOLVED",
+} as const;

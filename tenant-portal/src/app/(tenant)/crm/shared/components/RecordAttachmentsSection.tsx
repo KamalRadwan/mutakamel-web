@@ -25,7 +25,10 @@ import {
 } from "../attachments-contract";
 import { formatFileSize } from "../format-file-size";
 import { useCrmAttachments } from "../hooks/useCrmAttachments";
-import { useAmbiguousOutcomeLabels } from "../hooks/useAmbiguousOutcomeLabels";
+import {
+  useAmbiguousOutcomeLabels,
+  useAppliedUnreadableLabels,
+} from "../hooks/useAmbiguousOutcomeLabels";
 import { useCrmErrorText } from "../hooks/useCrmErrorText";
 import { CrmScopeGate } from "./CrmScopeGate";
 
@@ -64,6 +67,7 @@ export function RecordAttachmentsSection({
   const { t, lang } = useI18n();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
+  const appliedLabels = useAppliedUnreadableLabels();
   const attachments = useCrmAttachments({ branchId, sourceType, sourceId });
   const [queue, setQueue] = useState<UploadFile[]>([]);
   const [rejections, setRejections] = useState<string[]>([]);
@@ -158,6 +162,20 @@ export function RecordAttachmentsSection({
               onRetry={() => void attachments.ambiguity?.replay()}
               onDismiss={attachments.dismissAmbiguity}
               labels={ambiguousLabels}
+            />
+          )}
+
+          {attachments.appliedUnreadable && (
+            <AmbiguousOutcomePanel
+              operation={t.crmAttachments.operations.upload}
+              idempotencyKey={
+                attachments.appliedUnreadable.attempt.idempotencyKey
+              }
+              description={t.crmShared.appliedUnreadableDescription}
+              correlationId={attachments.appliedUnreadable.error.correlationId}
+              onRetry={attachments.reload}
+              onDismiss={attachments.dismissAppliedUnreadable}
+              labels={appliedLabels}
             />
           )}
 

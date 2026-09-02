@@ -7,6 +7,7 @@ import {
   DetailHeader,
   DetailSection,
   ErrorState,
+  IdentifierText,
   NotFoundState,
   Pagination,
   PermissionGate,
@@ -82,7 +83,7 @@ export function ItemDetailScreen({ id }: { id: string }) {
               fields={[
                 {
                   label: t.trade.itemCode,
-                  value: <span className="font-mono">{item.canonicalCode}</span>,
+                  value: <IdentifierText>{item.canonicalCode}</IdentifierText>,
                 },
                 {
                   label: t.trade.itemKind,
@@ -92,21 +93,21 @@ export function ItemDetailScreen({ id }: { id: string }) {
                 },
                 {
                   label: t.trade.itemBaseUom,
-                  value: <span className="font-mono text-xs">{item.baseUomId}</span>,
+                  value: <IdentifierText className="text-xs">{item.baseUomId}</IdentifierText>,
                 },
                 {
                   label: t.trade.itemCategory,
                   value: item.categoryId ? (
-                    <span className="font-mono text-xs">{item.categoryId}</span>
+                    <IdentifierText className="text-xs">{item.categoryId}</IdentifierText>
                   ) : null,
                 },
-                { label: t.trade.version, value: <span className="font-mono">{item.version}</span> },
+                { label: t.trade.version, value: <IdentifierText>{item.version}</IdentifierText> },
                 { label: t.trade.updatedAt, value: formatDateTime(item.updatedAt, lang) },
                 {
                   label: t.trade.itemVariantIdentity,
                   wide: true,
                   value: item.variantIdentity ? (
-                    <pre className="overflow-x-auto font-mono text-xs">
+                    <pre dir="ltr" className="overflow-x-auto font-mono text-xs">
                       {JSON.stringify(item.variantIdentity, null, 2)}
                     </pre>
                   ) : null,
@@ -160,17 +161,17 @@ export function ItemDetailScreen({ id }: { id: string }) {
                       {
                         label: t.trade.defaultSalesUom,
                         value: detail.companyProfile.defaultSalesUomId ? (
-                          <span className="font-mono text-xs">
+                          <IdentifierText className="text-xs">
                             {detail.companyProfile.defaultSalesUomId}
-                          </span>
+                          </IdentifierText>
                         ) : null,
                       },
                       {
                         label: t.trade.defaultPurchaseUom,
                         value: detail.companyProfile.defaultPurchaseUomId ? (
-                          <span className="font-mono text-xs">
+                          <IdentifierText className="text-xs">
                             {detail.companyProfile.defaultPurchaseUomId}
-                          </span>
+                          </IdentifierText>
                         ) : null,
                       },
                       { label: t.trade.taxClassificationKey, value: detail.companyProfile.taxClassificationKey },
@@ -216,9 +217,9 @@ export function ItemDetailScreen({ id }: { id: string }) {
                       {
                         label: t.trade.defaultFulfillmentNode,
                         value: detail.branchProfile.defaultFulfillmentNodeId ? (
-                          <span className="font-mono text-xs">
+                          <IdentifierText className="text-xs">
                             {detail.branchProfile.defaultFulfillmentNodeId}
-                          </span>
+                          </IdentifierText>
                         ) : null,
                       },
                       {
@@ -271,16 +272,16 @@ export function ItemDetailScreen({ id }: { id: string }) {
                         className="flex items-center justify-between gap-3 rounded-sm border border-border p-2"
                       >
                         <span className="min-w-0">
-                          <span className="block font-mono text-xs text-foreground">
+                          <IdentifierText className="block text-xs text-foreground">
                             {listing.channelId}
-                          </span>
+                          </IdentifierText>
                           <span className="block text-xs text-muted-foreground">
                             {formatDateTime(listing.updatedAt, lang)}
                           </span>
                         </span>
                         <span className="flex shrink-0 items-center gap-2">
                           <Badge tone="neutral">
-                            <span className="font-mono">{listing.publicationStatus}</span>
+                            <IdentifierText>{listing.publicationStatus}</IdentifierText>
                           </Badge>
                           {listings.canManage ? (
                             <Button

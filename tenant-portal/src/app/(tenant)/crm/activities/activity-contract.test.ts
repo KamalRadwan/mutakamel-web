@@ -115,6 +115,27 @@ describe("CRM activities module contract", () => {
     expect(body).not.toHaveProperty("assigneeUserId");
   });
 
+  // D8. Clearing the picker used to drop the key entirely, so the write said
+  // "nothing about dueAt" and the old date survived a save the user watched
+  // succeed.
+  it("clears a due date with an explicit null, and leaves an untouched one alone", () => {
+    const dated = { ...task, dueAt: "2026-09-04T12:00:00.000Z" };
+    expect(
+      buildUpdateTaskRequest({ title: dated.title, status: dated.status, dueAt: null }, dated),
+    ).toEqual({ dueAt: null });
+    // Untouched is still absent — three states, not two.
+    expect(
+      buildUpdateTaskRequest(
+        { title: dated.title, status: dated.status, dueAt: new Date(dated.dueAt) },
+        dated,
+      ),
+    ).toEqual({});
+    // A task with no date and no date typed sends nothing either.
+    expect(
+      buildUpdateTaskRequest({ title: task.title, status: task.status, dueAt: null }, task),
+    ).toEqual({});
+  });
+
   it("refuses an event window the server would answer 422 for", () => {
     const start = new Date("2026-09-01T09:00:00.000Z");
     expect(() =>

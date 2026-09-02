@@ -106,7 +106,7 @@ export function CreateWebhookSubscriptionModal({
             <SelectContent>
               {WEBHOOK_SCOPE_TARGETS.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -139,7 +139,7 @@ export function CreateWebhookSubscriptionModal({
             <SelectContent>
               {WEBHOOK_RETRY_POLICIES.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>

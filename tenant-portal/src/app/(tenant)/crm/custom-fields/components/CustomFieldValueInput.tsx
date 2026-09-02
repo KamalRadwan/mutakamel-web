@@ -43,12 +43,11 @@ export function CustomFieldValueInput({
   if (field.type === "BOOLEAN") {
     return (
       <div className="flex items-center gap-2">
-        <Switch
-          checked={value === true}
-          disabled={disabled}
-          aria-label={localizedValue(field.nameAr, field.nameEn, lang)}
-          onCheckedChange={onChange}
-        />
+        {/* No aria-label: the enclosing `Field` already renders this exact
+            string as a real <label>, and an aria-label would outrank it. Every
+            branch below is named the same way — each returns a design-system
+            primitive, and the primitive claims the field itself. */}
+        <Switch checked={value === true} disabled={disabled} onCheckedChange={onChange} />
         <span className="text-sm text-foreground">
           {value === true ? t.common.active : t.common.inactive}
         </span>

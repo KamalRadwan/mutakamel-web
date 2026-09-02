@@ -5,6 +5,7 @@ import type { NormalizedApiError } from "@/lib/api/errors";
 import {
   createCrmWriteAttempt,
   runCrmWrite,
+  type CrmAppliedUnreadable,
   type CrmWriteAttempt,
 } from "../../../shared/crm-write";
 import { leadPath, parseLeadDetailResponse, type LeadDetail } from "../../lead-contract";
@@ -48,12 +49,27 @@ export interface LeadEditAmbiguity {
  * concurrency headers at all, so a 409 from this route is a domain conflict —
  * a converted lead, a name collision — and never a version mismatch.
  */
-export function useLeadEdit(lead: LeadDetail | null, onSaved: (lead: LeadDetail) => void) {
+export function useLeadEdit(
+  lead: LeadDetail | null,
+  onSaved: (lead: LeadDetail) => void,
+  /**
+   * Re-read the record from the server — defect D2. Used when a write applied
+   * but its response body could not be parsed: there is no value to hand
+   * `onSaved`, the record has nonetheless changed, and the one thing that must
+   * NOT happen is a form left open with a Save the user presses again.
+   */
+  onReconcile: () => void,
+) {
   const baseline = useMemo(() => (lead ? toForm(lead) : null), [lead]);
   const [form, setForm] = useState<LeadEditForm | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [ambiguity, setAmbiguity] = useState<LeadEditAmbiguity | null>(null);
+  // D2: the write applied and its receipt could not be read. Its own state,
+  // because `error` invites a second Save and that is exactly what a
+  // non-idempotent route cannot take.
+  const [appliedUnreadable, setAppliedUnreadable] =
+    useState<CrmAppliedUnreadable | null>(null);
 
   const open = form !== null;
   const isDirty = useMemo(() => {
@@ -117,6 +133,16 @@ export function useLeadEdit(lead: LeadDetail | null, onSaved: (lead: LeadDetail)
           setAmbiguity({ attempt, error: outcome.error, replay: send });
           return;
         }
+        if (outcome.kind === "applied_unreadable") {
+          // The lead IS patched. The drawer closes so there is no Save to press
+          // again, and the detail screen re-reads what the server now holds.
+          setAmbiguity(null);
+          setError(null);
+          setForm(null);
+          setAppliedUnreadable({ attempt, error: outcome.error });
+          onReconcile();
+          return;
+        }
         setError(outcome.error);
       } finally {
         setIsSubmitting(false);
@@ -134,6 +160,9 @@ export function useLeadEdit(lead: LeadDetail | null, onSaved: (lead: LeadDetail)
     error,
     ambiguity,
     dismissAmbiguity: () => setAmbiguity(null),
+    appliedUnreadable,
+    dismissAppliedUnreadable: () => setAppliedUnreadable(null),
+    reconcile: onReconcile,
     openDrawer,
     closeDrawer,
     setField,

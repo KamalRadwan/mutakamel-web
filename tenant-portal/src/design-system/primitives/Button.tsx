@@ -52,12 +52,20 @@ export interface ButtonProps
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size = "md", loading, asChild, disabled, children, ...props }, ref) => {
+  ({ className, variant, size = "md", loading, asChild, disabled, children, type, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
 
     return (
       <Comp
         ref={ref}
+        // HTML defaults a button element inside a form to type="submit". Now that
+        // FormDrawer is a real form, every unadorned Button in a drawer body —
+        // add a row, remove a chip, reveal a password, open a picker — would
+        // submit it on click. The safe default is the one that does nothing
+        // until asked; a submit control says type="submit" for itself.
+        // Untouched under asChild, where the rendered element may not be a
+        // button at all (an <a>, a Next <Link>), and `type` would be invalid.
+        type={asChild ? type : (type ?? "button")}
         className={cn(
           buttonVariants({ variant }),
           controlSize({ size }),

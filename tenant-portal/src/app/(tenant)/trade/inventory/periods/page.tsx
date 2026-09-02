@@ -73,7 +73,7 @@ export default function InventoryPeriodsPage() {
       header: t.common.status,
       cell: (period) => (
         <Badge tone={period.status === "OPEN" ? "positive" : "neutral"}>
-          {tradeStatusLabel(t.tradeStatus, period.status)}
+          {tradeStatusLabel(t.tradeStatus, period.status, t.common.unknownCode)}
         </Badge>
       ),
     },
@@ -151,7 +151,7 @@ export default function InventoryPeriodsPage() {
                 placeholder: t.tradeCommon.anyStatus,
                 options: PERIOD_STATUSES.map((value) => ({
                   value,
-                  label: tradeStatusLabel(t.tradeStatus, value),
+                  label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
                 })),
               },
             ]}

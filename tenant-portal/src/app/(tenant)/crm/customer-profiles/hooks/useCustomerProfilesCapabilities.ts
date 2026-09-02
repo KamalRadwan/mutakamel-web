@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import {
+  SCOPE_UNRESOLVED_ERROR,
+  useOrganizationScopeHeaders,
+} from "@/hooks/useOrganizationScope";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -64,7 +67,7 @@ export function useCustomerProfilesCapabilities(branchId: string | null) {
   // OPEN-QUESTIONS.md Q24. Additive on purpose: when the branch's company
   // cannot be derived this resolves to {} and the request goes out exactly
   // as it did before, so a contract misreading cannot blank the screen.
-  const scopeHeaders = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
+  const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   const [capabilities, setCapabilities] = useState<CustomerProfilesCapabilities>(EMPTY_CAPABILITIES);
   const [isLoading, setIsLoading] = useState(false);
   // Set only when the question could not be ASKED. A 403 is an answer, and
@@ -72,9 +75,12 @@ export function useCustomerProfilesCapabilities(branchId: string | null) {
   const [error, setError] = useState<NormalizedApiError | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
-    if (!branchId || !isUUIDv7(branchId)) {
+    if (!branchId || !isUUIDv7(branchId) || !scope.ready) {
       setCapabilities(EMPTY_CAPABILITIES);
-      setError(null);
+      // D4: an unresolved organization scope is a gap on THIS side, so the
+      // request is not sent at all. It used to go out with no headers and come
+      // back 400 from the Gateway, which reads as a server refusal.
+      setError(isUUIDv7(branchId) && !scope.ready ? SCOPE_UNRESOLVED_ERROR : null);
       return;
     }
     setIsLoading(true);
@@ -85,7 +91,7 @@ export function useCustomerProfilesCapabilities(branchId: string | null) {
         signal,
         cache: "no-store",
         maxResponseBytes: 50_000,
-        headers: scopeHeaders,
+        headers: scope.headers,
       });
       setCapabilities(parseCapabilitiesResponse(response.data) ?? EMPTY_CAPABILITIES);
     } catch (caught) {
@@ -103,7 +109,7 @@ export function useCustomerProfilesCapabilities(branchId: string | null) {
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
-  }, [branchId, scopeHeaders]);
+  }, [branchId, scope]);
 
   useEffect(() => {
     const controller = new AbortController();

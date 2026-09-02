@@ -76,7 +76,7 @@ export default function TradeDashboardsPage() {
     {
       id: "accessLevel",
       header: t.tradeAnalytics.accessLevel,
-      cell: (dashboard) => tradeStatusLabel(t.tradeStatus, dashboard.accessLevel),
+      cell: (dashboard) => tradeStatusLabel(t.tradeStatus, dashboard.accessLevel, t.common.unknownCode),
     },
     {
       id: "revision",

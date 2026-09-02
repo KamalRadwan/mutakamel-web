@@ -6,6 +6,7 @@ import {
   createCrmWriteAttempt,
   expectNoContent,
   runCrmWrite,
+  type CrmAppliedUnreadable,
   type CrmWriteAttempt,
 } from "../../../shared/crm-write";
 import {
@@ -49,6 +50,12 @@ export function useCustomerProfileActions(
   profile: CustomerProfileDetail | null,
   onSaved: (profile: CustomerProfileDetail) => void,
   onDeleted: () => void,
+  /**
+   * Re-read the record from the server — defect D2. `onSaved` is a state
+   * setter, not a refetch, so it has nothing useful to be handed when the
+   * response body could not be parsed.
+   */
+  onReconcile: () => void,
 ) {
   const baseline = useMemo(
     () => (profile ? toCustomerProfileForm(profile) : null),
@@ -66,6 +73,10 @@ export function useCustomerProfileActions(
   const [ambiguity, setAmbiguity] = useState<CustomerProfileAmbiguity | null>(
     null,
   );
+  // D2: the write applied and its receipt could not be read. Its own state,
+  // because `error` invites a second Save and that is what must not happen.
+  const [appliedUnreadable, setAppliedUnreadable] =
+    useState<CrmAppliedUnreadable | null>(null);
 
   const isDirty = useMemo(() => {
     if (!form || !baseline) return false;
@@ -84,8 +95,15 @@ export function useCustomerProfileActions(
         | { kind: "success"; value: T }
         | { kind: "failed"; error: NormalizedApiError }
         | { kind: "ambiguous"; error: NormalizedApiError }
+        | { kind: "applied_unreadable"; error: NormalizedApiError }
       >,
       onSuccess: (value: T) => void,
+      /**
+       * What to do when the write applied but its body could not be read —
+       * defect D2. There is no parsed value to hand `onSuccess`, and the record
+       * is nonetheless changed, so the screen re-reads it from the server.
+       */
+      reconcile: () => void,
     ): Promise<boolean> {
       setBusy(operation);
       setError(null);
@@ -93,18 +111,30 @@ export function useCustomerProfileActions(
         const outcome = await send();
         if (outcome.kind === "success") {
           setAmbiguity(null);
+          setAppliedUnreadable(null);
           onSuccess(outcome.value);
           return true;
         }
         if (outcome.kind === "ambiguous") {
+          setAppliedUnreadable(null);
           setAmbiguity({
             operation,
             attempt,
             error: outcome.error,
             replay: async () => {
-              await runWrite(operation, attempt, send, onSuccess);
+              await runWrite(operation, attempt, send, onSuccess, reconcile);
             },
           });
+          return false;
+        }
+        if (outcome.kind === "applied_unreadable") {
+          // Deliberately NOT `setError`: an error leaves the drawer open with a
+          // Save the user presses again, and on the contact POST that second
+          // press is a duplicate relationship.
+          setAmbiguity(null);
+          setError(null);
+          setAppliedUnreadable({ attempt, error: outcome.error });
+          reconcile();
           return false;
         }
         setAmbiguity(null);
@@ -138,9 +168,12 @@ export function useCustomerProfileActions(
           config: { maxResponseBytes: 512 * 1024 },
         }),
       onSaved,
+      // The patch applied; the detail screen re-reads the record rather than
+      // leaving a Save the user presses again.
+      onReconcile,
     );
     if (saved) setForm(null);
-  }, [baseline, form, onSaved, profile, run]);
+  }, [baseline, form, onReconcile, onSaved, profile, run]);
 
   /**
    * `PATCH /:id` with `{ status }` — the same route the board's drag target
@@ -169,10 +202,11 @@ export function useCustomerProfileActions(
             config: { maxResponseBytes: 512 * 1024 },
           }),
         onSaved,
+        onReconcile,
       );
       if (saved) setPendingStatus(null);
     },
-    [onSaved, pendingStatus, profile, run],
+    [onReconcile, onSaved, pendingStatus, profile, run],
   );
 
   const submitContact = useCallback(async () => {
@@ -198,9 +232,15 @@ export function useCustomerProfileActions(
       // is refetched rather than patched from a payload that does not contain
       // it.
       () => setContactForm(null),
+      // Same remedy as the success path: the profile is refetched either way,
+      // because the response never carried the contact itself.
+      () => {
+        setContactForm(null);
+        onReconcile();
+      },
     );
     if (added) onSaved(profile);
-  }, [contactForm, onSaved, profile, run]);
+  }, [contactForm, onReconcile, onSaved, profile, run]);
 
   const submitDelete = useCallback(async () => {
     if (!profile) return;
@@ -217,12 +257,15 @@ export function useCustomerProfileActions(
           config: { maxResponseBytes: 64 * 1024 },
         }),
       () => undefined,
+      // A 204 has no body to misread, so this is unreachable in practice. It
+      // re-reads the record rather than assuming which way the delete went.
+      onReconcile,
     );
     if (deleted) {
       setConfirmingDelete(false);
       onDeleted();
     }
-  }, [onDeleted, profile, run]);
+  }, [onDeleted, onReconcile, profile, run]);
 
   return {
     form,
@@ -276,5 +319,8 @@ export function useCustomerProfileActions(
     error,
     ambiguity,
     dismissAmbiguity: () => setAmbiguity(null),
+    appliedUnreadable,
+    dismissAppliedUnreadable: () => setAppliedUnreadable(null),
+    reconcile: onReconcile,
   };
 }

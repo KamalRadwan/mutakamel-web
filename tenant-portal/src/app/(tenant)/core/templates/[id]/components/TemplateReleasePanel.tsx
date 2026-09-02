@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CircleAlert, CircleCheck, CircleDashed, Play, Upload } from "lucide-react";
-import { Badge, Button, DetailSection, Field, Input } from "@/design-system";
+import { Badge, Button, DetailSection, Field, IdentifierText, Input } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
 import { TEMPLATE_CHANGE_NOTE_MAX } from "../../template-lifecycle-contract";
@@ -108,7 +108,7 @@ export function TemplateReleasePanel({
                 <CircleAlert className="mt-0.5 size-3.5 text-destructive" aria-hidden="true" />
                 <span className="flex flex-col">
                   <span className="text-foreground">{issue.message}</span>
-                  <span className="font-mono text-muted-foreground">{issue.code}</span>
+                  <IdentifierText className="text-muted-foreground">{issue.code}</IdentifierText>
                 </span>
               </li>
             ))}

@@ -20,7 +20,18 @@ export interface AmbiguousOutcomePanelProps {
   /** The key the original request carried. Retrying with it is what makes the retry safe. */
   idempotencyKey: string;
   description: string;
-  /** Must replay the SAME idempotency key. A fresh key is a second write, not a retry. */
+  /**
+   * The one action offered beside the evidence. What it must be depends on
+   * which outcome raised the panel:
+   *
+   * - **unknown outcome** — replay the SAME idempotency key. A fresh key is a
+   *   second write, not a retry.
+   * - **applied but unreadable** (defect D2) — reload or reconcile. The write
+   *   is on the server; there is nothing to send again, and a replay would
+   *   return the same body this client already could not read.
+   *
+   * Either way, nothing wired here may start a fresh intent.
+   */
   onRetry: () => void;
   /** The user resolving the condition — the only thing that removes this panel. */
   onDismiss: () => void;

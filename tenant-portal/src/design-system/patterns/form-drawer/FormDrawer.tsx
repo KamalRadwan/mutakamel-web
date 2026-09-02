@@ -96,7 +96,11 @@ export function FormDrawer({
     if (!open) setSubmitAttempted(false);
   }
 
-  function handleSubmit() {
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    // Implicit submission reaches here from Enter in any field, and unlike a
+    // click it is not gated by the submit button's own disabled state.
+    if (isSubmitting || submitDisabled) return;
     setSubmitAttempted(true);
     onSubmit();
   }
@@ -128,45 +132,62 @@ export function FormDrawer({
           }}
           className="flex w-full flex-col sm:max-w-md"
         >
-          <SheetHeader>
-            <SheetTitle>{title}</SheetTitle>
-            {description && <SheetDescription>{description}</SheetDescription>}
-          </SheetHeader>
+          {/*
+            A real <form>, not a div with a click handler. Without it Enter from
+            a text field does nothing, the fields have no form semantics, and
+            assistive tech is given a pile of controls with no container saying
+            what they are for.
 
-          {error && (
-            <div
-              role="alert"
-              className={cn(
-                "flex items-start gap-2 rounded-sm border border-negative-200 bg-negative-100 p-2.5",
-                "text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300",
-                proseMeasure,
-              )}
-            >
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 wrap-anywhere">{error}</span>
+            noValidate is deliberate. Native constraint validation preempts the
+            submit event entirely, so `onSubmit` — which is what reveals this
+            app's own field errors and runs the focus rule below — would never
+            fire, and the user would get a transient browser bubble in the
+            BROWSER's language instead of a persistent, programmatically
+            associated error in the app's. Errors here are inline and ours:
+            docs/design/patterns.md#where-a-result-belongs.
+          */}
+          <form
+            noValidate
+            onSubmit={handleSubmit}
+            className="flex min-h-0 flex-1 flex-col gap-4"
+          >
+            <SheetHeader>
+              <SheetTitle>{title}</SheetTitle>
+              {description && <SheetDescription>{description}</SheetDescription>}
+            </SheetHeader>
+
+            {error && (
+              <div
+                role="alert"
+                className={cn(
+                  "flex items-start gap-2 rounded-sm border border-negative-200 bg-negative-100 p-2.5",
+                  "text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300",
+                  proseMeasure,
+                )}
+              >
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 wrap-anywhere">{error}</span>
+              </div>
+            )}
+
+            <div ref={bodyRef} className="flex-1 overflow-y-auto">
+              {children}
             </div>
-          )}
 
-          <div ref={bodyRef} className="flex-1 overflow-y-auto">
-            {children}
-          </div>
-
-          <SheetFooter>
-            {footerLeading && <div className="me-auto flex items-center gap-2">{footerLeading}</div>}
-            {/* Deliberately not SheetClose — that closes via Radix's own
-                context and would bypass the dirty guard below. */}
-            <Button variant="outline" onClick={requestClose} disabled={isSubmitting}>
-              {labels.cancel}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmit}
-              loading={isSubmitting}
-              disabled={submitDisabled}
-            >
-              {labels.submit}
-            </Button>
-          </SheetFooter>
+            <SheetFooter>
+              {footerLeading && (
+                <div className="me-auto flex items-center gap-2">{footerLeading}</div>
+              )}
+              {/* Deliberately not SheetClose — that closes via Radix's own
+                  context and would bypass the dirty guard below. */}
+              <Button type="button" variant="outline" onClick={requestClose} disabled={isSubmitting}>
+                {labels.cancel}
+              </Button>
+              <Button type="submit" variant="primary" loading={isSubmitting} disabled={submitDisabled}>
+                {labels.submit}
+              </Button>
+            </SheetFooter>
+          </form>
         </SheetContent>
       </Sheet>
 

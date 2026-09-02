@@ -3,7 +3,7 @@
 import { forwardRef } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { useDirection } from "@/i18n/useLanguage";
+import { useDictionary, useDirection } from "@/i18n/useLanguage";
 import { cn } from "../lib/cn";
 import { focusRing } from "../lib/variants";
 
@@ -35,12 +35,15 @@ export interface SheetContentProps
   // docs/design/primitives.md#dialog--alertdialog--sheet.
   side?: "start" | "end";
   showCloseButton?: boolean;
+  /** See `DialogContentProps.closeLabel`. Defaults to `t.common.close`. */
+  closeLabel?: string;
 }
 
 export const SheetContent = forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   SheetContentProps
->(({ className, side = "end", showCloseButton = true, children, ...props }, ref) => {
+>(({ className, side = "end", showCloseButton = true, closeLabel, children, ...props }, ref) => {
+  const t = useDictionary();
   const dir = useDirection();
   const physicalSide = side === "start" ? (dir === "rtl" ? "right" : "left") : dir === "rtl" ? "left" : "right";
 
@@ -69,7 +72,7 @@ export const SheetContent = forwardRef<
             )}
           >
             <X className="size-4" aria-hidden="true" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{closeLabel ?? t.common.close}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>

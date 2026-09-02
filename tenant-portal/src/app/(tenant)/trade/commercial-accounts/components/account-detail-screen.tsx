@@ -9,6 +9,7 @@ import {
   DetailSection,
   EmptyState,
   ErrorState,
+  IdentifierText,
   Money,
   NotFoundState,
   PermissionGate,
@@ -58,7 +59,7 @@ export function AccountDetailScreen({ id }: { id: string }) {
                 {isKnownStatus ? (
                   t.trade[`accountStatus_${account.status as "ACTIVE" | "BLOCKED"}`]
                 ) : (
-                  <span className="font-mono">{account.status}</span>
+                  <IdentifierText>{account.status}</IdentifierText>
                 )}
               </Badge>
             ) : null
@@ -107,7 +108,7 @@ export function AccountDetailScreen({ id }: { id: string }) {
               fields={[
                 {
                   label: t.trade.accountParty,
-                  value: <span className="font-mono text-xs">{account.partyId}</span>,
+                  value: <IdentifierText className="text-xs">{account.partyId}</IdentifierText>,
                 },
                 {
                   label: t.trade.accountCreditLimit,
@@ -123,25 +124,25 @@ export function AccountDetailScreen({ id }: { id: string }) {
                 {
                   label: t.trade.accountPaymentTerms,
                   value: account.paymentTermsId ? (
-                    <span className="font-mono text-xs">{account.paymentTermsId}</span>
+                    <IdentifierText className="text-xs">{account.paymentTermsId}</IdentifierText>
                   ) : null,
                 },
                 {
                   label: t.trade.accountPriceBook,
                   value: account.priceBookId ? (
-                    <span className="font-mono text-xs">{account.priceBookId}</span>
+                    <IdentifierText className="text-xs">{account.priceBookId}</IdentifierText>
                   ) : null,
                 },
                 {
                   label: t.trade.accountCreditPolicy,
                   value: account.creditPolicyVersionId ? (
-                    <span className="font-mono text-xs">{account.creditPolicyVersionId}</span>
+                    <IdentifierText className="text-xs">{account.creditPolicyVersionId}</IdentifierText>
                   ) : null,
                 },
                 { label: t.trade.accountBlockReason, value: account.blockReasonCode },
                 {
                   label: t.trade.version,
-                  value: <span className="font-mono">{account.version}</span>,
+                  value: <IdentifierText>{account.version}</IdentifierText>,
                 },
                 { label: t.trade.updatedAt, value: formatDateTime(account.updatedAt, lang) },
               ]}

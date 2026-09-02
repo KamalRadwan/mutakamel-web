@@ -113,7 +113,7 @@ rather than the weaker proxy of it.
 **Fifth permitted change — `src/context/AuthContext.tsx` and
 `src/components/auth/TenantAuthGuard.tsx`, the ended reason only.**
 
-[OPEN-QUESTIONS.md#q18](OPEN-QUESTIONS.md#q18--the-session-ending-reason-cannot-reach-session-expired)
+[OPEN-QUESTIONS.md#q18](OPEN-QUESTIONS.md#q18--the-session-ending-reason-cannot-reach-session-expired--resolved-2026-09-01)
 names this exactly: the seven session-ending codes are classified in
 `AuthContext` and then discarded, so `/session-expired` can never say why.
 
@@ -123,10 +123,28 @@ names this exactly: the seven session-ending codes are classified in
 | Appending that reason to the `/session-expired` destination the guard **already** chooses | Any change to **which** destination the guard chooses, or to the effect's `!isAuthenticated && !isPublic` condition |
 | Adding `endedReason` to the guard effect's dependency array | `AuthContext`'s own two `router.replace("/login")` calls |
 
-That last row is the second half of Q18 and it stays **open**: re-pointing
-those two calls is redirect logic in a spine file, it decides where a user
-lands when a session ends mid-work, and it wants its own review rather than a
-ride on this one. Q18 is therefore narrowed, not closed — see its entry.
+That last row was the second half of Q18, and it stayed **open** here because
+re-pointing those two calls is redirect logic in a spine file: it decides where
+a user lands when a session ends mid-work, and it wanted its own review rather
+than a ride on this one.
+
+#### Amendment · 2026-09-01 (third) — the review that last row was waiting for
+
+That review happened, and it took the two "not permitted" cells above with it.
+Both are now done, deliberately and under test, and Q18 is closed.
+
+| Now permitted | Still not permitted |
+| --- | --- |
+| Removing `AuthContext`'s two `router.replace("/login")` calls, so `TenantAuthGuard` is the single owner of terminal destinations | Any change to **when** `ENDED` is set by the transport, or to any refresh, bootstrap or lock condition beyond the adoption below |
+| Choosing a **different** destination per code, through one mapper (`tenantSessionEndedHref`), so `SESSION_IDENTITY_INACTIVE` reaches `/account-suspended` | Inventing a destination for a code outside `SESSION_ENDING_AUTH_CODES` — an unrecognised code still falls through to the reasonless `/session-expired` |
+| Carrying the ended code on the **in-tab** lifecycle channel, `publishTenantAuthLifecycle(state, reason?)` | Putting a reason on the **cross-tab** `session-ended` event, whose payload is the spine the fence protects |
+| Adopting a cookie-only session in `bootstrap` — one `POST /auth/refresh` before `/me` when, and only when, this tab holds no `tenant_session_meta` | Skipping `/me`, or treating a non-definitive adoption failure as a signed-out state |
+
+The last row is the fix for a tab that holds the cookies and no metadata — a
+second tab, a restored window, an accepted invite. It could not refresh, could
+not schedule a refresh, and had no realtime generation, so it worked until the
+access cookie expired and then answered every request with a 401 and a degraded
+retry screen that could only produce the same 401.
 
 `TenantHostAdmission.tsx` and `TenantPortalRuntime.tsx` stay fenced in full.
 The rest of Tier 1 is unchanged.

@@ -19,6 +19,8 @@ const UUID_V7_PATTERN =
 const DECIMAL_STRING = /^-?\d+(\.\d{1,8})?$/u;
 
 /** `^[A-Z][A-Z0-9_.-]{1,99}$` — the governed-code pattern on every Create DTO. */
+import { wireLabel } from "@/lib/format/wire-label";
+
 export const GOVERNED_CODE_PATTERN = /^[A-Z][A-Z0-9_.-]{1,99}$/u;
 
 /** The shorter variant inventory periods and reason codes use. */
@@ -89,20 +91,26 @@ export function asOpenEnum(value: unknown): string | null {
 }
 
 /**
- * The label for a wire value, falling back to the value itself.
+ * The label for a wire value.
  *
  * Every enum rendered needs a `t.*` label (AGENTS.md) and this page's closed
- * enums all have one. The fallback exists for the ones source does **not**
- * close — control tower's `severity` and `retryClass`, and the inline `@IsIn`
- * lists on inventory query DTOs that no exported enum pins. Showing the raw
- * value is the documented behaviour there; a blank cell or a mapped guess is
- * not (docs/api/trade-advanced.md#not-verified).
+ * enums all have one. A fallback is still needed for the ones source does
+ * **not** close — control tower's `severity` and `retryClass`, and the inline
+ * `@IsIn` lists on inventory query DTOs that no exported enum pins. The code
+ * must stay visible there; a blank cell or a mapped guess is not the answer
+ * (docs/api/trade-advanced.md#not-verified).
+ *
+ * It used to return the wire value **bare**, so an unpinned enum reached an
+ * Arabic screen as an English SCREAMING_CASE token and nothing anywhere
+ * recorded that a label was owed. `wireLabel` keeps the code visible, puts a
+ * translated sentence around it, and warns once per unseen value.
  */
 export function tradeStatusLabel(
   labels: Readonly<Record<string, string | undefined>>,
   value: string,
+  unknown: string,
 ): string {
-  return labels[value] ?? value;
+  return wireLabel(labels, value, unknown, "tradeStatus");
 }
 
 /** `{ items, total, page, limit }` — flat, with no `meta` and no `totalPages`. */

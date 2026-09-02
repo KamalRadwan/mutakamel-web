@@ -7,6 +7,7 @@ import {
   CardTitle,
   EmptyState,
   ErrorState,
+  IdentifierText,
   Label,
   Skeleton,
   Switch,
@@ -73,9 +74,9 @@ export function NotificationPreferencesPanel() {
             key={preference.notificationType}
             className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 last:border-b-0 last:pb-0"
           >
-            <span className="min-w-0 font-mono text-xs text-foreground">
+            <IdentifierText className="min-w-0 text-xs text-foreground">
               {preference.notificationType}
-            </span>
+            </IdentifierText>
             <div className="flex flex-wrap items-center gap-4">
               {CHANNELS.map((channel) => (
                 <span key={channel} className="flex items-center gap-2">

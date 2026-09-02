@@ -64,6 +64,10 @@ export function CustomerProfileDetailWorkspace({
     profile,
     detail.setProfile,
     () => router.push("/crm/customer-profiles"),
+    // The D2 reconciliation: when a write applies and its body cannot be read,
+    // the record is re-read from the server rather than patched from a response
+    // nothing could parse.
+    detail.reload,
   );
 
   if (detail.isLoading) {

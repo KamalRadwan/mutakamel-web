@@ -84,19 +84,19 @@ export function GovernanceWorkspace({ family }: { family: GovernanceFamily }) {
     {
       id: "kind",
       header: family === "policy" ? t.tradeGovernance.policyKind : t.tradeGovernance.workflowKind,
-      cell: (row) => tradeStatusLabel(t.tradeStatus, row.kind),
+      cell: (row) => tradeStatusLabel(t.tradeStatus, row.kind, t.common.unknownCode),
     },
     {
       id: "scopeTarget",
       header: t.tradeGovernance.scopeTarget,
-      cell: (row) => tradeStatusLabel(t.tradeStatus, row.scopeTarget),
+      cell: (row) => tradeStatusLabel(t.tradeStatus, row.scopeTarget, t.common.unknownCode),
     },
     {
       id: "status",
       header: t.common.status,
       cell: (row) => (
         <Badge tone={row.status === "ACTIVE" ? "positive" : "neutral"}>
-          {tradeStatusLabel(t.tradeStatus, row.status)}
+          {tradeStatusLabel(t.tradeStatus, row.status, t.common.unknownCode)}
         </Badge>
       ),
     },
@@ -110,7 +110,7 @@ export function GovernanceWorkspace({ family }: { family: GovernanceFamily }) {
           <span className="flex flex-wrap items-center gap-1">
             {row.versions.slice(0, 4).map((version) => (
               <Badge key={version.id} tone={version.status === "PUBLISHED" ? "positive" : "neutral"}>
-                {`v${version.versionNumber} · ${tradeStatusLabel(t.tradeStatus, version.status)}`}
+                {`v${version.versionNumber} · ${tradeStatusLabel(t.tradeStatus, version.status, t.common.unknownCode)}`}
               </Badge>
             ))}
           </span>
@@ -187,7 +187,7 @@ export function GovernanceWorkspace({ family }: { family: GovernanceFamily }) {
             placeholder: t.tradeCommon.anyStatus,
             options: kinds.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
           {
@@ -197,7 +197,7 @@ export function GovernanceWorkspace({ family }: { family: GovernanceFamily }) {
             placeholder: t.tradeCommon.anyStatus,
             options: DEFINITION_STATUSES.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
         ]}

@@ -99,7 +99,7 @@ export default function PriceBookVersionPage({
     {
       id: "status",
       header: t.common.status,
-      cell: (row) => <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, row.status)}</Badge>,
+      cell: (row) => <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, row.status, t.common.unknownCode)}</Badge>,
     },
     { id: "stackGroup", header: t.tradePricing.stackGroup, cell: (row) => row.stackGroup },
     {
@@ -139,7 +139,7 @@ export default function PriceBookVersionPage({
         status={
           detail ? (
             <Badge tone={detail.version.status === "PUBLISHED" ? "positive" : "neutral"}>
-              {tradeStatusLabel(t.tradeStatus, detail.version.status)}
+              {tradeStatusLabel(t.tradeStatus, detail.version.status, t.common.unknownCode)}
             </Badge>
           ) : undefined
         }

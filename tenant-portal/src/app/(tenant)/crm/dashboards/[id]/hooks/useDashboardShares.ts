@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { DASHBOARD_SHARE_TARGETS_PATH, dashboardPath } from "../../dashboard-contract";
@@ -44,21 +44,52 @@ export function useDashboardShares(dashboardId: string, enabled: boolean) {
   const [error, setError] = useState<NormalizedApiError | null>(null);
 
   const resourcePath = dashboardPath(dashboardId);
+  // Defect D9. Neither read was ordered or cancelled, so moving from one
+  // dashboard to another could leave the first dashboard's grants rendered
+  // under the second — a share list is exactly the wrong thing to show for the
+  // wrong resource. One epoch per source; a response that is no longer the one
+  // being waited for is discarded rather than committed.
+  const sharesEpochRef = useRef(0);
+  const sharesRequestRef = useRef<AbortController | null>(null);
+  const targetsEpochRef = useRef(0);
+  const targetsRequestRef = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      sharesRequestRef.current?.abort();
+      targetsRequestRef.current?.abort();
+    },
+    [],
+  );
 
   const load = useCallback(async (): Promise<void> => {
-    if (!enabled) return;
+    const epoch = sharesEpochRef.current + 1;
+    sharesEpochRef.current = epoch;
+    sharesRequestRef.current?.abort();
+    if (!enabled) {
+      sharesRequestRef.current = null;
+      return;
+    }
+    const controller = new AbortController();
+    sharesRequestRef.current = controller;
     setIsLoading(true);
     setError(null);
     try {
       const response = await axiosClient.get<unknown>(
         resourceSharesPath(resourcePath),
-        READ_CONFIG,
+        { ...READ_CONFIG, signal: controller.signal },
       );
-      setShares(parseSharesResponse(response.data));
+      const parsed = parseSharesResponse(response.data);
+      if (epoch !== sharesEpochRef.current) return;
+      setShares(parsed);
     } catch (caught) {
+      if (isAbortError(caught) || epoch !== sharesEpochRef.current) return;
       setError(normalizeApiError(caught));
     } finally {
-      setIsLoading(false);
+      if (epoch === sharesEpochRef.current) {
+        sharesRequestRef.current = null;
+        setIsLoading(false);
+      }
     }
   }, [enabled, resourcePath]);
 
@@ -76,17 +107,31 @@ export function useDashboardShares(dashboardId: string, enabled: boolean) {
   }, [load]);
 
   const searchTargets = async (search: string): Promise<void> => {
-    if (!enabled) return;
+    const epoch = targetsEpochRef.current + 1;
+    targetsEpochRef.current = epoch;
+    targetsRequestRef.current?.abort();
+    if (!enabled) {
+      targetsRequestRef.current = null;
+      return;
+    }
+    const controller = new AbortController();
+    targetsRequestRef.current = controller;
     try {
       const response = await axiosClient.get<unknown>(
         `${DASHBOARD_SHARE_TARGETS_PATH}${shareTargetsQuery(search, 0)}`,
-        READ_CONFIG,
+        { ...READ_CONFIG, signal: controller.signal },
       );
-      setTargets(parseShareTargetsResponse(response.data).items);
-    } catch {
+      const parsed = parseShareTargetsResponse(response.data).items;
+      if (epoch !== targetsEpochRef.current) return;
+      setTargets(parsed);
+    } catch (caught) {
       // A failed target search leaves the picker empty rather than failing the
-      // panel: the existing shares are a separate, already-loaded source.
+      // panel: the existing shares are a separate, already-loaded source. A
+      // superseded one leaves it alone entirely.
+      if (isAbortError(caught) || epoch !== targetsEpochRef.current) return;
       setTargets([]);
+    } finally {
+      if (epoch === targetsEpochRef.current) targetsRequestRef.current = null;
     }
   };
 
@@ -135,4 +180,8 @@ export function useDashboardShares(dashboardId: string, enabled: boolean) {
   };
 
   return { shares, targets, isLoading, isSubmitting, error, searchTargets, share, revoke, reload: load };
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }

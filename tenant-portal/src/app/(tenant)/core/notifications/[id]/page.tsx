@@ -12,11 +12,13 @@ import {
   CardTitle,
   DateTime,
   ErrorState,
+  IdentifierText,
   NotFoundState,
   PageHeader,
   PermissionGate,
   Skeleton,
 } from "@/design-system";
+import { wireLabel } from "@/lib/format/wire-label";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { PriorityBadge } from "../components/NotificationList";
 import { useNotificationDetail } from "./hooks/useNotificationDetail";
@@ -115,19 +117,24 @@ export default function NotificationDetailPage() {
               </CardHeader>
               <CardContent className="flex flex-col gap-2">
                 <DetailRow label={t.coreNotifications.detailType}>
-                  <span className="font-mono text-xs">{notification.notificationType}</span>
+                  <IdentifierText className="text-xs">{notification.notificationType}</IdentifierText>
                 </DetailRow>
                 <DetailRow label={t.coreNotifications.detailPriority}>
                   <PriorityBadge priority={notification.priority} />
                 </DetailRow>
                 <DetailRow label={t.coreNotifications.detailSource}>
-                  <span className="font-mono text-xs">{notification.sourceApp}</span>
+                  <IdentifierText className="text-xs">{notification.sourceApp}</IdentifierText>
                 </DetailRow>
                 <DetailRow label={t.coreNotifications.detailChannels}>
                   <span className="flex flex-wrap gap-1">
                     {notification.channels.map((channel) => (
-                      <Badge key={channel} tone="neutral" className="font-mono">
-                        {channel}
+                      <Badge key={channel} tone="neutral">
+                        {wireLabel(
+                          t.coreNotifications.channelNames,
+                          channel,
+                          t.common.unknownCode,
+                          "coreNotifications.channelNames",
+                        )}
                       </Badge>
                     ))}
                   </span>
@@ -155,9 +162,9 @@ export default function NotificationDetailPage() {
                 </DetailRow>
                 {notification.entityType && notification.entityId ? (
                   <DetailRow label={t.coreNotifications.detailEntity}>
-                    <span className="font-mono text-xs">
+                    <IdentifierText className="text-xs">
                       {`${notification.entityType} · ${notification.entityId}`}
-                    </span>
+                    </IdentifierText>
                   </DetailRow>
                 ) : null}
               </CardContent>

@@ -248,7 +248,7 @@ export function CreateVersionDrawer({
                   <SelectContent>
                     {PROMOTION_BENEFIT_TYPES.map((value) => (
                       <SelectItem key={value} value={value}>
-                        {tradeStatusLabel(t.tradeStatus, value)}
+                        {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                       </SelectItem>
                     ))}
                   </SelectContent>

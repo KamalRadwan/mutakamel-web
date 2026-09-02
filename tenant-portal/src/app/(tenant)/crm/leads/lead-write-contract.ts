@@ -5,6 +5,7 @@
 // from `crm-app/src/crm/leads/dto/lead.dto.ts` and nothing else is sent.
 
 import { isUUIDv7 } from "@/lib/uuid";
+import { isExactMoneyDecimal, toMoneyWireNumber } from "../shared/money";
 import type {
   CrmContactMethodType,
   CrmProfileType,
@@ -154,38 +155,14 @@ export interface LeadConversionForm {
 const CONVERSION_CONTACT_METHODS_MAX = 20;
 
 /**
- * A decimal with at most two places and an integer part small enough to survive
- * `Number()` exactly.
- *
- * 15 integer digits is the widest value below 2^53, so a string that matches
- * this converts without losing a unit. See `conversionAmount` for why a
- * conversion is unavoidable at all.
- */
-const SAFE_DECIMAL = /^\d{1,15}(\.\d{1,2})?$/;
-
-export function isValidConversionAmount(value: string): boolean {
-  return value.trim().length === 0 || SAFE_DECIMAL.test(value.trim());
-}
-
-/**
- * The one place this app turns a decimal string into a number, and the reason
- * it is not a violation of "never `Number()` a decimal string".
- *
- * That rule protects values coming **off the wire**, where precision loss is
- * silent and unrecoverable. This is the opposite direction:
  * `ConvertLeadOpportunityDto.amount` is `@IsNumber({ maxDecimalPlaces: 2 })`,
  * so JSON must carry a number and there is no string form the backend accepts.
- * `SAFE_DECIMAL` bounds the input so the conversion is exact, and the value
- * that comes back is a decimal string again, rendered through `Money` and
- * never converted.
+ * `../shared/money` owns the range where that conversion keeps every cent —
+ * defect D3. The value that comes back is a decimal string again, rendered
+ * through `Money` and never converted.
  */
-function conversionAmount(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return undefined;
-  if (!SAFE_DECIMAL.test(trimmed)) {
-    throw new Error("Opportunity amount must be a decimal with at most 2 places.");
-  }
-  return Number(trimmed);
+export function isValidConversionAmount(value: string): boolean {
+  return isExactMoneyDecimal(value);
 }
 
 export function buildConvertLeadRequest(
@@ -213,7 +190,7 @@ export function buildConvertLeadRequest(
       stageId: form.stageId,
       title: form.title.trim(),
     };
-    const amount = conversionAmount(form.amount);
+    const amount = toMoneyWireNumber(form.amount);
     if (amount !== undefined) opportunity.amount = amount;
     const currencyCode = form.currencyCode.trim().toUpperCase();
     if (currencyCode.length === 3) opportunity.currencyCode = currencyCode;

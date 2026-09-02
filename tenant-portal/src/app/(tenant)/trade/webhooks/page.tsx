@@ -85,7 +85,7 @@ export default function WebhookSubscriptionsPage() {
       header: t.common.status,
       cell: (subscription) => (
         <Badge tone={subscription.status === "ACTIVE" ? "positive" : "neutral"}>
-          {tradeStatusLabel(t.tradeStatus, subscription.status)}
+          {tradeStatusLabel(t.tradeStatus, subscription.status, t.common.unknownCode)}
         </Badge>
       ),
     },
@@ -94,7 +94,7 @@ export default function WebhookSubscriptionsPage() {
       header: t.tradeAutomation.secretStatus,
       cell: (subscription) =>
         subscription.secretStatus
-          ? tradeStatusLabel(t.tradeStatus, subscription.secretStatus)
+          ? tradeStatusLabel(t.tradeStatus, subscription.secretStatus, t.common.unknownCode)
           : "—",
     },
     {
@@ -152,7 +152,7 @@ export default function WebhookSubscriptionsPage() {
             placeholder: t.tradeCommon.anyStatus,
             options: WEBHOOK_SUBSCRIPTION_STATUSES.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
         ]}

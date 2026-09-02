@@ -4,6 +4,7 @@ import {
   Card,
   DateTime,
   DegradedBanner,
+  IdentifierText,
   Money,
   StatCard,
   Table,
@@ -179,7 +180,7 @@ export function PrebuiltWidgetCard({ spec, value }: PrebuiltWidgetCardProps) {
     // stays visible instead of blank.
     if (typeof cell === "string" && ENUM_COLUMNS.has(column)) {
       const label = t.crmDashboardReports.statusValues[cell];
-      return label ?? <code className="font-mono text-2xs">{cell}</code>;
+      return label ?? <IdentifierText className="text-2xs">{cell}</IdentifierText>;
     }
     // `reason` is two different things: an enum on `dataCleanupItems`
     // (MISSING_AMOUNT / MISSING_CURRENCY / MISSING_OWNER / CHECK_RECORD) and

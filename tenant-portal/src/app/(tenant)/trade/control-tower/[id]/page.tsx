@@ -150,7 +150,7 @@ export default function ControlTowerExceptionPage({
         status={
           exception ? (
             <Badge tone={exception.status === "RESOLVED" ? "positive" : "caution"}>
-              {tradeStatusLabel(t.tradeStatus, exception.status)}
+              {tradeStatusLabel(t.tradeStatus, exception.status, t.common.unknownCode)}
             </Badge>
           ) : undefined
         }
@@ -240,7 +240,7 @@ export default function ControlTowerExceptionPage({
                 label={t.tradeControlTower.attempts}
                 events={exception.attempts.map((attempt) => ({
                   id: attempt.id,
-                  title: `${attempt.ownerCode} · ${tradeStatusLabel(t.tradeStatus, attempt.status)}`,
+                  title: `${attempt.ownerCode} · ${tradeStatusLabel(t.tradeStatus, attempt.status, t.common.unknownCode)}`,
                   description: [attempt.retryClass, attempt.lastErrorCode]
                     .filter((part): part is string => part !== null)
                     .join(" · "),

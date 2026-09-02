@@ -6,6 +6,7 @@ import {
   isAmbiguousWriteFailure,
   runCrmWrite,
   IDEMPOTENCY_KEY_HEADER,
+  WRITE_APPLIED_UNREADABLE,
 } from "./crm-write";
 
 const post = vi.fn();
@@ -148,7 +149,12 @@ describe("CRM write attempts", () => {
     );
   });
 
-  it("treats an unreadable response body as failed, never as ambiguous", async () => {
+  // D2, corrected deliberately. This used to assert `failed`, which is the
+  // defect: a plain failure invites the user to fill the form in again and
+  // press Save, and on a non-idempotent route that fresh intent duplicates a
+  // record that already exists. It is not ambiguous either — replaying the key
+  // returns the same body this client already could not read.
+  it("reports an unreadable 2xx body as applied, neither failed nor ambiguous", async () => {
     post.mockResolvedValue({
       data: { unexpected: true },
       status: 201,
@@ -164,7 +170,25 @@ describe("CRM write attempts", () => {
         throw new Error("Invalid CRM notes response.");
       },
     });
-    // The write applied; offering a retry could only reproduce the same body.
+    expect(outcome.kind).toBe("applied_unreadable");
+    expect(outcome.kind === "applied_unreadable" && outcome.error).toEqual({
+      status: 201,
+      code: WRITE_APPLIED_UNREADABLE,
+      message: "Invalid CRM notes response.",
+    });
+  });
+
+  it("keeps a pre-response failure a failure — the parser is not involved", async () => {
+    post.mockRejectedValue(apiError(422));
+    const outcome = await runCrmWrite({
+      attempt: createCrmWriteAttempt(),
+      method: "post",
+      path: "/api/tenant/crm/v1/notes",
+      body: {},
+      parse: () => {
+        throw new Error("never reached");
+      },
+    });
     expect(outcome.kind).toBe("failed");
   });
 

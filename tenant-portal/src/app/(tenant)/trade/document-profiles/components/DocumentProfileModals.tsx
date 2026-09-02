@@ -96,7 +96,7 @@ export function CreateDocumentProfileModal({
             <SelectContent>
               {CREATABLE_DOCUMENT_TYPES.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -119,7 +119,7 @@ export function CreateDocumentProfileModal({
             <SelectContent>
               {DOCUMENT_PROFILE_SCOPE_TARGETS.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>

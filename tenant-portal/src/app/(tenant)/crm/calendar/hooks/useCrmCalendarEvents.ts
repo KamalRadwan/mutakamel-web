@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import {
+  SCOPE_UNRESOLVED_ERROR,
+  useOrganizationScopeHeaders,
+} from "@/hooks/useOrganizationScope";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -39,7 +42,7 @@ export function useCrmCalendarEvents() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
   const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
-  const scopeHeaders = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
+  const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   const canUpdate =
     user?.permissions.some((permission) =>
       permission.startsWith("crm.activities.update"),
@@ -55,9 +58,13 @@ export function useCrmCalendarEvents() {
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
-      if (!branchId) {
+      if (!branchId || !scope.ready) {
         setItems([]);
         setHasLoaded(false);
+        // D4: an unresolved organization scope is a gap on THIS side. Sending
+        // the request without the headers made the Gateway answer 400 and the
+        // screen report a server rejection for a client-side condition.
+        setQueryError(branchId && !scope.ready ? SCOPE_UNRESOLVED_ERROR : null);
         return;
       }
       setIsLoading(true);
@@ -68,7 +75,7 @@ export function useCrmCalendarEvents() {
         });
         const response = await axiosClient.get<unknown>(
           `${CALENDAR_EVENTS_PATH}?${query}`,
-          { ...READ_CONFIG, signal, headers: scopeHeaders },
+          { ...READ_CONFIG, signal, headers: scope.headers },
         );
         const parsed = parseEventsPage(response.data);
         setItems(parsed.items);
@@ -82,7 +89,7 @@ export function useCrmCalendarEvents() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [branchId, page, scopeHeaders, search],
+    [branchId, page, scope, search],
   );
 
   useEffect(() => {
@@ -102,12 +109,17 @@ export function useCrmCalendarEvents() {
     } catch (error) {
       return { ok: false, replayed: false, error: localError(error) };
     }
+    if (!scope.ready) {
+      // D4: never send a scoped write with no scope — the Gateway 400 that
+      // came back read as a server refusal of a perfectly good record.
+      return { ok: false, replayed: false, error: SCOPE_UNRESOLVED_ERROR };
+    }
     setIsSubmitting(true);
     try {
       const response = await axiosClient.post<unknown>(
         CALENDAR_EVENTS_PATH,
         body,
-        { ...WRITE_CONFIG, headers: scopeHeaders },
+        { ...WRITE_CONFIG, headers: scope.headers },
       );
       await load();
       return {
@@ -132,6 +144,11 @@ export function useCrmCalendarEvents() {
     } catch (error) {
       return { ok: false, replayed: false, error: localError(error) };
     }
+    if (!scope.ready) {
+      // D4: never send a scoped write with no scope — the Gateway 400 that
+      // came back read as a server refusal of a perfectly good record.
+      return { ok: false, replayed: false, error: SCOPE_UNRESOLVED_ERROR };
+    }
     if (Object.keys(body).length === 0) {
       return { ok: true, replayed: false, error: null };
     }
@@ -153,7 +170,7 @@ export function useCrmCalendarEvents() {
       const response = await axiosClient.patch<unknown>(
         calendarEventPath(event.id),
         body,
-        { ...WRITE_CONFIG, headers: scopeHeaders },
+        { ...WRITE_CONFIG, headers: scope.headers },
       );
       await load();
       return {

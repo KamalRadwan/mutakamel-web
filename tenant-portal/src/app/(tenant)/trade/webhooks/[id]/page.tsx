@@ -56,7 +56,7 @@ export default function WebhookSubscriptionPage({
         status={
           subscription ? (
             <Badge tone={subscription.status === "ACTIVE" ? "positive" : "neutral"}>
-              {tradeStatusLabel(t.tradeStatus, subscription.status)}
+              {tradeStatusLabel(t.tradeStatus, subscription.status, t.common.unknownCode)}
             </Badge>
           ) : undefined
         }
@@ -118,11 +118,11 @@ export default function WebhookSubscriptionPage({
             fields={[
               {
                 label: t.tradeGovernance.scopeTarget,
-                value: tradeStatusLabel(t.tradeStatus, subscription.scopeTarget),
+                value: tradeStatusLabel(t.tradeStatus, subscription.scopeTarget, t.common.unknownCode),
               },
               {
                 label: t.tradeAutomation.retryPolicy,
-                value: tradeStatusLabel(t.tradeStatus, subscription.retryPolicyCode),
+                value: tradeStatusLabel(t.tradeStatus, subscription.retryPolicyCode, t.common.unknownCode),
               },
               { label: t.tradeAutomation.maxAttempts, value: String(subscription.maxAttempts) },
               { label: t.tradeCommon.version, value: String(subscription.version) },
@@ -151,7 +151,7 @@ export default function WebhookSubscriptionPage({
               {
                 label: t.tradeAutomation.secretStatus,
                 value: subscription.secretStatus
-                  ? tradeStatusLabel(t.tradeStatus, subscription.secretStatus)
+                  ? tradeStatusLabel(t.tradeStatus, subscription.secretStatus, t.common.unknownCode)
                   : null,
               },
               {

@@ -97,7 +97,7 @@ export function CreateDefinitionModal({
             <SelectContent>
               {kinds.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -124,7 +124,7 @@ export function CreateDefinitionModal({
             <SelectContent>
               {GOVERNANCE_SCOPE_TARGETS.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>

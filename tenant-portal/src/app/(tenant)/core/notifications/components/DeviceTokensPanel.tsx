@@ -10,6 +10,7 @@ import {
   CardTitle,
   DateTime,
   Field,
+  IdentifierText,
   Input,
   Select,
   SelectContent,
@@ -125,7 +126,7 @@ export function DeviceTokensPanel() {
             className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3"
           >
             <span className="flex min-w-0 flex-col">
-              <span className="font-mono text-xs text-foreground">{item.tokenHash}</span>
+              <IdentifierText className="text-xs text-foreground">{item.tokenHash}</IdentifierText>
               <span className="text-2xs text-muted-foreground">
                 <DateTime value={item.lastSeenAt} precision="datetime" language={lang} />
               </span>

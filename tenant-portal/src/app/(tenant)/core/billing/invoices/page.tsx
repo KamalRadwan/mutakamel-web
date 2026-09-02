@@ -7,6 +7,7 @@ import {
   CORE_BILLING_NAV_ITEMS,
   DataTable,
   DateTime,
+  IdentifierText,
   Money,
   PageHeader,
   SubNav,
@@ -47,7 +48,7 @@ function InvoicesWorkspace() {
     {
       id: "number",
       header: t.coreBilling.invoiceNumber,
-      cell: (invoice) => <span className="font-mono text-foreground">{invoice.number}</span>,
+      cell: (invoice) => <IdentifierText className="text-foreground">{invoice.number}</IdentifierText>,
     },
     {
       id: "status",

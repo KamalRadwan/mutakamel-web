@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Pencil, Trash2 } from "lucide-react";
-import { Badge, Button, type ColumnDef } from "@/design-system";
+import { Badge, Button, IdentifierText, type ColumnDef } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { OrgLevel, OrgNodeOf } from "../../contracts/organization-contract";
 import type { OrgLevelConfig } from "../level-config";
@@ -47,7 +47,7 @@ export function useOrganizationColumns<L extends OrgLevel>({
       id: "code",
       sortable: true,
       header: copy.fields.code,
-      cell: (node) => <span className="font-mono text-2xs">{node.code}</span>,
+      cell: (node) => <IdentifierText className="text-2xs">{node.code}</IdentifierText>,
     },
     {
       id: "status",

@@ -68,7 +68,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
               <SelectContent>
                 {EXTENSION_VALUE_KINDS.map((value) => (
                   <SelectItem key={value} value={value}>
-                    {tradeStatusLabel(t.tradeStatus, value)}
+                    {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -88,7 +88,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
               <SelectContent>
                 {EXTENSION_SCALAR_TYPES.map((value) => (
                   <SelectItem key={value} value={value}>
-                    {tradeStatusLabel(t.tradeStatus, value)}
+                    {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -108,7 +108,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
               <SelectContent>
                 {EXTENSION_VISIBILITY_CODES.map((value) => (
                   <SelectItem key={value} value={value}>
-                    {tradeStatusLabel(t.tradeStatus, value)}
+                    {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -158,7 +158,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
               <SelectContent>
                 {EXTENSION_DEFAULT_STRATEGIES.map((value) => (
                   <SelectItem key={value} value={value}>
-                    {tradeStatusLabel(t.tradeStatus, value)}
+                    {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                   </SelectItem>
                 ))}
               </SelectContent>

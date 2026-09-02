@@ -12,11 +12,12 @@ import {
   DegradedBanner,
   ErrorState,
   Field,
+  IdentifierText,
   Input,
+  NAV_SECTIONS,
   PageHeader,
   PermissionGate,
   SubNav,
-  NAV_SECTIONS,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useCrmSettings } from "./hooks/useCrmSettings";
@@ -132,15 +133,21 @@ export default function CrmSettingsPage() {
                 <dl className="grid gap-4 text-xs md:grid-cols-2">
                   <div>
                     <dt className="text-muted-foreground">{t.crmSettings.defaultLeadStage}</dt>
-                    <dd className="mt-1 break-all font-mono text-foreground">{settings.defaultLeadStageId ?? t.crmSettings.notSet}</dd>
+                    <dd className="mt-1 text-foreground">
+                      <IdentifierText>{settings.defaultLeadStageId ?? t.crmSettings.notSet}</IdentifierText>
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">{t.crmSettings.defaultPipeline}</dt>
-                    <dd className="mt-1 break-all font-mono text-foreground">{settings.defaultPipelineId}</dd>
+                    <dd className="mt-1 text-foreground">
+                      <IdentifierText>{settings.defaultPipelineId}</IdentifierText>
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">{t.crmSettings.policyRevision}</dt>
-                    <dd className="mt-1 font-mono text-foreground">{settings.outboundEmailRetentionPolicyRevision}</dd>
+                    <dd className="mt-1 text-foreground">
+                      <IdentifierText>{settings.outboundEmailRetentionPolicyRevision}</IdentifierText>
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">{t.crmSettings.asterisk}</dt>

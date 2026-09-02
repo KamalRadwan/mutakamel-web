@@ -15,7 +15,10 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import type { AcquisitionSource } from "../../../acquisition-sources/acquisition-source-contract";
-import { useAmbiguousOutcomeLabels } from "../../../shared/hooks/useAmbiguousOutcomeLabels";
+import {
+  useAmbiguousOutcomeLabels,
+  useAppliedUnreadableLabels,
+} from "../../../shared/hooks/useAmbiguousOutcomeLabels";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import type { LeadEditForm } from "../../lead-write-contract";
 import type { useLeadEdit } from "../hooks/useLeadEdit";
@@ -38,6 +41,7 @@ export function LeadEditDrawer({ edit, sources, noSourceValue }: LeadEditDrawerP
   const { t, lang } = useI18n();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
+  const appliedLabels = useAppliedUnreadableLabels();
   const form = edit.form;
 
   return (
@@ -76,6 +80,18 @@ export function LeadEditDrawer({ edit, sources, noSourceValue }: LeadEditDrawerP
           onRetry={() => void edit.ambiguity?.replay()}
           onDismiss={edit.dismissAmbiguity}
           labels={ambiguousLabels}
+        />
+      )}
+
+      {edit.appliedUnreadable && (
+        <AmbiguousOutcomePanel
+          operation={t.crmLeadDetail.editOperation}
+          idempotencyKey={edit.appliedUnreadable.attempt.idempotencyKey}
+          description={t.crmShared.appliedUnreadableDescription}
+          correlationId={edit.appliedUnreadable.error.correlationId}
+          onRetry={() => edit.reconcile()}
+          onDismiss={edit.dismissAppliedUnreadable}
+          labels={appliedLabels}
         />
       )}
 

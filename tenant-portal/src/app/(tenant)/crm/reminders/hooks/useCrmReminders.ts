@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import {
+  SCOPE_UNRESOLVED_ERROR,
+  useOrganizationScopeHeaders,
+} from "@/hooks/useOrganizationScope";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -38,7 +41,7 @@ export function useCrmReminders() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
   const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
-  const scopeHeaders = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
+  const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   const canCancel =
     user?.permissions.some((permission) =>
       permission.startsWith("crm.activities.update"),
@@ -55,9 +58,13 @@ export function useCrmReminders() {
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
-      if (!branchId) {
+      if (!branchId || !scope.ready) {
         setItems([]);
         setHasLoaded(false);
+        // D4: an unresolved organization scope is a gap on THIS side. Sending
+        // the request without the headers made the Gateway answer 400 and the
+        // screen report a server rejection for a client-side condition.
+        setQueryError(branchId && !scope.ready ? SCOPE_UNRESOLVED_ERROR : null);
         return;
       }
       setIsLoading(true);
@@ -68,7 +75,7 @@ export function useCrmReminders() {
         const query = buildListQuery(branchId, page, PAGE_SIZE, { status });
         const response = await axiosClient.get<unknown>(
           `${REMINDERS_PATH}?${query}`,
-          { ...READ_CONFIG, signal, headers: scopeHeaders },
+          { ...READ_CONFIG, signal, headers: scope.headers },
         );
         const parsed = parseRemindersPage(response.data);
         setItems(parsed.items);
@@ -82,7 +89,7 @@ export function useCrmReminders() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [branchId, page, scopeHeaders, status],
+    [branchId, page, scope, status],
   );
 
   useEffect(() => {
@@ -102,11 +109,16 @@ export function useCrmReminders() {
     } catch (error) {
       return { ok: false, replayed: false, error: localError(error) };
     }
+    if (!scope.ready) {
+      // D4: never send a scoped write with no scope — the Gateway 400 that
+      // came back read as a server refusal of a perfectly good record.
+      return { ok: false, replayed: false, error: SCOPE_UNRESOLVED_ERROR };
+    }
     setIsSubmitting(true);
     try {
       const response = await axiosClient.post<unknown>(REMINDERS_PATH, body, {
         ...WRITE_CONFIG,
-        headers: scopeHeaders,
+        headers: scope.headers,
       });
       await load();
       return {
@@ -122,6 +134,12 @@ export function useCrmReminders() {
   };
 
   const cancel = async (reminder: CrmReminder): Promise<ReminderWriteResult> => {
+    if (!scope.ready) {
+      // D4: never send a scoped write with no scope. Checked before the
+      // optimistic row change, so the list is not moved for a request that
+      // will not leave.
+      return { ok: false, replayed: false, error: SCOPE_UNRESOLVED_ERROR };
+    }
     setPendingId(reminder.id);
     const previous = items;
     setItems((current) =>
@@ -133,7 +151,7 @@ export function useCrmReminders() {
       const response = await axiosClient.patch<unknown>(
         reminderCancelPath(reminder.id),
         undefined,
-        { ...WRITE_CONFIG, headers: scopeHeaders },
+        { ...WRITE_CONFIG, headers: scope.headers },
       );
       await load();
       return {

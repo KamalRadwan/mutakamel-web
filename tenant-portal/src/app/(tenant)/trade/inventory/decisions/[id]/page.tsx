@@ -29,11 +29,11 @@ export default function InventoryDecisionPage({
     <div className="flex flex-col gap-4">
       <DetailHeader
         title={t.tradeInventory.decisionDetailTitle}
-        subtitle={decision ? tradeStatusLabel(t.tradeStatus, decision.decisionType) : undefined}
+        subtitle={decision ? tradeStatusLabel(t.tradeStatus, decision.decisionType, t.common.unknownCode) : undefined}
         status={
           decision?.outcome ? (
             <Badge tone={decision.outcome === "ALLOW" ? "positive" : "caution"}>
-              {tradeStatusLabel(t.tradeStatus, decision.outcome)}
+              {tradeStatusLabel(t.tradeStatus, decision.outcome, t.common.unknownCode)}
             </Badge>
           ) : undefined
         }
@@ -65,7 +65,7 @@ export default function InventoryDecisionPage({
           fields={[
             {
               label: t.tradeInventory.aggregateType,
-              value: tradeStatusLabel(t.tradeStatus, decision.aggregateType),
+              value: tradeStatusLabel(t.tradeStatus, decision.aggregateType, t.common.unknownCode),
             },
             { label: t.tradeInventory.aggregateId, value: decision.aggregateId },
             { label: t.tradeInventory.explanationCode, value: decision.explanationCode },

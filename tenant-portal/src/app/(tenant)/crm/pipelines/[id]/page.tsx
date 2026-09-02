@@ -9,6 +9,7 @@ import {
   DetailHeader,
   DetailSection,
   ErrorState,
+  IdentifierText,
   NotFoundState,
   PermissionGate,
   Skeleton,
@@ -145,7 +146,7 @@ export default function PipelineDetailPage({
                 {
                   label: t.crmPipelines.codeLabel,
                   value: (
-                    <span className="font-mono text-xs">{pipeline.code}</span>
+                    <IdentifierText className="text-xs">{pipeline.code}</IdentifierText>
                   ),
                 },
                 {

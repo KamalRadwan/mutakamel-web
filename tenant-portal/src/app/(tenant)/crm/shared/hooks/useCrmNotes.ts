@@ -19,6 +19,7 @@ import {
   createCrmWriteAttempt,
   expectNoContent,
   runCrmWrite,
+  type CrmAppliedUnreadable,
   type CrmWriteAttempt,
 } from "../crm-write";
 
@@ -46,6 +47,7 @@ type SendWrite = () => Promise<
   | { kind: "success" }
   | { kind: "failed"; error: NormalizedApiError }
   | { kind: "ambiguous"; error: NormalizedApiError }
+  | { kind: "applied_unreadable"; error: NormalizedApiError }
 >;
 
 type SettleWrite = (
@@ -70,6 +72,11 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [ambiguity, setAmbiguity] = useState<CrmNotesAmbiguity | null>(null);
+  // D2: the write applied and its receipt could not be read. Kept apart from
+  // `writeError`, which invites the user to type the note again — and on a
+  // non-idempotent POST that is a second note.
+  const [appliedUnreadable, setAppliedUnreadable] =
+    useState<CrmAppliedUnreadable | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const requestEpochRef = useRef(0);
 
@@ -166,6 +173,15 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
         });
         // The record may already have changed underneath, so what is on screen
         // is refreshed even though the outcome is unknown.
+        await load();
+        return false;
+      }
+      if (outcome.kind === "applied_unreadable") {
+        // D2: the note IS saved. Reloading is the whole remedy — what this
+        // must never do is leave a form the user presses Save on again.
+        setWriteError(null);
+        setAmbiguity(null);
+        setAppliedUnreadable({ attempt, error: outcome.error });
         await load();
         return false;
       }
@@ -270,6 +286,8 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
     clearWriteError: () => setWriteError(null),
     ambiguity,
     dismissAmbiguity: () => setAmbiguity(null),
+    appliedUnreadable,
+    dismissAppliedUnreadable: () => setAppliedUnreadable(null),
     isSaving,
     pendingId,
     reload,

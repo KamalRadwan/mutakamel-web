@@ -37,13 +37,14 @@ export interface DataTableLabels {
   sortAscending: string;
   sortDescending: string;
   notSorted: string;
-  /** Ordinal column header; `N` and its tooltip fall back to English when absent. */
+  /** Ordinal column header. Absent, both resolve from `t.common.*`. */
   rowNumberShort?: string;
   rowNumber?: string;
   pagination: {
     previous: string;
     next: string;
     summary: (from: number, to: number, total: number) => string;
+    /** Absent, these resolve from `t.common.*` — never an English literal. */
     first?: string;
     last?: string;
     page?: (n: number) => string;

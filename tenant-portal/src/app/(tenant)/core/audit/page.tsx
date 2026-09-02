@@ -4,6 +4,7 @@ import { CircleCheck, CircleX, History, RefreshCw } from "lucide-react";
 import {
   Button,
   ErrorState,
+  IdentifierText,
   PageHeader,
   Pagination,
   PermissionGate,
@@ -53,9 +54,9 @@ export default function AuditPage() {
           </span>
         ) : null}
         {event.correlationId ? (
-          <span className="font-mono text-xs text-muted-foreground">
+          <IdentifierText className="text-xs text-muted-foreground">
             {formatTemplate(copy.referenceLine, { reference: event.correlationId })}
-          </span>
+          </IdentifierText>
         ) : null}
       </span>
     ),

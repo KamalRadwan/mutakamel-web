@@ -31,6 +31,16 @@ export type TenantAuthLifecycleState =
   | "DEGRADED"
   | "ENDED";
 
+export interface TenantAuthLifecycleSignal {
+  state: TenantAuthLifecycleState;
+  /**
+   * The wire code that ended the session. Carried only by ENDED — every other
+   * state is a phase the session is passing through, not an outcome it can be
+   * asked to explain.
+   */
+  reason?: string;
+}
+
 const STORAGE_KEY = "tenant_auth_session_event";
 const CHANNEL_NAME = "tenant_auth_session";
 const LOCAL_EVENT_NAME = "tenant-auth-session-event";
@@ -96,11 +106,15 @@ export function publishTenantAuthEvent(
 
 export function publishTenantAuthLifecycle(
   state: TenantAuthLifecycleState,
+  reason?: string,
 ): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
-    new CustomEvent<TenantAuthLifecycleState>(LIFECYCLE_EVENT_NAME, {
-      detail: state,
+    new CustomEvent<TenantAuthLifecycleSignal>(LIFECYCLE_EVENT_NAME, {
+      detail: {
+        state,
+        ...(state === "ENDED" && reason !== undefined ? { reason } : {}),
+      },
     }),
   );
 }
@@ -149,23 +163,36 @@ export function subscribeToTenantAuthEvents(
 }
 
 export function subscribeToTenantAuthLifecycle(
-  listener: (state: TenantAuthLifecycleState) => void,
+  listener: (signal: TenantAuthLifecycleSignal) => void,
 ): () => void {
   if (typeof window === "undefined") return () => undefined;
   const onLifecycle = (event: Event) => {
-    const state = (event as CustomEvent<unknown>).detail;
-    if (
-      state === "STALE" ||
-      state === "REFRESHING" ||
-      state === "AUTHENTICATED" ||
-      state === "DEGRADED" ||
-      state === "ENDED"
-    ) {
-      listener(state);
-    }
+    const signal = parseTenantAuthLifecycleSignal(
+      (event as CustomEvent<unknown>).detail,
+    );
+    if (signal) listener(signal);
   };
   window.addEventListener(LIFECYCLE_EVENT_NAME, onLifecycle);
   return () => window.removeEventListener(LIFECYCLE_EVENT_NAME, onLifecycle);
+}
+
+function parseTenantAuthLifecycleSignal(
+  value: unknown,
+): TenantAuthLifecycleSignal | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const { state, reason } = value as Partial<TenantAuthLifecycleSignal>;
+  if (
+    state !== "STALE" &&
+    state !== "REFRESHING" &&
+    state !== "AUTHENTICATED" &&
+    state !== "DEGRADED" &&
+    state !== "ENDED"
+  ) {
+    return null;
+  }
+  return state === "ENDED" && typeof reason === "string"
+    ? { state, reason }
+    : { state };
 }
 
 function parseTenantAuthEvent(value: unknown): TenantAuthEvent | null {

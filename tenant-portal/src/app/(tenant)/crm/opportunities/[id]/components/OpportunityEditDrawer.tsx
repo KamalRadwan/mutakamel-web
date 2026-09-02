@@ -9,7 +9,10 @@ import {
   Textarea,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { useAmbiguousOutcomeLabels } from "../../../shared/hooks/useAmbiguousOutcomeLabels";
+import {
+  useAmbiguousOutcomeLabels,
+  useAppliedUnreadableLabels,
+} from "../../../shared/hooks/useAmbiguousOutcomeLabels";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import { fromIsoDate, toIsoDate } from "../../../shared/iso-date";
 import { isValidOpportunityAmount } from "../../opportunity-write-contract";
@@ -31,6 +34,7 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
   const { t } = useI18n();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
+  const appliedLabels = useAppliedUnreadableLabels();
   const form = edit.form;
   const amountInvalid = form ? !isValidOpportunityAmount(form.amount) : false;
 
@@ -74,6 +78,18 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
           onRetry={() => void edit.ambiguity?.replay()}
           onDismiss={edit.dismissAmbiguity}
           labels={ambiguousLabels}
+        />
+      )}
+
+      {edit.appliedUnreadable && (
+        <AmbiguousOutcomePanel
+          operation={t.crmOpportunityDetail.editOperation}
+          idempotencyKey={edit.appliedUnreadable.attempt.idempotencyKey}
+          description={t.crmShared.appliedUnreadableDescription}
+          correlationId={edit.appliedUnreadable.error.correlationId}
+          onRetry={() => edit.reconcile()}
+          onDismiss={edit.dismissAppliedUnreadable}
+          labels={appliedLabels}
         />
       )}
 

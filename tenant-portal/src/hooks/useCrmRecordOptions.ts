@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -80,14 +80,34 @@ export function useCrmRecordOptions(
   const [options, setOptions] = useState<CrmRecordOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  // Defect D9. The exported `search` handed the caller a function that took no
+  // signal, so every keystroke and every branch or source change started a
+  // request nothing ordered or cancelled — the slowest response won, and the
+  // picker offered records from another resource entirely. The epoch orders
+  // them; the controller cancels the ones that lost.
+  const epochRef = useRef(0);
+  const inFlightRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => inFlightRef.current?.abort(), []);
 
   const search = useCallback(
-    async (query: string, signal?: AbortSignal) => {
+    async (query: string, external?: AbortSignal) => {
+      const epoch = epochRef.current + 1;
+      epochRef.current = epoch;
+      inFlightRef.current?.abort();
       if (!sourceType || !branchId || !isUUIDv7(branchId)) {
+        inFlightRef.current = null;
         setOptions([]);
         setError(null);
         return;
       }
+      const controller = new AbortController();
+      inFlightRef.current = controller;
+      // The effect below owns its own controller for unmount; this one owns
+      // supersession. Either aborting must abort the request.
+      const relay = () => controller.abort();
+      external?.addEventListener("abort", relay);
+      if (external?.aborted) controller.abort();
       setIsLoading(true);
       setError(null);
       try {
@@ -100,15 +120,21 @@ export function useCrmRecordOptions(
         if (trimmed) params.set("search", trimmed);
         const response = await axiosClient.get<unknown>(
           `${SOURCE_PATHS[sourceType]}?${params.toString()}`,
-          { signal, cache: "no-store", maxResponseBytes: 512 * 1024 },
+          { signal: controller.signal, cache: "no-store", maxResponseBytes: 512 * 1024 },
         );
-        setOptions(parseOptions(response.data, LABEL_KEYS[sourceType]));
+        const parsed = parseOptions(response.data, LABEL_KEYS[sourceType]);
+        if (epoch !== epochRef.current) return;
+        setOptions(parsed);
       } catch (caught) {
-        if (isAbortError(caught)) return;
+        if (isAbortError(caught) || epoch !== epochRef.current) return;
         setOptions([]);
         setError(normalizeApiError(caught));
       } finally {
-        if (!signal?.aborted) setIsLoading(false);
+        external?.removeEventListener("abort", relay);
+        if (epoch === epochRef.current && !controller.signal.aborted) {
+          inFlightRef.current = null;
+          setIsLoading(false);
+        }
       }
     },
     [branchId, sourceType],

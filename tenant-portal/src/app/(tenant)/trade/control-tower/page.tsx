@@ -86,7 +86,7 @@ export default function ControlTowerPage() {
           "—"
         ) : (
           <Badge tone={severityTone(exception.severity)}>
-            {tradeStatusLabel(t.tradeStatus, exception.severity)}
+            {tradeStatusLabel(t.tradeStatus, exception.severity, t.common.unknownCode)}
           </Badge>
         ),
     },
@@ -95,7 +95,7 @@ export default function ControlTowerPage() {
       header: t.common.status,
       cell: (exception) => (
         <Badge tone={exception.status === "RESOLVED" ? "positive" : "caution"}>
-          {tradeStatusLabel(t.tradeStatus, exception.status)}
+          {tradeStatusLabel(t.tradeStatus, exception.status, t.common.unknownCode)}
         </Badge>
       ),
     },
@@ -143,7 +143,7 @@ export default function ControlTowerPage() {
             placeholder: t.tradeCommon.anyStatus,
             options: EXCEPTION_STATUSES.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
           {
@@ -155,7 +155,7 @@ export default function ControlTowerPage() {
             // filtering by INFO or WARNING is a 400.
             options: EXCEPTION_SEVERITY_FILTERS.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
         ]}

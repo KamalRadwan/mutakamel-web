@@ -17,6 +17,7 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/lib/api/errors";
+import { wireLabel } from "@/lib/format/wire-label";
 import { KNOWN_NOTIFICATION_PRIORITY, type InboxNotification } from "../notification-contract";
 
 interface NotificationListProps {
@@ -145,9 +146,10 @@ export function NotificationList({
 
 /**
  * `P2_NORMAL` is the only value the backend is proven to emit. Anything else
- * renders as the raw value in a monospace face, so a new server priority is
- * visible rather than silently swallowed — the `StatusBadge` rule from
- * docs/design/patterns.md.
+ * still shows its code — a new server priority must be visible rather than
+ * silently swallowed, the `StatusBadge` rule from docs/design/patterns.md —
+ * but inside a TRANSLATED frame rather than as a bare English token, and it
+ * warns once so the missing dictionary entry is discoverable.
  */
 export function PriorityBadge({ priority }: { priority: string }) {
   const { t } = useI18n();
@@ -156,8 +158,13 @@ export function PriorityBadge({ priority }: { priority: string }) {
     return <Badge tone="neutral">{t.coreNotifications.priorityNormal}</Badge>;
   }
   return (
-    <Badge tone="neutral" className="font-mono">
-      {priority}
+    <Badge tone="neutral">
+      {wireLabel(
+        { [KNOWN_NOTIFICATION_PRIORITY]: t.coreNotifications.priorityNormal },
+        priority,
+        t.common.unknownCode,
+        "coreNotifications.priority",
+      )}
     </Badge>
   );
 }

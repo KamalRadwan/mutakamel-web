@@ -23,6 +23,15 @@ import { useUpdateCustomerProfileStatus } from "./useUpdateCustomerProfileStatus
 export function useCustomerProfileBoardMove(
   items: CustomerProfileItem[],
   reload: () => Promise<void> | void,
+  /**
+   * Whether the actor may update THIS card — defect D7.
+   *
+   * `canDrag` on the board asks the same question, and this asks it again on
+   * the way in. That is not belt-and-braces for its own sake: the optimistic
+   * override below happens BEFORE the request, so refusing here is what stops
+   * a card moving on screen for a write the backend is going to reject.
+   */
+  canUpdate: (item: CustomerProfileItem) => boolean,
 ) {
   const { t } = useI18n();
   const toast = useToast();
@@ -42,6 +51,13 @@ export function useCustomerProfileBoardMove(
   const handleCardMove = useCallback(
     async (move: BoardCardMove) => {
       const status = move.toColumnId as CustomerProfileStatus;
+      const item = items.find((entry) => entry.id === move.itemId);
+      if (!item || !canUpdate(item)) {
+        // 403 is the honest classification: this is the same refusal the
+        // backend's owner scope would have produced, made before the write.
+        toast.errorFromApi(t.crmCustomerProfiles.moveFailed, { status: 403 });
+        return;
+      }
       setOverrides((current) => ({ ...current, [move.itemId]: status }));
       const result = await updateStatus(move.itemId, status);
       setOverrides((current) => {
@@ -69,7 +85,7 @@ export function useCustomerProfileBoardMove(
         toast.errorFromApi(t.crmCustomerProfiles.moveFailed, result.error);
       }
     },
-    [reload, t, toast, updateStatus],
+    [canUpdate, items, reload, t, toast, updateStatus],
   );
 
   return { displayItems, handleCardMove };

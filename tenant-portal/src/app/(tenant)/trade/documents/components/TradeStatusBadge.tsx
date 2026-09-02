@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge } from "@/design-system";
+import { Badge, IdentifierText } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { resolveTradeStatus, type TradeStatusKind } from "../trade-document-status";
 
@@ -38,7 +38,7 @@ export function TradeStatusBadge({ value, kind, className }: TradeStatusBadgePro
   if (!known || !label) {
     return (
       <Badge tone="neutral" className={className}>
-        <span className="font-mono">{value}</span>
+        <IdentifierText>{value}</IdentifierText>
       </Badge>
     );
   }

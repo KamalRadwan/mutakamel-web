@@ -5,6 +5,7 @@ import type { NormalizedApiError } from "@/lib/api/errors";
 import {
   createCrmWriteAttempt,
   runCrmWrite,
+  type CrmAppliedUnreadable,
   type CrmWriteAttempt,
 } from "../../shared/crm-write";
 import { parseCustomerProfileDetailResponse } from "../customer-profile-contract";
@@ -31,12 +32,23 @@ export interface CreateCustomerProfileAmbiguity {
 export function useCreateCustomerProfile(
   branchId: string | null,
   onCreated: (profileId: string) => void,
+  /**
+   * Re-read what the screen shows — defect D2. Called when a write applied but
+   * its response body could not be parsed, and offered again as the panel's own
+   * action, because refreshing is the only safe thing left to do.
+   */
+  onReconcile: () => void,
 ) {
   const [form, setForm] = useState<CustomerProfileForm | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [ambiguity, setAmbiguity] =
     useState<CreateCustomerProfileAmbiguity | null>(null);
+  // D2. `POST /customer-profiles` is not idempotent across attempts, so a 2xx
+  // whose body this client cannot read is the most dangerous thing to report as
+  // a plain failure: the profile exists, and a second Save makes two.
+  const [appliedUnreadable, setAppliedUnreadable] =
+    useState<CrmAppliedUnreadable | null>(null);
 
   const submit = useCallback(async () => {
     if (!form || !branchId || isSubmitting) return;
@@ -66,6 +78,16 @@ export function useCreateCustomerProfile(
           setAmbiguity({ attempt, error: outcome.error, replay: send });
           return;
         }
+        if (outcome.kind === "applied_unreadable") {
+          // The form is cleared, so there is nothing left to press Save on, and
+          // the panel carries the key a person can use to find the record.
+          setAmbiguity(null);
+          setError(null);
+          setForm(null);
+          setAppliedUnreadable({ attempt, error: outcome.error });
+          onReconcile();
+          return;
+        }
         setError(outcome.error);
       } finally {
         setIsSubmitting(false);
@@ -73,7 +95,7 @@ export function useCreateCustomerProfile(
     };
 
     await send();
-  }, [branchId, form, isSubmitting, onCreated]);
+  }, [branchId, form, isSubmitting, onCreated, onReconcile]);
 
   return {
     open: form !== null,
@@ -82,6 +104,9 @@ export function useCreateCustomerProfile(
     error,
     ambiguity,
     dismissAmbiguity: () => setAmbiguity(null),
+    appliedUnreadable,
+    dismissAppliedUnreadable: () => setAppliedUnreadable(null),
+    reconcile: onReconcile,
     openDrawer: () => {
       setForm({ ...EMPTY_CUSTOMER_PROFILE_FORM });
       setError(null);

@@ -180,7 +180,11 @@ export function useOpportunitiesList(branchId: string | null, pipelineId: string
           page: String(requestedPage),
           limit: "25",
           sortBy: sort.id,
-          sortOrder: sort.direction === "asc" ? "ASC" : "DESC",
+          // , not . CRM validates with
+          // forbidNonWhitelisted, so the wrong name is a 400 on every list
+          // open rather than an ignored parameter — the values themselves
+          // were always right.
+          sortDir: sort.direction === "asc" ? "ASC" : "DESC",
         });
         if (pipelineId) query.set("pipelineId", pipelineId);
         const response = await axiosClient.get<unknown>(

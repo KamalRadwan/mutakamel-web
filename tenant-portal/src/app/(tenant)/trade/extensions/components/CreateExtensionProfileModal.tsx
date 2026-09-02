@@ -90,7 +90,7 @@ export function CreateExtensionProfileModal({
             <SelectContent>
               {EXTENSION_TARGET_CODES.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -117,7 +117,7 @@ export function CreateExtensionProfileModal({
             <SelectContent>
               {EXTENSION_SCOPE_TARGETS.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>

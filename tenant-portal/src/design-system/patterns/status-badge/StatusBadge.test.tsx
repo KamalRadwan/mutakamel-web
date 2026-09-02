@@ -21,10 +21,15 @@ describe("StatusBadge", () => {
     expect(container.querySelector(".dot-pending")).not.toBeNull();
   });
 
-  it("falls back to neutral with the raw value in monospace for an unmapped value, instead of throwing", () => {
+  it("falls back to neutral with the raw value bidi-isolated for an unmapped value, instead of throwing", () => {
     expect(() => render(<StatusBadge value="SOME_FUTURE_VALUE" kind="LeadStatus" />)).not.toThrow();
     const raw = screen.getByText("SOME_FUTURE_VALUE");
-    expect(raw.tagName.toLowerCase()).toBe("span");
+    // Was a plain monospace <span>. An unmapped wire value IS an identifier —
+    // a Latin code sitting in Arabic chrome — so it now renders through
+    // `IdentifierText`. Without the isolation the code the user reads is
+    // reordered and stops being the code the system holds (U8).
+    expect(raw.tagName.toLowerCase()).toBe("bdi");
+    expect(raw).toHaveAttribute("dir", "ltr");
     expect(raw).toHaveClass("font-mono");
   });
 });

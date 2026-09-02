@@ -5,6 +5,7 @@ import type { NormalizedApiError } from "@/lib/api/errors";
 import {
   createCrmWriteAttempt,
   runCrmWrite,
+  type CrmAppliedUnreadable,
   type CrmWriteAttempt,
 } from "../../../shared/crm-write";
 import type { OpportunityPipeline } from "../../hooks/pipeline-types";
@@ -44,6 +45,14 @@ export function usePipelineTransfer(
   item: OpportunityDetail | null,
   pipelines: OpportunityPipeline[],
   onTransferred: (item: OpportunityDetail) => void,
+  /**
+   * Re-read the record from the server — defect D2. Used when a write applied
+   * but its response body could not be parsed: there is no value to hand the
+   * success callback, the record has nonetheless changed, and the one thing
+   * that must NOT happen is a form left open with a Save the user presses
+   * again.
+   */
+  onReconcile: () => void,
 ) {
   const [open, setOpen] = useState(false);
   const [pipelineId, setPipelineId] = useState("");
@@ -54,6 +63,11 @@ export function usePipelineTransfer(
   const [ambiguity, setAmbiguity] = useState<PipelineTransferAmbiguity | null>(
     null,
   );
+  // D2: the write applied and its receipt could not be read. Its own state,
+  // because `error` invites a second Save and that is exactly what a
+  // non-idempotent route cannot take.
+  const [appliedUnreadable, setAppliedUnreadable] =
+    useState<CrmAppliedUnreadable | null>(null);
 
   /** The opportunity's current pipeline is never a transfer target. */
   const targetPipelines = useMemo(
@@ -109,6 +123,17 @@ export function usePipelineTransfer(
           setAmbiguity({ attempt, error: outcome.error, replay: send });
           return;
         }
+        if (outcome.kind === "applied_unreadable") {
+          // A transfer moves the opportunity and writes stage history. Sending
+          // it again is not a repeat of the same intent, so the dialog closes
+          // and the screen re-reads where the record actually landed.
+          setAmbiguity(null);
+          setError(null);
+          setOpen(false);
+          setAppliedUnreadable({ attempt, error: outcome.error });
+          onReconcile();
+          return;
+        }
         setError(outcome.error);
       } finally {
         setIsSubmitting(false);
@@ -135,6 +160,9 @@ export function usePipelineTransfer(
     error,
     ambiguity,
     dismissAmbiguity: () => setAmbiguity(null),
+    appliedUnreadable,
+    dismissAppliedUnreadable: () => setAppliedUnreadable(null),
+    reconcile: onReconcile,
     openDialog,
     closeDialog,
     submit,

@@ -4,6 +4,7 @@ import {
   DegradedBanner,
   Field,
   FormDrawer,
+  IdentifierText,
   Input,
   Select,
   SelectContent,
@@ -87,7 +88,7 @@ export function PurchaseQuotationDrawer({ state, isEdit }: PurchaseQuotationDraw
           <SelectContent>
             {state.suppliers.map((supplier) => (
               <SelectItem key={supplier.id} value={supplier.partyId}>
-                <span className="font-mono">{supplierOptionLabel(supplier)}</span>
+                <IdentifierText>{supplierOptionLabel(supplier)}</IdentifierText>
               </SelectItem>
             ))}
           </SelectContent>

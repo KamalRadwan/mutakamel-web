@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MONEY_MAX_AMOUNT } from "../shared/money";
 import {
   buildConvertLeadRequest,
   buildUpdateLeadRequest,
@@ -152,11 +153,20 @@ describe("lead conversion payload", () => {
     expect(isValidConversionAmount("150000.00")).toBe(true);
     expect(isValidConversionAmount("1.234")).toBe(false);
     expect(isValidConversionAmount("-1")).toBe(false);
-    // 16 integer digits crosses 2^53, where a conversion stops being exact.
     expect(isValidConversionAmount("1234567890123456")).toBe(false);
     expect(() =>
       buildConvertLeadRequest({ ...conversion, amount: "1.234" }),
     ).toThrow();
+    // D3: the comment this replaces said "16 integer digits crosses 2^53".
+    // The integer part is not what has to survive — the value WITH its cents
+    // is, and it stops being exact four orders of magnitude earlier.
+    expect(isValidConversionAmount("999999999999999.99")).toBe(false);
+    expect(isValidConversionAmount("99999999999999.99")).toBe(false);
+    expect(isValidConversionAmount(MONEY_MAX_AMOUNT)).toBe(true);
+    expect(
+      buildConvertLeadRequest({ ...conversion, amount: MONEY_MAX_AMOUNT }).opportunity
+        ?.amount,
+    ).toBe(9999999999999.99);
   });
 
   it("drops a currency code that is not three letters", () => {

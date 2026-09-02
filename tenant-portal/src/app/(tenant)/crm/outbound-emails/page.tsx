@@ -10,10 +10,11 @@ import {
   DateTime,
   DegradedBanner,
   FilterBar,
+  IdentifierText,
   PageHeader,
   PermissionGate,
-  useToast,
   type ColumnDef,
+  useToast,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
@@ -76,8 +77,8 @@ export default function OutboundEmailsPage() {
             {email.recipient.displayName}
           </p>
           {/* Already masked by the server. Rendered exactly as received. */}
-          <p className="truncate font-mono text-2xs text-muted-foreground">
-            {email.recipient.maskedAddress}
+          <p className="truncate text-2xs text-muted-foreground">
+            <IdentifierText>{email.recipient.maskedAddress}</IdentifierText>
           </p>
         </div>
       ),

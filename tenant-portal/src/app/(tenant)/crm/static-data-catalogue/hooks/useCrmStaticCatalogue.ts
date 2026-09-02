@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useI18n, type Language } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { formatBytes } from "@/lib/format/number";
 
 export const CRM_STATIC_DATA_PATH = "/api/tenant/crm/v1/static-data";
 
@@ -177,9 +178,10 @@ export function buildStaticCatalogueGroups(
     data.attachmentPolicy.familyLabels,
     lang,
   );
-  attachmentFamilies.push(
-    `${data.attachmentPolicy.maxSizeBytes.toLocaleString()} bytes`,
-  );
+  // Was a locale-less Intl call with the English word "bytes" spliced on: an
+  // English unit on an Arabic screen, and grouping separators that differed
+  // between a developer's machine, a user's browser and CI. U10.
+  attachmentFamilies.push(formatBytes(data.attachmentPolicy.maxSizeBytes, lang));
 
   return [
     ...enumGroups,

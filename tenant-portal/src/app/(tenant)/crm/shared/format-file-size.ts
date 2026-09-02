@@ -1,45 +1,20 @@
-import { formatNumber } from "@/lib/format/number";
+import { formatBytes } from "@/lib/format/number";
 import type { Language } from "@/i18n/useLanguage";
-
-const KIB = 1024;
-const MIB = KIB * KIB;
 
 /**
  * A byte count as a localized size.
  *
+ * Kept as a named CRM helper because two attachment call sites and a contract
+ * test refer to it, but the arithmetic now lives in one place:
+ * `formatBytes` in `src/lib/format/number.ts`. This file used to carry its own
+ * copy of the unit ladder, which is how the static-data catalogue ended up
+ * formatting the same quantity a third way — a locale-less conversion with the
+ * English word "bytes" appended (U10).
+ *
  * The unit name comes from `Intl`'s own unit formatting rather than a
  * dictionary key, so it is declined correctly in both languages without this
- * app inventing plural rules. `formatNumber` is the right helper here and
- * `formatDecimalString` is not: a size is a count this client computed, not a
- * decimal off the wire.
- *
- * Kibibytes and mebibytes are what the backend caps in (`25 * 1024 * 1024`),
- * and `Intl` has no unit for them — so the number is divided by the binary
- * factor and labelled with the decimal unit, the same convention every
- * operating-system file listing uses.
+ * app inventing plural rules.
  */
 export function formatFileSize(bytes: number, lang: Language): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "";
-  if (bytes < KIB) {
-    return formatNumber(bytes, lang, {
-      style: "unit",
-      unit: "byte",
-      unitDisplay: "short",
-      maximumFractionDigits: 0,
-    });
-  }
-  if (bytes < MIB) {
-    return formatNumber(bytes / KIB, lang, {
-      style: "unit",
-      unit: "kilobyte",
-      unitDisplay: "short",
-      maximumFractionDigits: 0,
-    });
-  }
-  return formatNumber(bytes / MIB, lang, {
-    style: "unit",
-    unit: "megabyte",
-    unitDisplay: "short",
-    maximumFractionDigits: 1,
-  });
+  return formatBytes(bytes, lang);
 }

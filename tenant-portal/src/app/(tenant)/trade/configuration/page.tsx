@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   DataTable,
+  IdentifierText,
   PageHeader,
   PermissionGate,
   SubNav,
@@ -42,7 +43,7 @@ export default function TradeConfigurationPage() {
     {
       id: "key",
       header: t.trade.definitionKey,
-      cell: (definition) => <span className="font-mono text-xs">{definition.key}</span>,
+      cell: (definition) => <IdentifierText className="text-xs">{definition.key}</IdentifierText>,
     },
     {
       id: "mergeStrategy",

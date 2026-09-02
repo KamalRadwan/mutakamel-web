@@ -3,7 +3,10 @@
 import { AmbiguousOutcomePanel, FormDrawer } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { AcquisitionSource } from "../../acquisition-sources/acquisition-source-contract";
-import { useAmbiguousOutcomeLabels } from "../../shared/hooks/useAmbiguousOutcomeLabels";
+import {
+  useAmbiguousOutcomeLabels,
+  useAppliedUnreadableLabels,
+} from "../../shared/hooks/useAmbiguousOutcomeLabels";
 import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import type { useCreateCustomerProfile } from "../hooks/useCreateCustomerProfile";
 import { CustomerProfileFormFields } from "./CustomerProfileFormFields";
@@ -21,6 +24,7 @@ export function CreateCustomerProfileDrawer({
   const { t } = useI18n();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
+  const appliedLabels = useAppliedUnreadableLabels();
   const form = create.form;
 
   return (
@@ -54,6 +58,18 @@ export function CreateCustomerProfileDrawer({
           onRetry={() => void create.ambiguity?.replay()}
           onDismiss={create.dismissAmbiguity}
           labels={ambiguousLabels}
+        />
+      )}
+
+      {create.appliedUnreadable && (
+        <AmbiguousOutcomePanel
+          operation={t.crmCustomerProfileActions.createOperation}
+          idempotencyKey={create.appliedUnreadable.attempt.idempotencyKey}
+          description={t.crmShared.appliedUnreadableDescription}
+          correlationId={create.appliedUnreadable.error.correlationId}
+          onRetry={() => create.reconcile()}
+          onDismiss={create.dismissAppliedUnreadable}
+          labels={appliedLabels}
         />
       )}
       {form && (

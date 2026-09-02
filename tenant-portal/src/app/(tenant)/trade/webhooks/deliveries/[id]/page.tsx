@@ -133,7 +133,7 @@ export default function WebhookDeliveryPage({
         subtitle={delivery?.sourceEventType}
         status={
           delivery ? (
-            <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, delivery.status)}</Badge>
+            <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, delivery.status, t.common.unknownCode)}</Badge>
           ) : undefined
         }
         backLabel={t.tradeAutomation.backToDeliveries}

@@ -72,7 +72,7 @@ export default function ImportRunPage({
     {
       id: "status",
       header: t.common.status,
-      cell: (row) => <Badge tone={rowTone(row.status)}>{tradeStatusLabel(t.tradeStatus, row.status)}</Badge>,
+      cell: (row) => <Badge tone={rowTone(row.status)}>{tradeStatusLabel(t.tradeStatus, row.status, t.common.unknownCode)}</Badge>,
     },
     {
       id: "errorCode",
@@ -100,7 +100,7 @@ export default function ImportRunPage({
         subtitle={run ? formatDateTime(run.createdAt, lang) : undefined}
         status={
           run ? (
-            <Badge tone={runTone(run.status)}>{tradeStatusLabel(t.tradeStatus, run.status)}</Badge>
+            <Badge tone={runTone(run.status)}>{tradeStatusLabel(t.tradeStatus, run.status, t.common.unknownCode)}</Badge>
           ) : undefined
         }
         backLabel={t.tradeAutomation.backToRuns}
@@ -189,7 +189,7 @@ export default function ImportRunPage({
                   placeholder: t.tradeCommon.anyStatus,
                   options: IMPORT_RESULT_STATUSES.map((value) => ({
                     value,
-                    label: tradeStatusLabel(t.tradeStatus, value),
+                    label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
                   })),
                 },
               ]}

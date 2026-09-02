@@ -6,6 +6,7 @@ import {
   DatePicker,
   DegradedBanner,
   Field,
+  FieldControlBoundary,
   FormDrawer,
   Input,
   Select,
@@ -201,13 +202,18 @@ export function CalendarEventDrawer({
               placeholder={t.crmCalendar.dayPlaceholder}
             />
           </div>
-          <Input
-            type="time"
-            className="w-32"
-            value={startTime}
-            aria-label={t.crmCalendar.startTime}
-            onChange={(input) => setStartTime(input.target.value)}
-          />
+          {/* Two controls under one label: the day picker is what "Starts at"
+              names, so the time input opts out of the field and keeps its own
+              accessible name rather than claiming the same id. */}
+          <FieldControlBoundary>
+            <Input
+              type="time"
+              className="w-32"
+              value={startTime}
+              aria-label={t.crmCalendar.startTime}
+              onChange={(input) => setStartTime(input.target.value)}
+            />
+          </FieldControlBoundary>
         </div>
       </Field>
 
@@ -220,13 +226,15 @@ export function CalendarEventDrawer({
               placeholder={t.crmCalendar.dayPlaceholder}
             />
           </div>
-          <Input
-            type="time"
-            className="w-32"
-            value={endTime}
-            aria-label={t.crmCalendar.endTime}
-            onChange={(input) => setEndTime(input.target.value)}
-          />
+          <FieldControlBoundary>
+            <Input
+              type="time"
+              className="w-32"
+              value={endTime}
+              aria-label={t.crmCalendar.endTime}
+              onChange={(input) => setEndTime(input.target.value)}
+            />
+          </FieldControlBoundary>
         </div>
       </Field>
 

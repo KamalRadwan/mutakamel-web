@@ -9,6 +9,7 @@ import {
   CardTitle,
   DateTime,
   DegradedBanner,
+  IdentifierText,
   Money,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -59,7 +60,7 @@ export function ActiveIntentPanel({
           />
           <IntentFigure
             label={t.coreBilling.paymentId}
-            value={<span className="font-mono">{active.paymentId}</span>}
+            value={<IdentifierText>{active.paymentId}</IdentifierText>}
           />
           {payment && (
             <IntentFigure

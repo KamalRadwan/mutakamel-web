@@ -18,6 +18,7 @@ pnpm test                 # vitest run
 pnpm docs:check           # route inventory + API reference + links
 pnpm design:census -- --check
 pnpm design:rtl
+pnpm design:identifiers   # bidi isolation on machine identifiers
 pnpm build
 ```
 
@@ -44,6 +45,8 @@ and diffs them against `docs/design/census.baseline.json`.
 | `handRolledTables` | 0 | |
 | `physicalRtlViolations` | 0 | |
 | `languageTernaries` | **5** | The real floor — see below |
+| `arabicIndicDigits` | 0 | The numeral decision, dictionary side |
+| `localeUnawareFormatting` | 0 | The numeral decision, formatter side |
 
 ### The three things 3.30 fixed
 
@@ -166,6 +169,57 @@ catches `border-l`/`border-r` and `rounded-l-`/`rounded-r-`), and
 forms, not just `lang === "ar"`). **The script's numbers are authoritative.**
 
 Phase 1's deletion alone should roughly halve most of these.
+
+### The two numeral counters
+
+The digit decision is settled and it is **Western digits in both languages**
+([typography.md](typography.md#the-digit-decision--settled)). `INTL_LOCALE.ar`
+is `ar-EG-u-nu-latn`, so everything the app *formats* obeys it — and nothing
+watched the half that is hand-written. The Arabic dictionary carried **24
+Arabic-Indic digits across 12 strings**, so one screen could show a formatted
+count in `0-9` beside a hardcoded limit in the Arabic-Indic block.
+
+`arabicIndicDigits` counts literal `\u0660-\u0669` / `\u06F0-\u06F9` anywhere
+under `src/`. `localeUnawareFormatting` catches the formatter-side twin: a
+locale-conversion call with **no argument** resolves to the *runtime's* default
+locale, so its output differs between a developer's laptop, a user's browser
+and CI. The attachment-size label was exactly that, plus the English word
+"bytes" appended to it — `formatBytes` in `src/lib/format/number.ts` replaced
+both.
+
+Both ratchet at 0. Where a test must name the Arabic-Indic block to assert the
+rule, it writes code-point escapes rather than the characters — the test that
+pins a rule must not be the thing that trips its gate.
+
+## identifier-guard.mjs
+
+`pnpm design:identifiers`. Fails on a monospace element that is not
+bidi-isolated, and on any `break-all`.
+
+This app's chrome is Arabic, so the paragraph direction is RTL and a bare Latin
+identifier inside it is reordered by the Unicode bidirectional algorithm. The
+id a user reads — and copies out of a screenshot into a support ticket — stops
+being the id the system holds. [accessibility.md](accessibility.md#bidirectional-text)
+had said "wrap identifiers in `<bdi>`" from the start; the tree contained
+**104 monospace elements, 98 of them with neither `<bdi>` nor `dir`, and not one
+`<bdi>` anywhere in feature code.** A written rule with no gate is a wish.
+
+The rule: an element carrying `font-mono` must be `<bdi>` (which
+`IdentifierText` renders) or must set `dir` itself. Two exemptions:
+
+- **`tabular-nums` alongside `font-mono`** marks a numeric column, not an
+  identifier. A figure is already `Intl`-formatted with an explicit locale.
+- **A named file list**, each entry a file another session owned while U7-U17
+  landed. Every one is a real violation left deliberately rather than edited
+  across a session boundary. A named floor is honest; a silent exclusion is
+  not. Delete an entry when its owner lands and the guard covers it.
+
+`break-all` is banned outright: it is `word-break: break-all`, which hyphenates
+ordinary Arabic and English prose mid-syllable. The rule for an unbreakable
+token is `wrap-anywhere`, which `identifierText` already carries. Three
+`break-all` sites survive under a named exemption for the same
+session-ownership reason; all three already set `dir`, so they are
+bidi-correct and only their wrapping utility is wrong.
 
 ## rtl-guard.mjs
 

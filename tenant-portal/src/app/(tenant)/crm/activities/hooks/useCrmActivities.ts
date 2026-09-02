@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import {
+  SCOPE_UNRESOLVED_ERROR,
+  useOrganizationScopeHeaders,
+} from "@/hooks/useOrganizationScope";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -43,7 +46,7 @@ export function useCrmActivities() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
   const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
-  const scopeHeaders = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
+  const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   const [items, setItems] = useState<CrmActivity[]>([]);
   const [pageInfo, setPageInfo] = useState({
     page: 1,
@@ -69,9 +72,13 @@ export function useCrmActivities() {
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
-      if (!branchId) {
+      if (!branchId || !scope.ready) {
         setItems([]);
         setHasLoaded(false);
+        // D4: an unresolved organization scope is a gap on THIS side. Sending
+        // the request without the headers made the Gateway answer 400 and the
+        // screen report a server rejection for a client-side condition.
+        setQueryError(branchId && !scope.ready ? SCOPE_UNRESOLVED_ERROR : null);
         return;
       }
       setIsLoading(true);
@@ -84,7 +91,7 @@ export function useCrmActivities() {
         });
         const response = await axiosClient.get<unknown>(
           `${ACTIVITIES_PATH}?${query}`,
-          { ...READ_CONFIG, signal, headers: scopeHeaders },
+          { ...READ_CONFIG, signal, headers: scope.headers },
         );
         const parsed = parseActivitiesPage(response.data);
         setItems(parsed.items);
@@ -102,7 +109,7 @@ export function useCrmActivities() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [branchId, filters.search, filters.type, page, scopeHeaders, sourceFilter],
+    [branchId, filters.search, filters.type, page, scope, sourceFilter],
   );
 
   useEffect(() => {

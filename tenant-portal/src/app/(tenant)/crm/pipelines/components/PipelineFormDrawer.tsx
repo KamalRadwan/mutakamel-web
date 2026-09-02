@@ -96,6 +96,7 @@ export function PipelineFormDrawer({
           value={form.code}
           maxLength={PIPELINE_CODE_MAX_LENGTH}
           autoComplete="off"
+          dir="ltr"
           className="font-mono"
           onChange={(event) => {
             setTouched(true);

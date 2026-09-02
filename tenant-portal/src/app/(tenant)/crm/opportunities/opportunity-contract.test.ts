@@ -6,7 +6,17 @@ import {
   parseOpportunityDetailResponse,
   parseOpportunityStageHistory,
 } from "./opportunity-contract";
+import { ar } from "@/i18n/dictionaries/ar";
+import { en } from "@/i18n/dictionaries/en";
+import { WRITE_APPLIED_UNREADABLE } from "../shared/crm-write";
+import { MONEY_MAX_AMOUNT, MONEY_OUT_OF_RANGE } from "../shared/money";
 import {
+  OPPORTUNITY_AMOUNT_NOT_CLEARABLE,
+  OPPORTUNITY_CURRENCY_INVALID,
+  OPPORTUNITY_IMPORTANCE_REQUIRED,
+  OPPORTUNITY_NOTHING_TO_SEND,
+  OPPORTUNITY_TITLE_REQUIRED,
+  OPPORTUNITY_VALUE_OUT_OF_RANGE,
   buildCreateOpportunityRequest,
   buildTransferPipelineRequest,
   buildUpdateOpportunityRequest,
@@ -211,6 +221,21 @@ describe("opportunity write payloads", () => {
     expect(isValidOpportunityAmount("150000.00")).toBe(true);
     expect(isValidOpportunityAmount("1.234")).toBe(false);
     expect(isValidOpportunityAmount("1234567890123456")).toBe(false);
+    // D3: the old guard allowed 15 integer digits because the INTEGER part
+    // stays below 2^53 — but `Number("999999999999999.99")` is
+    // 1_000_000_000_000_000, a whole unit invented on the client, on a column
+    // that stores the value exactly.
+    expect(isValidOpportunityAmount("999999999999999.99")).toBe(false);
+    expect(() =>
+      buildCreateOpportunityRequest(
+        { ...form, amount: "999999999999999.99" },
+        BRANCH,
+      ),
+    ).toThrow(MONEY_OUT_OF_RANGE);
+    expect(
+      buildCreateOpportunityRequest({ ...form, amount: MONEY_MAX_AMOUNT }, BRANCH)
+        .amount,
+    ).toBe(9999999999999.99);
   });
 
   it("round-trips a decimal string through the form without formatting it", () => {
@@ -231,9 +256,80 @@ describe("opportunity write payloads", () => {
     expect(changed).not.toHaveProperty("customerProfileId");
   });
 
-  it("omits an emptied title rather than sending an empty string", () => {
+  // D8. This used to assert `{}` — an emptied box produced a request with
+  // nothing in it, the drawer closed, and the old title stayed on the record.
+  // A key the API has no representation for is now a refusal the user reads.
+  it("refuses an emptied title instead of returning an empty patch", () => {
     const baseline = { ...form };
-    expect(buildUpdateOpportunityRequest({ ...baseline, title: "" }, baseline)).toEqual({});
+    expect(() =>
+      buildUpdateOpportunityRequest({ ...baseline, title: "" }, baseline),
+    ).toThrow(OPPORTUNITY_TITLE_REQUIRED);
+  });
+
+  it("clears the three columns the API can empty, with null rather than ''", () => {
+    const baseline = { ...form };
+    expect(
+      buildUpdateOpportunityRequest(
+        {
+          ...baseline,
+          expectedCloseDate: "",
+          currencyCode: "",
+          probabilityPercent: "",
+        },
+        baseline,
+      ),
+    ).toEqual({
+      // "" here is `@IsDateString()`'s 400 — the reason Clear used to fail.
+      expectedCloseDate: null,
+      currencyCode: null,
+      probabilityPercent: null,
+    });
+  });
+
+  it("refuses the two columns the API cannot empty rather than no-opping", () => {
+    const baseline = { ...form };
+    // `OpportunitiesService.amountValue` is `String(dto.amount)`, so a null
+    // would reach numeric(18,2) as the text "null".
+    expect(() =>
+      buildUpdateOpportunityRequest({ ...baseline, amount: "" }, baseline),
+    ).toThrow(OPPORTUNITY_AMOUNT_NOT_CLEARABLE);
+    // `importance` is smallint NOT NULL DEFAULT 0.
+    expect(() =>
+      buildUpdateOpportunityRequest({ ...baseline, importance: "" }, baseline),
+    ).toThrow(OPPORTUNITY_IMPORTANCE_REQUIRED);
+  });
+
+  it("refuses a half-typed currency instead of dropping the key", () => {
+    const baseline = { ...form };
+    expect(() =>
+      buildUpdateOpportunityRequest({ ...baseline, currencyCode: "US" }, baseline),
+    ).toThrow(OPPORTUNITY_CURRENCY_INVALID);
+  });
+
+  // A thrown code with no sentence behind it renders as the raw constant, which
+  // is how D8's refusals would land back in front of a user as gibberish. Both
+  // dictionaries are checked, because ar.ts is the type source and en.ts can
+  // still drift in content.
+  it("gives every client-side refusal a sentence in both dictionaries", () => {
+    const codes = [
+      MONEY_OUT_OF_RANGE,
+      OPPORTUNITY_VALUE_OUT_OF_RANGE,
+      OPPORTUNITY_TITLE_REQUIRED,
+      OPPORTUNITY_IMPORTANCE_REQUIRED,
+      OPPORTUNITY_CURRENCY_INVALID,
+      OPPORTUNITY_AMOUNT_NOT_CLEARABLE,
+      OPPORTUNITY_NOTHING_TO_SEND,
+    ];
+    for (const dictionary of [ar, en]) {
+      const refusals: Record<string, string> = dictionary.crmShared.refusals;
+      for (const code of codes) {
+        expect(refusals[code], code).toBeTruthy();
+      }
+    }
+    // D2's outcome is not a refusal — it has its own panel and its own words.
+    expect(ar.crmShared.refusals).not.toHaveProperty(WRITE_APPLIED_UNREADABLE);
+    expect(ar.crmShared.appliedUnreadableTitle).toBeTruthy();
+    expect(en.crmShared.appliedUnreadableTitle).toBeTruthy();
   });
 
   it("builds a transfer with an optional stage and reason", () => {

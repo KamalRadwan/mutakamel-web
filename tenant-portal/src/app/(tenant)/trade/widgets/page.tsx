@@ -67,7 +67,7 @@ export default function TradeWidgetsPage() {
     {
       id: "visualizationType",
       header: t.tradeAnalytics.visualizationType,
-      cell: (widget) => tradeStatusLabel(t.tradeStatus, widget.visualizationType),
+      cell: (widget) => tradeStatusLabel(t.tradeStatus, widget.visualizationType, t.common.unknownCode),
     },
     {
       id: "series",
@@ -80,7 +80,7 @@ export default function TradeWidgetsPage() {
     {
       id: "accessLevel",
       header: t.tradeAnalytics.accessLevel,
-      cell: (widget) => tradeStatusLabel(t.tradeStatus, widget.accessLevel),
+      cell: (widget) => tradeStatusLabel(t.tradeStatus, widget.accessLevel, t.common.unknownCode),
     },
     {
       id: "updatedAt",

@@ -4,6 +4,7 @@ import {
   Badge,
   DateTime,
   DetailSection,
+  IdentifierText,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -85,9 +86,9 @@ export function ActivityDetailDrawer({
                         {t.crmActivities.sourceTypes[activity.sourceType] ??
                           activity.sourceType}
                       </span>
-                      <span className="font-mono text-2xs text-muted-foreground">
+                      <IdentifierText className="text-2xs text-muted-foreground">
                         {activity.sourceId}
-                      </span>
+                      </IdentifierText>
                     </span>
                   ),
                 },

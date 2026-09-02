@@ -34,6 +34,7 @@ import { useCustomerProfileColumns } from "./components/useCustomerProfileColumn
 import { useCustomerProfilesCapabilities } from "./hooks/useCustomerProfilesCapabilities";
 import { useCreateCustomerProfile } from "./hooks/useCreateCustomerProfile";
 import { useCustomerProfileBoardMove } from "./hooks/useCustomerProfileBoardMove";
+import { crmCapabilityAllowsOwner } from "../shared/crm-capabilities";
 import { useCrmAcquisitionSources } from "../shared/hooks/useCrmAcquisitionSources";
 
 // Board axis is CustomerStatusEnum — fixed, 4 values, no catalogue fetch,
@@ -62,7 +63,23 @@ export default function CustomerProfilesPage() {
   } = useCustomerProfiles();
   const { capabilities, error: capabilitiesError } =
     useCustomerProfilesCapabilities(branchId);
-  const { displayItems, handleCardMove } = useCustomerProfileBoardMove(items, reload);
+  // D7. `capabilities.update !== null` says the actor may update SOMETHING in
+  // this branch, not that they may update THIS card. With `read.all +
+  // update.own` that let a user drag a colleague's customer, watch the
+  // optimistic move land, and watch the backend reject it a moment later. The
+  // detail workspace has always asked the owner-aware question; the board asks
+  // it too now, per card.
+  const canUpdateProfile = useCallback(
+    (item: CustomerProfileItem) =>
+      crmCapabilityAllowsOwner(capabilities.update, item.ownerUserId),
+    [capabilities.update],
+  );
+  const { displayItems, handleCardMove } = useCustomerProfileBoardMove(
+    items,
+    reload,
+    // The same owner-aware question `canDrag` asks, enforced on the drop.
+    canUpdateProfile,
+  );
   const router = useRouter();
   // The Pagination control only ever steps by one, and this hook exposes
   // cursors rather than a page setter — so a page written to the URL is
@@ -99,13 +116,16 @@ export default function CustomerProfilesPage() {
     outcomeRole: status === "ACTIVE_CUSTOMER" ? "positive" : status === "BLACKLISTED" ? "negative" : status === "INACTIVE" ? "caution" : undefined,
   }));
 
-  const canUpdate = capabilities.update !== null;
   const sources = useCrmAcquisitionSources();
   // A new profile opens on its own detail screen: the list defaults to page
   // one sorted by createdAt DESC, but a filter or a later page would hide the
   // record that was just created.
-  const create = useCreateCustomerProfile(branchId, (profileId) =>
-    router.push(`/crm/customer-profiles/${profileId}`),
+  const create = useCreateCustomerProfile(
+    branchId,
+    (profileId) => router.push(`/crm/customer-profiles/${profileId}`),
+    // D2: a create whose response could not be read has still created the
+    // record, so the list re-reads instead of leaving a Save to press again.
+    reload,
   );
   const tableColumns = useCustomerProfileColumns();
 
@@ -203,7 +223,7 @@ export default function CustomerProfilesPage() {
               items={displayItems}
               itemKey={(item) => item.id}
               renderCard={(item) => <CustomerProfileCard item={item} />}
-              canDrag={() => canUpdate}
+              canDrag={canUpdateProfile}
               confirmMove={(move) =>
                 move.toColumnId === TERMINAL_STATUS
                   ? new Promise<boolean>((resolve) => setPendingTerminalMove({ move, resolve }))

@@ -90,7 +90,7 @@ export default function PricingEvaluationPage() {
             <SelectContent>
               {PRICE_BOOK_PURPOSES.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {tradeStatusLabel(t.tradeStatus, value)}
+                  {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -176,7 +176,7 @@ export default function PricingEvaluationPage() {
               label: t.tradeInventory.outcome,
               value: (
                 <Badge tone={result.outcome === "ALLOW" ? "positive" : "caution"}>
-                  {tradeStatusLabel(t.tradeStatus, result.outcome)}
+                  {tradeStatusLabel(t.tradeStatus, result.outcome, t.common.unknownCode)}
                 </Badge>
               ),
             },

@@ -8,6 +8,7 @@ import {
   DegradedBanner,
   DetailSection,
   EmptyState,
+  IdentifierText,
   Select,
   SelectContent,
   SelectItem,
@@ -83,9 +84,9 @@ export function PipelineStagesSection({
                 aria-busy={pendingStageId === stage.id || undefined}
                 className="flex flex-wrap items-center gap-2 rounded-sm border border-border bg-card px-2.5 py-2"
               >
-                <span className="w-6 shrink-0 text-center font-mono text-xs text-muted-foreground">
+                <IdentifierText className="w-6 shrink-0 text-center text-xs text-muted-foreground">
                   {formatNumber(stage.rank, lang)}
-                </span>
+                </IdentifierText>
                 <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                   {localizedName(stage, lang)}
                 </span>

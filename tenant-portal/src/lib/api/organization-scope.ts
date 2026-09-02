@@ -150,6 +150,18 @@ export function isAccessibleBranchCompanies(
  * Returns null rather than guessing when ownership cannot be established:
  * `BRANCH_REQUIRED` needs the matching company, and pairing a branch with the
  * wrong company is a scope error the Gateway cannot catch for us.
+ *
+ * **The map is the authority on ownership; `accessibleCompanies` is not** —
+ * defect D4. Core truncates the two collections INDEPENDENTLY at 500
+ * (tenant-access.postgres.integration.spec.ts, "independent company
+ * truncation"): the pairs come back in branch order, the companies in their
+ * own, and a company owning one of the first 500 branches can be missing from
+ * the first 500 companies. Re-checking the resolved company against that list
+ * turned a perfectly valid branch into "no company", which
+ * `useOrganizationScopeHeaders` then turned into empty headers and a 400 on
+ * every `BRANCH_REQUIRED` route. The security boundary is the branch: the pair
+ * is only trusted when its branch is one the actor can reach, which is checked
+ * on the line above and again inside `isAccessibleBranchCompanies`.
  */
 export function resolveCompanyForBranch(
   source: TenantScopeSource | null | undefined,
@@ -157,13 +169,14 @@ export function resolveCompanyForBranch(
 ): string | null {
   if (!source || !validId(branchId) || !source.accessibleBranches.includes(branchId)) return null;
   if ("accessibleBranchCompanies" in source) {
+    // Validated with a null company set for the same reason the lookup no
+    // longer consults one — truncation is expected, not corruption.
     if (!isAccessibleBranchCompanies(
       source.accessibleBranchCompanies,
       source.accessibleBranches,
       null,
     )) return null;
-    const companyId = source.accessibleBranchCompanies.find((pair) => pair.branchId === branchId)?.companyId;
-    return companyId && source.accessibleCompanies.includes(companyId) ? companyId : null;
+    return source.accessibleBranchCompanies.find((pair) => pair.branchId === branchId)?.companyId ?? null;
   }
   const accessible = new Set(source.accessibleCompanies.filter(isUUIDv7));
   const owning = source.teamMemberships

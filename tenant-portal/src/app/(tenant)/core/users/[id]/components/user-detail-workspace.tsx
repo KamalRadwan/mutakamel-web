@@ -8,6 +8,7 @@ import {
   DetailHeader,
   DetailSection,
   ErrorState,
+  IdentifierText,
   NotFoundState,
   PermissionGate,
   Skeleton,
@@ -243,5 +244,5 @@ function toUpdateInput(values: UserFormValues) {
 
 /** The user routes return placement as ids; no joined name is on the response. */
 function idValue(value: string | null): React.ReactNode {
-  return value ? <span className="font-mono text-2xs">{value}</span> : null;
+  return value ? <IdentifierText className="text-2xs">{value}</IdentifierText> : null;
 }

@@ -4,6 +4,7 @@
 // `forbidNonWhitelisted` is on, so an extra key is a 400 rather than an
 // ignored field.
 
+import { isExactMoneyDecimal, toMoneyWireNumber } from "../shared/money";
 import type { OpportunityDetail } from "./opportunity-contract";
 
 export interface OpportunityForm {
@@ -33,28 +34,36 @@ export const EMPTY_OPPORTUNITY_FORM: OpportunityForm = {
 };
 
 /**
- * A decimal with at most two places whose integer part stays below 2^53.
- *
- * See `conversionAmount` in the lead write contract for why a conversion to
- * `number` is unavoidable on the way **out** and why it is exact under this
- * guard. Nothing ever converts the value on the way in — `amount` arrives as a
- * decimal string and renders through `Money`.
+ * `amount` is the one field on this form that becomes a JSON **number**, and
+ * `../shared/money` owns the range where that conversion keeps every cent —
+ * defect D3. Nothing converts it on the way in: it arrives as a decimal string
+ * and renders through `Money`.
  */
-const SAFE_DECIMAL = /^\d{1,15}(\.\d{1,2})?$/;
-
 export function isValidOpportunityAmount(value: string): boolean {
-  const trimmed = value.trim();
-  return trimmed.length === 0 || SAFE_DECIMAL.test(trimmed);
+  return isExactMoneyDecimal(value);
 }
 
-function optionalAmount(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return undefined;
-  if (!SAFE_DECIMAL.test(trimmed)) {
-    throw new Error("Opportunity amount must be a decimal with at most 2 places.");
-  }
-  return Number(trimmed);
-}
+/**
+ * Refusals this builder raises instead of dropping a key.
+ *
+ * Every one of them is a value the user typed that the API has no
+ * representation for. Omitting the key made the box look saved and left the old
+ * value in place — defect D8. They are thrown as codes, and
+ * `useCrmErrorText` turns each into a sentence.
+ */
+export const OPPORTUNITY_VALUE_OUT_OF_RANGE = "CRM_VALUE_OUT_OF_RANGE";
+export const OPPORTUNITY_TITLE_REQUIRED = "CRM_OPPORTUNITY_TITLE_REQUIRED";
+export const OPPORTUNITY_IMPORTANCE_REQUIRED = "CRM_OPPORTUNITY_IMPORTANCE_REQUIRED";
+export const OPPORTUNITY_CURRENCY_INVALID = "CRM_OPPORTUNITY_CURRENCY_INVALID";
+/**
+ * `OpportunitiesService.amountValue` is `String(dto.amount)`, and it runs
+ * whenever `amount` is not `undefined` — so a null reaches `numeric(18,2)` as
+ * the literal text `"null"`. There is no way to empty this column through the
+ * API, and pretending otherwise is worse than saying so.
+ */
+export const OPPORTUNITY_AMOUNT_NOT_CLEARABLE = "CRM_OPPORTUNITY_AMOUNT_NOT_CLEARABLE";
+/** An edited form that produced nothing to send — never a silent close. */
+export const OPPORTUNITY_NOTHING_TO_SEND = "CRM_OPPORTUNITY_NOTHING_TO_SEND";
 
 function optionalInteger(
   value: string,
@@ -65,7 +74,7 @@ function optionalInteger(
   if (trimmed.length === 0) return undefined;
   const parsed = Number(trimmed);
   if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error("Value is outside the range this field accepts.");
+    throw new Error(OPPORTUNITY_VALUE_OUT_OF_RANGE);
   }
   return parsed;
 }
@@ -96,7 +105,7 @@ export function buildCreateOpportunityRequest(
     title: form.title.trim(),
   };
   const importance = optionalInteger(form.importance, 0, 3);
-  const amount = optionalAmount(form.amount);
+  const amount = toMoneyWireNumber(form.amount);
   const probabilityPercent = optionalInteger(form.probabilityPercent, 0, 100);
   const currencyCode = form.currencyCode.trim().toUpperCase();
   const description = form.description.trim();
@@ -122,14 +131,27 @@ export function buildCreateOpportunityRequest(
  * `customerProfileId` is create-only for the same reason — an opportunity does
  * not change customer.
  */
+/**
+ * Three states per key, not two — defect D8:
+ *
+ *   absent   the box was not touched, and the stored value survives;
+ *   `null`   the box was emptied, and the stored value is cleared;
+ *   a value  the box was set.
+ *
+ * `null` is spelled out for exactly the three columns the API can empty.
+ * `@IsOptional()` skips validation for `null` as well as `undefined`, and
+ * `OpportunitiesService.update` keys its patch on `!== undefined`, so a null
+ * reaches the (nullable) column. `title`, `importance` and `amount` are not in
+ * that set and are refused rather than dropped.
+ */
 export interface UpdateOpportunityRequest {
   title?: string;
   importance?: number;
   amount?: number;
-  currencyCode?: string;
+  currencyCode?: string | null;
   description?: string;
-  expectedCloseDate?: string;
-  probabilityPercent?: number;
+  expectedCloseDate?: string | null;
+  probabilityPercent?: number | null;
 }
 
 export function toOpportunityForm(item: OpportunityDetail): OpportunityForm {
@@ -151,44 +173,63 @@ export function toOpportunityForm(item: OpportunityDetail): OpportunityForm {
   };
 }
 
-const PATCHABLE_TEXT_FIELDS = ["title", "currencyCode", "description", "expectedCloseDate"] as const;
-const PATCHABLE_NUMBER_FIELDS = [
-  { key: "importance", min: 0, max: 3 },
-  { key: "probabilityPercent", min: 0, max: 100 },
-] as const;
-
 /** Only the changed keys, so a concurrent edit to another field survives. */
 export function buildUpdateOpportunityRequest(
   form: OpportunityForm,
   baseline: OpportunityForm,
 ): UpdateOpportunityRequest {
   const request: UpdateOpportunityRequest = {};
+  const changed = <K extends keyof OpportunityForm>(key: K): string | null =>
+    form[key].trim() === baseline[key].trim() ? null : form[key].trim();
 
-  for (const key of PATCHABLE_TEXT_FIELDS) {
-    const next = form[key].trim();
-    if (next === baseline[key].trim()) continue;
-    // `@IsNotEmpty()` on `title` means an emptied box has no representation the
-    // server accepts, so it is omitted rather than sent as "".
-    if (key === "title" && next.length === 0) continue;
-    if (key === "currencyCode") {
-      const code = next.toUpperCase();
-      if (code.length === 3) request.currencyCode = code;
-      continue;
-    }
-    request[key] = next;
+  const title = changed("title");
+  if (title !== null) {
+    // `@IsNotEmpty()`: there is no value that empties this column, so an
+    // emptied box is a refusal the user is told about rather than a key that
+    // quietly does not travel.
+    if (title.length === 0) throw new Error(OPPORTUNITY_TITLE_REQUIRED);
+    request.title = title;
   }
 
-  for (const { key, min, max } of PATCHABLE_NUMBER_FIELDS) {
-    const next = form[key].trim();
-    if (next === baseline[key].trim()) continue;
-    const parsed = optionalInteger(next, min, max);
-    if (parsed !== undefined) request[key] = parsed;
+  const description = changed("description");
+  // `@IsString() @MaxLength(2000)` with no `@IsNotEmpty()`, so "" clears it.
+  if (description !== null) request.description = description;
+
+  const currencyCode = changed("currencyCode");
+  if (currencyCode !== null) {
+    const code = currencyCode.toUpperCase();
+    if (code.length === 0) request.currencyCode = null;
+    else if (code.length === 3) request.currencyCode = code;
+    else throw new Error(OPPORTUNITY_CURRENCY_INVALID);
   }
 
-  const amount = form.amount.trim();
-  if (amount !== baseline.amount.trim()) {
-    const parsed = optionalAmount(amount);
-    if (parsed !== undefined) request.amount = parsed;
+  const expectedCloseDate = changed("expectedCloseDate");
+  if (expectedCloseDate !== null) {
+    // "" is `@IsDateString()`'s 400. Clearing the picker sends null instead.
+    request.expectedCloseDate =
+      expectedCloseDate.length > 0 ? expectedCloseDate : null;
+  }
+
+  const importance = changed("importance");
+  if (importance !== null) {
+    // `smallint NOT NULL DEFAULT 0` — a null would be a constraint violation,
+    // so an emptied star rating has no meaning to send.
+    if (importance.length === 0) throw new Error(OPPORTUNITY_IMPORTANCE_REQUIRED);
+    request.importance = optionalInteger(importance, 0, 3);
+  }
+
+  const probabilityPercent = changed("probabilityPercent");
+  if (probabilityPercent !== null) {
+    request.probabilityPercent =
+      probabilityPercent.length > 0
+        ? optionalInteger(probabilityPercent, 0, 100)
+        : null;
+  }
+
+  const amount = changed("amount");
+  if (amount !== null) {
+    if (amount.length === 0) throw new Error(OPPORTUNITY_AMOUNT_NOT_CLEARABLE);
+    request.amount = toMoneyWireNumber(amount);
   }
   return request;
 }

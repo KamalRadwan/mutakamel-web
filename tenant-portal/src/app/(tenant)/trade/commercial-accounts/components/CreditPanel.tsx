@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button, DetailSection, Field, Input, Money } from "@/design-system";
+import { Badge, Button, DetailSection, Field, IdentifierText, Input, Money } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatDateTime } from "@/lib/format/date";
 import type { CreditDecision } from "../commercial-account-contract";
@@ -82,7 +82,7 @@ export function CreditPanel({
               </Badge>
             </Row>
             <Row label={t.trade.creditReason}>
-              <span className="font-mono text-xs">{decision.reasonCode}</span>
+              <IdentifierText className="text-xs">{decision.reasonCode}</IdentifierText>
             </Row>
             <Row label={t.trade.creditEffectiveLimit}>
               {decision.effectiveLimit === null ? (
@@ -112,7 +112,7 @@ export function CreditPanel({
               {decision.asOf ? formatDateTime(decision.asOf, lang) : "—"}
             </Row>
             <Row label={t.trade.creditReceipt}>
-              <span className="font-mono text-xs select-all">{decision.receiptId}</span>
+              <IdentifierText className="text-xs select-all">{decision.receiptId}</IdentifierText>
             </Row>
           </dl>
         ) : null}

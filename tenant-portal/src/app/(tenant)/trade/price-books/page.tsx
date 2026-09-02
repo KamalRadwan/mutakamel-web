@@ -66,7 +66,7 @@ export default function PriceBooksPage() {
     {
       id: "purpose",
       header: t.tradePricing.bookPurpose,
-      cell: (book) => tradeStatusLabel(t.tradeStatus, book.purpose),
+      cell: (book) => tradeStatusLabel(t.tradeStatus, book.purpose, t.common.unknownCode),
     },
     { id: "currency", header: t.tradePricing.currencyCode, cell: (book) => book.currencyCode },
     {
@@ -74,7 +74,7 @@ export default function PriceBooksPage() {
       // `status` on a price book is a free string with no enum in source, so it
       // is rendered as it arrives rather than mapped.
       header: t.common.status,
-      cell: (book) => <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, book.status)}</Badge>,
+      cell: (book) => <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, book.status, t.common.unknownCode)}</Badge>,
     },
     {
       id: "versions",
@@ -91,7 +91,7 @@ export default function PriceBooksPage() {
                 className="underline-offset-2 hover:underline"
               >
                 <Badge tone={version.status === "PUBLISHED" ? "positive" : "neutral"}>
-                  {`v${version.versionNumber} · ${tradeStatusLabel(t.tradeStatus, version.status)}`}
+                  {`v${version.versionNumber} · ${tradeStatusLabel(t.tradeStatus, version.status, t.common.unknownCode)}`}
                 </Badge>
               </Link>
             ))}
@@ -154,7 +154,7 @@ export default function PriceBooksPage() {
                 placeholder: t.tradeCommon.anyStatus,
                 options: PRICE_BOOK_PURPOSES.map((value) => ({
                   value,
-                  label: tradeStatusLabel(t.tradeStatus, value),
+                  label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
                 })),
               },
             ]}

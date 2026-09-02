@@ -4,6 +4,7 @@ import { forwardRef } from "react";
 import { cva } from "class-variance-authority";
 import { cn } from "../lib/cn";
 import { focusRing, readOnlySurface, textEntrySize, type ControlSizeProps } from "../lib/variants";
+import { useFieldControl } from "./field-control";
 
 // Matches Input's padding and type size at every step, but deliberately does
 // NOT reuse `controlSize`: that sets a fixed `h-(--size-control-*)`, which on a
@@ -29,6 +30,8 @@ export interface TextareaProps
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, rows = 3, size = "md", ...props }, ref) => {
+    const field = useFieldControl(props, { nativeReadOnly: true });
+
     return (
       <textarea
         ref={ref}
@@ -45,6 +48,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           className,
         )}
         {...props}
+        {...field}
       />
     );
   },

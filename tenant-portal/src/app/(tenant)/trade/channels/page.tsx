@@ -9,6 +9,7 @@ import {
   DataTable,
   DegradedBanner,
   EmptyState,
+  IdentifierText,
   PageHeader,
   PermissionGate,
   SubNav,
@@ -43,9 +44,9 @@ export default function TradeChannelsPage() {
       cell: (channel) => (
         <Link
           href={`${TENANT_ROUTES.tradeChannels}/${channel.id}`}
-          className="font-mono font-medium text-foreground hover:underline"
+          className="font-medium text-foreground hover:underline"
         >
-          {channel.code}
+          <IdentifierText>{channel.code}</IdentifierText>
         </Link>
       ),
     },
@@ -58,7 +59,7 @@ export default function TradeChannelsPage() {
           {isChannelType(channel.channelType) ? (
             t.trade[`channelType_${channel.channelType}`]
           ) : (
-            <span className="font-mono">{channel.channelType}</span>
+            <IdentifierText>{channel.channelType}</IdentifierText>
           )}
         </Badge>
       ),
@@ -75,7 +76,7 @@ export default function TradeChannelsPage() {
           </Badge>
         ) : (
           <Badge tone="neutral">
-            <span className="font-mono">{channel.status}</span>
+            <IdentifierText>{channel.status}</IdentifierText>
           </Badge>
         ),
     },
@@ -216,9 +217,9 @@ export default function TradeChannelsPage() {
             channels.conflict ? (
               <span className="block text-xs">
                 {channels.conflict.name}
-                <span className="ms-2 font-mono text-muted-foreground">
+                <IdentifierText className="ms-2 text-muted-foreground">
                   v{channels.conflict.version}
-                </span>
+                </IdentifierText>
               </span>
             ) : null
           }

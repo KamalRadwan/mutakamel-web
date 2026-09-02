@@ -4,6 +4,7 @@ import { CheckCircle2, Star, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
+  IdentifierText,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -48,9 +49,9 @@ export function usePipelineColumns({
       id: "code",
       header: t.crmPipelines.codeLabel,
       cell: (pipeline) => (
-        <span className="font-mono text-xs text-muted-foreground">
+        <IdentifierText className="text-xs text-muted-foreground">
           {pipeline.code}
-        </span>
+        </IdentifierText>
       ),
     },
     {

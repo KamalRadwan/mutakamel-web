@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   publishTenantAuthEvent,
@@ -63,6 +63,21 @@ function LoginProbe() {
       </button>
     </div>
   );
+}
+
+// Sign-out is driven through the context, not a third probe button:
+// `design:census` counts every hand-rolled button element under `src/`, tests
+// included, and one more here is a ratchet regression that says nothing true
+// about the design system.
+const signOut: { run: (() => Promise<void>) | null } = { run: null };
+
+function LogoutProbe() {
+  const { authState, logout } = useTenantAuth();
+  useEffect(() => {
+    signOut.run = logout;
+    return () => { signOut.run = null; };
+  }, [logout]);
+  return <span>state:{authState}</span>;
 }
 
 function OrganizationScopeProbe() {
@@ -128,17 +143,31 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     },
   );
 
+  // A second tab, a restored window, and the redirect after an accepted invite
+  // all hold the cookies and none of the metadata, because `tenant_session_meta`
+  // lives in sessionStorage. Authenticating on /me alone left every one of them
+  // signed in and unable to stay that way — no refresh timing, no session id
+  // for a 401 to name, no realtime generation — so the tab worked until the
+  // access cookie expired and then failed every request. It spends one refresh
+  // first instead, which the Gateway answers from the session cookie alone.
   it.each([
     "mutakamel-http-tenant-csrf",
     "__Host-mutakamel-tenant-csrf",
-  ])("restores a %s session without stored metadata", async (cookieName) => {
+  ])("adopts a %s session this tab holds no metadata for", async (cookieName) => {
     vi.spyOn(document, "cookie", "get").mockReturnValue(`${cookieName}=csrf-proof`);
     const addListener = vi.spyOn(window, "addEventListener");
+    const requested: string[] = [];
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      expect(url).toBe("/api/tenant/core/v1/auth/me");
-      expect(init?.method).toBe("GET");
+      requested.push(url);
       expect(init?.credentials).toBe("include");
       expect(new Headers(init?.headers).has("Authorization")).toBe(false);
+      if (url === "/api/tenant/core/v1/auth/refresh") {
+        expect(init?.method).toBe("POST");
+        expect(new Headers(init?.headers).get("x-csrf-token")).toBe("csrf-proof");
+        return jsonResponse(webAuthResponse());
+      }
+      expect(url).toBe("/api/tenant/core/v1/auth/me");
+      expect(init?.method).toBe("GET");
       return jsonResponse(profileResponse());
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -146,6 +175,15 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
 
     await waitFor(() => expect(screen.getByText("AUTHENTICATED:tenant@example.test")).toBeTruthy());
+    // Order is the point: /me answering 200 first would have left nothing to
+    // repair the session with once the access cookie ran out.
+    expect(requested).toEqual([
+      "/api/tenant/core/v1/auth/refresh",
+      "/api/tenant/core/v1/auth/me",
+    ]);
+    expect(JSON.parse(
+      window.sessionStorage.getItem("tenant_session_meta") ?? "null",
+    )).toMatchObject({ sessionId: "019f0000-0000-7000-8000-000000000002" });
     // Inside its own waitFor, not asserted straight after the one above.
     //
     // That first waitFor polls the DOM, and the DOM is written at commit time.
@@ -162,7 +200,61 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     await waitFor(() =>
       expect(addListener.mock.calls.some(([type]) => type === "pointerdown")).toBe(true),
     );
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  // The failure this whole path exists for. A tab that never held metadata
+  // could not refresh, so an access cookie that expired while it was closed
+  // meant a 401 on the very first request and a degraded screen whose retry
+  // button could only produce the same 401 — while the session cookie beside
+  // it was still perfectly valid.
+  it("recovers a fresh tab whose access cookie expired before its first request", async () => {
+    vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
+    let refreshed = false;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "/api/tenant/core/v1/auth/refresh") {
+        refreshed = true;
+        return jsonResponse(webAuthResponse());
+      }
+      if (url === "/api/tenant/core/v1/auth/me") {
+        // The exact code the Gateway returns for an expired access cookie —
+        // api-gateway-app/src/auth/gateway-jwt-verifier.service.ts.
+        return refreshed
+          ? jsonResponse(profileResponse())
+          : jsonResponse({ code: "COMMON.AUTH.TOKEN_EXPIRED" }, 401);
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+
+    await waitFor(() => expect(
+      screen.getByText("AUTHENTICATED:tenant@example.test"),
+    ).toBeTruthy());
+    expect(fetchMock.mock.calls.filter(([url]) =>
+      url === "/api/tenant/core/v1/auth/refresh",
+    )).toHaveLength(1);
+  });
+
+  // A refresh that fails for a reason that is not the session's fault must not
+  // condemn a still-valid access cookie: the adoption is best-effort, and /me
+  // stays the authority on whether this browser is signed in.
+  it("still authenticates a metadata-less tab when the adoption refresh is unavailable", async () => {
+    vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "/api/tenant/core/v1/auth/refresh") {
+        return jsonResponse({ code: "AUTH_REFRESH_UNAVAILABLE" }, 503);
+      }
+      return jsonResponse(profileResponse());
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+
+    await waitFor(() => expect(
+      screen.getByText("AUTHENTICATED:tenant@example.test"),
+    ).toBeTruthy());
   });
 
   it("restores an owner and resolves branch scope without a team membership", async () => {
@@ -179,13 +271,22 @@ describe("TenantAuthProvider committed login bootstrap", () => {
 
     await waitFor(() => expect(screen.getByText("AUTHENTICATED:tenant@example.test")).toBeTruthy());
     expect(JSON.parse(screen.getByTestId("organization-scope").textContent ?? "null")).toEqual({
-      "x-mutakamel-company-id": SCOPE_COMPANY,
-      "x-mutakamel-branch-id": SCOPE_BRANCH,
+      ready: true,
+      gap: null,
+      headers: {
+        "x-mutakamel-company-id": SCOPE_COMPANY,
+        "x-mutakamel-branch-id": SCOPE_BRANCH,
+      },
     });
   });
 
+  // D4, corrected deliberately. The `OTHER_SCOPE_COMPANY` row used to expect
+  // `{}` — no headers for a branch whose owning company truncation had dropped
+  // from `accessibleCompanies`. Core truncates the two collections
+  // independently, so that is a normal response about a perfectly valid
+  // branch; the ownership map is the authority and the headers come from it.
   it.each([SCOPE_COMPANY, OTHER_SCOPE_COMPANY])(
-    "accepts truncated company projections while requiring the selected company (%s)",
+    "resolves a mapped branch even when its company was truncated away (%s)",
     async (selectedCompany) => {
       const otherBranch = "0192f3a0-0000-7000-8000-000000000003";
       vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
@@ -204,11 +305,14 @@ describe("TenantAuthProvider committed login bootstrap", () => {
       );
 
       await waitFor(() => expect(screen.getByText("AUTHENTICATED:tenant@example.test")).toBeTruthy());
-      expect(JSON.parse(screen.getByTestId("organization-scope").textContent ?? "null")).toEqual(
-        selectedCompany === SCOPE_COMPANY
-          ? { "x-mutakamel-company-id": SCOPE_COMPANY, "x-mutakamel-branch-id": SCOPE_BRANCH }
-          : {},
-      );
+      expect(JSON.parse(screen.getByTestId("organization-scope").textContent ?? "null")).toEqual({
+        ready: true,
+        gap: null,
+        headers: {
+          "x-mutakamel-company-id": selectedCompany,
+          "x-mutakamel-branch-id": SCOPE_BRANCH,
+        },
+      });
     },
   );
 
@@ -225,7 +329,9 @@ describe("TenantAuthProvider committed login bootstrap", () => {
       { branchId: SCOPE_BRANCH, companyId: OTHER_SCOPE_COMPANY },
     ] },
   ])("rejects an auth profile with $name", async ({ mapping }) => {
-    vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=csrf-proof");
+    // Seeded so this stays a test of the profile validator: a tab that already
+    // holds its metadata has nothing to adopt, and asks /me exactly once.
+    seedSessionState("session-a");
     const fetchMock = vi.fn(async () => jsonResponse(profileResponse({
       accessibleBranches: [SCOPE_BRANCH],
       accessibleCompanies: [SCOPE_COMPANY, OTHER_SCOPE_COMPANY],
@@ -272,19 +378,29 @@ describe("TenantAuthProvider committed login bootstrap", () => {
 
   it("does not authenticate from a CSRF hint when the server rejects the session", async () => {
     vi.spyOn(document, "cookie", "get").mockReturnValue("mutakamel-http-tenant-csrf=stale-proof");
-    const fetchMock = vi.fn(async () =>
-      jsonResponse({ code: "COMMON.AUTH.MISSING_BEARER_TOKEN" }, 401),
-    );
+    const requested: string[] = [];
+    const fetchMock = vi.fn(async (url: string) => {
+      requested.push(url);
+      return jsonResponse({ code: "COMMON.AUTH.MISSING_BEARER_TOKEN" }, 401);
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
 
     await waitFor(() => expect(screen.getByText("UNAUTHENTICATED:none")).toBeTruthy());
-    expect(fetchMock).toHaveBeenCalledOnce();
+    // A cookie left behind by a session the server has forgotten buys an
+    // adoption attempt and nothing else: neither the refresh nor /me is
+    // allowed to turn a readable proof into a signed-in state, and no
+    // metadata survives either rejection.
+    expect(requested).toEqual([
+      "/api/tenant/core/v1/auth/refresh",
+      "/api/tenant/core/v1/auth/me",
+    ]);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/tenant/core/v1/auth/me",
       expect.objectContaining({ method: "GET", credentials: "include" }),
     );
+    expect(window.sessionStorage.getItem("tenant_session_meta")).toBeNull();
   });
 
   it("posts login credentials as JSON and bootstraps without Web Locks", async () => {
@@ -530,7 +646,12 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     publishTenantAuthEvent("session-ended", "session-a");
     await waitFor(() => expect(screen.getByText("ENDED:none")).toBeTruthy());
     expect(window.sessionStorage.getItem("tenant_session_meta")).toBeNull();
-    expect(replace).toHaveBeenCalledWith("/login");
+    // The provider records the end and routes nothing. It used to replace to
+    // /login from here, which is why a session ending in another tab could
+    // never reach the screen that explains it — see the terminal-destination
+    // tests below. `TenantAuthGuard` owns that decision now, and it is not
+    // rendered here.
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("does not commit a delayed bootstrap response after its SID ends", async () => {
@@ -711,18 +832,17 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     );
   });
 
-  // The half of Q18 that is still OPEN, pinned so that closing it is a
-  // deliberate act rather than an accident.
+  // The second half of Q18, now closed — this test previously pinned the
+  // opposite outcome and has been deliberately inverted.
   //
-  // With a session id in storage the transport tries a refresh, the refresh
-  // fails definitively, and `endTenantBrowserSession` publishes the same
-  // cross-tab tombstone another tab would send. That tombstone carries a
-  // session id and no code, and its handler in this file redirects to /login
-  // itself — so a session that ends *while the user is working* still loses
-  // both the reason and the screen. Re-pointing those two redirects is
-  // Tier-1 redirect logic and wants its own review; see HANDOFF.md's second
-  // 2026-08-31 amendment.
-  it("loses the reason when the tombstone path ends the session first", async () => {
+  // With a session id in storage the transport ends the session itself:
+  // `endTenantBrowserSession` clears the metadata, publishes the cross-tab
+  // tombstone, and signals ENDED on the in-tab lifecycle channel. The
+  // tombstone handler then finds no metadata to match and stands down, so the
+  // lifecycle signal is the only thing left carrying the outcome — and it used
+  // to carry a bare state and redirect to /login, which discarded both the
+  // reason and the screen. It carries the code now, and redirects nothing.
+  it("carries the reason through the path that ends a session mid-work", async () => {
     seedSessionState("session-a");
     vi.stubGlobal("fetch", vi.fn(async () =>
       jsonResponse({ code: "AUTH_SESSION_IDLE_EXPIRED" }, 401),
@@ -738,10 +858,73 @@ describe("TenantAuthProvider committed login bootstrap", () => {
       </I18nProvider>,
     );
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
-    expect(replace).not.toHaveBeenCalledWith(
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(
       "/session-expired?reason=AUTH_SESSION_IDLE_EXPIRED",
+    ));
+    expect(replace).not.toHaveBeenCalledWith("/login");
+  });
+
+  // A deactivated or suspended account is not an expired session, and the
+  // difference is the whole point: signing in again fixes one and cannot
+  // touch the other. Core answers with 403 SESSION_IDENTITY_INACTIVE
+  // (`auth-refresh.policy.ts`), which is definitive, so it ends the session
+  // like the rest — and then has to land somewhere else.
+  it("sends a deactivated identity to /account-suspended, not /session-expired", async () => {
+    seedSessionState("session-a");
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      jsonResponse({ code: "SESSION_IDENTITY_INACTIVE" }, 403),
+    ));
+
+    render(
+      <I18nProvider>
+        <TenantAuthProvider>
+          <TenantAuthGuard>
+            <LoginProbe />
+          </TenantAuthGuard>
+        </TenantAuthProvider>
+      </I18nProvider>,
     );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/account-suspended"));
+    expect(replace).not.toHaveBeenCalledWith(
+      expect.stringContaining("/session-expired"),
+    );
+  });
+
+  // Pressing "sign out" was answered by "your session expired". `logout()`
+  // replaced to /login and settled on ENDED, the guard read ENDED and replaced
+  // to /session-expired, and the guard's redirect landed second. Sign-out
+  // settles UNAUTHENTICATED now, so both redirects agree.
+  it("sends a completed sign-out to the sign-in form and nowhere else", async () => {
+    seedSessionState("session-a");
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/tenant/core/v1/auth/logout") {
+        return new Response(null, { status: 204 });
+      }
+      return jsonResponse(profileResponse());
+    }));
+
+    render(
+      <I18nProvider>
+        <TenantAuthProvider>
+          <TenantAuthGuard>
+            <LogoutProbe />
+          </TenantAuthGuard>
+        </TenantAuthProvider>
+      </I18nProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("state:AUTHENTICATED")).toBeTruthy());
+    replace.mockReset();
+
+    await act(async () => {
+      await signOut.run?.();
+    });
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+    // The guard runs on the same commit, with the pre-navigation pathname, so
+    // a second destination here is not a race that sometimes loses — it lands
+    // last and wins every time.
+    expect(replace.mock.calls.every(([href]) => href === "/login")).toBe(true);
   });
 });
 

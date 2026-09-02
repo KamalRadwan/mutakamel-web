@@ -5,7 +5,12 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "../lib/cn";
 import { controlSize, focusRing, textEntrySize, type ControlSizeProps } from "../lib/variants";
+import { useFieldControl } from "./field-control";
 
+// Radix's Root is a CONTEXT component — it renders no DOM node, so an id or an
+// aria-* attribute handed to it reaches nothing at all. The trigger below is
+// the only focusable element a select has, which is why it, and not the Root,
+// is what claims the enclosing `Field`. See field-control.tsx.
 export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
 export const SelectValue = SelectPrimitive.Value;
@@ -17,29 +22,43 @@ export interface SelectTriggerProps
 export const SelectTrigger = forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
   SelectTriggerProps
->(({ className, size = "lg", children, ...props }, ref) => (
-  <SelectPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-card text-foreground",
-      "disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
-      "data-[placeholder]:text-muted-foreground",
-      focusRing,
-      controlSize({ size }),
-      // B1: a select sits in the same row as the inputs it filters, so it
-      // takes the same 16px-below-sm step. Must follow controlSize —
-      // tailwind-merge keeps the last font-size in a group.
-      textEntrySize({ size }),
-      className,
-    )}
-    {...props}
-  >
-    {children}
-    <SelectPrimitive.Icon asChild>
-      <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-    </SelectPrimitive.Icon>
-  </SelectPrimitive.Trigger>
-));
+>(({ className, size = "lg", children, ...props }, ref) => {
+  // aria-readonly only, no native attribute: a trigger is a button element, and
+  // `readonly` on a button is meaningless markup.
+  const field = useFieldControl(props);
+
+  return (
+    <SelectPrimitive.Trigger
+      ref={ref}
+      className={cn(
+        "flex w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-card text-foreground",
+        "disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+        "data-[placeholder]:text-muted-foreground",
+        // Matches Input. Tailwind compiles `aria-invalid:` to
+        // `[aria-invalid="true"]`, so the aria-invalid="false" a Field puts on
+        // every control does not paint every select red.
+        "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
+        // `readOnlySurface` is keyed on the native :read-only pseudo-class,
+        // which a button element can never match — hence the aria twin here.
+        "aria-readonly:bg-muted aria-readonly:cursor-default aria-readonly:border-border",
+        focusRing,
+        controlSize({ size }),
+        // B1: a select sits in the same row as the inputs it filters, so it
+        // takes the same 16px-below-sm step. Must follow controlSize —
+        // tailwind-merge keeps the last font-size in a group.
+        textEntrySize({ size }),
+        className,
+      )}
+      {...props}
+      {...field}
+    >
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  );
+});
 SelectTrigger.displayName = "SelectTrigger";
 
 export const SelectContent = forwardRef<

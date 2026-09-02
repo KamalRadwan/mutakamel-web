@@ -8,6 +8,7 @@ import {
   DetailSection,
   EmptyState,
   ErrorState,
+  IdentifierText,
   NotFoundState,
   PermissionGate,
   Skeleton,
@@ -70,13 +71,13 @@ export default function TradeUomDetailPage({ params }: { params: Promise<{ id: s
               title={t.trade.uomDetailTitle}
               emptyValueLabel="—"
               fields={[
-                { label: t.trade.uomCode, value: <span className="font-mono">{uom.code}</span> },
+                { label: t.trade.uomCode, value: <IdentifierText>{uom.code}</IdentifierText> },
                 { label: t.trade.uomDisplayName, value: uom.displayName },
                 {
                   label: t.trade.localizedName,
                   value: tradeLocalizedName(uom.localizedNames, lang),
                 },
-                { label: t.trade.version, value: <span className="font-mono">{uom.version}</span> },
+                { label: t.trade.version, value: <IdentifierText>{uom.version}</IdentifierText> },
                 { label: t.trade.updatedAt, value: formatDateTime(uom.updatedAt, lang) },
               ]}
             />
@@ -94,7 +95,7 @@ export default function TradeUomDetailPage({ params }: { params: Promise<{ id: s
                 {
                   label: t.trade.uomRecordedBy,
                   value: uom.sourceEvidence.recordedBy ? (
-                    <span className="font-mono text-xs">{uom.sourceEvidence.recordedBy}</span>
+                    <IdentifierText className="text-xs">{uom.sourceEvidence.recordedBy}</IdentifierText>
                   ) : null,
                 },
                 {

@@ -83,6 +83,16 @@ export function TenantRealtimeBinding({
   const mode = suppliedMode ?? readDeploymentMode();
 
   useEffect(() => {
+    // Nothing is built for a signed-out visitor. This provider wraps every
+    // route including /login, and creating the coordinator eagerly gave anyone
+    // who merely opened the sign-in form a socket runtime and a device id
+    // persisted to localStorage. `peek` is what still lets a sign-out clear
+    // the coordinator a signed-in session did create.
+    if (generation === null) {
+      (suppliedCoordinator ?? runtime.peek())?.clearGeneration();
+      tenantNotificationRuntime.clear();
+      return;
+    }
     const coordinator =
       suppliedCoordinator ??
       runtime.getOrCreate(createTenantRealtimeCoordinator);
@@ -94,176 +104,169 @@ export function TenantRealtimeBinding({
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
 
-    let lease: ConnectionLease | null = null;
-    let applicationClient: RealtimeApplicationClient | null = null;
     let active = true;
     let notificationCacheInitialized = false;
     let resyncInFlight: Promise<void> | null = null;
     let queuedResyncCursor: string | null | undefined;
     const applicationUnsubscribers: Array<() => void> = [];
-    if (generation === null) {
-      coordinator.clearGeneration();
-      tenantNotificationRuntime.clear();
-    } else {
-      tenantNotificationRuntime.bindGeneration(generation);
-      const boundGeneration = coordinator.getSnapshot().generation;
-      if (
-        boundGeneration !== null &&
-        boundGeneration !== generation
-      ) {
-        coordinator.replaceGeneration(generation);
-      }
-      lease = coordinator.acquire(generation);
-      applicationClient = new RealtimeApplicationClient({
-        connection: coordinator,
-        onPermanentStop: handlePermanentStop,
-      });
-      const requestNotificationResync = (
-        lastCommittedCursor: string | null,
-      ): void => {
-        queuedResyncCursor = lastCommittedCursor;
-        if (resyncInFlight !== null) return;
-        const run = async (): Promise<void> => {
-          while (active && queuedResyncCursor !== undefined) {
-            const cursor = queuedResyncCursor;
-            queuedResyncCursor = undefined;
-            try {
-              const applied = await resyncTenantNotifications(
-                generation,
-                cursor,
-              );
-              if (!active || !applied) return;
-              notificationCacheInitialized = true;
-            } catch {
-              // Keep the last complete cache and cursor. The next ready/sync
-              // signal retries; partial REST results never become visible.
-            }
-          }
-        };
-        resyncInFlight = run().finally(() => {
-          resyncInFlight = null;
-          if (active && queuedResyncCursor !== undefined) {
-            requestNotificationResync(queuedResyncCursor);
-          }
-        });
-      };
-      applicationUnsubscribers.push(
-        applicationClient.subscribe("session.ready.v1", (event) => {
-          dispatchShellEvent(TENANT_REALTIME_SHELL_EVENTS.sessionReady, event);
-          if (
-            event.payload.notificationResyncRequired ||
-            !notificationCacheInitialized
-          ) {
-            dispatchShellEvent(
-              TENANT_REALTIME_SHELL_EVENTS.resyncRequired,
-              event,
-            );
-            requestNotificationResync(
-              tenantNotificationRuntime.getSnapshot().lastRealtimeCursor,
-            );
-          }
-        }),
-        applicationClient.subscribe("notification.created.v1", (event) => {
-          const result = tenantNotificationRuntime.applyCreated(
-            generation,
-            event.payload,
-          );
-          dispatchShellEvent(
-            TENANT_REALTIME_SHELL_EVENTS.notificationCreated,
-            event,
-          );
-          if (result === "applied" || result === "duplicate") {
-            if (result === "applied") {
-              requestNotificationResync(event.payload.cursor);
-            }
-            void applicationClient
-              ?.acknowledgeNotification({
-                notificationId: event.payload.notificationId,
-                recipientId: event.payload.recipientId,
-                deliveryEventId: event.payload.deliveryEventId,
-                cursor: event.payload.cursor,
-              })
-              .catch(() => {
-                requestNotificationResync(event.payload.cursor);
-              });
-          } else if (result === "conflict") {
-            requestNotificationResync(event.payload.cursor);
-          }
-        }),
-        applicationClient.subscribe("notification.updated.v1", (event) => {
-          const result = tenantNotificationRuntime.applyUpdated(
-            generation,
-            event.payload,
-          );
-          if (
-            result === "missing" ||
-            result === "gap" ||
-            result === "conflict"
-          ) {
-            requestNotificationResync(
-              tenantNotificationRuntime.getSnapshot().lastRealtimeCursor,
-            );
-          }
-          dispatchShellEvent(
-            TENANT_REALTIME_SHELL_EVENTS.notificationUpdated,
-            event,
-          );
-        }),
-        applicationClient.subscribe(
-          "notification.unread-count.changed.v1",
-          (event) => {
-            const result = tenantNotificationRuntime.applyUnreadCount(
+    tenantNotificationRuntime.bindGeneration(generation);
+    const boundGeneration = coordinator.getSnapshot().generation;
+    if (
+      boundGeneration !== null &&
+      boundGeneration !== generation
+    ) {
+      coordinator.replaceGeneration(generation);
+    }
+    const lease: ConnectionLease = coordinator.acquire(generation);
+    const applicationClient = new RealtimeApplicationClient({
+      connection: coordinator,
+      onPermanentStop: handlePermanentStop,
+    });
+    const requestNotificationResync = (
+      lastCommittedCursor: string | null,
+    ): void => {
+      queuedResyncCursor = lastCommittedCursor;
+      if (resyncInFlight !== null) return;
+      const run = async (): Promise<void> => {
+        while (active && queuedResyncCursor !== undefined) {
+          const cursor = queuedResyncCursor;
+          queuedResyncCursor = undefined;
+          try {
+            const applied = await resyncTenantNotifications(
               generation,
-              event.payload.unreadCount,
-              event.payload.unreadRevision,
-              event.payload.changedAt,
+              cursor,
             );
-            if (result === "gap" || result === "conflict") {
-              requestNotificationResync(
-                tenantNotificationRuntime.getSnapshot().lastRealtimeCursor,
-              );
-            }
-            dispatchShellEvent(
-              TENANT_REALTIME_SHELL_EVENTS.notificationUnreadCountChanged,
-              event,
-            );
-          },
-        ),
-        applicationClient.subscribe("realtime.sync.required.v1", (event) => {
+            if (!active || !applied) return;
+            notificationCacheInitialized = true;
+          } catch {
+            // Keep the last complete cache and cursor. The next ready/sync
+            // signal retries; partial REST results never become visible.
+          }
+        }
+      };
+      resyncInFlight = run().finally(() => {
+        resyncInFlight = null;
+        if (active && queuedResyncCursor !== undefined) {
+          requestNotificationResync(queuedResyncCursor);
+        }
+      });
+    };
+    applicationUnsubscribers.push(
+      applicationClient.subscribe("session.ready.v1", (event) => {
+        dispatchShellEvent(TENANT_REALTIME_SHELL_EVENTS.sessionReady, event);
+        if (
+          event.payload.notificationResyncRequired ||
+          !notificationCacheInitialized
+        ) {
           dispatchShellEvent(
             TENANT_REALTIME_SHELL_EVENTS.resyncRequired,
             event,
           );
-          if (
-            event.payload.scope === "NOTIFICATIONS" ||
-            event.payload.scope === "ALL"
-          ) {
+          requestNotificationResync(
+            tenantNotificationRuntime.getSnapshot().lastRealtimeCursor,
+          );
+        }
+      }),
+      applicationClient.subscribe("notification.created.v1", (event) => {
+        const result = tenantNotificationRuntime.applyCreated(
+          generation,
+          event.payload,
+        );
+        dispatchShellEvent(
+          TENANT_REALTIME_SHELL_EVENTS.notificationCreated,
+          event,
+        );
+        if (result === "applied" || result === "duplicate") {
+          if (result === "applied") {
+            requestNotificationResync(event.payload.cursor);
+          }
+          void applicationClient
+            .acknowledgeNotification({
+              notificationId: event.payload.notificationId,
+              recipientId: event.payload.recipientId,
+              deliveryEventId: event.payload.deliveryEventId,
+              cursor: event.payload.cursor,
+            })
+            .catch(() => {
+              requestNotificationResync(event.payload.cursor);
+            });
+        } else if (result === "conflict") {
+          requestNotificationResync(event.payload.cursor);
+        }
+      }),
+      applicationClient.subscribe("notification.updated.v1", (event) => {
+        const result = tenantNotificationRuntime.applyUpdated(
+          generation,
+          event.payload,
+        );
+        if (
+          result === "missing" ||
+          result === "gap" ||
+          result === "conflict"
+        ) {
+          requestNotificationResync(
+            tenantNotificationRuntime.getSnapshot().lastRealtimeCursor,
+          );
+        }
+        dispatchShellEvent(
+          TENANT_REALTIME_SHELL_EVENTS.notificationUpdated,
+          event,
+        );
+      }),
+      applicationClient.subscribe(
+        "notification.unread-count.changed.v1",
+        (event) => {
+          const result = tenantNotificationRuntime.applyUnreadCount(
+            generation,
+            event.payload.unreadCount,
+            event.payload.unreadRevision,
+            event.payload.changedAt,
+          );
+          if (result === "gap" || result === "conflict") {
             requestNotificationResync(
-              event.payload.lastCommittedNotificationCursor,
+              tenantNotificationRuntime.getSnapshot().lastRealtimeCursor,
             );
           }
-        }),
-        applicationClient.subscribe("system.server-draining.v1", (event) => {
           dispatchShellEvent(
-            TENANT_REALTIME_SHELL_EVENTS.serverDraining,
+            TENANT_REALTIME_SHELL_EVENTS.notificationUnreadCountChanged,
             event,
           );
-        }),
-      );
-      applicationClient.start();
-    }
+        },
+      ),
+      applicationClient.subscribe("realtime.sync.required.v1", (event) => {
+        dispatchShellEvent(
+          TENANT_REALTIME_SHELL_EVENTS.resyncRequired,
+          event,
+        );
+        if (
+          event.payload.scope === "NOTIFICATIONS" ||
+          event.payload.scope === "ALL"
+        ) {
+          requestNotificationResync(
+            event.payload.lastCommittedNotificationCursor,
+          );
+        }
+      }),
+      applicationClient.subscribe("system.server-draining.v1", (event) => {
+        dispatchShellEvent(
+          TENANT_REALTIME_SHELL_EVENTS.serverDraining,
+          event,
+        );
+      }),
+    );
+    applicationClient.start();
 
     const pushLifecycle = () =>
-      applicationClient?.updateLifecycle(readBrowserLifecycle());
+      applicationClient.updateLifecycle(readBrowserLifecycle());
     const pushBackgroundLifecycle = () =>
-      applicationClient?.updateLifecycle({
+      applicationClient.updateLifecycle({
         appState: "BACKGROUND",
         visibility: "HIDDEN",
         focus: "BLURRED",
       });
     const signalActivity = (event: Event) => {
       if (event.isTrusted && document.visibilityState === "visible") {
-        applicationClient?.signalActivity();
+        applicationClient.signalActivity();
       }
     };
     const onVisibilityChange = () => { pushLifecycle(); };
@@ -296,8 +299,8 @@ export function TenantRealtimeBinding({
       document.removeEventListener("keydown", signalActivity);
       document.removeEventListener("touchstart", signalActivity);
       for (const unsubscribe of applicationUnsubscribers) unsubscribe();
-      applicationClient?.dispose();
-      lease?.release();
+      applicationClient.dispose();
+      lease.release();
     };
   }, [generation, mode, suppliedCoordinator]);
 

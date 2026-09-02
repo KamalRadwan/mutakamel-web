@@ -53,8 +53,16 @@ export function OpportunityDetailWorkspace({
   const attached = useCrmRecordCapabilities(item?.branchId ?? null);
   const { canMutate } = useAccessMode();
 
-  const edit = useOpportunityEdit(item, detail.setItem);
-  const transfer = usePipelineTransfer(item, detail.pipelines, detail.setItem);
+  // The trailing argument on each is the D2 reconciliation: when a write
+  // applies and its body cannot be read, the record is re-read from the server
+  // rather than patched from a response nothing could parse.
+  const edit = useOpportunityEdit(item, detail.setItem, detail.reload);
+  const transfer = usePipelineTransfer(
+    item,
+    detail.pipelines,
+    detail.setItem,
+    detail.reload,
+  );
 
   if (detail.isLoading) {
     return (

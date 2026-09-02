@@ -491,9 +491,21 @@ Other rules the wrappers own so no dashboard re-decides them:
 Create and edit forms in a `Sheet`, not a dialog — a form long enough to need a
 scrollbar in a dialog belongs in a drawer.
 
+- **It is a real `<form>`.** Body and footer sit inside one, the submit button
+  is `type="submit"` and cancel is `type="button"`, so Enter from any text field
+  saves the record. It was a `SheetContent` wrapping a `<div>` with the save on
+  an `onClick` — 75 create drawers and 6 edit drawers with no form semantics and
+  no keyboard submit at all.
+- **`noValidate` is deliberate.** Native constraint validation preempts the
+  submit event, so `onSubmit` — which is what reveals this app's own field
+  errors and runs the focus rule below — would never fire. The user would get a
+  transient browser bubble in the **browser's** language rather than a
+  persistent inline error in the app's. Errors here are ours.
 - **Dirty guard**: closing with unsaved changes opens a confirm. Applies to
   backdrop click, `Esc`, and the close button alike.
-- Submit disabled while pending; button shows `loading`.
+- Submit disabled while pending; button shows `loading`. An implicit submit from
+  Enter is refused on the same conditions, since Enter does not go through the
+  button's `disabled` state.
 - Field errors from a 422 map back onto their `Field`s by field path — never a
   toast. See below.
 - Success closes the drawer and raises a toast.

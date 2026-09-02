@@ -10,6 +10,7 @@ import {
   DetailSection,
   ErrorState,
   Field,
+  IdentifierText,
   Input,
   NotFoundState,
   Select,
@@ -66,11 +67,11 @@ export default function TradeWidgetPage({
       <DetailHeader
         title={widget?.name ?? t.tradeAnalytics.widgetDetailTitle}
         subtitle={
-          widget ? tradeStatusLabel(t.tradeStatus, widget.visualizationType) : undefined
+          widget ? tradeStatusLabel(t.tradeStatus, widget.visualizationType, t.common.unknownCode) : undefined
         }
         status={
           widget ? (
-            <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, widget.accessLevel)}</Badge>
+            <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, widget.accessLevel, t.common.unknownCode)}</Badge>
           ) : undefined
         }
         backLabel={t.tradeAnalytics.backToWidgets}
@@ -213,7 +214,7 @@ export default function TradeWidgetPage({
                   <SelectContent>
                     {DASHBOARD_SHARE_SUBJECT_TYPES.map((value) => (
                       <SelectItem key={value} value={value}>
-                        {tradeStatusLabel(t.tradeStatus, value)}
+                        {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -239,7 +240,7 @@ export default function TradeWidgetPage({
                         @IsIn(["VIEW","EDIT"]). */}
                     {DASHBOARD_SHAREABLE_ACCESS_LEVELS.map((value) => (
                       <SelectItem key={value} value={value}>
-                        {tradeStatusLabel(t.tradeStatus, value)}
+                        {tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -263,11 +264,11 @@ export default function TradeWidgetPage({
                 {shares.map((share) => (
                   <li key={share.id} className="flex items-center gap-2 text-sm">
                     <Badge tone="neutral">
-                      {tradeStatusLabel(t.tradeStatus, share.subjectType)}
+                      {tradeStatusLabel(t.tradeStatus, share.subjectType, t.common.unknownCode)}
                     </Badge>
-                    <span className="font-mono text-xs">{share.subjectId}</span>
+                    <IdentifierText className="text-xs">{share.subjectId}</IdentifierText>
                     <Badge tone="brand">
-                      {tradeStatusLabel(t.tradeStatus, share.accessLevel)}
+                      {tradeStatusLabel(t.tradeStatus, share.accessLevel, t.common.unknownCode)}
                     </Badge>
                     <Button
                       variant="ghost"

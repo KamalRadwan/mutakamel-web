@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight } from "lucide-react";
+import { useDictionary } from "@/i18n/useLanguage";
 import { cn } from "../../lib/cn";
 import { iconSize, mirrorInRtl } from "../../lib/icons";
 import { Button } from "../../primitives/Button";
@@ -46,10 +47,12 @@ export function PageHeader({
   leading,
   className,
 }: PageHeaderProps) {
+  const t = useDictionary();
+
   return (
     <div className={cn("flex flex-col gap-1 pb-4", className)}>
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground">
+        <nav aria-label={t.common.breadcrumb} className="flex items-center gap-1 text-xs text-muted-foreground">
           {breadcrumbs.map((crumb, index) => (
             <span key={`${crumb.label}-${index}`} className="flex items-center gap-1">
               {index > 0 && (

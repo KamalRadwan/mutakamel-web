@@ -37,10 +37,21 @@ export function createCrmWriteAttempt(): CrmWriteAttempt {
   return { idempotencyKey: generateUUIDv7() };
 }
 
+/**
+ * Four outcomes, because "the write did not happen" and "the write happened
+ * and I cannot read the receipt" need different next actions — defect D2.
+ *
+ * `applied_unreadable` used to be reported as `failed` with a 2xx status. A
+ * plain failure invites the user to fill the form in again and press Save, and
+ * on a non-idempotent route that second attempt — a FRESH intent, with a fresh
+ * key — is a duplicate record. The row very probably exists; what is missing is
+ * only this client's ability to read the body describing it.
+ */
 export type CrmWriteOutcome<T> =
   | { kind: "success"; value: T; replayed: boolean }
   | { kind: "failed"; error: NormalizedApiError }
-  | { kind: "ambiguous"; error: NormalizedApiError };
+  | { kind: "ambiguous"; error: NormalizedApiError }
+  | { kind: "applied_unreadable"; error: NormalizedApiError };
 
 type CrmWriteMethod = "post" | "patch" | "put" | "delete";
 
@@ -104,9 +115,11 @@ export async function runCrmWrite<T>({
   }
 
   // Parsing sits outside the try on purpose. A body this client cannot read is
-  // a **contract** failure of a write that already applied — classifying it as
-  // ambiguous would offer a retry that can only reproduce it, since replaying
-  // the key returns the same stored body.
+  // a **contract** failure of a write that already applied, so it is neither
+  // ambiguous — replaying the key returns the same unreadable body — nor
+  // failed, which is what it used to be called. `applied_unreadable` says the
+  // one thing the caller has to act on: the record is on the server, so
+  // reconcile, and do not offer a fresh Save that would write it twice.
   try {
     return {
       kind: "success",
@@ -115,13 +128,30 @@ export async function runCrmWrite<T>({
     };
   } catch (caught) {
     return {
-      kind: "failed",
+      kind: "applied_unreadable",
       error: {
         status: response.status,
+        code: WRITE_APPLIED_UNREADABLE,
         message: caught instanceof Error ? caught.message : undefined,
       },
     };
   }
+}
+
+/** The code carried by an `applied_unreadable` outcome. */
+export const WRITE_APPLIED_UNREADABLE = "CRM_WRITE_APPLIED_UNREADABLE";
+
+/**
+ * What a screen holds after an `applied_unreadable` outcome.
+ *
+ * It carries the attempt for the same reason the ambiguous panel does — the key
+ * is the evidence a person needs to find the record that was written — but the
+ * action offered beside it is a REFRESH, never a retry. Nothing here may lead
+ * back to a fresh Save.
+ */
+export interface CrmAppliedUnreadable {
+  attempt: CrmWriteAttempt;
+  error: NormalizedApiError;
 }
 
 /** A `204` write. The body is empty by contract, so there is nothing to parse. */

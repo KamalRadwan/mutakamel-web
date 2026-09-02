@@ -78,7 +78,7 @@ export default function WebhookDeliveriesPage() {
       header: t.common.status,
       cell: (delivery) => (
         <Badge tone={deliveryTone(delivery.status)}>
-          {tradeStatusLabel(t.tradeStatus, delivery.status)}
+          {tradeStatusLabel(t.tradeStatus, delivery.status, t.common.unknownCode)}
         </Badge>
       ),
     },
@@ -131,7 +131,7 @@ export default function WebhookDeliveriesPage() {
             placeholder: t.tradeCommon.anyStatus,
             options: WEBHOOK_DELIVERY_STATUSES.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
         ]}

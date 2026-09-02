@@ -19,7 +19,7 @@ export function TenantBranchSelect({ branchIds, branchId, onChange, disabled = f
 
   return (
     <Select value={branchId ?? undefined} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger size="sm" aria-label={t.common.branch} className="w-56 font-mono">
+      <SelectTrigger size="sm" dir="ltr" aria-label={t.common.branch} className="w-56 font-mono">
         <SelectValue placeholder={t.common.selectBranch} />
       </SelectTrigger>
       <SelectContent>

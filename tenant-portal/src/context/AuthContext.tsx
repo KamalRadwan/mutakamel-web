@@ -12,14 +12,15 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
+  adoptTenantCookieSession,
   axiosClient,
   clearLocalTenantAuthState,
+  commitTenantSessionResponse,
   coordinateTenantSessionRefresh,
   getStoredTenantSessionMeta,
   hasTenantSessionCookieHint,
   readWebAuthSessionResponse,
   startTenantActivityTracking,
-  storeTenantSessionMetadata,
   synchronizeTenantTabSession,
   TenantApiClientError,
   unwrapCoreData,
@@ -97,9 +98,11 @@ interface TenantAuthContextValue {
    * enum, and inventing a mapping here would make an unrecognised code
    * disappear silently.
    *
-   * `null` is honest and common: a session ended in another tab, or by the
-   * lifecycle transition, carries no code, and no reason is better than a
-   * guessed one.
+   * `null` is honest and still common: a session ended in another tab carries
+   * a session id and nothing else, and a session ended because the readable
+   * CSRF proof vanished was never given a code by anyone. The lifecycle
+   * transition does carry the code when the transport saw one — that is what
+   * closed the second half of Q18 — but it is not required to invent one.
    */
   endedReason: string | null;
   /** Non-secret, session-bound fence used only by browser connection owners. */
@@ -152,6 +155,28 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         setRealtimeAuthGeneration(null);
         setAuthState("UNAUTHENTICATED");
         return;
+      }
+      // Before /me, not after: a tab holding only the cookies has no metadata,
+      // and /me answering 200 would leave it that way — signed in, with no
+      // refresh timing, no session id for the 401 retry to name, and no
+      // realtime generation. It works until the access cookie expires and then
+      // strands the user on a session that is still perfectly valid.
+      if (getStoredTenantSessionMeta() === null) {
+        try {
+          await adoptTenantCookieSession();
+        } catch (error) {
+          // A refresh that failed definitively ends the session, and the catch
+          // below reports which code did it. Anything else — offline, a 5xx, a
+          // lock that timed out — must not stop a still-valid access cookie
+          // from proving the session, so /me is still asked.
+          if (isDefinitiveAuthFailure(error)) throw error;
+        }
+        if (
+          controller.signal.aborted ||
+          generation !== authOperationGeneration.current
+        ) {
+          return;
+        }
       }
       const response = await axiosClient.get(
         "/api/tenant/core/v1/auth/me",
@@ -219,7 +244,12 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         setEndedReason(null);
         setRealtimeAuthGeneration(null);
         setAuthState("ENDED");
-        router.replace("/login");
+        // No redirect here. This used to send the tab to /login, which is why
+        // a session that ended while the user was working never reached
+        // `/session-expired` and never said why: the state and its reason were
+        // set correctly and then overtaken. `TenantAuthGuard` owns terminal
+        // destinations, and it is the only place that can also tell whether
+        // the current screen is one a signed-out visitor may stay on.
         return;
       }
       const previousSessionId = getStoredTenantSessionMeta()?.sessionId;
@@ -240,17 +270,21 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         setAuthState("BOOTSTRAPPING");
       }
       void bootstrap(!sessionChanged);
-    }), [bootstrap, invalidatePendingAuthWork, router]);
+    }), [bootstrap, invalidatePendingAuthWork]);
 
   useEffect(() =>
-    subscribeToTenantAuthLifecycle((state) => {
+    subscribeToTenantAuthLifecycle(({ state, reason }) => {
       if (state === "ENDED") {
         invalidatePendingAuthWork();
         setUser(null);
-        setEndedReason(null);
+        // Invalidating the pending work is exactly what stops `bootstrap`'s
+        // own catch from recording the code, so the transport hands it over
+        // here instead. `undefined` stays honest: the proof cookie vanishing
+        // and an idle checkpoint finding nothing to check both end a session
+        // without the server ever saying why.
+        setEndedReason(reason ?? null);
         setRealtimeAuthGeneration(null);
         setAuthState("ENDED");
-        router.replace("/login");
         return;
       }
       setAuthState((current) =>
@@ -258,7 +292,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
           ? current
           : state,
       );
-    }), [invalidatePendingAuthWork, router]);
+    }), [invalidatePendingAuthWork]);
 
   useEffect(() => {
     // Public and bootstrapping screens can still have stale tab metadata. Do
@@ -329,20 +363,10 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
           throw invalidResponse;
         }
 
-        const savedAt = Date.now();
-        const event = publishTenantAuthEvent(
-          "session-updated",
-          auth.session.id,
-          false,
-          {
-            savedAt,
-            expiresIn: auth.expiresIn,
-            sessionExpiresIn: auth.sessionExpiresIn,
-            authorizationVersion: auth.session.authorizationVersion,
-            profileVersion: auth.session.profileVersion,
-          },
-        );
-        storeTenantSessionMetadata(auth, rememberMe, event.eventId, savedAt);
+        commitTenantSessionResponse(auth, {
+          remember: rememberMe,
+          notifyCurrentTab: false,
+        });
         sessionCommitted = true;
 
         try {
@@ -461,10 +485,13 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     if (generation !== authOperationGeneration.current) return;
     setUser(null);
     // A deliberate sign-out is not a session that expired, so it carries no
-    // reason to report.
+    // reason to report — and it is not ENDED either. ENDED is now the guard's
+    // cue to route to a terminal screen, and a completed sign-out that claimed
+    // it was answered by "your session expired": this replace to /login and
+    // the guard's replace to /session-expired both fired, and the guard's won.
     setEndedReason(null);
     setRealtimeAuthGeneration(null);
-    setAuthState("ENDED");
+    setAuthState("UNAUTHENTICATED");
     router.replace("/login");
   }, [invalidatePendingAuthWork, router, user]);
 

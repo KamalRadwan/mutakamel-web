@@ -73,12 +73,12 @@ export default function DocumentProfilesPage() {
     {
       id: "documentType",
       header: t.tradeGovernance.documentType,
-      cell: (row) => tradeStatusLabel(t.tradeStatus, row.documentType),
+      cell: (row) => tradeStatusLabel(t.tradeStatus, row.documentType, t.common.unknownCode),
     },
     {
       id: "scopeTarget",
       header: t.tradeGovernance.scopeTarget,
-      cell: (row) => tradeStatusLabel(t.tradeStatus, row.scopeTarget),
+      cell: (row) => tradeStatusLabel(t.tradeStatus, row.scopeTarget, t.common.unknownCode),
     },
     {
       id: "versions",
@@ -91,7 +91,7 @@ export default function DocumentProfilesPage() {
             {row.versions.slice(0, 6).map((version) => (
               <span key={version.id} className="flex items-center gap-1">
                 <Badge tone={version.status === "PUBLISHED" ? "positive" : "neutral"}>
-                  {`v${version.profileVersion} · ${tradeStatusLabel(t.tradeStatus, version.status)}`}
+                  {`v${version.profileVersion} · ${tradeStatusLabel(t.tradeStatus, version.status, t.common.unknownCode)}`}
                 </Badge>
                 {canValidate ? (
                   <Button
@@ -180,7 +180,7 @@ export default function DocumentProfilesPage() {
             placeholder: t.tradeCommon.anyStatus,
             options: FILTERABLE_DOCUMENT_TYPES.map((value) => ({
               value,
-              label: tradeStatusLabel(t.tradeStatus, value),
+              label: tradeStatusLabel(t.tradeStatus, value, t.common.unknownCode),
             })),
           },
         ]}

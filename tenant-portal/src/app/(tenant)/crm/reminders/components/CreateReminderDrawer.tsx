@@ -6,6 +6,7 @@ import {
   DatePicker,
   DegradedBanner,
   Field,
+  FieldControlBoundary,
   FormDrawer,
   Input,
   Select,
@@ -166,16 +167,21 @@ export function CreateReminderDrawer({
               placeholder={t.crmReminders.dayPlaceholder}
             />
           </div>
-          <Input
-            type="time"
-            className="w-32"
-            value={time}
-            aria-label={t.crmReminders.timeOfDay}
-            onChange={(input) => {
-              setPastError(undefined);
-              setTime(input.target.value);
-            }}
-          />
+          {/* Two controls under one label: the day picker is what "Remind at"
+              names, so the time input opts out of the field and keeps its own
+              accessible name rather than claiming the same id. */}
+          <FieldControlBoundary>
+            <Input
+              type="time"
+              className="w-32"
+              value={time}
+              aria-label={t.crmReminders.timeOfDay}
+              onChange={(input) => {
+                setPastError(undefined);
+                setTime(input.target.value);
+              }}
+            />
+          </FieldControlBoundary>
         </div>
       </Field>
     </FormDrawer>

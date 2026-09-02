@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Skeleton } from "@/design-system";
+import { Badge, IdentifierText, Skeleton } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
 import {
@@ -43,8 +43,8 @@ export function NumberingPreview({ values }: NumberingPreviewProps) {
         {t.coreSettings.numberingPreviewTitle}
       </h3>
 
-      <p className="font-mono text-sm text-foreground" data-testid="numbering-preview">
-        {preview ?? t.coreSettings.numberingPreviewIncomplete}
+      <p className="text-sm text-foreground" data-testid="numbering-preview">
+        <IdentifierText>{preview ?? t.coreSettings.numberingPreviewIncomplete}</IdentifierText>
       </p>
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -74,12 +74,12 @@ function PeekValue({
   }
 
   return (
-    <span className="font-mono text-foreground">
+    <IdentifierText className="text-foreground">
       {formatTemplate(t.coreSettings.numberingPeekValue, {
         formatted,
         // A bigint counter, rendered exactly as it arrived — never parsed.
         nextValue,
       })}
-    </span>
+    </IdentifierText>
   );
 }

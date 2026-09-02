@@ -45,6 +45,7 @@ pnpm add @radix-ui/react-alert-dialog @radix-ui/react-avatar \
 | `Badge` | plain CVA | `tone`: `brand`/`positive`/`caution`/`negative`/`neutral` |
 | `Separator` | `@radix-ui/react-separator` | |
 | `Skeleton` | plain | The one permitted shimmer |
+| `IdentifierText` | plain `<bdi>` | **The only way to render a machine identifier.** `dir="ltr"` + `wrap-anywhere`. See [typography.md](typography.md#identifiers-wrap-never-overflow) |
 | `Dialog` | `@radix-ui/react-dialog` | `showCloseButton` prop |
 | `AlertDialog` | `@radix-ui/react-alert-dialog` | Destructive confirmation only |
 | `Sheet` | `@radix-ui/react-dialog` | **Logical** `side`: `start`/`end` |
@@ -77,6 +78,11 @@ asChild?: boolean
 Rules:
 
 - **At most one `primary` per screen**, in `PageHeader`.
+- **`type` defaults to `"button"`.** HTML defaults a `<button>` inside a
+  `<form>` to `type="submit"`, and `FormDrawer` is a real form — without this,
+  every add-a-row, remove-a-chip and reveal-password control in a drawer body
+  would save the record. A submit control says `type="submit"` for itself. Left
+  alone under `asChild`, where the rendered element may not be a button at all.
 - **`cursor-pointer` lives in the base CVA.** Neither Radix nor Tailwind
   Preflight adds it, and a native `<button>` does not carry it by default —
   without this line every button in the app shows a text cursor. Anything else
@@ -111,6 +117,41 @@ error text, sets `aria-invalid`, and marks required state.
 **A field error stays inline and never becomes a toast.** It must remain a
 persistent, programmatically-associated target for the input. See
 [patterns.md](patterns.md#where-a-result-belongs).
+
+### The control claims the field, the field does not push at the control
+
+`Field` publishes its id and ARIA state through **context**
+(`primitives/field-control.tsx`). Every design-system control calls
+`useFieldControl()` and takes them; the control's own props always win.
+
+It used to push them onto its **direct child** with `cloneElement`. That is a
+guess about which element is focusable, and the guess was wrong in four shapes
+at once:
+
+| Shape | What the direct child actually was | Result |
+| --- | --- | --- |
+| `Field > Select` | Radix `Select.Root` — a context component that renders **no DOM node** | 125 selects with no accessible name |
+| `Field > div > Input` | a wrapper positioning a reveal button | the id landed on the `<div>`; two password fields unnamed |
+| `Field > CustomFieldValueInput` | a feature component that forwarded nothing | every custom-field value unnamed |
+| `Field > Combobox` / `DatePicker` / `MultiSelect` / `DateRangePicker` | a composite taking `id` but not the rest | 29 fields lost hint, error and required |
+
+Context fixes all four at once, because it reaches the control **at any depth**
+and through anything in between. Two rules follow from it:
+
+- **Exactly one control per `Field`.** Two controls claiming the same id
+  produce duplicate ids, and `htmlFor` then resolves to whichever comes first.
+- **`FieldControlBoundary` opts a subtree out.** A composite wraps its popover
+  in one, so its internal search box cannot re-claim the field. A call site with
+  two controls under one label — a day picker beside a time input — wraps the
+  secondary one, which then carries its own `aria-label`.
+
+An `aria-label` on the control **outranks** the `Field`'s `<label>`, so a
+control that names itself for standalone use drops that name inside a `Field`
+rather than shadowing the real label. `MultiSelect` does exactly this.
+
+In development, a `Field` whose id lands on nothing logs an error naming the
+label. This wiring fails silently by nature — nothing throws, nothing looks
+different — so the failure is made loud where it can still be seen.
 
 ### Validate on blur, not on keystroke
 
@@ -189,6 +230,12 @@ keyboard-navigated consistently across browsers.
 
 Must receive `dir` — without it, arrow keys navigate LTR while the list renders
 RTL. See [theming.md](theming.md#third-party-physical-apis).
+
+**`SelectTrigger` is the control, `Select` is not.** The exported `Select` is
+Radix's `Root`: a context component that renders no DOM node at all, so an `id`
+or an `aria-*` attribute handed to it reaches nothing. `SelectTrigger` is the
+only focusable element a select has, and it is what claims an enclosing `Field`
+— see [Field](#the-control-claims-the-field-the-field-does-not-push-at-the-control).
 
 For >20 options with search, that is a `Combobox` — **which does not exist
 yet**. Build it when first genuinely needed (`CountrySelect`'s 250 countries is

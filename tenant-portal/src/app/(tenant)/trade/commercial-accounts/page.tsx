@@ -8,6 +8,7 @@ import {
   DataTable,
   EmptyState,
   FilterBar,
+  IdentifierText,
   Money,
   PageHeader,
   PermissionGate,
@@ -55,9 +56,9 @@ export default function TradeCommercialAccountsPage() {
       cell: (account) => (
         <Link
           href={`${TENANT_ROUTES.tradeCommercialAccounts}/${account.id}`}
-          className="font-mono text-xs font-medium text-foreground hover:underline"
+          className="text-xs font-medium text-foreground hover:underline"
         >
-          {account.partyId}
+          <IdentifierText>{account.partyId}</IdentifierText>
         </Link>
       ),
     },
@@ -95,7 +96,7 @@ export default function TradeCommercialAccountsPage() {
           </Badge>
         ) : (
           <Badge tone="neutral">
-            <span className="font-mono">{account.status}</span>
+            <IdentifierText>{account.status}</IdentifierText>
           </Badge>
         ),
     },

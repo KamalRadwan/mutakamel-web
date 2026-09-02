@@ -53,11 +53,11 @@ export default function ExtensionProfilePage({
     <div className="flex flex-col gap-4">
       <DetailHeader
         title={profile?.code ?? t.tradeAutomation.profileDetailTitle}
-        subtitle={profile ? tradeStatusLabel(t.tradeStatus, profile.targetCode) : undefined}
+        subtitle={profile ? tradeStatusLabel(t.tradeStatus, profile.targetCode, t.common.unknownCode) : undefined}
         status={
           profile ? (
             <Badge tone={profile.status === "ACTIVE" ? "positive" : "neutral"}>
-              {tradeStatusLabel(t.tradeStatus, profile.status)}
+              {tradeStatusLabel(t.tradeStatus, profile.status, t.common.unknownCode)}
             </Badge>
           ) : undefined
         }
@@ -127,7 +127,7 @@ export default function ExtensionProfilePage({
             fields={[
               {
                 label: t.tradeGovernance.scopeTarget,
-                value: tradeStatusLabel(t.tradeStatus, profile.scopeTarget),
+                value: tradeStatusLabel(t.tradeStatus, profile.scopeTarget, t.common.unknownCode),
               },
               { label: t.tradeCommon.version, value: String(profile.version) },
               {
@@ -168,7 +168,7 @@ export default function ExtensionProfilePage({
                 {versions.map((version) => (
                   <li key={version.id} className="flex items-center gap-2 text-sm">
                     <Badge tone={version.status === "PUBLISHED" ? "positive" : "neutral"}>
-                      {tradeStatusLabel(t.tradeStatus, version.status)}
+                      {tradeStatusLabel(t.tradeStatus, version.status, t.common.unknownCode)}
                     </Badge>
                     <span className="text-muted-foreground">
                       {formatDateTime(version.updatedAt, lang)}

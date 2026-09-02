@@ -41,7 +41,7 @@ export function TradeScopeBar() {
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.trade.scopeTitle}>
       <Select value={context.companyId ?? undefined} onValueChange={selectCompany}>
-        <SelectTrigger size="sm" aria-label={t.trade.scopeCompany} className="w-56 font-mono">
+        <SelectTrigger size="sm" dir="ltr" aria-label={t.trade.scopeCompany} className="w-56 font-mono">
           <SelectValue placeholder={t.trade.scopeSelectCompany} />
         </SelectTrigger>
         <SelectContent>
@@ -58,7 +58,7 @@ export function TradeScopeBar() {
         onValueChange={(next) => selectBranch(next === CLEAR_VALUE ? null : next)}
         disabled={branchIds.length === 0}
       >
-        <SelectTrigger size="sm" aria-label={t.trade.scopeBranch} className="w-56 font-mono">
+        <SelectTrigger size="sm" dir="ltr" aria-label={t.trade.scopeBranch} className="w-56 font-mono">
           <SelectValue placeholder={t.trade.scopeAllBranches} />
         </SelectTrigger>
         <SelectContent>

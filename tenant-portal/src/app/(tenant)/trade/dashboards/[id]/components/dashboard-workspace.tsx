@@ -11,6 +11,7 @@ import {
   EmptyState,
   ErrorState,
   Field,
+  IdentifierText,
   Input,
   NotFoundState,
   Select,
@@ -62,7 +63,7 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
         subtitle={dashboard?.description ?? undefined}
         status={
           dashboard ? (
-            <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, dashboard.accessLevel)}</Badge>
+            <Badge tone="neutral">{tradeStatusLabel(t.tradeStatus, dashboard.accessLevel, t.common.unknownCode)}</Badge>
           ) : undefined
         }
         backLabel={t.tradeAnalytics.backToDashboards}
@@ -125,7 +126,7 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
           {dashboard.unavailablePlacements.length > 0 ? (
             <DegradedBanner
               message={dashboard.unavailablePlacements
-                .map((entry) => tradeStatusLabel(t.tradeStatus, entry.reasonCode))
+                .map((entry) => tradeStatusLabel(t.tradeStatus, entry.reasonCode, t.common.unknownCode))
                 .join(" · ")}
             />
           ) : null}
@@ -248,11 +249,11 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
                 {shares.map((share) => (
                   <li key={share.id} className="flex items-center gap-2 text-sm">
                     <Badge tone="neutral">
-                      {tradeStatusLabel(t.tradeStatus, share.subjectType)}
+                      {tradeStatusLabel(t.tradeStatus, share.subjectType, t.common.unknownCode)}
                     </Badge>
-                    <span className="font-mono text-xs">{share.subjectId}</span>
+                    <IdentifierText className="text-xs">{share.subjectId}</IdentifierText>
                     <Badge tone="brand">
-                      {tradeStatusLabel(t.tradeStatus, share.accessLevel)}
+                      {tradeStatusLabel(t.tradeStatus, share.accessLevel, t.common.unknownCode)}
                     </Badge>
                     <Button
                       variant="ghost"

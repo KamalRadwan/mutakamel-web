@@ -3,13 +3,30 @@ import { headers } from "next/headers";
 import { plexArabic, plexLatin, plexMono } from "./fonts";
 import "./globals.css";
 import { DirectionBridge } from "@/i18n/DirectionBridge";
+import { ar } from "@/i18n/dictionaries/ar";
+import { formatTemplate } from "@/lib/format/template";
 import { DensityProvider, ThemeProvider, TooltipProvider } from "@/design-system";
 import { TenantBrandingTokens } from "./TenantBrandingTokens";
 import { InlineBootstrapScript } from "./InlineBootstrapScript";
 
+// The static default and the template every route-level title composes with.
+// Sourced from the Arabic dictionary rather than written here, because the
+// server always renders `lang="ar"` (language lives in localStorage, so no
+// request can resolve it) — hardcoding the copy would put a second, untracked
+// translation surface outside src/i18n. `RouteTitle` refines the title per
+// route on the client, where the language is actually known.
 export const metadata: Metadata = {
-  title: "Tenant Portal - Mutakamel Crowd Capital",
-  description: "Comprehensive SaaS Operations & Management Portal for Tenants",
+  title: {
+    default: formatTemplate(ar.metadata.title, {
+      portal: ar.common.portalName,
+      app: ar.common.appName,
+    }),
+    template: formatTemplate(ar.metadata.titleTemplate, {
+      page: "%s",
+      portal: ar.common.portalName,
+    }),
+  },
+  description: ar.metadata.description,
 };
 
 // All three axes — language, theme, density — must be correct in the first

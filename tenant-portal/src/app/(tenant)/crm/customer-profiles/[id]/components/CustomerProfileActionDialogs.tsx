@@ -11,7 +11,10 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
 import type { AcquisitionSource } from "../../../acquisition-sources/acquisition-source-contract";
-import { useAmbiguousOutcomeLabels } from "../../../shared/hooks/useAmbiguousOutcomeLabels";
+import {
+  useAmbiguousOutcomeLabels,
+  useAppliedUnreadableLabels,
+} from "../../../shared/hooks/useAmbiguousOutcomeLabels";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import { BLACKLISTED_STATUS } from "../../customer-profile-contract";
 import { CustomerProfileFormFields } from "../../components/CustomerProfileFormFields";
@@ -40,6 +43,7 @@ export function CustomerProfileActionDialogs({
   const { t } = useI18n();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
+  const appliedLabels = useAppliedUnreadableLabels();
   const errorText = describeError(actions.error) ?? undefined;
 
   const ambiguousPanel = actions.ambiguity ? (
@@ -51,6 +55,20 @@ export function CustomerProfileActionDialogs({
       onRetry={() => void actions.ambiguity?.replay()}
       onDismiss={actions.dismissAmbiguity}
       labels={ambiguousLabels}
+    />
+  ) : null;
+
+  // D2. Rendered wherever the ambiguous panel is, and never together with an
+  // `error`: the write applied, so the only action offered is a re-read.
+  const appliedUnreadablePanel = actions.appliedUnreadable ? (
+    <AmbiguousOutcomePanel
+      operation={t.crmCustomerProfileActions.operations.edit}
+      idempotencyKey={actions.appliedUnreadable.attempt.idempotencyKey}
+      description={t.crmShared.appliedUnreadableDescription}
+      correlationId={actions.appliedUnreadable.error.correlationId}
+      onRetry={() => actions.reconcile()}
+      onDismiss={actions.dismissAppliedUnreadable}
+      labels={appliedLabels}
     />
   ) : null;
 
@@ -83,6 +101,7 @@ export function CustomerProfileActionDialogs({
         }}
       >
         {ambiguousPanel}
+        {appliedUnreadablePanel}
         {actions.form && (
           <CustomerProfileFormFields
             form={actions.form}
@@ -121,6 +140,7 @@ export function CustomerProfileActionDialogs({
         }}
       >
         {ambiguousPanel}
+        {appliedUnreadablePanel}
         {actions.contactForm && (
           <div className="flex flex-col gap-3">
             <Field label={t.crmLeadConvert.contactFullName} required>

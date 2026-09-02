@@ -321,7 +321,14 @@ export function buildUpdateTaskRequest(
   if (input.status !== task.status) body.status = input.status;
   const dueAt = input.dueAt ? input.dueAt.toISOString() : null;
   const currentDueAt = task.dueAt ? new Date(task.dueAt).toISOString() : null;
-  if (dueAt !== currentDueAt && dueAt !== null) body.dueAt = dueAt;
+  // Clearing the picker sends `dueAt: null` — defect D8. Dropping the key made
+  // Clear look like it worked and left the old date on the record.
+  // `UpdateTaskDto.dueAt` is `@IsOptional() @Type(() => Date) @IsDate()`:
+  // class-transformer 0.5.1 returns null untouched for a Date target,
+  // `@IsOptional()` skips validation for null as well as undefined, and
+  // `ActivitiesService.updateTask` spreads the DTO over the entity, so the null
+  // reaches the nullable `due_at` column.
+  if (dueAt !== currentDueAt) body.dueAt = dueAt;
   return body;
 }
 

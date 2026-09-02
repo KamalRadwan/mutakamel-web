@@ -18,6 +18,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { useTenantAuth } from "@/context/AuthContext";
 import { hasPermission } from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
+import { wireLabel } from "@/lib/format/wire-label";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { parseWidgetResult, type WidgetResult } from "../../../dashboards/dashboard-run-contract";
@@ -120,7 +121,12 @@ export function WidgetDetailWorkspace({ widgetId }: { widgetId: string }) {
     <div className="flex flex-col gap-4">
       <DetailHeader
         title={widget.name}
-        subtitle={t.crmDashboards.visualizations[widget.visualizationType] ?? widget.visualizationType}
+        subtitle={wireLabel(
+          t.crmDashboards.visualizations,
+          widget.visualizationType,
+          t.common.unknownCode,
+          "crmDashboards.visualizations",
+        )}
         status={<Badge tone="neutral">{t.crmDashboards.accessLevels[widget.accessLevel]}</Badge>}
         backHref={TENANT_ROUTES.crmWidgets}
         backLabel={t.crmWidgets.backToList}
@@ -149,8 +155,27 @@ export function WidgetDetailWorkspace({ widgetId }: { widgetId: string }) {
         title={t.crmWidgets.definition}
         fields={[
           { label: t.crmWidgets.metric, value: widget.querySpec.series.map((s) => s.metricKey).join(", ") },
-          { label: t.crmWidgets.dimension, value: widget.querySpec.dimension?.key ?? "none" },
-          { label: t.crmWidgets.comparison, value: widget.querySpec.comparison?.type ?? "NONE" },
+          // Both keys have a translation and both used to print the wire value
+          // anyway — "none" and "NONE" reached the screen verbatim, in English,
+          // beside their own Arabic labels.
+          {
+            label: t.crmWidgets.dimension,
+            value: wireLabel(
+              t.crmWidgets.dimensions,
+              widget.querySpec.dimension?.key ?? "none",
+              t.common.unknownCode,
+              "crmWidgets.dimensions",
+            ),
+          },
+          {
+            label: t.crmWidgets.comparison,
+            value: wireLabel(
+              t.crmWidgets.comparisonValues,
+              widget.querySpec.comparison?.type ?? "NONE",
+              t.common.unknownCode,
+              "crmWidgets.comparisonValues",
+            ),
+          },
           { label: t.crmWidgets.revision, value: String(widget.revision) },
         ]}
       />
