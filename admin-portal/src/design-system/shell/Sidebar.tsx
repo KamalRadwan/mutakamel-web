@@ -23,7 +23,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggleCollapse, variant = "desktop", onNavigate }: SidebarProps) {
   const { lang } = useI18n();
-  const { sections, activeItem } = useNavTree();
+  const { sections, activeItem, homeHref } = useNavTree();
   const isCollapsed = variant === "desktop" && collapsed;
   const mainSections = sections.filter((s) => !s.pinned);
   const pinnedSections = sections.filter((s) => s.pinned);
@@ -40,9 +40,14 @@ export function Sidebar({ collapsed, onToggleCollapse, variant = "desktop", onNa
     >
       <div className={cn("flex h-12 shrink-0 items-center border-b border-sidebar-border", isCollapsed ? "justify-center px-2" : "gap-2.5 px-3")}>
         <Link
-          href="/dashboard"
+          // Not "/dashboard": that route is gated on admin.reports.read, and
+          // the brand is always visible. Staff without it could reach every
+          // area they are permitted to and still be sent to a denied page by
+          // the one link that never disappears. useNavTree already resolves
+          // this, and the topbar brand already uses it.
+          href={homeHref}
           onClick={onNavigate}
-          aria-label={isCollapsed ? (lang === "ar" ? "لوحة تحكم متكامل" : "Mutakamel dashboard") : undefined}
+          aria-label={isCollapsed ? (lang === "ar" ? "الصفحة الرئيسية لمتكامل" : "Mutakamel home") : undefined}
           className={cn(
             "flex min-w-0 items-center gap-2.5 rounded-md outline-none",
             focusRing,

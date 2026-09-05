@@ -145,6 +145,14 @@ admission/reconnect contract.
 5. Treat HTTP `403` as authoritative, never as an empty resource.
 6. Do not replace backend authorization with hidden controls.
 7. Use exact ALL/ANY composition from the Gateway contract.
+8. Route every always-visible link through `useNavTree`'s `homeHref`, never to
+   `/dashboard` directly. The dashboard is gated on `admin.reports.read`, and a
+   link that is always on screen must resolve to somewhere the signed-in staff
+   member may actually go. `homeHref` falls back dashboard -> tenants ->
+   applications -> first visible item -> `/profile`. Both brand links, sidebar
+   and topbar, use it; the sidebar one hard-coded `/dashboard` and sent
+   restricted staff to a denied page from the one control that never
+   disappears.
 
 ## Canonical link namespace
 
