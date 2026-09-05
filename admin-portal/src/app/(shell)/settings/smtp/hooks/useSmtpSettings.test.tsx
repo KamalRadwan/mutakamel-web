@@ -136,6 +136,74 @@ describe("useSmtpSettings", () => {
     ]);
   });
 
+  it("retries one probe on the same configuration, and never on a newer one", async () => {
+    const KEY_FIRST_PROBE = "019f0000-0000-7000-8000-0000000000a1";
+    const KEY_SAVE = "019f0000-0000-7000-8000-0000000000a2";
+    const KEY_SECOND_PROBE = "019f0000-0000-7000-8000-0000000000a3";
+    const issued = [KEY_FIRST_PROBE, KEY_SAVE, KEY_SECOND_PROBE];
+    let nextKey = 0;
+    uuidMock.mockReset().mockImplementation(() => issued[nextKey++] ?? "exhausted");
+
+    const unreachable = {
+      isNormalized: true,
+      httpStatus: 503,
+      errorCode: "CORE_DOWN",
+      message: "raw",
+    };
+    postMock.mockRejectedValue(unreachable);
+    patchMock.mockResolvedValue(
+      envelope(
+        {
+          ...config(2),
+          smtpHost: "new.example.com",
+          updatedAt: "2026-08-12T09:00:00.000Z",
+        },
+        "corr-saved",
+      ),
+    );
+
+    const { result } = renderHook(() => useSmtpSettings());
+    await waitFor(() => expect(result.current.configState).toBe("READY"));
+
+    // Ambiguous: the probe may have run and been committed. Its key is kept so
+    // an immediate retry reconciles with that same probe rather than issuing a
+    // second one against the same configuration.
+    await act(async () => {
+      expect(await result.current.verifyConnection()).toBe(false);
+    });
+    await act(async () => {
+      expect(await result.current.verifyConnection()).toBe(false);
+    });
+    expect(postMock).toHaveBeenCalledTimes(2);
+    expect(postMock.mock.calls[0][2].headers["x-idempotency-key"]).toBe(
+      KEY_FIRST_PROBE,
+    );
+    expect(postMock.mock.calls[1][2].headers["x-idempotency-key"]).toBe(
+      KEY_FIRST_PROBE,
+    );
+
+    // A new revision is now the saved configuration.
+    act(() => result.current.handleUpdate("smtpHost", "new.example.com"));
+    await act(async () => {
+      expect(await result.current.saveConfig()).toBe(true);
+    });
+    expect(patchMock.mock.calls[0][2].headers["x-idempotency-key"]).toBe(KEY_SAVE);
+    expect(result.current.snapshot?.data.revision).toBe(2);
+
+    // The verification request carries no body, so the key is the only thing
+    // telling the Gateway which configuration is being probed. Reusing the old
+    // one would let it replay revision 1's stored `{verified:true}` and show
+    // success for revision 2 without ever contacting the SMTP host.
+    postMock.mockResolvedValue(envelope({ verified: true }, "corr-verified"));
+    await act(async () => {
+      expect(await result.current.verifyConnection()).toBe(true);
+    });
+    expect(postMock).toHaveBeenCalledTimes(3);
+    expect(postMock.mock.calls[2][2].headers["x-idempotency-key"]).toBe(
+      KEY_SECOND_PROBE,
+    );
+  });
+
   it("renders forbidden/unavailable distinctly and never fabricates a config", async () => {
     authMock.user = { isSuperAdmin: false, permissions: [] };
     const { result, rerender } = renderHook(() => useSmtpSettings());

@@ -66,7 +66,13 @@ export function useSmtpSettings() {
   const configGeneration = useRef(0);
   const auditGeneration = useRef(0);
   const saveIntent = useRef<{ fingerprint: string; key: string } | null>(null);
-  const verifyIntent = useRef<string | null>(null);
+  // Bound to the configuration it was raised for. A verification carries no
+  // body, so its idempotency key is the *only* thing that distinguishes one
+  // probe from another: an unbound key retained past a save lets the Gateway
+  // answer a probe of revision B by replaying revision A's stored success.
+  const verifyIntent = useRef<{ configuration: string; key: string } | null>(
+    null,
+  );
 
   const fetchConfig = useCallback(async () => {
     const generation = ++configGeneration.current;
@@ -221,8 +227,13 @@ export function useSmtpSettings() {
       setMutation({ ...EMPTY_MUTATION, action: "VERIFY", phase: "FAILED", localCode: hasUnsavedChanges ? "SAVE_BEFORE_VERIFY" : "VERIFY_PERMISSION_OR_STATE_REQUIRED" });
       return false;
     }
-    const key = verifyIntent.current ?? generateUUIDv7();
-    verifyIntent.current = key;
+    // Retry the same probe, never a different configuration's probe.
+    const configuration = smtpConfigIdentity(snapshot.data);
+    const key =
+      verifyIntent.current?.configuration === configuration
+        ? verifyIntent.current.key
+        : generateUUIDv7();
+    verifyIntent.current = { configuration, key };
     setMutation({ action: "VERIFY", phase: "PENDING", error: null, localCode: null, correlationId: null });
     try {
       const response = await axiosClient.post<unknown>(
@@ -275,6 +286,18 @@ function classifyLoadError(error: NormalizedApiError): SettingsLoadState {
   if (error.httpStatus === 403) return "FORBIDDEN";
   if (error.httpStatus >= 500 || error.errorCode === "UNKNOWN_ERROR") return "UNAVAILABLE";
   return "ERROR";
+}
+
+/**
+ * Which saved configuration a verification result is about.
+ *
+ * `revision` is Core's own counter for the stored configuration and is what
+ * makes this correct; `updatedAt` is carried with it so a backend that ever
+ * reissued a revision number could not silently make two configurations look
+ * like one to the retry logic.
+ */
+function smtpConfigIdentity(config: PlatformSmtpConfig): string {
+  return `${config.revision}:${config.updatedAt}`;
 }
 
 function retainIntent(error: NormalizedApiError): boolean {

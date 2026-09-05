@@ -54,6 +54,21 @@ digest match; a changed intent or unavailable browser storage fails closed.
 Where a command cannot be safely reconstructed, use authoritative read-only
 status recovery and block replay instead of persisting its sensitive body.
 
+### Bodyless commands own the state they act on
+
+Rule 3 says reuse only with the same body — which decides nothing for a command
+whose body is empty. A command that acts on server-held state, and sends none of
+it, must fold that state's identity into its own retry key, or the Gateway will
+answer a retry with a stored result for whatever the state used to be.
+
+`POST /system-settings/email/verify-connection` is the case in the portal: it is
+write-sensitive and idempotent at the Gateway, and its request carries no body
+and no revision. Its intent key is therefore keyed by the saved configuration's
+`revision` and `updatedAt` (`useSmtpSettings.ts`). An ambiguous probe of one
+revision keeps its key, so retrying reconciles that same probe; saving a new
+revision retires it, so the next probe is a real probe and cannot render an
+older configuration's `{verified:true}` as a result for the one on screen.
+
 ## Required API states
 
 Each query owns:
