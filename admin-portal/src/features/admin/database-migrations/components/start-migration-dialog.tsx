@@ -436,7 +436,10 @@ export function StartMigrationDialog({
               }`}
             >
               {isSubmitting ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                <Loader2
+                  className="size-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
               ) : mode === "DRY_RUN" ? (
                 <FlaskConical className="size-4" aria-hidden="true" />
               ) : (
@@ -506,7 +509,7 @@ function ModeCard({
         : "border-input bg-muted";
   return (
     <label
-      className={`flex cursor-pointer gap-3 rounded-xl border-2 p-3 transition-colors ${
+      className={`flex cursor-pointer gap-3 rounded-xl border-2 p-3 transition-colors motion-reduce:transition-none ${
         checked
           ? selected
           : "border-border hover:border-input"

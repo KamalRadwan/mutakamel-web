@@ -609,7 +609,10 @@ export function MigrationChip({
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${TONE_CLASSES[tone]}`}
     >
-      <Icon className={`size-3.5 shrink-0 ${spin ? "animate-spin" : ""}`} aria-hidden="true" />
+      <Icon
+        className={`size-3.5 shrink-0 ${spin ? "animate-spin motion-reduce:animate-none" : ""}`}
+        aria-hidden="true"
+      />
       <span>{label}</span>
       <code dir="ltr" className="font-mono text-2xs opacity-70">
         {code}
@@ -770,7 +773,7 @@ export function MigrationsStatePanel({
       className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-border bg-card p-6 text-center shadow-sm"
     >
       <Icon
-        className={`mb-3 size-9 text-primary ${kind === "loading" ? "animate-spin" : ""}`}
+        className={`mb-3 size-9 text-primary ${kind === "loading" ? "animate-spin motion-reduce:animate-none" : ""}`}
         aria-hidden="true"
       />
       <h2 className="font-semibold">{title}</h2>
@@ -809,7 +812,7 @@ export function RefreshMigrationsButton({
       className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-50"
     >
       <RefreshCw
-        className={`size-4 ${pending ? "animate-spin" : ""}`}
+        className={`size-4 ${pending ? "animate-spin motion-reduce:animate-none" : ""}`}
         aria-hidden="true"
       />
       {label}

@@ -97,7 +97,30 @@ management, responsive reflow, screen-reader behavior, or visual parity.
 Those require the runtime matrix in
 [Accessibility, responsive behavior, and localization](accessibility-responsive-and-localization.md#verification-matrix).
 
-`census.mjs --check` currently reports drift but does not exit nonzero, and
-its scan excludes `src/design-system`. Treat it as diagnostic until Phase 0 of
-the [design-update roadmap](design-update-roadmap.md#phase-0--make-drift-visible)
-closes both gaps.
+`census.mjs --check` **does** exit nonzero on drift — verified, it exits 1 and
+prints `baseline drift must be reviewed`. This paragraph said the opposite,
+which is worth correcting because it is the sentence that would stop someone
+wiring the check into anything. Its scan does still exclude
+`src/design-system`; that half of Phase 0 of the
+[design-update roadmap](design-update-roadmap.md#phase-0--make-drift-visible)
+is open.
+
+It is available as `pnpm design:census:check`, and deliberately not part of
+`verify:ci`: the baseline is 2026-08-28 and the portal has grown 273 files
+since, so the check is red on work that has not been reviewed and updating the
+baseline would bless it sight-unseen. The script says as much itself — "run
+with `--update` only after approval". Current drift, for whoever reviews it:
+
+| Counter | Baseline → now |
+| --- | --- |
+| `nativeOneOffControls` | 0 → 30 |
+| `subFloorText` | 0 → 13 |
+| `stockShadows` | 0 → 12 |
+| `textXs` | 807 → 821 |
+| `handRolledTables` | 3 → 4 |
+| `gradients` | 0 → 1 |
+| `themeSensitiveWhite` | 0 → 1 |
+| `roundedXl` | 162 → 31 (improvement) |
+| `colorFamiliesInUse` | 2 → 0 (improvement) |
+
+`motionSitesMissingReducedMotion` was 0 → 5 and is back to 0.
