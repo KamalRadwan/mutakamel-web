@@ -43,6 +43,7 @@ export function useApplication(applicationKey: string) {
   const [loadedManifestOwnerToken, setLoadedManifestOwnerToken] =
     useState<symbol | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manifestError, setManifestError] = useState<string | null>(null);
   const [isManifestLoading, setIsManifestLoading] = useState(false);
@@ -51,6 +52,21 @@ export function useApplication(applicationKey: string) {
     applicationKeyRef.current = applicationKey;
     ownerTokenRef.current = ownerToken;
   }, [applicationKey, ownerToken]);
+
+  // Whether a snapshot is already on screen has to be readable at the instant
+  // a fetch starts, not one render later, because that is what separates the
+  // first read of an application from a re-read of one already displayed.
+  const displayedKeyRef = useRef<string | null>(null);
+  const displayedOwnerTokenRef = useRef<symbol | null>(null);
+  const markDisplayed = useCallback(
+    (key: string | null, token: symbol | null) => {
+      displayedKeyRef.current = key;
+      displayedOwnerTokenRef.current = token;
+      setLoadedApplicationKey(key);
+      setLoadedApplicationOwnerToken(token);
+    },
+    [],
+  );
 
   const fetchManifests = useCallback(async () => {
     const requestedKey = applicationKey;
@@ -101,8 +117,20 @@ export function useApplication(applicationKey: string) {
     requestAbort.current?.abort();
     const controller = new AbortController();
     requestAbort.current = controller;
-    setIsLoading(true);
-    setError(null);
+    // Every command reconciles by re-reading the application. Reporting that
+    // as loading collapsed the whole detail route to a spinner, taking with it
+    // the dialog waiting on the command's own answer — a database binding's
+    // per-server report has no other home. A re-read over a snapshot already
+    // on screen is a refresh: the page keeps rendering what it has.
+    const isReload =
+      displayedKeyRef.current === requestedKey &&
+      displayedOwnerTokenRef.current === requestedOwnerToken;
+    if (isReload) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+      setError(null);
+    }
     try {
       const data = await applicationsApi.get(requestedKey, controller.signal);
       if (
@@ -114,8 +142,7 @@ export function useApplication(applicationKey: string) {
         return;
       }
       setApplication(data);
-      setLoadedApplicationKey(requestedKey);
-      setLoadedApplicationOwnerToken(requestedOwnerToken);
+      markDisplayed(requestedKey, requestedOwnerToken);
       await fetchManifests();
     } catch (err) {
       if (
@@ -127,24 +154,30 @@ export function useApplication(applicationKey: string) {
         return;
       }
       const normalized = normalizeApiError(err);
-      setError(normalized.message);
-      setLoadedApplicationKey(null);
-      setLoadedApplicationOwnerToken(null);
+      // A failed refresh leaves the last good snapshot standing rather than
+      // replacing the page with an error frame: the toast reports it, and the
+      // operator keeps whatever the open dialog was showing them.
+      if (!isReload) {
+        setError(normalized.message);
+        markDisplayed(null, null);
+      }
       toast.error("Error", normalized.message);
     } finally {
       if (
         generation === requestGeneration.current &&
         ownerTokenRef.current === requestedOwnerToken
-      ) setIsLoading(false);
+      ) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, [applicationKey, fetchManifests, ownerToken, toast]);
+  }, [applicationKey, fetchManifests, markDisplayed, ownerToken, toast]);
 
   useEffect(() => {
     queueMicrotask(() => {
       if (ownerTokenRef.current !== ownerToken) return;
       setApplication(null);
-      setLoadedApplicationKey(null);
-      setLoadedApplicationOwnerToken(null);
+      markDisplayed(null, null);
       setManifests([]);
       setLoadedManifestKey(null);
       setLoadedManifestOwnerToken(null);
@@ -154,7 +187,7 @@ export function useApplication(applicationKey: string) {
       requestAbort.current?.abort();
       manifestAbort.current?.abort();
     };
-  }, [applicationKey, fetchApplication, ownerToken]);
+  }, [applicationKey, fetchApplication, markDisplayed, ownerToken]);
 
   const mutationOptions = (message: string) => {
     const ownerApplicationKey = applicationKey;
@@ -290,6 +323,8 @@ export function useApplication(applicationKey: string) {
     isManifestLoading,
     isMutating,
     isLoading,
+    /** A re-read over a snapshot already on screen; the page stays rendered. */
+    isRefreshing,
     error,
     fetchApplication,
     fetchManifests,

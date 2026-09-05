@@ -111,7 +111,9 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
     return result;
   };
 
-  return <PageFrame>
+  // A command's reconciling re-read no longer blanks the page, so the only
+  // thing left to announce is that the values on screen are being replaced.
+  return <PageFrame isBusy={detail.isRefreshing}>
     <div className="space-y-6">
       <PageHeader
         breadcrumb={
@@ -249,7 +251,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   </PageFrame>;
 }
 
-function PageFrame({ children }: { children: React.ReactNode }) { return <div className="w-full space-y-6">{children}</div>; }
+function PageFrame({ children, isBusy = false }: { children: React.ReactNode; isBusy?: boolean }) { return <div className="w-full space-y-6" aria-busy={isBusy || undefined}>{children}</div>; }
 function Fact({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) { return <Card className="p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</div><div className={`mt-2 truncate text-sm font-semibold text-foreground ${mono ? "font-mono" : ""}`} title={value}>{value}</div></Card>; }
 function Item({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</dt><dd className="mt-1 font-mono font-semibold text-foreground">{value}</dd></div>; }
 

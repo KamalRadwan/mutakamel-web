@@ -120,10 +120,34 @@ formatting. Use `BigInt` only for integer byte-string arithmetic. Do not use
 - For `204`, update local state only after the request succeeds.
 - Refetch after lifecycle/destructive changes where the authoritative
   projection can change.
+- A reconciling refetch is a refresh, never a load. Keep the two apart in the
+  hook and gate the route's loading frame on the load alone.
 
 Use [Operational UX](../design-system/operational-ux.md#mutation-lifecycle) for
 the corresponding visible pending, reconciliation, ambiguous, and result
 surfaces.
+
+### A refetch must not unmount the surface that is waiting for the result
+
+The mutation helper awaits its reconciling refetch before it hands the command
+result back, so anything that refetch tears down is torn down *before* the
+caller can render what the command answered. A route that renders a loading
+frame whenever its detail hook reports `isLoading` therefore destroys the dialog
+that issued the command: the receipt is assigned to an unmounted instance, and
+the replacement mounts with its state reset. Commands that report per-item
+outcomes rather than throwing — the application database binding's per-server
+report is the sharp case — lose their only surface this way even when the
+command fully succeeded, and any unsaved input in other open dialogs goes with
+it.
+
+So a detail hook distinguishes the first read of a resource, which owns
+`isLoading` because there is nothing to show yet, from a re-read over a snapshot
+already displayed, which reports `isRefreshing` and leaves the tree mounted. A
+failed re-read keeps the last good snapshot and reports through the toast rather
+than replacing the page with an error frame — the operator keeps whatever the
+open dialog was showing them. Both paths stay inside the existing owner-token
+and generation fences, so a response for a resource the route has moved off is
+still discarded. `useApplication` is the reference implementation.
 
 ## Source map
 
