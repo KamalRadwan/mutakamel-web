@@ -27,6 +27,7 @@ export function useDatabaseServers() {
   const [error, setError] = useState<string | null>(null);
   const [loadedQueryIdentity, setLoadedQueryIdentity] = useState<string | null>(null);
   const requestGeneration = useRef(0);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const requestAbort = useRef<AbortController | null>(null);
   const queryIdentityRef = useRef("");
   const deleteQueryIdentityRef = useRef<string | null>(null);
@@ -153,13 +154,28 @@ export function useDatabaseServers() {
     } finally {
       if (generation === requestGeneration.current) setIsLoading(false);
     }
-  }, [page, limit, search, statusFilter, countryFilter, deletionFilter, toast, currentQueryIdentity, copy.genericErrorTitle]);
+  }, [page, limit, search, statusFilter, countryFilter, deletionFilter, toast, currentQueryIdentity, copy.genericErrorTitle, refreshNonce]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchServers();
     return () => requestAbort.current?.abort();
   }, [fetchServers]);
+
+  /**
+   * FE-OPS-002. A mutation used to finish with `await fetchServers()`, calling
+   * the closure it captured when the dialog opened. If the operator changed a
+   * filter while the write was in flight, that stale closure aborted the newer
+   * request and then discarded its own response on the identity check - so the
+   * list was left empty, not loading, and nothing re-issued it.
+   *
+   * Bumping the nonce re-runs the effect instead, which always reads the
+   * current query. The entry guards on each mutation are unchanged: a delete
+   * still refuses to start if the query moved before it was confirmed.
+   */
+  const requestRefresh = useCallback(() => {
+    setRefreshNonce((value) => value + 1);
+  }, []);
 
   const openSoftDelete = (server: DatabaseServerView) => {
     if (
@@ -210,14 +226,14 @@ export function useDatabaseServers() {
       toast.success(copy.serverDeletedTitle, copy.serverDeletedDescription(server.name));
       resetKey();
       setServerPendingDelete(null);
-      await fetchServers();
+      requestRefresh();
     } catch (err) {
       const normalized = normalizeApiError(err);
       if (shouldResetDatabaseServerWriteKey(normalized)) {
         resetKey();
       }
       toast.error(copy.deleteFailedTitle, normalized.message);
-      await fetchServers();
+      requestRefresh();
       throw normalized;
     } finally {
       setDeletingServerId(null);
@@ -245,14 +261,14 @@ export function useDatabaseServers() {
       toast.success(copy.serverDestroyedTitle, copy.serverDestroyedDescription(server.name));
       resetKey();
       setServerPendingDestroy(null);
-      await fetchServers();
+      requestRefresh();
     } catch (err) {
       const normalized = normalizeApiError(err);
       if (shouldResetDatabaseServerWriteKey(normalized)) {
         resetKey();
       }
       toast.error(copy.destroyFailedTitle, normalized.message);
-      await fetchServers();
+      requestRefresh();
     } finally {
       setDestroyingServerId(null);
     }
