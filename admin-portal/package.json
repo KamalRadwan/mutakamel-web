@@ -11,9 +11,12 @@
     "docs:routes": "node scripts/docs/generate-admin-route-inventory.mjs",
     "docs:check": "node scripts/docs/generate-admin-route-inventory.mjs --check && node scripts/docs/check-docs.mjs",
     "design:census": "node scripts/design/census.mjs",
-    "design:rtl": "node scripts/design/rtl-guard.mjs"
+    "design:rtl": "node scripts/design/rtl-guard.mjs",
+    "typecheck": "tsc --noEmit",
+    "verify:ci": "npm run typecheck && npm run lint && npm run docs:check && npm run test && npm run build"
   },
   "dependencies": {
+    "@mutakamel/identifiers": "workspace:*",
     "@mutakamel/webphone": "workspace:*",
     "@noble/hashes": "2.4.0",
     "@radix-ui/react-alert-dialog": "^1.1.23",

@@ -916,8 +916,20 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     await waitFor(() => expect(screen.getByText("state:AUTHENTICATED")).toBeTruthy());
     replace.mockReset();
 
+    // Wait for the probe to publish `logout`, and refuse to proceed without it.
+    //
+    // `signOut` is a module singleton and `LogoutProbe`'s cleanup nulls it on
+    // unmount, so a previous test's unmount can land after this one's mount
+    // effect. `await signOut.run?.()` then did nothing at all, and the failure
+    // surfaced 1,060 ms later as "replace was never called with /login" -- a
+    // flake that passed on a quiet machine and failed in a full parallel run.
+    // The optional call was what hid it; a missing `run` has to be loud.
+    await waitFor(() => expect(signOut.run).toBeInstanceOf(Function));
+    const run = signOut.run;
+    if (!run) throw new Error("LogoutProbe never published logout()");
+
     await act(async () => {
-      await signOut.run?.();
+      await run();
     });
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));

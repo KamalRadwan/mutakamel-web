@@ -30,9 +30,11 @@
     "docs:verify-called-routes": "node scripts/docs/verify-called-routes.mjs",
     "knip": "knip",
     "docs:verify-anchors": "node scripts/docs/verify-anchors.mjs",
-    "build:budget": "node scripts/build/bundle-budget.mjs"
+    "build:budget": "node scripts/build/bundle-budget.mjs",
+    "verify:ci": "npm run typecheck && npm run lint && npm run docs:check && npm run test && npm run build"
   },
   "dependencies": {
+    "@mutakamel/identifiers": "workspace:*",
     "@hello-pangea/dnd": "^18.0.1",
     "@mutakamel/realtime-app-client": "0.0.2",
     "@noble/hashes": "2.4.0",
