@@ -78,6 +78,15 @@ export function useInvoiceDetail(invoiceId: string) {
     setSnapshot(next);
     setState("READY");
     setEditDraft(invoiceToEditDraft(next.data));
+    // FE-B01. Whoever delivers authoritative data owns the refresh flag.
+    //
+    // Only the generation-guarded `finally` in the read effect used to clear
+    // it, and a successful command bumps that generation on purpose - so a GET
+    // already in flight when the command landed failed the guard, skipped the
+    // clear, and left the refresh button disabled for the rest of the page's
+    // life. The command had just supplied a newer snapshot than the GET would
+    // have, so there is nothing left to wait for.
+    setIsRefreshing(false);
   }, []);
 
   useEffect(() => {

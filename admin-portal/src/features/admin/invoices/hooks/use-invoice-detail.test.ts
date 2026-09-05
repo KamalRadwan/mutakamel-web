@@ -201,4 +201,47 @@ describe("useInvoiceDetail", () => {
     await act(async () => resolveStale?.(snapshot("DRAFT")));
     expect(result.current.snapshot?.data.status).toBe("ISSUED");
   });
+
+  /**
+   * FE-B01, the other half of the case above. That test proves the stale read
+   * cannot overwrite the command's snapshot; this one proves the operator can
+   * still refresh afterwards.
+   *
+   * Only the generation-guarded `finally` in the read effect cleared
+   * `isRefreshing`, and a successful command bumps that generation on purpose -
+   * so the in-flight GET failed the guard, skipped the clear, and left the
+   * refresh button disabled for the rest of the page's life.
+   */
+  it("re-enables refresh after a command supersedes an in-flight read", async () => {
+    let resolveStale: ((value: CoreSnapshot<Invoice>) => void) | undefined;
+    getMock
+      .mockResolvedValueOnce(snapshot())
+      .mockReturnValueOnce(
+        new Promise<CoreSnapshot<Invoice>>((resolve) => {
+          resolveStale = resolve;
+        }),
+      );
+    issueMock.mockResolvedValue(snapshot("ISSUED"));
+    const { result } = renderHook(() => useInvoiceDetail(INVOICE_ID));
+    await waitFor(() => expect(result.current.state).toBe("READY"));
+
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.isRefreshing).toBe(true));
+
+    act(() => result.current.openIssue());
+    act(() => {
+      result.current.updateIssueDraft("reason", "Reviewed tenant and total");
+      result.current.updateIssueDraft("confirmed", true);
+    });
+    await act(async () => {
+      await result.current.issueInvoice();
+    });
+
+    // The command delivered a newer snapshot than the GET would have, so there
+    // is nothing left to wait for.
+    expect(result.current.isRefreshing).toBe(false);
+
+    await act(async () => resolveStale?.(snapshot("DRAFT")));
+    expect(result.current.isRefreshing).toBe(false);
+  });
 });
