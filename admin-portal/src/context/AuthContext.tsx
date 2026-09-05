@@ -30,6 +30,7 @@ import {
   subscribeToAdminAuthEvents,
   subscribeToAdminAuthLifecycle,
 } from "@/lib/auth/sessionCoordinator";
+import { isSupersededAdminBootstrap } from "@/lib/auth/bootstrap-supersession";
 import {
   classifyAuthFailure,
   getAdminAuthRetryDelayMs,
@@ -111,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ((markPending?: boolean) => Promise<void>) | null
   >(null);
   const bootstrapRerunRequestedRef = useRef(false);
+  const sessionCommitRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryAttemptRef = useRef(0);
   const proactiveSchedulerRef = useRef<AdminSessionRefreshScheduler | null>(
@@ -139,6 +141,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retryAttemptRef.current = 0;
   }, [cancelScheduledBootstrapRetry]);
 
+  /**
+   * Called wherever this provider itself decides what the session now is —
+   * a sign-in, an invite acceptance, a sign-out, or another tab's session
+   * replacing this one. Past this point, a bootstrap that is still in flight
+   * is describing a session that no longer exists, and its answer is dropped
+   * instead of written.
+   */
+  const commitSessionDecision = useCallback(() => {
+    sessionCommitRef.current += 1;
+  }, []);
+
   const scheduleBootstrapRetry = useCallback(() => {
     if (!mountedRef.current || retryTimerRef.current !== null) return;
 
@@ -163,18 +176,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
     }
 
+    // Captured before the request goes out. `/login` renders during
+    // bootstrap, so the operator can commit a whole new session while this
+    // check is still in flight; a result from before that commit describes a
+    // session nobody is using any more.
+    const commitAtRequest = sessionCommitRef.current;
+    const superseded = () =>
+      isSupersededAdminBootstrap({
+        commitAtRequest,
+        currentCommit: sessionCommitRef.current,
+      });
+
     const operation = (async () => {
       try {
         const response = await axiosClient.get(
           "/api/admin/core/v1/auth/me",
           { cache: "no-store" },
         );
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || superseded()) return;
         resetBootstrapRetry();
         setUser(readUserProfile(response.data));
         setAuthState("AUTHENTICATED");
       } catch (error) {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || superseded()) return;
         const disposition = classifyAuthFailure(
           getAuthErrorStatus(error),
           getAuthErrorCode(error),
@@ -248,6 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!shouldHonorSessionEndedEvent(event)) return;
         stopSessionMaintenance();
         resetBootstrapRetry();
+        commitSessionDecision();
         clearLocalAuthState();
         setUser(null);
         setAuthState("ENDED");
@@ -259,6 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (synchronization.sessionChanged) {
         stopSessionMaintenance();
         resetBootstrapRetry();
+        commitSessionDecision();
         setUser(null);
         setAuthState("STALE");
         requestAuthoritativeBootstrap();
@@ -274,7 +300,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ) {
         requestAuthoritativeBootstrap();
       }
-    }), [requestAuthoritativeBootstrap, resetBootstrapRetry, router, stopSessionMaintenance]);
+    }), [commitSessionDecision, requestAuthoritativeBootstrap, resetBootstrapRetry, router, stopSessionMaintenance]);
 
   useEffect(() =>
     subscribeToAdminAuthLifecycle((state) => {
@@ -354,6 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let sessionCommitted = false;
     stopSessionMaintenance();
     resetBootstrapRetry();
+    commitSessionDecision();
     setAuthState("BOOTSTRAPPING");
     try {
       const profile = await withAuthLock(async () => {
@@ -444,7 +471,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthState(disposition === "end" ? "ENDED" : "UNAUTHENTICATED");
       throw error;
     }
-  }, [resetBootstrapRetry, router, scheduleBootstrapRetry, stopSessionMaintenance]);
+  }, [commitSessionDecision, resetBootstrapRetry, router, scheduleBootstrapRetry, stopSessionMaintenance]);
 
   const acceptInvite = useCallback(async ({
     token,
@@ -453,6 +480,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let sessionCommitted = false;
     stopSessionMaintenance();
     resetBootstrapRetry();
+    commitSessionDecision();
     setAuthState("BOOTSTRAPPING");
     try {
       const profile = await withAuthLock(async () => {
@@ -543,11 +571,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthState(disposition === "end" ? "ENDED" : "UNAUTHENTICATED");
       throw error;
     }
-  }, [resetBootstrapRetry, router, scheduleBootstrapRetry, stopSessionMaintenance]);
+  }, [commitSessionDecision, resetBootstrapRetry, router, scheduleBootstrapRetry, stopSessionMaintenance]);
 
   const logout = useCallback(async () => {
     const sessionId = getStoredSessionMeta()?.sessionId;
     resetBootstrapRetry();
+    commitSessionDecision();
     try {
       await withAuthLock(async () => {
         await axiosClient.post(
@@ -579,7 +608,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setAuthState("ENDED");
     router.replace("/login");
-  }, [resetBootstrapRetry, router]);
+  }, [commitSessionDecision, resetBootstrapRetry, router]);
 
   const resetPassword = useCallback(async ({
     token,
@@ -587,6 +616,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }: AdminPasswordActionOptions) => {
     const sessionId = getStoredSessionMeta()?.sessionId;
     resetBootstrapRetry();
+    commitSessionDecision();
     try {
       await withAuthLock(() =>
         axiosClient.post(
@@ -623,11 +653,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setAuthState("ENDED");
     router.replace("/login");
-  }, [resetBootstrapRetry, router, stopSessionMaintenance, user]);
+  }, [commitSessionDecision, resetBootstrapRetry, router, stopSessionMaintenance, user]);
 
   const logoutAll = useCallback(async () => {
     const sessionId = getStoredSessionMeta()?.sessionId;
     resetBootstrapRetry();
+    commitSessionDecision();
     try {
       await ensureAdminCookieSessionFresh();
       await withAuthLock(() =>
@@ -662,7 +693,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setAuthState("ENDED");
     router.replace("/login");
-  }, [resetBootstrapRetry, router, stopSessionMaintenance]);
+  }, [commitSessionDecision, resetBootstrapRetry, router, stopSessionMaintenance]);
 
   const retryBootstrap = useCallback(
     () => bootstrap(true),

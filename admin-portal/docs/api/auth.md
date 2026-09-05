@@ -200,6 +200,23 @@ access cookie does not make a cold tab authenticated by itself: the protected
 tree remains pending until the replayed `/auth/me` has validated and hydrated
 the user profile.
 
+A bootstrap answers a question about whichever session existed when it was
+sent, and `/login` is a public route rendered *during* bootstrap — so an
+operator can complete a sign-in while the cold check they arrived with is
+still in flight. Every late answer is then about a session nobody is using:
+the `401` for the session that was missing, the `409 AUTH_SESSION_CHANGED`
+raised by the client's own epoch fence once it sees the newly stored metadata,
+or a `200` carrying the previous profile. The provider therefore counts the
+points at which it commits authoritative session state itself — login, invite
+acceptance, logout, logout-all, password reset, and another tab's session
+replacing this one — and a bootstrap captures that count before its request
+goes out. A result whose count no longer matches is dropped rather than
+written, so a superseded check can neither clear the session that replaced it,
+downgrade it to `DEGRADED`, nor hydrate the profile of whoever was signed in
+before. Every commit point that supersedes a bootstrap either settles the
+state itself or requests an authoritative rerun, so dropping the stale answer
+never leaves a tab pending.
+
 ## POST `/api/admin/core/v1/auth/accept-invite`
 
 Public. Rate limit: 5 requests per 60 seconds. Returns HTTP `200`.
