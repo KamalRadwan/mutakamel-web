@@ -2536,8 +2536,11 @@ export const ar = {
     currentRotationLabel: "التدوير الحالي",
     graceExpiresLabel: "انتهاء نافذة السماح",
     revokedAtLabel: "تاريخ الإبطال",
-    rotationIdWarning:
-      "لا يمكن استرجاع معرّف هذا التدوير إذا أُعيد تحميل الصفحة. أثبت رفض المفتاح القديم قبل مغادرة هذه الصفحة.",
+    rotationReceiptKeptNote:
+      "معرّف التدوير ليس جزءاً من قراءة الخادم، لذا يحتفظ به هذا المتصفح حتى إبطال المفتاح القديم. مسح بيانات هذا المتصفح يفقده، ويصبح إتمام التدوير خارج البوابة.",
+    rotationReceiptVolatileWarning:
+      "تعذر على هذا المتصفح تخزين معرّف التدوير، والخادم لا يعيده. أثبت رفض المفتاح القديم قبل مغادرة هذه الصفحة، وإلا تعذّر إتمام التدوير من هنا.",
+    dismissRotationReceiptButton: "تجاهل هذا الإيصال",
     verifyOldKeyButton: "إثبات رفض المفتاح القديم",
     waitForGraceTitle: "انتظر انتهاء نافذة السماح أولاً.",
     lifecycleUnchangedTemplate: (status: string) => `لم تتغير حالة دورة الحياة: ${status}.`,

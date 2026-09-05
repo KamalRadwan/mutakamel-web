@@ -54,6 +54,25 @@ digest match; a changed intent or unavailable browser storage fails closed.
 Where a command cannot be safely reconstructed, use authoritative read-only
 status recovery and block replay instead of persisting its sensitive body.
 
+### A handle the server returns once still has to survive a reload
+
+The same marker answers a rarer problem: a command whose *completion*, not its
+retry, needs a handle the server hands back once and will not hand back again.
+A safe credential rotation returns the rotation record's id, then makes the
+operator wait out a grace window of one to twenty-four hours before the revoke
+that finishes it — and Core has no route that reads rotations back. Held in
+component state, that handle is gone at the first reload, and the rotation
+cannot be completed from the portal at all.
+
+Persist it the same way: the record's identity and lifecycle, never the body
+that created it, scoped to the resource, retired the moment the command
+completes, discarded after a bounded retention. Unlike a replay marker this one
+cannot fail closed — the command already succeeded on the server — so when the
+browser refuses to store it, say so on the card and fall back to the old rule
+of finishing before leaving the page. `rotation-receipt.ts` is the case in the
+portal. Treat the missing read projection as the gap it is: this is a stopgap
+for a server projection, never a substitute for one.
+
 ### Bodyless commands own the state they act on
 
 Rule 3 says reuse only with the same body — which decides nothing for a command

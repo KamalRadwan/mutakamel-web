@@ -27,7 +27,10 @@ after success or a definitive client rejection.
 Credentials are write-only. A browser response must never contain an access
 key, secret, ciphertext, IV, tag, master key, provider body, presigned URL, or
 internal credential reference. The UI does not persist form values in local or
-session storage.
+session storage. The one thing it does keep in the browser is a credential
+rotation's record identity, for the reason set out under
+[Credential rotation has no read projection](#credential-rotation-has-no-read-projection);
+it carries no key material, no reason text, and nothing from a form.
 
 Core success envelope:
 
@@ -75,10 +78,39 @@ Permission arrays use ALL semantics.
 | `POST /storage-servers/:id/activate` | update + critical | 200 | `{}` |
 | `POST /storage-servers/:id/probe` | update + critical | 200 | `ProbeStorageServerDto` |
 | `POST /storage-servers/:id/offline` | update + critical | 200 | `{}` |
+| `POST /storage-servers/:id/credential-rotations` | update + critical | 200 | `RotateStorageCredentialsDto` |
+| `POST /storage-servers/:id/credential-rotations/:rotationId/revoke` | update + critical | 200 | `{}` |
 | `DELETE /storage-servers/:id` | `admin.storage_servers.delete` + critical | 204 | none |
 
 `id` is UUIDv7. There is no public hard-destroy, credential-read, topology,
 routing-profile, attestation, or migration control in this module.
+
+### Credential rotation has no read projection
+
+Safe rotation is two commands separated by hours. The first stages and
+activates the new key and opens a grace window of one to twenty-four hours
+during which both keys work; the second proves the old key is now rejected and
+records the rotation as revoked. Core refuses the second before the grace
+expires, and refuses it without the rotation record's id.
+
+That id is returned once, by the first command. There is no route that lists
+or reads rotations, and `StorageServerView` carries no rotation id, status, or
+grace detail — so the response to the first command is the only place the
+handle has ever existed. Holding it in component state meant a reload, a
+navigation, or simply coming back after the grace window it was waiting out
+destroyed it, and the rotation could no longer be completed from the portal:
+it stayed `ACTIVATED` past its grace and showed up as overdue.
+
+Until Core exposes the rotation on a read route, the portal keeps the handle in
+this browser, in the shape [a pending command's recovery marker](../architecture/permissions-idempotency-and-state.md#stable-uuidv7-intent)
+uses: a narrow, explicitly listed projection — record id, storage server id,
+lifecycle status, grace expiry, revocation time — validated on the way back in,
+verified by reading back what was written, scoped per storage server, retired
+on revocation, and discarded after thirty days. No key material and no request
+body is part of it. If the browser refuses to store it, the card says so and
+the old rule applies again: finish the revoke from that page or lose the
+handle. This is a browser-local stopgap, not durable server state: it does not
+survive clearing site data and was never visible to another operator.
 
 ## DTOs
 
@@ -375,7 +407,8 @@ same-revision concurrent completion, so the UI can reconcile a lost success
 without recreating the server, resending credentials, or misreporting DRAFT.
 
 The active detail hook clears the prior server, probe result, credential
-editor, and confirmation state as soon as the route `id` changes. Reads are
+editor, and confirmation state as soon as the route `id` changes, and reloads
+the pending rotation receipt for the server now on screen. Reads are
 abortable and generation/identity fenced; every write verifies that its loaded
 server identity still matches the route before and after the request. A late
 Storage Server A response therefore cannot render or submit against server B.
@@ -395,6 +428,7 @@ not establish authenticated Garage, deployment, or production-readiness proof.
 - `src/features/admin/storage-servers/hooks/useStorageServers.ts`
 - `src/features/admin/storage-servers/hooks/useStorageServerDetail.ts`
 - `src/features/admin/storage-servers/lib/storage-server-contract.ts`
+- `src/features/admin/storage-servers/lib/rotation-receipt.ts`
 - `src/features/admin/storage-servers/screens/`
 - `src/app/storage-servers/`
 

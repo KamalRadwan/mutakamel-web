@@ -10,9 +10,14 @@ import {
 import { useIdempotency } from "@/shared/hooks/useIdempotency";
 import { storageServersApi } from "../api/storage-servers.api";
 import { shouldResetStorageServerWriteKey } from "../lib/storage-server-contract";
+import {
+  forgetStorageRotationReceipt,
+  readStorageRotationReceipt,
+  rememberStorageRotation,
+  type StorageCredentialRotationReceipt,
+} from "../lib/rotation-receipt";
 import type {
   RotateStorageCredentialsDto,
-  StorageCredentialRotationView,
   StorageServerProbeResult,
   StorageServerView,
   UpdateStorageServerDto,
@@ -27,7 +32,9 @@ export function useStorageServerDetail(id: string) {
   const [server, setServer] = useState<StorageServerView | null>(null);
   const [loadedServerId, setLoadedServerId] = useState<string | null>(null);
   const [lastProbe, setLastProbe] = useState<StorageServerProbeResult | null>(null);
-  const [currentRotation, setCurrentRotation] = useState<StorageCredentialRotationView | null>(null);
+  const [currentRotation, setCurrentRotation] =
+    useState<StorageCredentialRotationReceipt | null>(null);
+  const [isRotationReceiptDurable, setIsRotationReceiptDurable] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -75,7 +82,11 @@ export function useStorageServerDetail(id: string) {
       setServer(null);
       setLoadedServerId(null);
       setLastProbe(null);
-      setCurrentRotation(null);
+      // The rotation this browser is still holding for the server now on
+      // screen. Without it the revoke card cannot be rebuilt after a reload,
+      // and the grace window it is waiting out is measured in hours.
+      setCurrentRotation(readStorageRotationReceipt(id));
+      setIsRotationReceiptDurable(true);
       setError(null);
       setIsLoading(true);
     });
@@ -195,7 +206,9 @@ export function useStorageServerDetail(id: string) {
           ),
       );
       if (idRef.current !== id) throw new Error("STORAGE_SERVER_CONTEXT_CHANGED");
-      setCurrentRotation(result);
+      const remembered = rememberStorageRotation(id, result);
+      setCurrentRotation(remembered.receipt);
+      setIsRotationReceiptDurable(remembered.durable);
       await refresh();
       return result;
     },
@@ -211,7 +224,9 @@ export function useStorageServerDetail(id: string) {
         (key) => storageServersApi.revokeCredentialRotation(id, rotationId, key),
       );
       if (idRef.current !== id) throw new Error("STORAGE_SERVER_CONTEXT_CHANGED");
-      setCurrentRotation(result);
+      const remembered = rememberStorageRotation(id, result);
+      setCurrentRotation(remembered.receipt);
+      setIsRotationReceiptDurable(remembered.durable);
       return result;
     },
     [assertCurrentServer, canUpdate, id, write],
@@ -232,11 +247,24 @@ export function useStorageServerDetail(id: string) {
     [update],
   );
 
+  /**
+   * Lets an operator put down a receipt whose rotation was completed
+   * elsewhere, so a handle this browser can no longer act on does not sit on
+   * the page for a month.
+   */
+  const dismissRotationReceipt = useCallback(() => {
+    forgetStorageRotationReceipt(id);
+    setCurrentRotation(null);
+    setIsRotationReceiptDurable(true);
+  }, [id]);
+
   return {
     server: loadedServerId === id ? server : null,
     loadedServerId,
     lastProbe,
     currentRotation,
+    isRotationReceiptDurable,
+    dismissRotationReceipt,
     isLoading,
     isMutating,
     error,

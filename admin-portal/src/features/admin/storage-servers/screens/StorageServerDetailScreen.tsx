@@ -28,8 +28,8 @@ import { ar } from "@/i18n/dictionaries/ar";
 import { useStorageServerDetail } from "../hooks/useStorageServerDetail";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import { isSecureStorageEndpoint, probeFreshnessPercent } from "../lib/storage-server-contract";
+import type { StorageCredentialRotationReceipt } from "../lib/rotation-receipt";
 import type {
-  StorageCredentialRotationView,
   StorageServerView,
   UpdateStorageServerDto,
 } from "../types";
@@ -289,12 +289,14 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
                 rotation={view.currentRotation}
                 lang={lang}
                 isMutating={view.isMutating}
+                isDurable={view.isRotationReceiptDurable}
                 onRevoke={() =>
                   void run(
-                    () => view.revokeCredentialRotation(view.currentRotation!.id),
+                    () => view.revokeCredentialRotation(view.currentRotation!.rotationId),
                     copy.oldKeyRejectedMessage,
                   )
                 }
+                onDismiss={view.dismissRotationReceipt}
               />
             )}
           </Panel>
@@ -703,12 +705,16 @@ function RotationStatusCard({
   rotation,
   lang,
   isMutating,
+  isDurable,
   onRevoke,
+  onDismiss,
 }: {
-  rotation: StorageCredentialRotationView;
+  rotation: StorageCredentialRotationReceipt;
   lang: Lang;
   isMutating: boolean;
+  isDurable: boolean;
   onRevoke: () => void;
+  onDismiss: () => void;
 }) {
   const copy = dict(lang);
   const [graceExpired, setGraceExpired] = useState(false);
@@ -741,7 +747,7 @@ function RotationStatusCard({
       {rotation.status === "ACTIVATED" && (
         <>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            {copy.rotationIdWarning}
+            {isDurable ? copy.rotationReceiptKeptNote : copy.rotationReceiptVolatileWarning}
           </p>
           <Button
             type="button"
@@ -750,15 +756,27 @@ function RotationStatusCard({
             className="mt-3 w-full"
             onClick={onRevoke}
             disabled={!canRevoke || isMutating}
-            aria-describedby={!graceExpired ? `rotation-${rotation.id}-wait-reason` : undefined}
+            aria-describedby={!graceExpired ? `rotation-${rotation.rotationId}-wait-reason` : undefined}
           >
             <ShieldCheck className="size-4" aria-hidden="true" />
             {copy.verifyOldKeyButton}
           </Button>
           {!graceExpired && (
-            <p id={`rotation-${rotation.id}-wait-reason`} className="mt-2 text-xs text-warning-subtle-foreground">
+            <p id={`rotation-${rotation.rotationId}-wait-reason`} className="mt-2 text-xs text-warning-subtle-foreground">
               {copy.waitForGraceTitle}
             </p>
+          )}
+          {isDurable && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-2 w-full"
+              onClick={onDismiss}
+              disabled={isMutating}
+            >
+              {copy.dismissRotationReceiptButton}
+            </Button>
           )}
         </>
       )}

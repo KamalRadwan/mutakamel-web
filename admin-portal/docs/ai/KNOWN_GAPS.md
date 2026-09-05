@@ -36,6 +36,14 @@ provisioning-governance routes.
 
 - Existing-tenant Storage Server migration is historical design only: its eight
   proposed routes are absent from current Core/Gateway source.
+- Storage Server credential rotations have no read projection. Core returns a
+  rotation's id once, from the command that starts it, then requires that id to
+  revoke the old key hours later; no route lists or reads rotations, and the
+  server projection carries no rotation state. The portal keeps the handle in
+  the operator's own browser as a stopgap
+  ([contract](../api/storage-servers.md#credential-rotation-has-no-read-projection)),
+  which cannot help a different browser or survive cleared site data. Closing
+  this needs the rotation exposed on the storage-server read route.
 - Admin Realtime Socket.IO activation remains gated; notifications use the
   integrated REST contract.
 - Worker Backup package/schema adoption and authenticated runtime evidence are

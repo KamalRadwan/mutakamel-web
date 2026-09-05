@@ -2642,8 +2642,11 @@ export const en: Dictionary = {
     currentRotationLabel: "Current rotation",
     graceExpiresLabel: "Grace expires",
     revokedAtLabel: "Revoked at",
-    rotationIdWarning:
-      "This rotation's id cannot be recovered after a page reload. Verify the old key is rejected before leaving this page.",
+    rotationReceiptKeptNote:
+      "The rotation's id is not part of the server's read projection, so this browser is holding it until the old key is revoked. Clearing this browser's data loses it, and the rotation would have to be completed outside the portal.",
+    rotationReceiptVolatileWarning:
+      "This browser refused to store the rotation's id, and the server does not return it. Verify the old key is rejected before leaving this page, or the rotation can no longer be completed here.",
+    dismissRotationReceiptButton: "Discard this receipt",
     verifyOldKeyButton: "Verify old key is rejected",
     waitForGraceTitle: "Wait for the grace window to expire first.",
     lifecycleUnchangedTemplate: (status: string) => `Lifecycle state remains ${status}.`,
