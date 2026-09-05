@@ -49,6 +49,7 @@ import {
   operationDetail,
   operationSummary,
   seedState,
+  timelineEvent,
 } from "../test/fixtures";
 import {
   readTenantComponentInstallation,
@@ -83,6 +84,104 @@ describe("useTenantProvisioning", () => {
     apiMock.listSeeds.mockResolvedValue({
       items: [readTenantSeedState(seedState())],
       meta: META,
+    });
+  });
+
+  /**
+   * FE-OPS-006. Both histories were requested as page 1, limit 100, and nothing
+   * asked for a second page. On a tenant provisioned, repaired and updated
+   * enough times, its earlier operations were simply unreachable from the
+   * portal - and the timeline header went on reporting the operation's true
+   * event count beside a list that stopped at a hundred.
+   */
+  describe("reaching past the first page", () => {
+    const olderSummary = readTenantOperationSummary(
+      operationSummary({ id: RETRY_OPERATION_ID, generation: 1 }),
+    );
+
+    it("appends the next page of operations and keeps what was already shown", async () => {
+      const first = readTenantOperationSummary(operationSummary());
+      apiMock.listOperations
+        .mockResolvedValueOnce({
+          items: [first],
+          meta: { ...META, total: 2, totalPages: 2, hasNext: true },
+        })
+        .mockResolvedValueOnce({
+          items: [olderSummary],
+          meta: { ...META, page: 2, total: 2, totalPages: 2, hasPrev: true },
+        });
+
+      const { result } = renderHook(() =>
+        useTenantProvisioning(TENANT_ID, { pollIntervalMs: 60_000 }),
+      );
+      await waitFor(() =>
+        expect(result.current.operations.data.items).toHaveLength(1),
+      );
+
+      await act(async () => {
+        await result.current.loadMoreOperations();
+      });
+
+      expect(apiMock.listOperations).toHaveBeenLastCalledWith(TENANT_ID, {
+        page: 2,
+        limit: 100,
+        sortBy: "generation",
+        sortDir: "DESC",
+      });
+      expect(result.current.operations.data.items.map((item) => item.id)).toEqual([
+        OPERATION_ID,
+        RETRY_OPERATION_ID,
+      ]);
+      expect(result.current.operations.data.meta.hasNext).toBe(false);
+    });
+
+    it("does nothing when there is no next page", async () => {
+      const { result } = renderHook(() =>
+        useTenantProvisioning(TENANT_ID, { pollIntervalMs: 60_000 }),
+      );
+      await waitFor(() =>
+        expect(result.current.operations.status).toBe("ready"),
+      );
+      const calls = apiMock.listOperations.mock.calls.length;
+
+      await act(async () => {
+        await result.current.loadMoreOperations();
+      });
+
+      expect(apiMock.listOperations.mock.calls).toHaveLength(calls);
+    });
+
+    it("appends the next page of the selected operation's timeline", async () => {
+      apiMock.listTimeline
+        .mockResolvedValueOnce({
+          items: [timelineEvent({ id: "e-1", sequence: 2 })],
+          meta: { ...META, total: 2, totalPages: 2, hasNext: true },
+        })
+        .mockResolvedValueOnce({
+          items: [timelineEvent({ id: "e-2", sequence: 1 })],
+          meta: { ...META, page: 2, total: 2, totalPages: 2, hasPrev: true },
+        });
+
+      const { result } = renderHook(() =>
+        useTenantProvisioning(TENANT_ID, { pollIntervalMs: 60_000 }),
+      );
+      await waitFor(() =>
+        expect(result.current.timeline.data.items).toHaveLength(1),
+      );
+
+      await act(async () => {
+        await result.current.loadMoreTimeline();
+      });
+
+      expect(apiMock.listTimeline).toHaveBeenLastCalledWith(
+        TENANT_ID,
+        OPERATION_ID,
+        { page: 2, limit: 100, sortBy: "sequence", sortDir: "DESC" },
+      );
+      expect(result.current.timeline.data.items.map((item) => item.id)).toEqual([
+        "e-1",
+        "e-2",
+      ]);
     });
   });
 

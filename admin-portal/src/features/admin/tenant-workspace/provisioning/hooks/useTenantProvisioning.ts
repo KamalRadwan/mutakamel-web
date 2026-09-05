@@ -75,6 +75,20 @@ export interface TenantProvisioningController {
   mutation: ProvisioningMutationState;
   polling: boolean;
   selectOperation: (operationId: string) => void;
+  /**
+   * Loads the next page of operations and appends it.
+   *
+   * The history was pinned to the newest 100 with no way to reach further
+   * back, so once a tenant had been provisioned, repaired and updated enough
+   * times, its earlier operations could not be selected from the portal at all
+   * - and the timeline of one operation stopped at its 100th event while the
+   * header went on reporting the true total beside it.
+   */
+  loadMoreOperations: () => Promise<void>;
+  /** The same, for the selected operation's timeline. */
+  loadMoreTimeline: () => Promise<void>;
+  loadingMoreOperations: boolean;
+  loadingMoreTimeline: boolean;
   refreshAll: () => Promise<void>;
   retryOperation: (operationId: string) => Promise<TenantProvisioningCommandResult>;
   cancelOperation: (operationId: string) => Promise<TenantProvisioningCommandResult>;
@@ -152,6 +166,8 @@ export function useTenantProvisioning(
     intentKey: null,
     error: null,
   });
+  const [loadingMoreOperations, setLoadingMoreOperations] = useState(false);
+  const [loadingMoreTimeline, setLoadingMoreTimeline] = useState(false);
 
   const intentKeys = useRef(new Map<string, string>());
 
@@ -596,6 +612,93 @@ export function useTenantProvisioning(
     ],
   );
 
+  /**
+   * Appends the next page of operations to the ones already shown.
+   *
+   * Guarded on the page it is extending: `meta.page` is the newest page loaded,
+   * so a second click while the first request is still in flight asks for the
+   * same page rather than skipping one, and the append is dropped if the list
+   * was reloaded underneath it.
+   */
+  const loadMoreOperations = useCallback(async () => {
+    if (!permissions.canReadOperations) return;
+    const current = operations.data.meta;
+    if (!current.hasNext || loadingMoreOperations) return;
+    const nextPage = current.page + 1;
+    setLoadingMoreOperations(true);
+    try {
+      const page = await tenantProvisioningApi.listOperations(tenantId, {
+        page: nextPage,
+        limit: current.limit,
+        sortBy: "generation",
+        sortDir: "DESC",
+      });
+      setOperations((previous) =>
+        previous.data.meta.page === nextPage - 1
+          ? readyResource({
+              items: [...previous.data.items, ...page.items],
+              meta: page.meta,
+            })
+          : previous,
+      );
+    } catch (error) {
+      if (!isAbortError(error)) failResource(setOperations, error);
+    } finally {
+      setLoadingMoreOperations(false);
+    }
+  }, [
+    loadingMoreOperations,
+    operations.data.meta,
+    permissions.canReadOperations,
+    tenantId,
+  ]);
+
+  /**
+   * The same for the timeline, and additionally fenced on the operation.
+   *
+   * Selecting another operation while a page is in flight must not append that
+   * operation's events to this one's - the same identity check the selected
+   * detail already makes.
+   */
+  const loadMoreTimeline = useCallback(async () => {
+    const operationId = selectedOperationIdRef.current;
+    if (!operationId || !permissions.canReadOperations) return;
+    const current = timeline.data.meta;
+    if (!current.hasNext || loadingMoreTimeline) return;
+    const nextPage = current.page + 1;
+    setLoadingMoreTimeline(true);
+    try {
+      const page = await tenantProvisioningApi.listTimeline(
+        tenantId,
+        operationId,
+        {
+          page: nextPage,
+          limit: current.limit,
+          sortBy: "sequence",
+          sortDir: "DESC",
+        },
+      );
+      if (selectedOperationIdRef.current !== operationId) return;
+      setTimeline((previous) =>
+        previous.data.meta.page === nextPage - 1
+          ? readyResource({
+              items: [...previous.data.items, ...page.items],
+              meta: page.meta,
+            })
+          : previous,
+      );
+    } catch (error) {
+      if (!isAbortError(error)) failResource(setTimeline, error);
+    } finally {
+      setLoadingMoreTimeline(false);
+    }
+  }, [
+    loadingMoreTimeline,
+    permissions.canReadOperations,
+    tenantId,
+    timeline.data.meta,
+  ]);
+
   return {
     authLoading,
     permissions,
@@ -610,6 +713,10 @@ export function useTenantProvisioning(
     mutation,
     polling,
     selectOperation: setSelectedOperationId,
+    loadMoreOperations,
+    loadMoreTimeline,
+    loadingMoreOperations,
+    loadingMoreTimeline,
     refreshAll,
     retryOperation,
     cancelOperation,

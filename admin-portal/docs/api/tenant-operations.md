@@ -232,6 +232,31 @@ Search spans `currentPhase`, safe error code, and safe error message. Results
 are tenant-scoped and ordered by the requested field plus id in the same
 direction. A soft-deleted tenant still counts as existing for this history.
 
+### Reaching past the first page
+
+The portal loads the newest 100 and then appends further pages on demand:
+`loadMoreOperations()` for the history and `loadMoreTimeline()` for the selected
+operation's events, each labelled *Showing N of M* from `meta.total` so the list
+states when it is not the whole record.
+
+Both were previously pinned to page 1 with no control to go further, so on a
+tenant provisioned, repaired and updated enough times the earlier operations
+could not be selected at all, and the timeline heading reported the operation's
+true event count beside a list that stopped at a hundred.
+
+Two rules the appends keep:
+
+- each is guarded on the page it is extending, so a second click while the first
+  request is in flight re-asks for the same page rather than skipping one, and
+  an append lands nowhere if the list was reloaded underneath it;
+- the timeline append is additionally fenced on the selected operation id, so
+  selecting another operation mid-request cannot append its events to this
+  one's - the same identity check the selected detail already makes.
+
+The other collections on this screen (updates, components, seeds) are bounded by
+the tenant's installed application set rather than by history, and are still
+single-page.
+
 ## Get detail and timeline
 
 Both ids must be UUIDv7 and the operation must belong to the path tenant.

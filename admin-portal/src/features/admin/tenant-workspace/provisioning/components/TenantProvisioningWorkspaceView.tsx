@@ -231,11 +231,67 @@ function OperationsSection({ model }: TenantProvisioningWorkspaceViewProps) {
                 </div>
               </Button>
             ))}
+            <LoadMoreFooter
+              shown={provisioning.operations.data.items.length}
+              total={provisioning.operations.data.meta.total}
+              hasNext={provisioning.operations.data.meta.hasNext}
+              loading={provisioning.loadingMoreOperations}
+              onLoadMore={() => void provisioning.loadMoreOperations()}
+              copy={copy}
+            />
           </div>
           <OperationDetail model={model} />
         </div>
       )}
     </ResourceBoundary>
+  );
+}
+
+/**
+ * FE-OPS-006. Both histories were pinned to the newest hundred with no control
+ * to reach past it, so an operator on a tenant with a long provisioning history
+ * could not select an earlier operation at all - and the timeline header went on
+ * reporting the true event count beside a list that stopped at a hundred.
+ *
+ * The count is stated rather than implied: "Showing 100 of 340" is the part
+ * that tells an operator the list is not the whole story even before they reach
+ * the button.
+ */
+function LoadMoreFooter({
+  shown,
+  total,
+  hasNext,
+  loading,
+  onLoadMore,
+  copy,
+}: {
+  shown: number;
+  total: number;
+  hasNext: boolean;
+  loading: boolean;
+  onLoadMore: () => void;
+  copy: { showingOfTotal: string; loadMore: string; loadingMore: string };
+}) {
+  if (total <= shown && !hasNext) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
+      <span>
+        {copy.showingOfTotal
+          .replace("{shown}", String(shown))
+          .replace("{total}", String(total))}
+      </span>
+      {hasNext ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          onClick={onLoadMore}
+        >
+          {loading ? copy.loadingMore : copy.loadMore}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -401,6 +457,17 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                         </li>
                       ))}
                     </ol>
+                    <LoadMoreFooter
+                      shown={provisioning.timeline.data.items.length}
+                      // The operation's own count, which the heading above
+                      // already shows: the list stopping short of it is the
+                      // thing an operator has to be able to see.
+                      total={operation.timelineEventCount}
+                      hasNext={provisioning.timeline.data.meta.hasNext}
+                      loading={provisioning.loadingMoreTimeline}
+                      onLoadMore={() => void provisioning.loadMoreTimeline()}
+                      copy={copy}
+                    />
                   </ResourceBoundary>
                 </div>
               </>
