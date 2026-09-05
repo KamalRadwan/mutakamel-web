@@ -48,7 +48,16 @@ export function LocationPickerDialog({
   const { t, dir } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<{ remove: () => void } | null>(null);
-  const [picked, setPicked] = useState<PickedLocation>(initial ?? CAIRO_DOWNTOWN);
+  // Read the starting pin as two numbers rather than as the `initial` object.
+  // A caller that builds that object inline hands us a new identity on every
+  // render, and an effect keyed on it would tear the map down — and move the
+  // pin back to the start — while the administrator is still dragging it.
+  const startLatitude = initial?.latitude ?? CAIRO_DOWNTOWN.latitude;
+  const startLongitude = initial?.longitude ?? CAIRO_DOWNTOWN.longitude;
+  const [picked, setPicked] = useState<PickedLocation>({
+    latitude: startLatitude,
+    longitude: startLongitude,
+  });
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -61,7 +70,7 @@ export function LocationPickerDialog({
       // The dialog can close while the chunk is still in flight.
       if (cancelled || !containerRef.current) return;
 
-      const start = initial ?? CAIRO_DOWNTOWN;
+      const start = { latitude: startLatitude, longitude: startLongitude };
       const map = leaflet.map(containerRef.current).setView(
         [start.latitude, start.longitude],
         13,
@@ -110,6 +119,12 @@ export function LocationPickerDialog({
         map.remove();
         mapRef.current = null;
         setIsReady(false);
+        // The pick belongs to this opening of the map, and to no other. The
+        // only point this dialog may hand back is one the administrator
+        // confirmed; a pin they dropped and then cancelled must not survive
+        // into the next opening, where the map is showing the start point
+        // again and Confirm would submit a location nobody can see.
+        setPicked(start);
       };
     })();
 
@@ -117,7 +132,7 @@ export function LocationPickerDialog({
       cancelled = true;
       cleanup?.();
     };
-  }, [open, initial]);
+  }, [open, startLatitude, startLongitude]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

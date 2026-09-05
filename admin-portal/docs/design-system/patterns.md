@@ -74,6 +74,21 @@ are constraint-critical operational patterns. Their route composition must
 preserve authoritative evidence and must not be replaced with generic toast or
 empty-state behavior.
 
+## A dialog that outlives its own opening owns nothing from the last one
+
+A screen that keeps a dialog mounted and only toggles `open` keeps that
+dialog's React state across a dismissal. Radix unmounts the *content*, not the
+component, so a selection the operator abandoned is still held when they open
+it again — while the content, rebuilt from props, shows the starting state. The
+two then disagree, and confirming submits the value nobody can see.
+
+A dialog whose selection is dismissible therefore resets that selection on
+close, alongside whatever else tears down with the opening: `open` is the
+lifecycle boundary, and cancelling preserves only what was already confirmed.
+`LocationPickerDialog` resets its picked coordinates in the same cleanup that
+disposes the Leaflet map, so the point it confirms and the pin on screen can
+never be two different places.
+
 ## Composing patterns from primitives, not the other way around
 
 A pattern's implementation reaches into `src/design-system/primitives/*`
