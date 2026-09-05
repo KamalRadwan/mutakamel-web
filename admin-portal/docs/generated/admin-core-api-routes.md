@@ -3,26 +3,26 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-09-04T22:57:59.844Z**
+Generated at: **2026-09-05T01:25:52.383Z**
 
-Frontend revision: `b8b73c0c87ae+dirty`
+Frontend revision: `6ab60f6f90d7`
 
-Backend revision: `d9373e1059c9+dirty`
+Backend revision: `116193f693c5+dirty`
 
 ## Coverage
 
-This inventory contains **251** browser-visible Core Admin routes.
+This inventory contains **253** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
 
 | Route class | Routes |
 | --- | ---: |
-| AUTHENTICATED | 88 |
+| AUTHENTICATED | 89 |
 | PUBLIC | 6 |
 | READ_HEAVY | 21 |
-| WRITE_SENSITIVE | 136 |
-| **Total** | **251** |
+| WRITE_SENSITIVE | 137 |
+| **Total** | **253** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -31,7 +31,7 @@ Machine-readable source:
 
 | Gateway route-key domain | Routes |
 | --- | ---: |
-| applications | 15 |
+| applications | 17 |
 | audit | 3 |
 | auth | 12 |
 | auth-invalidation-outbox | 1 |
@@ -72,6 +72,8 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/applications/:applicationKey/activate` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.activate` |
 | GET | `/api/admin/core/v1/applications/:applicationKey/database-manifests` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.database-manifests.list` |
 | PATCH | `/api/admin/core/v1/applications/:applicationKey/database-policy` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.database-policy.update` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/database-servers` | AUTHENTICATED | yes | ALL | admin.database_servers.read | `core.admin.applications.database-servers.list` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/database-servers/bind` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.update + admin.database_servers.critical | `core.admin.applications.database-servers.bind` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/deprecate` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.deprecate` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/disable` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.disable` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/publish` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.publish` |

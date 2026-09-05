@@ -1,30 +1,30 @@
 {
   "metadata": {
-    "generatedAt": "2026-09-04T22:57:59.844Z",
+    "generatedAt": "2026-09-05T01:25:52.383Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "b8b73c0c87ae+dirty",
-    "backendRevision": "d9373e1059c9+dirty",
+    "frontendRevision": "6ab60f6f90d7",
+    "backendRevision": "116193f693c5+dirty",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
   },
   "counts": {
-    "total": 251,
+    "total": 253,
     "byMethod": {
-      "GET": 100,
-      "POST": 108,
+      "GET": 101,
+      "POST": 109,
       "DELETE": 16,
       "PATCH": 24,
       "PUT": 3
     },
     "byRouteClass": {
-      "AUTHENTICATED": 88,
-      "WRITE_SENSITIVE": 136,
+      "AUTHENTICATED": 89,
+      "WRITE_SENSITIVE": 137,
       "PUBLIC": 6,
       "READ_HEAVY": 21
     },
     "byDomain": {
-      "applications": 15,
+      "applications": 17,
       "catalog": 17,
       "audit": 3,
       "auth-invalidation-outbox": 1,
@@ -50,7 +50,7 @@
     }
   },
   "sourceHashes": {
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "aafca0d95bebaba1896defebecd383f8f8ad582c5ee07aa3b63a4f2be0e53585",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "0d37316fc904a3cb73ab0154f86016f808b725267b80f8057893d6624de8f9c9",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
   },
   "routes": [
@@ -277,6 +277,41 @@
       "timeoutClass": "DEFAULT",
       "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": "CORE.ADMIN.APPLICATIONS.UPDATE_DATABASE_POLICY"
+    },
+    {
+      "method": "GET",
+      "canonicalPath": "/api/admin/core/v1/applications/:applicationKey/database-servers",
+      "upstreamPath": "/api/v1/admin/applications/:applicationKey/database-servers",
+      "routeKey": "core.admin.applications.database-servers.list",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [
+        "admin.database_servers.read"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/applications/:applicationKey/database-servers/bind",
+      "upstreamPath": "/api/v1/admin/applications/:applicationKey/database-servers/bind",
+      "routeKey": "core.admin.applications.database-servers.bind",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.database_servers.update",
+        "admin.database_servers.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": "CORE.ADMIN.APPLICATIONS.DATABASE_SERVERS.BIND"
     },
     {
       "method": "POST",
