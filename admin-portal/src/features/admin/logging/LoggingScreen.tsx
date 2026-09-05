@@ -346,7 +346,33 @@ function DirectoryPanel({
               </footer>
             </div>
           ) : (
-            <InlineEmpty text={copy.emptyDirectory} />
+            <>
+              <InlineEmpty text={copy.emptyDirectory} />
+              {/*
+                FE-AL01. The pagination footer used to live inside the
+                rows.length branch, so a page that came back empty - the last
+                page of a list that shrank, or a filter that matches nothing
+                beyond page 1 - rendered the empty state with no Previous
+                button. The operator was stranded on an empty page with no way
+                back except editing the URL or reloading.
+              */}
+              {view.directoryPage > 1 ? (
+                <footer className="mt-3 flex items-center justify-between gap-3 text-sm">
+                  <span className="font-semibold text-muted-foreground">
+                    {copy.page} {formatInteger(view.directoryPage, lang)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => view.setDirectoryPage(view.directoryPage - 1)}
+                    disabled={view.directory.isRefreshing}
+                  >
+                    {copy.previous}
+                  </Button>
+                </footer>
+              ) : null}
+            </>
           )}
           <Correlation resource={view.directory} copy={copy} lang={lang} />
         </>

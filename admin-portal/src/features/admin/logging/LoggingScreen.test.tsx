@@ -232,4 +232,45 @@ describe("LoggingScreen", () => {
     expect(screen.getByRole("heading", { name: "دليل التجاوزات" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "السجلات المباشرة المنقحة" })).toBeTruthy();
   });
+
+  /**
+   * FE-AL01. The pagination footer lived inside the rows.length branch, so a
+   * page that came back empty - the last page of a list that shrank, or a
+   * filter matching nothing beyond page 1 - rendered the empty state with no
+   * Previous button. The operator was stranded with no way back short of
+   * editing the URL.
+   */
+  it("offers a way back from an empty page past the first", () => {
+    consoleMock.directory = {
+      data: [],
+      state: "READY",
+      error: null,
+      correlationId: null,
+      timestamp: null,
+      isRefreshing: false,
+    };
+    consoleMock.directoryPage = 3;
+
+    render(<LoggingScreen />);
+
+    const previous = screen.getByRole("button", { name: "Previous" });
+    fireEvent.click(previous);
+    expect(consoleMock.setDirectoryPage).toHaveBeenCalledWith(2);
+  });
+
+  it("offers no pagination on an empty first page", () => {
+    consoleMock.directory = {
+      data: [],
+      state: "READY",
+      error: null,
+      correlationId: null,
+      timestamp: null,
+      isRefreshing: false,
+    };
+    consoleMock.directoryPage = 1;
+
+    render(<LoggingScreen />);
+
+    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
+  });
 });
