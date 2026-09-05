@@ -598,6 +598,17 @@ returned with four fractional digits.
 }
 ```
 
+Both replacements are whole-set writes, and neither returns through the tier and
+feature lists: a tier's grants and its price ladders are read by their own
+requests, keyed by tier id. Re-listing tiers after a save therefore proves
+nothing about them. `useApplicationCatalogue` re-reads the selected tier's
+grants and prices after every write and on the header's Refresh, because saving
+into the tier already selected changes no id and so wakes no id-driven reload.
+Without it the editor kept rebuilding its brackets from the pre-save ladder and
+would offer to write that ladder back over the one just saved. The re-read is
+skipped when the write moved the selection — deleting the selected tier — so a
+succeeded command cannot report a failure for the row it removed.
+
 ## Exact endpoint matrix
 
 | Method and browser path | Permission | HTTP success | Idempotency |

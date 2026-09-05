@@ -257,6 +257,45 @@ export function useApplicationCatalogue(applicationId: string | null) {
     [commitSelectedTier],
   );
 
+  /**
+   * Re-reads the selected tier's grants and prices after a write.
+   *
+   * `loadCatalogue` refreshes the tier and feature lists only; grants and prices
+   * have a request of their own, fired by the effect that watches
+   * `selectedTierId`. Saving into the tier already selected changes no id, so
+   * that effect never runs and the two arrays keep the values they held before
+   * the save. The pricing editor rebuilds its brackets from that cache every
+   * time the billing cycle changes, so a just-saved ladder came back as the
+   * previous one — and saving again wrote the stale ladder over the new one.
+   *
+   * Skipped when the selection has already moved underneath it — deleting the
+   * selected tier is the case — because the effect is then loading whichever
+   * tier replaced it, and re-reading the deleted one would report a failure for
+   * a command that succeeded.
+   */
+  const reloadSelectedTierDetails = useCallback(
+    async (requestedApplicationId: string, requestedTierId: string | null) => {
+      if (
+        !requestedTierId ||
+        applicationIdRef.current !== requestedApplicationId ||
+        selectedTierIdRef.current !== requestedTierId
+      ) {
+        return;
+      }
+      await loadTierDetails(requestedTierId);
+    },
+    [loadTierDetails],
+  );
+
+  /** Everything the header's Refresh button is expected to bring up to date. */
+  const refreshAll = useCallback(async () => {
+    const requestedApplicationId = applicationIdRef.current;
+    const requestedTierId = selectedTierIdRef.current;
+    if (!requestedApplicationId) return;
+    await Promise.all([loadCatalogue(), loadAudit()]);
+    await reloadSelectedTierDetails(requestedApplicationId, requestedTierId);
+  }, [loadAudit, loadCatalogue, reloadSelectedTierDetails]);
+
   const runMutation = async <T,>(
     action: string,
     payload: unknown,
@@ -267,6 +306,7 @@ export function useApplicationCatalogue(applicationId: string | null) {
     if (!requestedApplicationId || applicationIdRef.current !== requestedApplicationId) {
       throw new Error("APPLICATION_CONTEXT_CHANGED");
     }
+    const requestedTierId = selectedTierIdRef.current;
     setPendingAction(action);
     setCatalogueError(null);
     try {
@@ -277,6 +317,7 @@ export function useApplicationCatalogue(applicationId: string | null) {
       if (applicationIdRef.current === requestedApplicationId) {
         toast.success("Saved", message);
         await Promise.all([loadCatalogue(), loadAudit()]);
+        await reloadSelectedTierDetails(requestedApplicationId, requestedTierId);
       }
       return result;
     } catch (error) {
@@ -284,6 +325,10 @@ export function useApplicationCatalogue(applicationId: string | null) {
       if (shouldRotateWriteCommandKey(normalized)) resetKey();
       if (applicationIdRef.current === requestedApplicationId) {
         await Promise.allSettled([loadCatalogue(), loadAudit()]);
+        // The write may still have landed — an ambiguous outcome is exactly when
+        // the operator most needs the arrays to be the server's, not the ones
+        // they were editing.
+        await reloadSelectedTierDetails(requestedApplicationId, requestedTierId);
         reportError(normalized, setCatalogueError);
       }
       throw normalized;
@@ -428,6 +473,7 @@ export function useApplicationCatalogue(applicationId: string | null) {
     loadCatalogue,
     loadTierDetails,
     loadAudit,
+    refreshAll,
     recoverPendingCreateAttempt,
     clearAbsentPendingCreateAttempt,
     createTier,

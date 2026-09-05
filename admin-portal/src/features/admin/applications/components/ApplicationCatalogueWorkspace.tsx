@@ -208,10 +208,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
               variant="outline"
               size="sm"
               loading={catalogue.isLoading}
-              onClick={() => {
-                void catalogue.loadCatalogue();
-                void catalogue.loadAudit();
-              }}
+              onClick={() => void catalogue.refreshAll()}
               className="self-start"
             >
               <RefreshCw className="size-4" aria-hidden="true" />
