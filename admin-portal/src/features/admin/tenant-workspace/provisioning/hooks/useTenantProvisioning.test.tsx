@@ -232,4 +232,55 @@ describe("useTenantProvisioning", () => {
     expect(apiMock.cancelOperation).not.toHaveBeenCalled();
     expect(SEED_ID).not.toBe(OPERATION_ID);
   });
+
+  /**
+   * FE-OPS-005. `loadSelectedOperation` only checked `signal?.aborted`. The
+   * selection effect does pass a signal and aborts it on change, so that path
+   * was already safe - but `refreshAll` and the poll pass **no** signal, so
+   * there was nothing to abort. A refresh started while A was selected, the
+   * operator picked B, and A's late response committed: the list highlighted B
+   * while the detail pane, the timeline and the retry/cancel actions read A.
+   *
+   * This drives refreshAll deliberately, because that is the defective path;
+   * asserting through the selection effect would pass on the abort and prove
+   * nothing about the guard.
+   */
+  it("drops a signal-less refresh response for an operation no longer selected", async () => {
+    const { result } = renderHook(() =>
+      useTenantProvisioning(TENANT_ID, { pollIntervalMs: 60_000 }),
+    );
+    await waitFor(() =>
+      expect(result.current.selectedOperation.data?.id).toBe(OPERATION_ID),
+    );
+
+    // A refresh for A that has not answered yet - and carries no signal.
+    let resolveStale: ((value: unknown) => void) | undefined;
+    apiMock.getOperation.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveStale = resolve;
+        }),
+    );
+    let refreshing: Promise<unknown> | undefined;
+    act(() => {
+      refreshing = result.current.refreshAll();
+    });
+
+    // The operator moves to B, whose detail resolves immediately.
+    apiMock.getOperation.mockResolvedValue(
+      readTenantOperationDetail(operationDetail({ id: RETRY_OPERATION_ID })),
+    );
+    act(() => result.current.selectOperation(RETRY_OPERATION_ID));
+    await waitFor(() =>
+      expect(result.current.selectedOperation.data?.id).toBe(RETRY_OPERATION_ID),
+    );
+
+    // A answers late. Nothing aborted it, so only its identity can refuse it.
+    await act(async () => {
+      resolveStale?.(readTenantOperationDetail(operationDetail()));
+      await refreshing;
+    });
+
+    expect(result.current.selectedOperation.data?.id).toBe(RETRY_OPERATION_ID);
+  });
 });

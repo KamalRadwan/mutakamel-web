@@ -115,6 +115,20 @@ export function useTenantProvisioning(
   const [selectedOperationId, setSelectedOperationId] = useState<string | null>(
     null,
   );
+
+  /**
+   * The live selection, outside the closure.
+   *
+   * `loadSelectedOperation` only checked `signal?.aborted`, and two of its three
+   * callers - `refreshAll` and the poll - pass no signal at all. Selecting
+   * operation B while A's detail was in flight therefore let A's response
+   * commit: the list highlighted B while the detail pane, timeline, and the
+   * retry/cancel actions read A.
+   */
+  const selectedOperationIdRef = useRef(selectedOperationId);
+  useEffect(() => {
+    selectedOperationIdRef.current = selectedOperationId;
+  }, [selectedOperationId]);
   const [selectedOperation, setSelectedOperation] = useState(() =>
     idleResource<TenantOperationDetail | null>(null),
   );
@@ -183,7 +197,12 @@ export function useTenantProvisioning(
           signal,
         ),
       ]);
-      if (signal?.aborted) return;
+      // Identity, not just the signal: a signal-less caller has nothing to
+      // abort, so the operation the response describes is the only thing that
+      // can say whether it is still the one on screen.
+      if (signal?.aborted || selectedOperationIdRef.current !== operationId) {
+        return;
+      }
       if (detailResult.status === "fulfilled") {
         setSelectedOperation(readyResource(detailResult.value));
       } else if (!isAbortError(detailResult.reason)) {
