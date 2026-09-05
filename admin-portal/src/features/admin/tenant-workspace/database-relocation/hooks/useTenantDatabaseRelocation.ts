@@ -102,7 +102,20 @@ export function useTenantDatabaseRelocation(
   const [ambiguousCommand, setAmbiguousCommand] = useState<
     "start" | "release" | null
   >(null);
-  const [intentMismatch, setIntentMismatch] = useState(false);
+  /**
+   * Which persisted slot raised PendingCommandIntentMismatchError, not merely
+   * that one did.
+   *
+   * There are two slots - the start command and the release command - and only
+   * the matching reconciler can clear the stale attempt. A boolean could not
+   * say which, so the banner always offered reconcileStart: a release-path
+   * mismatch was "recovered" by clearing an unrelated slot, and the next
+   * Release threw the same error again with no HTTP request ever issued. That
+   * loop had no exit.
+   */
+  const [intentMismatch, setIntentMismatch] = useState<
+    "start" | "release" | null
+  >(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [releaseConfirmOpen, setReleaseConfirmOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -214,7 +227,7 @@ export function useTenantDatabaseRelocation(
   const hasBlockers = blockers.length > 0;
   const hasTargets = (preflight?.targets.length ?? 0) > 0;
   const startLocked =
-    ambiguousCommand === "start" || intentMismatch || isStarting;
+    ambiguousCommand === "start" || intentMismatch !== null || isStarting;
   const canSubmit =
     permissions.canExecute &&
     !hasBlockers &&
@@ -282,7 +295,7 @@ export function useTenantDatabaseRelocation(
       setConfirmOpen(false);
     } catch (caught) {
       if (caught instanceof PendingCommandIntentMismatchError) {
-        setIntentMismatch(true);
+        setIntentMismatch("start");
         setConfirmOpen(false);
         return;
       }
@@ -327,7 +340,7 @@ export function useTenantDatabaseRelocation(
       // what strands the next submission behind an intent mismatch.
       startCommand.clear();
       setAmbiguousCommand(null);
-      setIntentMismatch(false);
+      setIntentMismatch(null);
       setCommandError(null);
       return recovered;
     } catch (caught) {
@@ -362,7 +375,7 @@ export function useTenantDatabaseRelocation(
       setReleaseConfirmOpen(false);
     } catch (caught) {
       if (caught instanceof PendingCommandIntentMismatchError) {
-        setIntentMismatch(true);
+        setIntentMismatch("release");
         setReleaseConfirmOpen(false);
         return;
       }
@@ -388,6 +401,10 @@ export function useTenantDatabaseRelocation(
         setAmbiguousCommand(null);
         setCommandError(null);
       }
+      // Cleared whatever the ledger said: the stale release attempt is what
+      // blocks the next submission, and re-reading the run is the answer to it
+      // either way. reconcileStart has always done this for its own slot.
+      setIntentMismatch((slot) => (slot === "release" ? null : slot));
     } catch (caught) {
       setCommandError(normalizeApiError(caught));
     } finally {

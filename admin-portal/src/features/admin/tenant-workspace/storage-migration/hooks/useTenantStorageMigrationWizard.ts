@@ -119,7 +119,16 @@ export function useTenantStorageMigrationWizard(
   const [ambiguousCommand, setAmbiguousCommand] = useState<
     "start" | "release" | null
   >(null);
-  const [intentMismatch, setIntentMismatch] = useState(false);
+  /**
+   * Which persisted slot raised PendingCommandIntentMismatchError. A boolean
+   * could not say, so the banner always offered reconcileStart and a
+   * release-path mismatch stayed stuck: the wrong slot was cleared and the next
+   * Release raised the same error with no request issued. Twin of the database
+   * relocation wizard.
+   */
+  const [intentMismatch, setIntentMismatch] = useState<
+    "start" | "release" | null
+  >(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [releaseConfirmOpen, setReleaseConfirmOpen] = useState(false);
 
@@ -243,7 +252,7 @@ export function useTenantStorageMigrationWizard(
     null;
 
   const startLocked =
-    ambiguousCommand !== null || intentMismatch || isStarting;
+    ambiguousCommand !== null || intentMismatch !== null || isStarting;
   const canSubmit =
     permissions.canExecute &&
     permissions.canReadBackupEvidence &&
@@ -318,7 +327,7 @@ export function useTenantStorageMigrationWizard(
       setConfirmOpen(false);
     } catch (caught) {
       if (caught instanceof PendingCommandIntentMismatchError) {
-        setIntentMismatch(true);
+        setIntentMismatch("start");
         setConfirmOpen(false);
         return;
       }
@@ -363,7 +372,7 @@ export function useTenantStorageMigrationWizard(
       // blocks the next submission as an intent mismatch.
       startCommand.clear();
       setAmbiguousCommand(null);
-      setIntentMismatch(false);
+      setIntentMismatch(null);
       setCommandError(null);
       return next.openMigrationId;
     } catch (caught) {
@@ -406,7 +415,7 @@ export function useTenantStorageMigrationWizard(
       setReleaseConfirmOpen(false);
     } catch (caught) {
       if (caught instanceof PendingCommandIntentMismatchError) {
-        setIntentMismatch(true);
+        setIntentMismatch("release");
         setReleaseConfirmOpen(false);
         return;
       }
@@ -435,6 +444,10 @@ export function useTenantStorageMigrationWizard(
         setAmbiguousCommand(null);
         setCommandError(null);
       }
+      // Cleared whatever the projection said: re-reading the migration answers
+      // the stale release attempt either way, and that attempt is what blocks
+      // the next submission. reconcileStart has always done this for its slot.
+      setIntentMismatch((slot) => (slot === "release" ? null : slot));
     } catch (caught) {
       setCommandError(normalizeApiError(caught));
     } finally {

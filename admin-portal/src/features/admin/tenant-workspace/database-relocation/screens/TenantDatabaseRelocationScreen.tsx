@@ -20,6 +20,18 @@ import { useTenantDatabaseRelocation } from "../hooks/useTenantDatabaseRelocatio
 import { TENANT_RELOCATION_READ_PERMISSION } from "../model/permissions";
 
 /**
+ * Refusals that mean "this Worker cannot take the copy", which the operator
+ * reads better as a sentence than as a code.
+ *
+ * Two codes, one meaning: the copy used to share the backup runtime's gate and
+ * a Worker on that build still answers the older one.
+ */
+const COPY_RUNTIME_REFUSAL_CODES: ReadonlySet<string> = new Set([
+  "WORKER.RELOCATION.RUNTIME_UNAVAILABLE",
+  "WORKER.BACKUP.RUNTIME_UNAVAILABLE",
+]);
+
+/**
  * Moving one tenant's database to another Database Server.
  *
  * The page is gated on the relocation *read* permission because every phase —
@@ -94,6 +106,11 @@ function TenantDatabaseRelocationWorkspace({ tenantId }: { tenantId: string }) {
         // Actionable, because the operator cannot resolve this any other way:
         // the stale attempt lives in their own session storage, and the only
         // honest way to clear it is to read what the Worker actually has.
+        //
+        // Routed by the slot that raised the mismatch. Only the matching
+        // reconciler clears the right stale attempt; sending a release-path
+        // mismatch to reconcileStart cleared an unrelated slot and left the
+        // next Release throwing the same error, with no request issued.
         <div
           role="alert"
           className="flex flex-col gap-2 rounded-md border border-warning/30 bg-warning-subtle p-3 text-sm text-warning-subtle-foreground"
@@ -104,7 +121,11 @@ function TenantDatabaseRelocationWorkspace({ tenantId }: { tenantId: string }) {
               variant="outline"
               size="sm"
               loading={controller.isReconciling}
-              onClick={() => void controller.reconcileStart()}
+              onClick={() =>
+                void (controller.intentMismatch === "release"
+                  ? controller.reconcileRelease()
+                  : controller.reconcileStart())
+              }
             >
               {copy.pendingIntentResolve}
             </Button>
@@ -139,8 +160,9 @@ function TenantDatabaseRelocationWorkspace({ tenantId }: { tenantId: string }) {
           className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground"
         >
           <p>
-            {controller.commandError.errorCode ===
-            "WORKER.BACKUP.RUNTIME_UNAVAILABLE"
+            {COPY_RUNTIME_REFUSAL_CODES.has(
+              controller.commandError.errorCode ?? "",
+            )
               ? // The raw code reads like a fault. It is a deliberate refusal
                 // with a specific cause and a specific remedy, and saying so
                 // saves an operator from retrying a command that cannot run.

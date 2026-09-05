@@ -106,7 +106,11 @@ function TenantStorageMigrationWorkspace({ tenantId }: { tenantId: string }) {
               variant="outline"
               size="sm"
               loading={controller.isReconciling}
-              onClick={() => void controller.reconcileStart()}
+              onClick={() =>
+                void (controller.intentMismatch === "release"
+                  ? controller.reconcileRelease()
+                  : controller.reconcileStart())
+              }
             >
               {copy.pendingIntentResolve}
             </Button>

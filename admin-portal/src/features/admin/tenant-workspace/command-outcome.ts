@@ -39,9 +39,13 @@ export function isAmbiguousCommandOutcome(
 }
 
 /** Worker refusals raised before a relocation exists. */
-export const RELOCATION_DEFINITIVE_REFUSAL_CODES: ReadonlySet<string> = new Set(
-  ["WORKER.BACKUP.RUNTIME_UNAVAILABLE", "WORKER.RELOCATION.CORE_PLACEMENT_UNAVAILABLE"],
-);
+export const RELOCATION_DEFINITIVE_REFUSAL_CODES: ReadonlySet<string> = new Set([
+  "WORKER.RELOCATION.RUNTIME_UNAVAILABLE",
+  "WORKER.RELOCATION.CORE_PLACEMENT_UNAVAILABLE",
+  // Kept for Workers still on the build where the copy shared the backup
+  // runtime's gate. Same meaning: refused before anything was opened.
+  "WORKER.BACKUP.RUNTIME_UNAVAILABLE",
+]);
 
 /** Core refusals raised before a storage migration command row exists. */
 export const STORAGE_MIGRATION_DEFINITIVE_REFUSAL_CODES: ReadonlySet<string> =
@@ -49,3 +53,40 @@ export const STORAGE_MIGRATION_DEFINITIVE_REFUSAL_CODES: ReadonlySet<string> =
     "STORAGE_MIGRATION_READINESS_UNAVAILABLE",
     "STORAGE_MIGRATION_READINESS_TIMEOUT",
   ]);
+
+/**
+ * Which persisted command slot raised `PendingCommandIntentMismatchError`.
+ *
+ * Both wizards keep two slots — the start command and the release command —
+ * and only the matching reconciler can clear the stale attempt.
+ */
+export type PendingIntentSlot = "start" | "release";
+
+/**
+ * Names the reconciler that owns a stale attempt.
+ *
+ * The mismatch used to be a bare boolean, so the banner always offered the
+ * start reconciler. A release-path mismatch was then "recovered" by clearing an
+ * unrelated slot, and the next Release raised the same error again — with no
+ * HTTP request ever issued, so nothing in the run could move it forward. The
+ * loop had no exit short of clearing session storage by hand.
+ */
+export function reconcilerForPendingIntent(
+  slot: PendingIntentSlot | null,
+): "start" | "release" | null {
+  return slot;
+}
+
+/**
+ * Whether re-reading the run answers this slot's stale attempt.
+ *
+ * Both reconcilers re-read authoritative state, so either answers its own
+ * slot; what matters is that the one that runs is the one holding the stale
+ * attempt.
+ */
+export function clearsPendingIntent(
+  slot: PendingIntentSlot | null,
+  reconciler: "start" | "release",
+): boolean {
+  return slot !== null && slot === reconciler;
+}
