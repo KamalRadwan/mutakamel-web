@@ -170,6 +170,23 @@ Gateway write-sensitive routes require UUIDv7 intent keys where declared in the
 [generated inventory](../generated/admin-core-api-routes.md). Disable duplicate
 submissions and retain the original key for an exact retry.
 
+**An ambiguous invite is never reconciled from the directory.** A `5xx`,
+`GW.IDEM.IN_FLIGHT`, or transport failure on `POST /users` leaves the outcome
+unknown, and searching the list for a user carrying the submitted email, names,
+role, and super-admin flag cannot resolve it: those fields describe an account,
+not a command. An account that was already `ACTIVE` — or already holding an
+older pending invitation — matches every one of them, so the search confirmed
+an invitation that had sent no email, closed the modal, and discarded the
+pending intent. The invite modal keeps that intent and its key and shows the
+ambiguous panel instead; the operator's exact retry carries the same key, so
+the Gateway answers for the original command.
+
+This is what separates an invite from the reconciliations on the user detail
+screen. Those address a row whose id is already known and only ask whether the
+desired state now holds, which a read of that row proves. An invite has no row
+id to address, and the operator's real question — did this person receive an
+invitation — is not answered by an account that merely looks alike.
+
 A missing read permission renders forbidden, not an empty user list.
 
 ## Current frontend evidence

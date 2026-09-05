@@ -5,7 +5,6 @@ import { useToast } from "@/components/ui/ToastContext";
 import {
   inviteAdminUser,
   isForbiddenError,
-  listAdminUsers,
   listRoles,
 } from "../api/adminUsersApi";
 import { getErrorMessageAndDetails } from "../utils/errorMapping";
@@ -118,16 +117,19 @@ export function useInviteUserModal({ onClose, onSuccess }: UseInviteUserModalOpt
       const ambiguous = nextIntent?.ambiguous === true;
       setIsAmbiguous(ambiguous);
 
-      if (ambiguous && (await invitedUserExists(intent.command))) {
-        inviteIntentRef.current = null;
-        setIsAmbiguous(false);
-        setIdempotencyKey(undefined);
-        toast.success(t.users.invitationConfirmedTitle, t.users.invitationConfirmedDesc);
-        onSuccess();
-        onClose();
-        return;
-      }
-
+      // An ambiguous invitation is NOT reconciled by searching the directory
+      // for a user with these fields. The directory says whether an account
+      // like this exists, never whether this command created it: an account
+      // that was already ACTIVE — or already carrying an older pending
+      // invitation — matches every field this modal submitted, so a search
+      // reported "invitation confirmed" for a request that had sent no email
+      // at all, then closed the modal and dropped the pending intent.
+      //
+      // The only thing that can answer the question is the command itself, so
+      // the intent and its UUIDv7 stay put and the operator retries the exact
+      // request from the ambiguous panel. That replay carries the same key, so
+      // the Gateway answers with the original outcome instead of inviting
+      // twice.
       const details = getErrorMessageAndDetails(err, lang);
       if (details.fieldErrors) {
         setFieldErrors(details.fieldErrors);
@@ -164,24 +166,4 @@ export function useInviteUserModal({ onClose, onSuccess }: UseInviteUserModalOpt
     isDirty,
     handleSubmit,
   };
-}
-
-async function invitedUserExists(command: CreateAdminUserDto): Promise<boolean> {
-  try {
-    const result = await listAdminUsers({
-      page: 1,
-      limit: 100,
-      search: command.email,
-    });
-    return result.data.some(
-      (candidate) =>
-        candidate.email.toLowerCase() === command.email &&
-        candidate.firstName === command.firstName &&
-        candidate.lastName === command.lastName &&
-        candidate.roleId === command.roleId &&
-        candidate.isSuperAdmin === Boolean(command.isSuperAdmin),
-    );
-  } catch {
-    return false;
-  }
 }

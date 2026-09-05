@@ -1932,9 +1932,6 @@ export const en: Dictionary = {
       "Restore the original values before retrying the unresolved invitation.",
     invitationSentTitle: "Invitation Sent",
     invitationSentDesc: "The invitation email has been sent successfully.",
-    invitationConfirmedTitle: "Invitation confirmed",
-    invitationConfirmedDesc:
-      "An authoritative user read confirmed the invitation was saved.",
     invitationFailedTitle: "Invitation Failed",
     cancel: "Cancel",
     ambiguousInviteMessage:

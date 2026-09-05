@@ -1869,8 +1869,6 @@ export const ar = {
     requestChangedDesc: "أعد القيم الأصلية لإعادة المحاولة.",
     invitationSentTitle: "تمت الدعوة بنجاح",
     invitationSentDesc: "تم إرسال دعوة الانضمام للمشرف الجديد بنجاح.",
-    invitationConfirmedTitle: "تم تأكيد الدعوة",
-    invitationConfirmedDesc: "أكدت قراءة المستخدم أن الدعوة حفظت بنجاح.",
     invitationFailedTitle: "فشل إرسال الدعوة",
     cancel: "إلغاء",
     ambiguousInviteMessage: "نتيجة الدعوة غير مؤكدة. أعد محاولة نفس الطلب.",
