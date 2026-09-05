@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { apiMock, authMock, toastMock, i18nMock } = vi.hoisted(() => ({
   apiMock: {
+    countAdminUsers: vi.fn(),
     listAdminUsers: vi.fn(),
     listWebphoneExtensions: vi.fn(),
     getAdminUser: vi.fn(),
@@ -67,6 +68,7 @@ describe("useUsers out-of-order responses", () => {
     apiMock.normalizeErrorCode.mockReturnValue("UNKNOWN");
     apiMock.listRoles.mockResolvedValue({ data: [] });
     apiMock.listWebphoneExtensions.mockResolvedValue([]);
+    apiMock.countAdminUsers.mockResolvedValue(0);
   });
 
   it("ignores an older list response after a newer filter has been requested", async () => {

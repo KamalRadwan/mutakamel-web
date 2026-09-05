@@ -2,13 +2,14 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import { adminCan } from "@/lib/auth/rbac";
 import {
+  countAdminUsers,
   listAdminUsers,
   listWebphoneExtensions,
   getAdminUser,
@@ -18,6 +19,7 @@ import {
   activateAdminUser,
   deleteAdminUser,
   normalizeErrorCode,
+  type ListUsersParams,
 } from "../api/adminUsersApi";
 import { getErrorMessageAndDetails } from "../utils/errorMapping";
 import type { AdminUser, AdminRole, AdminUserErrorCode } from "../types";
@@ -30,6 +32,19 @@ import {
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
 
 type DirectoryAction = "suspend" | "activate" | "delete";
+/** `null` where the route reported no total, so the card can say so. */
+type DirectoryStatusCounts = {
+  active: number | null;
+  invited: number | null;
+  suspended: number | null;
+  superAdmins: number | null;
+};
+const UNKNOWN_STATUS_COUNTS: DirectoryStatusCounts = {
+  active: null,
+  invited: null,
+  suspended: null,
+  superAdmins: null,
+};
 type DirectoryActionCommand = {
   userId: string;
   action: DirectoryAction;
@@ -75,13 +90,19 @@ export function useUsers() {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const actionIntentRef = useRef<AdminUserWriteIntent<DirectoryActionCommand> | null>(null);
 
-  const [summaryMetrics, setSummaryMetrics] = useState({
-    total: 0,
-    active: 0,
-    invited: 0,
-    suspended: 0,
-    superAdmins: 0,
-  });
+  /**
+   * UI-014. The four cards read as one breakdown of one population, but the
+   * total came from the list's pagination metadata while active, invited and
+   * super-admin were counted from whichever rows the current page happened to
+   * hold. Past a single page the breakdown moved every time the operator
+   * paged, and it never reconciled with the total printed beside it.
+   *
+   * Core exposes no summary route, so each card asks the list route for its
+   * own count. They deliberately do not depend on `page` or `limit`: the cards
+   * describe the filtered directory, the table describes one page of it.
+   */
+  const [statusCounts, setStatusCounts] =
+    useState<DirectoryStatusCounts>(UNKNOWN_STATUS_COUNTS);
 
   // Debounce search
   useEffect(() => {
@@ -173,20 +194,6 @@ export function useUsers() {
 
       setTotalCount(total);
       setTotalPages(totalPgs);
-
-      // Derive metrics accurately
-      const activeCount = userList.filter((u: AdminUser) => u.status === "ACTIVE").length;
-      const invitedCount = userList.filter((u: AdminUser) => u.status === "INVITED").length;
-      const suspendedCount = userList.filter((u: AdminUser) => u.status === "SUSPENDED").length;
-      const superAdminCount = userList.filter((u: AdminUser) => u.isSuperAdmin).length;
-
-      setSummaryMetrics({
-        total,
-        active: activeCount,
-        invited: invitedCount,
-        suspended: suspendedCount,
-        superAdmins: superAdminCount,
-      });
     } catch (err: any) {
       if (!isCurrent()) return;
       const code = normalizeErrorCode(err);
@@ -211,6 +218,53 @@ export function useUsers() {
       fetchUsers();
     });
   }, [fetchUsers]);
+
+  // Same guard as the directory, for the same reason: a slow count answering
+  // after the filter moved on must not repaint the cards.
+  const summaryGeneration = useRef(0);
+
+  const fetchStatusCounts = useCallback(async () => {
+    const generation = ++summaryGeneration.current;
+    const scope: ListUsersParams = {
+      search: debouncedSearch || undefined,
+      status: statusFilter,
+      isSuperAdmin: isSuperAdminFilter,
+      roleId: roleFilter,
+    };
+    try {
+      const [active, invited, suspended, superAdmins] = await Promise.all([
+        countAdminUsers({ ...scope, status: "ACTIVE" }),
+        countAdminUsers({ ...scope, status: "INVITED" }),
+        countAdminUsers({ ...scope, status: "SUSPENDED" }),
+        countAdminUsers({ ...scope, isSuperAdmin: "TRUE" }),
+      ]);
+      if (generation !== summaryGeneration.current) return;
+      setStatusCounts({ active, invited, suspended, superAdmins });
+    } catch {
+      // The directory below reports the failure itself. The cards go blank
+      // rather than keep standing behind numbers nothing has confirmed.
+      if (generation !== summaryGeneration.current) return;
+      setStatusCounts(UNKNOWN_STATUS_COUNTS);
+    }
+  }, [debouncedSearch, statusFilter, isSuperAdminFilter, roleFilter]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      fetchStatusCounts();
+    });
+  }, [fetchStatusCounts]);
+
+  const reload = useCallback(async () => {
+    await Promise.all([fetchUsers(), fetchStatusCounts()]);
+  }, [fetchUsers, fetchStatusCounts]);
+
+  // Every card now states a count for the whole filtered directory: the total
+  // is the list route's own pagination total, the rest are its counts for one
+  // status each. Nothing here is a tally of the visible page.
+  const summaryMetrics = useMemo(
+    () => ({ total: totalCount, ...statusCounts }),
+    [totalCount, statusCounts],
+  );
 
   const activeModalUser = users.find((u) => u.id === activeModalUserId);
 
@@ -264,7 +318,7 @@ export function useUsers() {
       actionIntentRef.current = null;
       setActiveModalUserId(null);
       setModalActionType(null);
-      await fetchUsers();
+      await reload();
     } catch (err: any) {
       const normalized = normalizeApiError(err);
       actionIntentRef.current = settleAdminUserWriteIntent(intent, err, normalized);
@@ -289,7 +343,7 @@ export function useUsers() {
           actionIntentRef.current = null;
           setActiveModalUserId(null);
           setModalActionType(null);
-          await fetchUsers();
+          await reload();
           return;
         }
       }
@@ -339,6 +393,6 @@ export function useUsers() {
     closeModal,
     confirmModalAction,
     isActionLoading,
-    refresh: fetchUsers,
+    refresh: reload,
   };
 }

@@ -57,6 +57,21 @@ from `AdminUserQueryDto`. Rows are in `data`; the total is `meta.total`, never
 type UserStatus = "INVITED" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
 ```
 
+### Counting a filtered set
+
+Core exposes no summary route for the directory. A card that has to state how
+many users match a filter asks this same route for a single-row page and reads
+`meta.total` — `countAdminUsers()` in `adminUsersApi.ts`. The rows in `data` are
+never a count: they are bounded by `limit`, so tallying one page reports the
+page rather than the filter, and the number moves as the operator pages. A
+response carrying no `meta.total` yields `null`, which the card renders as an em
+dash rather than a figure nothing confirmed.
+
+The directory's four summary cards each carry the screen's current search,
+status, super-admin and role filters, overriding only the one dimension they
+count. They are not keyed on `page` or `limit`: the cards describe the filtered
+directory, the table describes one page of it.
+
 ## Update and lifecycle
 
 - Email is immutable.

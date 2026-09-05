@@ -82,6 +82,22 @@ export async function listAdminUsers(params: ListUsersParams = {}) {
   return res.data;
 }
 
+/**
+ * How many users match a filter, without pulling their rows.
+ *
+ * Core exposes no summary route for the directory, so a card that has to state
+ * a count for the whole filtered set asks for a single-row page and reads the
+ * pagination total. `null` when the route answered without one: the row that
+ * came back says nothing about how many there are, and a count nobody reported
+ * must not be invented.
+ */
+export async function countAdminUsers(
+  params: ListUsersParams = {},
+): Promise<number | null> {
+  const res = await listAdminUsers({ ...params, page: 1, limit: 1 });
+  return typeof res?.meta?.total === "number" ? res.meta.total : null;
+}
+
 export async function getAdminUser(id: string) {
   const res = await axiosClient.get<SuccessResponse<AdminUser>>(
     `/api/admin/core/v1/users/${encodeURIComponent(id)}`

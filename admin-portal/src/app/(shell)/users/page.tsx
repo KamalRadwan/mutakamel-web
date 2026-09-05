@@ -242,10 +242,13 @@ export default function UsersDirectoryPage() {
       ) : (
         <>
           <StatGrid>
+            {/* Every card counts the whole filtered directory, so the three
+                parts stay comparable with the total however the table below is
+                paged. An em dash stands where no count was reported. */}
             <StatCard label={t.users.totalMembers} value={summaryMetrics.total} icon={Users} />
-            <StatCard label={t.users.activeAccounts} value={summaryMetrics.active} icon={CheckCircle2} />
-            <StatCard label={t.users.pendingInvites} value={summaryMetrics.invited} icon={Clock} />
-            <StatCard label={t.users.superAdmins} value={summaryMetrics.superAdmins} icon={ShieldCheck} />
+            <StatCard label={t.users.activeAccounts} value={summaryMetrics.active ?? "—"} icon={CheckCircle2} />
+            <StatCard label={t.users.pendingInvites} value={summaryMetrics.invited ?? "—"} icon={Clock} />
+            <StatCard label={t.users.superAdmins} value={summaryMetrics.superAdmins ?? "—"} icon={ShieldCheck} />
           </StatGrid>
 
           {error && (
