@@ -183,6 +183,22 @@ layout-ready within five seconds, it uses the same exact-value representation,
 re-enables export immediately, and announces that chart graphics were omitted
 with an option to retry.
 
+A closed `<details>` prints as its summary line alone, so a group tab's exact
+values are opened for the duration of the print and closed again afterwards,
+rather than duplicating every table into the DOM. Only disclosures the hook
+itself opened are closed again, so one the reader had already expanded stays
+expanded.
+
+That record accumulates across a print cycle; it is never replaced. One print
+is announced twice in a browser that has both `beforeprint` and a `print` media
+query — the media query exists because Safari and older WebKit fire no print
+events at all. Replacing the record on each announcement meant the second one
+found every disclosure already open, recorded nothing, and left the page
+expanded after the print or its cancellation. Accumulating also covers a
+disclosure that mounts between the two announcements, which a lazily drawn
+chart's exact-value table does. The record is cleared once, by whichever channel
+reports the end of the cycle first.
+
 ## Performance expectations
 
 - Paginated server data remains the default for large directories.

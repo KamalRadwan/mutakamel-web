@@ -25,20 +25,31 @@ export function usePrintableDisclosures(
 
     // Only disclosures this hook opened are closed again, so one the reader
     // had already expanded stays expanded after printing.
-    let opened: HTMLDetailsElement[] = [];
+    //
+    // The set accumulates rather than being replaced. One print is announced
+    // on both channels in a browser that has both, and replacing the record
+    // meant the second announcement found everything already open and tracked
+    // nothing — so restoring closed nothing and the page stayed expanded after
+    // the print or its cancellation. Accumulating is also what covers a
+    // disclosure that mounts between the two announcements, which a lazily
+    // drawn chart's exact-value table does.
+    const opened = new Set<HTMLDetailsElement>();
 
     const expand = () => {
       const root = containerRef.current;
       if (!root) return;
-      opened = [...root.querySelectorAll("details")].filter(
-        (details) => !details.open,
-      );
-      for (const details of opened) details.open = true;
+      for (const details of root.querySelectorAll("details")) {
+        if (details.open) continue;
+        details.open = true;
+        opened.add(details);
+      }
     };
 
+    // The print cycle ends here, on whichever channel reports it first, so the
+    // record is cleared once and the next cycle starts from nothing.
     const restore = () => {
       for (const details of opened) details.open = false;
-      opened = [];
+      opened.clear();
     };
 
     window.addEventListener("beforeprint", expand);
