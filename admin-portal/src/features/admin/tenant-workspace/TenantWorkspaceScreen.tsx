@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Database, HardDrive, ReceiptText, RefreshCw, Settings2, Users } from "lucide-react";
-import { Badge, Button, Card } from "@/design-system";
+import { ArrowLeft, ArrowRight, Database, HardDrive, MoveRight, ReceiptText, RefreshCw, Settings2, Users } from "lucide-react";
+import { Badge, Button, Card, PermissionGate } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantAccessPanel } from "./access";
+import { TENANT_RELOCATION_READ_PERMISSION } from "./database-relocation";
+import { STORAGE_MIGRATION_READ_PERMISSION } from "./storage-migration";
 import { TenantBillingPanel } from "./billing/components/TenantBillingPanel";
 import { useTenantBillingWorkspace } from "./billing/hooks/useTenantBillingWorkspace";
 import { TenantFqdnPanel } from "./core/components/TenantFqdnPanel";
@@ -167,6 +170,32 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
         </Card>
         </header>
 
+        {/* Placement moves are full wizards with their own progress monitor, so
+            they are routes rather than panels. `fallback={null}` keeps an
+            unauthorized operator's page unchanged instead of stamping a
+            forbidden block into the middle of the workspace — the routes
+            themselves still render the real permission boundary. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <PermissionGate permission={TENANT_RELOCATION_READ_PERMISSION} fallback={null}>
+            <PlacementMoveAction
+              href={`/tenants/${tenantId}/move-database`}
+              label={copy.moveDatabase}
+              icon={Database}
+              disabled={deleted}
+              hintId={DELETED_HINT_ID}
+            />
+          </PermissionGate>
+          <PermissionGate permission={STORAGE_MIGRATION_READ_PERMISSION} fallback={null}>
+            <PlacementMoveAction
+              href={`/tenants/${tenantId}/move-storage`}
+              label={copy.moveStorage}
+              icon={HardDrive}
+              disabled={deleted}
+              hintId={DELETED_HINT_ID}
+            />
+          </PermissionGate>
+        </div>
+
         <nav className="overflow-x-auto rounded-lg border border-border bg-card p-2" aria-label={copy.sectionsLabel} tabIndex={0}>
           <div className="flex min-w-max gap-2">
           {tabs.map((tab) => {
@@ -252,6 +281,47 @@ function PageFrame({ children }: { children: React.ReactNode }) {
   return <div className="mx-auto max-w-[1600px]">{children}</div>;
 }
 
+/**
+ * A link to one of the placement-move wizards.
+ *
+ * A deleted tenant cannot be moved, so the control stays visible and disabled,
+ * pointing at the same note the closed tabs use — that is a stated reason
+ * rather than a control that silently disappeared.
+ */
+function PlacementMoveAction({
+  href,
+  label,
+  icon: Icon,
+  disabled,
+  hintId,
+}: {
+  href: string;
+  label: string;
+  icon: typeof Database;
+  disabled: boolean;
+  hintId: string;
+}) {
+  if (disabled) {
+    return (
+      <Button type="button" variant="outline" size="sm" disabled aria-describedby={hintId}>
+        <Icon size={16} aria-hidden="true" />
+        {label}
+        <MoveRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
+      </Button>
+    );
+  }
+
+  return (
+    <Button asChild variant="outline" size="sm">
+      <Link href={href}>
+        <Icon size={16} aria-hidden="true" />
+        {label}
+        <MoveRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
+      </Link>
+    </Button>
+  );
+}
+
 function WorkspaceState({ children, alert = false }: { children: React.ReactNode; alert?: boolean }) {
   return <div role={alert ? "alert" : "status"} className="rounded-lg border border-border bg-card p-10 text-center text-sm text-muted-foreground">{children}</div>;
 }
@@ -283,6 +353,8 @@ const workspaceCopy = {
     access: "Users & access",
     billing: "Billing",
     storage: "Storage",
+    moveDatabase: "Move database server",
+    moveStorage: "Move storage server",
     accessNotReady: "Users and access become available when the tenant is ACTIVE or SUSPENDED.",
     deletedSections: "This tenant is deleted. Provisioning, users and storage stay closed until it is restored.",
   },
@@ -305,6 +377,8 @@ const workspaceCopy = {
     access: "المستخدمون والوصول",
     billing: "الفوترة",
     storage: "التخزين",
+    moveDatabase: "نقل خادم قاعدة البيانات",
+    moveStorage: "نقل خادم التخزين",
     accessNotReady: "يتاح المستخدمون والوصول عندما تصبح حالة المستأجر ACTIVE أو SUSPENDED.",
     deletedSections: "هذا المستأجر محذوف. تظل أقسام التجهيز والمستخدمين والتخزين مغلقة حتى تتم استعادته.",
   },

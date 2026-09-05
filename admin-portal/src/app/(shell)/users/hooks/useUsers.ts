@@ -7,8 +7,10 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
 import { useAuth } from "@/context/AuthContext";
+import { adminCan } from "@/lib/auth/rbac";
 import {
   listAdminUsers,
+  listWebphoneExtensions,
   getAdminUser,
   isForbiddenError,
   listRoles,
@@ -39,6 +41,7 @@ export function useUsers() {
   const { lang, t } = useI18n();
   const toast = useToast();
   const { user: currentUser } = useAuth();
+  const canReadWebphone = adminCan(currentUser, "admin.webphone.read");
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -51,6 +54,11 @@ export function useUsers() {
   const [limit, setLimit] = useState(20);
 
   const [users, setUsers] = useState<AdminUser[]>([]);
+  // ownerId → extension number. Extensions live in the WebPhone module, so the
+  // directory joins them in rather than reading them off the user record.
+  const [webphoneExtensions, setWebphoneExtensions] = useState(
+    new Map<string, string>(),
+  );
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [rolesForbidden, setRolesForbidden] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
@@ -117,16 +125,25 @@ export function useUsers() {
     setPermissionDenied(false);
 
     try {
-      const res = await listAdminUsers({
-        page,
-        limit,
-        search: debouncedSearch || undefined,
-        status: statusFilter,
-        isSuperAdmin: isSuperAdminFilter,
-        roleId: roleFilter,
-        sortBy,
-        sortDir,
-      });
+      // The extension list is a second resource, owned by another module:
+      // losing it must leave one column empty, never fail the directory.
+      const [res, extensions] = await Promise.all([
+        listAdminUsers({
+          page,
+          limit,
+          search: debouncedSearch || undefined,
+          status: statusFilter,
+          isSuperAdmin: isSuperAdminFilter,
+          roleId: roleFilter,
+          sortBy,
+          sortDir,
+        }),
+        canReadWebphone ? listWebphoneExtensions().catch(() => []) : [],
+      ]);
+
+      setWebphoneExtensions(
+        new Map(extensions.map((entry) => [entry.ownerId, entry.extension])),
+      );
 
       const responseData = res?.data;
       const meta = res?.meta;
@@ -167,7 +184,7 @@ export function useUsers() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, debouncedSearch, statusFilter, roleFilter, isSuperAdminFilter, sortBy, sortDir, lang, t, toast]);
+  }, [page, limit, debouncedSearch, statusFilter, roleFilter, isSuperAdminFilter, sortBy, sortDir, lang, t, toast, canReadWebphone]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -291,6 +308,7 @@ export function useUsers() {
     permissionDenied,
     rolesForbidden,
     users,
+    webphoneExtensions,
     roles,
     summaryMetrics,
     isInviteModalOpen,

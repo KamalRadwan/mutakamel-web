@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   updateUser: vi.fn(),
   resetPassword: vi.fn(),
   resendInvite: vi.fn(),
+  transferOwnership: vi.fn(),
   changePassword: vi.fn(),
   suspendUser: vi.fn(),
   activateUser: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock("./api", async () => {
       updateUser: mocks.updateUser,
       resetPassword: mocks.resetPassword,
       resendInvite: mocks.resendInvite,
+      transferOwnership: mocks.transferOwnership,
       changePassword: mocks.changePassword,
       suspendUser: mocks.suspendUser,
       activateUser: mocks.activateUser,
@@ -350,7 +352,10 @@ describe("useTenantAccess", () => {
     expect(mocks.inviteUser.mock.calls[1]?.[2]).toBe(COMMAND_ID_2);
   });
 
-  it("protects owner identity, access, and lifecycle", async () => {
+  // Owner protection is per action: what is refused is the pair with no way
+  // back (identity and roles) plus deletion. Lifecycle and credentials are the
+  // operator's only route to an owner who cannot get in, so they go through.
+  it("protects owner identity, roles, and deletion — and nothing else", async () => {
     const owner = userFixture({ id: "019ff251-1000-7000-8000-000000000002", isTenantOwner: true });
     const { result } = renderHook(() =>
       useTenantAccess({ tenantId: TENANT_ID, tenantStatus: "ACTIVE" }),
@@ -358,12 +363,56 @@ describe("useTenantAccess", () => {
     await waitFor(() => expect(result.current.directory.status).toBe("ready"));
     await act(async () => {
       await expect(result.current.updateUser(owner, { firstName: "Owner" })).rejects.toMatchObject({ errorCode: "TENANT_OWNER_PROTECTED" });
-      await expect(result.current.suspendUser(owner)).rejects.toMatchObject({ errorCode: "TENANT_OWNER_PROTECTED" });
       await expect(result.current.replaceRoles(owner, { assignments: [] })).rejects.toMatchObject({ errorCode: "TENANT_OWNER_PROTECTED" });
+      await expect(result.current.deleteUser(owner)).rejects.toMatchObject({ errorCode: "TENANT_OWNER_PROTECTED" });
     });
     expect(mocks.updateUser).not.toHaveBeenCalled();
-    expect(mocks.suspendUser).not.toHaveBeenCalled();
     expect(mocks.replaceRoles).not.toHaveBeenCalled();
+    expect(mocks.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("lets the owner be suspended, activated, and re-credentialed", async () => {
+    const owner = userFixture({ id: "019ff251-1000-7000-8000-000000000002", isTenantOwner: true });
+    const { result } = renderHook(() =>
+      useTenantAccess({ tenantId: TENANT_ID, tenantStatus: "ACTIVE" }),
+    );
+    await waitFor(() => expect(result.current.directory.status).toBe("ready"));
+    await act(async () => {
+      await result.current.suspendUser(owner);
+    });
+    expect(mocks.suspendUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves the owner seat through transferOwnership", async () => {
+    const owner = userFixture({ id: "019ff251-1000-7000-8000-000000000002", isTenantOwner: true });
+    const heir = "019ff251-1000-7000-8000-0000000000a1";
+    const { result } = renderHook(() =>
+      useTenantAccess({ tenantId: TENANT_ID, tenantStatus: "ACTIVE" }),
+    );
+    await waitFor(() => expect(result.current.directory.status).toBe("ready"));
+    await act(async () => {
+      await result.current.transferOwnership(owner, heir);
+    });
+    expect(mocks.transferOwnership).toHaveBeenCalledWith(
+      TENANT_ID,
+      owner.id,
+      heir,
+      expect.any(String),
+    );
+  });
+
+  it("refuses to transfer ownership from a user who does not hold it", async () => {
+    const member = userFixture({ isTenantOwner: false });
+    const { result } = renderHook(() =>
+      useTenantAccess({ tenantId: TENANT_ID, tenantStatus: "ACTIVE" }),
+    );
+    await waitFor(() => expect(result.current.directory.status).toBe("ready"));
+    await act(async () => {
+      await expect(
+        result.current.transferOwnership(member, "019ff251-1000-7000-8000-0000000000a1"),
+      ).rejects.toMatchObject({ errorCode: "TENANT_OWNER_TRANSFER_INVALID" });
+    });
+    expect(mocks.transferOwnership).not.toHaveBeenCalled();
   });
 
   it("enforces lifecycle predicates before transport", async () => {

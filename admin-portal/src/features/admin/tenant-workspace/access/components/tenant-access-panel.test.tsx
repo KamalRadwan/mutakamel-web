@@ -56,6 +56,7 @@ function controller(overrides: Record<string, unknown> = {}) {
       canAssignRoles: true,
       canDelete: true,
       canRestore: true,
+      canTransferOwnership: true,
     },
     query: { page: 1, limit: 20, visibility: "ACTIVE", sortBy: "createdAt", sortDir: "DESC" },
     setQuery: vi.fn(),
@@ -80,6 +81,7 @@ function controller(overrides: Record<string, unknown> = {}) {
     updateUser: vi.fn().mockResolvedValue(user),
     resetPassword: vi.fn().mockResolvedValue({ userId: user.id, delivery: "QUEUED" }),
     resendInvite: vi.fn().mockResolvedValue({ userId: user.id, delivery: "QUEUED" }),
+    transferOwnership: vi.fn().mockResolvedValue(user),
     changePassword: vi.fn().mockResolvedValue(user),
     suspendUser: vi.fn().mockResolvedValue({ ...user, status: "SUSPENDED" }),
     activateUser: vi.fn().mockResolvedValue(user),
@@ -172,18 +174,46 @@ describe("TenantAccessPanel", () => {
     expect(screen.getByText(/corr-1/)).toBeInTheDocument();
   });
 
-  it("protects owner actions while preserving the reset action", () => {
+  // The owner keeps the lifecycle and credential actions an operator needs to
+  // reach them, and loses only identity, roles, and deletion — with Change
+  // ownership as the way past those.
+  it("offers the owner every action except identity, roles, and deletion", () => {
     const owner = userFixture({ isTenantOwner: true });
     state.controller = controller({
       directory: { status: "ready", data: pageFixture([owner]), error: null },
       selectedUser: { status: "ready", data: owner, error: null },
     });
     render(<TenantAccessPanel tenantId={TENANT_ID} tenantStatus="ACTIVE" />);
-    expect(screen.getByText("Owner account is protected from this action.")).toBeInTheDocument();
+    expect(screen.getByText(/cannot be edited, re-roled, or deleted/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit profile" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Manage roles" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Change password" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send reset link" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change password" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Suspend" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change ownership" })).toBeInTheDocument();
+  });
+
+  it("keeps Change ownership off a user who is not the owner", () => {
+    const member = userFixture({ isTenantOwner: false });
+    state.controller = controller({
+      directory: { status: "ready", data: pageFixture([member]), error: null },
+      selectedUser: { status: "ready", data: member, error: null },
+    });
+    render(<TenantAccessPanel tenantId={TENANT_ID} tenantStatus="ACTIVE" />);
+    expect(screen.queryByRole("button", { name: "Change ownership" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  it("offers activation to an invited owner, which is how an unreachable owner is recovered", () => {
+    const owner = userFixture({ isTenantOwner: true, status: "INVITED" });
+    state.controller = controller({
+      directory: { status: "ready", data: pageFixture([owner]), error: null },
+      selectedUser: { status: "ready", data: owner, error: null },
+    });
+    render(<TenantAccessPanel tenantId={TENANT_ID} tenantStatus="ACTIVE" />);
+    expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resend invite" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send reset link" })).toBeInTheDocument();
   });
 

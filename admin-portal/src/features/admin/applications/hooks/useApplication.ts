@@ -14,6 +14,7 @@ import type {
   ApplicationLifecycleCommandDto,
   ApplicationManifestEvidenceView,
   ApplicationView,
+  BindApplicationDatabaseServersDto,
   PublishApplicationDto,
   UpdateApplicationDatabasePolicyDto,
   UpdateApplicationDto,
@@ -220,6 +221,20 @@ export function useApplication(applicationKey: string) {
     );
   };
 
+  /**
+   * The command reports per-server outcomes rather than throwing on a partial
+   * failure, so the success toast stays generic and the dialog renders the
+   * receipt.
+   */
+  const bindDatabaseServers = (dto: BindApplicationDatabaseServersDto) => {
+    assertCurrentKey();
+    return mutate(
+      { operation: "BIND_DATABASE_SERVERS", applicationKey, dto },
+      (key) => applicationsApi.bindDatabaseServers(applicationKey, dto, key),
+      mutationOptions("Database binding command completed."),
+    );
+  };
+
   const deprecateApplication = (dto: ApplicationLifecycleCommandDto) => {
     assertCurrentKey();
     return mutate(
@@ -282,6 +297,7 @@ export function useApplication(applicationKey: string) {
     updateDatabasePolicy,
     publishApplication,
     activateApplication,
+    bindDatabaseServers,
     deprecateApplication,
     disableApplication,
     deleteApplication,

@@ -25,6 +25,7 @@ import {
   PasswordDialog,
   RolesDialog,
   TenantUserEditorDialog,
+  TransferOwnershipDialog,
   type ConfirmationAction,
 } from "./tenant-access-dialogs";
 import { useTenantAccess } from "../use-tenant-access";
@@ -42,6 +43,7 @@ type DialogState =
   | { kind: "edit"; user: TenantUserView }
   | { kind: "password"; user: TenantUserView }
   | { kind: "roles"; user: TenantUserView }
+  | { kind: "transfer-ownership"; user: TenantUserView }
   | { kind: "confirm"; action: ConfirmationAction; user: TenantUserView }
   | null;
 
@@ -342,6 +344,7 @@ export function TenantAccessPanel({
       {dialog?.kind === "edit" ? <TenantUserEditorDialog controller={controller} copy={copy} locale={locale} mode="edit" user={dialog.user} onClose={() => setDialog(null)} onSuccess={success} /> : null}
       {dialog?.kind === "password" ? <PasswordDialog controller={controller} copy={copy} locale={locale} user={dialog.user} onClose={() => setDialog(null)} onSuccess={success} /> : null}
       {dialog?.kind === "roles" ? <RolesDialog controller={controller} copy={copy} locale={locale} user={dialog.user} onClose={() => setDialog(null)} onSuccess={success} /> : null}
+      {dialog?.kind === "transfer-ownership" ? <TransferOwnershipDialog controller={controller} copy={copy} locale={locale} user={dialog.user} onClose={() => setDialog(null)} onSuccess={success} /> : null}
       {dialog?.kind === "confirm" ? <ConfirmationDialog controller={controller} copy={copy} locale={locale} user={dialog.user} action={dialog.action} onClose={() => setDialog(null)} onSuccess={success} /> : null}
     </section>
   );
@@ -402,12 +405,13 @@ function UserDetailCard({ controller, locale, openDialog }: { controller: Return
       {protectedOwner ? <p className="mt-3 rounded-lg bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-foreground">{copy.protectedOwner}</p> : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {controller.permissions.canUpdate && !protectedOwner && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "edit", user })}>{copy.edit}</Button> : null}
-        {controller.permissions.canResetPassword && user.status === "ACTIVE" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "reset-password", user })}>{copy.resetPassword}</Button> : null}
+        {controller.permissions.canResetPassword && user.status !== "DEACTIVATED" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "reset-password", user })}>{copy.resetPassword}</Button> : null}
         {controller.permissions.canInvite && user.status === "INVITED" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "resend-invite", user })}>{copy.resendInvite}</Button> : null}
-        {controller.permissions.canResetPassword && !protectedOwner && (user.status === "ACTIVE" || user.status === "SUSPENDED") && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "password", user })}>{copy.changePassword}</Button> : null}
+        {controller.permissions.canResetPassword && (user.status === "ACTIVE" || user.status === "SUSPENDED") && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "password", user })}>{copy.changePassword}</Button> : null}
         {controller.permissions.canAssignRoles && !protectedOwner && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "roles", user })}>{copy.manageRoles}</Button> : null}
-        {controller.permissions.canSuspend && !protectedOwner && user.status === "ACTIVE" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "suspend", user })}>{copy.suspend}</Button> : null}
-        {controller.permissions.canSuspend && !protectedOwner && user.status === "SUSPENDED" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "activate", user })}>{copy.activate}</Button> : null}
+        {controller.permissions.canSuspend && user.status === "ACTIVE" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "suspend", user })}>{copy.suspend}</Button> : null}
+        {controller.permissions.canSuspend && (user.status === "SUSPENDED" || user.status === "INVITED") && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "activate", user })}>{copy.activate}</Button> : null}
+        {controller.permissions.canTransferOwnership && protectedOwner && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "transfer-ownership", user })}>{copy.transferOwnership}</Button> : null}
         {controller.permissions.canDelete && !protectedOwner && !deleted ? <Button type="button" variant="destructive" size="sm" onClick={() => openDialog({ kind: "confirm", action: "delete", user })}>{copy.delete}</Button> : null}
         {controller.permissions.canRestore && deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "restore", user })}>{copy.restore}</Button> : null}
       </div>

@@ -59,12 +59,13 @@ function LogoutProbe() {
 }
 
 function LoginProbe() {
-  const { authState, user, login } = useAuth();
+  const { authState, user, login, freshLoginCount } = useAuth();
   const [error, setError] = useState("none");
   return (
     <div>
       <span>{authState}:{user?.email ?? "none"}</span>
       <span>error:{error}</span>
+      <span>fresh:{freshLoginCount}</span>
       <button
         type="button"
         onClick={() => {
@@ -898,6 +899,102 @@ describe("AuthProvider server-authoritative bootstrap", () => {
       window.localStorage.getItem("admin_auth_session_event") ?? "null",
     )).toMatchObject({ kind: "session-ended" });
     expect(push).not.toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("raises the fresh-login signal once per credential sign-in", async () => {
+    let loginAccepted = false;
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/admin/core/v1/auth/login") {
+        loginAccepted = true;
+        return jsonResponse(webAuthResponse("mutakamel-admin-web"));
+      }
+      if (url === "/api/admin/core/v1/auth/me") {
+        return loginAccepted
+          ? jsonResponse(adminMePayload())
+          : endedSessionResponse();
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+
+    render(
+      <AuthProvider>
+        <LoginProbe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("ENDED:none")).toBeTruthy());
+    expect(screen.getByText("fresh:0")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "login" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("AUTHENTICATED:admin@example.test"),
+      ).toBeTruthy(),
+    );
+    expect(screen.getByText("fresh:1")).toBeTruthy();
+    expect(push).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("leaves the fresh-login signal alone for a restore and a cross-tab adoption", async () => {
+    window.sessionStorage.setItem(
+      "admin_session_meta",
+      JSON.stringify({
+        savedAt: Date.now(),
+        expiresIn: 600,
+        sessionExpiresIn: 1_800,
+        tokenType: "Bearer",
+        sessionId: "019f0000-0000-7000-8000-000000000001",
+        remember: false,
+        authorizationVersion: 1,
+        profileVersion: 1,
+        authEventId: "old-session-event",
+      }),
+    );
+    vi.stubGlobal("fetch", vi.fn((url: string) =>
+      url === "/api/admin/core/v1/auth/me"
+        ? Promise.resolve(jsonResponse(adminMePayload()))
+        : Promise.reject(new Error(`Unexpected request: ${url}`))));
+
+    render(
+      <AuthProvider>
+        <LoginProbe />
+      </AuthProvider>,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText("AUTHENTICATED:admin@example.test"),
+      ).toBeTruthy(),
+    );
+    // A cold tab that recovers a live server session did not just sign in.
+    expect(screen.getByText("fresh:0")).toBeTruthy();
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("admin-auth-session-event", {
+        detail: {
+          realm: "admin",
+          kind: "session-updated",
+          eventId: "new-session-event",
+          sourceId: "other-tab",
+          issuedAt: Date.now() + 1,
+          sessionId: "019f0000-0000-7000-8000-000000000002",
+          timing: {
+            expiresIn: 600,
+            sessionExpiresIn: 1_800,
+            authorizationVersion: 1,
+            profileVersion: 1,
+          },
+        },
+      }));
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("AUTHENTICATED:admin@example.test"),
+      ).toBeTruthy(),
+    );
+    // Adopting another tab's sign-in is still not this tab's sign-in.
+    expect(screen.getByText("fresh:0")).toBeTruthy();
   });
 });
 

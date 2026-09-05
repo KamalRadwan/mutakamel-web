@@ -2,66 +2,51 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
-  Bell,
   BookOpen,
   Building2,
   CircleDollarSign,
-  ClipboardCheck,
-  CreditCard,
   Database,
-  Globe2,
-  HardDrive,
   LayoutDashboard,
-  LineChart,
-  ReceiptText,
   ShieldCheck,
-  WalletCards,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { Tabs, TabsList, TabsTrigger } from "@/design-system";
-import type { DashboardGroupKey } from "@/types/dashboard";
-import type { DashboardTabKey } from "../hooks/useDashboardData";
-import { getDashboardGroupLabel } from "../utils/dashboard-groups";
+import type {
+  DashboardSubjectKey,
+  DashboardTabKey,
+} from "../utils/dashboard-subjects";
 
 interface DashboardTabsNavProps {
   activeTab: DashboardTabKey;
   onTabChange: (tab: DashboardTabKey) => void;
-  groups: DashboardGroupKey[];
+  /** Subjects holding at least one report this actor may see. */
+  subjects: DashboardSubjectKey[];
 }
 
 // Icons carry meaning through shape, not per-item hue - size-4, currentColor
 // only (docs/design-system/shell-and-navigation.md's icon rule). The
 // per-tab color map this replaced was one of the largest single sources of
 // "14 competing hues" in the app's original census.
-const GROUP_ICONS: Record<DashboardGroupKey, LucideIcon> = {
+const SUBJECT_ICONS: Record<DashboardSubjectKey, LucideIcon> = {
   tenants: Building2,
-  domains: Globe2,
-  subscriptions: ReceiptText,
-  billing: CircleDollarSign,
-  payments: CreditCard,
-  wallets: WalletCards,
-  database: Database,
-  storage: HardDrive,
-  provisioning: LineChart,
-  catalogue: BookOpen,
-  notifications: Bell,
-  usage: LayoutDashboard,
-  security: ShieldCheck,
-  audit: ClipboardCheck,
+  revenue: CircleDollarSign,
+  infrastructure: Database,
+  platform: BookOpen,
+  trust: ShieldCheck,
 };
 
 export function DashboardTabsNav({
   activeTab,
   onTabChange,
-  groups,
+  subjects,
 }: DashboardTabsNavProps) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const tabs: Array<{ key: DashboardTabKey; label: string; icon: LucideIcon }> = [
     { key: "overview", label: t.dashboard.tabs.overview, icon: LayoutDashboard },
-    ...groups.map((key) => ({
+    ...subjects.map((key) => ({
       key,
-      label: getDashboardGroupLabel(key, lang),
-      icon: GROUP_ICONS[key],
+      label: t.dashboard.subjects[key],
+      icon: SUBJECT_ICONS[key],
     })),
   ];
 
@@ -72,7 +57,7 @@ export function DashboardTabsNav({
       className="sticky top-[61px] z-10 rounded-lg border border-border bg-card px-2"
     >
       <TabsList
-        className="h-auto w-full justify-start gap-1.5 overflow-x-auto border-b-0 py-2 scrollbar-none"
+        className="h-auto w-full flex-wrap justify-start gap-1.5 border-b-0 py-2"
         aria-label={t.dashboard.groupsAriaLabel}
       >
         {tabs.map((tab) => {

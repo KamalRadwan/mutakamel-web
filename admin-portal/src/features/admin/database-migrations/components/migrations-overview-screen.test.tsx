@@ -381,7 +381,7 @@ describe("MigrationsOverviewScreen dry-run dialog", () => {
 
     // The run is held until the operator types what is affected.
     expect(overviewMock.startRun).not.toHaveBeenCalled();
-    const confirmation = screen.getByRole("dialog", {
+    const confirmation = screen.getByRole("alertdialog", {
       name: "Apply to every eligible tenant",
     });
     expect(confirmation.textContent).toContain("crm");

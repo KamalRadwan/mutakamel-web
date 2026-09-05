@@ -10,8 +10,9 @@ import { useAuth } from "@/context/AuthContext";
 import { ApplicationCatalogueWorkspace } from "@/features/admin/applications/components/ApplicationCatalogueWorkspace";
 import { ApplicationConfigurationDialog } from "@/features/admin/applications/components/ApplicationConfigurationDialog";
 import { ApplicationLifecycleDialog, type ApplicationLifecycleAction } from "@/features/admin/applications/components/ApplicationLifecycleDialog";
+import { ApplicationDatabaseBindDialog } from "@/features/admin/applications/components/ApplicationDatabaseBindDialog";
 import { ApplicationPrimaryComponentDialog } from "@/features/admin/applications/components/ApplicationPrimaryComponentDialog";
-import { ApplicationPublishDialog } from "@/features/admin/applications/components/ApplicationPublishDialog";
+import { ApplicationPublishActivateDialog } from "@/features/admin/applications/components/ApplicationPublishActivateDialog";
 import { ApplicationReleaseAuthorityRail } from "@/features/admin/applications/components/ApplicationReleaseAuthorityRail";
 import { ApplicationTechnicalProvisioningPanel } from "@/features/admin/applications/components/ApplicationTechnicalProvisioningPanel";
 import { useApplication } from "@/features/admin/applications/hooks/useApplication";
@@ -34,7 +35,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   const [lifecycleAction, setLifecycleAction] = useState<ApplicationLifecycleAction | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [technicalDialog, setTechnicalDialog] = useState<"ADOPT" | "BIND" | null>(null);
-  const [publishOpen, setPublishOpen] = useState(false);
+  // Releasing is two steps: publish + activate, then bind the databases.
+  const [releaseStep, setReleaseStep] = useState<"PUBLISH_ACTIVATE" | "BIND_DATABASES" | null>(null);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -42,7 +44,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
       setLifecycleAction(null);
       setDeleteOpen(false);
       setTechnicalDialog(null);
-      setPublishOpen(false);
+      setReleaseStep(null);
     });
   }, [applicationKey]);
 
@@ -72,6 +74,15 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
     (application.serverSummary.ready < application.serverSummary.eligible ||
       application.serverSummary.pending > 0 ||
       application.serverSummary.degraded > 0);
+  // Only the blockers that publishing cannot clear are pre-declared to step 1.
+  // A merely-unpublished readiness projection turns ALLOWED the moment the
+  // publish inside that dialog lands, so it must not defer activation.
+  const activationBlockedReason =
+    activationReadiness === "UNAVAILABLE"
+      ? t.applications.detail.activationUnavailable
+      : requiredFleetCoverageBlocked
+        ? t.applications.detail.activationBlocked
+        : null;
   const lifecycleOptions: ApplicationLifecycleAction[] = application.lifecycleStatus === "DRAFT"
     ? ["activate", "disable"]
     : application.lifecycleStatus === "ACTIVE"
@@ -147,7 +158,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
         hasReadinessError={technical.error !== null}
         canPublish={canLifecycle}
         isPublishing={detail.isMutating}
-        onPublish={() => setPublishOpen(true)}
+        onPublish={() => setReleaseStep("PUBLISH_ACTIVATE")}
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -188,13 +199,31 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
 
     <ApplicationConfigurationDialog mode={configurationMode} application={application} isSubmitting={detail.isMutating} onClose={() => setConfigurationMode(null)} onUpdateMetadata={detail.updateApplication} onUpdatePolicy={detail.updateDatabasePolicy} />
     <ApplicationLifecycleDialog action={lifecycleAction} currentStatus={application.lifecycleStatus} isSubmitting={detail.isMutating} onClose={() => setLifecycleAction(null)} onConfirm={runLifecycle} />
-    <ApplicationPublishDialog
-      isOpen={publishOpen}
+    <ApplicationPublishActivateDialog
+      isOpen={releaseStep === "PUBLISH_ACTIVATE"}
       application={application}
       isSubmitting={detail.isMutating}
-      onClose={() => setPublishOpen(false)}
-      onConfirm={async (dto) => {
+      activationBlockedReason={activationBlockedReason}
+      onClose={() => setReleaseStep(null)}
+      onPublish={async (dto) => {
         const result = await detail.publishApplication(dto);
+        await technical.refresh();
+        return result;
+      }}
+      onActivate={async (expectedCatalogueRevision, reason) => {
+        const result = await detail.activateApplication(expectedCatalogueRevision, reason);
+        await technical.refresh();
+        return result;
+      }}
+      onContinueToBind={() => setReleaseStep("BIND_DATABASES")}
+    />
+    <ApplicationDatabaseBindDialog
+      isOpen={releaseStep === "BIND_DATABASES"}
+      applicationKey={application.key}
+      isSubmitting={detail.isMutating}
+      onClose={() => setReleaseStep(null)}
+      onBind={async (dto) => {
+        const result = await detail.bindDatabaseServers(dto);
         await technical.refresh();
         return result;
       }}

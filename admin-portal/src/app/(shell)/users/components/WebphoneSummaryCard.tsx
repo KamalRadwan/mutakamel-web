@@ -3,14 +3,14 @@
 import { PhoneCall, Edit2, CheckCircle2, XCircle, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { Badge, Button } from "@/design-system";
-import type { AdminWebphoneConfig } from "../types";
+import type { AdminWebphoneExtension } from "../types";
 
 export function WebphoneSummaryCard({
   webphone,
   canEdit,
   onEditToggle,
 }: {
-  webphone?: AdminWebphoneConfig | null;
+  webphone?: AdminWebphoneExtension | null;
   canEdit: boolean;
   onEditToggle: () => void;
 }) {
@@ -80,12 +80,6 @@ export function WebphoneSummaryCard({
           </span>
         </div>
 
-        <div>
-          <span className="block text-xs text-muted-foreground mb-1">{t.users.sipTransportLabel}</span>
-          <span className="font-mono font-semibold uppercase text-foreground">
-            {webphone?.transport || "wss"}
-          </span>
-        </div>
       </div>
 
       <div className="flex items-center justify-between border-t border-border bg-muted p-3 text-xs text-muted-foreground">

@@ -51,6 +51,12 @@ import type {
   TenantProvisioningWorkspaceModel,
 } from "../hooks/useTenantProvisioningWorkspace";
 import { canResolveSeedConflict } from "../model/readers";
+import {
+  provisioningEventLabel,
+  provisioningStepKindLabel,
+  provisioningStepLabel,
+  provisioningStepStatusLabel,
+} from "../model/step-labels";
 import type {
   ProvisioningResource,
   SeedConflictDecision,
@@ -220,7 +226,7 @@ function OperationsSection({ model }: TenantProvisioningWorkspaceViewProps) {
                   <StatusBadge status={operation.status} ar={ar} />
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span className="truncate">{operation.currentPhase}</span>
+                  <span className="truncate">{provisioningStepLabel(operation.currentPhase, ar)}</span>
                   <ChevronRight className="size-3.5 rtl:rotate-180" aria-hidden="true" />
                 </div>
               </Button>
@@ -276,7 +282,9 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                       <h3 className="text-sm font-semibold text-foreground">
                         {operationTypeLabel(operation.type, ar)} · {copy.generationLabelLower} {operation.generation}
                       </h3>
-                      <p className="mt-1 text-xs text-muted-foreground">{operation.currentPhase}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {provisioningStepLabel(operation.currentPhase, ar)}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge status={operation.status} ar={ar} />
@@ -354,11 +362,18 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                         {operation.steps.map((step) => (
                           <TableRow key={step.id}>
                             <Td>
-                              <span className="font-semibold text-foreground">{step.stepKey}</span>
-                              {step.componentKey && <span className="block text-xs text-muted-foreground">{step.componentKey}</span>}
+                              {/* The name leads; the plan key stays beside it,
+                                  because it is what an operator pastes into a
+                                  query and what support asks for. */}
+                              <span className="font-semibold text-foreground">
+                                {provisioningStepLabel(step.stepKey, ar)}
+                              </span>
+                              <span className="block font-mono text-2xs text-muted-foreground" dir="ltr">
+                                {step.stepKey}
+                              </span>
                             </Td>
-                            <Td>{step.kind}</Td>
-                            <Td><StepBadge status={step.status} /></Td>
+                            <Td>{provisioningStepKindLabel(step.kind, ar)}</Td>
+                            <Td><StepBadge status={step.status} ar={ar} /></Td>
                             <Td>{step.attemptCount}{step.retryable ? " ↻" : ""}</Td>
                           </TableRow>
                         ))}
@@ -377,7 +392,9 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                         <li key={event.id} className="relative rounded-md bg-muted p-2 text-xs">
                           <span className="absolute -start-[1.18rem] top-3 size-2 rounded-full bg-primary" />
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="font-semibold text-foreground">{event.eventType}</span>
+                            <span className="font-semibold text-foreground">
+                              {provisioningEventLabel(event.eventType, ar)}
+                            </span>
                             <span className="text-xs text-muted-foreground">#{event.sequence} · {formatDate(event.occurredAt, model.lang)}</span>
                           </div>
                           {event.message && <p className="mt-1 text-muted-foreground">{event.message}</p>}
@@ -778,10 +795,10 @@ function progressTone(status: TenantOperationStatus): "running" | "succeeded" | 
   return "running";
 }
 
-function StepBadge({ status }: { status: TenantOperationStepStatus }) {
+function StepBadge({ status, ar }: { status: TenantOperationStepStatus; ar: boolean }) {
   const Icon = status === "SUCCEEDED" || status === "SKIPPED" ? CheckCircle2 : status === "FAILED" || status === "CONFLICT" ? AlertTriangle : status === "CANCELLED" ? XCircle : CircleDashed;
   const tone = status === "SUCCEEDED" || status === "SKIPPED" ? "success" : status === "FAILED" || status === "CONFLICT" ? "danger" : "neutral";
-  return <Badge tone={tone}><Icon className="size-3" aria-hidden="true" />{status}</Badge>;
+  return <Badge tone={tone}><Icon className="size-3" aria-hidden="true" />{provisioningStepStatusLabel(status, ar)}</Badge>;
 }
 
 function CommandCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {

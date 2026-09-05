@@ -79,7 +79,7 @@ function DashboardPollingHarness() {
       <button type="button" onClick={dashboard.handleRefresh}>
         Refresh dashboard
       </button>
-      <button type="button" onClick={() => dashboard.setActiveTab("storage")}>
+      <button type="button" onClick={() => dashboard.setActiveTab("infrastructure")}>
         Open storage tab
       </button>
       <output data-testid="refresh-paused">
@@ -92,16 +92,11 @@ function DashboardPollingHarness() {
   );
 }
 
-// Two distinct windows; the ordering test only needs them to differ.
+// The window the ordering tests switch to.
 const LAST_MONTH = {
   from: new Date("2026-08-01T00:00:00.000Z"),
   to: new Date("2026-08-31T23:59:59.999Z"),
 };
-const THIS_MONTH = {
-  from: new Date("2026-09-01T00:00:00.000Z"),
-  to: new Date("2026-09-30T23:59:59.999Z"),
-};
-
 function DashboardRequestOrderingHarness() {
   const dashboard = useDashboardData();
 
@@ -367,11 +362,20 @@ async function advance(milliseconds: number): Promise<void> {
 }
 
 describe("per-tab group scoping", () => {
-  it("scopes a group tab, and leaves the overview unscoped", () => {
-    expect(requestedGroupsForTab("storage")).toEqual(["storage"]);
-    // The overview's report-group grid summarises every authorized group,
-    // so scoping it would leave most of that grid blank.
-    expect(requestedGroupsForTab("overview")).toEqual([]);
+  it("scopes a subject to its own reports, and leaves the overview unscoped", () => {
+    const response = {
+      authorizedGroups: ["tenants", "domains", "storage", "audit"],
+    } as unknown as DashboardResponse;
+
+    // Story order, not alphabetical, and only the reports this actor holds —
+    // `provisioning` belongs to the subject but is not authorized here.
+    expect(requestedGroupsForTab("tenants", response)).toEqual([
+      "tenants",
+      "domains",
+    ]);
+    // The overview's charts read across every group, so scoping it would
+    // leave most of them blank.
+    expect(requestedGroupsForTab("overview", response)).toEqual([]);
   });
 
   it("distinguishes reporting windows so a stale group is never carried", () => {
@@ -413,6 +417,51 @@ describe("per-tab group scoping", () => {
     it("has nothing to carry on the first response", () => {
       expect(mergeDashboardGroups(null, next, true)).toBe(next);
     });
+
+    /**
+     * Core filters `overview` down to the groups it actually loaded, so a
+     * scoped fetch answers with a thinner one — fewer KPIs, and no growth or
+     * recent-tenants block at all. Letting it win meant opening a tab and
+     * finding the overview had lost half its panels on the way back.
+     */
+    it("keeps the fuller overview when the new response was scoped", () => {
+      const rich = {
+        ...previous,
+        overview: {
+          kpis: [{ key: "open-alerts" }, { key: "total-tenants" }],
+          tenantBillingGrowth: { currencyCode: "USD", points: [] },
+          recentTenants: { items: [] },
+        },
+      } as unknown as DashboardResponse;
+      const thin = {
+        ...next,
+        overview: { kpis: [{ key: "open-alerts" }] },
+      } as unknown as DashboardResponse;
+
+      const merged = mergeDashboardGroups(rich, thin, true);
+
+      expect(merged.overview).toBe(rich.overview);
+      expect(merged.overview.tenantBillingGrowth).toBeDefined();
+      // The group data still comes from the newer, scoped response.
+      expect(merged.storage).toBe(thin.storage);
+    });
+
+    it("takes the new overview when the response was not scoped", () => {
+      const rich = {
+        ...previous,
+        overview: { kpis: [{ key: "open-alerts" }] },
+      } as unknown as DashboardResponse;
+      const full = {
+        ...previous,
+        asOf: "b",
+        loadedGroups: ["tenants", "storage"],
+        overview: { kpis: [{ key: "open-alerts" }, { key: "total-tenants" }] },
+      } as unknown as DashboardResponse;
+
+      expect(mergeDashboardGroups(rich, full, true).overview).toBe(
+        full.overview,
+      );
+    });
   });
 });
 
@@ -439,23 +488,30 @@ describe("Core that predates the groups parameter", () => {
     const rejection = Object.assign(new Error("Bad Request"), {
       response: { status: 400, data: { code: "COMMON.GENERIC.VALIDATION_FAILED" } },
     });
+    // A scope is only sent for reports the actor actually holds, so the
+    // fallback can only be exercised by an actor who has some.
+    const authorized = {
+      ...DASHBOARD_FIXTURE,
+      authorizedGroups: ["database", "storage"],
+    };
     api.get
-      .mockResolvedValueOnce({ data: { data: DASHBOARD_FIXTURE } })
+      .mockResolvedValueOnce({ data: { data: authorized } })
       .mockRejectedValueOnce(rejection)
       .mockResolvedValue({
-        data: { data: { ...DASHBOARD_FIXTURE, loadedGroups: undefined } },
+        data: { data: { ...authorized, loadedGroups: undefined } },
       });
 
     render(<DashboardPollingHarness />);
     await advance(0);
     api.get.mockClear();
 
-    // Only a group tab sends a scope, so that is where the 400 appears.
+    // Only a subject tab sends a scope, so that is where the 400 appears.
     fireEvent.click(screen.getByRole("button", { name: "Open storage tab" }));
     await advance(0);
 
     expect(api.get).toHaveBeenCalledTimes(2);
-    expect(api.get.mock.calls[0][0]).toContain("groups=storage");
+    // Both reports in the subject, in the declared story order.
+    expect(api.get.mock.calls[0][0]).toContain("groups=database%2Cstorage");
     expect(api.get.mock.calls[1][0]).not.toContain("groups=");
     // The operator sees data, not the validation error.
     expect(screen.getByTestId("dashboard-as-of")).toHaveTextContent(

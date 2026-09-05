@@ -7,36 +7,34 @@
  * type below: an ICE server's `credential` and an extension's `sipPassword`.
  * Both are write-only; only `credentialConfigured` / `passwordConfigured` come
  * back, and rendering a stored value is impossible by construction.
+ *
+ * The module holds many SIP servers, tried in order: every SIP detail belongs
+ * to one server row, and a server's transport is the scheme of its own
+ * WebSocket URL rather than a field of its own. The extension shapes below are
+ * read by the users screen, which is the one place a user's extension is
+ * edited; the settings screen is the server chain and nothing else.
  */
 
 export type WebphoneIceServerKind = "STUN" | "TURN";
 export type WebphoneIceTransportPolicy = "all" | "relay";
-export type WebphoneTransport = "ws" | "wss";
+/** The scheme of a server's WebSocket URL; it has no separate column. */
+export type WebphoneProtocol = "ws" | "wss";
 
 export const WEBPHONE_REGISTER_EXPIRES_MIN = 30;
 export const WEBPHONE_REGISTER_EXPIRES_MAX = 86_400;
-export const WEBPHONE_TURN_TTL_MIN_SECONDS = 60;
-export const WEBPHONE_TURN_TTL_MAX_SECONDS = 86_400;
-export const WEBPHONE_ENDPOINT_PRIORITY_MIN = 0;
-export const WEBPHONE_ENDPOINT_PRIORITY_MAX = 100;
-export const WEBPHONE_ICE_SORT_ORDER_MIN = 0;
+export const WEBPHONE_SERVER_PRIORITY_MAX = 1_000;
 export const WEBPHONE_ICE_SORT_ORDER_MAX = 1_000;
 export const WEBPHONE_ICE_URLS_MAX = 8;
+export const WEBPHONE_TIMEOUT_MIN_SECONDS = 1;
+export const WEBPHONE_TIMEOUT_MAX_SECONDS = 300;
+export const WEBPHONE_MAX_RETRIES_MIN = 0;
+export const WEBPHONE_MAX_RETRIES_MAX = 10;
 
 const WS_URL_PATTERN = /^wss?:\/\/\S+$/iu;
+const WS_SCHEME_PATTERN = /^wss?:\/\//iu;
 const SIP_DOMAIN_PATTERN = /^[a-z0-9.-]+(?::[0-9]+)?$/iu;
 const SIP_URI_PATTERN = /^sip:\S+$/iu;
 const ICE_URI_PATTERN = /^(?:stun|stuns|turn|turns):\S+$/iu;
-const EXTENSION_PATTERN = /^[0-9*#+]{1,32}$/u;
-
-export interface WebphoneEndpoint {
-  id: string;
-  label: string | null;
-  websocketUrl: string;
-  /** Lower is tried first. */
-  priority: number;
-  enabled: boolean;
-}
 
 export interface WebphoneIceServer {
   id: string;
@@ -49,25 +47,46 @@ export interface WebphoneIceServer {
   sortOrder: number;
 }
 
-export interface WebphoneConfig {
+/**
+ * One SIP server and everything the browser needs to register against it.
+ *
+ * `priority` is the position in the failover chain. It is read here to order
+ * the list and is never edited field-by-field: the order is the whole
+ * statement, so it is written by reordering the list.
+ */
+export interface WebphoneServer {
   id: string;
-  tenantId: string | null;
-  enabled: boolean;
+  name: string;
   sipDomain: string;
+  websocketUrl: string;
+  priority: number;
+  enabled: boolean;
   realm: string | null;
   outboundProxy: string | null;
   fromDomain: string | null;
   registrarServer: string | null;
   contactUri: string | null;
   registerExpires: number;
-  sessionTimers: boolean;
-  traceSip: boolean;
-  allowInvalidTlsCertificate: boolean;
-  iceTransportPolicy: WebphoneIceTransportPolicy;
   defaultCallerId: string | null;
-  turnRestEnabled: boolean;
-  turnRestTtlSeconds: number;
-  endpoints: WebphoneEndpoint[];
+  iceTransportPolicy: WebphoneIceTransportPolicy;
+  /**
+   * The master switch above `iceServers`.
+   *
+   * The entries below it are returned whole either way — this screen is where
+   * the switch is put back, so hiding them would leave nothing to restore. What
+   * the flag changes is what the browser is handed: with it off, `GET /me`
+   * offers this server no ICE at all and mints it no TURN credential.
+   *
+   * Like `enabled`, it is owned by its own switch and is deliberately absent
+   * from `WebphoneServerForm`: one value with two owners is how a Save button
+   * and a toggle come to disagree.
+   */
+  iceEnabled: boolean;
+  traceSip: boolean;
+  sessionTimers: boolean;
+  allowInvalidTlsCertificate: boolean;
+  defaultTimeoutSeconds: number;
+  defaultMaxRetries: number;
   iceServers: WebphoneIceServer[];
 }
 
@@ -80,79 +99,65 @@ export interface WebphoneExtension {
   passwordConfigured: boolean;
   displayName: string | null;
   outboundCallerId: string | null;
-  transport: WebphoneTransport;
   enabled: boolean;
 }
 
-export interface WebphoneSeats {
-  allowed: number;
-  occupied: number;
-  available: number;
-  overAllowance: boolean;
+/**
+ * One link in a user's failover chain.
+ *
+ * A null `timeoutSeconds` or `maxRetries` inherits the server's default; it is
+ * not a zero. The two are therefore kept nullable all the way to the wire.
+ */
+export interface WebphoneExtensionServer {
+  serverId: string;
+  priority: number;
+  timeoutSeconds: number | null;
+  maxRetries: number | null;
 }
 
-export interface WebphoneFleetSeatRow extends WebphoneSeats {
-  tenantId: string;
-  tenantName: string;
-}
-
-/** Editable server-configuration fields, held as form strings. */
-export interface WebphoneConfigForm {
-  enabled: boolean;
+/** Editable server fields, held as form strings. Priority is deliberately absent. */
+export interface WebphoneServerForm {
+  name: string;
   sipDomain: string;
+  websocketUrl: string;
+  enabled: boolean;
   realm: string;
   outboundProxy: string;
   fromDomain: string;
   registrarServer: string;
   contactUri: string;
   registerExpires: string;
-  sessionTimers: boolean;
-  traceSip: boolean;
-  allowInvalidTlsCertificate: boolean;
-  iceTransportPolicy: WebphoneIceTransportPolicy;
   defaultCallerId: string;
-  turnRestEnabled: boolean;
-  turnRestTtlSeconds: string;
+  iceTransportPolicy: WebphoneIceTransportPolicy;
+  traceSip: boolean;
+  sessionTimers: boolean;
+  allowInvalidTlsCertificate: boolean;
+  defaultTimeoutSeconds: string;
+  defaultMaxRetries: string;
 }
 
-export interface UpdateWebphoneConfigDto {
+export interface CreateWebphoneServerDto {
+  name: string;
+  sipDomain: string;
+  websocketUrl: string;
   enabled?: boolean;
-  sipDomain?: string;
   realm?: string | null;
   outboundProxy?: string | null;
   fromDomain?: string | null;
   registrarServer?: string | null;
   contactUri?: string | null;
   registerExpires?: number;
-  sessionTimers?: boolean;
-  traceSip?: boolean;
-  allowInvalidTlsCertificate?: boolean;
-  iceTransportPolicy?: WebphoneIceTransportPolicy;
   defaultCallerId?: string | null;
-  turnRestEnabled?: boolean;
-  turnRestTtlSeconds?: number;
+  iceTransportPolicy?: WebphoneIceTransportPolicy;
+  iceEnabled?: boolean;
+  traceSip?: boolean;
+  sessionTimers?: boolean;
+  allowInvalidTlsCertificate?: boolean;
+  defaultTimeoutSeconds?: number;
+  defaultMaxRetries?: number;
 }
 
-export interface EndpointDraft {
-  label: string;
-  websocketUrl: string;
-  priority: string;
-  enabled: boolean;
-}
-
-export interface CreateWebphoneEndpointDto {
-  label?: string | null;
-  websocketUrl: string;
-  priority?: number;
-  enabled?: boolean;
-}
-
-export interface UpdateWebphoneEndpointDto {
-  label?: string | null;
-  websocketUrl?: string;
-  priority?: number;
-  enabled?: boolean;
-}
+export type UpdateWebphoneServerDto = Partial<CreateWebphoneServerDto>;
 
 export interface IceServerDraft {
   kind: WebphoneIceServerKind;
@@ -160,7 +165,6 @@ export interface IceServerDraft {
   username: string;
   credential: string;
   enabled: boolean;
-  sortOrder: string;
 }
 
 export interface CreateWebphoneIceServerDto {
@@ -181,17 +185,6 @@ export interface UpdateWebphoneIceServerDto {
   sortOrder?: number;
 }
 
-export interface ExtensionDraft {
-  ownerId: string;
-  extension: string;
-  sipUsername: string;
-  sipPassword: string;
-  displayName: string;
-  outboundCallerId: string;
-  transport: WebphoneTransport;
-  enabled: boolean;
-}
-
 export interface CreateWebphoneExtensionDto {
   ownerId: string;
   extension: string;
@@ -199,7 +192,6 @@ export interface CreateWebphoneExtensionDto {
   sipPassword?: string | null;
   displayName?: string | null;
   outboundCallerId?: string | null;
-  transport?: WebphoneTransport;
   enabled?: boolean;
 }
 
@@ -209,8 +201,14 @@ export interface UpdateWebphoneExtensionDto {
   sipPassword?: string | null;
   displayName?: string | null;
   outboundCallerId?: string | null;
-  transport?: WebphoneTransport;
   enabled?: boolean;
+}
+
+/** One row of a user's chain while it is being edited; both overrides are text. */
+export interface ExtensionServerRow {
+  serverId: string;
+  timeoutSeconds: string;
+  maxRetries: string;
 }
 
 /** Field-level validation codes; the presentation layer localizes them. */
@@ -218,72 +216,70 @@ export type WebphoneFieldErrors = Record<string, string>;
 
 // --- Response parsing --------------------------------------------------------
 
-export function readWebphoneConfig(payload: unknown): WebphoneConfig {
-  const config = plainRecord(payload);
+export function readWebphoneServer(payload: unknown): WebphoneServer {
+  const server = plainRecord(payload);
   if (
-    !config ||
-    !nonEmptyString(config.id) ||
-    typeof config.enabled !== "boolean" ||
-    typeof config.sipDomain !== "string" ||
-    typeof config.sessionTimers !== "boolean" ||
-    typeof config.traceSip !== "boolean" ||
-    typeof config.allowInvalidTlsCertificate !== "boolean" ||
-    typeof config.turnRestEnabled !== "boolean" ||
-    !boundedInteger(config.registerExpires, 0, WEBPHONE_REGISTER_EXPIRES_MAX) ||
-    !boundedInteger(config.turnRestTtlSeconds, 0, WEBPHONE_TURN_TTL_MAX_SECONDS) ||
-    !isIceTransportPolicy(config.iceTransportPolicy) ||
-    !Array.isArray(config.endpoints) ||
-    !Array.isArray(config.iceServers)
+    !server ||
+    !nonEmptyString(server.id) ||
+    typeof server.name !== "string" ||
+    typeof server.sipDomain !== "string" ||
+    !nonEmptyString(server.websocketUrl) ||
+    typeof server.enabled !== "boolean" ||
+    typeof server.iceEnabled !== "boolean" ||
+    typeof server.traceSip !== "boolean" ||
+    typeof server.sessionTimers !== "boolean" ||
+    typeof server.allowInvalidTlsCertificate !== "boolean" ||
+    !boundedInteger(server.priority, 0, WEBPHONE_SERVER_PRIORITY_MAX) ||
+    !boundedInteger(server.registerExpires, 0, WEBPHONE_REGISTER_EXPIRES_MAX) ||
+    !boundedInteger(server.defaultTimeoutSeconds, 0, WEBPHONE_TIMEOUT_MAX_SECONDS) ||
+    !boundedInteger(server.defaultMaxRetries, 0, WEBPHONE_MAX_RETRIES_MAX) ||
+    !isIceTransportPolicy(server.iceTransportPolicy) ||
+    !Array.isArray(server.iceServers)
   ) {
-    invalidResponse("CONFIG");
+    invalidResponse("SERVER");
   }
 
   return {
-    id: config.id as string,
-    tenantId: nullableString(config.tenantId),
-    enabled: config.enabled as boolean,
-    sipDomain: config.sipDomain as string,
-    realm: nullableString(config.realm),
-    outboundProxy: nullableString(config.outboundProxy),
-    fromDomain: nullableString(config.fromDomain),
-    registrarServer: nullableString(config.registrarServer),
-    contactUri: nullableString(config.contactUri),
-    registerExpires: config.registerExpires as number,
-    sessionTimers: config.sessionTimers as boolean,
-    traceSip: config.traceSip as boolean,
-    allowInvalidTlsCertificate: config.allowInvalidTlsCertificate as boolean,
-    iceTransportPolicy: config.iceTransportPolicy,
-    defaultCallerId: nullableString(config.defaultCallerId),
-    turnRestEnabled: config.turnRestEnabled as boolean,
-    turnRestTtlSeconds: config.turnRestTtlSeconds as number,
-    endpoints: (config.endpoints as unknown[])
-      .map(readWebphoneEndpoint)
-      .sort((left, right) => left.priority - right.priority),
-    iceServers: (config.iceServers as unknown[])
+    id: server.id as string,
+    name: server.name as string,
+    sipDomain: server.sipDomain as string,
+    websocketUrl: server.websocketUrl as string,
+    priority: server.priority as number,
+    enabled: server.enabled as boolean,
+    realm: nullableString(server.realm),
+    outboundProxy: nullableString(server.outboundProxy),
+    fromDomain: nullableString(server.fromDomain),
+    registrarServer: nullableString(server.registrarServer),
+    contactUri: nullableString(server.contactUri),
+    registerExpires: server.registerExpires as number,
+    defaultCallerId: nullableString(server.defaultCallerId),
+    iceTransportPolicy: server.iceTransportPolicy,
+    iceEnabled: server.iceEnabled as boolean,
+    traceSip: server.traceSip as boolean,
+    sessionTimers: server.sessionTimers as boolean,
+    allowInvalidTlsCertificate: server.allowInvalidTlsCertificate as boolean,
+    defaultTimeoutSeconds: server.defaultTimeoutSeconds as number,
+    defaultMaxRetries: server.defaultMaxRetries as number,
+    iceServers: (server.iceServers as unknown[])
       .map(readWebphoneIceServer)
       .sort((left, right) => left.sortOrder - right.sortOrder),
   };
 }
 
-export function readWebphoneEndpoint(payload: unknown): WebphoneEndpoint {
-  const endpoint = plainRecord(payload);
-  if (
-    !endpoint ||
-    !nonEmptyString(endpoint.id) ||
-    !nonEmptyString(endpoint.websocketUrl) ||
-    typeof endpoint.enabled !== "boolean" ||
-    !boundedInteger(endpoint.priority, 0, WEBPHONE_ENDPOINT_PRIORITY_MAX)
-  ) {
-    invalidResponse("ENDPOINT");
-  }
-
-  return {
-    id: endpoint.id as string,
-    label: nullableString(endpoint.label),
-    websocketUrl: endpoint.websocketUrl as string,
-    priority: endpoint.priority as number,
-    enabled: endpoint.enabled as boolean,
-  };
+/**
+ * The failover chain, lowest priority first.
+ *
+ * The list arrives ordered, but the order is what the screen renders and what
+ * a reorder writes back, so it is re-derived here rather than assumed.
+ */
+export function readWebphoneServers(payload: unknown): WebphoneServer[] {
+  const items = Array.isArray(payload)
+    ? payload
+    : (plainRecord(payload)?.items as unknown);
+  if (!Array.isArray(items)) invalidResponse("SERVER_LIST");
+  return items
+    .map(readWebphoneServer)
+    .sort((left, right) => left.priority - right.priority);
 }
 
 export function readWebphoneIceServer(payload: unknown): WebphoneIceServer {
@@ -328,8 +324,7 @@ export function readWebphoneExtension(payload: unknown): WebphoneExtension {
     !nonEmptyString(extension.extension) ||
     !nonEmptyString(extension.sipUsername) ||
     typeof extension.passwordConfigured !== "boolean" ||
-    typeof extension.enabled !== "boolean" ||
-    !isTransport(extension.transport)
+    typeof extension.enabled !== "boolean"
   ) {
     invalidResponse("EXTENSION");
   }
@@ -346,7 +341,6 @@ export function readWebphoneExtension(payload: unknown): WebphoneExtension {
     passwordConfigured: extension.passwordConfigured as boolean,
     displayName: nullableString(extension.displayName),
     outboundCallerId: nullableString(extension.outboundCallerId),
-    transport: extension.transport,
     enabled: extension.enabled as boolean,
   };
 }
@@ -359,89 +353,188 @@ export function readWebphoneExtensions(payload: unknown): WebphoneExtension[] {
   return items.map(readWebphoneExtension);
 }
 
-/**
- * Seat accounting, derived rather than trusted.
- *
- * `available` and `overAllowance` are recomputed from `allowed` and `occupied`
- * so no response can make the UI print a negative availability. Occupancy above
- * the allowance is a legitimate state — reducing seats never auto-disables a
- * working phone — and is reported as `overAllowance`, not as a negative number.
- */
-export function readWebphoneSeats(payload: unknown): WebphoneSeats {
-  const seats = plainRecord(payload);
+export function readWebphoneExtensionServer(
+  payload: unknown,
+): WebphoneExtensionServer {
+  const link = plainRecord(payload);
   if (
-    !seats ||
-    !nonNegativeInteger(seats.allowed) ||
-    !nonNegativeInteger(seats.occupied)
+    !link ||
+    !nonEmptyString(link.serverId) ||
+    !boundedInteger(link.priority, 0, WEBPHONE_SERVER_PRIORITY_MAX) ||
+    !nullableBoundedInteger(
+      link.timeoutSeconds,
+      0,
+      WEBPHONE_TIMEOUT_MAX_SECONDS,
+    ) ||
+    !nullableBoundedInteger(link.maxRetries, 0, WEBPHONE_MAX_RETRIES_MAX)
   ) {
-    invalidResponse("SEATS");
+    invalidResponse("EXTENSION_SERVER");
   }
 
-  const allowed = seats.allowed as number;
-  const occupied = seats.occupied as number;
   return {
-    allowed,
-    occupied,
-    available: Math.max(0, allowed - occupied),
-    overAllowance: occupied > allowed,
+    serverId: link.serverId as string,
+    priority: link.priority as number,
+    // Undefined and null both mean "inherit the server default", so they are
+    // collapsed to one representation rather than kept apart.
+    timeoutSeconds: (link.timeoutSeconds as number | null | undefined) ?? null,
+    maxRetries: (link.maxRetries as number | null | undefined) ?? null,
   };
 }
 
-export function readWebphoneFleetSeats(
+export function readWebphoneExtensionServers(
   payload: unknown,
-): WebphoneFleetSeatRow[] {
+): WebphoneExtensionServer[] {
   const items = Array.isArray(payload)
     ? payload
     : (plainRecord(payload)?.items as unknown);
-  if (!Array.isArray(items)) invalidResponse("FLEET_SEATS");
-
-  return items.map((entry) => {
-    const row = plainRecord(entry);
-    if (!row || !nonEmptyString(row.tenantId)) invalidResponse("FLEET_SEATS");
-    return {
-      tenantId: row.tenantId as string,
-      tenantName: nonEmptyString(row.tenantName)
-        ? (row.tenantName as string)
-        : (row.tenantId as string),
-      ...readWebphoneSeats(row),
-    };
-  });
+  if (!Array.isArray(items)) invalidResponse("EXTENSION_SERVER_LIST");
+  return items
+    .map(readWebphoneExtensionServer)
+    .sort((left, right) => left.priority - right.priority);
 }
 
-// --- Form <-> DTO ------------------------------------------------------------
+// --- WebSocket protocol ------------------------------------------------------
 
-export function configToForm(config: WebphoneConfig): WebphoneConfigForm {
+/**
+ * The protocol control edits the scheme of the WebSocket URL, because that is
+ * where a server's transport actually lives — there is no protocol column to
+ * disagree with it.
+ */
+export function websocketProtocol(url: string): WebphoneProtocol {
+  return /^ws:\/\//iu.test(url.trim()) ? "ws" : "wss";
+}
+
+export function withWebsocketProtocol(
+  url: string,
+  protocol: WebphoneProtocol,
+): string {
+  return `${protocol}://${url.trim().replace(WS_SCHEME_PATTERN, "")}`;
+}
+
+// --- Server form <-> DTO -----------------------------------------------------
+
+/**
+ * The identity a just-created server carries until its operator edits it.
+ *
+ * Both are required by the API — a blank SIP domain or WebSocket URL is
+ * refused — so a placeholder has to stand in. `.invalid` is reserved by
+ * RFC 2606 and can never resolve, so a server left half-configured cannot
+ * register against somebody else's host by accident.
+ */
+export const NEW_SERVER_SIP_DOMAIN = "example.invalid";
+export const NEW_SERVER_WEBSOCKET_URL = "wss://example.invalid/ws";
+
+/**
+ * A free name in the shape `baseName`, `baseName 2`, `baseName 3`...
+ *
+ * Names are not unique in the database, but two servers called the same thing
+ * are indistinguishable in the failover list, in the delete confirmation and in
+ * every move button's accessible name — so a new one is numbered on sight.
+ */
+export function nextServerName(
+  servers: readonly WebphoneServer[],
+  baseName: string,
+): string {
+  const taken = new Set(servers.map((server) => server.name.trim()));
+  if (!taken.has(baseName)) return baseName;
+  // Terminates: `taken` is finite, so some suffix is always free.
+  let suffix = 2;
+  while (taken.has(`${baseName} ${suffix}`)) suffix += 1;
+  return `${baseName} ${suffix}`;
+}
+
+/**
+ * A blank-but-valid server, created in one click and edited in place.
+ *
+ * It arrives disabled: the chain is live, and appending an enabled server that
+ * still points at a placeholder domain would put real calls onto a host that
+ * cannot answer them. The operator enables it once the two identity fields are
+ * real.
+ */
+export function newServerDto(
+  servers: readonly WebphoneServer[],
+  baseName: string,
+): CreateWebphoneServerDto {
   return {
-    enabled: config.enabled,
-    sipDomain: config.sipDomain,
-    realm: config.realm ?? "",
-    outboundProxy: config.outboundProxy ?? "",
-    fromDomain: config.fromDomain ?? "",
-    registrarServer: config.registrarServer ?? "",
-    contactUri: config.contactUri ?? "",
-    registerExpires: String(config.registerExpires),
-    sessionTimers: config.sessionTimers,
-    traceSip: config.traceSip,
-    allowInvalidTlsCertificate: config.allowInvalidTlsCertificate,
-    iceTransportPolicy: config.iceTransportPolicy,
-    defaultCallerId: config.defaultCallerId ?? "",
-    turnRestEnabled: config.turnRestEnabled,
-    turnRestTtlSeconds: String(config.turnRestTtlSeconds),
+    name: nextServerName(servers, baseName),
+    sipDomain: NEW_SERVER_SIP_DOMAIN,
+    websocketUrl: NEW_SERVER_WEBSOCKET_URL,
+    enabled: false,
+    registerExpires: 600,
+    iceTransportPolicy: "all",
+    // A new server has no ICE entries yet, so the switch above them starts on:
+    // it is the state in which adding the first STUN or TURN entry does what
+    // the operator expects, and it is the column default besides.
+    iceEnabled: true,
+    traceSip: false,
+    sessionTimers: false,
+    allowInvalidTlsCertificate: false,
+    defaultTimeoutSeconds: 15,
+    defaultMaxRetries: 1,
   };
 }
 
-export function validateConfigForm(
-  form: WebphoneConfigForm,
+export function serverToForm(server: WebphoneServer): WebphoneServerForm {
+  return {
+    name: server.name,
+    sipDomain: server.sipDomain,
+    websocketUrl: server.websocketUrl,
+    enabled: server.enabled,
+    realm: server.realm ?? "",
+    outboundProxy: server.outboundProxy ?? "",
+    fromDomain: server.fromDomain ?? "",
+    registrarServer: server.registrarServer ?? "",
+    contactUri: server.contactUri ?? "",
+    registerExpires: String(server.registerExpires),
+    defaultCallerId: server.defaultCallerId ?? "",
+    iceTransportPolicy: server.iceTransportPolicy,
+    traceSip: server.traceSip,
+    sessionTimers: server.sessionTimers,
+    allowInvalidTlsCertificate: server.allowInvalidTlsCertificate,
+    defaultTimeoutSeconds: String(server.defaultTimeoutSeconds),
+    defaultMaxRetries: String(server.defaultMaxRetries),
+  };
+}
+
+/**
+ * Validates one server, including the rule that gives relay-only its meaning.
+ *
+ * Relay-only transport with nothing to relay through is not a configuration
+ * that merely performs badly — every call loses its media path — so it is
+ * refused here rather than left for the operator to discover on a live call.
+ *
+ * Two states reach that: no enabled TURN entry, and the server's ICE master
+ * switch turned off, which withholds every entry from the browser however many
+ * are stored. They are reported as separate codes because the operator's remedy
+ * differs — add or enable a TURN entry, versus switch ICE back on — and a
+ * message naming the wrong one sends them looking at controls that are already
+ * correct.
+ */
+export function validateServerForm(
+  form: WebphoneServerForm,
+  iceServers: readonly WebphoneIceServer[] = [],
+  iceEnabled = true,
 ): WebphoneFieldErrors {
   const errors: WebphoneFieldErrors = {};
-  const sipDomain = form.sipDomain.trim();
+  const name = form.name.trim();
+  if (!name || name.length > 64) errors.name = "NAME_REQUIRED";
 
-  if (sipDomain.length > 253 || (sipDomain && !SIP_DOMAIN_PATTERN.test(sipDomain))) {
+  const sipDomain = form.sipDomain.trim();
+  if (!sipDomain) {
+    errors.sipDomain = "SIP_DOMAIN_REQUIRED";
+  } else if (sipDomain.length > 253 || !SIP_DOMAIN_PATTERN.test(sipDomain)) {
     errors.sipDomain = "INVALID_SIP_DOMAIN";
   }
-  if (form.enabled && !sipDomain) {
-    errors.sipDomain = "SIP_DOMAIN_REQUIRED";
+
+  const websocketUrl = form.websocketUrl.trim();
+  if (
+    !websocketUrl ||
+    websocketUrl.length > 512 ||
+    !WS_URL_PATTERN.test(websocketUrl)
+  ) {
+    errors.websocketUrl = "INVALID_WS_URL";
   }
+
   if (form.realm.trim().length > 253) errors.realm = "TOO_LONG";
   if (form.fromDomain.trim().length > 253) errors.fromDomain = "TOO_LONG";
   if (form.defaultCallerId.trim().length > 64) {
@@ -466,103 +559,118 @@ export function validateConfigForm(
   }
   if (
     !integerInRange(
-      form.turnRestTtlSeconds,
-      WEBPHONE_TURN_TTL_MIN_SECONDS,
-      WEBPHONE_TURN_TTL_MAX_SECONDS,
+      form.defaultTimeoutSeconds,
+      WEBPHONE_TIMEOUT_MIN_SECONDS,
+      WEBPHONE_TIMEOUT_MAX_SECONDS,
     )
   ) {
-    errors.turnRestTtlSeconds = "OUT_OF_RANGE";
+    errors.defaultTimeoutSeconds = "OUT_OF_RANGE";
+  }
+  if (
+    !integerInRange(
+      form.defaultMaxRetries,
+      WEBPHONE_MAX_RETRIES_MIN,
+      WEBPHONE_MAX_RETRIES_MAX,
+    )
+  ) {
+    errors.defaultMaxRetries = "OUT_OF_RANGE";
+  }
+
+  if (form.iceTransportPolicy === "relay") {
+    // The master switch is checked first: with ICE off the entries below are
+    // not offered at all, so pointing the operator at their TURN list would be
+    // pointing at a list that is already correct.
+    if (!iceEnabled) {
+      errors.iceTransportPolicy = "RELAY_REQUIRES_ICE_ENABLED";
+    } else if (!hasEnabledTurn(iceServers)) {
+      errors.iceTransportPolicy = "RELAY_REQUIRES_TURN";
+    }
   }
 
   return errors;
 }
 
-export function buildConfigPatch(
-  config: WebphoneConfig,
-  form: WebphoneConfigForm,
-): UpdateWebphoneConfigDto {
-  const patch: UpdateWebphoneConfigDto = {};
-  if (form.enabled !== config.enabled) patch.enabled = form.enabled;
-  if (form.sipDomain.trim() !== config.sipDomain) {
-    patch.sipDomain = form.sipDomain.trim();
-  }
-  assignNullable(patch, "realm", form.realm, config.realm);
-  assignNullable(patch, "outboundProxy", form.outboundProxy, config.outboundProxy);
-  assignNullable(patch, "fromDomain", form.fromDomain, config.fromDomain);
-  assignNullable(
-    patch,
-    "registrarServer",
-    form.registrarServer,
-    config.registrarServer,
-  );
-  assignNullable(patch, "contactUri", form.contactUri, config.contactUri);
-  assignNullable(
-    patch,
-    "defaultCallerId",
-    form.defaultCallerId,
-    config.defaultCallerId,
-  );
+function hasEnabledTurn(iceServers: readonly WebphoneIceServer[]): boolean {
+  return iceServers.some((server) => server.kind === "TURN" && server.enabled);
+}
 
-  const registerExpires = Number(form.registerExpires);
-  if (registerExpires !== config.registerExpires) {
-    patch.registerExpires = registerExpires;
-  }
-  const ttl = Number(form.turnRestTtlSeconds);
-  if (ttl !== config.turnRestTtlSeconds) patch.turnRestTtlSeconds = ttl;
+export function serverFormToDto(
+  form: WebphoneServerForm,
+): CreateWebphoneServerDto {
+  return {
+    name: form.name.trim(),
+    sipDomain: form.sipDomain.trim(),
+    websocketUrl: form.websocketUrl.trim(),
+    enabled: form.enabled,
+    realm: emptyToNull(form.realm),
+    outboundProxy: emptyToNull(form.outboundProxy),
+    fromDomain: emptyToNull(form.fromDomain),
+    registrarServer: emptyToNull(form.registrarServer),
+    contactUri: emptyToNull(form.contactUri),
+    registerExpires: Number(form.registerExpires),
+    defaultCallerId: emptyToNull(form.defaultCallerId),
+    iceTransportPolicy: form.iceTransportPolicy,
+    traceSip: form.traceSip,
+    sessionTimers: form.sessionTimers,
+    allowInvalidTlsCertificate: form.allowInvalidTlsCertificate,
+    defaultTimeoutSeconds: Number(form.defaultTimeoutSeconds),
+    defaultMaxRetries: Number(form.defaultMaxRetries),
+  };
+}
 
-  if (form.sessionTimers !== config.sessionTimers) {
-    patch.sessionTimers = form.sessionTimers;
+/**
+ * The changed fields only. `priority` is never included: the failover order is
+ * written by `PUT /servers/order` as one statement about the whole list, so a
+ * per-server patch that also moved a server could contradict it.
+ */
+export function buildServerPatch(
+  server: WebphoneServer,
+  form: WebphoneServerForm,
+): UpdateWebphoneServerDto {
+  const patch: UpdateWebphoneServerDto = {};
+  const next = serverFormToDto(form);
+
+  if (next.name !== server.name) patch.name = next.name;
+  if (next.sipDomain !== server.sipDomain) patch.sipDomain = next.sipDomain;
+  if (next.websocketUrl !== server.websocketUrl) {
+    patch.websocketUrl = next.websocketUrl;
   }
-  if (form.traceSip !== config.traceSip) patch.traceSip = form.traceSip;
-  if (form.allowInvalidTlsCertificate !== config.allowInvalidTlsCertificate) {
-    patch.allowInvalidTlsCertificate = form.allowInvalidTlsCertificate;
+  if (next.enabled !== server.enabled) patch.enabled = next.enabled;
+  if (next.realm !== server.realm) patch.realm = next.realm;
+  if (next.outboundProxy !== server.outboundProxy) {
+    patch.outboundProxy = next.outboundProxy;
   }
-  if (form.iceTransportPolicy !== config.iceTransportPolicy) {
-    patch.iceTransportPolicy = form.iceTransportPolicy;
+  if (next.fromDomain !== server.fromDomain) patch.fromDomain = next.fromDomain;
+  if (next.registrarServer !== server.registrarServer) {
+    patch.registrarServer = next.registrarServer;
   }
-  if (form.turnRestEnabled !== config.turnRestEnabled) {
-    patch.turnRestEnabled = form.turnRestEnabled;
+  if (next.contactUri !== server.contactUri) patch.contactUri = next.contactUri;
+  if (next.registerExpires !== server.registerExpires) {
+    patch.registerExpires = next.registerExpires;
+  }
+  if (next.defaultCallerId !== server.defaultCallerId) {
+    patch.defaultCallerId = next.defaultCallerId;
+  }
+  if (next.iceTransportPolicy !== server.iceTransportPolicy) {
+    patch.iceTransportPolicy = next.iceTransportPolicy;
+  }
+  if (next.traceSip !== server.traceSip) patch.traceSip = next.traceSip;
+  if (next.sessionTimers !== server.sessionTimers) {
+    patch.sessionTimers = next.sessionTimers;
+  }
+  if (next.allowInvalidTlsCertificate !== server.allowInvalidTlsCertificate) {
+    patch.allowInvalidTlsCertificate = next.allowInvalidTlsCertificate;
+  }
+  if (next.defaultTimeoutSeconds !== server.defaultTimeoutSeconds) {
+    patch.defaultTimeoutSeconds = next.defaultTimeoutSeconds;
+  }
+  if (next.defaultMaxRetries !== server.defaultMaxRetries) {
+    patch.defaultMaxRetries = next.defaultMaxRetries;
   }
   return patch;
 }
 
-export const EMPTY_ENDPOINT_DRAFT: EndpointDraft = {
-  label: "",
-  websocketUrl: "",
-  priority: "0",
-  enabled: true,
-};
-
-export function validateEndpointDraft(draft: EndpointDraft): WebphoneFieldErrors {
-  const errors: WebphoneFieldErrors = {};
-  const url = draft.websocketUrl.trim();
-  if (!url || url.length > 512 || !WS_URL_PATTERN.test(url)) {
-    errors.websocketUrl = "INVALID_WS_URL";
-  }
-  if (draft.label.trim().length > 64) errors.label = "TOO_LONG";
-  if (
-    !integerInRange(
-      draft.priority,
-      WEBPHONE_ENDPOINT_PRIORITY_MIN,
-      WEBPHONE_ENDPOINT_PRIORITY_MAX,
-    )
-  ) {
-    errors.priority = "OUT_OF_RANGE";
-  }
-  return errors;
-}
-
-export function endpointDraftToDto(
-  draft: EndpointDraft,
-): CreateWebphoneEndpointDto {
-  const label = draft.label.trim();
-  return {
-    websocketUrl: draft.websocketUrl.trim(),
-    priority: Number(draft.priority),
-    enabled: draft.enabled,
-    ...(label ? { label } : {}),
-  };
-}
+// --- ICE servers -------------------------------------------------------------
 
 export const EMPTY_ICE_SERVER_DRAFT: IceServerDraft = {
   kind: "STUN",
@@ -570,7 +678,6 @@ export const EMPTY_ICE_SERVER_DRAFT: IceServerDraft = {
   username: "",
   credential: "",
   enabled: true,
-  sortOrder: "0",
 };
 
 export function parseIceUrls(value: string): string[] {
@@ -580,8 +687,18 @@ export function parseIceUrls(value: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Validates one ICE entry.
+ *
+ * `credentialStored` is what makes editing an existing TURN entry possible. The
+ * credential is write-only, so an edit form always shows it blank; without this
+ * flag the pair rule would read that blank as "no credential" and refuse every
+ * change to the username of an entry that already has one — a credential the
+ * operator cannot retype, because it was never shown to them.
+ */
 export function validateIceServerDraft(
   draft: IceServerDraft,
+  credentialStored = false,
 ): WebphoneFieldErrors {
   const errors: WebphoneFieldErrors = {};
   const urls = parseIceUrls(draft.urls);
@@ -599,31 +716,30 @@ export function validateIceServerDraft(
   }
   if (
     draft.kind === "TURN" &&
-    Boolean(draft.username.trim()) !== Boolean(draft.credential)
+    Boolean(draft.username.trim()) !==
+      Boolean(draft.credential || credentialStored)
   ) {
     errors.credential = "TURN_CREDENTIAL_PAIR_REQUIRED";
-  }
-  if (
-    !integerInRange(
-      draft.sortOrder,
-      WEBPHONE_ICE_SORT_ORDER_MIN,
-      WEBPHONE_ICE_SORT_ORDER_MAX,
-    )
-  ) {
-    errors.sortOrder = "OUT_OF_RANGE";
   }
   return errors;
 }
 
+/**
+ * A new ICE entry, appended to its server's list.
+ *
+ * `sortOrder` is positional, so it is derived from the list length rather than
+ * asked for — one fewer number for an operator to keep consistent by hand.
+ */
 export function iceServerDraftToDto(
   draft: IceServerDraft,
+  sortOrder: number,
 ): CreateWebphoneIceServerDto {
   const username = draft.username.trim();
   return {
     kind: draft.kind,
     urls: parseIceUrls(draft.urls),
     enabled: draft.enabled,
-    sortOrder: Number(draft.sortOrder),
+    sortOrder: Math.min(Math.max(sortOrder, 0), WEBPHONE_ICE_SORT_ORDER_MAX),
     ...(draft.kind === "TURN" && username ? { username } : {}),
     ...(draft.kind === "TURN" && draft.credential
       ? { credential: draft.credential }
@@ -631,70 +747,110 @@ export function iceServerDraftToDto(
   };
 }
 
-export const EMPTY_EXTENSION_DRAFT: ExtensionDraft = {
-  ownerId: "",
-  extension: "",
-  sipUsername: "",
-  sipPassword: "",
-  displayName: "",
-  outboundCallerId: "",
-  transport: "wss",
-  enabled: false,
-};
+// --- Extension server chain --------------------------------------------------
 
-export function validateExtensionDraft(
-  draft: ExtensionDraft,
+export function extensionServersToRows(
+  chain: readonly WebphoneExtensionServer[],
+): ExtensionServerRow[] {
+  return chain.map((link) => ({
+    serverId: link.serverId,
+    timeoutSeconds: link.timeoutSeconds === null ? "" : String(link.timeoutSeconds),
+    maxRetries: link.maxRetries === null ? "" : String(link.maxRetries),
+  }));
+}
+
+/**
+ * Validation keyed by `<serverId>.<field>` so a bad override renders against
+ * the row that carries it rather than as one message for the whole chain.
+ */
+export function validateExtensionServerRows(
+  rows: readonly ExtensionServerRow[],
 ): WebphoneFieldErrors {
   const errors: WebphoneFieldErrors = {};
-  if (!draft.ownerId.trim()) errors.ownerId = "OWNER_REQUIRED";
-  if (!EXTENSION_PATTERN.test(draft.extension.trim())) {
-    errors.extension = "INVALID_EXTENSION";
-  }
-  const sipUsername = draft.sipUsername.trim();
-  if (!sipUsername || sipUsername.length > 120) {
-    errors.sipUsername = "INVALID_SIP_USERNAME";
-  }
-  if (draft.sipPassword.length > 1024) errors.sipPassword = "TOO_LONG";
-  if (draft.enabled && !draft.sipPassword) {
-    errors.sipPassword = "PASSWORD_REQUIRED_TO_ENABLE";
-  }
-  if (draft.displayName.trim().length > 120) errors.displayName = "TOO_LONG";
-  if (draft.outboundCallerId.trim().length > 64) {
-    errors.outboundCallerId = "TOO_LONG";
+  for (const row of rows) {
+    if (
+      row.timeoutSeconds.trim() &&
+      !integerInRange(
+        row.timeoutSeconds,
+        WEBPHONE_TIMEOUT_MIN_SECONDS,
+        WEBPHONE_TIMEOUT_MAX_SECONDS,
+      )
+    ) {
+      errors[`${row.serverId}.timeoutSeconds`] = "OUT_OF_RANGE";
+    }
+    if (
+      row.maxRetries.trim() &&
+      !integerInRange(
+        row.maxRetries,
+        WEBPHONE_MAX_RETRIES_MIN,
+        WEBPHONE_MAX_RETRIES_MAX,
+      )
+    ) {
+      errors[`${row.serverId}.maxRetries`] = "OUT_OF_RANGE";
+    }
   }
   return errors;
 }
 
-export function extensionDraftToDto(
-  draft: ExtensionDraft,
-): CreateWebphoneExtensionDto {
-  const displayName = draft.displayName.trim();
-  const outboundCallerId = draft.outboundCallerId.trim();
-  return {
-    ownerId: draft.ownerId.trim(),
-    extension: draft.extension.trim(),
-    sipUsername: draft.sipUsername.trim(),
-    transport: draft.transport,
-    enabled: draft.enabled,
-    ...(draft.sipPassword ? { sipPassword: draft.sipPassword } : {}),
-    ...(displayName ? { displayName } : {}),
-    ...(outboundCallerId ? { outboundCallerId } : {}),
-  };
+/**
+ * The chain for the wire. Position is authoritative: `priority` is the row's
+ * index, and a blank override is sent as null so the server default applies
+ * rather than a zero that would mean "never wait" or "never retry".
+ */
+export function rowsToExtensionServers(
+  rows: readonly ExtensionServerRow[],
+): WebphoneExtensionServer[] {
+  return rows.map((row, index) => ({
+    serverId: row.serverId,
+    priority: index,
+    timeoutSeconds: blankToNullInteger(row.timeoutSeconds),
+    maxRetries: blankToNullInteger(row.maxRetries),
+  }));
+}
+
+export function extensionServerRowsChanged(
+  rows: readonly ExtensionServerRow[],
+  chain: readonly WebphoneExtensionServer[],
+): boolean {
+  const next = rowsToExtensionServers(rows);
+  if (next.length !== chain.length) return true;
+  return next.some((link, index) => {
+    const current = chain[index];
+    return (
+      link.serverId !== current.serverId ||
+      link.timeoutSeconds !== current.timeoutSeconds ||
+      link.maxRetries !== current.maxRetries
+    );
+  });
+}
+
+/** Moves one entry within a list, returning a new list. */
+export function moveInList<T>(list: readonly T[], from: number, to: number): T[] {
+  if (
+    from === to ||
+    from < 0 ||
+    to < 0 ||
+    from >= list.length ||
+    to >= list.length
+  ) {
+    return [...list];
+  }
+  const next = [...list];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
 }
 
 // --- Local helpers -----------------------------------------------------------
 
-function assignNullable<K extends keyof UpdateWebphoneConfigDto>(
-  patch: UpdateWebphoneConfigDto,
-  field: K,
-  formValue: string,
-  serverValue: string | null,
-): void {
-  const trimmed = formValue.trim();
-  const next = trimmed === "" ? null : trimmed;
-  if (next !== serverValue) {
-    (patch as Record<string, unknown>)[field as string] = next;
-  }
+function emptyToNull(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+function blankToNullInteger(value: string): number | null {
+  const trimmed = value.trim();
+  return trimmed === "" ? null : Number(trimmed);
 }
 
 function integerInRange(value: string, min: number, max: number): boolean {
@@ -722,8 +878,16 @@ function boundedInteger(value: unknown, min: number, max: number): boolean {
   return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max;
 }
 
-function nonNegativeInteger(value: unknown): boolean {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+function nullableBoundedInteger(
+  value: unknown,
+  min: number,
+  max: number,
+): boolean {
+  return (
+    value === null ||
+    value === undefined ||
+    boundedInteger(value, min, max)
+  );
 }
 
 function isIceServerKind(value: unknown): value is WebphoneIceServerKind {
@@ -734,10 +898,6 @@ function isIceTransportPolicy(
   value: unknown,
 ): value is WebphoneIceTransportPolicy {
   return value === "all" || value === "relay";
-}
-
-function isTransport(value: unknown): value is WebphoneTransport {
-  return value === "ws" || value === "wss";
 }
 
 function invalidResponse(part: string): never {

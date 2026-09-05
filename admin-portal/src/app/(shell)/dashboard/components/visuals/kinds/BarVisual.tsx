@@ -34,7 +34,7 @@ type BarVisualModel = Extract<DashboardVisual, { kind: "bar" }>;
 
 const ROW_HEIGHT = 34;
 
-/** Ranked categories, always sorted descending, horizontal so labels read. */
+/** Ranked categories, sorted descending unless the order is the point. */
 export function BarVisual({ visual }: { visual: BarVisualModel }) {
   const { dir, lang, t } = useI18n();
   const reducedMotion = useReducedMotion();
@@ -45,15 +45,25 @@ export function BarVisual({ visual }: { visual: BarVisualModel }) {
     return <ChartEmptyState title={visual.title} lang={lang} />;
   }
 
-  const ranked = sortPointsDescending(source);
-  const folded = foldVisualPoints(ranked, t.dashboard.visuals.other);
+  // A histogram's buckets are a scale: "today, this week, never" ranked by
+  // size loses the axis and reads as nonsense. Folding a tail into "Other"
+  // would do the same, so an ordered chart keeps every bucket too.
+  const ranked = visual.ordered ? source : sortPointsDescending(source);
+  const folded = visual.ordered
+    ? ranked
+    : foldVisualPoints(ranked, t.dashboard.visuals.other);
   const total = sumPoints(ranked);
   const rows = folded.map((point, index) => ({
     ...point,
     color: visualColor(index, point.tone),
   }));
   const height = Math.max(160, rows.length * ROW_HEIGHT + 32);
-  const leader = ranked[0];
+  // The summary names the biggest bar. In an ordered chart the first bar is
+  // simply the first bucket, so the maximum has to be found rather than read.
+  const leader = ranked.reduce(
+    (highest, point) => (point.value > highest.value ? point : highest),
+    ranked[0],
+  );
   const summary =
     lang === "ar"
       ? `${visual.title}: ${formatVisualValue(lang, total, visual.unit)} إجمالاً عبر ${ranked.length} فئة. الأعلى ${leader.label} بقيمة ${formatVisualValue(lang, leader.value, visual.unit)}.`

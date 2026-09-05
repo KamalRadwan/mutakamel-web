@@ -173,6 +173,60 @@ describe("Application technical provisioning API", () => {
     );
   });
 
+  it("reads the bindable database-server candidates for one Application", async () => {
+    const candidates = {
+      applicationId: "019f0000-0000-7000-8000-000000000001",
+      applicationKey: "crm",
+      applicationName: "CRM",
+      databasePrincipal: "mutakamel_crm_app",
+      catalogueRevision: "5",
+      policyRevision: "2",
+      bindable: true,
+      blockedReason: null,
+      servers: [],
+    };
+    getMock.mockResolvedValue(envelope(candidates));
+
+    await expect(
+      applicationsApi.listBindableDatabaseServers("crm"),
+    ).resolves.toEqual(candidates);
+    expect(getMock).toHaveBeenCalledWith(
+      "/api/admin/core/v1/applications/crm/database-servers",
+    );
+  });
+
+  it("submits the bulk database bind with an idempotency key", async () => {
+    const dto = {
+      databaseServerIds: [
+        "019f0000-0000-7000-8000-0000000000a1",
+        "019f0000-0000-7000-8000-0000000000a2",
+      ],
+      expectedCatalogueRevision: "5",
+      expectedPolicyRevision: "2",
+      reason: "Roll CRM out to the Cairo fleet",
+    };
+    const receipt = {
+      applicationId: "019f0000-0000-7000-8000-000000000001",
+      applicationKey: "crm",
+      requested: 2,
+      bound: 2,
+      alreadyBound: 0,
+      failed: 0,
+      results: [],
+      completedAt: "2026-08-02T12:00:00.000Z",
+    };
+    postMock.mockResolvedValue(envelope(receipt));
+
+    await expect(
+      applicationsApi.bindDatabaseServers("crm", dto, "idem-bind-1"),
+    ).resolves.toEqual(receipt);
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/admin/core/v1/applications/crm/database-servers/bind",
+      dto,
+      { headers: { "x-idempotency-key": "idem-bind-1" } },
+    );
+  });
+
   it("never auto-keys or replays non-idempotent tier and feature creates", async () => {
     const tier = { id: "tier-1", key: "business", name: "Business" };
     const feature = { id: "feature-1", key: "crm.email", name: "Email" };

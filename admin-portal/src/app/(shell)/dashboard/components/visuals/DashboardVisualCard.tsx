@@ -10,6 +10,9 @@ import { DonutVisual } from "./kinds/DonutVisual";
 import { FunnelVisual } from "./kinds/FunnelVisual";
 import { GaugeVisual } from "./kinds/GaugeVisual";
 import { HeatmapVisual } from "./kinds/HeatmapVisual";
+import { ListVisual } from "./kinds/ListVisual";
+import { ScatterVisual } from "./kinds/ScatterVisual";
+import { MultiSeriesVisual } from "./kinds/MultiSeriesVisual";
 import { ParetoVisual } from "./kinds/ParetoVisual";
 import { TimeSeriesVisual } from "./kinds/TimeSeriesVisual";
 import { TwoSeriesVisual } from "./kinds/TwoSeriesVisual";
@@ -37,6 +40,10 @@ export function DashboardVisualBody({ visual }: { visual: DashboardVisual }) {
     case "line":
     case "area":
       return <TimeSeriesVisual visual={visual} />;
+    case "multi-series":
+      return <MultiSeriesVisual visual={visual} />;
+    case "list":
+      return <ListVisual visual={visual} />;
     case "gauge":
       return <GaugeVisual visual={visual} />;
     case "bullet":
@@ -45,6 +52,8 @@ export function DashboardVisualBody({ visual }: { visual: DashboardVisual }) {
       return <WaterfallVisual visual={visual} />;
     case "heatmap":
       return <HeatmapVisual visual={visual} />;
+    case "scatter":
+      return <ScatterVisual visual={visual} />;
   }
 }
 

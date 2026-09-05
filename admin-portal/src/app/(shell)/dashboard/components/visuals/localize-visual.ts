@@ -51,6 +51,43 @@ export function localizeVisual(
     case "area":
       // Bucket labels are formatted dates, not vocabulary; leave them alone.
       return base;
+    case "scatter":
+      // Axis names are vocabulary; the point labels are tenant names, which
+      // are records and must never be translated.
+      return {
+        ...base,
+        data: {
+          ...base.data,
+          xLabel: term(base.data.xLabel),
+          yLabel: term(base.data.yLabel),
+        },
+      };
+    case "multi-series":
+      // The series names ("Verified", "Needing Attention") are vocabulary and
+      // translate; the points inside them are the same dated buckets a `line`
+      // carries, so they do not.
+      return {
+        ...base,
+        data: {
+          series: base.data.series.map((entry) => ({
+            ...entry,
+            label: term(entry.label),
+          })),
+        },
+      };
+    case "list":
+      // A list row names a record — a tenant, a domain — not a category, so
+      // translating it would rename the thing the operator has to go open.
+      // Only `value`, which Core writes as a reason phrase, is vocabulary.
+      return {
+        ...base,
+        data: {
+          rows: base.data.rows.map((row) => ({
+            ...row,
+            value: row.value ? term(row.value) : row.value,
+          })),
+        },
+      };
     case "comparison":
     case "diverging":
     case "stacked":

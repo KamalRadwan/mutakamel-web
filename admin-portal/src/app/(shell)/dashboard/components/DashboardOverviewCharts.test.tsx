@@ -318,6 +318,132 @@ describe("DashboardOverviewCharts", () => {
       screen.getByRole("status", { name: en.dashboard.tenantsTab.statusBreakdownTitle }),
     ).toBeInTheDocument();
   });
+  /**
+   * Core drops `tenantBillingGrowth` unless the actor holds both tenants and
+   * billing, and `recentTenants` unless they hold tenants — both are optional
+   * in its own contract. The portal declared them required and dereferenced
+   * them unguarded, so an operator with only one of the two permissions got a
+   * TypeError instead of a dashboard.
+   */
+  it("renders for an actor whose permissions drop the optional overview blocks", () => {
+    const data = buildData({
+      overview: { kpis: [], tenantBillingGrowth: undefined, recentTenants: undefined },
+    });
+
+    expect(() => render(<DashboardOverviewCharts data={data} />)).not.toThrow();
+  });
+
+  /**
+   * Withheld, not drawn empty: a blank growth chart reads as "no tenants
+   * signed up" when the truth is "this is not yours to see".
+   */
+  it("withholds the growth and recent-tenant cards rather than drawing them empty", () => {
+    const data = buildData({
+      overview: { kpis: [], tenantBillingGrowth: undefined, recentTenants: undefined },
+    });
+
+    render(<DashboardOverviewCharts data={data} />);
+
+    expect(
+      screen.queryByText(en.dashboard.overviewTab.growthTitle),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(en.dashboard.overviewTab.recentTenantsTitle),
+    ).not.toBeInTheDocument();
+  });
+
+  it("still draws both cards when the actor may see them", () => {
+    render(<DashboardOverviewCharts data={buildData()} />);
+
+    expect(
+      screen.getByText(en.dashboard.overviewTab.growthTitle),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(en.dashboard.overviewTab.recentTenantsTitle),
+    ).toBeInTheDocument();
+  });
+  /**
+   * The list is how an operator gets from "a tenant was provisioned" to that
+   * tenant's page. A name that is only text makes them go and search for it.
+   */
+  it("makes each recently provisioned tenant reachable", () => {
+    const data = buildData({
+      overview: {
+        kpis: [],
+        recentTenants: {
+          items: [
+            {
+              id: "11111111-1111-4111-8111-111111111111",
+              name: "Acme Holdings",
+              status: "Active",
+              plan: "Growth Plan",
+              createdAt: "2026-08-20T00:00:00.000Z",
+            },
+          ],
+        },
+      },
+    });
+
+    render(<DashboardOverviewCharts data={data} />);
+
+    const link = screen.getByRole("link", { name: /Acme Holdings/ });
+    expect(link).toHaveAttribute(
+      "href",
+      "/tenants/11111111-1111-4111-8111-111111111111",
+    );
+  });
+
+  /**
+   * The series under a KPI is almost never that KPI's own history — the
+   * control plane keeps no status history — so it carries its own name. A
+   * sparkline captioned "Active Tenants" would be claiming something untrue.
+   */
+  it("labels a KPI trend as its own series, not as the card's history", () => {
+    const data = buildData({
+      overview: {
+        kpis: [
+          {
+            key: "active-tenants",
+            label: "Active Tenants",
+            value: 12,
+            kind: "integer",
+            description: "",
+            tone: "blue",
+            trend: { label: "New tenants", kind: "line", points: [1, 3, 2] },
+          },
+        ],
+      },
+    });
+
+    render(<DashboardOverviewCharts data={data} />);
+
+    expect(screen.getByText("New tenants")).toBeInTheDocument();
+    // The picture itself is unreadable at this size, so the values are spoken.
+    expect(
+      screen.getByRole("img", { name: /New tenants: 1, 3, 2/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("draws no sparkline for a KPI Core sent no series for", () => {
+    const data = buildData({
+      overview: {
+        kpis: [
+          {
+            key: "db-capacity",
+            label: "DB Capacity",
+            value: "4 / 100",
+            kind: "ratio",
+            description: "",
+            tone: "cyan",
+          },
+        ],
+      },
+    });
+
+    render(<DashboardOverviewCharts data={data} />);
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
 });
 
 async function revealLazyChartGroups(): Promise<void> {

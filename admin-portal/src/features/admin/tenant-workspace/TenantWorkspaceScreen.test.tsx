@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   status: "PROVISIONING" as string,
+  permissions: [] as string[],
   accessPanel: vi.fn(),
   billingHook: vi.fn(),
   refresh: vi.fn(),
@@ -14,6 +15,28 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
+}));
+// The placement-move entry points are `PermissionGate`d, so the screen now
+// reads `/auth/me` claims even though nothing else on it does.
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => ({
+    user: { isSuperAdmin: false, permissions: mocks.permissions },
+    isLoading: false,
+  }),
+}));
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    ...props
+  }: {
+    href: string;
+    children: React.ReactNode;
+  } & React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
 }));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en", dir: "ltr" }),
@@ -71,6 +94,7 @@ import { TenantWorkspaceScreen } from "./TenantWorkspaceScreen";
 describe("TenantWorkspaceScreen post-create lifecycle", () => {
   beforeEach(() => {
     mocks.status = "PROVISIONING";
+    mocks.permissions = [];
     mocks.accessPanel.mockReset();
     mocks.billingHook.mockReset();
     mocks.refresh.mockReset();
@@ -179,5 +203,67 @@ describe("TenantWorkspaceScreen post-create lifecycle", () => {
 
     await screen.findByText("provisioning-panel");
     expect(screen.queryByText("billing-panel")).not.toBeInTheDocument();
+  });
+});
+
+describe("TenantWorkspaceScreen placement-move entry points", () => {
+  beforeEach(() => {
+    mocks.status = "ACTIVE";
+    mocks.permissions = [];
+  });
+
+  it("shows neither move link without the matching read permission", () => {
+    render(<TenantWorkspaceScreen tenantId="tenant-1" />);
+
+    expect(
+      screen.queryByRole("link", { name: /Move database server/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Move storage server/ }),
+    ).not.toBeInTheDocument();
+    // A missing entry point must not stamp a forbidden block into the page.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("links each move to its own route under its own permission", () => {
+    mocks.permissions = ["admin.tenant_relocations.read"];
+    const { unmount } = render(<TenantWorkspaceScreen tenantId="tenant-1" />);
+
+    expect(
+      screen.getByRole("link", { name: /Move database server/ }),
+    ).toHaveAttribute("href", "/tenants/tenant-1/move-database");
+    expect(
+      screen.queryByRole("link", { name: /Move storage server/ }),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    mocks.permissions = ["admin.storage_migrations.read"];
+    render(<TenantWorkspaceScreen tenantId="tenant-1" />);
+    expect(screen.getByRole("link", { name: /Move storage server/ })).toHaveAttribute(
+      "href",
+      "/tenants/tenant-1/move-storage",
+    );
+  });
+
+  it("keeps both moves visible but disabled on a deleted tenant", () => {
+    mocks.status = "DELETED";
+    mocks.permissions = [
+      "admin.tenant_relocations.read",
+      "admin.storage_migrations.read",
+    ];
+
+    render(<TenantWorkspaceScreen tenantId="tenant-1" />);
+
+    expect(
+      screen.queryByRole("link", { name: /Move database server/ }),
+    ).not.toBeInTheDocument();
+    const database = screen.getByRole("button", { name: /Move database server/ });
+    const storage = screen.getByRole("button", { name: /Move storage server/ });
+    expect(database).toBeDisabled();
+    expect(storage).toBeDisabled();
+    expect(database).toHaveAttribute(
+      "aria-describedby",
+      "tenant-deleted-unavailable",
+    );
   });
 });

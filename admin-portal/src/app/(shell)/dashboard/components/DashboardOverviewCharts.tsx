@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   Badge,
@@ -97,8 +98,13 @@ export function DashboardOverviewCharts({
   const { overview } = data;
 
   const kpis = safeArray(overview.kpis);
-  const recentTenants = safeArray(overview.recentTenants.items);
-  const tenantGrowthPoints = safeArray(overview.tenantBillingGrowth.points);
+  // Core drops both of these when the actor lacks the permission behind them
+  // — growth needs tenants *and* billing. An operator with only one of the two
+  // is a normal case, not a broken response, so the panels that read them are
+  // simply not rendered rather than crashing the whole overview.
+  const recentTenants = safeArray(overview.recentTenants?.items);
+  const growth = overview.tenantBillingGrowth;
+  const tenantGrowthPoints = safeArray(growth?.points);
 
   // Every chart input below comes from the group that owns it. The parallel
   // overview/panels structures these used to read were deleted with the
@@ -142,7 +148,7 @@ export function DashboardOverviewCharts({
       rows: tenantGrowthPoints.map((point, index) => ({
         key: `${point.month}-${index}`,
         label: point.month || formatChartNumber(lang, index + 1),
-        value: `${t.dashboard.overviewTab.tenantCount}: ${formatChartNumber(lang, point.tenants)} · ${t.dashboard.overviewTab.collectedRevenue}: ${formatChartCurrency(lang, point.collected, overview.tenantBillingGrowth.currencyCode)}`,
+        value: `${t.dashboard.overviewTab.tenantCount}: ${formatChartNumber(lang, point.tenants)} · ${t.dashboard.overviewTab.collectedRevenue}: ${formatChartCurrency(lang, point.collected, growth?.currencyCode ?? "USD")}`,
       })),
     },
     {
@@ -257,41 +263,53 @@ export function DashboardOverviewCharts({
       {kpis.length > 0 && (
         <section>
           <SectionHeading title={t.dashboard.overviewTab.kpisTitle} />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Denser than the default stat grid: six cards that each now carry
+              a chart would otherwise push the real charts below the fold. */}
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
             {kpis.map((kpi) => (
-              <KpiCard key={kpi.key} card={kpi} />
+              <KpiCard key={kpi.key} card={kpi} compact />
             ))}
           </div>
         </section>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <DashboardChartCard
-          className="xl:col-span-2"
-          title={t.dashboard.overviewTab.growthTitle}
-          subtitle={t.dashboard.overviewTab.growthSubtext}
-        >
-          <TenantGrowthRevenueChart
-            points={tenantGrowthPoints}
-            title={t.dashboard.overviewTab.growthTitle}
-            currencyCode={overview.tenantBillingGrowth.currencyCode}
-          />
-        </DashboardChartCard>
-
-        <DashboardChartCard
-          title={t.dashboard.overviewTab.recentTenantsTitle}
-          action={
-            <Link
-              href="/tenants"
-              className="text-xs font-semibold text-primary hover:underline"
+      {/* An absent field means the actor may not see that data at all, so the
+          card is withheld rather than drawn empty — an empty frame reads as
+          "no tenants" when the truth is "not yours to see". */}
+      {(growth || overview.recentTenants) && (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          {growth && (
+            <DashboardChartCard
+              className="xl:col-span-2"
+              title={t.dashboard.overviewTab.growthTitle}
+              subtitle={t.dashboard.overviewTab.growthSubtext}
             >
-              {t.dashboard.overviewTab.viewAllTenants}
-            </Link>
-          }
-        >
-          <RecentTenantsList items={recentTenants} />
-        </DashboardChartCard>
-      </div>
+              <TenantGrowthRevenueChart
+                points={tenantGrowthPoints}
+                title={t.dashboard.overviewTab.growthTitle}
+                currencyCode={growth.currencyCode}
+              />
+            </DashboardChartCard>
+          )}
+
+          {overview.recentTenants && (
+            <DashboardChartCard
+              className={growth ? undefined : "xl:col-span-3"}
+              title={t.dashboard.overviewTab.recentTenantsTitle}
+              action={
+                <Link
+                  href="/tenants"
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  {t.dashboard.overviewTab.viewAllTenants}
+                </Link>
+              }
+            >
+              <RecentTenantsList items={recentTenants} />
+            </DashboardChartCard>
+          )}
+        </div>
+      )}
 
       <DashboardChartViewport
         kind="operations"
@@ -326,8 +344,11 @@ export function DashboardOverviewCharts({
         />
       </DashboardChartViewport>
 
+      {/* A titled section with no rows prints as a heading over blank paper,
+          which reads as "nothing happened" rather than "you were not shown
+          this". Same reason the cards above are withheld. */}
       <DashboardPrintExactValues
-        sections={printSections}
+        sections={printSections.filter((section) => section.rows.length > 0)}
         visibleInPrint={!printChartsReady}
       />
     </div>
@@ -409,17 +430,37 @@ function RecentTenantsList({
   return (
     <ul className="space-y-2">
       {items.slice(0, 6).map((tenant) => (
-        <li
-          key={tenant.id}
-          className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2"
-        >
-          <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-foreground">{tenant.name}</p>
-            <p className="text-xs text-muted-foreground">{tenant.plan}</p>
-          </div>
-          <Badge tone="neutral" className="shrink-0">
-            {tenant.status}
-          </Badge>
+        <li key={tenant.id}>
+          {/* The whole row is the target rather than the name alone: at this
+              size a text-width hit area is a miss most of the time, and the
+              status badge is part of what the reader is pointing at. */}
+          <Link
+            href={`/tenants/${tenant.id}`}
+            className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 transition-colors hover:border-primary/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset motion-reduce:transition-none"
+          >
+            <span className="min-w-0">
+              {/* A tenant name is a proper noun, so `dir="auto"` keeps a Latin
+                  name readable inside the Arabic page. */}
+              <span
+                className="block truncate text-xs font-semibold text-foreground"
+                dir="auto"
+              >
+                {tenant.name}
+              </span>
+              <span className="block text-xs text-muted-foreground">{tenant.plan}</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1">
+              <Badge tone="neutral">{tenant.status}</Badge>
+              <ChevronLeft
+                className="size-4 text-muted-foreground rtl:block ltr:hidden"
+                aria-hidden="true"
+              />
+              <ChevronRight
+                className="size-4 text-muted-foreground ltr:block rtl:hidden"
+                aria-hidden="true"
+              />
+            </span>
+          </Link>
         </li>
       ))}
     </ul>

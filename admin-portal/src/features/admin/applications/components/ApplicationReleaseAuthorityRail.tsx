@@ -43,8 +43,11 @@ export function ApplicationReleaseAuthorityRail({
     Boolean(application.publishedBy);
   const readinessUnavailable =
     isReadinessLoading || hasReadinessError || readiness === null;
+  // The action is now publish *and* activate, then bind databases, so it stays
+  // available to an already-published DRAFT that still has to be activated.
   const canOfferPublish =
-    application.publicationStatus === "UNPUBLISHED" &&
+    (application.publicationStatus === "UNPUBLISHED" ||
+      application.lifecycleStatus === "DRAFT") &&
     application.lifecycleStatus !== "DISABLED";
 
   return (
@@ -64,7 +67,9 @@ export function ApplicationReleaseAuthorityRail({
             {!isPublishing && (
               <BookOpenCheck className="size-3.5" aria-hidden="true" />
             )}
-            {isPublishing ? copy.publishing : copy.publish}
+            {isPublishing
+              ? copy.publishing
+              : t.applications.detail.publishActivate.title}
           </Button>
         )}
       </header>

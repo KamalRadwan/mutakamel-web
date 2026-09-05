@@ -40,6 +40,7 @@ import { DestructiveActionModal } from "@/components/shared/DestructiveActionMod
 import { UserMetadataCard } from "../components/UserMetadataCard";
 import { UserProfileCard } from "../components/UserProfileCard";
 import { WebphoneSummaryCard } from "../components/WebphoneSummaryCard";
+import { WebphoneServerChainCard } from "../components/WebphoneServerChainCard";
 import { UserNotFoundState } from "../components/UserNotFoundState";
 import { UserPermissionDenied } from "../components/UserPermissionDenied";
 
@@ -84,13 +85,23 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     setWebphoneDisplayName,
     outboundCallerId,
     setOutboundCallerId,
-    webphoneTransport,
-    setWebphoneTransport,
     passwordConfigured,
 
-    webphoneConfig,
+    webphoneExtension,
     extensionError,
     sipUsernameError,
+
+    webphoneServers,
+    serverChainRows,
+    serverChainErrors,
+    serverChainHasChanges,
+    canEditServerChain,
+    moveServerChainRow,
+    updateServerChainRow,
+    addServerToChain,
+    removeServerFromChain,
+    resetServerChain,
+    saveServerChain,
 
     saveIdentity,
     saveRole,
@@ -324,9 +335,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             )}
           </Card>
 
-          {!isEditingWebphone ? (
+          {/* Without the WebPhone module's read permission the extension is
+              never fetched, so the card would report every user as
+              unconfigured — say nothing rather than something false. */}
+          {!permissions.canViewWebphone ? null : !isEditingWebphone ? (
             <WebphoneSummaryCard
-              webphone={webphoneConfig}
+              webphone={webphoneExtension}
               canEdit={permissions.canEditWebphone}
               onEditToggle={() => setIsEditingWebphone(true)}
             />
@@ -431,19 +445,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     />
                   )}
                 </Field>
-                <Field label={t.users.sipTransportLabel}>
-                  {(fieldProps) => (
-                    <Select value={webphoneTransport} onValueChange={(v) => setWebphoneTransport(v === "ws" ? "ws" : "wss")}>
-                      <SelectTrigger {...fieldProps}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="wss">WSS</SelectItem>
-                        <SelectItem value="ws">WS</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                </Field>
               </CardContent>
               <CardFooter className="justify-between">
                 <span className="text-xs text-muted-foreground">
@@ -465,6 +466,26 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 </Button>
               </CardFooter>
             </Card>
+          )}
+
+          {/* The chain is the user's failover order over the servers from
+              Settings → WebPhone, so it is shown wherever the identity is —
+              but only to an operator allowed to read the module at all. */}
+          {permissions.canViewWebphone && (
+            <WebphoneServerChainCard
+              servers={webphoneServers}
+              rows={serverChainRows}
+              errors={serverChainErrors}
+              hasChanges={serverChainHasChanges}
+              canEdit={permissions.canEditWebphone && canEditServerChain}
+              isSaving={isSaving}
+              onMove={moveServerChainRow}
+              onUpdateRow={updateServerChainRow}
+              onAdd={addServerToChain}
+              onRemove={removeServerFromChain}
+              onReset={resetServerChain}
+              onSave={() => void saveServerChain()}
+            />
           )}
         </div>
       </div>

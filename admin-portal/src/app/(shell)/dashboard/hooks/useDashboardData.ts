@@ -18,22 +18,14 @@ import {
   resolvePreset,
   type DateRange,
 } from "../utils/date-range-presets";
+import {
+  authorizedSubjects,
+  requestedGroupsForTab,
+  type DashboardTabKey,
+} from "../utils/dashboard-subjects";
 
-export type DashboardTabKey = "overview" | DashboardGroupKey;
-
-/**
- * Which groups a tab needs loaded.
- *
- * A group tab needs its own group and nothing else — that is where the
- * saving is, since tab switches and auto-refresh polls are the frequent
- * requests. The overview is a summary of everything: its report-group grid
- * shows availability and open alerts for every authorized group, so scoping
- * it would leave most of that grid blank. It asks for the full set, which an
- * empty list expresses.
- */
-export function requestedGroupsForTab(tab: DashboardTabKey): DashboardGroupKey[] {
-  return tab === "overview" ? [] : [tab];
-}
+export type { DashboardTabKey } from "../utils/dashboard-subjects";
+export { requestedGroupsForTab } from "../utils/dashboard-subjects";
 
 /**
  * Groups already loaded for a different window would show numbers from that
@@ -64,7 +56,16 @@ export function mergeDashboardGroups(
     const group = previous[key];
     if (group) carried[key] = group;
   }
-  return { ...carried, ...next } as DashboardResponse;
+
+  // Core filters `overview` to the groups it actually loaded, so a scoped
+  // response carries a deliberately thinner one — fewer KPIs, and no growth
+  // or recent-tenants block at all. Letting it win would mean opening one tab
+  // and finding the overview had lost half its panels on the way back, so the
+  // fuller overview from the unscoped load is kept.
+  const scoped = loaded.length < previous.authorizedGroups.length;
+  const overview = scoped ? previous.overview : next.overview;
+
+  return { ...carried, ...next, overview } as DashboardResponse;
 }
 
 /**
@@ -121,6 +122,9 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
   const loadedRangeRef = useRef<string | null>(null);
   const scopingSupportedRef = useRef(true);
   const activeTabRef = useRef<DashboardTabKey>("overview");
+  // The scoped fetch needs to know which reports the active subject holds,
+  // and that comes from the last response's authorized set.
+  const dataRef = useRef<DashboardResponse | null>(null);
   const rangeRef = useRef<DateRange>(range);
   const setRange = useCallback((next: DateRange) => {
     if (
@@ -162,7 +166,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
         // One tab is on screen at a time; the export is the only reader that
         // legitimately needs all fourteen groups at once.
         const scoped = withGroups
-          ? requestedGroupsForTab(activeTabRef.current)
+          ? requestedGroupsForTab(activeTabRef.current, dataRef.current)
           : [];
         if (scoped.length > 0) searchParams.set("groups", scoped.join(","));
         const search = searchParams.toString();
@@ -192,9 +196,11 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
         setData((previous) =>
           mergeDashboardGroups(previous, nextData, sameRange),
         );
+        // A subject the actor may no longer see any report inside is not a
+        // place to leave them standing.
         setActiveTab((currentTab) =>
           currentTab === "overview" ||
-          nextData.authorizedGroups.includes(currentTab)
+          authorizedSubjects(nextData).includes(currentTab)
             ? currentTab
             : "overview",
         );
@@ -210,6 +216,10 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
     },
     [range],
   );
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   useEffect(() => {
     activeTabRef.current = activeTab;

@@ -6,24 +6,44 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
+import { useAuth } from "@/context/AuthContext";
+import { notifyWebphoneChanged } from "@mutakamel/webphone";
+import { adminCan } from "@/lib/auth/rbac";
 import {
+  WEBPHONE_EXTENSIONS_PATH,
+  createUserWebphone,
   getAdminUser,
+  getExtensionServers,
   getUserWebphone,
   isForbiddenError,
   listRoles,
+  listWebphoneServers,
+  putExtensionServers,
   updateAdminUser,
   assignUserRole,
   updateUserWebphone,
+  userWebphonePath,
+  userWebphoneServersPath,
   suspendAdminUser,
   activateAdminUser,
   deleteAdminUser,
   normalizeErrorCode,
 } from "../api/adminUsersApi";
+import {
+  extensionServerRowsChanged,
+  extensionServersToRows,
+  moveInList,
+  rowsToExtensionServers,
+  validateExtensionServerRows,
+  type ExtensionServerRow,
+  type WebphoneExtensionServer,
+  type WebphoneServer,
+} from "../../settings/webphone/webphone-contract";
 import { getErrorMessageAndDetails, type MappedErrorDetails } from "../utils/errorMapping";
 import type {
   AdminUser,
   AdminRole,
-  AdminWebphoneConfig,
+  AdminWebphoneExtension,
   AdminUserStatus,
 } from "../types";
 import {
@@ -33,6 +53,14 @@ import {
 } from "../model/writeIntent";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
 
+/**
+ * The user's WebPhone identity.
+ *
+ * There is no transport here: a transport is the scheme of a server's own
+ * WebSocket URL, so it belongs to the server the user is pointed at, not to
+ * the user. Which servers those are, and in what order, is the separate chain
+ * below.
+ */
 export type WebphoneForm = {
   enabled: boolean;
   extension: string;
@@ -40,7 +68,6 @@ export type WebphoneForm = {
   sipPassword: string;
   displayName: string;
   outboundCallerId: string;
-  transport: "ws" | "wss";
 };
 
 const emptyWebphoneForm: WebphoneForm = {
@@ -50,7 +77,6 @@ const emptyWebphoneForm: WebphoneForm = {
   sipPassword: "",
   displayName: "",
   outboundCallerId: "",
-  transport: "wss",
 };
 
 function toastErrorMessage(details: MappedErrorDetails) {
@@ -63,6 +89,11 @@ export function useUserDetail(id: string) {
   const router = useRouter();
   const { lang, t } = useI18n();
   const toast = useToast();
+  const { user: currentUser } = useAuth();
+  // The extension list belongs to the WebPhone module, so an admin without its
+  // read permission must not be sent there at all — the transport toasts every
+  // 403 it sees, and one would fire on a screen that never asked for WebPhone.
+  const canReadWebphone = adminCan(currentUser, "admin.webphone.read");
 
   const [user, setUser] = useState<AdminUser>();
   const [availableRoles, setAvailableRoles] = useState<AdminRole[]>([]);
@@ -72,8 +103,13 @@ export function useUserDetail(id: string) {
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
   const [status, setStatus] = useState<AdminUserStatus>("INVITED");
 
-  const [webphone, setWebphone] = useState<AdminWebphoneConfig>();
+  const [webphone, setWebphone] = useState<AdminWebphoneExtension>();
   const [webphoneForm, setWebphoneForm] = useState<WebphoneForm>(emptyWebphoneForm);
+  const [webphoneServers, setWebphoneServers] = useState<WebphoneServer[]>([]);
+  const [serverChain, setServerChain] = useState<WebphoneExtensionServer[]>([]);
+  const [serverChainRows, setServerChainRows] = useState<ExtensionServerRow[]>(
+    [],
+  );
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -130,11 +166,20 @@ export function useUserDetail(id: string) {
     setPermissionDenied(false);
 
     try {
-      const [loadedUser, loadedWebphone, rolesData] = await Promise.all([
-        getAdminUser(id),
-        getUserWebphone(id).catch(() => undefined),
-        listRoles({ page: 1, limit: 100, sortBy: "name", sortDir: "ASC" }).catch(() => undefined),
-      ]);
+      const [loadedUser, loadedWebphone, loadedServers, rolesData] =
+        await Promise.all([
+          getAdminUser(id),
+          canReadWebphone ? getUserWebphone(id).catch(() => undefined) : undefined,
+          canReadWebphone ? listWebphoneServers().catch(() => []) : [],
+          listRoles({ page: 1, limit: 100, sortBy: "name", sortDir: "ASC" }).catch(() => undefined),
+        ]);
+
+      // The chain hangs off the extension, so it can only be read once the
+      // extension id is known — a user with no extension has no chain, which
+      // is an empty list rather than a failed read.
+      const loadedChain = loadedWebphone
+        ? await getExtensionServers(loadedWebphone.id).catch(() => [])
+        : [];
 
       const assignedRoles = loadedUser.role ? [loadedUser.role] : [];
       const rolesList = rolesData?.data ?? assignedRoles;
@@ -147,10 +192,14 @@ export function useUserDetail(id: string) {
       setAvailableRoles(rolesList);
       setAssignedRoleId(loadedUser.roleId ?? loadedUser.role?.id ?? undefined);
 
-      if (loadedWebphone) {
-        setWebphone(loadedWebphone);
-        setWebphoneForm(webphoneFormFromConfig(loadedWebphone));
-      }
+      // Set unconditionally: a user with no extension is a real state, and a
+      // reload after one is removed elsewhere must clear the panel, not keep
+      // showing the extension that no longer exists.
+      setWebphone(loadedWebphone);
+      setWebphoneForm(webphoneFormFromExtension(loadedWebphone));
+      setWebphoneServers(loadedServers);
+      setServerChain(loadedChain);
+      setServerChainRows(extensionServersToRows(loadedChain));
     } catch (requestError: any) {
       const code = normalizeErrorCode(requestError);
 
@@ -165,7 +214,7 @@ export function useUserDetail(id: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [id, lang, t, toast]);
+  }, [id, lang, t, toast, canReadWebphone]);
 
   useEffect(() => {
     queueMicrotask(() => loadUser());
@@ -189,6 +238,103 @@ export function useUserDetail(id: string) {
     () => webphoneFormChanged(webphoneForm, webphone),
     [webphone, webphoneForm]
   );
+
+  const serverChainErrors = useMemo(
+    () => validateExtensionServerRows(serverChainRows),
+    [serverChainRows],
+  );
+
+  const serverChainHasChanges = useMemo(
+    () => extensionServerRowsChanged(serverChainRows, serverChain),
+    [serverChain, serverChainRows],
+  );
+
+  const moveServerChainRow = useCallback((from: number, to: number) => {
+    setServerChainRows((current) => moveInList(current, from, to));
+  }, []);
+
+  const updateServerChainRow = useCallback(
+    (
+      serverId: string,
+      field: "timeoutSeconds" | "maxRetries",
+      value: string,
+    ) => {
+      setServerChainRows((current) =>
+        current.map((row) =>
+          row.serverId === serverId ? { ...row, [field]: value } : row,
+        ),
+      );
+    },
+    [],
+  );
+
+  const addServerToChain = useCallback((serverId: string) => {
+    setServerChainRows((current) =>
+      current.some((row) => row.serverId === serverId)
+        ? current
+        : // Blank overrides mean "inherit this server's defaults", which is
+          // the right starting point for a link nobody has tuned yet.
+          [...current, { serverId, timeoutSeconds: "", maxRetries: "" }],
+    );
+  }, []);
+
+  const removeServerFromChain = useCallback((serverId: string) => {
+    setServerChainRows((current) =>
+      current.filter((row) => row.serverId !== serverId),
+    );
+  }, []);
+
+  const resetServerChain = useCallback(() => {
+    setServerChainRows(extensionServersToRows(serverChain));
+  }, [serverChain]);
+
+  const saveServerChain = async () => {
+    if (!webphone || !serverChainHasChanges || isSaving) return;
+    if (Object.keys(serverChainErrors).length > 0) {
+      toast.error(t.users.validationErrorTitle, t.users.serverChainInvalidMsg);
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const chain = rowsToExtensionServers(serverChainRows);
+      await runWrite(
+        "webphone:servers",
+        "PATCH",
+        userWebphoneServersPath(webphone.id),
+        chain,
+        (intent) =>
+          putExtensionServers(webphone.id, intent.command, intent.idempotencyKey),
+        async () => {
+          // The write replaces the whole chain, so the stored order either
+          // matches what was sent or the write never landed — nothing partial
+          // to reason about.
+          const fresh = await getExtensionServers(webphone.id).catch(() => null);
+          if (!fresh) return false;
+          const matches = chainsMatch(chain, fresh);
+          if (matches) {
+            setServerChain(fresh);
+            setServerChainRows(extensionServersToRows(fresh));
+          }
+          return matches;
+        },
+      );
+
+      const fresh = await getExtensionServers(webphone.id);
+      setServerChain(fresh);
+      setServerChainRows(extensionServersToRows(fresh));
+      // The dock resolves its failover order from `/me`, so a reordered chain
+      // is stale there until this signal makes it read again.
+      notifyWebphoneChanged();
+      toast.success(t.users.serverChainSavedTitle, t.users.serverChainSavedDesc);
+    } catch (requestError: any) {
+      const details = getErrorMessageAndDetails(requestError, lang);
+      toast.error(t.users.saveErrorTitle, toastErrorMessage(details));
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const saveIdentity = async () => {
     if (!user || !identityHasChanges || isSaving) return;
@@ -292,25 +438,57 @@ export function useUserDetail(id: string) {
     setSipUsernameError(null);
 
     try {
-      const payload = webphonePayloadFromForm(webphoneForm);
-      let updated = (await runWrite(
-        "webphone",
-        "PATCH",
-        `/api/admin/core/v1/users/${encodeURIComponent(user.id)}/webphone`,
-        payload,
-        (intent) => updateUserWebphone(user.id, intent.command, intent.idempotencyKey),
-        async () => {
-          const fresh = await getUserWebphone(user.id).catch(() => null);
-          if (!fresh) return false;
-          const matches = webphonePayloadMatches(payload, fresh);
-          if (matches) setWebphone(fresh);
-          return matches;
-        },
-      )) as AdminWebphoneConfig | undefined;
+      const fields = webphoneFieldsFromForm(webphoneForm);
+      const existing = webphone;
+
+      // An ambiguous write is reconciled against the owner's extension either
+      // way: after a create it proves the row now exists, after an update that
+      // the edit landed. Both read the same list, so one closure serves both.
+      const reconcile = async () => {
+        const fresh = await getUserWebphone(user.id).catch(() => null);
+        if (!fresh) return false;
+        const matches = webphoneFieldsMatch(fields, fresh);
+        if (matches) setWebphone(fresh);
+        return matches;
+      };
+
+      // A user with no extension row is having their first one created; the
+      // module keys extensions by owner and allows at most one per user, so
+      // this branch is the whole difference between the two writes.
+      let updated = (existing
+        ? await runWrite(
+            "webphone",
+            "PATCH",
+            userWebphonePath(existing.id),
+            fields,
+            (intent) =>
+              updateUserWebphone(existing.id, intent.command, intent.idempotencyKey),
+            reconcile,
+          )
+        : await runWrite(
+            "webphone",
+            "POST",
+            WEBPHONE_EXTENSIONS_PATH,
+            { ownerId: user.id, ...fields },
+            (intent) => createUserWebphone(intent.command, intent.idempotencyKey),
+            reconcile,
+          )) as AdminWebphoneExtension | undefined;
       updated ??= await getUserWebphone(user.id);
 
       setWebphone(updated);
-      setWebphoneForm(webphoneFormFromConfig(updated));
+      setWebphoneForm(webphoneFormFromExtension(updated));
+      // A first save creates the extension, and only then does it have an id
+      // to hang a chain off — so the chain is read here rather than left empty
+      // until the next full page load.
+      if (!existing && updated) {
+        const chain = await getExtensionServers(updated.id).catch(() => []);
+        setServerChain(chain);
+        setServerChainRows(extensionServersToRows(chain));
+      }
+      // The dock in the root layout read `/me` when the shell mounted. If this
+      // save was the admin giving themselves a phone, that read is now stale
+      // and only this signal makes the widget appear without a page reload.
+      notifyWebphoneChanged();
       toast.success(t.users.webphoneSavedTitle, t.users.webphoneSavedDesc);
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
@@ -439,14 +617,24 @@ export function useUserDetail(id: string) {
     outboundCallerId: webphoneForm.outboundCallerId,
     setOutboundCallerId: (outboundCallerId: string) =>
       setWebphoneForm((current) => ({ ...current, outboundCallerId })),
-    webphoneTransport: webphoneForm.transport,
-    setWebphoneTransport: (transport: "ws" | "wss") =>
-      setWebphoneForm((current) => ({ ...current, transport })),
     passwordConfigured: Boolean(webphone?.passwordConfigured),
 
-    webphoneConfig: webphone,
+    webphoneExtension: webphone,
     extensionError,
     sipUsernameError,
+
+    webphoneServers,
+    serverChainRows,
+    serverChainErrors,
+    serverChainHasChanges,
+    // A chain hangs off an extension, so it can only be edited once one exists.
+    canEditServerChain: Boolean(webphone),
+    moveServerChainRow,
+    updateServerChainRow,
+    addServerToChain,
+    removeServerFromChain,
+    resetServerChain,
+    saveServerChain,
 
     saveIdentity,
     saveRole,
@@ -456,53 +644,82 @@ export function useUserDetail(id: string) {
   };
 }
 
-function webphoneFormFromConfig(config?: AdminWebphoneConfig | null): WebphoneForm {
+function chainsMatch(
+  sent: readonly WebphoneExtensionServer[],
+  stored: readonly WebphoneExtensionServer[],
+): boolean {
+  return (
+    sent.length === stored.length &&
+    sent.every((link, index) => {
+      const current = stored[index];
+      return (
+        link.serverId === current.serverId &&
+        link.timeoutSeconds === current.timeoutSeconds &&
+        link.maxRetries === current.maxRetries
+      );
+    })
+  );
+}
+
+function webphoneFormFromExtension(
+  extension?: AdminWebphoneExtension | null,
+): WebphoneForm {
   return {
-    enabled: Boolean(config?.enabled),
-    extension: config?.extension ?? "",
-    sipUsername: config?.sipUsername ?? "",
+    enabled: Boolean(extension?.enabled),
+    extension: extension?.extension ?? "",
+    sipUsername: extension?.sipUsername ?? "",
     sipPassword: "",
-    displayName: config?.displayName ?? "",
-    outboundCallerId: config?.outboundCallerId ?? "",
-    transport: config?.transport === "ws" ? "ws" : "wss",
+    displayName: extension?.displayName ?? "",
+    outboundCallerId: extension?.outboundCallerId ?? "",
   };
 }
 
-function webphonePayloadFromForm(form: WebphoneForm) {
+/**
+ * The editable fields, shaped for the wire.
+ *
+ * Both writes carry the same fields — a create only adds the owner — so one
+ * builder serves both, and the same object is what an ambiguous write is
+ * reconciled against.
+ */
+function webphoneFieldsFromForm(form: WebphoneForm) {
+  const sipPassword = form.sipPassword.trim();
   return {
     enabled: form.enabled,
-    extension: nullableText(form.extension),
-    sipUsername: nullableText(form.sipUsername),
-    ...(form.sipPassword.trim() ? { sipPassword: form.sipPassword.trim() } : {}),
+    extension: form.extension.trim(),
+    sipUsername: form.sipUsername.trim(),
     displayName: nullableText(form.displayName),
     outboundCallerId: nullableText(form.outboundCallerId),
-    transport: form.transport,
+    ...(sipPassword ? { sipPassword } : {}),
   };
 }
 
-function webphoneFormChanged(form: WebphoneForm, config?: AdminWebphoneConfig | null) {
-  const baseline = webphoneFormFromConfig(config);
+function webphoneFormChanged(
+  form: WebphoneForm,
+  extension?: AdminWebphoneExtension | null,
+) {
+  const baseline = webphoneFormFromExtension(extension);
   return (
     form.enabled !== baseline.enabled ||
     form.extension.trim() !== baseline.extension ||
     form.sipUsername.trim() !== baseline.sipUsername ||
     Boolean(form.sipPassword.trim()) ||
     form.displayName.trim() !== baseline.displayName ||
-    form.outboundCallerId.trim() !== baseline.outboundCallerId ||
-    form.transport !== baseline.transport
+    form.outboundCallerId.trim() !== baseline.outboundCallerId
   );
 }
 
 function validateWebphoneForm(
   form: WebphoneForm,
-  config: AdminWebphoneConfig | undefined,
+  extension: AdminWebphoneExtension | undefined,
   t: ReturnType<typeof useI18n>["t"],
 ) {
-  if (!form.enabled) return undefined;
+  // An extension row cannot exist without a number and a SIP username, so both
+  // are required for every save — not only when enabling. Clearing them does
+  // not delete the extension; that is done from Settings → WebPhone.
   if (!form.extension.trim() || !form.sipUsername.trim()) {
     return t.users.webphoneRequiresExtensionMsg;
   }
-  if (!form.sipPassword.trim() && !config?.passwordConfigured) {
+  if (form.enabled && !form.sipPassword.trim() && !extension?.passwordConfigured) {
     return t.users.webphoneRequiresPasswordMsg;
   }
   return undefined;
@@ -513,17 +730,18 @@ function nullableText(value: string) {
   return trimmed || null;
 }
 
-function webphonePayloadMatches(
-  payload: ReturnType<typeof webphonePayloadFromForm>,
-  config: AdminWebphoneConfig,
+function webphoneFieldsMatch(
+  fields: ReturnType<typeof webphoneFieldsFromForm>,
+  extension: AdminWebphoneExtension,
 ): boolean {
   return (
-    config.enabled === payload.enabled &&
-    (config.extension ?? null) === payload.extension &&
-    (config.sipUsername ?? null) === payload.sipUsername &&
-    (config.displayName ?? null) === payload.displayName &&
-    (config.outboundCallerId ?? null) === payload.outboundCallerId &&
-    (config.transport ?? "wss") === payload.transport &&
-    !("sipPassword" in payload)
+    extension.enabled === fields.enabled &&
+    extension.extension === fields.extension &&
+    extension.sipUsername === fields.sipUsername &&
+    extension.displayName === fields.displayName &&
+    extension.outboundCallerId === fields.outboundCallerId &&
+    // A submitted password can never be confirmed from a response that only
+    // reports whether one exists, so such a write stays ambiguous.
+    !("sipPassword" in fields)
   );
 }

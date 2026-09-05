@@ -20,7 +20,8 @@ import {
   type OperationTimelineStep,
 } from "@/design-system";
 import { useTenantStorageMigration } from "../use-tenant-storage-migration";
-import type { TenantStorageMigrationStatus, TenantStorageMigrationView } from "../types";
+import { isStorageMigrationAwaitingSourceRelease } from "../types";
+import type { TenantStorageMigrationView } from "../types";
 
 const UUID_V7_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -105,15 +106,23 @@ function MigrationStatusView({
   isPolling: boolean;
 }) {
   const { t, lang } = useI18n();
+  const awaitingRelease = isStorageMigrationAwaitingSourceRelease(migration);
   return (
     <div className="space-y-4 rounded-md border border-border p-4" aria-busy={isPolling || undefined}>
       <div className="flex items-center justify-between gap-3">
         <StatusBadge status={migration.status} />
-        {isPolling && (
+        {isPolling && !awaitingRelease && (
           <Badge tone="info" role="status" aria-live="polite">{t.storageMigration.autoRefreshingBadge}</Badge>
         )}
       </div>
-      <OperationTimeline steps={migrationSteps(migration.status, lang, t)} lang={lang} />
+      {awaitingRelease && (
+        <p role="status" className="rounded-md border border-info/30 bg-info-subtle p-3 text-xs leading-5 text-info-subtle-foreground">
+          {lang === "ar"
+            ? "اكتمل النقل ويعمل المستأجر على الوجهة. لا تزال النسخة القديمة محفوظة حتى يؤكد مشغّل حذفها من صفحة نقل التخزين."
+            : "The move is finished and the tenant runs on the destination. The old copy is deliberately kept until an operator confirms deleting it from the move-storage page."}
+        </p>
+      )}
+      <OperationTimeline steps={migrationSteps(migration, lang, t)} lang={lang} />
       <dl className="grid gap-3 text-xs sm:grid-cols-2">
         <DatumRow label={t.storageMigration.sourceServerLabel} value={migration.sourceStorageServerId} mono />
         <DatumRow label={t.storageMigration.targetServerLabel} value={migration.targetStorageServerId} mono />
@@ -132,10 +141,11 @@ function MigrationStatusView({
 }
 
 function migrationSteps(
-  status: TenantStorageMigrationStatus,
+  migration: TenantStorageMigrationView,
   lang: "ar" | "en",
   t: ReturnType<typeof useI18n>["t"],
 ): OperationTimelineStep[] {
+  const status = migration.status;
   const order = ["ACCEPTED", "COPYING", "COPIED", "PLACEMENT_COMMITTED", "COMPLETED"] as const;
   const labels: Record<(typeof order)[number], [string, string]> = {
     ACCEPTED: ["Accepted", "مقبول"],
@@ -157,10 +167,18 @@ function migrationSteps(
     ];
   }
   const currentIndex = order.indexOf(status);
+  // A retained committed migration is resting, not running: its committed step
+  // is done and nothing is in flight until an operator confirms the deletion.
+  const awaitingRelease = isStorageMigrationAwaitingSourceRelease(migration);
   return order.map((step, index) => ({
     label: isArabic ? labels[step][1] : labels[step][0],
     detail: "",
-    state: index < currentIndex ? "done" : index === currentIndex ? "active" : "pending",
+    state:
+      index < currentIndex || (awaitingRelease && index === currentIndex)
+        ? "done"
+        : index === currentIndex
+          ? "active"
+          : "pending",
   }));
 }
 

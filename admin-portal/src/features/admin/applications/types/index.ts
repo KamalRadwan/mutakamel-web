@@ -228,6 +228,70 @@ export interface ApplicationMutationReceipt {
   };
 }
 
+export type ApplicationDatabaseServerBindOutcome =
+  | "BOUND"
+  | "ALREADY_BOUND"
+  | "FAILED";
+
+export interface ApplicationDatabaseServerCandidateView {
+  databaseServerId: string;
+  name: string;
+  host: string;
+  port: number;
+  serverStatus: string;
+  countryIsoCode: string | null;
+  currentTenants: number;
+  maxTenants: number;
+  bindingStatus: string | null;
+  credentialRevision: string | null;
+  safeFailureCode: string | null;
+  /** The exact READY pin already exists, so re-binding is a no-op. */
+  bound: boolean;
+  bindable: boolean;
+  blockedReason: string | null;
+}
+
+export interface ApplicationDatabaseServerCandidatesView {
+  applicationId: string;
+  applicationKey: string;
+  applicationName: string;
+  databasePrincipal: string | null;
+  catalogueRevision: string;
+  policyRevision: string | null;
+  bindable: boolean;
+  blockedReason: string | null;
+  servers: ApplicationDatabaseServerCandidateView[];
+}
+
+export interface ApplicationDatabaseServerBindResult {
+  databaseServerId: string;
+  databaseServerName: string | null;
+  outcome: ApplicationDatabaseServerBindOutcome;
+  databasePrincipal: string | null;
+  credentialRevision: string | null;
+  bindingStatus: string | null;
+  code: string | null;
+  message: string | null;
+}
+
+export interface ApplicationDatabaseServerBindReceipt {
+  applicationId: string;
+  applicationKey: string;
+  requested: number;
+  bound: number;
+  alreadyBound: number;
+  failed: number;
+  results: ApplicationDatabaseServerBindResult[];
+  completedAt: string;
+}
+
+export interface BindApplicationDatabaseServersDto {
+  databaseServerIds: string[];
+  expectedCatalogueRevision: string;
+  expectedPolicyRevision: string;
+  reason: string;
+}
+
 export interface ApplicationListQueryDto {
   page?: number;
   limit?: number;

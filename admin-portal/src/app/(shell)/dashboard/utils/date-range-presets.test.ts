@@ -70,6 +70,12 @@ describe("resolvePreset", () => {
     expect(iso(resolvePreset("q4", NOW)!.to)).toBe("2026-12-31 23:59");
   });
 
+  it("runs maximum from the start of 2000 to the end of today", () => {
+    const range = resolvePreset("maximum", NOW)!;
+    expect(iso(range.from)).toBe("2000-01-01 00:00");
+    expect(iso(range.to)).toBe("2026-09-01 23:59");
+  });
+
   it("has no range of its own for a custom selection", () => {
     expect(resolvePreset("custom", NOW)).toBeNull();
   });
@@ -79,6 +85,7 @@ describe("matchPreset", () => {
   it("names a range that happens to equal a preset", () => {
     expect(matchPreset(resolvePreset("q2", NOW)!, NOW)).toBe("q2");
     expect(matchPreset(resolvePreset("today", NOW)!, NOW)).toBe("today");
+    expect(matchPreset(resolvePreset("maximum", NOW)!, NOW)).toBe("maximum");
   });
 
   it("calls anything else custom", () => {

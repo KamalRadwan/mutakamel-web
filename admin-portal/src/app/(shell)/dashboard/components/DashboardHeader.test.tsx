@@ -64,12 +64,13 @@ describe("DashboardHeader range picker", () => {
       "2nd quarter",
       "3rd quarter",
       "4th quarter",
+      "Maximum",
     ]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
   });
 
-  it("marks the active preset pressed, and only that one", () => {
+  it("marks the committed preset pressed when first opened", () => {
     renderHeader();
     openPicker();
 
@@ -83,14 +84,53 @@ describe("DashboardHeader range picker", () => {
     );
   });
 
-  it("emits a whole-day range when a preset is chosen", () => {
+  it("stages a preset without committing it, so the panel stays open", () => {
     const { onRangeChange } = renderHeader();
     openPicker();
     fireEvent.click(screen.getByRole("button", { name: "Yesterday" }));
 
+    // Nothing reloads yet — the reader may still narrow the hours.
+    expect(onRangeChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Yesterday" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Today" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("commits the staged preset on Apply", () => {
+    const { onRangeChange } = renderHeader();
+    openPicker();
+    fireEvent.click(screen.getByRole("button", { name: "Yesterday" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
     expect(onRangeChange).toHaveBeenCalledTimes(1);
     const [range] = onRangeChange.mock.calls[0];
     expect(range.to.getTime() - range.from.getTime()).toBe(86_400_000 - 1);
+  });
+
+  it("reaches back to 2000 for the maximum window", () => {
+    const { onRangeChange } = renderHeader();
+    openPicker();
+    fireEvent.click(screen.getByRole("button", { name: "Maximum" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    const [range] = onRangeChange.mock.calls[0];
+    expect(range.from.getFullYear()).toBe(2000);
+    expect(range.from.getMonth()).toBe(0);
+    expect(range.from.getDate()).toBe(1);
+  });
+
+  it("abandons a staged preset when cancelled", () => {
+    const { onRangeChange } = renderHeader();
+    openPicker();
+    fireEvent.click(screen.getByRole("button", { name: "Last month" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(onRangeChange).not.toHaveBeenCalled();
   });
 
   it("carries a from and to time for the window", () => {

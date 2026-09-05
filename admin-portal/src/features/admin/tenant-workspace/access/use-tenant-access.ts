@@ -137,6 +137,10 @@ export function useTenantAccess({
       ),
       canDelete: adminCanAll(admin, TENANT_ACCESS_PERMISSION_SETS.delete),
       canRestore: adminCanAll(admin, TENANT_ACCESS_PERMISSION_SETS.restore),
+      canTransferOwnership: adminCanAll(
+        admin,
+        TENANT_ACCESS_PERMISSION_SETS.transferOwnership,
+      ),
     }),
     [admin],
   );
@@ -576,7 +580,8 @@ export function useTenantAccess({
   const activateUser = useCallback(
     async (target: TenantUserView) => {
       assertUserState(
-        !isDeletedTenantUser(target) && target.status === "SUSPENDED",
+        !isDeletedTenantUser(target) &&
+          (target.status === "SUSPENDED" || target.status === "INVITED"),
         "TENANT_USER_ACTIVATE_UNAVAILABLE",
       );
       const result = await execute(
@@ -590,6 +595,36 @@ export function useTenantAccess({
       return result;
     },
     [execute, permissions.canSuspend, refreshAfterWrite, tenantId],
+  );
+
+  const transferOwnership = useCallback(
+    async (target: TenantUserView, newOwnerUserId: string) => {
+      assertUserState(
+        !isDeletedTenantUser(target) && target.isTenantOwner,
+        "TENANT_OWNER_TRANSFER_INVALID",
+      );
+      const result = await execute(
+        "transfer-ownership",
+        target,
+        permissions.canTransferOwnership,
+        null,
+        (key) =>
+          tenantAccessApi.transferOwnership(
+            tenantId,
+            target.id,
+            newOwnerUserId,
+            key,
+          ),
+      );
+      await refreshAfterWrite(result);
+      return result;
+    },
+    [
+      execute,
+      permissions.canTransferOwnership,
+      refreshAfterWrite,
+      tenantId,
+    ],
   );
 
   const replaceRoles = useCallback(
@@ -711,6 +746,7 @@ export function useTenantAccess({
     changePassword,
     suspendUser,
     activateUser,
+    transferOwnership,
     replaceRoles,
     deleteUser,
     restoreUser,

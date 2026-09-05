@@ -6,7 +6,7 @@ import {
   type NormalizedApiError,
 } from "@/shared/api/normalized-api-error";
 import { tenantStorageMigrationApi } from "./api";
-import { TERMINAL_MIGRATION_STATUSES } from "./types";
+import { isStorageMigrationSettled } from "./types";
 import type { TenantStorageMigrationView } from "./types";
 
 const POLL_INTERVAL_MS = 5_000;
@@ -47,7 +47,11 @@ export function useTenantStorageMigration() {
       const result = await tenantStorageMigrationApi.get(id, controller.signal);
       if (generation !== requestGeneration.current) return;
       setMigration(result);
-      if (!TERMINAL_MIGRATION_STATUSES.has(result.status)) {
+      // A committed migration holding its retained source has stopped
+      // changing even though its status is not terminal. Polling it would
+      // wait forever for a status that only an operator's confirmed deletion
+      // can produce.
+      if (!isStorageMigrationSettled(result)) {
         pollTimer.current = window.setTimeout(() => void fetchOnceRef.current?.(id), POLL_INTERVAL_MS);
       }
     } catch (caught) {

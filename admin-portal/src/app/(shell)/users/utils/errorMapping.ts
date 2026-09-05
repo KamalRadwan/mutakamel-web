@@ -156,6 +156,22 @@ export function getErrorMessageAndDetails(
       };
     }
 
+    // Both mean the panel's view of the user's extension is stale — it created
+    // one that already exists, or edited one that has since been removed.
+    case "WEBPHONE_OWNER_HAS_EXTENSION":
+      return {
+        code,
+        message: copy.webphoneOwnerHasExtension,
+        correlationId,
+      };
+
+    case "WEBPHONE_EXTENSION_NOT_FOUND":
+      return {
+        code,
+        message: copy.webphoneExtensionNotFound,
+        correlationId,
+      };
+
     case "GW.IDEM.MISSING":
     case "GW.IDEM.BAD_VALUE":
     case "GW.IDEM.IN_FLIGHT":

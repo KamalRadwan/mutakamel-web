@@ -87,6 +87,15 @@ interface AuthContextType {
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   retryBootstrap: () => Promise<void>;
+  /**
+   * Counts credential sign-ins completed in this document. Only `login()`
+   * bumps it: bootstrap, proactive refresh, and cross-tab session adoption
+   * all reach AUTHENTICATED without a human having just typed a password,
+   * and a full page load starts a new provider back at 0. A consumer that
+   * must run once per *fresh* sign-in — not once per authenticated
+   * session — reacts to this changing rather than to `authState`.
+   */
+  freshLoginCount: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -94,6 +103,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authState, setAuthState] = useState<AuthState>("BOOTSTRAPPING");
+  const [freshLoginCount, setFreshLoginCount] = useState(0);
   const router = useRouter();
 
   const bootstrapInFlightRef = useRef<Promise<void> | null>(null);
@@ -407,6 +417,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(profile);
       setAuthState("AUTHENTICATED");
+      // Only this path — a password the operator just typed — counts as a
+      // fresh sign-in. Every other route to AUTHENTICATED is a restore.
+      setFreshLoginCount((count) => count + 1);
       router.push("/dashboard");
     } catch (error) {
       if (sessionCommitted && shouldRetainCommittedSession(error)) {
@@ -503,6 +516,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(profile);
       setAuthState("AUTHENTICATED");
+      // Accepting an invite is a sign-in too, and it is the first one this
+      // administrator ever makes — the moment the browser prompts matter most.
+      setFreshLoginCount((count) => count + 1);
       router.push("/dashboard");
     } catch (error) {
       if (sessionCommitted && shouldRetainCommittedSession(error)) {
@@ -664,7 +680,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     logoutAll,
     retryBootstrap,
-  }), [acceptInvite, authState, login, logout, logoutAll, resetPassword, retryBootstrap, user]);
+    freshLoginCount,
+  }), [acceptInvite, authState, freshLoginCount, login, logout, logoutAll, resetPassword, retryBootstrap, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

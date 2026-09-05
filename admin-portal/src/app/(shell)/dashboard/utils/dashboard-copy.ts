@@ -126,3 +126,15 @@ function humanizeSegment(segment: string): string {
   }
   return humanizeDashboardField(segment);
 }
+
+/**
+ * The name of the small series under a KPI.
+ *
+ * Core authors it in English ("New tenants", "Alerts by source") and it goes
+ * through the same shared term table every chart label uses, so the two never
+ * drift into naming the same series differently.
+ */
+export function resolveTrendLabel(label: string, t: Dictionary): string {
+  const terms = t.dashboard.visualTerms as Record<string, string | undefined>;
+  return terms[label] ?? label;
+}

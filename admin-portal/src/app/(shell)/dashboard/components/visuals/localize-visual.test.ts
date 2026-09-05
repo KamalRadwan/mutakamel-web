@@ -133,6 +133,119 @@ describe("localizeVisual", () => {
     ]);
   });
 
+  it("translates a multi-series' names while leaving its dated buckets alone", () => {
+    const health = localizeVisual(
+      {
+        key: "domains.health",
+        kind: "multi-series",
+        title: "Verified vs Needing Attention",
+        unit: "count",
+        data: {
+          series: [
+            {
+              key: "verified",
+              label: "Verified",
+              tone: "green",
+              points: [{ key: "2026-08", label: "Aug", value: 9 }],
+            },
+            {
+              key: "attention",
+              label: "Needing Attention",
+              tone: "red",
+              points: [{ key: "2026-08", label: "Aug", value: 3 }],
+            },
+          ],
+        },
+      } as DashboardVisual,
+      "ar",
+      ar,
+    );
+
+    expect(health.title).toBe("المُتحقَّق منها مقابل ما يحتاج متابعة");
+    expect(health.kind === "multi-series" && health.data.series.map((s) => s.label)).toEqual([
+      "مُتحقَّق منه",
+      "يحتاج متابعة",
+    ]);
+    expect(
+      health.kind === "multi-series" && health.data.series[0].points.map((p) => p.label),
+    ).toEqual(["Aug"]);
+  });
+
+  it("translates a scatter's axis names while leaving the subject each mark stands for", () => {
+    const evidence = localizeVisual(
+      {
+        key: "audit.evidenceQuality",
+        kind: "scatter",
+        title: "Evidence Gaps Against Event Volume",
+        unit: "count",
+        data: {
+          xLabel: "Events",
+          yLabel: "Non-success",
+          points: [
+            { key: "t-1", label: "Acme Holdings", x: 12_000, y: 0.7, size: 40, tone: "red" },
+            { key: "t-2", label: "Beta Logistics", x: 12, y: 0.7 },
+          ],
+        },
+      } as DashboardVisual,
+      "ar",
+      ar,
+    );
+
+    expect(evidence.title).toBe("فجوات الأدلة مقابل حجم الأحداث");
+    // The axis names are vocabulary; they say what the two measures are.
+    expect(evidence.kind === "scatter" && [evidence.data.xLabel, evidence.data.yLabel]).toEqual([
+      "الأحداث",
+      "غير ناجح",
+    ]);
+    // A mark stands for a tenant, and a tenant name is a record, not a word.
+    expect(evidence.kind === "scatter" && evidence.data.points.map((p) => p.label)).toEqual([
+      "Acme Holdings",
+      "Beta Logistics",
+    ]);
+    // Both coordinates and the third measure come through untouched.
+    expect(evidence.kind === "scatter" && evidence.data.points[0]).toMatchObject({
+      key: "t-1",
+      x: 12_000,
+      y: 0.7,
+      size: 40,
+    });
+  });
+
+  it("never renames the record a list row points at", () => {
+    const list = localizeVisual(
+      {
+        key: "domains.invalidTenants",
+        kind: "list",
+        title: "Invalid Tenant Domains",
+        unit: "count",
+        data: {
+          rows: [
+            {
+              key: "t-1:acme.example",
+              label: "Acme Holdings",
+              detail: "acme.example",
+              value: "Validation failed",
+              href: "/tenants/t-1",
+              tone: "red",
+            },
+          ],
+        },
+      } as DashboardVisual,
+      "ar",
+      ar,
+    );
+
+    expect(list.title).toBe("نطاقات مستأجرين غير صالحة");
+    expect(list.kind === "list" && list.data.rows[0]).toMatchObject({
+      // A tenant name and its domain are the identity of the thing to open.
+      label: "Acme Holdings",
+      detail: "acme.example",
+      href: "/tenants/t-1",
+      // The reason phrase is vocabulary, so it does translate.
+      value: "فشل التحقق",
+    });
+  });
+
   it("falls back to Core's English for a visual the portal has no copy for", () => {
     const unknown = localizeVisual(
       {

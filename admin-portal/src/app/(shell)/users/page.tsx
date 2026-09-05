@@ -41,6 +41,7 @@ export default function UsersDirectoryPage() {
     sortDir,
     setSortDir,
     users,
+    webphoneExtensions,
     roles,
     rolesForbidden,
     summaryMetrics,
@@ -146,15 +147,17 @@ export default function UsersDirectoryPage() {
       key: "sipExtension",
       headerEn: t.users.sipExtension,
       headerAr: t.users.sipExtension,
-      cell: (usr) =>
-        usr.webphoneExtension ? (
+      cell: (usr) => {
+        const extension = webphoneExtensions.get(usr.id);
+        return extension ? (
           <span className="flex w-fit items-center gap-1 rounded-md bg-info-subtle px-2 py-0.5 font-mono text-xs text-info-subtle-foreground">
             <PhoneCall className="size-3 text-info" aria-hidden="true" />
-            Ext {usr.webphoneExtension}
+            Ext {extension}
           </span>
         ) : (
           <span className="text-xs italic text-muted-foreground">{t.users.notConfigured}</span>
-        ),
+        );
+      },
     },
     {
       key: "actions",

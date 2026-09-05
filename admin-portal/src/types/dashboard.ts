@@ -50,6 +50,20 @@ export interface DashboardMetric {
   kind: DashboardMetricKind;
   description: string;
   tone: DashboardMetricTone;
+  /**
+   * A small chart drawn under the number, carrying its own label because it
+   * is rarely the card's own value over time — the control plane keeps no
+   * status history, so "active tenants last Tuesday" is unanswerable. It is a
+   * related series that *is* recorded, and the label is what stops a reader
+   * taking it for the card's history. Absent when there is nothing to draw.
+   */
+  trend?: DashboardMetricTrend;
+}
+
+export interface DashboardMetricTrend {
+  label: string;
+  kind: "line" | "bar";
+  points: number[];
 }
 
 export interface DashboardGroupAlert {
@@ -181,7 +195,13 @@ export interface DashboardResponse extends DashboardGroups {
    */
   overview: {
     kpis: DashboardMetric[];
-    tenantBillingGrowth: {
+    /**
+     * Both of the fields below are dropped by Core when the actor lacks the
+     * permission behind them — growth needs tenants *and* billing, recent
+     * tenants needs tenants. Optional here because they are optional there;
+     * declaring them required only moved the failure to a runtime crash.
+     */
+    tenantBillingGrowth?: {
       year: number;
       currencyCode: string; // current backend value: "USD"
       granularity: DashboardRangeGranularity;
@@ -191,7 +211,7 @@ export interface DashboardResponse extends DashboardGroups {
         collected: number;
       }>;
     };
-    recentTenants: {
+    recentTenants?: {
       items: Array<{
         id: string;
         name: string;
@@ -310,7 +330,10 @@ export type DashboardVisualKind =
   | "bullet"
   | "funnel"
   | "waterfall"
-  | "heatmap";
+  | "heatmap"
+  | "multi-series"
+  | "list"
+  | "scatter";
 
 export type DashboardVisualUnit =
   | "count"
@@ -357,9 +380,45 @@ export interface DashboardVisualHeatRow {
   values: number[];
 }
 
+/** One named line or stack in a chart carrying more than two measures. */
+export interface DashboardVisualSeries {
+  key: string;
+  label: string;
+  tone?: DashboardMetricTone;
+  points: DashboardVisualPoint[];
+}
+
+/**
+ * A row in a list panel. `href` makes the row a link, which is how a report
+ * hands an operator the record that needs their attention rather than only
+ * telling them how many there are.
+ */
+export interface DashboardVisualListRow {
+  key: string;
+  label: string;
+  detail?: string;
+  value?: string;
+  href?: string;
+  tone?: DashboardMetricTone;
+}
+
 export interface DashboardVisualBand {
   upTo: number;
   tone: "green" | "amber" | "red";
+}
+
+/**
+ * One mark on a two-axis plot. `size` is an optional third measure carried as
+ * radius, for when the same coordinates mean different things at ten requests
+ * and at ten thousand.
+ */
+export interface DashboardVisualScatterPoint {
+  key: string;
+  label: string;
+  x: number;
+  y: number;
+  size?: number;
+  tone?: DashboardMetricTone;
 }
 
 interface DashboardVisualBase {
@@ -370,10 +429,23 @@ interface DashboardVisualBase {
   secondaryUnit?: DashboardVisualUnit;
   /** `primary` spans two grid columns. */
   emphasis?: "primary" | "secondary";
+  /**
+   * Keep the categories in the order Core sent instead of ranking them.
+   *
+   * A histogram's buckets are a scale — "today, this week, never" sorted by
+   * size tells the reader nothing and costs them the axis.
+   */
+  ordered?: boolean;
   reference?: {
     target?: number;
     maximum?: number;
     bands?: DashboardVisualBand[];
+    /**
+     * What the unreached part of a gauge means. `neutral` is simply "not yet";
+     * `danger` says the shortfall is itself the problem, which is what an
+     * unverified domain is.
+     */
+    remainderTone?: "neutral" | "danger";
   };
 }
 
@@ -403,6 +475,13 @@ interface DashboardVisualDataByKind extends Record<DashboardVisualKind, unknown>
   bullet: { rows: DashboardVisualBulletRow[] };
   waterfall: { steps: DashboardVisualWaterfallStep[] };
   heatmap: { columns: string[]; rows: DashboardVisualHeatRow[] };
+  "multi-series": { series: DashboardVisualSeries[] };
+  list: { rows: DashboardVisualListRow[] };
+  scatter: {
+    points: DashboardVisualScatterPoint[];
+    xLabel: string;
+    yLabel: string;
+  };
 }
 
 export type DashboardVisualOf<K extends DashboardVisualKind> =

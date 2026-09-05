@@ -223,7 +223,8 @@ export type TenantAccessCommandName =
   | "activate"
   | "roles"
   | "delete"
-  | "restore";
+  | "restore"
+  | "transfer-ownership";
 
 export interface TenantAccessCommandState {
   name: TenantAccessCommandName | null;
@@ -242,6 +243,7 @@ export interface TenantAccessPermissions {
   canAssignRoles: boolean;
   canDelete: boolean;
   canRestore: boolean;
+  canTransferOwnership: boolean;
 }
 
 export const TENANT_ACCESS_PERMISSION_SETS = {
@@ -260,6 +262,10 @@ export const TENANT_ACCESS_PERMISSION_SETS = {
   ],
   delete: ["admin.tenant_users.delete", "admin.tenant_users.critical"],
   restore: ["admin.tenant_users.restore", "admin.tenant_users.critical"],
+  transferOwnership: [
+    "admin.tenant_users.transfer_ownership",
+    "admin.tenant_users.critical",
+  ],
 } as const;
 
 export function isTenantAccessDatabaseReady(status: TenantStatus): boolean {
@@ -270,15 +276,18 @@ export function isDeletedTenantUser(user: TenantUserView): boolean {
   return user.deletedAt !== null;
 }
 
+/**
+ * Commands the tenant owner is exempt from — the ones with no way back.
+ *
+ * Owner protection used to cover the whole lifecycle, which left an operator
+ * unable to activate, suspend, or re-credential the one account that
+ * administers a tenant; an invited owner who never got their mail could not be
+ * reached at all. What stays protected is deletion and identity edits, and the
+ * way past those is `transfer-ownership`, not a wider exemption. The same rule
+ * is enforced server-side in `admin-tenant-users.service.ts`.
+ */
 export function isOwnerProtectedCommand(
   command: TenantAccessCommandName,
 ): boolean {
-  return [
-    "update",
-    "change-password",
-    "suspend",
-    "activate",
-    "roles",
-    "delete",
-  ].includes(command);
+  return ["update", "roles", "delete"].includes(command);
 }

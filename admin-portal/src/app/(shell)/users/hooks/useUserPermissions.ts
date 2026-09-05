@@ -44,11 +44,11 @@ export function getUserRowPermissions(
   );
 
   const canViewRoles = adminCan(currentUser, "admin.roles.read");
-  const canViewWebphone = adminCan(currentUser, "admin.users.read");
-  const canEditWebphone = adminCanAll(
-    currentUser,
-    ADMIN_RBAC_CRITICAL.USERS_UPDATE
-  );
+  // A user's WebPhone identity is served by the WebPhone module, whose routes
+  // ask for its own permissions — admin.users.* no longer opens that door, and
+  // the module's writes carry no `critical` companion.
+  const canViewWebphone = adminCan(currentUser, "admin.webphone.read");
+  const canEditWebphone = adminCan(currentUser, "admin.webphone.update");
 
   const isInvited = targetStatus === "INVITED";
   const canSuspend = canSuspendBase && !isSelf && !isInvited && targetStatus === "ACTIVE";

@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* The WebPhone widget is a workspace package, so it reaches this app through
+   node_modules — which Tailwind's automatic source detection excludes. Without
+   this line the widget renders with only the utilities other screens happen to
+   use: `grid` applies but `grid-cols-[...]` does not, `h-[24.5rem]` does not,
+   `w-[min(17.5rem,...)]` does not. The dock still appears, which is why this
+   went unnoticed — it just lays itself out from content instead of its own
+   rules, so its size changed with whichever tab was open. */
+@source "../../../packages/webphone/src";
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {

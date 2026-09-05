@@ -1,9 +1,16 @@
-import { axiosClient } from "@/lib/api/axiosClient";
+import { axiosClient, unwrapCoreData } from "@/lib/api/axiosClient";
 import type { SuccessResponse } from "@/types/common";
+import {
+  readWebphoneExtension,
+  readWebphoneExtensions,
+  readWebphoneExtensionServers,
+  readWebphoneServers,
+  type WebphoneExtensionServer,
+} from "../../settings/webphone/webphone-contract";
 import type {
   AdminUser,
   AdminRole,
-  AdminWebphoneConfig,
+  AdminWebphoneCreateDto,
   AdminWebphoneUpdateDto,
   CreateAdminUserDto,
   UpdateAdminUserDto,
@@ -144,24 +151,104 @@ export async function deleteAdminUser(id: string, idempotencyKey: string) {
   );
 }
 
-export async function getUserWebphone(id: string) {
-  const res = await axiosClient.get<SuccessResponse<AdminWebphoneConfig>>(
-    `/api/admin/core/v1/users/${encodeURIComponent(id)}/webphone`
-  );
-  return res.data.data;
+// WebPhone identities are extension rows served by the WebPhone module, not
+// fields on the user — so they are addressed under that module's namespace and
+// by extension id, never under /users/:id.
+export const WEBPHONE_EXTENSIONS_PATH = "/api/admin/webphone/v1/extensions";
+
+export function userWebphonePath(extensionId: string) {
+  return `${WEBPHONE_EXTENSIONS_PATH}/${encodeURIComponent(extensionId)}`;
 }
 
-export async function updateUserWebphone(
-  id: string,
-  dto: AdminWebphoneUpdateDto,
+/** Every admin extension. The module has no by-owner read; callers match. */
+export async function listWebphoneExtensions() {
+  const res = await axiosClient.get<unknown>(WEBPHONE_EXTENSIONS_PATH, {
+    cache: "no-store",
+  });
+  return readWebphoneExtensions(unwrapCoreData(res.data));
+}
+
+/**
+ * The extension belonging to one user, or undefined when they have none.
+ * Having no extension is a normal, unconfigured state — not an error.
+ */
+export async function getUserWebphone(ownerId: string) {
+  return (await listWebphoneExtensions()).find(
+    (extension) => extension.ownerId === ownerId,
+  );
+}
+
+export async function createUserWebphone(
+  dto: AdminWebphoneCreateDto,
   idempotencyKey: string,
 ) {
-  const res = await axiosClient.patch<SuccessResponse<AdminWebphoneConfig>>(
-    `/api/admin/core/v1/users/${encodeURIComponent(id)}/webphone`,
+  const res = await axiosClient.post<unknown>(
+    WEBPHONE_EXTENSIONS_PATH,
     dto,
     idempotentWrite(idempotencyKey),
   );
-  return res.data.data;
+  return readWebphoneExtension(unwrapCoreData(res.data));
+}
+
+export async function updateUserWebphone(
+  extensionId: string,
+  dto: AdminWebphoneUpdateDto,
+  idempotencyKey: string,
+) {
+  const res = await axiosClient.patch<unknown>(
+    userWebphonePath(extensionId),
+    dto,
+    idempotentWrite(idempotencyKey),
+  );
+  return readWebphoneExtension(unwrapCoreData(res.data));
+}
+
+export const WEBPHONE_SERVERS_PATH = "/api/admin/webphone/v1/servers";
+
+export function userWebphoneServersPath(extensionId: string) {
+  return `${userWebphonePath(extensionId)}/servers`;
+}
+
+/**
+ * Every SIP server, in failover order.
+ *
+ * The user panel needs them for two things it cannot invent: the name to show
+ * against each link in the user's chain, and the per-server defaults that its
+ * blank override inputs advertise as their placeholder.
+ */
+export async function listWebphoneServers() {
+  const res = await axiosClient.get<unknown>(WEBPHONE_SERVERS_PATH, {
+    cache: "no-store",
+  });
+  return readWebphoneServers(unwrapCoreData(res.data));
+}
+
+export async function getExtensionServers(extensionId: string) {
+  const res = await axiosClient.get<unknown>(
+    userWebphoneServersPath(extensionId),
+    { cache: "no-store" },
+  );
+  return readWebphoneExtensionServers(unwrapCoreData(res.data));
+}
+
+/**
+ * Replaces the whole chain in one write.
+ *
+ * The order is the statement, so a partial update has no meaning here: sending
+ * every link makes the write idempotent and leaves no room for two links to
+ * claim the same position. The caller re-reads afterwards rather than parsing
+ * this response, because the route's success body is not part of the contract.
+ */
+export async function putExtensionServers(
+  extensionId: string,
+  chain: WebphoneExtensionServer[],
+  idempotencyKey: string,
+): Promise<void> {
+  await axiosClient.put<unknown>(
+    userWebphoneServersPath(extensionId),
+    chain,
+    idempotentWrite(idempotencyKey),
+  );
 }
 
 export async function listRoles(params: ListRolesParams = {}) {

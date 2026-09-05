@@ -40,6 +40,8 @@ describe("tenant storage migration API", () => {
       copiedBytes: null,
       namespaceDigest: null,
       failureCode: null,
+      retainSource: true,
+      sourceReleaseRequestedAt: null,
     };
     postMock.mockResolvedValue(envelope(migration));
 
@@ -49,6 +51,7 @@ describe("tenant storage migration API", () => {
       backupArtifactId: "019f0000-0000-7000-8000-000000000020",
       restoreRunId: "019f0000-0000-7000-8000-000000000021",
       maxBytes: "1000000000",
+      retainSource: true,
     };
     await expect(
       tenantStorageMigrationApi.start(TENANT_ID, dto, COMMAND_ID),
@@ -73,6 +76,60 @@ describe("tenant storage migration API", () => {
     expect(getMock).toHaveBeenCalledWith(
       `/api/admin/core/v1/storage-migrations/${MIGRATION_ID}`,
       { signal: controller.signal },
+    );
+  });
+  it("sends retainSource verbatim so the source is kept until it is confirmed", async () => {
+    postMock.mockResolvedValue(envelope({ id: MIGRATION_ID, retainSource: false }));
+    const dto = {
+      targetStorageServerId: "019f0000-0000-7000-8000-000000000011",
+      expectedStoragePlacementRevision: "3",
+      backupArtifactId: "019f0000-0000-7000-8000-000000000020",
+      restoreRunId: "019f0000-0000-7000-8000-000000000021",
+      maxBytes: "1000000000",
+      retainSource: false,
+    };
+
+    await tenantStorageMigrationApi.start(TENANT_ID, dto, COMMAND_ID);
+
+    expect(postMock.mock.calls[0][1]).toEqual(dto);
+  });
+
+  it("releases the retained source with a typed confirmation and an idempotency key", async () => {
+    const completed = {
+      id: MIGRATION_ID,
+      tenantId: TENANT_ID,
+      status: "COMPLETED",
+      retainSource: true,
+      sourceReleaseRequestedAt: "2026-09-03T10:00:00.000Z",
+    };
+    postMock.mockResolvedValue(envelope(completed));
+
+    await expect(
+      tenantStorageMigrationApi.releaseSource(
+        MIGRATION_ID,
+        { confirmTenantId: TENANT_ID },
+        COMMAND_ID,
+      ),
+    ).resolves.toEqual(completed);
+
+    expect(postMock).toHaveBeenCalledWith(
+      `/api/admin/core/v1/storage-migrations/${MIGRATION_ID}/release-source`,
+      { confirmTenantId: TENANT_ID },
+      { headers: { "x-idempotency-key": COMMAND_ID } },
+    );
+  });
+
+  it("encodes the migration id into the release path", async () => {
+    postMock.mockResolvedValue(envelope({}));
+
+    await tenantStorageMigrationApi.releaseSource(
+      "a/b c",
+      { confirmTenantId: TENANT_ID },
+      COMMAND_ID,
+    );
+
+    expect(postMock.mock.calls[0][0]).toBe(
+      "/api/admin/core/v1/storage-migrations/a%2Fb%20c/release-source",
     );
   });
 });

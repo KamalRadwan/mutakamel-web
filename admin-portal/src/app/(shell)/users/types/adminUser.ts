@@ -39,12 +39,6 @@ export interface AdminUser {
   lastLoginAt?: string | null;
   failedLoginAttempts?: number;
   lockedUntil?: string | null;
-  webphoneEnabled?: boolean;
-  webphoneExtension?: string | null;
-  webphoneSipUsername?: string | null;
-  webphoneDisplayName?: string | null;
-  webphoneOutboundCallerId?: string | null;
-  webphoneTransport?: "ws" | "wss";
   roleId: string;
   role: AdminRole;
   profile?: AdminUserProfile | null;
@@ -53,27 +47,15 @@ export interface AdminUser {
   deletedAt?: string | null;
 }
 
-export interface AdminWebphoneConfig {
-  enabled: boolean;
-  extension?: string | null;
-  sipUsername?: string | null;
-  displayName?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  outboundCallerId?: string | null;
-  transport?: "ws" | "wss";
-  passwordConfigured: boolean;
-}
-
-export interface AdminWebphoneUpdateDto {
-  enabled?: boolean;
-  extension?: string | null;
-  sipUsername?: string | null;
-  sipPassword?: string | null;
-  displayName?: string | null;
-  outboundCallerId?: string | null;
-  transport?: "ws" | "wss";
-}
+// A user's WebPhone identity is an extension row owned by the WebPhone module
+// and keyed by ownerId — it is no longer a set of columns on the user record.
+// The module's contract owns those shapes and their response parser, so they
+// are re-exported here rather than restated, keeping one definition per shape.
+export type {
+  WebphoneExtension as AdminWebphoneExtension,
+  CreateWebphoneExtensionDto as AdminWebphoneCreateDto,
+  UpdateWebphoneExtensionDto as AdminWebphoneUpdateDto,
+} from "../../settings/webphone/webphone-contract";
 
 export interface CreateAdminUserDto {
   /**

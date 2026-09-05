@@ -13,7 +13,10 @@ import { preloadDashboardChartGroups } from "./components/DashboardOverviewChart
 import { useDashboardData } from "./hooks/useDashboardData";
 import { useDashboardPrint } from "./hooks/useDashboardPrint";
 import { usePrintableDisclosures } from "./hooks/usePrintableDisclosures";
-import { getAuthorizedDashboardGroupKeys } from "./utils/dashboard-groups";
+import {
+  authorizedGroupsInSubject,
+  authorizedSubjects,
+} from "./utils/dashboard-subjects";
 
 export default function DashboardPage() {
   const { t } = useI18n();
@@ -96,11 +99,11 @@ export default function DashboardPage() {
     );
   }
 
-  // Tabs come from the authorized set; the panel's data may still be in
-  // flight, because switching tabs is what triggers its fetch.
-  const groupKeys = data ? getAuthorizedDashboardGroupKeys(data) : [];
-  const activeGroup =
-    activeTab === "overview" ? undefined : data?.[activeTab];
+  // Tabs are subjects; the reports inside one may still be in flight,
+  // because switching subject is what triggers their fetch.
+  const subjects = authorizedSubjects(data);
+  const activeGroups =
+    activeTab === "overview" ? [] : authorizedGroupsInSubject(data, activeTab);
 
   return (
     <PageShell>
@@ -147,25 +150,36 @@ export default function DashboardPage() {
             <DashboardTabsNav
               activeTab={activeTab}
               onTabChange={setActiveTab}
-              groups={groupKeys}
+              subjects={subjects}
             />
             {activeTab === "overview" ? (
               <DashboardGroupsOverview
                 data={data}
-                onOpenGroup={setActiveTab}
                 forceRenderCharts={dashboardPrint.forceRenderCharts}
                 printChartsReady={dashboardPrint.chartsReady}
                 onOperationalChartsReady={markOperationalChartsReady}
                 onBillingChartsReady={markBillingChartsReady}
               />
-            ) : activeGroup ? (
-              <DashboardGroupPanel
-                groupKey={activeTab}
-                group={activeGroup}
-                rangeLabel={data.range.label}
-              />
             ) : (
-              <DashboardGroupSkeleton />
+              // Every report in the subject, stacked in story order — which
+              // is the whole point of the grouping: a subscription, its
+              // invoice and the payment that settled it now read together
+              // instead of across three tab switches.
+              <div className="space-y-6">
+                {activeGroups.map((key) => {
+                  const group = data[key];
+                  return group ? (
+                    <DashboardGroupPanel
+                      key={key}
+                      groupKey={key}
+                      group={group}
+                      rangeLabel={data.range.label}
+                    />
+                  ) : (
+                    <DashboardGroupSkeleton key={key} />
+                  );
+                })}
+              </div>
             )}
           </>
         ) : null}

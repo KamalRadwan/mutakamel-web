@@ -117,6 +117,12 @@ export const ADMIN_RBAC_CRITICAL = {
   // Tenant Storage Migrations Critical
   STORAGE_MIGRATIONS_EXECUTE: ["admin.storage_migrations.execute", "admin.storage_migrations.critical"] as const,
 
+  // Tenant Database Relocations Critical. The Worker declares this exact pair
+  // on both mutating relocation routes — `POST /relocations/tenants/:tenantId`
+  // and `POST /relocations/:runId/destroy-source` — so one entry covers the
+  // move and the irreversible source release.
+  TENANT_RELOCATIONS_EXECUTE: ["admin.tenant_relocations.execute", "admin.tenant_relocations.critical"] as const,
+
   // Backups Critical
   BACKUPS_POLICY_MANAGE: ["admin.backups.manage", "admin.backups.critical"] as const,
   BACKUPS_DELETE: ["admin.backups.delete", "admin.backups.critical"] as const,

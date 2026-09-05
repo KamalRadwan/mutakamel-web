@@ -17,6 +17,7 @@ export type DateRangePresetKey =
   | "q2"
   | "q3"
   | "q4"
+  | "maximum"
   | "custom";
 
 export interface DateRange {
@@ -37,6 +38,7 @@ export const DATE_RANGE_PRESET_KEYS: readonly DateRangePresetKey[] = [
   "q2",
   "q3",
   "q4",
+  "maximum",
 ];
 
 const QUARTER_START_MONTH: Record<"q1" | "q2" | "q3" | "q4", number> = {
@@ -45,6 +47,12 @@ const QUARTER_START_MONTH: Record<"q1" | "q2" | "q3" | "q4", number> = {
   q3: 6,
   q4: 9,
 };
+
+/**
+ * The earliest date the platform is asked to report from. Nothing predates
+ * it, so "maximum" is everything without pretending to an open-ended query.
+ */
+export const EARLIEST_REPORTABLE_DATE = new Date(2000, 0, 1);
 
 /**
  * Quarters are always of the current year, which is what an operator means by
@@ -79,6 +87,8 @@ export function resolvePreset(preset: DateRangePresetKey, now: Date): DateRange 
         from: new Date(year - 1, 0, 1),
         to: endOfDay(new Date(year - 1, 11, 31)),
       };
+    case "maximum":
+      return { from: new Date(EARLIEST_REPORTABLE_DATE), to: endOfDay(now) };
     default: {
       const month = QUARTER_START_MONTH[preset];
       return {

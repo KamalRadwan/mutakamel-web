@@ -232,6 +232,20 @@ export const tenantAccessApi = {
     return readTenantUserDelivery(response.data);
   },
 
+  transferOwnership: async (
+    tenantId: string,
+    userId: string,
+    newOwnerUserId: string,
+    idempotencyKey: string,
+  ) => {
+    const response = await axiosClient.post<unknown>(
+      `${userUrl(tenantId, userId)}/transfer-ownership`,
+      { newOwnerUserId },
+      writeConfig(idempotencyKey),
+    );
+    return readTenantUserView(response.data);
+  },
+
   resendInvite: async (
     tenantId: string,
     userId: string,

@@ -23,11 +23,14 @@ import { formatDashboardMetric, metricToneToRole } from "../utils/formatters";
 import {
   resolveMetricDescription,
   resolveMetricLabel,
+  resolveTrendLabel,
 } from "../utils/dashboard-copy";
 
 interface KpiCardProps {
   card: DashboardMetric;
   currencyCode?: string;
+  /** Tighter padding and a smaller number, for the overview's dense grid. */
+  compact?: boolean;
 }
 
 function getCardIcon(key: string, label: string): LucideIcon {
@@ -50,7 +53,7 @@ function getCardIcon(key: string, label: string): LucideIcon {
   return Building2;
 }
 
-export function KpiCard({ card, currencyCode = "USD" }: KpiCardProps) {
+export function KpiCard({ card, currencyCode = "USD", compact = false }: KpiCardProps) {
   const { lang, t } = useI18n();
   const formattedValue = formatDashboardMetric(card, currencyCode, lang);
   const tone: StatTone = metricToneToRole(card.tone);
@@ -63,6 +66,15 @@ export function KpiCard({ card, currencyCode = "USD" }: KpiCardProps) {
       description={resolveMetricDescription(card, lang, t)}
       icon={icon}
       tone={tone}
+      compact={compact}
+      trend={
+        card.trend && {
+          ...card.trend,
+          // The series name is Core's vocabulary, so it translates like every
+          // other label the reports author.
+          label: resolveTrendLabel(card.trend.label, t),
+        }
+      }
     />
   );
 }

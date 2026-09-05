@@ -11,6 +11,9 @@ import {
   ApplicationLifecycleCommandDto,
   PublishApplicationDto,
   ApplicationManifestEvidenceView,
+  ApplicationDatabaseServerCandidatesView,
+  ApplicationDatabaseServerBindReceipt,
+  BindApplicationDatabaseServersDto,
   ApplicationTechnicalReadinessView,
   CreateApplicationProvisioningBindingDto,
   AdoptApplicationTechnicalPackageDto,
@@ -159,6 +162,27 @@ export const applicationsApi = {
     const response = await axiosClient.post<SuccessResponse<ApplicationMutationReceipt>>(
       `${BASE_URL}/${encodeURIComponent(applicationKey)}/activate`,
       { expectedCatalogueRevision, reason },
+      { headers: { "x-idempotency-key": idempotencyKey } }
+    );
+    return extractCoreData(response);
+  },
+
+  listBindableDatabaseServers: async (applicationKey: string, signal?: AbortSignal) => {
+    const response = await getWithSignal<SuccessResponse<ApplicationDatabaseServerCandidatesView>>(
+      `${BASE_URL}/${encodeURIComponent(applicationKey)}/database-servers`,
+      signal,
+    );
+    return extractCoreData(response);
+  },
+
+  bindDatabaseServers: async (
+    applicationKey: string,
+    data: BindApplicationDatabaseServersDto,
+    idempotencyKey: string,
+  ) => {
+    const response = await axiosClient.post<SuccessResponse<ApplicationDatabaseServerBindReceipt>>(
+      `${BASE_URL}/${encodeURIComponent(applicationKey)}/database-servers/bind`,
+      data,
       { headers: { "x-idempotency-key": idempotencyKey } }
     );
     return extractCoreData(response);

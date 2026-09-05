@@ -218,7 +218,9 @@ export const SETTINGS_SUBNAV: { href: string; labelKey: { en: string; ar: string
   { href: "/settings/auth", labelKey: { en: "Auth & Security", ar: "المصادقة والأمان" } },
   { href: "/settings/billing", labelKey: { en: "Billing & Gateways", ar: "الفواتير وبوابات الدفع" } },
   { href: "/settings/notifications", labelKey: { en: "Notifications & Alerts", ar: "الإشعارات والتنبيهات" } },
-  { href: "/settings/asterisk", labelKey: { en: "WebPhone (Asterisk SIP)", ar: "الهاتف المرئي (Asterisk SIP)" } },
+  // The WebPhone module replaced the `asterisk.*` settings keys and the
+  // /settings/asterisk screen that edited them; that route no longer exists.
+  { href: "/settings/webphone", labelKey: { en: "WebPhone", ar: "الهاتف المرئي" } },
   { href: "/settings/smtp", labelKey: { en: "Email (SMTP)", ar: "البريد الإلكتروني (SMTP)" } },
   { href: "/settings/fatal-alerts", labelKey: { en: "Fatal Alerts", ar: "التنبيهات الحرجة" } },
   { href: "/settings/storage", labelKey: { en: "Storage Runtime", ar: "تشغيل التخزين" } },

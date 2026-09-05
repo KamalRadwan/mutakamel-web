@@ -354,6 +354,94 @@ export function RolesDialog({
   );
 }
 
+/**
+ * Moving the single tenant-owner seat.
+ *
+ * Both ends are on screen because this is the one action whose consequence is
+ * not visible from the button: the reader has to see who is losing the seat as
+ * well as who is gaining it. Destinations are the tenant's own active,
+ * non-owner, non-deleted users — the same set the server accepts, so a choice
+ * offered here cannot be refused there.
+ */
+export function TransferOwnershipDialog({
+  controller,
+  copy,
+  locale,
+  user,
+  onClose,
+  onSuccess,
+}: SharedDialogProps & { user: TenantUserView }) {
+  const [newOwnerUserId, setNewOwnerUserId] = useState("");
+  const candidates = useMemo(
+    () =>
+      (controller.directory.data?.items ?? []).filter(
+        (candidate: TenantUserView) =>
+          candidate.id !== user.id &&
+          !candidate.isTenantOwner &&
+          candidate.deletedAt === null &&
+          candidate.status === "ACTIVE",
+      ),
+    [controller.directory.data?.items, user.id],
+  );
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!newOwnerUserId) return;
+    try {
+      await controller.transferOwnership(user, newOwnerUserId);
+      onSuccess(copy.transferOwnershipSucceeded);
+      onClose();
+    } catch {
+      // The command error remains visible.
+    }
+  };
+  return (
+    <DialogFrame title={copy.transferOwnershipTitle} onClose={onClose} locale={locale}>
+      <form onSubmit={submit} className="grid gap-3">
+        <p className="text-sm leading-6 text-foreground/90">{copy.transferOwnershipHint}</p>
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground">{copy.currentOwner}</p>
+          <p className="mt-1 rounded-lg bg-muted p-2 text-sm font-semibold text-foreground">
+            {user.firstName} {user.lastName} · {user.email}
+          </p>
+        </div>
+        {candidates.length ? (
+          <DialogSelectField
+            id="tenant-owner-transfer-target"
+            label={copy.newOwner}
+            value={newOwnerUserId}
+            onValueChange={setNewOwnerUserId}
+            options={[
+              ["", copy.newOwnerPlaceholder] as const,
+              ...candidates.map(
+                (candidate: TenantUserView) =>
+                  [
+                    candidate.id,
+                    `${candidate.firstName} ${candidate.lastName} · ${candidate.email}`,
+                  ] as const,
+              ),
+            ]}
+          />
+        ) : (
+          <p className="rounded-lg bg-warning-subtle p-2 text-sm text-warning-subtle-foreground">
+            {copy.transferOwnershipEmpty}
+          </p>
+        )}
+        <DialogError controller={controller} />
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={controller.command.pending || !newOwnerUserId}
+          >
+            {copy.transferOwnership}
+          </Button>
+        </div>
+      </form>
+    </DialogFrame>
+  );
+}
+
 export type ConfirmationAction =
   | "reset-password"
   | "resend-invite"

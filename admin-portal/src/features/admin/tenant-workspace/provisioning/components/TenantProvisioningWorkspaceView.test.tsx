@@ -124,6 +124,28 @@ describe("TenantProvisioningWorkspaceView", () => {
     expect(screen.getByRole("button", { name: "طلب الإلغاء" })).toBeInTheDocument();
   });
 
+  // The step table used to print `core.foundation.schema` / `SCHEMA` /
+  // `STEP_STARTED` at the reader. It names them now, and keeps the plan key
+  // beside the name because that is what an operator pastes into a query.
+  it("names steps, kinds and timeline events instead of printing plan keys", () => {
+    render(<TenantProvisioningWorkspaceView model={makeModel()} />);
+
+    expect(screen.getByText("Core foundation — schema")).toBeInTheDocument();
+    expect(screen.getByText("core.foundation.schema")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "Schema" })).toBeInTheDocument();
+    expect(screen.getByText("Step started")).toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: "STEP_STARTED" })).toBeNull();
+  });
+
+  it("names them in Arabic too, with the key left untranslated", () => {
+    render(<TenantProvisioningWorkspaceView model={makeModel({ lang: "ar" })} />);
+
+    expect(screen.getByText("أساس النواة — المخطط")).toBeInTheDocument();
+    expect(screen.getByText("core.foundation.schema")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "المخطط" })).toBeInTheDocument();
+    expect(screen.getByText("بدأت الخطوة")).toBeInTheDocument();
+  });
+
   it("disables prerequisite requests when the selected plan has none", () => {
     const model = makeModel({ section: "prerequisites", prerequisiteCount: 0 });
     render(<TenantProvisioningWorkspaceView model={model} />);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { localeForLanguage } from "@/i18n/locale";
@@ -50,16 +50,11 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
   const [anchor, setAnchor] = useState<Date | null>(null);
   const [month, setMonth] = useState<Date>(() => startOfMonth(value.from));
 
-  // Reopening shows the committed window, not an abandoned half-selection.
-  useEffect(() => {
-    if (open) return;
-    setDraft(value);
-    setAnchor(null);
-    setMonth(startOfMonth(value.from));
-  }, [open, value]);
-
   const now = useMemo(() => new Date(), []);
-  const activePreset = matchPreset(value, now);
+  // The trigger names the committed window; the list highlights what is
+  // staged, so a chosen preset reads as selected before Apply commits it.
+  const committedPreset = matchPreset(value, now);
+  const draftPreset = matchPreset(draft, now);
   const weekStartsOn = lang === "ar" ? 6 : 0;
   const days = useMemo(() => monthGrid(month, weekStartsOn), [month, weekStartsOn]);
 
@@ -80,11 +75,26 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
     [locale],
   );
 
-  const applyPreset = (preset: DateRangePresetKey) => {
+  // Reopening shows the committed window, not an abandoned half-selection.
+  // Done on the open event rather than in an effect: the draft is only ever
+  // stale between a close and the next open, and nothing renders in between.
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      setDraft(value);
+      setAnchor(null);
+      setMonth(startOfMonth(value.from));
+    }
+    setOpen(next);
+  };
+
+  // A preset stages a window rather than committing it: the reader may want
+  // to narrow the hours, or pick a different one, before anything reloads.
+  const stagePreset = (preset: DateRangePresetKey) => {
     const range = resolvePreset(preset, new Date());
     if (!range) return;
-    onChange(range);
-    setOpen(false);
+    setDraft(range);
+    setAnchor(null);
+    setMonth(startOfMonth(range.to));
   };
 
   const pickDay = (day: Date) => {
@@ -103,12 +113,12 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
   };
 
   const label =
-    activePreset === "custom"
+    committedPreset === "custom"
       ? `${summary.format(value.from)} — ${summary.format(value.to)}`
-      : copy.presets[activePreset];
+      : copy.presets[committedPreset];
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -232,11 +242,11 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
                   type="button"
                   variant="ghost"
                   size="sm"
-                  aria-pressed={activePreset === preset}
+                  aria-pressed={draftPreset === preset}
                   className={`w-full justify-start ${
-                    activePreset === preset ? "bg-selected text-selected-foreground" : ""
+                    draftPreset === preset ? "bg-selected text-selected-foreground" : ""
                   }`}
-                  onClick={() => applyPreset(preset)}
+                  onClick={() => stagePreset(preset)}
                 >
                   {copy.presets[preset]}
                 </Button>

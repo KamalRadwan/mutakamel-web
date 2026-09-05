@@ -35,20 +35,30 @@ export function GaugeVisual({
   const band = bands.find((candidate) => ratio <= candidate.upTo);
   const fill = band ? bandColor(band.tone) : CHART_COLORS.action;
   const remaining = Math.max(0, maximum - value);
+  // What the gap means. Absent, it is simply "not yet" and stays the neutral
+  // grid grey; `danger` says the shortfall is itself the defect — an
+  // unverified domain, not merely an unfilled one — so the unreached arc
+  // reads red while the filled part keeps whatever its band earned.
+  const shortfallIsTheProblem = visual.reference?.remainderTone === "danger";
+  const restColor = shortfallIsTheProblem ? CHART_COLORS.danger : CHART_COLORS.grid;
 
   const arc = [
     { key: "value", name: visual.title, value: ratio, color: fill },
-    { key: "rest", name: t.dashboard.visuals.remaining, value: 1 - ratio, color: CHART_COLORS.grid },
+    { key: "rest", name: t.dashboard.visuals.remaining, value: 1 - ratio, color: restColor },
   ];
 
   const statusText = band
     ? t.dashboard.visuals.bandTone[band.tone]
     : t.dashboard.visuals.noThreshold;
+  // Colour is never the only encoding: a red gap is also said in words.
+  const shortfallText = shortfallIsTheProblem
+    ? ` ${t.dashboard.visuals.remainderNeedsAttention}`
+    : "";
 
   const summary =
     lang === "ar"
-      ? `${visual.title}: ${formatVisualValue(lang, value, visual.unit)} من ${formatVisualValue(lang, maximum, visual.unit)}، أي ${formatChartPercent(lang, ratio)}. الحالة: ${statusText}.`
-      : `${visual.title}: ${formatVisualValue(lang, value, visual.unit)} of ${formatVisualValue(lang, maximum, visual.unit)}, or ${formatChartPercent(lang, ratio)}. Status: ${statusText}.`;
+      ? `${visual.title}: ${formatVisualValue(lang, value, visual.unit)} من ${formatVisualValue(lang, maximum, visual.unit)}، أي ${formatChartPercent(lang, ratio)}. الحالة: ${statusText}.${shortfallText}`
+      : `${visual.title}: ${formatVisualValue(lang, value, visual.unit)} of ${formatVisualValue(lang, maximum, visual.unit)}, or ${formatChartPercent(lang, ratio)}. Status: ${statusText}.${shortfallText}`;
 
   return (
     <ChartFigure
@@ -66,7 +76,7 @@ export function GaugeVisual({
         {
           key: "remaining",
           label: t.dashboard.visuals.remaining,
-          color: CHART_COLORS.grid,
+          color: restColor,
           value: formatVisualValue(lang, remaining, visual.unit),
         },
       ]}

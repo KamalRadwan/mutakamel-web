@@ -59,6 +59,15 @@ interface ChartFigureProps {
   legend?: ChartLegendItem[];
   columns: string[];
   rows: ChartTableRow[];
+  /**
+   * An SVG chart is decorative — the summary and the exact-value table carry
+   * everything it says — so the body is hidden from assistive technology by
+   * default. A body made of real content rather than marks, and especially one
+   * containing links, must pass `false`: `aria-hidden` over a focusable
+   * element hides it from a screen reader without taking it out of the tab
+   * order, which is worse than not hiding it at all.
+   */
+  bodyHidden?: boolean;
   children: ReactNode;
 }
 
@@ -97,6 +106,7 @@ export function ChartFigure({
   legend = [],
   columns,
   rows,
+  bodyHidden = true,
   children,
 }: ChartFigureProps) {
   const titleId = useId();
@@ -136,7 +146,7 @@ export function ChartFigure({
         </ul>
       )}
 
-      <div aria-hidden="true" className="w-full" style={{ height }}>
+      <div aria-hidden={bodyHidden || undefined} className="w-full" style={{ height }}>
         {children}
       </div>
 
