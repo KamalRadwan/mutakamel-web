@@ -89,6 +89,8 @@ const ALL_PERMISSIONS = Array.from(
 );
 const COMMAND_ID_2 = "019ff251-4000-7000-8000-000000000002";
 const OTHER_BRANCH_ID = "019ff251-2000-7000-8000-000000000099";
+const OWNER_ID = "019ff251-1000-7000-8000-000000000002";
+const HEIR_ID = "019ff251-1000-7000-8000-0000000000a1";
 
 describe("useTenantAccess", () => {
   beforeEach(() => {
@@ -115,6 +117,10 @@ describe("useTenantAccess", () => {
     mocks.suspendUser.mockResolvedValue(userFixture({ status: "SUSPENDED" }));
     mocks.activateUser.mockResolvedValue(userFixture({ status: "ACTIVE" }));
     mocks.replaceRoles.mockResolvedValue(userFixture());
+    // The service contract answers a transfer with the *new* owner's view.
+    mocks.transferOwnership.mockResolvedValue(
+      userFixture({ id: HEIR_ID, isTenantOwner: true }),
+    );
     mocks.deleteUser.mockResolvedValue(undefined);
     mocks.restoreUser.mockResolvedValue(
       userFixture({ status: "SUSPENDED", deletedAt: null }),
@@ -399,6 +405,60 @@ describe("useTenantAccess", () => {
       heir,
       expect.any(String),
     );
+  });
+
+  // The transfer answers with the destination's view, so the generic readback
+  // — which only replaces the selected detail when the ids match — leaves the
+  // former owner's open detail showing the seat it no longer holds.
+  it("reloads the former owner's open detail after the seat moves", async () => {
+    const owner = userFixture({ id: OWNER_ID, isTenantOwner: true });
+    mocks.getUser
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce(userFixture({ id: OWNER_ID, isTenantOwner: false }));
+    const { result } = renderHook(() =>
+      useTenantAccess({ tenantId: TENANT_ID, tenantStatus: "ACTIVE" }),
+    );
+    await waitFor(() => expect(result.current.directory.status).toBe("ready"));
+
+    await act(async () => {
+      await result.current.loadUser(OWNER_ID);
+    });
+    expect(result.current.selectedUser.data?.isTenantOwner).toBe(true);
+
+    await act(async () => {
+      await result.current.transferOwnership(owner, HEIR_ID);
+    });
+
+    await waitFor(() => {
+      expect(result.current.selectedUser.data?.id).toBe(OWNER_ID);
+      expect(result.current.selectedUser.data?.isTenantOwner).toBe(false);
+    });
+    expect(mocks.getUser).toHaveBeenCalledTimes(2);
+    expect(mocks.getUser).toHaveBeenLastCalledWith(
+      TENANT_ID,
+      OWNER_ID,
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("leaves an unrelated open detail alone when the seat moves", async () => {
+    const owner = userFixture({ id: OWNER_ID, isTenantOwner: true });
+    const bystander = userFixture();
+    mocks.getUser.mockResolvedValue(bystander);
+    const { result } = renderHook(() =>
+      useTenantAccess({ tenantId: TENANT_ID, tenantStatus: "ACTIVE" }),
+    );
+    await waitFor(() => expect(result.current.directory.status).toBe("ready"));
+
+    await act(async () => {
+      await result.current.loadUser(bystander.id);
+    });
+    await act(async () => {
+      await result.current.transferOwnership(owner, HEIR_ID);
+    });
+
+    expect(result.current.selectedUser.data?.id).toBe(bystander.id);
+    expect(mocks.getUser).toHaveBeenCalledTimes(1);
   });
 
   it("refuses to transfer ownership from a user who does not hold it", async () => {

@@ -194,6 +194,27 @@ open dialog was showing them. Both paths stay inside the existing owner-token
 and generation fences, so a response for a resource the route has moved off is
 still discarded. `useApplication` is the reference implementation.
 
+### A readback keyed on the returned id misses the row the command moved *from*
+
+The common readback helper takes the command's response and replaces the open
+detail when the ids match — right for an update, suspend, or restore, where the
+row acted on is the row returned. It silently does nothing for a command whose
+response is a *different* row than the one the operator had open.
+
+Ownership transfer is that shape: it answers with the new owner, so a transfer
+away from the currently open former owner never matched, and refreshing the
+directory and summary did not repair it. The list showed the seat on B while the
+still-open detail for A kept reporting `isTenantOwner: true` — and that stale
+copy is what owner protection (`isOwnerProtectedCommand`) is decided from, so
+the workspace refused edits to a user who no longer held the seat and offered a
+second transfer from a former owner. Only closing and reopening the detail fixed
+it.
+
+A command with a source and a destination has to refresh both projections, not
+just the one it returned. `transferOwnership` re-reads the former owner through
+`loadUser` — inside the existing request-generation and abort fences — whenever
+that user is the open detail and is not the row the response carried.
+
 ## Source map
 
 - `src/lib/auth/rbac.ts`

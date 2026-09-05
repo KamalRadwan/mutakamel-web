@@ -622,12 +622,23 @@ export function useTenantAccess({
           ),
       );
       await refreshAfterWrite(result);
+      // A transfer answers with the *destination's* view, so the generic
+      // readback — which replaces the selected detail only when the ids match
+      // — never touches the former owner. Left alone, an open A detail keeps
+      // asserting `isTenantOwner: true` while the list and summary already
+      // show the seat on B, and owner protection is decided from that stale
+      // copy. Re-read A under the current request generation instead.
+      if (selectedUser.data?.id === target.id && target.id !== result.id) {
+        await loadUser(target.id);
+      }
       return result;
     },
     [
       execute,
+      loadUser,
       permissions.canTransferOwnership,
       refreshAfterWrite,
+      selectedUser.data?.id,
       tenantId,
     ],
   );
