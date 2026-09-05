@@ -224,4 +224,60 @@ describe("useLoggingConsole", () => {
     await waitFor(() => expect(result.current.directory.state).toBe("STALE"));
     expect(result.current.directory.data?.[0].id).toBe(OVERRIDE_ROW.id);
   });
+
+  /**
+   * FE-AL02. The effective-policy commit had no generation and no binding to
+   * the target it asked about, while the screen leaves the target inputs and
+   * Resolve enabled during the request and labels the result from the current
+   * form. Start a slow resolve for one app, switch to another and resolve
+   * again, and the first answer replaced the second - under the second's label.
+   */
+  it("ignores an effective result for a target the operator has moved off", async () => {
+    let resolveStale: ((value: unknown) => void) | undefined;
+    effectiveMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveStale = resolve;
+          }),
+      )
+      .mockResolvedValue({
+        data: { level: "error", source: "PLATFORM" },
+        correlationId: CORRELATION_ID,
+        timestamp: "2026-08-12T12:32:00.000Z",
+      });
+
+    const { result } = renderHook(() => useLoggingConsole());
+
+    act(() => result.current.setEffectiveDraftField("appName", "core-app"));
+    let stale: Promise<boolean> | undefined;
+    act(() => {
+      stale = result.current.resolveEffective();
+    });
+
+    // The operator moves to another app and resolves again; that one answers.
+    act(() => result.current.setEffectiveDraftField("appName", "crm-app"));
+    await act(async () => {
+      expect(await result.current.resolveEffective()).toBe(true);
+    });
+    expect(result.current.effective.data).toEqual({
+      level: "error",
+      source: "PLATFORM",
+    });
+
+    // The abandoned target answers late.
+    await act(async () => {
+      resolveStale?.({
+        data: { level: "debug", source: "TENANT_APP" },
+        correlationId: CORRELATION_ID,
+        timestamp: "2026-08-12T12:31:00.000Z",
+      });
+      await stale;
+    });
+
+    expect(result.current.effective.data).toEqual({
+      level: "error",
+      source: "PLATFORM",
+    });
+  });
 });

@@ -305,10 +305,16 @@ export function useLoggingConsole() {
     setHistoryRevision((current) => current + 1);
   }, []);
 
+  /** Monotonic, so only the newest resolve may commit. */
+  const effectiveGeneration = useRef(0);
+
   const setEffectiveDraftField = useCallback(
     <K extends keyof EffectiveDraft>(field: K, value: EffectiveDraft[K]) => {
       setEffectiveDraft((current) => ({ ...current, [field]: value }));
       setEffectiveErrors({});
+      // Editing the target invalidates any resolve still in flight: its answer
+      // describes the target the operator has just moved away from.
+      effectiveGeneration.current += 1;
     },
     [],
   );
@@ -321,9 +327,18 @@ export function useLoggingConsole() {
       return false;
     }
     setEffectiveErrors({});
+    // FE-AL02. The commit had no generation and no binding to the target it
+    // asked about, while the screen leaves the target inputs and Resolve
+    // enabled during the request. Start a slow resolve for Core, switch to
+    // Worker and resolve again, and Core's late answer replaced Worker's -
+    // under a Worker label, because the panel names the result from the
+    // current form.
+    const generation = ++effectiveGeneration.current;
+    const isCurrent = () => generation === effectiveGeneration.current;
     setEffective({ ...emptyResource(), ownerId, state: "LOADING" });
     try {
       const result = await loggingApi.effective(built.query);
+      if (!isCurrent()) return false;
       setEffective({
         ownerId,
         data: result.data,
@@ -335,6 +350,7 @@ export function useLoggingConsole() {
       });
       return true;
     } catch (caught) {
+      if (!isCurrent()) return false;
       const normalized = normalizeApiError(caught);
       setEffective({
         ...emptyResource(),
