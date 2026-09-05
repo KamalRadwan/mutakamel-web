@@ -88,6 +88,9 @@ function DashboardPollingHarness() {
       <output data-testid="dashboard-as-of">
         {dashboard.data?.asOf ?? "not-loaded"}
       </output>
+      <output data-testid="dashboard-tenants">
+        {dashboard.data?.tenants ? "tenants-report" : "no-tenants-report"}
+      </output>
     </div>
   );
 }
@@ -197,6 +200,46 @@ describe("useDashboardData guarded polling", () => {
     expect(screen.getByTestId("refresh-paused")).toHaveTextContent("false");
     await advance(30_000);
     expect(api.get).toHaveBeenCalledTimes(4);
+  });
+
+  /**
+   * An operator's tenants permission is withdrawn while they have the
+   * dashboard open. The next answer stops authorizing that report; the numbers
+   * already on screen must go with it, not wait for a reload.
+   */
+  it("stops showing a report the newest answer no longer authorizes", async () => {
+    const authorized = {
+      ...DASHBOARD_FIXTURE,
+      authorizedGroups: ["tenants", "storage"],
+      loadedGroups: ["tenants", "storage"],
+      tenants: { key: "tenants", available: true },
+      storage: { key: "storage", available: true },
+    };
+    const withdrawn = {
+      ...DASHBOARD_FIXTURE,
+      authorizedGroups: ["storage"],
+      loadedGroups: ["storage"],
+      storage: { key: "storage", available: true },
+    };
+    api.get
+      .mockReset()
+      .mockResolvedValueOnce({ data: authorized })
+      .mockResolvedValue({ data: withdrawn });
+
+    render(<DashboardPollingHarness />);
+    await advance(0);
+    expect(screen.getByTestId("dashboard-tenants")).toHaveTextContent(
+      "tenants-report",
+    );
+
+    // A subject fetch is scoped, so the withdrawn report is absent from the
+    // payload for two different reasons at once — that is the trap.
+    fireEvent.click(screen.getByRole("button", { name: "Open storage tab" }));
+    await advance(0);
+
+    expect(screen.getByTestId("dashboard-tenants")).toHaveTextContent(
+      "no-tenants-report",
+    );
   });
 
   it("keeps the newer range response when an older request resolves last", async () => {
@@ -444,6 +487,60 @@ describe("per-tab group scoping", () => {
       expect(merged.overview.tenantBillingGrowth).toBeDefined();
       // The group data still comes from the newer, scoped response.
       expect(merged.storage).toBe(thin.storage);
+    });
+
+    /**
+     * A carried group is only ever a saving of one request. It is not a right
+     * to keep looking at a report the newest answer says this actor may no
+     * longer see — a role edited mid-session must take effect on the next
+     * answer, not on the next full reload.
+     */
+    it("drops a carried group the new response no longer authorizes", () => {
+      const rich = {
+        ...previous,
+        overview: {
+          kpis: [{ key: "total-tenants" }],
+          recentTenants: { items: [{ id: "tenant-1" }] },
+        },
+      } as unknown as DashboardResponse;
+      const withdrawn = {
+        asOf: "b",
+        authorizedGroups: ["storage"],
+        loadedGroups: ["storage"],
+        storage: { key: "storage", available: true, asOf: "b" },
+        overview: { kpis: [] },
+      } as unknown as DashboardResponse;
+
+      const merged = mergeDashboardGroups(rich, withdrawn, true);
+
+      expect(merged.tenants).toBeUndefined();
+      expect(merged.storage).toBe(withdrawn.storage);
+      // The fuller overview is a scoped-response allowance, not a permission
+      // override: it still names tenants that are no longer authorized.
+      expect(merged.overview).toBe(withdrawn.overview);
+    });
+
+    /**
+     * `loadedGroups` shorter than the *previous* authorized set is what a
+     * withdrawal looks like as well as what a scoped fetch looks like, so the
+     * comparison has to be against the set the new answer authorizes.
+     */
+    it("does not read a withdrawal as a scoped response", () => {
+      const rich = {
+        ...previous,
+        overview: { kpis: [{ key: "total-tenants" }] },
+      } as unknown as DashboardResponse;
+      const withdrawn = {
+        asOf: "b",
+        authorizedGroups: ["storage"],
+        loadedGroups: ["storage"],
+        storage: { key: "storage", available: true },
+        overview: { kpis: [{ key: "storage-used" }] },
+      } as unknown as DashboardResponse;
+
+      expect(mergeDashboardGroups(rich, withdrawn, true).overview).toBe(
+        withdrawn.overview,
+      );
     });
 
     it("takes the new overview when the response was not scoped", () => {

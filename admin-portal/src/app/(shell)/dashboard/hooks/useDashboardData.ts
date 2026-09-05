@@ -39,6 +39,12 @@ export function rangeSignature(query: AdminDashboardQuery): string {
 /**
  * Keeps groups the new response did not carry, so switching tabs does not
  * blank the ones already fetched for the same window.
+ *
+ * Carrying is a saving of one request, never a licence to keep a report the
+ * newest answer stopped authorizing. `authorizedGroups` is the authority on
+ * every merge, and it is the *new* one that governs: a scoped fetch and a
+ * withdrawn permission both leave a group out of the payload, so absence alone
+ * says nothing.
  */
 export function mergeDashboardGroups(
   previous: DashboardResponse | null,
@@ -50,9 +56,11 @@ export function mergeDashboardGroups(
   // returns the full set, so there is nothing to carry over.
   const loaded = next.loadedGroups;
   if (!Array.isArray(loaded)) return next;
+  if (!Array.isArray(next.authorizedGroups)) return next;
+  const authorized = new Set<DashboardGroupKey>(next.authorizedGroups);
   const carried: Partial<Record<DashboardGroupKey, unknown>> = {};
   for (const key of previous.authorizedGroups) {
-    if (loaded.includes(key)) continue;
+    if (loaded.includes(key) || !authorized.has(key)) continue;
     const group = previous[key];
     if (group) carried[key] = group;
   }
@@ -62,8 +70,17 @@ export function mergeDashboardGroups(
   // or recent-tenants block at all. Letting it win would mean opening one tab
   // and finding the overview had lost half its panels on the way back, so the
   // fuller overview from the unscoped load is kept.
-  const scoped = loaded.length < previous.authorizedGroups.length;
-  const overview = scoped ? previous.overview : next.overview;
+  //
+  // Only while the actor may still see everything it was built from, though.
+  // Measured against the previous authorized set, a withdrawal is
+  // indistinguishable from a scope, and the older overview names tenants and
+  // KPIs drawn from reports that are now refused.
+  const authorizationUnchanged =
+    previous.authorizedGroups.length === authorized.size &&
+    previous.authorizedGroups.every((key) => authorized.has(key));
+  const scoped = loaded.length < authorized.size;
+  const overview =
+    scoped && authorizationUnchanged ? previous.overview : next.overview;
 
   return { ...carried, ...next, overview } as DashboardResponse;
 }

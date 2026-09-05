@@ -187,6 +187,37 @@ type AdminDashboardData = {
 13. Do not infer runtime health from ACTIVE/OFFLINE registry values.
 14. Do not add a health group in this implementation.
 15. Do not create a `/v2` endpoint or a second dashboard endpoint.
+16. Re-apply rule 1 to every answer. A group cached from an earlier answer is
+    discarded unless the newest `authorizedGroups` still names it.
+
+### Carried groups and the withdrawal case
+
+One subject tab is on screen at a time, so the portal asks for that subject's
+reports with `?groups=`, and Core replies with `loadedGroups` naming what it
+actually built. Groups the reply left out are carried forward from the previous
+answer for the same reporting window, so returning to a tab does not re-fetch
+what is already held. A response carrying no `loadedGroups` predates the
+parameter and always holds the full set, so nothing is carried over it.
+
+Absence in the payload is ambiguous: a report is missing both when it was out of
+scope and when the actor may no longer see it. Only `authorizedGroups` separates
+the two, and it is the new one that governs — a role edited mid-session must
+take effect on the next answer, not on the next full reload. So carrying
+intersects with the new authorized set, and a report withdrawn between two
+answers leaves the screen with the answer that withdrew it.
+
+The same ambiguity governs `overview`. Core filters it to the groups it loaded,
+so a scoped reply carries a deliberately thinner one, and the fuller unscoped
+overview is kept rather than letting a tab visit strip half the panels. That
+allowance holds only while the authorized set is unchanged: measured against the
+*previous* set a withdrawal looks exactly like a scope, and the retained
+overview still names tenants and KPIs drawn from reports that are now refused.
+Once the authorized set changes, the new overview wins whether or not it is
+thinner.
+
+This is a display-correctness rule, not an access control. The server already
+refuses to send what it does not authorize; the client's duty is to stop showing
+what it was sent before.
 
 
 ## DTOs (Migrated from dtos.md)
