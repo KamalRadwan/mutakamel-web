@@ -1,7 +1,14 @@
 "use client";
 
-import { useId, useState, type FormEvent } from "react";
-import { FlaskConical, Loader2, ShieldAlert, X } from "lucide-react";
+import { useId, useRef, useState, type FormEvent } from "react";
+import { FlaskConical, Loader2, ShieldAlert } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/design-system";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { readFleetHealth } from "../model/migration-outcomes";
 import {
@@ -49,7 +56,7 @@ export function StartMigrationDialog({
   onClose,
   onStart,
 }: StartMigrationDialogProps) {
-  const titleId = useId();
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const fieldId = useId();
   const [mode, setMode] = useState<MigrationRunMode>("DRY_RUN");
   const [scope, setScope] = useState<MigrationRunScope>(defaultScope);
@@ -138,35 +145,40 @@ export function StartMigrationDialog({
       : copy.confirmSingleBody(tenantId.trim(), applicationKey.trim());
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-xs"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.currentTarget === event.target && !isSubmitting) onClose();
+    // Radix, not a hand-rolled overlay. The previous markup was a plain div
+    // with role="dialog": no Escape handler, no focus trap, no focus return,
+    // no portal and no scroll lock, so the only way out was the mouse.
+    // onOpenChange is what routes both Escape and an outside click.
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next && !isSubmitting) onClose();
       }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="relative my-6 w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+      <DialogContent
+        showCloseButton={!isSubmitting}
+        className="max-w-2xl"
+        onOpenAutoFocus={() => {
+          returnFocusRef.current =
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          // isConnected matters: if the trigger unmounted while the dialog was
+          // open, fall back to Radix's own restore rather than focusing a
+          // detached node and dropping focus to <body>.
+          const returnTarget = returnFocusRef.current;
+          if (!returnTarget?.isConnected) return;
+          event.preventDefault();
+          returnTarget.focus();
+          returnFocusRef.current = null;
+        }}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={isSubmitting}
-          aria-label={copy.close}
-          className="absolute end-4 top-4 rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-        >
-          <X className="size-4" aria-hidden="true" />
-        </button>
-
-        <h2 id={titleId} className="text-lg font-black">
-          {copy.startTitle}
-        </h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-          {copy.startHelp}
-        </p>
+        <DialogHeader>
+          <DialogTitle>{copy.startTitle}</DialogTitle>
+          <DialogDescription>{copy.startHelp}</DialogDescription>
+        </DialogHeader>
 
         <form
           className="mt-5 space-y-5"
@@ -407,7 +419,7 @@ export function StartMigrationDialog({
             </button>
           </div>
         </form>
-      </div>
+      </DialogContent>
 
       <DestructiveActionModal
         isOpen={confirming}
@@ -434,7 +446,7 @@ export function StartMigrationDialog({
         confirmLabel={copy.startApply}
         submittingLabel={copy.starting}
       />
-    </div>
+    </Dialog>
   );
 }
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -10,7 +10,12 @@ import type {
 } from "../types/database-migrations";
 
 const { languageMock, overviewMock } = vi.hoisted(() => ({
-  languageMock: { lang: "en" as "en" | "ar", dir: "ltr" as "ltr" | "rtl" },
+  languageMock: {
+    lang: "en" as "en" | "ar",
+    dir: "ltr" as "ltr" | "rtl",
+    // The Dialog primitive labels its close button from here.
+    t: { common: { cancel: "Cancel", close: "Close" } },
+  },
   overviewMock: {
     permissions: {
       canRead: true,
@@ -48,7 +53,12 @@ const { languageMock, overviewMock } = vi.hoisted(() => ({
 vi.mock("@/components/layout/Navbar", () => ({
   Navbar: () => <nav aria-label="Admin navigation">Admin navigation</nav>,
 }));
-vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => languageMock }));
+// The Dialog primitive reads useOptionalI18n for its close-button label, so a
+// mock supplying only useI18n breaks any component rendering a real dialog.
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => languageMock,
+  useOptionalI18n: () => languageMock,
+}));
 vi.mock("../hooks/use-migrations-overview", () => ({
   useMigrationsOverview: () => overviewMock,
 }));
@@ -421,5 +431,33 @@ describe("MigrationsOverviewScreen dry-run dialog", () => {
 
     expect(screen.getByRole("radio", { name: /Single tenant/ })).toBeChecked();
     expect(screen.getByLabelText("Tenant ID")).toHaveValue("tenant-a");
+  });
+
+  /**
+   * UI-008 / UI-002. The dialog used to be a plain div with role="dialog"
+   * inside a hand-rolled overlay: no Escape handler, no focus trap, no focus
+   * return, no portal and no scroll lock, so the only way out was the mouse and
+   * closing it dropped focus to <body>. It now uses the Radix primitive, which
+   * routes Escape and outside clicks through onOpenChange.
+   */
+  it("closes on Escape and returns focus to the trigger", async () => {
+    render(<MigrationsOverviewScreen />);
+    const trigger = screen.getByRole("button", { name: /Run a migration/ });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Run a migration",
+    });
+    expect(dialog).toBeInTheDocument();
+
+    fireEvent.keyDown(dialog, { key: "Escape", code: "Escape" });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Run a migration" }),
+      ).not.toBeInTheDocument();
+    });
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });
