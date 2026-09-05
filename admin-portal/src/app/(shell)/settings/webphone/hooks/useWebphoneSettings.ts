@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { notifyWebphoneChanged } from "@mutakamel/webphone";
 import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -471,11 +472,41 @@ function classifyLoadError(error: NormalizedApiError): SettingsLoadState {
 }
 
 /**
+ * Distinguishes one TURN credential from another without being one.
+ *
+ * The salt is drawn once per page load and never leaves this module: it is not
+ * sent, stored, or logged, so a marker that somehow escaped could not be
+ * matched against a guessed credential. Within one load it is constant, which
+ * is what makes the marker stable for an exact retry.
+ */
+const CREDENTIAL_MARKER_SALT = generateUUIDv7();
+
+/**
  * The idempotency fingerprint is derived from the request body, so secrets are
  * stripped before it is built. A TURN credential must not sit in component
  * state one moment longer than the request that carries it.
+ *
+ * It is replaced by a digest rather than a constant, because the fingerprint
+ * has two jobs and a constant only does one of them. `"[set]"` kept the secret
+ * out, and made every non-empty credential look like the same intent: after an
+ * ambiguous save of credential A, changing only the credential to B reused A's
+ * idempotency key, and the Gateway — which hashes the real body — refused the
+ * retry as a mismatch. The operator's first attempt to replace the credential
+ * failed for a reason no part of the screen could explain.
  */
 function redactCredential(dto: { credential?: string | null }): unknown {
   const { credential, ...rest } = dto;
-  return { ...rest, credential: credential ? "[set]" : credential };
+  return {
+    ...rest,
+    credential: credential ? credentialMarker(credential) : credential,
+  };
+}
+
+function credentialMarker(credential: string): string {
+  const digest = sha256(
+    new TextEncoder().encode(`${CREDENTIAL_MARKER_SALT}:${credential}`),
+  );
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
 }

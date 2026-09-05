@@ -69,6 +69,19 @@ revision keeps its key, so retrying reconciles that same probe; saving a new
 revision retires it, so the next probe is a real probe and cannot render an
 older configuration's `{verified:true}` as a result for the one on screen.
 
+### A redacted body still has to distinguish two secrets
+
+A fingerprint built from the request body must never contain a secret and must
+still tell two different secrets apart. Replacing every secret with one constant
+marker satisfies the first and breaks the second: two different values look like
+one intent, so a retry after an ambiguous save reuses the previous value's key,
+and the Gateway — which hashes the real body — answers `GW.IDEM.MISMATCH`.
+
+Digest the secret instead. `useWebphoneSettings.ts` fingerprints a TURN
+credential as SHA-256 over a per-page-load random salt and the value: stable for
+an exact retry, different for a different credential, and worthless without the
+salt, which never leaves the module and is never sent, stored, or logged.
+
 ## Required API states
 
 Each query owns:
