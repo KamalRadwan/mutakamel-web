@@ -589,6 +589,17 @@ A price ladder starts at user 1, is contiguous, has no gaps/overlaps, and has
 exactly one open-ended final bracket. Prices remain decimal strings and are
 returned with four fractional digits.
 
+**Deleting a bracket re-seats the ladder it leaves behind.** Those three rules
+are enforced on save, but only the maximum of the *final* bracket is beyond
+repair on screen: that input is disabled, because the final bracket is the
+open-ended one. Removing the open-ended row used to leave the finite bound of
+the row above it standing as the new last bound, so every save was refused for
+a value no field could reach and the editor had to be abandoned. Deletion now
+re-derives the ladder exactly as the validator reads it — first bracket starts
+at 1, each later start is the previous maximum plus one, and the final maximum
+is cleared to open-ended — so any single deletion still leaves a saveable
+ladder.
+
 `crm.outbound_email` grant config must contain exactly:
 
 ```ts

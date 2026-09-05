@@ -61,6 +61,25 @@ interface Props {
 const decimalPattern = /^\d{1,18}(?:\.\d{1,4})?$/;
 const CRM_OUTBOUND_EMAIL_DEFAULT_CONFIG = JSON.stringify({ dailyQuota: 1000, rateLimitPerMin: 30 });
 
+/**
+ * Re-seats a ladder after a row is removed from it.
+ *
+ * The last row's maximum is not an editable field — the final bracket is the
+ * open-ended one, so its input is disabled — and `validateAndSavePrices`
+ * refuses any finite bound there. Removing the open-ended row therefore left
+ * the bound of the row above it standing on a field nothing on screen could
+ * reach: the save was refused every time and the value it complained about was
+ * not editable. Starts are derived the way the validator derives them, so a
+ * deletion anywhere in the ladder leaves a shape that can still be saved.
+ */
+export function reseatBracketLadder(rows: PriceTierInput[]): PriceTierInput[] {
+  return rows.map((row, index) => ({
+    ...row,
+    minUsers: index === 0 ? 1 : (rows[index - 1].maxUsers ?? 0) + 1,
+    maxUsers: index === rows.length - 1 ? null : row.maxUsers,
+  }));
+}
+
 export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, canRead, canCreate, canMutate }: Props) {
   const { lang, dir } = useI18n();
   const copy = catalogueCopy(lang);
@@ -472,7 +491,9 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                           aria-label={copy.removeBracket(index + 1)}
                           onClick={() => {
                             setFormError(null);
-                            setBrackets((current) => current.filter((_, rowIndex) => rowIndex !== index));
+                            setBrackets((current) => reseatBracketLadder(
+                              current.filter((_, rowIndex) => rowIndex !== index),
+                            ));
                           }}
                           className="self-end text-destructive"
                         >
