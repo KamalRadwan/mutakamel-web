@@ -527,8 +527,7 @@ function ReportBody({
         copy={copy}
         lang={lang}
         isRefreshing={report.isRefreshing}
-        previousTenantPage={report.previousTenantPage}
-        nextTenantPage={report.nextTenantPage}
+        goToTenantPage={report.goToTenantPage}
       />
       <SnapshotFooter data={report.data} copy={copy} lang={lang} />
     </div>
@@ -540,15 +539,13 @@ function ReportView({
   copy,
   lang,
   isRefreshing,
-  previousTenantPage,
-  nextTenantPage,
+  goToTenantPage,
 }: {
   data: ReportData;
   copy: Copy;
   lang: "ar" | "en";
   isRefreshing: boolean;
-  previousTenantPage: () => void;
-  nextTenantPage: () => void;
+  goToTenantPage: (target: number) => void;
 }) {
   switch (data.kind) {
     case "OVERVIEW":
@@ -560,8 +557,7 @@ function ReportView({
           copy={copy}
           lang={lang}
           isRefreshing={isRefreshing}
-          previous={previousTenantPage}
-          next={nextTenantPage}
+          goToPage={goToTenantPage}
         />
       );
     case "SERVERS":
@@ -649,15 +645,13 @@ function TenantView({
   copy,
   lang,
   isRefreshing,
-  previous,
-  next,
+  goToPage,
 }: {
   data: TenantReportPage;
   copy: Copy;
   lang: "ar" | "en";
   isRefreshing: boolean;
-  previous: () => void;
-  next: () => void;
+  goToPage: (target: number) => void;
 }) {
   const columns: ColumnDef<TenantReportRow>[] = [
     {
@@ -727,7 +721,10 @@ function TenantView({
         limit: data.limit,
         totalItems: data.total,
         totalPages: Math.max(1, data.totalPages),
-        onPageChange: (target) => (target > data.page ? next() : previous()),
+        // The table hands over the page the operator actually asked for, so
+        // First, Last and any numbered page land there. Reducing it to a
+        // forward/back decision made every one of them a single step.
+        onPageChange: goToPage,
       }}
       emptyState={{ titleEn: copy.empty, titleAr: copy.empty }}
     />

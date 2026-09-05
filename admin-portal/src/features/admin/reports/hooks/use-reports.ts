@@ -216,6 +216,26 @@ export function useReports() {
     setTenantPage((current) => current + 1);
   }, [data]);
 
+  /**
+   * FE-B03. The table's onPageChange only ever asked "forward or back" and
+   * called next/previous, so First, Last and any numbered page moved a single
+   * step - clicking page 9 from page 1 went to page 2, and Last was
+   * indistinguishable from Next. A report of any size was effectively
+   * unreachable past its second page.
+   *
+   * Clamped to the reported page count, so a stale render cannot request a
+   * page the current snapshot does not have.
+   */
+  const goToTenantPage = useCallback(
+    (target: number) => {
+      if (data?.kind !== "TENANTS") return;
+      const totalPages = Math.max(1, data.snapshot.data.totalPages);
+      const clamped = Math.min(Math.max(1, Math.trunc(target)), totalPages);
+      setTenantPage(clamped);
+    },
+    [data],
+  );
+
   const visibleState: ReportsRequestState = isAuthLoading
     ? "LOADING"
     : !canRead
@@ -242,6 +262,7 @@ export function useReports() {
       refresh,
       previousTenantPage,
       nextTenantPage,
+      goToTenantPage,
     }),
     [
       activeReport,
@@ -250,6 +271,7 @@ export function useReports() {
       draft,
       error,
       isRefreshing,
+      goToTenantPage,
       nextTenantPage,
       previousTenantPage,
       refresh,

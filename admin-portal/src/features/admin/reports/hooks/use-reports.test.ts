@@ -175,4 +175,55 @@ describe("useReports", () => {
     await waitFor(() => expect(result.current.requestState).toBe("ERROR"));
     expect(result.current.error?.message).toBe("INVALID_ADMIN_REPORT_RESPONSE");
   });
+
+  /**
+   * FE-B03. The table's onPageChange only ever asked "forward or back" and
+   * called next/previous, so First, Last and any numbered page moved a single
+   * step: clicking page 9 from page 1 landed on page 2, and Last was
+   * indistinguishable from Next. A report of any size was unreachable past its
+   * second page.
+   */
+  it("jumps to the requested tenant report page, clamped to the page count", async () => {
+    tenantsMock.mockResolvedValue(
+      snapshot({
+        items: [],
+        total: 180,
+        page: 1,
+        limit: 20,
+        totalPages: 9,
+        hasNext: true,
+        hasPrev: false,
+      }),
+    );
+
+    const { result } = renderHook(() => useReports());
+    act(() => result.current.setActiveReport("TENANTS"));
+    await waitFor(() => expect(tenantsMock).toHaveBeenCalled());
+
+    act(() => result.current.goToTenantPage(9));
+    await waitFor(() =>
+      expect(tenantsMock).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 9 }),
+        expect.anything(),
+      ),
+    );
+
+    // Out of range in either direction resolves to the nearest real page, so a
+    // stale render cannot ask for one the snapshot does not have.
+    act(() => result.current.goToTenantPage(99));
+    await waitFor(() =>
+      expect(tenantsMock).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 9 }),
+        expect.anything(),
+      ),
+    );
+
+    act(() => result.current.goToTenantPage(0));
+    await waitFor(() =>
+      expect(tenantsMock).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1 }),
+        expect.anything(),
+      ),
+    );
+  });
 });
