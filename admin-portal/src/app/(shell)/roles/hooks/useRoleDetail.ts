@@ -35,6 +35,18 @@ interface OwnedIntent<T> {
   ambiguous: boolean;
 }
 
+/**
+ * Which editor a server-confirmed role belongs to.
+ *
+ * The page carries two independent forms with their own Save buttons, and each
+ * write answers with the whole role. Adopting all of it would let one editor's
+ * success overwrite whatever the operator had typed or ticked in the other and
+ * silently clear its dirty flag, so a response only overwrites the editor that
+ * submitted it. The editor that did not submit still takes the new baseline —
+ * it just keeps its unsaved draft on top of it, and stays dirty against it.
+ */
+type RoleApplyScope = "all" | "metadata" | "permissions";
+
 export function useRoleDetail(id: string) {
   const router = useRouter();
   const { lang, t } = useI18n();
@@ -78,45 +90,75 @@ export function useRoleDetail(id: string) {
   const permissionsIntentRef =
     useRef<OwnedIntent<ReplaceRolePermissionsCommand> | null>(null);
 
-  const applyAuthoritativeRole = useCallback((next: AdminRole) => {
-    setRole(next);
-    setOriginalName(next.name);
-    setOriginalDescription(next.description ?? "");
-    const metadataIntent = metadataIntentRef.current;
-    const metadataConfirmed =
-      metadataIntent?.ambiguous === true &&
-      next.name === metadataIntent.command.name &&
-      next.description === metadataIntent.command.description;
-    if (metadataConfirmed) {
-      metadataIntentRef.current = null;
-      setMetadataAmbiguous(false);
-      setMetadataError(null);
-      setMetadataIdempotencyKey(undefined);
-    }
-    if (!metadataIntent?.ambiguous || metadataConfirmed) {
-      setName(next.name);
-      setDescription(next.description ?? "");
-    }
+  // The baselines the drafts below are currently dirty against. Held as refs so
+  // that applying a role can tell an untouched editor (safe to refresh in
+  // place) from one carrying unsaved work, without re-creating this callback on
+  // every keystroke.
+  const baselineNameRef = useRef("");
+  const baselineDescriptionRef = useRef("");
+  const baselinePermissionIdsRef = useRef<readonly string[]>([]);
 
-    const authoritativeIds = new Set(next.permissionIds);
-    setOriginalPermissionIds(authoritativeIds);
-    const permissionsIntent = permissionsIntentRef.current;
-    const permissionsConfirmed =
-      permissionsIntent?.ambiguous === true &&
-      sameStringSet(
-        next.permissionIds,
-        permissionsIntent.command.permissionIds,
-      );
-    if (permissionsConfirmed) {
-      permissionsIntentRef.current = null;
-      setPermissionsAmbiguous(false);
-      setPermissionsError(null);
-      setPermissionsIdempotencyKey(undefined);
-    }
-    if (!permissionsIntent?.ambiguous || permissionsConfirmed) {
-      setAssignedPermissions(authoritativeIds);
-    }
-  }, []);
+  const applyAuthoritativeRole = useCallback(
+    (next: AdminRole, scope: RoleApplyScope) => {
+      setRole(next);
+      const previousName = baselineNameRef.current;
+      const previousDescription = baselineDescriptionRef.current;
+      const nextDescription = next.description ?? "";
+      baselineNameRef.current = next.name;
+      baselineDescriptionRef.current = nextDescription;
+      setOriginalName(next.name);
+      setOriginalDescription(nextDescription);
+      const metadataIntent = metadataIntentRef.current;
+      const metadataConfirmed =
+        metadataIntent?.ambiguous === true &&
+        next.name === metadataIntent.command.name &&
+        next.description === metadataIntent.command.description;
+      if (metadataConfirmed) {
+        metadataIntentRef.current = null;
+        setMetadataAmbiguous(false);
+        setMetadataError(null);
+        setMetadataIdempotencyKey(undefined);
+      }
+      const ownsMetadata = scope === "all" || scope === "metadata";
+      if (!metadataIntent?.ambiguous || metadataConfirmed) {
+        setName((current) =>
+          ownsMetadata || current === previousName ? next.name : current,
+        );
+        setDescription((current) =>
+          ownsMetadata || current === previousDescription
+            ? nextDescription
+            : current,
+        );
+      }
+
+      const authoritativeIds = new Set(next.permissionIds);
+      const previousPermissionIds = baselinePermissionIdsRef.current;
+      baselinePermissionIdsRef.current = next.permissionIds;
+      setOriginalPermissionIds(authoritativeIds);
+      const permissionsIntent = permissionsIntentRef.current;
+      const permissionsConfirmed =
+        permissionsIntent?.ambiguous === true &&
+        sameStringSet(
+          next.permissionIds,
+          permissionsIntent.command.permissionIds,
+        );
+      if (permissionsConfirmed) {
+        permissionsIntentRef.current = null;
+        setPermissionsAmbiguous(false);
+        setPermissionsError(null);
+        setPermissionsIdempotencyKey(undefined);
+      }
+      const ownsPermissions = scope === "all" || scope === "permissions";
+      if (!permissionsIntent?.ambiguous || permissionsConfirmed) {
+        setAssignedPermissions((current) =>
+          ownsPermissions || sameStringSet([...current], previousPermissionIds)
+            ? authoritativeIds
+            : current,
+        );
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -126,7 +168,7 @@ export function useRoleDetail(id: string) {
       setRoleError(null);
       try {
         const result = await rolesApi.get(id, controller.signal);
-        if (!disposed) applyAuthoritativeRole(result.data);
+        if (!disposed) applyAuthoritativeRole(result.data, "all");
       } catch (caught) {
         if (!disposed && !isAbortError(caught)) {
           setRoleError(normalizeApiError(caught));
@@ -244,7 +286,7 @@ export function useRoleDetail(id: string) {
       metadataIntentRef.current = null;
       setMetadataAmbiguous(false);
       setMetadataIdempotencyKey(undefined);
-      applyAuthoritativeRole(result.data);
+      applyAuthoritativeRole(result.data, "metadata");
       toast.success(t.roles.metadataSavedTitle, t.roles.metadataSavedDesc);
     } catch (caught) {
       const error = normalizeApiError(caught);
@@ -308,7 +350,7 @@ export function useRoleDetail(id: string) {
       permissionsIntentRef.current = null;
       setPermissionsAmbiguous(false);
       setPermissionsIdempotencyKey(undefined);
-      applyAuthoritativeRole(result.data);
+      applyAuthoritativeRole(result.data, "permissions");
       toast.success(t.roles.permissionsSavedTitle, t.roles.permissionsSavedDesc);
     } catch (caught) {
       const error = normalizeApiError(caught);

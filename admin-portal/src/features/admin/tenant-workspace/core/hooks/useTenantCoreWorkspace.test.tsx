@@ -278,6 +278,51 @@ describe("useTenantCoreWorkspace profile and destructive actions", () => {
     expect(result.current.profileStale).toBe(true);
   });
 
+  // Suspending is not the profile editor's write, so its response must not
+  // overwrite a profile form the operator had already started filling in.
+  it.each([
+    ["suspend", "SUSPENDED"],
+    ["activate", "ACTIVE"],
+  ] as const)(
+    "keeps an unsaved profile draft across %s",
+    async (command, nextStatus) => {
+      api[command].mockResolvedValue(
+        tenantFixture(nextStatus, { updatedAt: NEXT_UPDATED_AT }),
+      );
+      const { result } = renderHook(() => useTenantCoreWorkspace(TENANT_ID));
+      await waitFor(() => expect(result.current.profileDraft).not.toBeNull());
+
+      act(() => result.current.updateProfileDraft({ industry: "Finance" }));
+      await act(async () => {
+        await result.current[command]();
+      });
+
+      expect(result.current.tenant?.status).toBe(nextStatus);
+      expect(result.current.profileDraft?.industry).toBe("Finance");
+      expect(result.current.profileDirty).toBe(true);
+      expect(result.current.profileStale).toBe(true);
+    },
+  );
+
+  it("refreshes an untouched profile draft from a lifecycle response", async () => {
+    api.suspend.mockResolvedValue(
+      tenantFixture("SUSPENDED", {
+        industry: "Changed elsewhere",
+        updatedAt: NEXT_UPDATED_AT,
+      }),
+    );
+    const { result } = renderHook(() => useTenantCoreWorkspace(TENANT_ID));
+    await waitFor(() => expect(result.current.profileDraft).not.toBeNull());
+
+    await act(async () => {
+      await result.current.suspend();
+    });
+
+    expect(result.current.profileDraft?.industry).toBe("Changed elsewhere");
+    expect(result.current.profileDirty).toBe(false);
+    expect(result.current.profileStale).toBe(false);
+  });
+
   it("reuses a caller key for an ambiguous exact retry", async () => {
     api.updateProfile.mockRejectedValue(
       normalizedError(503, "TEMPORARY", "Try again"),

@@ -1063,6 +1063,14 @@ updated `TenantView` and invalidate the tenant-host cache.
 Suspension blocks normal tenant application access but does not mean the
 tenant is deleted. Admin Portal access remains independently authorized.
 
+A lifecycle response is not the profile editor's write. Suspend, activate, and
+restore each answer with the whole `TenantView`, but seeding the profile draft
+from one discarded whatever the operator had already typed into the profile
+form. They now follow the same rule as a background refresh: an untouched draft
+is refreshed in place, and a dirty one is kept and marked stale so the operator
+can compare and reload deliberately. Only `PATCH /tenants/:id` — the profile
+editor's own write — reseeds the draft unconditionally.
+
 ### Retry and cancel provisioning
 
 The two tenant-level compatibility routes return:

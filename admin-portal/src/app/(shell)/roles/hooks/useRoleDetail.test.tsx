@@ -190,6 +190,95 @@ describe("useRoleDetail", () => {
     expect(hook.current.permissionsDirty).toBe(false);
   });
 
+  // Metadata and permissions are two forms with two Save buttons, and each
+  // write answers with the whole role. Whichever one is saved must leave the
+  // other operator's unsaved work — and its dirty flag — exactly where it was.
+  describe("independent editors", () => {
+    const bothPermissions = ["admin.roles.update", "admin.roles.critical"];
+    const twoPermissionCatalogue = [
+      permission,
+      { ...permission, id: SECOND_PERMISSION_ID, key: "admin.billing.update" },
+    ];
+
+    it("keeps an unsaved name when the permission editor saves", async () => {
+      authMock.user.permissions = bothPermissions;
+      vi.mocked(rolesApi.permissions).mockResolvedValue(
+        result(twoPermissionCatalogue),
+      );
+      vi.mocked(rolesApi.replacePermissions).mockResolvedValue(
+        result({ ...role, permissionIds: [PERMISSION_ID, SECOND_PERMISSION_ID] }),
+      );
+      const { result: hook } = renderHook(() => useRoleDetail(ROLE_ID));
+      await waitFor(() => expect(hook.current.catalogueLength).toBe(2));
+
+      act(() => {
+        hook.current.setName("Renamed role");
+        hook.current.setDescription("Draft description");
+        hook.current.togglePermission(SECOND_PERMISSION_ID);
+      });
+      await act(async () => hook.current.savePermissions());
+
+      expect(rolesApi.update).not.toHaveBeenCalled();
+      expect(hook.current.name).toBe("Renamed role");
+      expect(hook.current.description).toBe("Draft description");
+      expect(hook.current.metadataDirty).toBe(true);
+      expect(hook.current.assignedPermissions).toEqual(
+        new Set([PERMISSION_ID, SECOND_PERMISSION_ID]),
+      );
+      expect(hook.current.permissionsDirty).toBe(false);
+    });
+
+    it("keeps an unsaved permission selection when the metadata editor saves", async () => {
+      authMock.user.permissions = bothPermissions;
+      vi.mocked(rolesApi.permissions).mockResolvedValue(
+        result(twoPermissionCatalogue),
+      );
+      vi.mocked(rolesApi.update).mockResolvedValue(
+        result({ ...role, name: "Renamed role", description: "Saved" }),
+      );
+      const { result: hook } = renderHook(() => useRoleDetail(ROLE_ID));
+      await waitFor(() => expect(hook.current.catalogueLength).toBe(2));
+
+      act(() => {
+        hook.current.setName("Renamed role");
+        hook.current.setDescription("Saved");
+        hook.current.togglePermission(SECOND_PERMISSION_ID);
+      });
+      await act(async () => hook.current.saveMetadata());
+
+      expect(rolesApi.replacePermissions).not.toHaveBeenCalled();
+      expect(hook.current.assignedPermissions).toEqual(
+        new Set([PERMISSION_ID, SECOND_PERMISSION_ID]),
+      );
+      expect(hook.current.permissionsDirty).toBe(true);
+      expect(hook.current.name).toBe("Renamed role");
+      expect(hook.current.metadataDirty).toBe(false);
+    });
+
+    it("refreshes an untouched editor from the other editor's response", async () => {
+      authMock.user.permissions = bothPermissions;
+      vi.mocked(rolesApi.permissions).mockResolvedValue(
+        result(twoPermissionCatalogue),
+      );
+      // Somebody else renamed the role between the page load and this save.
+      vi.mocked(rolesApi.replacePermissions).mockResolvedValue(
+        result({
+          ...role,
+          name: "Renamed elsewhere",
+          permissionIds: [PERMISSION_ID, SECOND_PERMISSION_ID],
+        }),
+      );
+      const { result: hook } = renderHook(() => useRoleDetail(ROLE_ID));
+      await waitFor(() => expect(hook.current.catalogueLength).toBe(2));
+
+      act(() => hook.current.togglePermission(SECOND_PERMISSION_ID));
+      await act(async () => hook.current.savePermissions());
+
+      expect(hook.current.name).toBe("Renamed elsewhere");
+      expect(hook.current.metadataDirty).toBe(false);
+    });
+  });
+
   it("reuses the same UUIDv7 for an exact retry after an ambiguous write", async () => {
     authMock.user.permissions = ["admin.roles.update"];
     vi.mocked(rolesApi.update)

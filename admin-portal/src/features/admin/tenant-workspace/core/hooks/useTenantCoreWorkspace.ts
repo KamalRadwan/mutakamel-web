@@ -355,6 +355,11 @@ export function useTenantCoreWorkspace(
     return loadTenant(false);
   }, [loadTenant]);
 
+  // A lifecycle command answers with the whole tenant, but it is not the
+  // profile editor's write. Resetting the draft from it would throw away
+  // whatever the operator had typed into the profile form before suspending —
+  // so an untouched draft is refreshed and a dirty one is kept and marked
+  // stale, exactly as a background refresh is handled.
   const suspend = useCallback(async () => {
     requirePermission(
       permissions.canSuspendOrActivate,
@@ -370,7 +375,7 @@ export function useTenantCoreWorkspace(
       { action: "tenant.suspend", tenantId },
       (key) => tenantCoreApi.suspend(tenantId, key),
     );
-    applyTenant(updated, true);
+    applyTenant(updated, !profileDirtyRef.current);
     return updated;
   }, [
     applyTenant,
@@ -395,7 +400,7 @@ export function useTenantCoreWorkspace(
       { action: "tenant.activate", tenantId },
       (key) => tenantCoreApi.activate(tenantId, key),
     );
-    applyTenant(updated, true);
+    applyTenant(updated, !profileDirtyRef.current);
     return updated;
   }, [
     applyTenant,
@@ -484,7 +489,7 @@ export function useTenantCoreWorkspace(
       { action: "tenant.restore", tenantId },
       (key) => tenantCoreApi.restore(tenantId, key),
     );
-    applyTenant(updated, true);
+    applyTenant(updated, !profileDirtyRef.current);
     return updated;
   }, [
     applyTenant,

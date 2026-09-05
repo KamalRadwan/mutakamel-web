@@ -67,6 +67,15 @@ only.
   are the session-ending category.
 - Delete returns `204` with no body.
 - Retain one UUIDv7 key for one exact retry of a write-sensitive intent.
+- **A response only overwrites the editor that submitted it.** The role detail
+  page carries two independent forms — metadata and permissions — with their
+  own Save buttons, and both routes answer with the whole role. Applying all of
+  it to both editors let a metadata save wipe pending permission ticks, and a
+  permission save revert an unsaved name, in each case clearing the discarded
+  editor's dirty flag so nothing signalled the loss. The editor that did not
+  submit still takes the new authoritative baseline; it keeps its unsaved draft
+  on top of it and stays dirty against it. An editor holding no unsaved work is
+  refreshed in place, so a rename made elsewhere still appears.
 
 ## Current frontend status
 
