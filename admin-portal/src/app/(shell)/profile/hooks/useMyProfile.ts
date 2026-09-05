@@ -7,6 +7,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 import { useToast } from "@/components/ui/ToastContext";
+import { useOptionalPreferences } from "@/context/PreferencesContext";
 import type { SuccessResponse } from "@/types/common";
 import type { AdminUserProfile } from "@/app/(shell)/users/types";
 import {
@@ -31,6 +32,7 @@ interface ProfileWriteIntent {
 
 export function useMyProfile() {
   const { lang, setLang } = useI18n();
+  const preferences = useOptionalPreferences();
   const copy = (lang === "ar" ? ar : en).profile;
   const toast = useToast();
 
@@ -129,6 +131,11 @@ export function useMyProfile() {
       if (language === "ar" || language === "en") {
         setLang(language);
       }
+      // The theme and table density only reach the portal through the
+      // preference provider, so a save has to tell it. Without this the form
+      // reported success and the portal kept the values it was already using
+      // until the next sign-in.
+      void preferences?.refresh();
 
       toast.success(copy.savedTitle, copy.savedDescription);
     } catch (caught: unknown) {

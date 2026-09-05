@@ -7,6 +7,7 @@ import { I18nProvider } from "@/i18n/I18nContext";
 import { DirectionBridge } from "@/i18n/DirectionBridge";
 import { ToastProvider } from "@/components/ui/ToastContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { PreferencesProvider } from "@/context/PreferencesContext";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { AdminWebPhone } from "@/components/layout/AdminWebPhone";
 
@@ -49,10 +50,15 @@ export default function RootLayout({
             <DirectionBridge>
               <ToastProvider>
                 <AuthProvider>
-                  <AuthGuard>
-                    {children}
-                    <AdminWebPhone />
-                  </AuthGuard>
+                  {/* Inside AuthProvider because it needs the session, and
+                      inside ThemeProvider because applying the saved theme is
+                      what it is for. */}
+                  <PreferencesProvider>
+                    <AuthGuard>
+                      {children}
+                      <AdminWebPhone />
+                    </AuthGuard>
+                  </PreferencesProvider>
                 </AuthProvider>
               </ToastProvider>
             </DirectionBridge>

@@ -9,6 +9,7 @@ import { focusRing } from "../../lib/variants";
 import { Button } from "../../primitives/Button";
 import { Checkbox } from "../../primitives/Checkbox";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../primitives/Table";
+import { useTableDensity } from "@/context/PreferencesContext";
 import { Pagination } from "../pagination/Pagination";
 import { useDataTable } from "./useDataTable";
 import { DataTableSkeleton } from "./DataTableSkeleton";
@@ -16,6 +17,18 @@ import { DataTableToolbar } from "./DataTableToolbar";
 import type { ColumnDef, DataTableProps, DataTableSelection, ExplicitIdSelection } from "./types";
 
 const ALIGN_CLASS = { start: "text-start", center: "text-center", end: "text-end" } as const;
+
+/**
+ * UI-010. The profile's saved `tableDensity` had no consumer at all: it could be
+ * set, it persisted, and every table went on rendering the same height. These
+ * are the row metrics it now selects, taken from the two the tables already
+ * used - the compact one is exactly what was hard-coded before, so a reader who
+ * never opens the profile sees no change.
+ */
+const DENSITY_ROW_CLASS = {
+  compact: "h-11 py-2.5",
+  comfortable: "h-14 py-4",
+} as const;
 
 interface VisibleRow<T> {
   id: string;
@@ -62,6 +75,9 @@ export function DataTable<T>(props: DataTableProps<T>) {
     showRowNumbers = true,
   } = props;
   const { lang } = useI18n();
+  // Falls back to compact where no provider is mounted, which is what every
+  // table rendered before this preference had a consumer.
+  const rowClass = DENSITY_ROW_CLASS[useTableDensity()];
   const { rows } = useDataTable({ data, getRowId });
   const tableLabel = lang === "ar" ? (labelAr ?? "جدول البيانات") : (labelEn ?? "Data table");
   const busy = isLoading || isRefreshing;
@@ -452,7 +468,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                     className="border-s-4 border-s-transparent data-[state=selected]:border-s-primary"
                   >
                     {selectable && (
-                      <TableCell className="h-11 py-2.5">
+                      <TableCell className={rowClass}>
                         <Checkbox
                           checked={rowSelected}
                           disabled={!isEligible(row)}
@@ -464,7 +480,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                       </TableCell>
                     )}
                     {showRowNumbers && (
-                      <TableCell className="h-11 py-2.5 text-xs tabular-nums text-muted-foreground">
+                      <TableCell className={cn(rowClass, "text-xs tabular-nums text-muted-foreground")}>
                         {formatLocaleNumber(lang, rowNumber(rowIndex))}
                       </TableCell>
                     )}
@@ -472,7 +488,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                       <TableCell
                         key={column.key}
                         className={cn(
-                          "h-11 py-2.5",
+                          rowClass,
                           ALIGN_CLASS[column.align ?? "start"],
                           priorityClass(column, responsiveMode),
                         )}

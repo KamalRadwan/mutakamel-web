@@ -268,6 +268,32 @@ A missing read permission renders forbidden, not an empty user list.
 }
 ```
 
+#### What the portal does with these
+
+`PreferencesProvider` (`src/context/PreferencesContext.tsx`) is the consumer.
+It reads `/users/me/profile` once the session is authenticated and applies:
+
+| Field | Applied to | Accepted values |
+| --- | --- | --- |
+| `themeKey` | `next-themes` | `dark`, `light`; anything else is ignored |
+| `extensions.tableDensity` | every `DataTable` row height | `compact` (default), `comfortable` |
+
+Both were previously saved and read by nothing at all: an administrator could
+set a preference, watch it persist, sign in again, and find the portal
+unchanged.
+
+**Precedence** had to be decided rather than discovered. The saved profile is an
+account preference; the header theme toggle is a this-browser, now override that
+`next-themes` already persists per browser. So the profile is applied when its
+value *changes* — which includes the first load after signing in — and the local
+toggle wins from then until the profile changes again. Applying it on every read
+would fight the toggle; never applying it was the defect.
+
+Saving on the profile page refreshes the provider, so a change takes effect
+without a reload. A value the portal cannot render is ignored rather than
+guessed at, and a profile that cannot be read leaves the painted defaults in
+place — the portal is usable without a preference.
+
 ### `CreateWebphoneExtensionDto`
 ```typescript
 {
