@@ -214,8 +214,12 @@ dropdown ends up behind a sticky column.
 
 ```
 --z-sticky-cell: 10   --z-sticky-header: 20   --z-topbar: 30
---z-dropdown: 40      --z-overlay: 100        --z-toast: 1000
+--z-overlay: 100      --z-dropdown: 110       --z-toast: 1000
 ```
+
+The dropdown sits ABOVE the overlay, which the first cut of this ladder had
+backwards: a select opened inside a dialog portals to `<body>` as the dialog's
+sibling, so a lower value hid every such list behind the scrim.
 
 ### B8 · `cursor-pointer` is not specified
 **Rule:** `cursor-pointer` — appears in the skill's own pre-delivery checklist

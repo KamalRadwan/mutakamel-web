@@ -90,6 +90,25 @@ session, or accepting the invite from the email. See
 | C15 | Deep-link `?view=board` | Lands on board. Refresh keeps it |
 | C16 | Select rows, switch view | Selection survives; the bulk bar shows the count |
 | C17 | Delete a lead | Confirm dialog. Cancel does nothing; confirm removes the row |
+| C18 | Basic search, default field | The value control is a text box. Typing narrows by name, phone **or email** — a phone that is only on a contact method still matches |
+| C19 | Switch the field to **Status** | The text box is replaced by a select, and the previous value is **cleared** — a name is not a status |
+| C20 | Pick a value, then pick **All** | The filter is removed and the full list returns. `All` is the only way back, so it must exist on every value select |
+| C21 | Filter on page 3 | The list returns to **page 1**. A filtered page 3 is not the page 3 you left |
+| C22 | Watch the network tab through all of it | **One** filter key per request, never two, and never an empty one (`?status=` is a `400`) |
+| C23 | Open **Create lead**, look at a contact row | Honorific, name, job title, number and email sit on **one line**, each box the width of what goes in it — an honorific is not as wide as an email |
+| C24 | Open the job-title picker | A hundred titles, searchable, sorted in the language on screen, with **Other** last. Picking Other replaces the picker with a text box; the icon beside it goes back to the list |
+| C25 | Look at the phone box before touching it | The code is already the country of **your own timezone**. Change it, then paste a full international number into the number box — the pasted code wins and the number splits across both boxes |
+| C26 | Pick a contact from the directory | Only the name (read-only) and the job title remain. The honorific, phone and email disappear, because the service discards them for a reused party |
+| C27 | Add a second number to a contact | It appears **below** the line, numbered, with its own remove control — the line itself does not grow sideways |
+| C28 | On a customer profile, choose **Add contact** | It opens as a centred **card**, not a side drawer, and the same one-line contact fields are inside it |
+| C29 | In the lead address, open **Country** | A searchable list of flag + country name. A country saved in the other language still shows its flag, and the stored text is not rewritten by opening the form |
+| C30 | Open any source picker | Each row shows the tenant's uploaded icon; a source with none gets the megaphone; the “no source” row keeps an empty tile so the labels stay aligned |
+| C31 | Look at any field on any CRM form | The label is **inside** the control's box, above the value — and it is a real label: click it and the control focuses, type and it stays |
+| C32 | Switch Lead type between Company and Individual | The person's line and a contact's line are the **same** control set in the same widths. The only difference is the job title, which a person does not have |
+| C33 | On a contact line, press the green **+** | A second number appears **under the first**, inside the phone column — not across the line and not under the honorific |
+| C34 | Compare a form against the old screenshots | Every text control is one step smaller (`sm`). On a phone, a focused input is still 16px — iOS must not zoom |
+| C35 | On Leads or Opportunities, switch to Card or Table | A chevron stage bar sits above the list: `All` first, then one segment per stage, each pointing into the next. In Arabic the arrows point the other way and the labels do not |
+| C36 | Press a stage, then press it again | The list filters, then clears. Press one and switch Card↔Table — the choice survives. Change the pipeline or the branch — it clears, and no request goes out carrying the old pipeline's stage |
 
 ## D · CRM — conversion
 
@@ -113,6 +132,9 @@ session, or accepting the invite from the email. See
 | E5 | `/crm/customer-profiles` | Three views; status changes reflect the real lifecycle |
 | E6 | Open a customer detail | Contacts, custom fields, and the capability-gated action cluster |
 | E7 | Open a **deleted** customer by URL | A not-found surface with a back action and **no retry button** |
+| E8 | On `/crm/customer-profiles`, run C18–C22 again | The same basic search, over this screen's four fields: free text, Status, Customer type, Source. **One** filter key per request, never two, never empty, and a change returns to page 1 |
+| E9 | Pick **Source**, and compare a row with the create modal's picker | The same icon-and-name row. The catalogue is fetched **once** for the screen — the bar reuses the modal's, so no second `/acquisition-sources` request appears |
+| E10 | `/crm/pipelines`, type in the search box | One box, no field picker. It narrows by **Arabic name, English name and code**, with no network request at all — `GET /pipelines` takes no query parameters, so the filter can only be client-side |
 
 ## F · Permissions and lifecycle
 

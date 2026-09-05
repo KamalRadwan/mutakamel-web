@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Radix Switch measures its thumb through ResizeObserver, which jsdom does not
@@ -20,6 +27,7 @@ const { api, toastMock, authMock } = vi.hoisted(() => ({
   api: {
     get: vi.fn(),
     post: vi.fn(),
+    put: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
   },
@@ -59,26 +67,47 @@ vi.mock("@/design-system/feedback/useToast", () => ({
 
 import TenantWebphoneSettingsPage from "./page";
 
+/**
+ * The whole of `GET /config`. The scope stores nothing: `enabled` is derived
+ * from the servers, and there is no `PATCH` for any of it. A fixture richer
+ * than the real response is how this screen drifted from the API last time, so
+ * this one is kept exactly as wide as the endpoint.
+ */
 const CONFIG = {
-  id: "0198c0de-0000-7000-8000-000000000001",
-  tenantId: "0198c0de-0000-7000-8000-0000000000ff",
+  tenantId: "0198c0de-0000-7000-8000-0000000000t1",
   enabled: true,
+};
+
+const PRIMARY_SERVER = {
+  id: "0198c0de-0000-7000-8000-00000000a001",
+  name: "Cairo primary",
   sipDomain: "sip.example.com",
+  websocketUrl: "wss://primary.example.com/ws",
+  priority: 1,
+  enabled: true,
   realm: null,
   outboundProxy: null,
   fromDomain: null,
   registrarServer: null,
   contactUri: null,
   registerExpires: 600,
-  sessionTimers: false,
-  traceSip: false,
-  allowInvalidTlsCertificate: false,
-  iceTransportPolicy: "all",
   defaultCallerId: null,
-  turnRestEnabled: false,
-  turnRestTtlSeconds: 3600,
-  endpoints: [],
+  iceTransportPolicy: "all",
+  traceSip: false,
+  sessionTimers: false,
+  allowInvalidTlsCertificate: false,
+  defaultTimeoutSeconds: 10,
+  defaultMaxRetries: 2,
   iceServers: [],
+};
+
+const BACKUP_SERVER = {
+  ...PRIMARY_SERVER,
+  id: "0198c0de-0000-7000-8000-00000000a002",
+  name: "Cairo backup",
+  websocketUrl: "wss://backup.example.com/ws",
+  priority: 2,
+  enabled: false,
 };
 
 function moduleError(status: number, code: string) {
@@ -92,23 +121,32 @@ function refuseAllReads(status: number, code: string) {
   api.get.mockRejectedValue(moduleError(status, code));
 }
 
-function resolveReads(seats: {
-  allowed: number;
-  occupied: number;
-  available: number;
-  overAllowance: boolean;
-}) {
+function resolveReads(
+  seats: {
+    allowed: number;
+    occupied: number;
+    available: number;
+    overAllowance: boolean;
+  },
+  servers: unknown[] = [],
+) {
   api.get.mockImplementation((url: string) => {
     if (url.endsWith("/config")) return Promise.resolve({ data: { data: CONFIG } });
+    if (url.endsWith("/servers")) {
+      return Promise.resolve({ data: { data: servers } });
+    }
     if (url.endsWith("/extensions")) return Promise.resolve({ data: { data: [] } });
     if (url.endsWith("/seats")) return Promise.resolve({ data: { data: seats } });
     throw new Error(`unexpected request: ${url}`);
   });
 }
 
+const SEATS = { allowed: 10, occupied: 4, available: 6, overAllowance: false };
+
 beforeEach(() => {
   api.get.mockReset();
   api.post.mockReset();
+  api.put.mockReset();
   api.patch.mockReset();
   api.delete.mockReset();
   toastMock.success.mockReset();
@@ -139,11 +177,10 @@ describe("Tenant WebPhone settings — unavailable states", () => {
 
     // The capability is still advertised: the sections and their controls are
     // present, and every one of them is inert.
-    expect(
-      screen.getByRole("region", { name: "Server configuration" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "SIP servers" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Extensions" })).toBeInTheDocument();
     expect(screen.getByLabelText("SIP domain")).toBeDisabled();
-    expect(screen.getByRole("switch", { name: /WebPhone enabled/ })).toBeDisabled();
+    expect(screen.getByLabelText("Server name")).toBeDisabled();
     for (const button of screen.getAllByRole("button")) {
       if (button.textContent?.includes("Reload")) continue;
       expect(button).toBeDisabled();
@@ -200,6 +237,7 @@ describe("Tenant WebPhone settings — unavailable states", () => {
     });
 
     expect(api.post).not.toHaveBeenCalled();
+    expect(api.put).not.toHaveBeenCalled();
     expect(api.patch).not.toHaveBeenCalled();
     expect(api.delete).not.toHaveBeenCalled();
   });
@@ -218,6 +256,217 @@ describe("Tenant WebPhone settings — unavailable states", () => {
         name: "WebPhone is not available on this workspace",
       }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("Tenant WebPhone settings — the server chain", () => {
+  it("shows each server's position as a badge and offers no priority field", async () => {
+    resolveReads(SEATS, [PRIMARY_SERVER, BACKUP_SERVER]);
+    render(<TenantWebphoneSettingsPage />);
+
+    const primary = await screen.findByRole("article", {
+      name: "SIP server: Cairo primary",
+    });
+    expect(within(primary).getByLabelText("Position 1")).toHaveTextContent("1");
+    const backup = screen.getByRole("article", {
+      name: "SIP server: Cairo backup",
+    });
+    expect(within(backup).getByLabelText("Position 2")).toHaveTextContent("2");
+
+    // Position is renumbered wholesale by the reorder endpoint, so it is never
+    // offered as something to type.
+    expect(screen.queryByLabelText("Priority")).not.toBeInTheDocument();
+  });
+
+  it("keeps the advanced fields collapsed until they are asked for", async () => {
+    resolveReads(SEATS, [PRIMARY_SERVER]);
+    render(<TenantWebphoneSettingsPage />);
+
+    const card = await screen.findByRole("article", {
+      name: "SIP server: Cairo primary",
+    });
+    expect(within(card).getByLabelText("Server name")).toHaveValue(
+      "Cairo primary",
+    );
+    expect(
+      within(card).queryByLabelText("Authentication realm"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(card).getByRole("button", { name: /Advanced settings/ }),
+    );
+    expect(
+      await within(card).findByLabelText("Authentication realm"),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByLabelText("Attempts before moving to the next server"),
+    ).toBeInTheDocument();
+  });
+
+  it("reorders by sending the whole id list under an idempotency key", async () => {
+    resolveReads(SEATS, [PRIMARY_SERVER, BACKUP_SERVER]);
+    api.put.mockResolvedValue({ data: { data: null } });
+    render(<TenantWebphoneSettingsPage />);
+
+    const moveLater = await screen.findByRole("button", {
+      name: "Move later: Cairo primary",
+    });
+    fireEvent.click(moveLater);
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1));
+    const [url, body, config] = api.put.mock.calls[0];
+    expect(url).toBe("/api/tenant/webphone/v1/servers/order");
+    // The full chain in its new order — the endpoint takes no delta.
+    expect(body).toEqual({ ids: [BACKUP_SERVER.id, PRIMARY_SERVER.id] });
+    expect(config.headers["x-idempotency-key"]).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it("cannot move the first server earlier or the last one later", async () => {
+    resolveReads(SEATS, [PRIMARY_SERVER, BACKUP_SERVER]);
+    render(<TenantWebphoneSettingsPage />);
+
+    expect(
+      await screen.findByRole("button", { name: "Move earlier: Cairo primary" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Move later: Cairo backup" }),
+    ).toBeDisabled();
+  });
+
+  it("nests each server's ICE list inside its own card", async () => {
+    resolveReads(SEATS, [
+      {
+        ...PRIMARY_SERVER,
+        iceServers: [
+          {
+            id: "0198c0de-0000-7000-8000-00000000b001",
+            kind: "TURN",
+            urls: ["turn:turn.example.com:3478"],
+            username: "turnuser",
+            credentialConfigured: true,
+            enabled: true,
+            sortOrder: 0,
+          },
+        ],
+      },
+      BACKUP_SERVER,
+    ]);
+    render(<TenantWebphoneSettingsPage />);
+
+    const primary = await screen.findByRole("article", {
+      name: "SIP server: Cairo primary",
+    });
+    expect(
+      within(primary).getByRole("region", { name: "ICE servers: Cairo primary" }),
+    ).toBeInTheDocument();
+    expect(
+      within(primary).getByRole("article", {
+        name: "ICE server: turn:turn.example.com:3478",
+      }),
+    ).toBeInTheDocument();
+
+    // The backup lives in a different network, so it does not inherit the
+    // primary's relay.
+    const backup = screen.getByRole("article", {
+      name: "SIP server: Cairo backup",
+    });
+    expect(
+      within(backup).getByText("No ICE server is configured for this server yet."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows each server's TURN entry on the server that owns it", async () => {
+    // TURN is described in exactly one editable place: the server whose network
+    // the relay is reachable in. Two servers may legitimately list the same
+    // URI, and each states it for itself rather than through a scope-level
+    // summary that outlived the settings it belonged to.
+    const turn = {
+      id: "0198c0de-0000-7000-8000-00000000b001",
+      kind: "TURN",
+      urls: ["turn:shared.example.com:3478"],
+      username: "turnuser",
+      credentialConfigured: true,
+      enabled: true,
+      sortOrder: 0,
+    };
+    resolveReads(SEATS, [
+      { ...PRIMARY_SERVER, iceServers: [turn] },
+      {
+        ...BACKUP_SERVER,
+        iceServers: [{ ...turn, id: "0198c0de-0000-7000-8000-00000000b002" }],
+      },
+    ]);
+    render(<TenantWebphoneSettingsPage />);
+
+    for (const name of ["Cairo primary", "Cairo backup"]) {
+      const card = await screen.findByRole("article", {
+        name: `SIP server: ${name}`,
+      });
+      expect(
+        within(card).getByRole("article", {
+          name: "ICE server: turn:shared.example.com:3478",
+        }),
+      ).toBeInTheDocument();
+    }
+  });
+});
+
+describe("Tenant WebPhone settings — the scope has no stored settings", () => {
+  it("offers no scope-level switch or TURN REST controls", async () => {
+    // `enabled` is derived from the servers and TURN REST minting is an
+    // environment concern, so neither is a control here. Offering either would
+    // be a switch whose write the API no longer has a route for.
+    resolveReads(SEATS, [PRIMARY_SERVER]);
+    render(<TenantWebphoneSettingsPage />);
+    await screen.findByRole("region", { name: "SIP servers" });
+
+    expect(
+      screen.queryByRole("region", { name: "WebPhone module" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "TURN REST credentials" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: /WebPhone enabled/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Credential lifetime (seconds)"),
+    ).not.toBeInTheDocument();
+    // Saving is per row now. Every save button on the screen belongs to the
+    // server or ICE entry that owns the fields it writes — none of them saves
+    // the scope, because the scope has nothing to save.
+    for (const button of screen.getAllByRole("button", {
+      name: /Save configuration/,
+    })) {
+      expect(button.closest("article")).not.toBeNull();
+    }
+  });
+
+  it("never writes to the configuration endpoint, which no longer exists", async () => {
+    // `PATCH /config` was removed with the settings row behind it; a call to it
+    // now returns 404 GW.ROUTE.UNKNOWN.
+    resolveReads(SEATS, [PRIMARY_SERVER]);
+    api.patch.mockResolvedValue({ data: { data: null } });
+    render(<TenantWebphoneSettingsPage />);
+
+    const card = await screen.findByRole("article", {
+      name: "SIP server: Cairo primary",
+    });
+    fireEvent.change(within(card).getByLabelText("Server name"), {
+      target: { value: "Cairo edge" },
+    });
+    fireEvent.click(within(card).getByRole("button", { name: "Save configuration" }));
+
+    await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1));
+    // The one write went to the server that owns the field, not to the scope.
+    expect(api.patch.mock.calls[0][0]).toBe(
+      `/api/tenant/webphone/v1/servers/${PRIMARY_SERVER.id}`,
+    );
+    for (const [url] of api.patch.mock.calls) {
+      expect(url).not.toMatch(/\/config$/);
+    }
   });
 });
 

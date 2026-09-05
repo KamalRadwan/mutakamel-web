@@ -63,8 +63,9 @@ Query (`LeadsQueryDto extends BranchListQueryDto extends PaginationQueryDto`):
 | `branchId` | UUIDv7 | **yes** | `@IsUUID('7')`, not optional |
 | `page` | integer ≥ 1 | no | |
 | `limit` | integer | no | endpoint-bounded |
-| `sortBy` | string | no | default `createdAt` |
+| `sortBy` | string | no | **`displayName` or `createdAt` only.** Default `createdAt`. Anything else is a `400` — the service does **not** fall back |
 | `sortDir` | `ASC` \| `DESC` | no | Uppercase. **Not** `sortOrder`, which is a lead-stage *field* — see [README.md#sort-parameters-differ-per-endpoint](README.md#sort-parameters-differ-per-endpoint) |
+| `search` | string ≤ 200 | no | Free text over the party's **display name, first name, last name, organization name and contact methods** (phone/email). **Not** the lead's `description`, despite `LeadsRepository.searchableFields` — the list path is a hand-written query that never reads that array |
 | `leadProfileType` | `CrmProfileTypeEnum` | no | `INDIVIDUAL` \| `CORPORATE` |
 | `status` | `LeadStatusEnum` | no | `OPEN` \| `CONVERTED` \| `DISQUALIFIED` \| `ON_HOLD` |
 | `stageFlag` | `LeadStageFlagEnum` | no | 8 values — see [enums](../reference/enums.md#leadstageflagenum) |
@@ -203,12 +204,23 @@ documented otherwise — that was wrong).
 - Every action control is gated by `capabilities`, not by permission strings.
 - Status renders through `StatusBadge`; never display the raw wire value.
 - `ownerUserId` is a filter, not an authorization mechanism.
+- The list screen's search is **one field, one value** — a field picker beside
+  a value control whose type follows the field, built in
+  `crm/leads/lead-search-contract.ts`. That module is the only place a query
+  key is named, and it sends **at most one** filter key: `forbidNonWhitelisted`
+  makes an unknown key a `400`, and a blank value would send `status=`, which
+  `@IsEnum` also rejects. There is no advanced/operator mode — see
+  [OPEN-QUESTIONS Q131](../build/OPEN-QUESTIONS.md).
+- `ownerUserId` is offered by no control: nothing lists assignable users by
+  name, so the only possible input is a raw UUID — see
+  [OPEN-QUESTIONS Q132](../build/OPEN-QUESTIONS.md).
 
 ## Portal status
 
 | Capability | Status |
 | --- | --- |
 | List, branch-scoped, paginated | live |
+| Basic search — one field, one value | live |
 | Create | live |
 | Delete | live |
 | Stage move + board | live |

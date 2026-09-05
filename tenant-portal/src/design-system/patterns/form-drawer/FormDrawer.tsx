@@ -1,9 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { AlertTriangle } from "lucide-react";
-import { cn } from "../../lib/cn";
-import { proseMeasure } from "../../lib/variants";
+import { useState } from "react";
 import { Button } from "../../primitives/Button";
 import {
   Sheet,
@@ -14,6 +11,8 @@ import {
   SheetTitle,
 } from "../../primitives/Sheet";
 import { ConfirmActionModal } from "../confirm-action/ConfirmActionModal";
+import { FormErrorSummary } from "../form-shell/FormErrorSummary";
+import { useFormShell } from "../form-shell/useFormShell";
 
 export interface FormDrawerLabels {
   submit: string;
@@ -47,10 +46,11 @@ export interface FormDrawerProps {
   children: React.ReactNode;
 }
 
-// Create/edit in a Sheet, not a Dialog — a form long enough to need its own
-// scrollbar belongs in a drawer. The dirty guard applies identically to
-// backdrop click, Escape, and the close button — see
-// docs/design/patterns.md#formdrawer.
+// Create/edit in a Sheet — the default for a form that is a handful of fields
+// on one axis. A record form wide enough to want two columns and its own
+// section index takes `FormModal` instead — and so does a CRM *create* however
+// short, at `size="card"`; see docs/design/patterns.md#formdrawer. The dirty
+// guard applies identically to backdrop click, Escape, and the close button.
 export function FormDrawer({
   open,
   onOpenChange,
@@ -65,70 +65,32 @@ export function FormDrawer({
   labels,
   children,
 }: FormDrawerProps) {
-  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
-  const [submitAttempted, setSubmitAttempted] = useState(false);
-  const bodyRef = useRef<HTMLDivElement>(null);
-
-  // B2 (SKILL-AUDIT.md): after a rejected submit, focus lands on the FIRST
-  // invalid field, not on the submit button. A sighted user sees the toast;
-  // a screen-reader user hears "there are errors" and is then sitting on a
-  // button with no route to the field that is actually wrong. Arriving on
-  // the field is what makes its aria-describedby error text get read.
-  // docs/design/patterns.md#focus-after-a-failed-submit.
-  //
-  // Keyed on isSubmitting and error as well as the attempt itself: a
-  // synchronous validation stop renders its errors in the same commit, while
-  // a 422 renders them only once the request settles.
-  useEffect(() => {
-    if (!submitAttempted || isSubmitting) return;
-    const firstInvalid = bodyRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
-    firstInvalid?.focus();
-  }, [submitAttempted, isSubmitting, error]);
-
-  // A reopened drawer starts clean; otherwise the previous attempt's focus
-  // rule fires against a fresh form. Adjusted during render rather than in an
-  // effect — the setState-in-effect form causes a cascading render, and React
-  // documents this exact case:
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
-  const [wasOpen, setWasOpen] = useState(open);
-  if (wasOpen !== open) {
-    setWasOpen(open);
-    if (!open) setSubmitAttempted(false);
-  }
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    // Implicit submission reaches here from Enter in any field, and unlike a
-    // click it is not gated by the submit button's own disabled state.
-    if (isSubmitting || submitDisabled) return;
-    setSubmitAttempted(true);
-    onSubmit();
-  }
-
-  function requestClose() {
-    if (isDirty) {
-      setConfirmingDiscard(true);
-    } else {
-      onOpenChange(false);
-    }
-  }
-
-  function confirmDiscard() {
-    setConfirmingDiscard(false);
-    onOpenChange(false);
-  }
+  // A callback ref into state, not a `useRef`: the sheet's content mounts in a
+  // later commit than this component's first effect pass, and only a state
+  // change can tell the shell's focus rule that the body finally exists.
+  const [body, setBody] = useState<HTMLDivElement | null>(null);
+  const shell = useFormShell({
+    body,
+    open,
+    isDirty,
+    isSubmitting,
+    error,
+    submitDisabled,
+    onSubmit,
+    onOpenChange,
+  });
 
   return (
     <>
-      <Sheet open={open} onOpenChange={(next) => (next ? onOpenChange(true) : requestClose())}>
+      <Sheet open={open} onOpenChange={(next) => (next ? onOpenChange(true) : shell.requestClose())}>
         <SheetContent
           onEscapeKeyDown={(event) => {
             event.preventDefault();
-            requestClose();
+            shell.requestClose();
           }}
           onPointerDownOutside={(event) => {
             event.preventDefault();
-            requestClose();
+            shell.requestClose();
           }}
           className="flex w-full flex-col sm:max-w-md"
         >
@@ -140,15 +102,15 @@ export function FormDrawer({
 
             noValidate is deliberate. Native constraint validation preempts the
             submit event entirely, so `onSubmit` — which is what reveals this
-            app's own field errors and runs the focus rule below — would never
-            fire, and the user would get a transient browser bubble in the
-            BROWSER's language instead of a persistent, programmatically
+            app's own field errors and runs the focus rule in useFormShell —
+            would never fire, and the user would get a transient browser bubble
+            in the BROWSER's language instead of a persistent, programmatically
             associated error in the app's. Errors here are inline and ours:
             docs/design/patterns.md#where-a-result-belongs.
           */}
           <form
             noValidate
-            onSubmit={handleSubmit}
+            onSubmit={shell.handleSubmit}
             className="flex min-h-0 flex-1 flex-col gap-4"
           >
             <SheetHeader>
@@ -156,21 +118,13 @@ export function FormDrawer({
               {description && <SheetDescription>{description}</SheetDescription>}
             </SheetHeader>
 
-            {error && (
-              <div
-                role="alert"
-                className={cn(
-                  "flex items-start gap-2 rounded-sm border border-negative-200 bg-negative-100 p-2.5",
-                  "text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300",
-                  proseMeasure,
-                )}
-              >
-                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 wrap-anywhere">{error}</span>
-              </div>
-            )}
+            <FormErrorSummary error={error} />
 
-            <div ref={bodyRef} className="flex-1 overflow-y-auto">
+            {/* `relative` for the same reason FormModal needs it: Radix
+                Select's hidden native <select> is absolutely positioned, and
+                without a positioned ancestor it resolves against the sheet
+                and escapes this box's clipping. */}
+            <div ref={setBody} className="relative flex-1 overflow-y-auto">
               {children}
             </div>
 
@@ -179,8 +133,13 @@ export function FormDrawer({
                 <div className="me-auto flex items-center gap-2">{footerLeading}</div>
               )}
               {/* Deliberately not SheetClose — that closes via Radix's own
-                  context and would bypass the dirty guard below. */}
-              <Button type="button" variant="outline" onClick={requestClose} disabled={isSubmitting}>
+                  context and would bypass the dirty guard. */}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={shell.requestClose}
+                disabled={isSubmitting}
+              >
                 {labels.cancel}
               </Button>
               <Button type="submit" variant="primary" loading={isSubmitting} disabled={submitDisabled}>
@@ -192,13 +151,13 @@ export function FormDrawer({
       </Sheet>
 
       <ConfirmActionModal
-        open={confirmingDiscard}
-        onOpenChange={setConfirmingDiscard}
+        open={shell.confirmingDiscard}
+        onOpenChange={shell.setConfirmingDiscard}
         title={labels.discardTitle}
         description={labels.discardDescription}
         confirmLabel={labels.discardConfirm}
         cancelLabel={labels.discardCancel}
-        onConfirm={confirmDiscard}
+        onConfirm={shell.confirmDiscard}
       />
     </>
   );

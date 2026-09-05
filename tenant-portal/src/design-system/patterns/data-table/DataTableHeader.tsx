@@ -26,6 +26,8 @@ interface DataTableHeaderProps<T> {
   onToggleSelectAll?: () => void;
   hasSelection: boolean;
   showRowNumbers?: boolean;
+  /** Names the leading handle column when the caller enabled row reordering. */
+  reorderLabel?: string;
   layout?: ColumnLayout;
   columnLayout?: ColumnLayoutState;
   layoutLabels?: ColumnLayoutLabels;
@@ -48,6 +50,7 @@ export function DataTableHeader<T>({
   onToggleSelectAll,
   hasSelection,
   showRowNumbers = false,
+  reorderLabel,
   layout,
   columnLayout,
   layoutLabels,
@@ -58,6 +61,15 @@ export function DataTableHeader<T>({
   return (
     <TableHeader className="sticky top-0 z-(--z-sticky-header)">
       <TableRow className="odd:bg-transparent hover:bg-transparent">
+        {reorderLabel !== undefined && (
+          // The 24px grip DESIGN-SYSTEM.md#75-catalogue-screens gives a
+          // reorderable catalogue, plus the cell's own padding. The label is
+          // sr-only: the column has no heading to show, but an unnamed one
+          // reads as an empty header to a screen reader.
+          <TableHead scope="col" className="w-10">
+            <span className="sr-only">{reorderLabel}</span>
+          </TableHead>
+        )}
         {hasSelection && (
           <TableHead className="w-8">
             <Checkbox

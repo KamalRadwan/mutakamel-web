@@ -1,102 +1,157 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildConfigPatch,
-  configToForm,
+  buildServerPatch,
+  moveServerId,
   readWebphoneConfig,
   readWebphoneExtension,
   readWebphoneIceServer,
   readWebphoneSeats,
-  validateConfigForm,
-  validateEndpointDraft,
+  readWebphoneServer,
+  readWebphoneServers,
+  serverToForm,
   validateExtensionDraft,
   validateIceServerDraft,
-  EMPTY_ENDPOINT_DRAFT,
+  validateServerDraft,
+  validateServerForm,
+  websocketProtocol,
+  withWebsocketProtocol,
   EMPTY_EXTENSION_DRAFT,
   EMPTY_ICE_SERVER_DRAFT,
+  EMPTY_SERVER_DRAFT,
 } from "./webphone-contract";
 
+/** The whole of `GET /config`: a tenant id this screen ignores, and a derived flag. */
 const CONFIG = {
-  id: "0198c0de-0000-7000-8000-000000000001",
-  tenantId: null,
+  tenantId: "0198c0de-0000-7000-8000-0000000000t1",
   enabled: true,
+};
+
+const TURN_ENTRY = {
+  id: "i2",
+  kind: "TURN",
+  urls: ["turn:turn.example.com:3478"],
+  username: "turnuser",
+  credentialConfigured: true,
+  enabled: true,
+  sortOrder: 3,
+};
+
+const STUN_ENTRY = {
+  id: "i1",
+  kind: "STUN",
+  urls: ["stun:stun.example.com:3478"],
+  username: null,
+  credentialConfigured: false,
+  enabled: true,
+  sortOrder: 0,
+};
+
+const PRIMARY_SERVER = {
+  id: "s1",
+  name: "Cairo primary",
   sipDomain: "sip.example.com",
+  websocketUrl: "wss://primary.example.com/ws",
+  priority: 1,
+  enabled: true,
   realm: "asterisk",
   outboundProxy: null,
   fromDomain: null,
   registrarServer: null,
   contactUri: null,
   registerExpires: 600,
-  sessionTimers: false,
-  traceSip: false,
-  allowInvalidTlsCertificate: false,
-  iceTransportPolicy: "all",
   defaultCallerId: null,
-  turnRestEnabled: false,
-  turnRestTtlSeconds: 3600,
-  endpoints: [
-    {
-      id: "e2",
-      label: "backup",
-      websocketUrl: "wss://backup.example.com/ws",
-      priority: 5,
-      enabled: false,
-    },
-    {
-      id: "e1",
-      label: null,
-      websocketUrl: "wss://primary.example.com/ws",
-      priority: 0,
-      enabled: true,
-    },
-  ],
-  iceServers: [
-    {
-      id: "i2",
-      kind: "TURN",
-      urls: ["turn:turn.example.com:3478"],
-      username: "turnuser",
-      credentialConfigured: true,
-      enabled: true,
-      sortOrder: 3,
-    },
-    {
-      id: "i1",
-      kind: "STUN",
-      urls: ["stun:stun.example.com:3478"],
-      username: null,
-      credentialConfigured: false,
-      enabled: true,
-      sortOrder: 0,
-    },
-  ],
+  iceTransportPolicy: "all",
+  traceSip: false,
+  sessionTimers: false,
+  allowInvalidTlsCertificate: false,
+  defaultTimeoutSeconds: 10,
+  defaultMaxRetries: 2,
+  iceServers: [TURN_ENTRY, STUN_ENTRY],
+};
+
+const BACKUP_SERVER = {
+  ...PRIMARY_SERVER,
+  id: "s2",
+  name: "Cairo backup",
+  websocketUrl: "ws://backup.example.com/ws",
+  priority: 2,
+  enabled: false,
+  iceServers: [],
 };
 
 describe("readWebphoneConfig", () => {
-  it("orders endpoints by priority and ICE servers by sort order", () => {
-    const config = readWebphoneConfig(CONFIG);
-    expect(config.endpoints.map((entry) => entry.id)).toEqual(["e1", "e2"]);
-    expect(config.iceServers.map((entry) => entry.id)).toEqual(["i1", "i2"]);
+  it("reads the one derived flag and ignores the tenant id beside it", () => {
+    // The scope keeps no settings of its own: no SIP field, no stored switch,
+    // and no TURN REST minting controls. Anything else in the payload is not
+    // this screen's to render.
+    expect(readWebphoneConfig(CONFIG)).toEqual({ enabled: true });
   });
 
   it("rejects a malformed configuration rather than rendering a partial one", () => {
+    expect(() => readWebphoneConfig({ ...CONFIG, enabled: "yes" })).toThrow(
+      /INVALID_WEBPHONE_CONFIG_RESPONSE/,
+    );
+    expect(() => readWebphoneConfig({ tenantId: "t1" })).toThrow(
+      /INVALID_WEBPHONE_CONFIG_RESPONSE/,
+    );
+  });
+});
+
+describe("readWebphoneServers", () => {
+  it("orders servers by priority and each server's ICE entries by sort order", () => {
+    const servers = readWebphoneServers([BACKUP_SERVER, PRIMARY_SERVER]);
+    expect(servers.map((entry) => entry.id)).toEqual(["s1", "s2"]);
+    expect(servers[0].iceServers.map((entry) => entry.id)).toEqual(["i1", "i2"]);
+  });
+
+  it("accepts the paginated envelope as well as a bare array", () => {
+    expect(
+      readWebphoneServers({ items: [PRIMARY_SERVER] }).map((entry) => entry.id),
+    ).toEqual(["s1"]);
+  });
+
+  it("rejects a malformed server rather than rendering a partial one", () => {
     expect(() =>
-      readWebphoneConfig({ ...CONFIG, iceTransportPolicy: "direct" }),
-    ).toThrow(/INVALID_WEBPHONE_CONFIG_RESPONSE/);
+      readWebphoneServer({ ...PRIMARY_SERVER, iceTransportPolicy: "direct" }),
+    ).toThrow(/INVALID_WEBPHONE_SERVER_RESPONSE/);
+  });
+
+  it("rejects a priority outside the contiguous-from-one range", () => {
+    // Zero was a legal endpoint priority and is not a legal server position;
+    // a response carrying one is a server the badge could not number.
+    expect(() => readWebphoneServer({ ...PRIMARY_SERVER, priority: 0 })).toThrow(
+      /INVALID_WEBPHONE_SERVER_RESPONSE/,
+    );
+  });
+
+  it("rejects failover defaults outside the range the server enforces", () => {
+    expect(() =>
+      readWebphoneServer({ ...PRIMARY_SERVER, defaultTimeoutSeconds: 1 }),
+    ).toThrow(/INVALID_WEBPHONE_SERVER_RESPONSE/);
+    expect(() =>
+      readWebphoneServer({ ...PRIMARY_SERVER, defaultMaxRetries: 11 }),
+    ).toThrow(/INVALID_WEBPHONE_SERVER_RESPONSE/);
   });
 });
 
 describe("write-only secrets", () => {
   it("refuses an ICE server response that carries a credential", () => {
     expect(() =>
-      readWebphoneIceServer({
-        ...CONFIG.iceServers[0],
-        credential: "leaked-secret",
+      readWebphoneIceServer({ ...TURN_ENTRY, credential: "leaked-secret" }),
+    ).toThrow(/INVALID_WEBPHONE_ICE_SERVER_RESPONSE/);
+  });
+
+  it("refuses a server whose nested ICE entry carries a credential", () => {
+    expect(() =>
+      readWebphoneServer({
+        ...PRIMARY_SERVER,
+        iceServers: [{ ...TURN_ENTRY, credential: "leaked-secret" }],
       }),
     ).toThrow(/INVALID_WEBPHONE_ICE_SERVER_RESPONSE/);
   });
 
   it("keeps only the configured flag for an ICE credential", () => {
-    const server = readWebphoneIceServer(CONFIG.iceServers[0]);
+    const server = readWebphoneIceServer(TURN_ENTRY);
     expect(server.credentialConfigured).toBe(true);
     expect(Object.keys(server)).not.toContain("credential");
   });
@@ -162,53 +217,148 @@ describe("readWebphoneSeats", () => {
   });
 });
 
-describe("configuration form", () => {
-  it("sends only changed fields, mapping a cleared optional to null", () => {
-    const config = readWebphoneConfig(CONFIG);
-    const form = configToForm(config);
-    expect(buildConfigPatch(config, form)).toEqual({});
+describe("server form", () => {
+  const server = readWebphoneServer(PRIMARY_SERVER);
+  const form = serverToForm(server);
 
+  it("sends only changed fields, mapping a cleared optional to null", () => {
+    expect(buildServerPatch(server, form)).toEqual({});
     expect(
-      buildConfigPatch(config, { ...form, realm: "", registerExpires: "900" }),
+      buildServerPatch(server, { ...form, realm: "", registerExpires: "900" }),
     ).toEqual({ realm: null, registerExpires: 900 });
   });
 
-  it("requires a SIP domain before the module can be enabled", () => {
-    const form = configToForm(readWebphoneConfig(CONFIG));
-    expect(validateConfigForm({ ...form, sipDomain: "" })).toMatchObject({
-      sipDomain: "SIP_DOMAIN_REQUIRED",
-    });
+  it("never offers priority as an edit", () => {
+    // Position is renumbered wholesale by the reorder endpoint, so it is not
+    // on the form and cannot reach a patch from here.
+    expect(Object.keys(form)).not.toContain("priority");
     expect(
-      validateConfigForm({ ...form, enabled: false, sipDomain: "" }),
-    ).toEqual({});
+      buildServerPatch(server, { ...form, name: "Renamed" }),
+    ).not.toHaveProperty("priority");
   });
 
-  it("bounds the registration expiry and the TURN credential lifetime", () => {
-    const form = configToForm(readWebphoneConfig(CONFIG));
-    expect(validateConfigForm({ ...form, registerExpires: "29" })).toMatchObject(
-      { registerExpires: "OUT_OF_RANGE" },
-    );
+  it("requires a name, a SIP domain and a WebSocket URL", () => {
+    expect(validateServerForm({ ...form, name: "" }, [])).toMatchObject({
+      name: "INVALID_SERVER_NAME",
+    });
+    expect(validateServerForm({ ...form, sipDomain: "" }, [])).toMatchObject({
+      sipDomain: "INVALID_SIP_DOMAIN",
+    });
     expect(
-      validateConfigForm({ ...form, turnRestTtlSeconds: "59" }),
-    ).toMatchObject({ turnRestTtlSeconds: "OUT_OF_RANGE" });
+      validateServerForm({ ...form, websocketUrl: "https://sip.example.com" }, []),
+    ).toMatchObject({ websocketUrl: "INVALID_WS_URL" });
+  });
+
+  it("bounds the registration expiry and the failover defaults", () => {
+    expect(
+      validateServerForm({ ...form, registerExpires: "29" }, []),
+    ).toMatchObject({ registerExpires: "OUT_OF_RANGE" });
+    expect(
+      validateServerForm({ ...form, defaultTimeoutSeconds: "121" }, []),
+    ).toMatchObject({ defaultTimeoutSeconds: "OUT_OF_RANGE" });
+    expect(
+      validateServerForm({ ...form, defaultMaxRetries: "11" }, []),
+    ).toMatchObject({ defaultMaxRetries: "OUT_OF_RANGE" });
   });
 
   it("rejects a sip: URI that is not one", () => {
-    const form = configToForm(readWebphoneConfig(CONFIG));
     expect(
-      validateConfigForm({ ...form, outboundProxy: "https://proxy.example.com" }),
+      validateServerForm(
+        { ...form, outboundProxy: "https://proxy.example.com" },
+        [],
+      ),
     ).toMatchObject({ outboundProxy: "INVALID_SIP_URI" });
+  });
+
+  it("refuses relay-only transport unless this server has an enabled TURN entry", () => {
+    // Relay-only with nothing to relay through leaves every call on this
+    // server without a media path, so the save is refused before it is sent.
+    const relay = { ...form, iceTransportPolicy: "relay" as const };
+    expect(validateServerForm(relay, [])).toMatchObject({
+      iceTransportPolicy: "RELAY_REQUIRES_TURN",
+    });
+    expect(
+      validateServerForm(relay, [readWebphoneIceServer(STUN_ENTRY)]),
+    ).toMatchObject({ iceTransportPolicy: "RELAY_REQUIRES_TURN" });
+    expect(
+      validateServerForm(relay, [
+        readWebphoneIceServer({ ...TURN_ENTRY, enabled: false }),
+      ]),
+    ).toMatchObject({ iceTransportPolicy: "RELAY_REQUIRES_TURN" });
+    expect(
+      validateServerForm(relay, [readWebphoneIceServer(TURN_ENTRY)]),
+    ).toEqual({});
+  });
+
+  it("applies the rule per server, not across the whole scope", () => {
+    const relay = { ...form, iceTransportPolicy: "relay" as const };
+    const backup = readWebphoneServer(BACKUP_SERVER);
+    // The primary's TURN entry is no help to a server in another network.
+    expect(validateServerForm(relay, backup.iceServers)).toMatchObject({
+      iceTransportPolicy: "RELAY_REQUIRES_TURN",
+    });
+  });
+});
+
+describe("the WebSocket URL carries the protocol", () => {
+  it("reads the transport out of the scheme", () => {
+    expect(websocketProtocol("wss://sip.example.com/ws")).toBe("wss");
+    expect(websocketProtocol("ws://sip.example.com/ws")).toBe("ws");
+    // A half-typed URL sits on the secure default rather than reporting `ws`.
+    expect(websocketProtocol("sip.example.com")).toBe("wss");
+  });
+
+  it("rewrites the scheme in place instead of storing a second copy", () => {
+    expect(withWebsocketProtocol("wss://sip.example.com/ws", "ws")).toBe(
+      "ws://sip.example.com/ws",
+    );
+    expect(withWebsocketProtocol("ws://sip.example.com/ws", "wss")).toBe(
+      "wss://sip.example.com/ws",
+    );
+    expect(withWebsocketProtocol("sip.example.com/ws", "wss")).toBe(
+      "wss://sip.example.com/ws",
+    );
+  });
+
+  it("keeps a rewritten URL valid", () => {
+    const form = serverToForm(readWebphoneServer(PRIMARY_SERVER));
+    expect(
+      validateServerForm(
+        {
+          ...form,
+          websocketUrl: withWebsocketProtocol(form.websocketUrl, "ws"),
+        },
+        [],
+      ),
+    ).toEqual({});
+  });
+});
+
+describe("moveServerId", () => {
+  it("returns the full list in the new order", () => {
+    expect(moveServerId(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"]);
+    expect(moveServerId(["a", "b", "c"], 0, 1)).toEqual(["b", "a", "c"]);
+  });
+
+  it("never loses an id to an out-of-range or no-op move", () => {
+    expect(moveServerId(["a", "b", "c"], 1, 1)).toEqual(["a", "b", "c"]);
+    expect(moveServerId(["a", "b", "c"], 0, 9)).toEqual(["a", "b", "c"]);
+    expect(moveServerId(["a", "b", "c"], -1, 0)).toEqual(["a", "b", "c"]);
   });
 });
 
 describe("draft validation", () => {
-  it("requires a ws:// or wss:// endpoint URL", () => {
-    expect(validateEndpointDraft(EMPTY_ENDPOINT_DRAFT)).toMatchObject({
+  it("requires a name, domain and ws:// or wss:// URL on a new server", () => {
+    expect(validateServerDraft(EMPTY_SERVER_DRAFT)).toMatchObject({
+      name: "INVALID_SERVER_NAME",
+      sipDomain: "INVALID_SIP_DOMAIN",
       websocketUrl: "INVALID_WS_URL",
     });
     expect(
-      validateEndpointDraft({
-        ...EMPTY_ENDPOINT_DRAFT,
+      validateServerDraft({
+        ...EMPTY_SERVER_DRAFT,
+        name: "Cairo primary",
+        sipDomain: "sip.example.com",
         websocketUrl: "wss://sip.example.com:8089/ws",
       }),
     ).toEqual({});
@@ -259,12 +409,25 @@ describe("draft validation", () => {
     ).toEqual({});
   });
 
-  it("rejects an extension number with letters in it", () => {
+  // Letters are legitimate: a dial plan addresses queues and departments by
+  // name as often as by number, so `SQ_1023` is an ordinary extension.
+  it("accepts an alphanumeric extension", () => {
     expect(
       validateExtensionDraft({
         ...EMPTY_EXTENSION_DRAFT,
         ownerId: "u1",
-        extension: "10a1",
+        extension: "SQ_1023",
+        sipUsername: "user1001",
+      }),
+    ).not.toMatchObject({ extension: "INVALID_EXTENSION" });
+  });
+
+  it("still rejects an extension carrying characters a SIP URI would have to escape", () => {
+    expect(
+      validateExtensionDraft({
+        ...EMPTY_EXTENSION_DRAFT,
+        ownerId: "u1",
+        extension: "10 1@x",
         sipUsername: "user1001",
       }),
     ).toMatchObject({ extension: "INVALID_EXTENSION" });

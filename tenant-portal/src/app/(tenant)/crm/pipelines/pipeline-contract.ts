@@ -96,6 +96,55 @@ export interface CreatePipelineInput {
   nameEn: string;
   description: string;
   isDefault: boolean;
+  /**
+   * Catalogue stage ids, in the order they will rank.
+   *
+   * Empty means "seed the canonical six" — the request omits the key entirely,
+   * because `@ArrayNotEmpty()` makes `[]` a 400 rather than a shorthand for the
+   * default.
+   */
+  stageIds: string[];
+}
+
+/** `@ArrayMaxSize(100)` on `stageIds`. */
+export const PIPELINE_STAGE_IDS_MAX = 100;
+
+/**
+ * `assertValidStageDefinitions`, mirrored.
+ *
+ * The server requires **exactly one** stage of each of these flags, and the
+ * `NEW` one must rank first — two separate throws, `PIPELINE_STAGES_REQUIRED`
+ * and `PIPELINE_STAGE_REORDER_INVALID`. Both are cheap to check here and
+ * expensive to discover from a rejected create.
+ */
+const PIPELINE_REQUIRED_STAGE_FLAGS = ["NEW", "WON", "LOST"] as const;
+
+export type PipelineStageSelectionProblem =
+  | "MISSING_NEW"
+  | "MISSING_WON"
+  | "MISSING_LOST"
+  | "DUPLICATE_NEW"
+  | "DUPLICATE_WON"
+  | "DUPLICATE_LOST"
+  | "NEW_NOT_FIRST"
+  | "TOO_MANY";
+
+/**
+ * Why the chosen stage order would be refused, or `null` when it would be
+ * accepted. An empty selection is accepted: it means the canonical six.
+ */
+export function validatePipelineStageSelection(
+  selected: ReadonlyArray<{ flag: OpportunityStageFlag }>,
+): PipelineStageSelectionProblem | null {
+  if (selected.length === 0) return null;
+  if (selected.length > PIPELINE_STAGE_IDS_MAX) return "TOO_MANY";
+  for (const flag of PIPELINE_REQUIRED_STAGE_FLAGS) {
+    const count = selected.filter((stage) => stage.flag === flag).length;
+    if (count === 0) return `MISSING_${flag}` as PipelineStageSelectionProblem;
+    if (count > 1) return `DUPLICATE_${flag}` as PipelineStageSelectionProblem;
+  }
+  if (selected[0].flag !== "NEW") return "NEW_NOT_FIRST";
+  return null;
 }
 
 /** One entry of the reusable catalogue — `CrmOpportunityStageEntity`. */
@@ -166,11 +215,15 @@ export function pipelineStagePath(id: string, pipelineStageId: string): string {
  * Keys omitted rather than sent empty: `forbidNonWhitelisted` rejects an
  * unknown key, and `@IsNotEmpty()` on an optional string rejects `""`.
  *
- * `stageIds` is deliberately never sent. Omitting it makes the service seed
- * the canonical `CRM_DEFAULT_OPPORTUNITY_STAGES`, and stage composition then
- * happens on the pipeline detail screen where attach, reorder and detach all
- * live together — rather than as a one-shot choice inside a create form that
- * cannot show what the choice means.
+ * `stageIds` used to be omitted unconditionally, because a 448px drawer could
+ * not show what choosing a stage order meant. The create surface is now a
+ * full-screen modal with room for the ordered list and its rules, so the choice
+ * is offered — and an EMPTY selection still omits the key, which is what makes
+ * the service seed the canonical `CRM_DEFAULT_OPPORTUNITY_STAGES`. Sending
+ * `[]` instead would be a 400: `@ArrayNotEmpty()` is on the field.
+ *
+ * Attach, reorder and detach after the fact still live on the pipeline detail
+ * screen; this only removes the need to visit it before the pipeline is usable.
  */
 export function buildCreatePipelineRequest(
   input: CreatePipelineInput,
@@ -194,6 +247,7 @@ export function buildCreatePipelineRequest(
     throw new Error("PIPELINE_DESCRIPTION_TOO_LONG");
   }
   if (description.length > 0) body.description = description;
+  if (input.stageIds.length > 0) body.stageIds = [...input.stageIds];
   return body;
 }
 

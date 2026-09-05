@@ -1,8 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { DragDropContext, type DragStart, type DropResult } from "@hello-pangea/dnd";
 import type { NormalizedApiError } from "@/lib/api/errors";
-import { Checkbox } from "../../primitives/Checkbox";
 import { Table, TableBody, TableCell, TableRow } from "../../primitives/Table";
 import { cn } from "../../lib/cn";
 import { useVirtualWindow } from "../../views/useVirtualWindow";
@@ -12,8 +12,18 @@ import { Pagination } from "../pagination/Pagination";
 import type { ColumnLayoutLabels } from "./ColumnHeaderControls";
 import { applyColumnLayout, resolveColumnLayout, type ColumnLayoutState } from "./column-layout";
 import { DataTableHeader } from "./DataTableHeader";
+import { DataTableReorderBody } from "./DataTableReorderBody";
+import { DataTableRow } from "./DataTableRow";
 import { DataTableSkeleton } from "./DataTableSkeleton";
-import type { ColumnDef, DataTableLabels, PageInfo, SelectionState, SortState } from "./types";
+import { captureCellWidths, moveRowKey } from "./row-reorder";
+import type {
+  ColumnDef,
+  DataTableLabels,
+  PageInfo,
+  RowReorderState,
+  SelectionState,
+  SortState,
+} from "./types";
 
 // Above this many rows the body renders a window plus two spacer rows instead
 // of the whole page — task 2.9. Rows are uniform by construction, so the
@@ -58,6 +68,12 @@ export interface DataTableProps<T> {
    * detail tables where an ordinal carries no meaning.
    */
   showRowNumbers?: boolean;
+  /**
+   * Row drag reordering plus its earlier/later controls. Off unless passed.
+   * `rows` must be the **unfiltered** list while it is on: `onReorder` reports
+   * the whole order, and a searched view is not the order being written.
+   */
+  rowReorder?: RowReorderState<T>;
   className?: string;
 }
 
@@ -84,6 +100,7 @@ export function DataTable<T>({
   columnLayout,
   layoutLabels,
   showRowNumbers = true,
+  rowReorder,
   className,
 }: DataTableProps<T>) {
   // Resolved every render rather than stored: the declared column set is the
@@ -91,10 +108,16 @@ export function DataTable<T>({
   // hide it.
   const layout = columnLayout ? resolveColumnLayout(columns, columnLayout.layout) : undefined;
   const orderedColumns = layout ? applyColumnLayout(columns, layout) : columns;
+  const bodyRef = useRef<HTMLTableSectionElement | null>(null);
+  const [draggingWidths, setDraggingWidths] = useState<number[] | null>(null);
 
   const { scrollRef, itemRef, range } = useVirtualWindow({
     count: rows.length,
-    threshold: VIRTUALIZE_ABOVE,
+    // A windowed body renders a slice, so a `<Draggable>` index would not be
+    // the row's index in the order being written. Reordering renders the whole
+    // body instead — virtualized dragging is the board's problem, solved there
+    // with react-window (D9).
+    threshold: rowReorder ? Number.POSITIVE_INFINITY : VIRTUALIZE_ABOVE,
     estimatedRowSize: ESTIMATED_ROW_PX,
   });
 
@@ -103,7 +126,9 @@ export function DataTable<T>({
   const someSelected = selectedCount > 0 && !allSelected;
   const hasStickyStart = selection !== undefined || columns.some((column) => column.sticky === "start");
   const hasStickyEnd = columns.some((column) => column.sticky === "end");
-  const cellCount = orderedColumns.length + (selection ? 1 : 0) + (showRowNumbers ? 1 : 0);
+  const cellCount =
+    orderedColumns.length + (selection ? 1 : 0) + (showRowNumbers ? 1 : 0) + (rowReorder ? 1 : 0);
+  const rowIds = rows.map(rowKey);
 
   // Continuous across pages, so the ordinal identifies a record in the whole
   // result set rather than repeating 1..limit on every page. The windowed body
@@ -135,6 +160,24 @@ export function DataTable<T>({
     onSortChange({ id: field, direction: nextDirection });
   }
 
+  function handleBeforeDragStart(start: DragStart) {
+    setDraggingWidths(captureCellWidths(bodyRef.current, start.draggableId));
+  }
+
+  function handleDragEnd(result: DropResult) {
+    setDraggingWidths(null);
+    if (!rowReorder || !result.destination) return;
+    // A drop onto a pinned row's index resolves to null and is dropped here,
+    // rather than travelling to a server that answers 422 for it.
+    const ordered = moveRowKey(
+      rowIds,
+      result.source.index,
+      result.destination.index,
+      rowReorder.isPinned,
+    );
+    if (ordered) rowReorder.onReorder(ordered);
+  }
+
   if (isLoading) {
     return (
       <div className={cn("overflow-x-auto", className)}>
@@ -153,7 +196,64 @@ export function DataTable<T>({
 
   const visibleRows = range ? rows.slice(range.start, range.end) : rows;
 
-  return (
+  const sharedRowProps = (row: T, index: number) => {
+    const id = rowKey(row);
+    return {
+      row,
+      id,
+      columns: orderedColumns,
+      labels,
+      rowNumber: showRowNumbers ? rowNumber(index) : undefined,
+      hasSelection: selection !== undefined,
+      isSelected: selection?.selectedIds.has(id) ?? false,
+      onToggleRow: toggleRow,
+      onRowClick,
+      hasStickyStart,
+      hasStickyEnd,
+    };
+  };
+
+  const body = rowReorder ? (
+    <DataTableReorderBody
+      rows={rows}
+      rowKey={rowKey}
+      reorder={rowReorder}
+      rowProps={sharedRowProps}
+      draggingWidths={draggingWidths}
+      bodyRef={bodyRef}
+      cellCount={cellCount}
+    />
+  ) : (
+    <TableBody>
+      {range && range.paddingStart > 0 && (
+        <TableRow
+          aria-hidden="true"
+          className="border-b-0 odd:bg-transparent hover:bg-transparent"
+          style={{ height: range.paddingStart }}
+        >
+          <TableCell colSpan={cellCount} className="p-0" />
+        </TableRow>
+      )}
+      {visibleRows.map((row, index) => (
+        <DataTableRow
+          key={rowKey(row)}
+          {...sharedRowProps(row, index)}
+          rowRef={index === 0 ? itemRef : undefined}
+        />
+      ))}
+      {range && range.paddingEnd > 0 && (
+        <TableRow
+          aria-hidden="true"
+          className="border-b-0 odd:bg-transparent hover:bg-transparent"
+          style={{ height: range.paddingEnd }}
+        >
+          <TableCell colSpan={cellCount} className="p-0" />
+        </TableRow>
+      )}
+    </TableBody>
+  );
+
+  const grid = (
     <div className={cn("flex flex-col gap-3", range && "h-full min-h-0", className)}>
       {/* Horizontal overflow lives inside this container — the page itself
           never scrolls sideways. When the body is windowed this container also
@@ -176,90 +276,25 @@ export function DataTable<T>({
             columnLayout={columnLayout}
             layoutLabels={layoutLabels}
             labels={labels}
+            reorderLabel={rowReorder?.dragHandleLabel}
           />
-          <TableBody>
-            {range && range.paddingStart > 0 && (
-              <TableRow
-                aria-hidden="true"
-                className="border-b-0 odd:bg-transparent hover:bg-transparent"
-                style={{ height: range.paddingStart }}
-              >
-                <TableCell colSpan={cellCount} className="p-0" />
-              </TableRow>
-            )}
-            {visibleRows.map((row, index) => {
-              const id = rowKey(row);
-              const isSelected = selection?.selectedIds.has(id) ?? false;
-
-              return (
-                <TableRow
-                  key={id}
-                  ref={index === 0 ? itemRef : undefined}
-                  data-state={isSelected ? "selected" : undefined}
-                  tabIndex={onRowClick ? 0 : undefined}
-                  onClick={() => onRowClick?.(row)}
-                  onKeyDown={(event) => {
-                    if (onRowClick && (event.key === "Enter" || event.key === " ")) {
-                      event.preventDefault();
-                      onRowClick(row);
-                    }
-                  }}
-                  // Four sticky layers overlap this grid. Without a scroll
-                  // margin, tabbing into a row lands the focus ring behind the
-                  // sticky header or a sticky column with no visual indication
-                  // at all — WCAG 2.2 AA focus-not-obscured.
-                  className={cn(
-                    "scroll-mt-(--size-row)",
-                    hasStickyStart && "scroll-ms-16",
-                    hasStickyEnd && "scroll-me-16",
-                    onRowClick &&
-                      "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                  )}
-                >
-                  {selection && (
-                    <TableCell onClick={(event) => event.stopPropagation()}>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleRow(id)}
-                        aria-label={labels.selectRow}
-                      />
-                    </TableCell>
-                  )}
-                  {showRowNumbers && (
-                    <TableCell className="text-xs tabular-nums text-muted-foreground">
-                      {rowNumber(index)}
-                    </TableCell>
-                  )}
-                  {orderedColumns.map((column) => (
-                    <TableCell
-                      key={column.id}
-                      className={cn(
-                        (column.numeric || column.align === "end") && "text-end tabular-nums font-mono",
-                        column.sticky === "start" && "sticky start-0 z-(--z-sticky-cell) bg-inherit",
-                        column.sticky === "end" && "sticky end-0 z-(--z-sticky-cell) bg-inherit",
-                      )}
-                    >
-                      {column.cell(row)}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              );
-            })}
-            {range && range.paddingEnd > 0 && (
-              <TableRow
-                aria-hidden="true"
-                className="border-b-0 odd:bg-transparent hover:bg-transparent"
-                style={{ height: range.paddingEnd }}
-              >
-                <TableCell colSpan={cellCount} className="p-0" />
-              </TableRow>
-            )}
-          </TableBody>
+          {body}
         </Table>
       </div>
       {page && onPageChange && (
         <Pagination page={page} onPageChange={onPageChange} labels={labels.pagination} />
       )}
     </div>
+  );
+
+  // DragDropContext renders no element of its own, so wrapping the whole grid
+  // keeps the table markup legal — and it exists only when a caller asked for
+  // reordering, so every other screen renders exactly the tree it always did.
+  if (!rowReorder) return grid;
+
+  return (
+    <DragDropContext onBeforeDragStart={handleBeforeDragStart} onDragEnd={handleDragEnd}>
+      {grid}
+    </DragDropContext>
   );
 }

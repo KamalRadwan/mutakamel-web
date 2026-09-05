@@ -240,6 +240,12 @@ width 288px, gap 12px. The row scrolls; the page does not. Under RTL the
 scroll direction and column order mirror automatically — use logical
 properties and let the browser handle it.
 
+**Every state owns the full height of the pane**, not only the populated one:
+the loading skeletons, the error state and the empty state all carry `h-full`.
+A board that collapses to its content while loading makes the page jump as the
+columns arrive, and an empty pipeline rendered as a short strip under the
+filters reads as a broken screen rather than as a pipeline with nothing in it.
+
 **Column header.** Stage name (400 weight), a count chip, and — where the
 stage carries an outcome — a 2px top border in the mapped role color from
 [tokens.md](tokens.md#status-mapping). Intermediate stages get no color.
@@ -377,6 +383,47 @@ to it.
 keyboard, both directions, both languages, which is what D9 requires and what
 keeps task 2.8 at `[/]`. What exists is `BoardVirtualization.test.tsx` and
 `virtual-dnd.probe.test.tsx`: structure, indices and invariants, not behaviour.
+
+## Stage bar — the pipeline, above the two views that lose it
+
+```
+src/design-system/views/stage-bar/StageBar.tsx
+```
+
+A board shows its stages as columns. A card or table view has nowhere to put
+them, and without help the stage a row is in becomes just another text cell.
+`StageBar` puts them back as one chevron strip above those two views: an `All`
+step first, then a segment per stage, each pointing into the next.
+
+It is the filter as well as the picture. Pressing a stage narrows the list to
+it and pressing it again clears — there is no separate control to keep in sync,
+and on Leads it writes the same single filter the search bar's Stage field
+writes, because the endpoint answers one filter at a time.
+
+- **The arrow is a `clip-path`**, not a rotated square or a border trick: those
+  leave a seam at a non-integer device pixel ratio, and a border chevron cannot
+  take a background. The first segment has no notch cut into its start edge and
+  the last has no point on its end, so the bar reads as one object rather than
+  a row of loose arrows.
+- **Selection is `aria-pressed` first and fill second.** Colour is
+  reinforcement, never the only signal.
+- **Only an outcome stage takes a hue** — WON positive, LOST negative — which
+  is the rule the board's columns already follow. An intermediate stage gets
+  none: position and label carry it.
+- **Mirrored under RTL** by flipping the segment and flipping its label back, so
+  the arrow follows the reading direction and the text does not.
+- Its hover colours use `not-disabled:hover:` rather than a bare `hover:`.
+  `Button`'s ghost variant paints `not-disabled:hover:bg-accent`, two
+  pseudo-classes to a bare `hover:`'s one, so a plain `hover:bg-…` loses on
+  specificity however late it appears — every segment turned grey under the
+  pointer before that was matched.
+
+On Opportunities the bar filters both views for real: `stageId` on
+`GET /opportunities` for the table and on `GET /pipelines/:id/cards` for the
+cards. The card cursor is **stamped with the selected stage**
+(`opportunity-board.service.ts:209`), so `stageId` has to be repeated on every
+`loadMore` — dropping it does not return an unfiltered page, it makes the
+server reject the cursor.
 
 ## Card view
 

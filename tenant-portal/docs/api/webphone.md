@@ -1,7 +1,7 @@
 # Tenant WebPhone API
 
 > **Contract status:** Current
-> **Last verified:** 2026-08-29
+> **Last verified:** 2026-09-03 against `core-app/src/webphone/tenant/tenant-webphone.controller.ts`
 > **Backend owner:** Core (`core-app`)
 > **Canonical browser prefix:** `/api/tenant/webphone/v1`
 > **Controller-relative prefix:** `/tenant/webphone`
@@ -76,22 +76,46 @@ The enforced limit is the **lower** of the purchased seat count and the tier's
 `maxExtensions` ceiling. A tier that grants no `webphone.extensions` ceiling
 yields zero seats, not unlimited ones.
 
-## Server configuration routes
+## Scope state
 
 | Method and canonical browser path | Permission | Contract |
 |---|---|---|
-| `GET /api/tenant/webphone/v1/config` | `webphone.settings.read` | SIP server configuration |
-| `PATCH /api/tenant/webphone/v1/config` | `webphone.settings.update` | Update SIP server configuration |
-| `GET /api/tenant/webphone/v1/config/endpoints` | `webphone.settings.read` | Endpoint list, by priority |
-| `POST /api/tenant/webphone/v1/config/endpoints` | `webphone.settings.update` | Add an endpoint |
-| `PATCH /api/tenant/webphone/v1/config/endpoints/:id` | `webphone.settings.update` | Update an endpoint |
-| `DELETE /api/tenant/webphone/v1/config/endpoints/:id` | `webphone.settings.update` | Remove an endpoint |
-| `GET /api/tenant/webphone/v1/config/ice-servers` | `webphone.settings.read` | ICE server list |
-| `POST /api/tenant/webphone/v1/config/ice-servers` | `webphone.settings.update` | Add an ICE server |
-| `PATCH /api/tenant/webphone/v1/config/ice-servers/:id` | `webphone.settings.update` | Update an ICE server |
-| `DELETE /api/tenant/webphone/v1/config/ice-servers/:id` | `webphone.settings.update` | Remove an ICE server |
+| `GET /api/tenant/webphone/v1/config` | `webphone.settings.read` | `{ tenantId, enabled }` — nothing else |
 
-Endpoint priority is unique within a tenant; a duplicate returns `409`.
+**Read-only, and that is the whole contract.** The scope has no stored settings
+row: `enabled` is **derived**, true when the tenant holds an enabled server
+carrying both a SIP domain and a WebSocket URL. There is therefore no
+`PATCH .../config` — the route and its Gateway contract are both gone, and a
+call to it returns `404 GW.ROUTE.UNKNOWN`. WebPhone is switched on by giving
+the tenant a working server, not by writing a flag.
+
+TURN REST minting lost its stored on/off and TTL in the same change. It runs
+when `ASTERISK_TURN_SHARED_SECRET` is set in the environment and the scope has
+enabled TURN entries; it is an operator concern, not a tenant setting.
+
+## Server routes
+
+A scope owns an ordered failover chain, and each server owns its own SIP fields
+and its own ICE set — a relay is only reachable inside the network its server
+lives in, so one shared ICE list would hand other servers candidates that
+cannot work. The former `/config/endpoints` and `/config/ice-servers` families
+are gone; these replaced them.
+
+| Method and canonical browser path | Permission | Contract |
+|---|---|---|
+| `GET /api/tenant/webphone/v1/servers` | `webphone.settings.read` | The chain, lowest priority first, ICE nested |
+| `POST /api/tenant/webphone/v1/servers` | `webphone.settings.update` | Append a server; an untested server never takes live traffic |
+| `PUT /api/tenant/webphone/v1/servers/order` | `webphone.settings.update` | Renumber the whole chain; the body names every server once |
+| `PATCH /api/tenant/webphone/v1/servers/:id` | `webphone.settings.update` | Update a server; `priority` is not editable here |
+| `DELETE /api/tenant/webphone/v1/servers/:id` | `webphone.settings.update` | Remove a server; survivors are renumbered |
+| `GET /api/tenant/webphone/v1/servers/:serverId/ice-servers` | `webphone.settings.read` | ICE for one server; credentials never returned |
+| `POST /api/tenant/webphone/v1/servers/:serverId/ice-servers` | `webphone.settings.update` | Add an ICE server |
+| `PATCH /api/tenant/webphone/v1/servers/:serverId/ice-servers/:id` | `webphone.settings.update` | Update an ICE server; `null` clears a credential |
+| `DELETE /api/tenant/webphone/v1/servers/:serverId/ice-servers/:id` | `webphone.settings.update` | Remove an ICE server |
+
+`priority` is contiguous from 1 and unique per scope, and the reorder route is
+the only thing that writes it: a move renumbers every row between the two
+positions, so no sequence of single-row writes stays valid in between.
 
 ## Extension routes
 
@@ -99,6 +123,8 @@ Endpoint priority is unique within a tenant; a duplicate returns `409`.
 |---|---|---|
 | `GET /api/tenant/webphone/v1/extensions` | `webphone.extensions.read` | Paginated extension list |
 | `POST /api/tenant/webphone/v1/extensions` | `webphone.extensions.manage` | Create an extension; consumes a seat |
+| `GET /api/tenant/webphone/v1/extensions/:id/servers` | `webphone.extensions.read` | This user's chain, in failover order |
+| `PUT /api/tenant/webphone/v1/extensions/:id/servers` | `webphone.extensions.manage` | Replace that chain wholesale, in the given order |
 | `PATCH /api/tenant/webphone/v1/extensions/:id` | `webphone.extensions.manage` | Update or enable/disable an extension |
 | `DELETE /api/tenant/webphone/v1/extensions/:id` | `webphone.extensions.manage` | Remove an extension; frees its seat |
 

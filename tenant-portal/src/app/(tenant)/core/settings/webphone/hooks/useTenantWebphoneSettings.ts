@@ -7,31 +7,38 @@ import { axiosClient } from "@/lib/api/axiosClient";
 import { getAuthErrorCode, getAuthErrorStatus } from "@/lib/auth/sessionErrors";
 import { generateUUIDv7 } from "@/lib/uuid";
 import {
-  buildConfigPatch,
-  configToForm,
-  EMPTY_CONFIG_FORM,
+  moveServerId,
   readWebphoneConfig,
   readWebphoneExtensions,
   readWebphoneSeats,
+  readWebphoneServers,
   unwrapWebphoneEnvelope,
-  validateConfigForm,
-  type CreateWebphoneEndpointDto,
   type CreateWebphoneExtensionDto,
   type CreateWebphoneIceServerDto,
-  type UpdateWebphoneEndpointDto,
+  type CreateWebphoneServerDto,
   type UpdateWebphoneExtensionDto,
   type UpdateWebphoneIceServerDto,
-  type WebphoneConfig,
-  type WebphoneConfigForm,
+  type UpdateWebphoneServerDto,
   type WebphoneExtension,
-  type WebphoneFieldErrors,
+  type WebphoneScopeConfig,
   type WebphoneSeats,
+  type WebphoneServer,
 } from "../webphone-contract";
 
 const BASE_PATH = "/api/tenant/webphone/v1";
+/**
+ * Read-only. The scope has no stored settings row, so there is no `PATCH` here
+ * — `enabled` is derived from the servers below and is switched by giving the
+ * scope a working server, not by writing a flag.
+ */
 const CONFIG_ENDPOINT = `${BASE_PATH}/config`;
+const SERVERS_ENDPOINT = `${BASE_PATH}/servers`;
 const EXTENSIONS_ENDPOINT = `${BASE_PATH}/extensions`;
 const SEATS_ENDPOINT = `${BASE_PATH}/seats`;
+
+function iceServersEndpoint(serverId: string): string {
+  return `${SERVERS_ENDPOINT}/${encodeURIComponent(serverId)}/ice-servers`;
+}
 
 /**
  * Why the screen is or is not usable.
@@ -50,11 +57,10 @@ export type WebphoneEntitlement =
 export type WebphoneLoadState = "LOADING" | "READY" | "FORBIDDEN" | "ERROR";
 
 export type WebphoneMutationTarget =
-  | "config"
-  | "endpoint:new"
-  | "ice:new"
+  | "servers:order"
+  | "server:new"
   | "extension:new"
-  | `endpoint:${string}`
+  | `server:${string}`
   | `ice:${string}`
   | `extension:${string}`;
 
@@ -85,8 +91,8 @@ export function useTenantWebphoneSettings() {
   const hasExtensionsManage = permissions.includes(EXTENSIONS_MANAGE);
 
   const [entitlement, setEntitlement] = useState<WebphoneEntitlement>("ACTIVE");
-  const [config, setConfig] = useState<WebphoneConfig | null>(null);
-  const [form, setForm] = useState<WebphoneConfigForm | null>(null);
+  const [config, setConfig] = useState<WebphoneScopeConfig | null>(null);
+  const [servers, setServers] = useState<WebphoneServer[]>([]);
   const [extensions, setExtensions] = useState<WebphoneExtension[]>([]);
   const [seats, setSeats] = useState<WebphoneSeats | null>(null);
   const [loadState, setLoadState] = useState<WebphoneLoadState>("LOADING");
@@ -95,14 +101,9 @@ export function useTenantWebphoneSettings() {
   const generation = useRef(0);
   const intent = useRef<{ fingerprint: string; key: string } | null>(null);
 
-  const applyConfig = useCallback((next: WebphoneConfig) => {
-    setConfig(next);
-    setForm(configToForm(next));
-  }, []);
-
   const clearData = useCallback(() => {
     setConfig(null);
-    setForm(null);
+    setServers([]);
     setExtensions([]);
     setSeats(null);
   }, []);
@@ -115,6 +116,11 @@ export function useTenantWebphoneSettings() {
    * capability stays discoverable, which means it issues a read the server is
    * meant to refuse. That refusal becomes the disabled state — never an error
    * banner and never an error boundary.
+   *
+   * The server list sits behind the same permission and the same entitlement as
+   * the scope settings, so it is read here rather than tolerantly: an empty
+   * chain and an unreadable one are different facts, and the failover order is
+   * the substance of this screen.
    */
   const load = useCallback(async () => {
     const currentGeneration = ++generation.current;
@@ -130,21 +136,23 @@ export function useTenantWebphoneSettings() {
 
     setLoadState("LOADING");
     try {
-      const response = await axiosClient.get<unknown>(CONFIG_ENDPOINT, {
-        cache: "no-store",
-      });
+      const [configResponse, serversResponse] = await Promise.all([
+        axiosClient.get<unknown>(CONFIG_ENDPOINT, { cache: "no-store" }),
+        axiosClient.get<unknown>(SERVERS_ENDPOINT, { cache: "no-store" }),
+      ]);
       if (currentGeneration !== generation.current) return;
-      applyConfig(readWebphoneConfig(unwrapWebphoneEnvelope(response.data)));
+      setConfig(readWebphoneConfig(unwrapWebphoneEnvelope(configResponse.data)));
+      setServers(readWebphoneServers(unwrapWebphoneEnvelope(serversResponse.data)));
       setEntitlement("ACTIVE");
     } catch (caught) {
       if (currentGeneration !== generation.current) return;
       const blocked = entitlementFromError(caught);
       clearData();
       setEntitlement(blocked ?? "ACTIVE");
-      // An unavailable module still gets the whole form, inert and empty, so
-      // the capability is visible rather than hidden. `config` stays null, so
-      // nothing here can be mistaken for something the server returned.
-      if (blocked) setForm(EMPTY_CONFIG_FORM);
+      // An unavailable module still reaches READY, so the screen renders its
+      // sections inert and empty and the capability stays visible rather than
+      // hidden. `config` stays null, so nothing on screen can be mistaken for
+      // something the server returned.
       setLoadState(blocked ? "READY" : classifyLoadError(caught));
       intent.current = null;
       setMutation(IDLE_MUTATION);
@@ -167,7 +175,7 @@ export function useTenantWebphoneSettings() {
     intent.current = null;
     setMutation(IDLE_MUTATION);
     setLoadState("READY");
-  }, [applyConfig, canRead, clearData, isAuthLoading]);
+  }, [canRead, clearData, isAuthLoading]);
 
   useEffect(() => {
     queueMicrotask(() => void load());
@@ -176,26 +184,6 @@ export function useTenantWebphoneSettings() {
   const isSubscribed = entitlement === "ACTIVE";
   const canUpdateConfig = isSubscribed && hasSettingsUpdate;
   const canManageExtensions = isSubscribed && hasExtensionsManage;
-
-  const fieldErrors: WebphoneFieldErrors = useMemo(
-    () => (form ? validateConfigForm(form) : {}),
-    [form],
-  );
-  const configPatch = useMemo(
-    () => (config && form ? buildConfigPatch(config, form) : {}),
-    [config, form],
-  );
-  const hasUnsavedChanges = Object.keys(configPatch).length > 0;
-
-  const updateField = useCallback(
-    <K extends keyof WebphoneConfigForm>(
-      field: K,
-      value: WebphoneConfigForm[K],
-    ) => {
-      setForm((current) => (current ? { ...current, [field]: value } : current));
-    },
-    [],
-  );
 
   const failLocally = useCallback(
     (target: WebphoneMutationTarget, errorCode: string) => {
@@ -269,12 +257,20 @@ export function useTenantWebphoneSettings() {
     [failLocally, isSubscribed, mutation.phase],
   );
 
-  const reloadConfig = useCallback(async () => {
-    const response = await axiosClient.get<unknown>(CONFIG_ENDPOINT, {
+  /**
+   * Re-reads the chain after any server or ICE write.
+   *
+   * One read for the whole list rather than patching the one row back in: a
+   * create appends a priority the client did not choose and a delete renumbers
+   * everything after it, so a local splice would be guessing at what the server
+   * just decided.
+   */
+  const reloadServers = useCallback(async () => {
+    const response = await axiosClient.get<unknown>(SERVERS_ENDPOINT, {
       cache: "no-store",
     });
-    applyConfig(readWebphoneConfig(unwrapWebphoneEnvelope(response.data)));
-  }, [applyConfig]);
+    setServers(readWebphoneServers(unwrapWebphoneEnvelope(response.data)));
+  }, []);
 
   /**
    * Refreshes the extension list and the seat counter after a write.
@@ -294,106 +290,120 @@ export function useTenantWebphoneSettings() {
     setSeats((current) => readOrDefault(seatsResult, readWebphoneSeats, current));
   }, []);
 
-  const saveConfig = useCallback(async () => {
-    if (!config || !form) return false;
-    if (Object.keys(validateConfigForm(form)).length > 0) {
-      return failLocally("config", "WEBPHONE_VALIDATION_FAILED");
-    }
-    const patch = buildConfigPatch(config, form);
-    if (Object.keys(patch).length === 0) {
-      return failLocally("config", "NO_WEBPHONE_CHANGES");
-    }
-    return runMutation(
-      "config",
-      canUpdateConfig,
-      "WEBPHONE_UPDATE_PERMISSION_REQUIRED",
-      patch,
-      async (key) => {
-        const response = await axiosClient.patch<unknown>(
-          CONFIG_ENDPOINT,
-          patch,
-          { headers: { "x-idempotency-key": key } },
-        );
-        applyConfig(readWebphoneConfig(unwrapWebphoneEnvelope(response.data)));
-      },
-    );
-  }, [applyConfig, canUpdateConfig, config, failLocally, form, runMutation]);
-
-  const createEndpoint = useCallback(
-    (dto: CreateWebphoneEndpointDto) =>
+  const createServer = useCallback(
+    (dto: CreateWebphoneServerDto) =>
       runMutation(
-        "endpoint:new",
+        "server:new",
         canUpdateConfig,
         "WEBPHONE_UPDATE_PERMISSION_REQUIRED",
         dto,
         async (key) => {
-          await axiosClient.post<unknown>(`${CONFIG_ENDPOINT}/endpoints`, dto, {
+          await axiosClient.post<unknown>(SERVERS_ENDPOINT, dto, {
             headers: { "x-idempotency-key": key },
           });
-          await reloadConfig();
+          await reloadServers();
         },
       ),
-    [canUpdateConfig, reloadConfig, runMutation],
+    [canUpdateConfig, reloadServers, runMutation],
   );
 
-  const updateEndpoint = useCallback(
-    (id: string, dto: UpdateWebphoneEndpointDto) =>
+  const updateServer = useCallback(
+    (id: string, dto: UpdateWebphoneServerDto) =>
       runMutation(
-        `endpoint:${id}`,
+        `server:${id}`,
         canUpdateConfig,
         "WEBPHONE_UPDATE_PERMISSION_REQUIRED",
         dto,
         async (key) => {
           await axiosClient.patch<unknown>(
-            `${CONFIG_ENDPOINT}/endpoints/${encodeURIComponent(id)}`,
+            `${SERVERS_ENDPOINT}/${encodeURIComponent(id)}`,
             dto,
             { headers: { "x-idempotency-key": key } },
           );
-          await reloadConfig();
+          await reloadServers();
         },
       ),
-    [canUpdateConfig, reloadConfig, runMutation],
+    [canUpdateConfig, reloadServers, runMutation],
   );
 
-  const deleteEndpoint = useCallback(
+  const deleteServer = useCallback(
     (id: string) =>
       runMutation(
-        `endpoint:${id}`,
+        `server:${id}`,
         canUpdateConfig,
         "WEBPHONE_UPDATE_PERMISSION_REQUIRED",
         { delete: id },
         async (key) => {
           await axiosClient.delete<unknown>(
-            `${CONFIG_ENDPOINT}/endpoints/${encodeURIComponent(id)}`,
+            `${SERVERS_ENDPOINT}/${encodeURIComponent(id)}`,
             { headers: { "x-idempotency-key": key } },
           );
-          await reloadConfig();
+          await reloadServers();
         },
       ),
-    [canUpdateConfig, reloadConfig, runMutation],
+    [canUpdateConfig, reloadServers, runMutation],
+  );
+
+  /**
+   * Moves one server in the chain.
+   *
+   * The endpoint takes the whole id list rather than a delta, because a move
+   * renumbers every row between the two positions and `priority` is unique per
+   * scope — there is no sequence of single-row writes that stays valid in
+   * between. The new order is shown before the response lands, since a row that
+   * springs back to where it was reads as a drag that failed; a refusal puts
+   * the previous chain back.
+   */
+  const moveServer = useCallback(
+    async (fromIndex: number, toIndex: number): Promise<boolean> => {
+      const previous = servers;
+      const ids = moveServerId(
+        previous.map((server) => server.id),
+        fromIndex,
+        toIndex,
+      );
+      if (ids.length === 0) return false;
+
+      setServers(applyOrder(previous, ids));
+      const succeeded = await runMutation(
+        "servers:order",
+        canUpdateConfig,
+        "WEBPHONE_UPDATE_PERMISSION_REQUIRED",
+        { ids },
+        async (key) => {
+          await axiosClient.put<unknown>(
+            `${SERVERS_ENDPOINT}/order`,
+            { ids },
+            { headers: { "x-idempotency-key": key } },
+          );
+          await reloadServers();
+        },
+      );
+      if (!succeeded) setServers(previous);
+      return succeeded;
+    },
+    [canUpdateConfig, reloadServers, runMutation, servers],
   );
 
   const createIceServer = useCallback(
-    (dto: CreateWebphoneIceServerDto) =>
+    (serverId: string, dto: CreateWebphoneIceServerDto) =>
       runMutation(
-        "ice:new",
+        `ice:new:${serverId}`,
         canUpdateConfig,
         "WEBPHONE_UPDATE_PERMISSION_REQUIRED",
         redactCredential(dto),
         async (key) => {
-          await axiosClient.post<unknown>(
-            `${CONFIG_ENDPOINT}/ice-servers`,
-            dto,
-            { headers: { "x-idempotency-key": key } },
-          );
-          await reloadConfig();
+          await axiosClient.post<unknown>(iceServersEndpoint(serverId), dto, {
+            headers: { "x-idempotency-key": key },
+          });
+          await reloadServers();
         },
       ),
-    [canUpdateConfig, reloadConfig, runMutation],
+    [canUpdateConfig, reloadServers, runMutation],
   );
 
   const updateIceServer = useCallback(
-    (id: string, dto: UpdateWebphoneIceServerDto) =>
+    (serverId: string, id: string, dto: UpdateWebphoneIceServerDto) =>
       runMutation(
         `ice:${id}`,
         canUpdateConfig,
@@ -401,18 +411,18 @@ export function useTenantWebphoneSettings() {
         redactCredential(dto),
         async (key) => {
           await axiosClient.patch<unknown>(
-            `${CONFIG_ENDPOINT}/ice-servers/${encodeURIComponent(id)}`,
+            `${iceServersEndpoint(serverId)}/${encodeURIComponent(id)}`,
             dto,
             { headers: { "x-idempotency-key": key } },
           );
-          await reloadConfig();
+          await reloadServers();
         },
       ),
-    [canUpdateConfig, reloadConfig, runMutation],
+    [canUpdateConfig, reloadServers, runMutation],
   );
 
   const deleteIceServer = useCallback(
-    (id: string) =>
+    (serverId: string, id: string) =>
       runMutation(
         `ice:${id}`,
         canUpdateConfig,
@@ -420,13 +430,13 @@ export function useTenantWebphoneSettings() {
         { delete: id },
         async (key) => {
           await axiosClient.delete<unknown>(
-            `${CONFIG_ENDPOINT}/ice-servers/${encodeURIComponent(id)}`,
+            `${iceServersEndpoint(serverId)}/${encodeURIComponent(id)}`,
             { headers: { "x-idempotency-key": key } },
           );
-          await reloadConfig();
+          await reloadServers();
         },
       ),
-    [canUpdateConfig, reloadConfig, runMutation],
+    [canUpdateConfig, reloadServers, runMutation],
   );
 
   const createExtension = useCallback(
@@ -491,17 +501,13 @@ export function useTenantWebphoneSettings() {
     refetch: load,
     canUpdateConfig,
     canManageExtensions,
+    /** Read-only, and derived server-side. Null while the module is blocked. */
     config,
-    form,
-    fieldErrors,
-    hasUnsavedChanges,
-    updateField,
-    saveConfig,
-    endpoints: config?.endpoints ?? [],
-    createEndpoint,
-    updateEndpoint,
-    deleteEndpoint,
-    iceServers: config?.iceServers ?? [],
+    servers,
+    createServer,
+    updateServer,
+    deleteServer,
+    moveServer,
     createIceServer,
     updateIceServer,
     deleteIceServer,
@@ -540,6 +546,22 @@ export function entitlementFromError(
 
 function classifyLoadError(error: unknown): WebphoneLoadState {
   return getAuthErrorStatus(error) === 403 ? "FORBIDDEN" : "ERROR";
+}
+
+/**
+ * Re-sequences the chain into `ids`, renumbering `priority` from 1 the way the
+ * reorder endpoint does, so the position badges match what was just dropped
+ * rather than the numbers the previous response carried.
+ */
+function applyOrder(
+  servers: readonly WebphoneServer[],
+  ids: readonly string[],
+): WebphoneServer[] {
+  const byId = new Map(servers.map((server) => [server.id, server]));
+  return ids.flatMap((id, index) => {
+    const server = byId.get(id);
+    return server ? [{ ...server, priority: index + 1 }] : [];
+  });
 }
 
 /**

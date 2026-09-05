@@ -307,6 +307,10 @@ export const ar = {
     defaultFailed: "تعذّر تغيير المرحلة الافتراضية.",
     defaultInvalidResponseReloaded: "تغيّرت المرحلة الافتراضية لكن ردّ الخادم كان غير صالح، وأُعيد تحميل القائمة.",
     defaultInvalidResponseStale: "تغيّرت المرحلة الافتراضية لكن ردّ الخادم كان غير صالح وتعذّر إعادة تحميل القائمة.",
+    dragHandle: "اسحب لإعادة الترتيب",
+    reorderFilteredHint: "امسح البحث لإعادة ترتيب المراحل: الترتيب يُكتب كاملًا، ولا يمكن أخذه من قائمة مُصفّاة.",
+    reorderInvalid: "هذا الترتيب غير صالح. تبقى مرحلة البداية أولًا ويجب أن يشمل الترتيب كل المراحل.",
+    reorderFailed: "تعذّر حفظ ترتيب المراحل.",
     editTitle: "تعديل المرحلة",
     editDescription: "المرحلة الافتراضية تُحدَّد من القائمة، لا من هذا النموذج.",
     revert: "استرجاع القيم المحفوظة",
@@ -322,9 +326,33 @@ export const ar = {
   },
   crmLeads: {
     title: "العملاء المحتملون",
-    subtitle: "تتبّع العملاء المحتملين عبر مراحل المبيعات وسلّمهم إلى فريق المبيعات عند التأهّل.",
     addLead: "إضافة عميل محتمل",
     search: "ابحث عن عميل محتمل...",
+    basicSearch: {
+      field: "بحث حسب",
+      value: "قيمة البحث",
+      any: "الكل",
+      selectValue: "اختر قيمة",
+      catalogueUnavailable: "لا توجد خيارات متاحة",
+      fields: {
+        text: "الاسم أو الهاتف أو البريد",
+        status: "الحالة",
+        stageFlag: "علامة المرحلة"
+      }
+    },
+    searchMode: {
+      label: "نمط البحث",
+      basic: "أساسي",
+      advanced: "متقدم"
+    },
+    advancedSearch: {
+      conditions: "شروط البحث",
+      and: "و",
+      addCondition: "إضافة شرط",
+      removeCondition: "إزالة الشرط: {field}",
+      unsupported:
+        "تُدمج الشروط بعامل «و» فقط. أما «أو» وعوامل المقارنة مثل «أكبر من» و«يحتوي» و«بين» فتحتاج إلى نقطة بحث لا توفرها الواجهة البرمجية بعد."
+    },
     name: "الاسم",
     contact: "التواصل",
     stage: "المرحلة",
@@ -347,11 +375,63 @@ export const ar = {
     stagesUnavailable: "تعذّر تحميل مراحل العملاء المحتملين، لذلك تظهر القائمة دون أعمدة المراحل.",
     capabilitiesUnavailable: "تعذّر تحميل صلاحيات الإجراءات، لذلك أُخفيت أزرار الإنشاء والتعديل والحذف. البيانات المعروضة كاملة.",
     existingCompany: "شركة قائمة في الدليل",
-    existingCompanyHint: "اربط العميل المحتمل بمنشأة مسجّلة بالفعل بدلًا من إنشاء واحدة جديدة.",
     newCompany: "إنشاء شركة جديدة",
     existingContact: "جهة اتصال قائمة",
-    existingContactHint: "اختر شخصًا مسجّلًا لدى هذه الشركة لتفادي تكرار السجل.",
     newContact: "إنشاء جهة اتصال جديدة",
+    create: {
+      sectionsNav: "أقسام النموذج",
+      sectionInvalid: "يحتوي على أخطاء",
+      errorCount: "حقول تحتاج إلى مراجعة: {count}",
+      sections: {
+        classification: "التصنيف",
+        company: "الشركة",
+        person: "بيانات الشخص",
+        contacts: "جهات الاتصال",
+        address: "العنوان",
+        qualification: "التأهيل",
+        customFields: "حقول مخصّصة"
+      },
+      leadType: "نوع العميل المحتمل",
+      types: { INDIVIDUAL: "فرد", CORPORATE: "شركة" },
+      legalName: "الاسم القانوني",
+      taxNumber: "الرقم الضريبي",
+      commercialRegistrationNumber: "رقم السجل التجاري",
+      companyPhones: "هواتف الشركة",
+      existingCompanyLocked: "مأخوذ من الدليل ولا يُعدَّل من هنا.",
+      displayName: "الاسم المعروض",
+      honorificTitle: "اللقب",
+      firstName: "الاسم الأول",
+      lastName: "اسم العائلة",
+      mobiles: "أرقام الجوال",
+      contactHeading: "جهة اتصال {number}",
+      contactJobTitle: "المسمّى الوظيفي",
+      addContact: "إضافة جهة اتصال",
+      removeContact: "حذف جهة الاتصال {number}",
+      contactsLimit: "الحد الأقصى {max} جهة اتصال.",
+      primaryContact: "أساسية",
+      primaryContactGroup: "جهة الاتصال الأساسية",
+      existingContactLocked: "مأخوذ من الدليل ولا يُعدَّل من هنا.",
+      country: "الدولة",
+      city: "المدينة",
+      state: "المنطقة",
+      street1: "الشارع 1",
+      street2: "الشارع 2",
+      buildingNo: "رقم المبنى",
+      floor: "الدور",
+      landmark: "علامة مميزة",
+      postalCode: "الرمز البريدي",
+      description: "ملاحظات",
+      interestSummary: "ملخّص الاهتمام",
+      expectedNeed: "الاحتياج المتوقّع",
+      sourcesUnavailable: "تعذّر تحميل مصادر الاستقطاب، لذلك تظهر قائمة المصدر فارغة. بقية النموذج كاملة.",
+      errors: {
+        required: "هذا الحقل مطلوب.",
+        email: "أدخل بريدًا إلكترونيًا صحيحًا.",
+        maxLength: "الحد الأقصى {max} حرفًا.",
+        duplicatePhone: "هذا الرقم مكرّر في القائمة.",
+        contactRequired: "أضف جهة اتصال واحدة على الأقل."
+      }
+    },
     messages: {
       selectBranchToCreate: "اختر فرعًا واحدًا متاحًا قبل إنشاء عميل محتمل.",
       createNotPermitted: "ليست لديك صلاحية إنشاء عملاء محتملين في هذا الفرع.",
@@ -387,6 +467,7 @@ export const ar = {
     title: "العنوان",
     customer: "العميل",
     stage: "المرحلة",
+    allStages: "كل المراحل",
     owner: "المسؤول",
     expectedClose: "الإغلاق المتوقع",
     notProvided: "غير متوفر",
@@ -572,6 +653,28 @@ export const ar = {
     } as Record<string, string>
   },
   crmPipelines: {
+    create: {
+      sections: {
+        identity: "بيانات المسار",
+        stages: "المراحل"
+      },
+      stagesDefaultNote: "لم تُختَر أي مرحلة، لذلك سيبدأ المسار بالمراحل الافتراضية الست.",
+      addStage: "إضافة مرحلة",
+      useDefaultStages: "العودة إلى المراحل الافتراضية",
+      moveStageEarlier: "تقديم المرحلة {name}",
+      moveStageLater: "تأخير المرحلة {name}",
+      removeStage: "إزالة المرحلة {name}",
+      stageProblems: {
+        MISSING_NEW: "أضف مرحلة واحدة بعلامة «جديد».",
+        MISSING_WON: "أضف مرحلة واحدة بعلامة «رابح».",
+        MISSING_LOST: "أضف مرحلة واحدة بعلامة «خاسر».",
+        DUPLICATE_NEW: "لا يمكن أن يحتوي المسار على أكثر من مرحلة «جديد» واحدة.",
+        DUPLICATE_WON: "لا يمكن أن يحتوي المسار على أكثر من مرحلة «رابح» واحدة.",
+        DUPLICATE_LOST: "لا يمكن أن يحتوي المسار على أكثر من مرحلة «خاسر» واحدة.",
+        NEW_NOT_FIRST: "يجب أن تكون مرحلة «جديد» في المرتبة الأولى.",
+        TOO_MANY: "الحد الأقصى 100 مرحلة."
+      }
+    },
     title: "مسارات الفرص",
     subtitle: "أنشئ مسارات الفرص، ورتّب مراحلها، وحدّد من يصل إليها.",
     add: "مسار جديد",
@@ -605,7 +708,6 @@ export const ar = {
     defaultCannotDisable: "لا يمكن تعطيل المسار الافتراضي. عيّن مسارًا افتراضيًا آخر أولًا.",
     createStagesNote: "يُنشأ المسار بمراحله القياسية، ثم تعدّل تركيبها من صفحة المسار.",
     createTitle: "مسار فرص جديد",
-    createDescription: "الرمز والاسمان مطلوبة. يمكن ضبط المراحل والوصول بعد الإنشاء.",
     editTitle: "تعديل المسار",
     editDescription: "الرمز غير قابل للتغيير، وتغيير المسار الافتراضي يتم من قائمة المسارات.",
     deleteTitle: "حذف المسار",
@@ -1050,8 +1152,46 @@ export const ar = {
   // in phase 4 — see src/design-system/patterns/status-badge. An unmapped
   // key is not an error: StatusBadge falls back to the raw wire value.
   crmCustomerProfiles: {
+    create: {
+      sections: {
+        classification: "التصنيف",
+        person: "بيانات الشخص",
+        company: "بيانات الشركة",
+        contacts: "جهات الاتصال",
+        notes: "ملاحظات",
+        customFields: "حقول مخصّصة"
+      },
+      statusHint: "يبدأ العميل كعميل محتمل ما لم تختر غير ذلك.",
+      companyNameHint: "اتركه فارغًا ليُستخدم الاسم المعروض كاسم المنشأة.",
+      companyEmail: "البريد الإلكتروني للشركة",
+      companyWebsite: "الموقع الإلكتروني",
+      companyWebsiteHint: "يجب أن يبدأ بـ https:// أو http://."
+    },
     subtitle: "ملفات العملاء الحالية من CRM للفرع الموثوق في الجلسة.",
     search: "ابحث بالاسم أو بيانات التواصل...",
+    basicSearch: {
+      field: "بحث حسب",
+      value: "قيمة البحث",
+      any: "الكل",
+      selectValue: "اختر قيمة",
+      catalogueUnavailable: "لا توجد خيارات متاحة",
+      fields: {
+        text: "الاسم أو الهاتف أو البريد"
+      }
+    },
+    searchMode: {
+      label: "نمط البحث",
+      basic: "أساسي",
+      advanced: "متقدم"
+    },
+    advancedSearch: {
+      conditions: "شروط البحث",
+      and: "و",
+      addCondition: "إضافة شرط",
+      removeCondition: "إزالة الشرط: {field}",
+      unsupported:
+        "تُدمج الشروط بعامل «و» فقط. أما «أو» وعوامل المقارنة مثل «أكبر من» و«يحتوي» و«بين» فتحتاج إلى نقطة بحث لا توفرها الواجهة البرمجية بعد."
+    },
     sessionRequired: "تعذر تحديد جلسة مستخدم موثقة لتحميل ملفات العملاء.",
     singleBranchRequired: "تعذر تحديد فرع واحد موثوق. عيّن فرعًا أساسيًا أو اختر حسابًا له فرع واحد متاح.",
     name: "اسم العميل",
@@ -3374,6 +3514,28 @@ export const ar = {
     scopeDeniedTitle: "هذا السجل خارج نطاقك",
     scopeDeniedDescription: "يعتمد الوصول في CRM على الفرع والمالك معًا، لا على الصلاحية وحدها. تواصل مع مالك السجل أو مسؤول مساحة العمل.",
     customFieldsTitle: "الحقول المخصّصة",
+    customFieldsFormDescription: "الحقول التي عرّفها فريقك لهذا النوع من السجلات.",
+    customFieldsUnavailable: "تعذّر تحميل الحقول المخصّصة، لذلك لا يظهر قسمها. إن كان أحدها إلزاميًا عند الإنشاء فسيرفض الخادم الحفظ.",
+    phoneNumbered: "هاتف {number}",
+    addPhone: "إضافة رقم",
+    removePhone: "حذف الهاتف {number}",
+    callingCode: "رمز الدولة",
+    searchCountries: "ابحث باسم الدولة أو رمزها",
+    noMatchingCountries: "لا توجد دولة مطابقة.",
+    chooseCountry: "اختر دولة",
+    clearCountry: "مسح الدولة",
+    chooseJobTitle: "اختر مسمّى",
+    searchJobTitles: "ابحث عن مسمّى وظيفي",
+    noMatchingJobTitles: "لا يوجد مسمّى مطابق.",
+    backToJobTitleList: "اختر من قائمة المسمّيات",
+    fieldRequired: "هذا الحقل مطلوب.",
+    fieldEmail: "أدخل بريدًا إلكترونيًا صحيحًا.",
+    fieldMaxLength: "الحد الأقصى {max} حرفًا.",
+    fieldDuplicatePhone: "هذا الرقم مكرّر في القائمة.",
+    fieldUrl: "أدخل رابطًا صحيحًا يبدأ بـ http أو https.",
+    formSectionsNav: "أقسام النموذج",
+    formSectionInvalid: "يحتوي على أخطاء",
+    formErrorCount: "حقول تحتاج إلى مراجعة: {count}",
     booleanYes: "نعم",
     booleanNo: "لا",
     copyId: "نسخ المعرّف",
@@ -4285,6 +4447,23 @@ export const ar = {
     } as Record<string, string>
   },
   crmOpportunityDetail: {
+    create: {
+      sections: {
+        placement: "العميل والمسار",
+        deal: "بيانات الصفقة",
+        notes: "ملاحظات",
+        customFields: "حقول مخصّصة"
+      },
+      placementDescription: "لمن هذه الفرصة، وفي أي مسار ومرحلة تبدأ.",
+      dealDescription: "قيمة الصفقة وموعدها المتوقّع وأولويتها.",
+      notesDescription: "أي سياق إضافي عن هذه الفرصة.",
+      probabilityPercent: "احتمال الإغلاق",
+      probabilityHint: "رقم صحيح من 0 إلى 100.",
+      importanceHint: "رقم صحيح من 0 إلى 3.",
+      amountInvalid: "أدخل مبلغًا صحيحًا بمنزلتين عشريتين على الأكثر.",
+      outOfRange: "القيمة خارج النطاق المسموح.",
+      currencyLength: "رمز العملة ثلاثة أحرف بالضبط."
+    },
     backToOpportunities: "العودة إلى الفرص البيعية",
     notFoundTitle: "لم تعد هذه الفرصة موجودة",
     notFoundDescription: "ربما حُذف السجل أو أن الرابط قديم.",
@@ -4333,7 +4512,6 @@ export const ar = {
   crmCustomerProfileActions: {
     createAction: "عميل جديد",
     createTitle: "إنشاء ملف عميل",
-    createDescription: "يُنشأ الملف في الفرع المحدّد. حقول الشركة تخصّ الملفات المؤسسية فقط.",
     createOperation: "إنشاء ملف عميل",
     editTitle: "تعديل ملف العميل",
     editDescription: "تُحفظ الحقول المتغيّرة فقط. لا يمكن تغيير نوع الملف بعد الإنشاء.",

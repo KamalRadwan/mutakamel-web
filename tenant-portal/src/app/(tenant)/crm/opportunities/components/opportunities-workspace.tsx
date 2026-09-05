@@ -16,6 +16,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  StageBar,
   TableView,
   ViewSwitcher,
   useWorkspaceState,
@@ -27,7 +28,9 @@ import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
-import { CreateOpportunityDrawer } from "./CreateOpportunityDrawer";
+import { CreateOpportunityModal } from "./CreateOpportunityModal";
+import { useCrmCreateCustomFields } from "../../shared/hooks/useCrmCreateCustomFields";
+import { useCrmFieldMessages } from "../../shared/hooks/useCrmFieldMessages";
 import { DeleteOpportunityDialog } from "./DeleteOpportunityDialog";
 import { useOpportunityColumns } from "./useOpportunityColumns";
 import { OpportunityBoardColumn } from "./OpportunityBoardColumn";
@@ -38,6 +41,13 @@ import { useOpportunityCards } from "../hooks/useOpportunityCards";
 import { type OpportunityListItem, useOpportunitiesList } from "../hooks/useOpportunitiesList";
 import { useCreateOpportunity } from "../hooks/useCreateOpportunity";
 import { usePipelineWorkspace } from "../hooks/usePipelineWorkspace";
+
+// Only an outcome stage takes a hue — the same rule the board's columns
+// follow: position and label carry the stage, colour carries the outcome.
+const STAGE_BAR_TONE: Record<string, "positive" | "negative" | undefined> = {
+  WON: "positive",
+  LOST: "negative",
+};
 
 export function OpportunitiesWorkspace() {
   const { t, lang } = useI18n();
@@ -91,8 +101,36 @@ export function OpportunitiesWorkspace() {
   });
   const { view, setView } = workspace;
 
-  const cards = useOpportunityCards(view === "card" ? selectedPipelineId : null, view === "card" ? branchId : null);
-  const list = useOpportunitiesList(view === "table" ? branchId : null, selectedPipelineId);
+  // The stage filter lives above both views, so switching card <-> table keeps
+  // it, and it is stamped with the branch and pipeline it was picked in: a
+  // stage id from another pipeline is a 404 from the cards route and an empty
+  // list from the table. The scope mismatch — not a wrapped handler — is what
+  // clears it, because usePipelineWorkspace re-selects the pipeline on its own
+  // after a branch change, which no onChange of ours would ever see.
+  const stageScope = `${branchId ?? ""}/${selectedPipelineId ?? ""}`;
+  const [stageFilter, setStageFilter] = useState<{ scope: string; stageId: string } | null>(null);
+  // Retired during render rather than in an effect: React re-runs this
+  // component before committing, so returning to a pipeline cannot revive a
+  // filter the bar has already stopped showing. The line below is what keeps
+  // the stale pair off the wire in the meantime.
+  if (stageFilter !== null && stageFilter.scope !== stageScope) setStageFilter(null);
+  const stageId = stageFilter?.scope === stageScope ? stageFilter.stageId : null;
+
+  function selectStage(nextStageId: string | undefined) {
+    setStageFilter(nextStageId ? { scope: stageScope, stageId: nextStageId } : null);
+    // A filter is a new result set. The card cursor and the table's fetch both
+    // restart on their own, because the stage is part of their fetch key — but
+    // the table's page NUMBER lives in the URL and would otherwise survive as
+    // a page 3 that no longer means anything.
+    if (workspace.page !== 1) workspace.setPage(1);
+  }
+
+  const cards = useOpportunityCards(
+    view === "card" ? selectedPipelineId : null,
+    view === "card" ? branchId : null,
+    stageId,
+  );
+  const list = useOpportunitiesList(view === "table" ? branchId : null, selectedPipelineId, stageId);
 
   // A new opportunity opens on its own detail screen: the board is grouped by
   // stage and a freshly created deal is easy to lose in a long entry column.
@@ -103,9 +141,25 @@ export function OpportunitiesWorkspace() {
   // The trailing argument is the D2 reconciliation: a create whose response
   // could not be read has still created the deal, so the list re-reads instead
   // of leaving a Save to press again.
+  // Fetched with the screen rather than with the modal: the create hook needs
+  // the required-field keys to build its validator, and the modal's open state
+  // comes back OUT of that hook — gating the fetch on it would be a cycle.
+  const customFields = useCrmCreateCustomFields("OPPORTUNITY", true);
+  const fieldMessages = useCrmFieldMessages();
+  const createMessages = useMemo(
+    () => ({
+      ...fieldMessages,
+      amountInvalid: t.crmOpportunityDetail.create.amountInvalid,
+      outOfRange: t.crmOpportunityDetail.create.outOfRange,
+      currencyLength: t.crmOpportunityDetail.create.currencyLength,
+    }),
+    [fieldMessages, t],
+  );
   const create = useCreateOpportunity(
     branchId,
     pipelines,
+    createMessages,
+    customFields.requiredFieldKeys,
     openOpportunity,
     () => list.reload(),
   );
@@ -152,13 +206,17 @@ export function OpportunitiesWorkspace() {
   // has configured a pipeline for this tenant yet — the second is what the
   // hook used to report as "No accessible opportunity pipeline is
   // configured" in a red banner.
+  // `h-full` on every one of these: the board pane keeps the height of its
+  // area in each state, so the page does not jump as data arrives and an empty
+  // pipeline does not render as a short strip floating under the filters.
   function resolvePipelineEmptyState() {
     if (needsBranchSelection) {
-      return <EmptyState title={t.crmOpportunities.selectBranchFirst} />;
+      return <EmptyState className="h-full" title={t.crmOpportunities.selectBranchFirst} />;
     }
     if (hasNoPipelines) {
       return (
         <EmptyState
+          className="h-full"
           title={t.crmOpportunities.noPipelineTitle}
           description={t.crmOpportunities.noPipelineDescription}
         />
@@ -202,6 +260,7 @@ export function OpportunitiesWorkspace() {
     if (loadError) {
       return (
         <ErrorState
+          className="h-full"
           title={t.crmOpportunities.loadFailed}
           onRetry={() => void fetchPipelines()}
           retryLabel={t.common.retry}
@@ -211,15 +270,15 @@ export function OpportunitiesWorkspace() {
     // isMounted gates @hello-pangea/dnd, which cannot render server-side.
     if (!isMounted || isLoading) {
       return (
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="flex h-full gap-2 overflow-x-auto pb-2">
           {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={`board-column-skeleton-${index}`} className="h-64 w-70 shrink-0 rounded-md" />
+            <Skeleton key={`board-column-skeleton-${index}`} className="h-full w-70 shrink-0 rounded-md" />
           ))}
         </div>
       );
     }
     if (pipelineEmptyState) return pipelineEmptyState;
-    if (!board) return <EmptyState title={t.crmOpportunities.empty} />;
+    if (!board) return <EmptyState className="h-full" title={t.crmOpportunities.empty} />;
 
     return (
       <DragDropContext onDragEnd={onDragEnd}>
@@ -249,7 +308,7 @@ export function OpportunitiesWorkspace() {
         description={t.crmOpportunities.subtitle}
         primaryAction={
           capabilities?.create
-            ? { label: t.crmOpportunityDetail.createAction, onClick: create.openDrawer }
+            ? { label: t.crmOpportunityDetail.createAction, onClick: create.openModal }
             : undefined
         }
       />
@@ -288,6 +347,25 @@ export function OpportunitiesWorkspace() {
         <div role="alert" className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
           {error}
         </div>
+      )}
+
+      {/* The board shows its stages as columns; the card and table views have
+          nowhere to put them, so the pipeline's shape comes back as a bar
+          above them — and doubles as the stage filter, which both of their
+          endpoints answer. */}
+      {view !== "board" && (selectedPipeline?.stages.length ?? 0) > 0 && (
+        <StageBar
+          label={t.crmOpportunities.stage}
+          allLabel={t.crmOpportunities.allStages}
+          steps={(selectedPipeline?.stages ?? []).map((stage) => ({
+            id: stage.id,
+            label: localizedName(stage, lang),
+            tone: STAGE_BAR_TONE[stage.flag],
+          }))}
+          value={stageId ?? undefined}
+          onChange={selectStage}
+          disabled={!branchId}
+        />
       )}
 
       <div className="min-h-0 flex-1">
@@ -346,7 +424,12 @@ export function OpportunitiesWorkspace() {
         error={terminalMove ? error : null}
       />
 
-      <CreateOpportunityDrawer create={create} pipelines={pipelines} branchId={branchId} />
+      <CreateOpportunityModal
+        create={create}
+        pipelines={pipelines}
+        branchId={branchId}
+        customFields={customFields}
+      />
 
       <DeleteOpportunityDialog
         item={selectedForDelete}

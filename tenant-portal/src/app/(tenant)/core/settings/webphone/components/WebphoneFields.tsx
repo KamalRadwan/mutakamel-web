@@ -71,6 +71,7 @@ export function SelectField<T extends string>({
   lang,
   disabled,
   error,
+  help,
 }: {
   label: string;
   value: T;
@@ -79,9 +80,14 @@ export function SelectField<T extends string>({
   lang: "ar" | "en";
   disabled: boolean;
   error?: string;
+  help?: string;
 }) {
   return (
-    <Field label={label} error={error ? webphoneFieldErrorText(error, lang) : undefined}>
+    <Field
+      label={label}
+      hint={help}
+      error={error ? webphoneFieldErrorText(error, lang) : undefined}
+    >
       {/* Direction comes from the app-wide DirectionProvider in
           src/i18n/DirectionBridge.tsx, so no screen branches on `dir`. */}
       <Select value={value} onValueChange={(next) => onChange(next as T)} disabled={disabled}>

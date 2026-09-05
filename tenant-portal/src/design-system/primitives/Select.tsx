@@ -5,7 +5,7 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "../lib/cn";
 import { controlSize, focusRing, textEntrySize, type ControlSizeProps } from "../lib/variants";
-import { useFieldControl } from "./field-control";
+import { useFieldControl, useFieldControlContext } from "./field-control";
 
 // Radix's Root is a CONTEXT component — it renders no DOM node, so an id or an
 // aria-* attribute handed to it reaches nothing at all. The trigger below is
@@ -13,7 +13,22 @@ import { useFieldControl } from "./field-control";
 // is what claims the enclosing `Field`. See field-control.tsx.
 export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
-export const SelectValue = SelectPrimitive.Value;
+/**
+ * Radix's value, with the enclosing `Field`'s label as its prompt.
+ *
+ * A `Select` cannot fall back the way an `<input>` does — the placeholder is a
+ * prop on the VALUE, not on the trigger that claims the field — so this reads
+ * the field itself. A caller's own placeholder still wins, which is how
+ * "Default stage" and "No source" keep saying what the empty value MEANS
+ * rather than repeating the label.
+ */
+export function SelectValue({
+  placeholder,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Value>) {
+  const field = useFieldControlContext();
+  return <SelectPrimitive.Value placeholder={placeholder ?? field?.label} {...props} />;
+}
 
 export interface SelectTriggerProps
   extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>,
@@ -22,7 +37,7 @@ export interface SelectTriggerProps
 export const SelectTrigger = forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
   SelectTriggerProps
->(({ className, size = "lg", children, ...props }, ref) => {
+>(({ className, size = "sm", children, ...props }, ref) => {
   // aria-readonly only, no native attribute: a trigger is a button element, and
   // `readonly` on a button is meaningless markup.
   const field = useFieldControl(props);

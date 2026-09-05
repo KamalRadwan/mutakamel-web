@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-02T15:25:18.433Z",
-  "fileCount": 870,
-  "designSystemFileCount": 202,
+  "generatedAt": "2026-09-04T22:39:42.047Z",
+  "fileCount": 923,
+  "designSystemFileCount": 214,
   "counts": {
     "colorUtilityTotal": 0,
-    "roleRampUtilities": 164,
+    "roleRampUtilities": 166,
     "arbitraryTypeSize": 0,
     "fontBoldOrHeavier": 0,
-    "fontNormalOrMedium": 112,
+    "fontNormalOrMedium": 116,
     "roundedXlOrAbove": 0,
     "gradients": 0,
     "backdropBlur": 0,
@@ -47,10 +47,10 @@
   },
   "designSystemCounts": {
     "colorUtilityTotal": 0,
-    "roleRampUtilities": 171,
+    "roleRampUtilities": 177,
     "arbitraryTypeSize": 0,
     "fontBoldOrHeavier": 0,
-    "fontNormalOrMedium": 53,
+    "fontNormalOrMedium": 55,
     "roundedXlOrAbove": 0,
     "gradients": 1,
     "backdropBlur": 3,
@@ -61,7 +61,7 @@
     "arabicIndicDigits": 0,
     "localeUnawareFormatting": 0,
     "rtlMirrorOutliers": 1,
-    "rtlMirrorCanonical": 7,
+    "rtlMirrorCanonical": 9,
     "colorFamiliesInUse": 0
   }
 }

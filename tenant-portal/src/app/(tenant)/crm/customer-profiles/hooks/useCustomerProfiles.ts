@@ -12,6 +12,12 @@ import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
+import {
+  EMPTY_CUSTOMER_PROFILE_SEARCH,
+  buildCustomerProfilesListQuery,
+  type CustomerProfileSearchState,
+  type CustomerProfileSortBy,
+} from "../customer-profile-search-contract";
 
 export const CUSTOMER_PROFILES_PATH = "/api/tenant/crm/v1/customer-profiles";
 export const CUSTOMER_PROFILES_PAGE_SIZE = 25;
@@ -223,14 +229,26 @@ export function resolveCustomerProfilesBranchId(
 /**
  * GET /crm/customer-profiles accepts these two fields only; else a 400.
  *
- * Not exported: the allowlist is consumed by `setSort` below and by the type on
- * the next line, both in this file, and nothing outside imports it. `knip`
- * flags the unused export, and it is right to — an export is a claim that
- * something else needs the value.
+ * Not exported: the allowlist is consumed by `setSort` below and nothing else.
+ * `knip` flags the unused export, and it is right to — an export is a claim
+ * that something else needs the value. The TYPE lives in
+ * `customer-profile-search-contract`, with the rest of the wire vocabulary.
  */
-const CUSTOMER_PROFILE_SORT_FIELDS = ["displayName", "createdAt"] as const;
-export type CustomerProfileSortField = (typeof CUSTOMER_PROFILE_SORT_FIELDS)[number];
+const CUSTOMER_PROFILE_SORT_FIELDS: readonly CustomerProfileSortBy[] = [
+  "displayName",
+  "createdAt",
+];
 
+/**
+ * The list request's address: this module's path, and the search contract's
+ * query string.
+ *
+ * The preconditions stay here because they are about the CALLER, not the wire
+ * — a bad branch or page is a bug in this portal, worth a thrown Error rather
+ * than a request the server answers 400 to. Everything downstream of `?` is
+ * `customer-profile-search-contract`'s, which is the only module allowed to
+ * name a query key.
+ */
 export function buildCustomerProfilesListPath({
   branchId,
   page,
@@ -240,8 +258,8 @@ export function buildCustomerProfilesListPath({
 }: {
   branchId: string;
   page: number;
-  search: string;
-  sortBy?: CustomerProfileSortField;
+  search: CustomerProfileSearchState;
+  sortBy?: CustomerProfileSortBy;
   sortDir?: "ASC" | "DESC";
 }): string {
   if (!isUUIDv7(branchId)) {
@@ -250,19 +268,15 @@ export function buildCustomerProfilesListPath({
   if (!Number.isSafeInteger(page) || page < 1) {
     throw new Error("Customer profile page must be a positive integer.");
   }
-  const normalizedSearch = search.trim();
-  if (normalizedSearch.length > 200) {
-    throw new Error("Customer profile search must be 200 characters or fewer.");
-  }
 
-  const query = new URLSearchParams({
+  const query = buildCustomerProfilesListQuery({
     branchId,
-    page: String(page),
-    limit: String(CUSTOMER_PROFILES_PAGE_SIZE),
+    page,
+    limit: CUSTOMER_PROFILES_PAGE_SIZE,
     sortBy,
     sortDir,
+    search,
   });
-  if (normalizedSearch) query.set("search", normalizedSearch);
   return CUSTOMER_PROFILES_PATH + "?" + query.toString();
 }
 
@@ -284,7 +298,7 @@ function isAbortError(error: unknown): boolean {
 // Never mutated in place: `setSort` assigns a fresh object to `sortRef.current`
 // rather than writing through it, so sharing this one object at init is safe.
 const DEFAULT_CUSTOMER_PROFILES_SORT: {
-  id: CustomerProfileSortField;
+  id: CustomerProfileSortBy;
   direction: "asc" | "desc";
 } = { id: "createdAt", direction: "desc" };
 
@@ -292,8 +306,16 @@ export function useCustomerProfiles() {
   const { lang, t } = useI18n();
   const { user, isLoading: isAuthLoading } = useTenantAuth();
   const [result, setResult] = useState<CustomerProfilesPage | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [serverSearch, setServerSearch] = useState("");
+  // Conditions of `[field] [value]`, AND-ed — the whole of what this screen
+  // may ask the list endpoint, one of them in basic mode and up to one per
+  // field in advanced. `customer-profile-search-contract` owns which wire key
+  // each field becomes, and refuses to name two rows the same one.
+  const [search, setSearch] = useState<CustomerProfileSearchState>(
+    EMPTY_CUSTOMER_PROFILE_SEARCH,
+  );
+  const [serverSearch, setServerSearch] = useState<CustomerProfileSearchState>(
+    EMPTY_CUSTOMER_PROFILE_SEARCH,
+  );
   const [page, setPage] = useState(1);
   const sortRef = useRef(DEFAULT_CUSTOMER_PROFILES_SORT);
   const [sort, setSortState] = useState(DEFAULT_CUSTOMER_PROFILES_SORT);
@@ -309,13 +331,20 @@ export function useCustomerProfiles() {
     useTenantBranchSelection(user);
   const userId = user?.id ?? null;
 
+  // The screen's ONE debounce, and it now stands alone: the `FilterBar` this
+  // bar replaced carried a 300ms debounce of its own, so a keystroke waited
+  // 600ms and two timers had to be reasoned about to explain one request.
+  //
+  // Any change to the filter — a field, a value, a condition added or removed,
+  // a mode switch, or a reset — also starts the result set over: page 4 of a
+  // name search is not page 4 of a status filter.
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setPage(1);
-      setServerSearch(searchQuery.trim());
+      setServerSearch(search);
     }, 300);
     return () => window.clearTimeout(timeoutId);
-  }, [searchQuery]);
+  }, [search]);
 
   const load = useCallback(
     async (signal: AbortSignal) => {
@@ -410,15 +439,15 @@ export function useCustomerProfiles() {
     selectBranch: (nextBranchId: string) => {
       selectBranch(nextBranchId);
       setResult(null);
-      setSearchQuery("");
-      setServerSearch("");
+      setSearch(EMPTY_CUSTOMER_PROFILE_SEARCH);
+      setServerSearch(EMPTY_CUSTOMER_PROFILE_SEARCH);
       setPage(1);
       setPrecondition(null);
       setLoadError(null);
     },
     pagination: result,
-    searchQuery,
-    setSearchQuery,
+    search,
+    setSearch,
     isLoading: isAuthLoading || isLoading,
     precondition,
     loadError,

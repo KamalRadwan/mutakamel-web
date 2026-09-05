@@ -694,3 +694,87 @@ Portal-side, and complete on its own:
 
 The contract is now written down where it would have prevented this, in
 [crm-dashboards.md](../api/crm-dashboards.md#patch-widgetsid-replaces-queryspec-wholesale--it-never-merges).
+
+---
+
+## D24 — Row reorder has no single-pointer alternative · **open**
+
+Written: **2026-09-04**
+
+**Severity: conformance. WCAG 2.2 AA `dragging-alternative` (2.5.7) fails on
+the lead-stages catalogue.**
+
+`DataTable`'s `rowReorder` shipped on 2026-09-04 with a grip *and* two
+earlier/later buttons in its handle column. The buttons were removed the same
+day at the product owner's instruction — the requirement was drag only — so
+reordering a lead stage now requires a sustained press-move-release.
+
+What remains covers half the rule: `@hello-pangea/dnd`'s keyboard sensor still
+rides on the grip (space to lift, arrows to move, space to drop). The half that
+is gone is the **single-pointer** path. A user with a tremor, a motor
+impairment, a trackpad they struggle with, or a switch device can focus the grip
+but cannot complete a drag, and there is no other control that writes the order.
+This is the same failure the board carried as audit
+[B3](../design/SKILL-AUDIT.md), which was closed by giving every card a
+**Move to…** menu — [views.md](../design/views.md#every-card-carries-a-move-to-action--not-optional)
+states plainly that the keyboard path alone "satisfies only half of it".
+
+Not fatal to the screen the way B3 was to the board: a stage's rank is a
+setup-time preference on a five-to-fifteen row catalogue, not the only thing the
+screen is for, and every other action on it — create, edit, delete, set default
+— is an ordinary button.
+
+**To close it**, restore the two buttons, or put a Move-to menu on the grip
+(first / earlier / later / last), gated by the same `isPinned` rule the drop is.
+The order math is already there and already tested: `moveRowKey` in
+`src/design-system/patterns/data-table/row-reorder.ts` refuses exactly the moves
+the server would answer `422` for.
+
+Files: `src/design-system/patterns/data-table/DataTableRow.tsx`,
+`src/design-system/patterns/data-table/types.ts`,
+`src/app/(tenant)/crm/lead-stages/page.tsx`
+
+---
+
+## D25 — A lead created into a branch other than the list's is reported as failed · **open**
+
+Written: **2026-09-05**
+
+**Severity: a successful create is shown to the user as a failure, and the
+obvious response to that is to create the lead a second time.**
+
+The create-lead modal now carries its own branch picker (`branchId` on
+`CreateLeadForm`, rendered at the top of `LeadClassificationSection` whenever
+the account can reach more than one branch), so the branch a lead is filed
+under no longer has to be the branch the list page is scoped to.
+
+`useLeads.handleCreate` still assumes it is:
+
+```ts
+const response = await axiosClient.post(…, buildCreateLeadRequest(form, branchId), …);
+parseLeadResponse(response.data, branchId);   // ← the PAGE's branch
+```
+
+`parseLead` throws `Invalid leads response.` when the returned lead's
+`branchId` is not the one passed in (`useLeads.ts:115-118`). On a divergent
+pick the POST succeeds, the server stores the lead, and the throw is caught by
+the same handler that reports a network failure — the modal stays open on
+`createFailed` with every field still filled. There is no second request to
+distinguish it from a real failure, and `isAmbiguousMutationError` does not
+match a local parse error, so the "uncertain result" path does not run either.
+
+The list would not show the lead in any case: it is scoped to the page's
+branch, so a lead filed elsewhere is invisible until the branch selector is
+moved.
+
+**To close it**, take the branch out of the response check — the created
+lead's own `branchId` is the authority on where it landed — and have the modal
+hand its branch back to the screen on success, so `TenantBranchSelect` and the
+list follow the lead that was just created. Both changes are in
+`useLeads.ts`/`page.tsx`, which were owned by another session while this
+picker landed; that ownership is the only reason the fix is not in the same
+commit as the defect.
+
+Files: `src/app/(tenant)/crm/leads/hooks/useLeads.ts`,
+`src/app/(tenant)/crm/leads/page.tsx`,
+`src/app/(tenant)/crm/leads/components/CreateLeadsModal.tsx`

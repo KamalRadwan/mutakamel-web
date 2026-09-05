@@ -159,6 +159,7 @@ describe("opportunity stage history", () => {
 });
 
 const form: OpportunityForm = {
+  customFields: {},
   customerProfileId: PROFILE,
   pipelineId: PIPELINE,
   stageId: STAGE,

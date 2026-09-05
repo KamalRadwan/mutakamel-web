@@ -9,17 +9,20 @@ import {
   textEntrySize,
   type ControlSizeProps,
 } from "../lib/variants";
-import { useFieldControl } from "./field-control";
+import { useFieldControl, useFieldControlContext } from "./field-control";
 
 export interface InputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
     ControlSizeProps {}
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, size = "lg", ...props }, ref) => {
+  ({ className, size = "sm", ...props }, ref) => {
     // Claims the enclosing Field, however deep it sits — a password input
     // inside `<div className="relative">` is still the field's control.
     const field = useFieldControl(props, { nativeReadOnly: true });
+    // The field's label is the prompt when the caller names none. The label
+    // element still exists and still names the control; this is only its look.
+    const enclosing = useFieldControlContext();
 
     return (
       <input
@@ -38,6 +41,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           textEntrySize({ size }),
           className,
         )}
+        placeholder={props.placeholder ?? enclosing?.label}
         {...props}
         {...field}
       />

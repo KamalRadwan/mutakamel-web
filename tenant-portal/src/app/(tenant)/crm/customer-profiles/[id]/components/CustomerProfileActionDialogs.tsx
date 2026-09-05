@@ -5,12 +5,13 @@ import {
   ConfirmActionModal,
   EditDrawer,
   Field,
-  FormDrawer,
+  FormModal,
   Input,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
 import type { AcquisitionSource } from "../../../acquisition-sources/acquisition-source-contract";
+import { CrmContactLine } from "../../../shared/components/CrmContactLine";
 import {
   useAmbiguousOutcomeLabels,
   useAppliedUnreadableLabels,
@@ -27,8 +28,11 @@ export interface CustomerProfileActionDialogsProps {
 }
 
 /**
- * The edit drawer, add-contact drawer, status confirmation and delete
+ * The edit drawer, add-contact card, status confirmation and delete
  * confirmation for one customer profile — MASTER-PLAN 8.7.
+ *
+ * Adding a contact is a CREATE, so it is a centred card and not a drawer; four
+ * fields are far too few for the full-viewport size, hence `size="card"`.
  *
  * The status change gets a confirmation only for `BLACKLISTED`, which is
  * terminal in practice: it blocks new opportunities on the customer
@@ -115,7 +119,8 @@ export function CustomerProfileActionDialogs({
         )}
       </EditDrawer>
 
-      <FormDrawer
+      <FormModal
+        size="card"
         open={actions.contactForm !== null}
         onOpenChange={(open) => {
           if (!open) actions.closeContact();
@@ -137,54 +142,45 @@ export function CustomerProfileActionDialogs({
           discardDescription: t.common.discardDescription,
           discardConfirm: t.common.discardConfirm,
           discardCancel: t.common.cancel,
+          // Required by `FormModalLabels` and unused at this size: a card
+          // renders no section index. The shared CRM keys, so the string a
+          // reader would meet elsewhere is the string here.
+          sections: t.crmShared.formSectionsNav,
+          sectionInvalid: t.crmShared.formSectionInvalid,
+          close: t.common.close,
         }}
       >
         {ambiguousPanel}
         {appliedUnreadablePanel}
         {actions.contactForm && (
           <div className="flex flex-col gap-3">
-            <Field label={t.crmLeadConvert.contactFullName} required>
-              <Input
-                value={actions.contactForm.fullName}
-                onChange={(event) =>
-                  actions.setContactField("fullName", event.target.value)
-                }
-                maxLength={180}
-              />
-            </Field>
-            <Field label={t.crmLeadConvert.contactJobTitle}>
-              <Input
-                value={actions.contactForm.jobTitle}
-                onChange={(event) =>
-                  actions.setContactField("jobTitle", event.target.value)
-                }
-                maxLength={120}
-              />
-            </Field>
-            <Field label={t.crmLeads.email}>
-              <Input
-                type="email"
-                dir="ltr"
-                value={actions.contactForm.email}
-                onChange={(event) =>
-                  actions.setContactField("email", event.target.value)
-                }
-                maxLength={180}
-              />
-            </Field>
-            <Field label={t.crmLeads.phone}>
-              <Input
-                dir="ltr"
-                value={actions.contactForm.phone}
-                onChange={(event) =>
-                  actions.setContactField("phone", event.target.value)
-                }
-                maxLength={32}
-              />
-            </Field>
+            <CrmContactLine
+              path="contact"
+              contact={{
+              honorificTitle: actions.contactForm?.honorificTitle ?? "",
+              fullName: actions.contactForm?.fullName ?? "",
+              jobTitle: actions.contactForm?.jobTitle ?? "",
+              email: actions.contactForm?.email ?? "",
+              phones: [actions.contactForm?.phone ?? ""],
+            }}
+              errors={{}}
+              // `CustomerProfileContactPersonDto`: fullName and email 180,
+              // jobTitle 120.
+              limits={{ fullName: 180, jobTitle: 120, email: 180 }}
+              nameLabel={t.crmLeadConvert.contactFullName}
+              onFieldChange={(patch) => {
+              for (const [key, next] of Object.entries(patch)) {
+                actions.setContactField(key as "fullName", next);
+              }
+            }}
+            // One number here, not a list: `CustomerContactForm` holds a single
+            // `phone`, which the builder sends as `phones: [value]`.
+              onPhoneChange={(_index, next) => actions.setContactField("phone", next)}
+              onBlur={() => undefined}
+            />
           </div>
         )}
-      </FormDrawer>
+      </FormModal>
 
       <ConfirmActionModal
         open={actions.pendingStatus === BLACKLISTED_STATUS}

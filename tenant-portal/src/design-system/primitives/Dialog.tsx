@@ -29,16 +29,30 @@ export const DialogOverlay = forwardRef<
 ));
 DialogOverlay.displayName = "DialogOverlay";
 
+// Every sized dialog is the same centred card; only its cap differs. Kept as
+// one constant rather than repeated per step so the five sizes cannot drift
+// apart, and so `full` can opt out of centring wholesale instead of having to
+// unset six utilities the base string would otherwise have imposed.
+const CENTERED_CARD =
+  "start-1/2 top-1/2 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg p-6";
+
 const dialogContentVariants = cva(
-  "fixed start-1/2 top-1/2 z-(--z-overlay) grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-border bg-popover p-6 text-popover-foreground shadow-overlay",
+  "fixed z-(--z-overlay) border border-border bg-popover text-popover-foreground shadow-overlay",
   {
     variants: {
       size: {
-        sm: "max-w-[384px]",
-        md: "max-w-[448px]",
-        lg: "max-w-[512px]",
-        xl: "max-w-[576px]",
-        "2xl": "max-w-[672px]",
+        sm: `${CENTERED_CARD} max-w-[384px]`,
+        md: `${CENTERED_CARD} max-w-[448px]`,
+        lg: `${CENTERED_CARD} max-w-[512px]`,
+        xl: `${CENTERED_CARD} max-w-[576px]`,
+        "2xl": `${CENTERED_CARD} max-w-[672px]`,
+        // The viewport, less 20px on every side — the working surface a long
+        // record form needs, and the one size that is NOT a card floating in
+        // the middle of the page. It brings no padding of its own: a surface
+        // this size wants a header and a footer that reach its own edges, so
+        // padding belongs to the bands inside it. See
+        // docs/design/primitives.md#dialog--alertdialog--sheet.
+        full: "inset-5 flex flex-col overflow-hidden rounded-lg",
       },
     },
     defaultVariants: { size: "md" },

@@ -15,6 +15,8 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import type { AcquisitionSource } from "../../../acquisition-sources/acquisition-source-contract";
+import { AcquisitionSourceOption } from "../../../shared/components/AcquisitionSourceIcon";
+import { CrmPhoneNumberInput } from "../../../shared/components/CrmPhoneNumberInput";
 import {
   useAmbiguousOutcomeLabels,
   useAppliedUnreadableLabels,
@@ -133,11 +135,14 @@ export function LeadEditDrawer({ edit, sources, noSourceValue }: LeadEditDrawerP
             />
           </Field>
           <Field label={t.crmLeads.phone}>
-            <Input
+            <CrmPhoneNumberInput
               value={form.primaryMobile}
-              onChange={(event) => edit.setField("primaryMobile", event.target.value)}
               maxLength={32}
-              inputMode="tel"
+              onChange={(next) => edit.setField("primaryMobile", next)}
+              // The control takes an `onBlur` for the create forms' touched
+              // tracking. This drawer has none: its errors come back from
+              // `PATCH /leads/:id`, so there is nothing a blur could mark.
+              onBlur={() => undefined}
             />
           </Field>
           <Field label={t.crmLeads.email}>
@@ -162,10 +167,12 @@ export function LeadEditDrawer({ edit, sources, noSourceValue }: LeadEditDrawerP
                 <SelectValue placeholder={t.crmLeadDetail.noSource} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={noSourceValue}>{t.crmLeadDetail.noSource}</SelectItem>
+                <SelectItem value={noSourceValue}>
+                  <AcquisitionSourceOption source={null} label={t.crmLeadDetail.noSource} />
+                </SelectItem>
                 {sources.map((source) => (
                   <SelectItem key={source.id} value={source.id}>
-                    {localizedName(source, lang)}
+                    <AcquisitionSourceOption source={source} label={localizedName(source, lang)} />
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -5,7 +5,9 @@ import { useI18n } from "@/i18n/I18nContext";
 import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
 import {
   buildCreateLeadStageRequest,
+  buildLeadStageReorderRequest,
   buildUpdateLeadStageRequest,
+  parseLeadStageCatalogueResponse,
   parseLeadStageResponse,
   type CreateLeadStageFormData,
   type LeadStageItem,
@@ -13,9 +15,18 @@ import {
 } from "../lead-stage-contract";
 
 const CATALOGUE_PATH = "/api/tenant/crm/v1/lead-stages";
+const REORDER_PATH = `${CATALOGUE_PATH}/reorder`;
 const NON_REPLAYABLE_MUTATION = {
   nonReplayable: true,
   skipAutoIdempotency: true,
+  cache: "no-store",
+  maxResponseBytes: 256 * 1024,
+} as const;
+// Reorder is the one write here the Gateway declares `idempotent: true`
+// (crm.lead.stages.reorder.patch), and it answers IDEM_MISSING without the
+// key — so auto-idempotency stays on and the replay of a retried drop is the
+// server's job, not a second reordering.
+const REPLAYABLE_MUTATION = {
   cache: "no-store",
   maxResponseBytes: 256 * 1024,
 } as const;
@@ -53,6 +64,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -215,6 +227,58 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     }
   };
 
+  /**
+   * `PATCH /lead-stages/reorder` — the drop, and the earlier/later buttons.
+   *
+   * The body is the COMPLETE order, every non-deleted stage exactly once:
+   * `sortOrder` is a field the server owns and there is no per-stage rank to
+   * PATCH — sending individual updates races and can leave two stages sharing a
+   * rank (docs/api/crm-catalogues.md).
+   */
+  const reorder = async (
+    stages: readonly LeadStageItem[],
+    orderedIds: string[],
+  ): Promise<void> => {
+    if (isReordering) return;
+    if (!canManage) {
+      notify(t.crmLeadStages.manageForbidden);
+      return;
+    }
+    let payload: ReturnType<typeof buildLeadStageReorderRequest>;
+    try {
+      payload = buildLeadStageReorderRequest(stages, orderedIds);
+    } catch {
+      notify(t.crmLeadStages.reorderInvalid);
+      return;
+    }
+    const previous = [...stages];
+    setIsReordering(true);
+    // Optimistic: the row lands where it was dropped, re-ranked exactly the way
+    // the endpoint renumbers — dense and one-based.
+    setItems(
+      payload.orderedIds.map((id, index) => ({
+        ...previous.find((stage) => stage.id === id)!,
+        sortOrder: index + 1,
+      })),
+    );
+    try {
+      const response = await axiosClient.patch<unknown>(
+        REORDER_PATH,
+        payload,
+        REPLAYABLE_MUTATION,
+      );
+      setItems(parseLeadStageCatalogueResponse(response.data));
+    } catch (caught) {
+      // Roll back AND say why: a silent revert leaves the user watching their
+      // own change undo itself (docs/design/states.md, state 8).
+      setItems(previous);
+      notify(errorMessage(caught, t.crmLeadStages.reorderFailed));
+      await reconcile();
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
   const setDefault = async (stage: LeadStageItem): Promise<void> => {
     // CONVERTED can never be the default (LEAD_STAGE_DEFAULT_CONVERTED) and an
     // inactive stage cannot either (LEAD_STAGE_DEFAULT_INACTIVE).
@@ -266,6 +330,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     isCreating,
     isDeleting,
     isUpdating,
+    isReordering,
     settingDefaultId,
     createError,
     deleteError,
@@ -276,6 +341,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     create,
     update,
     remove,
+    reorder,
     setDefault,
   };
 }

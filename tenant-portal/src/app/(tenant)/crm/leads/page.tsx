@@ -10,7 +10,6 @@ import {
   CardView,
   DegradedBanner,
   EmptyState,
-  FilterBar,
   PageHeader,
   PermissionGate,
   resolveStatusRole,
@@ -18,6 +17,7 @@ import {
   ViewSwitcher,
   useWorkspaceState,
   type WorkspaceViewLabels,
+  StageBar,
 } from "@/design-system";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
@@ -26,6 +26,8 @@ import { formatTemplate } from "@/lib/format/template";
 import { CreateLeadsModal } from "./components/CreateLeadsModal";
 import { DeleteLeadsConfirmModal } from "./components/DeleteLeadsConfirmModal";
 import { LeadCard } from "./components/LeadCard";
+import { LeadSearchBar } from "./components/LeadSearchBar";
+import { leadSearchValueOf, leadSearchWithField } from "./lead-search-contract";
 import { useLeadColumns } from "./components/useLeadColumns";
 import { type LeadItem, useLeads } from "./hooks/useLeads";
 
@@ -33,6 +35,13 @@ import { type LeadItem, useLeads } from "./hooks/useLeads";
 // the board must not offer it as a destination either — see
 // docs/api/crm-leads.md.
 const TERMINAL_STAGE_FLAG = "CONVERTED";
+
+// Only an outcome stage takes a hue, which is the rule the board's columns
+// follow too: position and label carry the stage, colour carries the outcome.
+const STAGE_BAR_TONE: Record<string, "positive" | "negative" | undefined> = {
+  CONVERTED: "positive",
+  DISQUALIFIED: "negative",
+};
 
 export default function LeadsPage() {
   const { t, lang } = useI18n();
@@ -52,8 +61,8 @@ export default function LeadsPage() {
     error,
     loadError,
     degraded,
-    searchQuery,
-    setSearchQuery,
+    search,
+    setSearch,
     pageInfo,
     setPage,
     setSort,
@@ -147,19 +156,20 @@ export default function LeadsPage() {
       <div className="flex h-full flex-col gap-4">
         <PageHeader
           title={t.crmLeads.title}
-          description={t.crmLeads.subtitle}
           primaryAction={canCreate ? { label: t.crmLeads.addLead, onClick: openCreate } : undefined}
         />
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <FilterBar
-            filters={[]}
-            values={{}}
-            onChange={() => undefined}
-            onReset={() => undefined}
-            searchValue={searchQuery}
-            onSearchChange={setSearchQuery}
-            searchPlaceholder={t.crmLeads.search}
+          {/* Not a FilterBar: that pattern's chips carry operators this
+              endpoint has none of, and its own 300ms debounce sat on top of
+              the hook's 250ms. It was called here with `filters={[]}` and
+              no-op handlers — a bare search box. The bar below asks the six
+              equality filters instead, one or several AND-ed. */}
+          <LeadSearchBar
+            value={search}
+            onChange={setSearch}
+            stages={stages}
+            disabled={!branchId}
           />
           <div className="flex items-center gap-2">
             <TenantBranchSelect
@@ -193,6 +203,29 @@ export default function LeadsPage() {
               {t.common.retry}
             </Button>
           </div>
+        )}
+
+        {/* The board shows its stages as columns; the other two views have
+            nowhere to put them, so the pipeline's shape comes back as a bar
+            above them. It is the stage filter as well as the picture: pressing
+            a stage here writes the same condition the search bar's Stage field
+            writes, and "all" removes that condition alone rather than clearing
+            the other conditions a user built beside it. */}
+        {view !== "board" && stages.length > 0 && (
+          <StageBar
+            label={t.crmLeads.stage}
+            allLabel={t.crmLeads.basicSearch.any}
+            steps={stages.map((stage) => ({
+              id: stage.id,
+              label: localizedName(stage, lang),
+              tone: STAGE_BAR_TONE[stage.flag],
+            }))}
+            value={leadSearchValueOf(search, "stage") || undefined}
+            onChange={(stageId: string | undefined) =>
+              setSearch(leadSearchWithField(search, "stage", stageId ?? ""))
+            }
+            disabled={!branchId}
+          />
         )}
 
         <div className="min-h-0 flex-1">

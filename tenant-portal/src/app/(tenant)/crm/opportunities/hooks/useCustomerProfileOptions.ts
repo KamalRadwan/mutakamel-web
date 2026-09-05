@@ -8,6 +8,7 @@ import {
   parseCustomerProfilesPageResponse,
   type CustomerProfileItem,
 } from "../../customer-profiles/hooks/useCustomerProfiles";
+import { customerProfileTextSearch } from "../../customer-profiles/customer-profile-search-contract";
 
 /**
  * Customer profiles as picker options for the opportunity create drawer.
@@ -18,7 +19,8 @@ import {
  *
  * A remote list, deliberately: a tenant can hold thousands of profiles and a
  * `Select` over all of them is unusable. The `Combobox` sends the typed query
- * back through `search`.
+ * back through the list's free-text field — a picker matches people by name,
+ * so it never uses the other three filters the list screen offers.
  */
 export function useCustomerProfileOptions(
   branchId: string | null,
@@ -37,7 +39,11 @@ export function useCustomerProfileOptions(
       setIsLoading(true);
       try {
         const response = await axiosClient.get<unknown>(
-          buildCustomerProfilesListPath({ branchId, page: 1, search }),
+          buildCustomerProfilesListPath({
+            branchId,
+            page: 1,
+            search: customerProfileTextSearch(search),
+          }),
           { signal, cache: "no-store", maxResponseBytes: 512 * 1024 },
         );
         const page = parseCustomerProfilesPageResponse(response.data, branchId);

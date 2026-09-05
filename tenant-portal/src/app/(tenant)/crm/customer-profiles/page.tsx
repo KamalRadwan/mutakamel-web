@@ -10,7 +10,6 @@ import {
   ConfirmActionModal,
   DegradedBanner,
   EmptyState,
-  FilterBar,
   PageHeader,
   PermissionGate,
   TableView,
@@ -28,11 +27,14 @@ import {
   type CustomerProfileStatus,
   useCustomerProfiles,
 } from "./hooks/useCustomerProfiles";
-import { CreateCustomerProfileDrawer } from "./components/CreateCustomerProfileDrawer";
+import { CreateCustomerProfileModal } from "./components/CreateCustomerProfileModal";
 import { CustomerProfileCard } from "./components/CustomerProfileCard";
+import { CustomerProfileSearchBar } from "./components/CustomerProfileSearchBar";
 import { useCustomerProfileColumns } from "./components/useCustomerProfileColumns";
 import { useCustomerProfilesCapabilities } from "./hooks/useCustomerProfilesCapabilities";
 import { useCreateCustomerProfile } from "./hooks/useCreateCustomerProfile";
+import { useCrmCreateCustomFields } from "../shared/hooks/useCrmCreateCustomFields";
+import { useCrmFieldMessages } from "../shared/hooks/useCrmFieldMessages";
 import { useCustomerProfileBoardMove } from "./hooks/useCustomerProfileBoardMove";
 import { crmCapabilityAllowsOwner } from "../shared/crm-capabilities";
 import { useCrmAcquisitionSources } from "../shared/hooks/useCrmAcquisitionSources";
@@ -51,8 +53,8 @@ export default function CustomerProfilesPage() {
     branchId,
     selectBranch,
     pagination,
-    searchQuery,
-    setSearchQuery,
+    search,
+    setSearch,
     isLoading,
     precondition,
     loadError,
@@ -117,11 +119,19 @@ export default function CustomerProfilesPage() {
   }));
 
   const sources = useCrmAcquisitionSources();
+  // Fetched with the screen rather than with the modal: the create hook needs
+  // the required-field keys to build its validator, and the modal's open state
+  // comes back OUT of that hook — gating the fetch on it would be a cycle. The
+  // catalogue is small, tenant-wide and already cached by the browser.
+  const customFields = useCrmCreateCustomFields("CUSTOMER_PROFILE", true);
   // A new profile opens on its own detail screen: the list defaults to page
   // one sorted by createdAt DESC, but a filter or a later page would hide the
   // record that was just created.
+  const fieldMessages = useCrmFieldMessages();
   const create = useCreateCustomerProfile(
     branchId,
+    fieldMessages,
+    customFields.requiredFieldKeys,
     (profileId) => router.push(`/crm/customer-profiles/${profileId}`),
     // D2: a create whose response could not be read has still created the
     // record, so the list re-reads instead of leaving a Save to press again.
@@ -177,7 +187,7 @@ export default function CustomerProfilesPage() {
             capabilities.create && branchId
               ? {
                   label: t.crmCustomerProfileActions.createAction,
-                  onClick: create.openDrawer,
+                  onClick: create.openModal,
                 }
               : undefined
           }
@@ -190,14 +200,16 @@ export default function CustomerProfilesPage() {
         />
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <FilterBar
-            filters={[]}
-            values={{}}
-            onChange={() => undefined}
-            onReset={() => undefined}
-            searchValue={searchQuery}
-            onSearchChange={setSearchQuery}
-            searchPlaceholder={t.crmCustomerProfiles.search}
+          {/* Not a FilterBar: that pattern's chips carry operators this
+              endpoint has none of, and its own 300ms debounce sat on top of
+              the hook's 300ms. It was called here with `filters={[]}` and
+              no-op handlers — a bare search box. The bar below asks the four
+              equality filters instead, one or several AND-ed. */}
+          <CustomerProfileSearchBar
+            value={search}
+            onChange={setSearch}
+            sources={sources.items}
+            disabled={!branchId}
           />
           <div className="flex items-center gap-2">
             <TenantBranchSelect branchIds={branchIds} branchId={branchId} onChange={selectBranch} disabled={isLoading} />
@@ -282,7 +294,12 @@ export default function CustomerProfilesPage() {
           )}
         </div>
 
-        <CreateCustomerProfileDrawer create={create} sources={sources.items} />
+        <CreateCustomerProfileModal
+          create={create}
+          sources={sources.items}
+          sourcesDegraded={sources.degraded}
+          customFields={customFields}
+        />
 
         <ConfirmActionModal
           open={pendingTerminalMove !== null}

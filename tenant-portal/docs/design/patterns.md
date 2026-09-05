@@ -68,6 +68,7 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   selection?: SelectionState;
   emptyState?: React.ReactNode;
+  rowReorder?: RowReorderState<T>;    // opt-in row drag + earlier/later
 }
 
 interface ColumnDef<T> {
@@ -124,6 +125,49 @@ arrow keys.
   are dropped, and columns the layout has never seen are appended.
 - Widths clamp to 64–720px, and the resize handle's direction is computed from
   `dir` — in RTL a drag toward smaller `clientX` makes the column wider.
+
+### Row reorder
+
+Optional, and off unless the caller passes `rowReorder`. It is the drag handle
+[DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#75-catalogue-screens) gives a reorderable
+catalogue — shipped on lead stages, which ranks its pipeline this way.
+
+```ts
+interface RowReorderState<T> {
+  onReorder: (orderedIds: string[]) => void;   // the WHOLE order, not (from, to)
+  isPinned?: (id: string) => boolean;          // rows that keep their index
+  isPending?: boolean;                         // a write is in flight
+  rowLabel: (row: T) => string;                // names the row in its grip
+  dragHandleLabel: string;                     // names every grip and the column
+}
+```
+
+- **`onReorder` reports every row key in its new order**, because that is what
+  the endpoints behind it take: a catalogue's `reorder` route replaces the whole
+  dense order in one write, and a per-row `PATCH` of rank races into duplicate
+  ranks. It follows that the caller must pass `rows` **unfiltered** while
+  reordering is on, and suppress it while a search narrows the view — the
+  visible order is not the order being written.
+- **Drag is currently the only pointer path, which is a known conformance gap**
+  — WCAG 2.2 AA `dragging-alternative`, recorded as
+  [D24](../build/DEFECTS.md#d24--row-reorder-has-no-single-pointer-alternative--open).
+  The keyboard half is covered: `@hello-pangea/dnd`'s sensor (space to lift,
+  arrows to move, space to drop) rides on `dragHandleProps`, so the grip must
+  stay the activation surface and dragging must never be disabled to style it.
+  The earlier/later buttons this column shipped with were removed on
+  2026-09-04 at the product owner's instruction; restoring them, or a Move-to
+  menu on the grip, is what closes D24.
+- **A pinned row keeps its index**, and nothing may be dropped through one: a
+  move that would displace it is refused before it is sent, so a rank the server
+  would answer `422` for never leaves the browser. Lead stages pins its `NEW`
+  stage, which the CRM holds at rank 1.
+- **The body never windows while reordering.** A windowed body renders a slice,
+  so a `Draggable` index would not be the row's index in the order being
+  written; virtualized dragging is the board's problem, solved there with
+  `react-window` (D9).
+- **A row that cannot be dragged keeps a dimmed, inert grip**, never an empty
+  cell: the column must not change width row to row, and a control that is
+  simply gone reads as a rendering bug where a disabled one reads as a rule.
 
 Rules:
 
@@ -488,8 +532,10 @@ Other rules the wrappers own so no dashboard re-decides them:
 
 ## FormDrawer
 
-Create and edit forms in a `Sheet`, not a dialog — a form long enough to need a
-scrollbar in a dialog belongs in a drawer.
+Create and edit forms in a `Sheet` by default — a form long enough to need a
+scrollbar in a centred dialog belongs in a drawer. The exception is a record
+that outgrows one column entirely; that one takes
+[`FormModal`](#formmodal) instead.
 
 - **It is a real `<form>`.** Body and footer sit inside one, the submit button
   is `type="submit"` and cancel is `type="button"`, so Enter from any text field
@@ -531,6 +577,114 @@ field that is actually wrong.
 The field's own `aria-describedby` error text is what gets announced on
 arrival, which is why [`Field`](primitives.md#field) wiring is
 constraint-critical rather than cosmetic.
+
+
+## FormModal
+
+The same contract as `FormDrawer`, on a centred `DialogContent`. Both take their
+behaviour from `useFormShell`, so the real `<form>`, the `noValidate` decision,
+the dirty guard on all four dismissal routes and the focus-the-first-invalid-field
+rule are one implementation, not two that drift.
+
+`size` picks the surface, and the two answer different questions. `full` — the
+default — is `DialogContent size="full"`, the viewport less 20px on every side.
+`card` is `DialogContent size="2xl"`: a centred 672px card, capped at `85dvh`,
+with that size's own `grid`, `gap-4` and `p-6` overridden away so the header,
+body and footer bands own their padding exactly as they do at `full`. Nothing
+else forks — one dirty guard, one error summary, one focus rule, one shell.
+
+**The bar for `full`**, and both halves are required:
+
+1. the record has more fields than fit one readable column — `CreateLeadDto` is
+   two dozen keys plus a contacts array, an address block and the tenant's own
+   custom fields; and
+2. those fields group into sections a reader would navigate between.
+
+A form that only fails to fit is a longer drawer, not a modal.
+
+**`card` is not that bar relaxed.** It exists because every CRM *create* is a
+centred card rather than a side drawer, and a create that is genuinely short —
+a handful of fields, no sections — can never clear the bar above and has no
+business being stretched to the viewport to try. Four fields on the whole
+screen is absurd; four fields in a drawer breaks the create rule; `card` is the
+third answer. Its fields go in as direct children, with no `FormSection` around
+them, and it passes no `sections`. `FormModalLabels` still requires the two
+index strings — pass the shared `t.crmShared.formSectionsNav` and
+`t.crmShared.formSectionInvalid`, so the wording cannot drift from the
+full-size modals if the form later grows into one. An *edit* surface is outside
+this entirely: the rule is about create, and `EditDrawer` stays a drawer.
+
+What the extra width buys `full`, beyond room:
+
+- **A section index.** Rendered at `size="full"` only — a card has no room for
+  one, and a form short enough for a card has no sections to index. `sections`
+  renders a `<nav>` on the inline start from
+  `lg:` up, and it is the only thing that can say a problem exists in a section
+  scrolled out of view — the failure mode a form this tall introduces. An entry
+  marked `invalid` carries a visible marker AND the `sectionInvalid` label for a
+  screen reader, never colour alone. Activating one scrolls its `FormSection`
+  into view and moves focus to that section's heading, because a scroll moves
+  the eye and leaves the keyboard behind.
+- **`FormSection`.** A titled block with a responsive field grid — one column
+  below `md`, then two or three. Each column is **capped at 24rem** rather than
+  taking an equal fraction of the row: a full-viewport modal leaves ~1600px of
+  body, and three equal fractions of that made a postal-code box 500px wide, so
+  every field looked the same size as every other and the form read as a wall.
+  A bounded column lets a row end where its fields end. A prose field spans the
+  row at the call site (`className="md:col-span-2"`); only the call site knows
+  which those are.
+- **Sticky header and footer.** The error summary lives in the footer band,
+  next to the action that produced it, and stays visible while the body scrolls.
+
+**Submit is not disabled while the form is invalid.** A disabled submit gives a
+keyboard user no way to ask what is wrong; the press is what reveals every
+error, including on fields never focused, and the focus rule then lands them on
+the first one.
+
+### Who uses it
+
+Four create surfaces, and each of them cleared the bar by carrying fields the
+drawer could not show:
+
+| Screen | Sections | What the drawer was missing |
+|---|---|---|
+| Lead | 7 | contacts, phone lists, address, custom fields — 5 of 24 DTO keys were sent |
+| Customer profile | 6 | contacts, company phone list, custom fields |
+| Opportunity | 4 | `importance`, `probabilityPercent`, `description` (modelled, never rendered) and custom fields |
+| Pipeline | 2 | the ordered `stageIds` — every pipeline was born with the canonical six |
+
+Their shared machinery lives in `src/app/(tenant)/crm/shared/`:
+`useCrmCreateForm` (the touched-set and reveal rule), `crm-form-validation.ts`
+(`CrmErrorBag` and the section-index helpers), `useCrmCreateCustomFields`,
+`CrmPhoneListField` and the `CrmPhoneNumberInput` it renders per row (a phone
+as a country code and a national number, stored as the single string the DTO
+takes), `CrmCountrySelect` (the same catalogue as a flag-and-name picker,
+storing the country NAME because that is all the DTO's `country` is, and
+keeping a value it does not recognise rather than blanking it),
+`CrmCustomFieldsFormSection`, `AcquisitionSourceOption` — a source picker's
+row, the tenant's uploaded icon then the name, rendered from one implementation
+by all four pickers and the catalogue screen — and `CrmContactLine`, which puts
+a whole contact on one line: honorific, name, job title, number, email. A fifth
+create form should reach for those before writing a field of its own.
+
+Two of those read from `src/lib/catalogues/contact-titles.ts` and
+`src/lib/geo/country-data.ts`, which hold **values rather than copy** and so sit
+outside the dictionaries deliberately. What a picker there stores is the LABEL
+in the language the person chose, never a key: `honorificTitle`, `jobTitle` and
+`country` are free text on the wire with nothing but a length cap, and every
+screen that shows a record prints the string back exactly as it was saved — a
+key would read as `SALES_MANAGER` on all of them. Each catalogue reads a stored
+value back in either language, so a row written in Arabic is still recognised,
+and shown in the reader's own language, while the stored string is left alone
+until somebody picks a new one. A value the catalogue does not recognise is
+kept and shown as it stands, because records written before the picker existed
+have to survive being opened in it.
+
+One surface uses `card` instead: **add contact** on a customer profile
+(`CustomerProfileActionDialogs`) — full name, job title, email, phone. It is
+here for the create rule alone, not for room, which is exactly the case `card`
+was added for. The edit surface in the same file is an `EditDrawer` and stays
+one.
 
 ## StatusBadge
 

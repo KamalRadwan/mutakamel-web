@@ -6,7 +6,7 @@
 
 Status: **verified** (parsed from controller DTO source)
 
-Last source verification: **2026-08-30**
+Last source verification: **2026-09-03**
 
 Classes: **46** · Fields: **293**
 

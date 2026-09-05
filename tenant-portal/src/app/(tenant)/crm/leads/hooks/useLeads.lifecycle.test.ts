@@ -17,6 +17,7 @@ vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
 const COMPANY = "0192f3a0-0000-7000-8000-000000000001";
 const BRANCH = "0192f3a0-0000-7000-8000-000000000002";
 const OTHER_BRANCH = "0192f3a0-0000-7000-8000-000000000003";
+const LEADS_PATH = "/api/tenant/crm/v1/leads";
 
 function serverError(status: number): TenantApiClientError {
   return new TenantApiClientError("Request failed", {
@@ -97,6 +98,55 @@ describe("leads request lifecycle", () => {
     expect(get).not.toHaveBeenCalled();
     expect(result.current.branchId).toBeNull();
     expect(result.current.loadError).toBeNull();
+  });
+
+  // The list request's shape, pinned at the hook rather than at the builder:
+  // this is what proves the screen goes THROUGH `lead-search-contract` instead
+  // of hand-assembling a query of its own. An extra or misspelled key is a 400
+  // the user reads as an empty list.
+  it("sends the unfiltered window, then one filter key, resetting to page 1", async () => {
+    const { result } = renderHook(() => useLeads());
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    const listUrl = () =>
+      get.mock.calls
+        .map(([url]) => url as string)
+        .filter((url) => url.startsWith(`${LEADS_PATH}?`))
+        .at(-1);
+    const unfiltered = `branchId=${BRANCH}&page=1&limit=50&sortBy=createdAt&sortDir=DESC`;
+
+    // A blank value sends no filter key at all — `search=` is not "no filter".
+    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}`);
+
+    act(() => result.current.setPage(2));
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered.replace("page=1", "page=2")}`);
+
+    // Changing the filter starts the result set over, exactly as the old
+    // free-text search did.
+    act(() =>
+      result.current.setSearch({ mode: "basic", rows: [{ field: "status", value: "OPEN" }] }),
+    );
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&status=OPEN`);
+
+    act(() =>
+      result.current.setSearch({ mode: "basic", rows: [{ field: "text", value: " acme " }] }),
+    );
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&search=acme`);
+
+    // Advanced mode sends one key per condition, AND-ed by the server.
+    act(() =>
+      result.current.setSearch({
+        mode: "advanced",
+        rows: [
+          { field: "text", value: "acme" },
+          { field: "status", value: "OPEN" },
+        ],
+      }),
+    );
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&search=acme&status=OPEN`);
   });
 
   it("does not retry failed detail capabilities on state renders", async () => {

@@ -13,6 +13,8 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import type { AcquisitionSource } from "../../acquisition-sources/acquisition-source-contract";
+import { AcquisitionSourceOption } from "../../shared/components/AcquisitionSourceIcon";
+import { CrmPhoneNumberInput } from "../../shared/components/CrmPhoneNumberInput";
 import { CUSTOMER_STATUSES } from "../customer-profile-contract";
 import type { CustomerProfileForm } from "../customer-profile-write-contract";
 
@@ -120,11 +122,11 @@ export function CustomerProfileFormFields({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NO_SOURCE_VALUE}>
-              {t.crmLeadDetail.noSource}
+              <AcquisitionSourceOption source={null} label={t.crmLeadDetail.noSource} />
             </SelectItem>
             {sources.map((source) => (
               <SelectItem key={source.id} value={source.id}>
-                {localizedName(source, lang)}
+                <AcquisitionSourceOption source={source} label={localizedName(source, lang)} />
               </SelectItem>
             ))}
           </SelectContent>
@@ -152,12 +154,15 @@ export function CustomerProfileFormFields({
             />
           </Field>
           <Field label={t.crmLeadDetail.companyPhone}>
-            <Input
-              dir="ltr"
+            <CrmPhoneNumberInput
               value={form.companyPhone}
-              onChange={(event) => setField("companyPhone", event.target.value)}
               maxLength={32}
               disabled={disabled}
+              onChange={(next) => setField("companyPhone", next)}
+              // The control takes an `onBlur` for the create forms' touched
+              // tracking. This field set is driven by `setField` alone, so
+              // there is nothing a blur could mark.
+              onBlur={() => undefined}
             />
           </Field>
           <Field

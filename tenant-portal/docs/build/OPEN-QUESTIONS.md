@@ -2122,3 +2122,106 @@ server can name the module or resource that moved — or an explicit decision th
 tenant lists are read-through-on-navigation and whole-session resync is the
 intended granularity, in which case 13.6's "every open list" wording is
 satisfied as built and should say so.
+
+## Q131 — the filter engine is complete and reachable from nowhere, so an advanced search cannot be built
+
+Found 2026-09-04, designing the two-mode search on `/crm/leads`.
+
+`shared-libs/packages/database` ships a finished query engine: `SearchManyDto`
+takes a `filterTree` of nested `{op: 'AND'|'OR', children}` groups, the
+validator bounds it (`filter-tree.validator.ts:13-17` — depth 5, 100 leaves,
+100 children per group), and `operator.compiler.ts:35-185` implements 22
+operators — `eq neq gt gte lt lte isNull isNotNull in nin between like ilike
+startsWith endsWith any eqAny neqAny likeAny ilikeAny startsWithAny
+endsWithAny` — each with a checked value contract that answers
+`400 INVALID_OPERATOR_VALUE` rather than dropping the clause. An unknown field
+answers `400 INVALID_FIELD` **and returns the allowed list in
+`details.allowed`**, which is precisely what a query builder's UI would want.
+
+**No HTTP route in any app accepts it.** `grep -rn "SearchManyDto"
+--include=*.controller.ts` across core, crm, trade, worker and the gateway
+returns nothing. The two consumers — `parties.repository.ts` and
+`database-servers.repository.ts` — are handed the DTO by a service that built
+it internally. Even `trade-app`'s `POST /catalog/search` bypasses the engine
+for a hand-written three-field DTO.
+
+For leads specifically the ceiling is lower still. `GET /crm/leads` accepts
+twelve keys, six of which are filters, and every one of them is exact equality
+ANDed with the rest; `LeadsRepository.searchReadModels` is a hand-written query
+builder that never reaches the engine, which is why that repository's declared
+`filterableFields`, `searchableFields` and `sortableFields` are dead code on
+the list path. `crm-app` runs `forbidNonWhitelisted: true`, so a thirteenth key
+is a `400 CRM_VALIDATION_FAILED` — there is nothing to probe and nothing to
+degrade into.
+
+So the requested advanced search — rows of `[AND|OR] [field] [operator]
+[value]` — has no wire to travel on. It is not a UI that is missing.
+
+**Assumed:** the portal ships both modes, with advanced cut down to exactly
+what the wire carries rather than to what was asked for. Basic is one field and
+one value; advanced is a list of `[field] [value]` rows over the same six
+equality filters plus the free-text `search`, AND-ed. Three things the request
+asked for are absent because they cannot be sent, and their absence is stated
+on the panel rather than mimed: there is no operator column, the join between
+rows is a static AND chip rather than an AND/OR control, and a field already
+used is withheld from every other row's picker because the query string has one
+slot per key. `lead-search-contract.ts` and `customer-profile-search-contract.ts`
+own the row-to-key mapping and throw on a duplicate; the same shape ships on
+`/crm/customer-profiles`, whose four equality filters make the row list
+shorter but not different.
+
+The operator matrix the UI would need is already settled and recorded here, so
+adopting the endpoint below is a widening of the existing rows — an operator
+column and an OR join — rather than a redesign.
+
+**Settle with:** `POST /crm/leads/search` taking a DTO that extends
+`SearchManyDto`, a `RouteEntry` for it in
+`api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts`
+(the gateway forwards verbatim and validates nothing, so the entry is all it
+needs), and `LeadsRepository.filterableFields` widened past its current seven
+to include at least `createdAt`, `convertedAt` and the three text columns.
+Three things to decide with it, all of which the engine gets wrong for a user
+rather than for a caller: `startsWith` and `endsWith` compile to `ILIKE`
+despite their names while `like` alone is case-sensitive; `eqAny`/`neqAny` are
+literally `in`/`nin` and should not appear twice in a menu; and a `condition`
+key on a leaf inside a `filterTree` is accepted by the validator and then
+ignored by the compiler, so a tree written that way silently ANDs.
+
+## Q132 — the CRM owner filter has no source of owner names, so it cannot be offered
+
+Found 2026-09-05, building the basic search on `/crm/leads`; the same gap
+stopped the owner field on `/crm/customer-profiles` the same day.
+
+`GET /crm/leads` accepts `ownerUserId` (`LeadsQueryDto`, `@IsUUID('7')`), and
+`docs/api/crm-leads.md` documents it. It is the one filter of the six that the
+portal cannot put a control on. `GET /crm/customer-profiles` accepts the same
+key from the same file (`CustomerProfilesQueryDto`, `crm-list-query.dto.ts`)
+and is unreachable for the identical reason — one of four filters there rather
+than one of six.
+
+**Why this cannot be resolved from source:** nothing in the tenant surface
+lists the users who may own a CRM record. `GET /crm/leads/capabilities`
+returns `ownerUserIds` — the actor's *own* boundary, a permission answer, not
+a directory, and it is `null` outright for `scope: "all"`. `GET /leads` rows
+carry `ownerUserId` and no owner name (the same gap Q14 records for
+the opportunities table). Core's tenant-user routes are admin surfaces behind
+different permissions and are not branch-scoped to CRM ownership. The one
+endpoint that does return `ownerDisplayName` is the opportunities *card*
+projection, which is not a user directory and knows nothing about leads.
+
+So a control here could only be a text box asking a human to paste a raw
+UUIDv7 — an input nobody has, validated by a `400`.
+
+**Assumed:** the field is omitted from the search catalogue entirely, with the
+reason in a comment on `LEAD_SEARCH_FIELDS` in
+`src/app/(tenant)/crm/leads/lead-search-contract.ts` and on
+`CUSTOMER_PROFILE_SEARCH_FIELDS` in
+`src/app/(tenant)/crm/customer-profiles/customer-profile-search-contract.ts`.
+Omitted, not disabled: a greyed-out "Owner" entry advertises a capability that
+is not coming back on its own. Scoped read already narrows every list to what
+the actor may see, so the absence costs a user with `own` scope nothing.
+
+**Settle with:** either a branch-scoped `GET /crm/owners` (or
+`?includeOwner=true` on the list, projecting `ownerDisplayName` the way
+`/pipelines/:id/cards` already does), or an explicit decision that owner is a
+CRM-admin filter and does not belong on a user-facing list screen.

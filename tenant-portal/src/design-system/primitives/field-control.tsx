@@ -18,6 +18,16 @@ import { createContext, useContext } from "react";
  */
 export interface FieldControlContextValue {
   /**
+   * The field's label text, for a control that renders it as its own prompt.
+   *
+   * The label element itself is still rendered and still points at the
+   * control — it is only visually hidden. A placeholder is not an accessible
+   * name: it is announced inconsistently, and it is gone the moment there is a
+   * value. So the name lives in the label and the LOOK lives in the
+   * placeholder, and neither pretends to be the other.
+   */
+  label: string;
+  /**
    * The id `Field`'s `<Label htmlFor>` points at. Exactly one control may take
    * it. A button is a labelable element, so this names a Radix select trigger
    * or a composite's trigger as directly as it names an `<input>` — no

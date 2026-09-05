@@ -151,7 +151,11 @@ function isAbortError(error: unknown): boolean {
 // /opportunities list. Unlike the board/card projections, this returns the
 // raw OpportunityEntity: no customer or owner display name. See Q14 in
 // docs/build/OPEN-QUESTIONS.md.
-export function useOpportunitiesList(branchId: string | null, pipelineId: string | null) {
+export function useOpportunitiesList(
+  branchId: string | null,
+  pipelineId: string | null,
+  stageId: string | null,
+) {
   const [items, setItems] = useState<OpportunityListItem[]>([]);
   const [pageInfo, setPageInfo] = useState<OpportunitiesListPageInfo>({ page: 1, limit: 25, total: 0 });
   const [sort, setSort] = useState<OpportunitiesSort>({ id: "createdAt", direction: "desc" });
@@ -187,6 +191,10 @@ export function useOpportunitiesList(branchId: string | null, pipelineId: string
           sortDir: sort.direction === "asc" ? "ASC" : "DESC",
         });
         if (pipelineId) query.set("pipelineId", pipelineId);
+        // Absent rather than empty when nothing is chosen: `@IsOptional()`
+        // skips only null/undefined, so `stageId=` would reach `@IsUUID('7')`
+        // in OpportunitiesQueryDto and answer 400 instead of "every stage".
+        if (stageId) query.set("stageId", stageId);
         const response = await axiosClient.get<unknown>(
           `/api/tenant/crm/v1/opportunities?${query.toString()}`,
           { signal, cache: "no-store", maxResponseBytes: 1024 * 1024 },
@@ -204,9 +212,12 @@ export function useOpportunitiesList(branchId: string | null, pipelineId: string
         if (!signal?.aborted && requestEpoch === requestEpochRef.current) setIsLoading(false);
       }
     },
-    [branchId, pipelineId, sort],
+    [branchId, pipelineId, sort, stageId],
   );
 
+  // Every change to the fetch key — branch, pipeline, stage or sort — restarts
+  // at page 1. Page 3 of one stage is not the page 3 being left, and on a
+  // narrowed result it is usually past the end.
   useEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => {

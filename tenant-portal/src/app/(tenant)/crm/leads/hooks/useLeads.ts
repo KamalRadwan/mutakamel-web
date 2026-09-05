@@ -19,6 +19,15 @@ import {
   parseLeadStageCatalogueResponse,
   type LeadStageFlag,
 } from "../../lead-stages/lead-stage-contract";
+import {
+  buildCreateLeadRequest,
+  type CreateLeadForm,
+} from "../lead-create-contract";
+import {
+  EMPTY_LEAD_SEARCH,
+  buildLeadsListQuery,
+  type LeadSearchState,
+} from "../lead-search-contract";
 
 export type LeadsView = "board" | "card" | "list";
 
@@ -63,50 +72,6 @@ export interface LeadsPage {
 }
 
 export type LeadsPageInfo = Omit<LeadsPage, "items">;
-
-export interface CreateLeadFormData {
-  contactName: string;
-  companyName: string;
-  email: string;
-  phone: string;
-  stageId?: string;
-  /**
-   * An organization Party already in the tenant Directory — MASTER-PLAN 8.4.
-   *
-   * `CreateLeadDto.existingCompanyPartyId` is deliberately narrower than a
-   * generic `partyId`: the service revalidates that the party is an ACTIVE
-   * ORGANIZATION inside the lead's branch, and rejects anything else with
-   * `LEAD_EXISTING_COMPANY_INVALID` / `LEAD_EXISTING_COMPANY_OUTSIDE_BRANCH`.
-   */
-  existingCompanyPartyId?: string;
-  /** An existing contact person on that party — `contacts[].contactPartyId`. */
-  contactPartyId?: string;
-}
-
-export function buildCreateLeadRequest(
-  form: CreateLeadFormData,
-  branchId: string,
-) {
-  const contact = {
-    fullName: form.contactName.trim(),
-    email: form.email.trim(),
-    phone: form.phone.trim(),
-    isPrimary: true,
-    ...(form.contactPartyId ? { contactPartyId: form.contactPartyId } : {}),
-  };
-  return {
-    branchId,
-    leadProfileType: "CORPORATE" as const,
-    displayName: form.companyName.trim(),
-    companyName: form.companyName.trim(),
-    companyPhone: form.phone.trim(),
-    contacts: [contact],
-    ...(form.stageId ? { stageId: form.stageId } : {}),
-    ...(form.existingCompanyPartyId
-      ? { existingCompanyPartyId: form.existingCompanyPartyId }
-      : {}),
-  };
-}
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -359,11 +324,15 @@ export function useLeads() {
   const [capabilities, setCapabilities] = useState<LeadCapabilities | null>(
     null,
   );
-  const [searchQuery, setSearchQuery] = useState("");
+  // Conditions of `[field] [value]`, AND-ed — the whole of what this screen
+  // may ask the list endpoint, one of them in basic mode and up to one per
+  // field in advanced. `lead-search-contract` owns which wire key each field
+  // becomes, and refuses to name two rows the same one.
+  const [search, setSearch] = useState<LeadSearchState>(EMPTY_LEAD_SEARCH);
   const [page, setPage] = useState(1);
   const sortRef = useRef(DEFAULT_LEADS_SORT);
   const [sort, setSortState] = useState(DEFAULT_LEADS_SORT);
-  const searchQueryRef = useRef("");
+  const searchRef = useRef<LeadSearchState>(EMPTY_LEAD_SEARCH);
   const pageRef = useRef(1);
   const requestEpochRef = useRef(0);
   const [pageInfo, setPageInfo] = useState<LeadsPageInfo>({
@@ -416,10 +385,13 @@ export function useLeads() {
     setPage(1);
   }, []);
 
-  const changeSearchQuery = useCallback(
-    (value: string) => {
-      searchQueryRef.current = value;
-      setSearchQuery(value);
+  // Any change to the filter — a field, a value, a condition added or removed,
+  // a mode switch, or a reset — starts the result set over: page 4 of a name
+  // search is not page 4 of a status filter.
+  const changeSearch = useCallback(
+    (next: LeadSearchState) => {
+      searchRef.current = next;
+      setSearch(next);
       changePage(1);
     },
     [changePage],
@@ -429,7 +401,7 @@ export function useLeads() {
     async (
       signal?: AbortSignal,
       requestedPage = page,
-      requestedSearch = searchQuery,
+      requestedSearch: LeadSearchState = search,
     ): Promise<boolean> => {
       const requestEpoch = requestEpochRef.current + 1;
       requestEpochRef.current = requestEpoch;
@@ -459,15 +431,14 @@ export function useLeads() {
       setDegraded(NO_DEGRADATION);
       try {
         const readPage = (requestedPageNumber: number) => {
-          const query = new URLSearchParams({
+          const query = buildLeadsListQuery({
             branchId,
-            page: String(requestedPageNumber),
-            limit: "50",
+            page: requestedPageNumber,
+            limit: 50,
             sortBy: sortRef.current.id,
             sortDir: sortRef.current.direction === "asc" ? "ASC" : "DESC",
+            search: requestedSearch,
           });
-          const search = requestedSearch.trim();
-          if (search) query.set("search", search);
           return axiosClient.get<unknown>(
             `/api/tenant/crm/v1/leads?${query.toString()}`,
             {
@@ -580,7 +551,7 @@ export function useLeads() {
         }
       }
     },
-    [branchId, capabilityScope, changePage, page, searchQuery],
+    [branchId, capabilityScope, changePage, page, search],
   );
 
   useEffect(() => {
@@ -594,7 +565,7 @@ export function useLeads() {
     };
   }, [fetchLeads]);
 
-  const handleCreate = async (form: CreateLeadFormData): Promise<boolean> => {
+  const handleCreate = async (form: CreateLeadForm): Promise<boolean> => {
     if (!branchId) {
       setError(t.crmLeads.messages.selectBranchToCreate);
       return false;
@@ -616,16 +587,21 @@ export function useLeads() {
           maxResponseBytes: 256 * 1024,
         },
       );
-      parseLeadResponse(response.data, branchId);
+      // Validated against the branch the lead was FILED INTO, not the one the
+      // list happens to be showing. `parseLead` throws on a branch mismatch,
+      // so passing the page's branch reported a lead that was created — and
+      // is sitting in the other branch — as a failure, which invites the user
+      // to create it a second time. D25.
+      parseLeadResponse(response.data, form.branchId || branchId);
       setIsCreateOpen(false);
       changePage(1);
-      await fetchLeads(undefined, 1, searchQueryRef.current);
+      await fetchLeads(undefined, 1, searchRef.current);
       return true;
     } catch (caught) {
       const message = errorMessage(caught, t.crmLeads.messages.createFailed);
       if (isAmbiguousMutationError(caught)) {
-        changeSearchQuery("");
-        const reloaded = await fetchLeads(undefined, 1, "");
+        changeSearch(EMPTY_LEAD_SEARCH);
+        const reloaded = await fetchLeads(undefined, 1, EMPTY_LEAD_SEARCH);
         setIsCreateOpen(false);
         setError(
           reloaded
@@ -673,7 +649,7 @@ export function useLeads() {
         await fetchLeads(
           undefined,
           pageRef.current,
-          searchQueryRef.current,
+          searchRef.current,
         );
         setSelectedForDelete(null);
       }
@@ -728,7 +704,7 @@ export function useLeads() {
       await fetchLeads(
         undefined,
         pageRef.current,
-        searchQueryRef.current,
+        searchRef.current,
       );
     } catch (caught) {
       const message = errorMessage(caught, t.crmLeads.messages.moveFailed);
@@ -736,7 +712,7 @@ export function useLeads() {
         await fetchLeads(
           undefined,
           pageRef.current,
-          searchQueryRef.current,
+          searchRef.current,
         );
       }
       setError(message);
@@ -760,7 +736,7 @@ export function useLeads() {
       setItems([]);
       setStages([]);
       setCapabilities(null);
-      changeSearchQuery("");
+      changeSearch(EMPTY_LEAD_SEARCH);
       setSelectedForDelete(null);
       setIsCreateOpen(false);
       setError(null);
@@ -778,8 +754,8 @@ export function useLeads() {
     error,
     loadError,
     degraded,
-    searchQuery,
-    setSearchQuery: changeSearchQuery,
+    search,
+    setSearch: changeSearch,
     pageInfo,
     setPage: changePage,
     sort,

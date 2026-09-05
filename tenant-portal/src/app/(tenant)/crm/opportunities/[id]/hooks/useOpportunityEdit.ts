@@ -65,8 +65,13 @@ export function useOpportunityEdit(
 
   const isDirty = useMemo(() => {
     if (!form || !baseline) return false;
+    // `customFields` is excluded rather than compared: this drawer does not
+    // edit it — the detail screen's own rail does — so it is `{}` on both
+    // sides and only the string fields carry a change.
     return (Object.keys(form) as Array<keyof OpportunityForm>).some(
-      (key) => form[key].trim() !== baseline[key].trim(),
+      (key) =>
+        key !== "customFields" &&
+        (form[key] as string).trim() !== (baseline[key] as string).trim(),
     );
   }, [baseline, form]);
 

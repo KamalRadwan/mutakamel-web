@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import { cva } from "class-variance-authority";
 import { cn } from "../lib/cn";
 import { focusRing, readOnlySurface, textEntrySize, type ControlSizeProps } from "../lib/variants";
-import { useFieldControl } from "./field-control";
+import { useFieldControl, useFieldControlContext } from "./field-control";
 
 // Matches Input's padding and type size at every step, but deliberately does
 // NOT reuse `controlSize`: that sets a fixed `h-(--size-control-*)`, which on a
@@ -29,8 +29,10 @@ export interface TextareaProps
     ControlSizeProps {}
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, rows = 3, size = "md", ...props }, ref) => {
+  ({ className, rows = 3, size = "sm", ...props }, ref) => {
     const field = useFieldControl(props, { nativeReadOnly: true });
+    // See Input: the label stays, and lends its text to the prompt.
+    const enclosing = useFieldControlContext();
 
     return (
       <textarea
@@ -47,6 +49,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           textEntrySize({ size }),
           className,
         )}
+        placeholder={props.placeholder ?? enclosing?.label}
         {...props}
         {...field}
       />

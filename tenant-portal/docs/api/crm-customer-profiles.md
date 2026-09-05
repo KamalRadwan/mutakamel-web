@@ -116,12 +116,30 @@ Returns **`204`** with no body.
   Leads and opportunities default to `board`.
 - Core owns the underlying party directory; CRM owns the profile. Do not try
   to join them client-side.
+- The list screen's search is **one field, one value** — a field picker beside
+  a value control whose type follows the field, built in
+  `crm/customer-profiles/customer-profile-search-contract.ts`. That module is
+  the only place a query key is named, and it sends **at most one** filter key:
+  `forbidNonWhitelisted` makes an unknown key a `400`, and a blank value would
+  send `status=`, which `@IsEnum` also rejects. There is no advanced/operator
+  mode — see [OPEN-QUESTIONS Q131](../build/OPEN-QUESTIONS.md).
+- `search` matches the **party's identity**: display name, first name, last
+  name, organization name and its contact methods (`partySearchPredicate()`).
+  The profile's own `description` is in the repository's `searchableFields` but
+  no code path reaches it from this route, so no label may promise it.
+- `sortBy` accepts `displayName` and `createdAt` and nothing else. `safeSortBy`
+  **throws** on an unlisted value rather than falling back to the default it is
+  handed, so an unrecognised sort is a `400`, not a default sort.
+- `ownerUserId` is offered by no control: nothing lists assignable users by
+  name, so the only possible input is a raw UUID — see
+  [OPEN-QUESTIONS Q132](../build/OPEN-QUESTIONS.md).
 
 ## Portal status
 
 | Capability | Status |
 | --- | --- |
 | List, branch-scoped, paginated | live |
+| Basic search — one field, one value | live — free text, status, customer type, source |
 | Detail route | live — full action cluster and custom-fields rail |
 | Board view | live — `CustomerStatusEnum` axis, no catalogue fetch |
 | Card view | live |

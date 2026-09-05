@@ -155,22 +155,33 @@ export function BoardView<T>({
     });
   }
 
+  // Every state owns the full height of the pane, not just the populated one.
+  // A board that collapses to its content while loading makes the page jump as
+  // the columns arrive, and an empty pipeline that renders as a short strip
+  // reads as a broken screen rather than as a pipeline with nothing in it.
   if (isLoading) {
     return (
-      <div className={cn("flex gap-2 overflow-x-auto", className)}>
+      <div className={cn("flex h-full gap-2 overflow-x-auto", className)}>
         {Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={`board-column-skeleton-${index}`} className="h-64 w-70 shrink-0 rounded-md" />
+          <Skeleton key={`board-column-skeleton-${index}`} className="h-full w-70 shrink-0 rounded-md" />
         ))}
       </div>
     );
   }
 
   if (error) {
-    return <ErrorState title={labels.errorTitle} onRetry={onRetry} retryLabel={labels.retry} className={className} />;
+    return (
+      <ErrorState
+        title={labels.errorTitle}
+        onRetry={onRetry}
+        retryLabel={labels.retry}
+        className={cn("h-full", className)}
+      />
+    );
   }
 
   if (columns.length === 0) {
-    return emptyState ?? <EmptyState title={labels.emptyTitle} className={className} />;
+    return emptyState ?? <EmptyState title={labels.emptyTitle} className={cn("h-full", className)} />;
   }
 
   return (

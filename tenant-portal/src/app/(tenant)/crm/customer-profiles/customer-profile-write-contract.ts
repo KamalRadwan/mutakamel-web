@@ -24,20 +24,6 @@ export interface CustomerProfileForm {
   acquisitionSourceId: string;
 }
 
-export const EMPTY_CUSTOMER_PROFILE_FORM: CustomerProfileForm = {
-  profileType: "CORPORATE",
-  displayName: "",
-  status: "PROSPECT",
-  companyName: "",
-  companyEmail: "",
-  companyPhone: "",
-  companyWebsite: "",
-  taxNumber: "",
-  commercialRegistrationNumber: "",
-  description: "",
-  acquisitionSourceId: "",
-};
-
 export function toCustomerProfileForm(
   profile: CustomerProfileDetail,
 ): CustomerProfileForm {
@@ -159,6 +145,7 @@ export function buildUpdateCustomerProfileRequest(
 }
 
 export interface CustomerContactForm {
+  honorificTitle: string;
   fullName: string;
   jobTitle: string;
   email: string;
@@ -166,6 +153,7 @@ export interface CustomerContactForm {
 }
 
 export const EMPTY_CUSTOMER_CONTACT_FORM: CustomerContactForm = {
+  honorificTitle: "",
   fullName: "",
   jobTitle: "",
   email: "",
@@ -174,6 +162,7 @@ export const EMPTY_CUSTOMER_CONTACT_FORM: CustomerContactForm = {
 
 export interface AddCustomerContactRequest {
   fullName: string;
+  honorificTitle?: string;
   jobTitle?: string;
   email?: string;
   phones?: string[];
@@ -189,9 +178,11 @@ export function buildAddCustomerContactRequest(
   form: CustomerContactForm,
 ): AddCustomerContactRequest {
   const request: AddCustomerContactRequest = { fullName: form.fullName.trim() };
+  const honorificTitle = form.honorificTitle.trim();
   const jobTitle = form.jobTitle.trim();
   const email = form.email.trim();
   const phone = form.phone.trim();
+  if (honorificTitle.length > 0) request.honorificTitle = honorificTitle;
   if (jobTitle.length > 0) request.jobTitle = jobTitle;
   if (email.length > 0) request.email = email;
   if (phone.length > 0) request.phones = [phone];

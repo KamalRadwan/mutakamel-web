@@ -336,3 +336,48 @@ describe("useBlurValidation", () => {
     expect(screen.getByText("Required.")).toBeInTheDocument();
   });
 });
+
+describe("the label is hidden, not gone", () => {
+  it("renders a real label that still names the control", () => {
+    render(
+      <Field label="Legal name">
+        <Input />
+      </Field>,
+    );
+    const label = screen.getByText("Legal name");
+    // Visually hidden, but present and pointing at the control: a placeholder
+    // is not an accessible name, so the name cannot live there.
+    expect(label).toHaveClass("sr-only");
+    expect(screen.getByRole("textbox", { name: "Legal name" })).toBeInTheDocument();
+  });
+
+  it("lends its text to the control as the prompt", () => {
+    render(
+      <Field label="Legal name">
+        <Input />
+      </Field>,
+    );
+    expect(screen.getByRole("textbox")).toHaveAttribute("placeholder", "Legal name");
+  });
+
+  it("carries the required marker into the prompt, where it can be seen", () => {
+    render(
+      <Field label="Legal name" required>
+        <Input />
+      </Field>,
+    );
+    // A hidden asterisk marks nothing.
+    expect(screen.getByRole("textbox")).toHaveAttribute("placeholder", "Legal name *");
+  });
+
+  it("never overrides a prompt the caller wrote", () => {
+    render(
+      <Field label="Stage">
+        <Input placeholder="Default stage" />
+      </Field>,
+    );
+    // "Default stage" says what the EMPTY value means; the label would only
+    // repeat the box's own name.
+    expect(screen.getByRole("textbox")).toHaveAttribute("placeholder", "Default stage");
+  });
+});

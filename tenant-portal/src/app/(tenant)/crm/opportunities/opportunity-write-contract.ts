@@ -18,6 +18,14 @@ export interface OpportunityForm {
   description: string;
   expectedCloseDate: string;
   probabilityPercent: string;
+  /**
+   * Keyed by `fieldKey`. `saveCustomFieldValues` runs with
+   * `CrmFieldRequirementOperationEnum.CREATE` here too, so a definition marked
+   * required-on-create fails the whole write with `422 CUSTOM_FIELD_REQUIRED`.
+   * `OPPORTUNITY` is the only owner type in scope — unlike a lead, which also
+   * picks up `LEAD_AND_PARTY`.
+   */
+  customFields: Record<string, unknown>;
 }
 
 export const EMPTY_OPPORTUNITY_FORM: OpportunityForm = {
@@ -31,6 +39,7 @@ export const EMPTY_OPPORTUNITY_FORM: OpportunityForm = {
   description: "",
   expectedCloseDate: "",
   probabilityPercent: "",
+  customFields: {},
 };
 
 /**
@@ -91,6 +100,7 @@ export interface CreateOpportunityRequest {
   description?: string;
   expectedCloseDate?: string;
   probabilityPercent?: number;
+  customFields?: Record<string, unknown>;
 }
 
 export function buildCreateOpportunityRequest(
@@ -119,6 +129,14 @@ export function buildCreateOpportunityRequest(
   if (currencyCode.length === 3) request.currencyCode = currencyCode;
   if (description.length > 0) request.description = description;
   if (expectedCloseDate.length > 0) request.expectedCloseDate = expectedCloseDate;
+
+  const customFields = Object.entries(form.customFields).filter(([, value]) => {
+    if (value === undefined || value === null) return false;
+    if (typeof value === "string") return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    return true;
+  });
+  if (customFields.length > 0) request.customFields = Object.fromEntries(customFields);
   return request;
 }
 
@@ -170,8 +188,15 @@ export function toOpportunityForm(item: OpportunityDetail): OpportunityForm {
     expectedCloseDate: item.expectedCloseDate ?? "",
     probabilityPercent:
       item.probabilityPercent === null ? "" : String(item.probabilityPercent),
+    // The edit drawer does not write custom fields — the detail screen's own
+    // rail owns them — so the baseline is always empty here and the PATCH
+    // builder never looks at it.
+    customFields: {},
   };
 }
+
+/** Every `OpportunityForm` key the PATCH builder diffs, i.e. the string ones. */
+type OpportunityTextField = Exclude<keyof OpportunityForm, "customFields">;
 
 /** Only the changed keys, so a concurrent edit to another field survives. */
 export function buildUpdateOpportunityRequest(
@@ -179,7 +204,7 @@ export function buildUpdateOpportunityRequest(
   baseline: OpportunityForm,
 ): UpdateOpportunityRequest {
   const request: UpdateOpportunityRequest = {};
-  const changed = <K extends keyof OpportunityForm>(key: K): string | null =>
+  const changed = (key: OpportunityTextField): string | null =>
     form[key].trim() === baseline[key].trim() ? null : form[key].trim();
 
   const title = changed("title");

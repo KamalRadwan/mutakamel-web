@@ -88,6 +88,17 @@ export function usePipelines() {
     return () => controller.abort();
   }, [load]);
 
+  // The screen's whole search, and it runs here rather than on the wire
+  // because neither list route accepts a query parameter of any kind —
+  // `findAll(@CurrentActor() actor)` and the `configuration` route beside it
+  // take no page, no search and no filter (pipelines.controller.ts). The full
+  // catalogue arrives in one array; narrowing it in the browser is the only
+  // search this endpoint permits, not a stand-in for one that was skipped.
+  //
+  // BOTH names, not `localizedName`: a tenant names a pipeline twice, and
+  // someone reading an Arabic UI who knows a pipeline by its English name
+  // should still find it. `code` joins them because the table shows it beside
+  // the name, so it is on screen to be searched for.
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
     if (!query) return items;

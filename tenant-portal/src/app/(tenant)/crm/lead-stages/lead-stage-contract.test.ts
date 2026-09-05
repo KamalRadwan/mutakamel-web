@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCreateLeadStageRequest,
+  buildLeadStageReorderRequest,
   buildUpdateLeadStageRequest,
+  entryLeadStageId,
   isProtectedLeadStage,
   parseLeadStageCatalogueResponse,
   parseLeadStageResponse,
@@ -169,5 +171,64 @@ describe("Lead-stage update contract", () => {
         defaultStage,
       ),
     ).toThrow("Invalid lead stage form.");
+  });
+});
+
+describe("Lead-stage reorder contract", () => {
+  const entry: LeadStageItem = {
+    ...(stage as LeadStageItem),
+    id: "01900100-0000-7000-8000-000000000001",
+    nameAr: "جديد",
+    nameEn: "New",
+    flag: "NEW",
+    sortOrder: 1,
+    isDefault: true,
+  };
+  const qualified: LeadStageItem = {
+    ...(stage as LeadStageItem),
+    id: "01900100-0000-7000-8000-000000000030",
+    flag: "QUALIFIED",
+    sortOrder: 3,
+  };
+  const catalogue: LeadStageItem[] = [entry, stage as LeadStageItem, qualified];
+
+  it("sends the COMPLETE order the endpoint replaces, as its own array", () => {
+    const orderedIds = [entry.id, qualified.id, stage.id];
+    const request = buildLeadStageReorderRequest(catalogue, orderedIds);
+
+    expect(request).toEqual({ orderedIds });
+    // Its own array: the caller's list must not become the optimistic state by
+    // reference.
+    expect(request.orderedIds).not.toBe(orderedIds);
+  });
+
+  // `assertExactOrder` in crm-app answers 422 LEAD_STAGE_REORDER_INVALID for
+  // each of these, so none of them is worth a round trip.
+  it("refuses a partial order, a duplicate, an unknown id, or a displaced NEW", () => {
+    expect(() =>
+      buildLeadStageReorderRequest(catalogue, [entry.id, stage.id]),
+    ).toThrow("Invalid lead stage order.");
+    expect(() =>
+      buildLeadStageReorderRequest(catalogue, [entry.id, stage.id, stage.id]),
+    ).toThrow("Invalid lead stage order.");
+    expect(() =>
+      buildLeadStageReorderRequest(catalogue, [
+        entry.id,
+        stage.id,
+        "01900100-0000-7000-8000-0000000000ff",
+      ]),
+    ).toThrow("Invalid lead stage order.");
+    expect(() =>
+      buildLeadStageReorderRequest(catalogue, [stage.id, entry.id, qualified.id]),
+    ).toThrow("Invalid lead stage order.");
+    expect(() => buildLeadStageReorderRequest([], [])).toThrow(
+      "Invalid lead stage order.",
+    );
+  });
+
+  it("names the pinned entry stage only when the catalogue holds exactly one", () => {
+    expect(entryLeadStageId(catalogue)).toBe(entry.id);
+    expect(entryLeadStageId([stage as LeadStageItem, qualified])).toBeNull();
+    expect(entryLeadStageId([entry, { ...qualified, flag: "NEW" }])).toBeNull();
   });
 });

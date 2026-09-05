@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
+  entryLeadStageId,
   parseLeadStageCatalogueResponse,
   type LeadStageItem,
   type UpdateLeadStageFormData,
@@ -111,9 +112,15 @@ export function useLeadStages() {
     canManage,
     searchQuery,
     setSearchQuery,
+    // A reorder writes the WHOLE catalogue order, so it is driven by the
+    // unfiltered list and the controls are suppressed while a search narrows
+    // the view — the visible order would not be the order being written.
+    isFiltered: searchQuery.trim().length > 0,
+    entryStageId: entryLeadStageId(items),
     isCreating: mutations.isCreating,
     isDeleting: mutations.isDeleting,
     isUpdating: mutations.isUpdating,
+    isReordering: mutations.isReordering,
     settingDefaultId: mutations.settingDefaultId,
     createError: mutations.createError,
     deleteError: mutations.deleteError,
@@ -163,6 +170,9 @@ export function useLeadStages() {
       if (await mutations.remove(target)) setSelectedForDelete(null);
     },
     handleSetDefault: mutations.setDefault,
+    // The table hands back the whole visible order; it is the unfiltered
+    // catalogue that is validated against and re-ranked.
+    handleReorder: (orderedIds: string[]) => mutations.reorder(items, orderedIds),
     fetchStages,
   };
 }

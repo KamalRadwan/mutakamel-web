@@ -217,7 +217,7 @@ export default function CrmCustomFieldsPage() {
         <CustomFieldValuesPanel definitions={items} canManage={canManage} />
 
         <CreateCrmCustomFieldsModal
-          key={isCreateOpen ? "open" : "closed"}
+          key={isCreateOpen ? "create-open" : "create-closed"}
           isOpen={isCreateOpen}
           isSubmitting={isCreating}
           error={createError}
@@ -226,7 +226,7 @@ export default function CrmCustomFieldsPage() {
         />
 
         <CustomFieldRequirementsDrawer
-          key={requirementsField?.id ?? "closed"}
+          key={`requirements-${requirementsField?.id ?? "closed"}`}
           field={requirementsField}
           initialFlags={
             requirementsField ? requirements.readFlags(requirementsField) : null

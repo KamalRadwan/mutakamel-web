@@ -209,7 +209,7 @@ export default function CrmTasksPage() {
 
         {branchId ? (
           <CreateTaskDrawer
-            key={isCreateOpen ? "open" : "closed"}
+            key={isCreateOpen ? "create-open" : "create-closed"}
             open={isCreateOpen}
             onOpenChange={(open) => {
               if (!open) setCreateError(undefined);
@@ -235,7 +235,7 @@ export default function CrmTasksPage() {
         ) : null}
 
         <EditTaskDrawer
-          key={editTask?.id ?? "closed"}
+          key={`edit-${editTask?.id ?? "closed"}`}
           task={editTask}
           isSubmitting={isSubmitting}
           error={editError}

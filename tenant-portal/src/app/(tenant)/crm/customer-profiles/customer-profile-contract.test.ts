@@ -166,6 +166,7 @@ describe("customer profile write payloads", () => {
   it("sends a contact phone as `phones`, the only key the DTO has", () => {
     expect(
       buildAddCustomerContactRequest({
+        honorificTitle: "Ms",
         fullName: "  Noura Saleh ",
         jobTitle: "Procurement",
         email: "noura@acme.test",
@@ -173,6 +174,7 @@ describe("customer profile write payloads", () => {
       }),
     ).toEqual({
       fullName: "Noura Saleh",
+      honorificTitle: "Ms",
       jobTitle: "Procurement",
       email: "noura@acme.test",
       phones: ["+201000000000"],
@@ -182,6 +184,7 @@ describe("customer profile write payloads", () => {
   it("omits every blank contact field", () => {
     expect(
       buildAddCustomerContactRequest({
+        honorificTitle: "",
         fullName: "Noura Saleh",
         jobTitle: "",
         email: "",

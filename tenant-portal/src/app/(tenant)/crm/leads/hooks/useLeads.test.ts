@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildCreateLeadRequest,
   capabilityAllowsOwner,
   parseLeadResponse,
   parseLeadCapabilitiesResponse,
@@ -202,33 +201,4 @@ describe("Leads API contracts", () => {
     ).toThrow("Invalid lead stages response.");
   });
 
-  it("builds the corporate lead DTO required by CRM", () => {
-    expect(
-      buildCreateLeadRequest(
-        {
-          contactName: "  Dina Ali  ",
-          companyName: "  Acme Trading  ",
-          email: "  dina@example.com  ",
-          phone: "  +201001112223  ",
-          stageId: lead.stageId,
-        },
-        "01900100-0000-7000-8000-000000000099",
-      ),
-    ).toEqual({
-      branchId: "01900100-0000-7000-8000-000000000099",
-      leadProfileType: "CORPORATE",
-      displayName: "Acme Trading",
-      companyName: "Acme Trading",
-      companyPhone: "+201001112223",
-      contacts: [
-        {
-          fullName: "Dina Ali",
-          email: "dina@example.com",
-          phone: "+201001112223",
-          isPrimary: true,
-        },
-      ],
-      stageId: lead.stageId,
-    });
-  });
 });

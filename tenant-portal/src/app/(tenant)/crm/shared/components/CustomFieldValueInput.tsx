@@ -13,7 +13,7 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedValue } from "@/lib/format/localized";
-import type { CustomFieldItem } from "../custom-field-contract";
+import type { CustomFieldItem } from "../../custom-fields/custom-field-contract";
 
 interface CustomFieldValueInputProps {
   field: CustomFieldItem;

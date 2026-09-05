@@ -291,6 +291,10 @@ export const en: Dictionary = {
     defaultFailed: "The default lead stage could not be changed.",
     defaultInvalidResponseReloaded: "The default changed, but its response was invalid. The catalogue was reloaded.",
     defaultInvalidResponseStale: "The default changed, but its response was invalid and the catalogue could not be reloaded.",
+    dragHandle: "Drag to reorder",
+    reorderFilteredHint: "Clear the search to reorder stages: the whole order is written at once, so it cannot be taken from a filtered list.",
+    reorderInvalid: "That order is not valid. The entry stage stays first, and the order must cover every stage.",
+    reorderFailed: "The stage order could not be saved.",
     editTitle: "Edit lead stage",
     editDescription: "The default stage is chosen from the list, not from this form.",
     revert: "Revert to saved",
@@ -306,9 +310,33 @@ export const en: Dictionary = {
   },
   crmLeads: {
     title: "Leads",
-    subtitle: "Track prospects through the lead-stage pipeline and hand qualified leads to sales.",
     addLead: "Add lead",
     search: "Search leads…",
+    basicSearch: {
+      field: "Search by",
+      value: "Search value",
+      any: "All",
+      selectValue: "Choose a value",
+      catalogueUnavailable: "No options available",
+      fields: {
+        text: "Name, phone or email",
+        status: "Status",
+        stageFlag: "Stage flag"
+      }
+    },
+    searchMode: {
+      label: "Search mode",
+      basic: "Basic",
+      advanced: "Advanced"
+    },
+    advancedSearch: {
+      conditions: "Search conditions",
+      and: "AND",
+      addCondition: "Add condition",
+      removeCondition: "Remove condition: {field}",
+      unsupported:
+        "Conditions combine with AND only. OR and the comparison operators — greater than, contains, between — need a search endpoint the API does not expose yet."
+    },
     name: "Name",
     contact: "Contact",
     stage: "Stage",
@@ -331,11 +359,63 @@ export const en: Dictionary = {
     stagesUnavailable: "Lead stages could not be loaded, so the list is shown without stage columns.",
     capabilitiesUnavailable: "Action permissions could not be loaded, so the create, edit and delete controls are hidden. The list itself is complete.",
     existingCompany: "Existing company in the directory",
-    existingCompanyHint: "Link this lead to an organization that already exists instead of creating a new one.",
     newCompany: "Create a new company",
     existingContact: "Existing contact person",
-    existingContactHint: "Pick someone already recorded against this company to avoid a duplicate record.",
     newContact: "Create a new contact",
+    create: {
+      sectionsNav: "Form sections",
+      sectionInvalid: "has errors",
+      errorCount: "Fields needing attention: {count}",
+      sections: {
+        classification: "Classification",
+        company: "Company",
+        person: "Person",
+        contacts: "Contacts",
+        address: "Address",
+        qualification: "Qualification",
+        customFields: "Custom fields"
+      },
+      leadType: "Lead type",
+      types: { INDIVIDUAL: "Individual", CORPORATE: "Company" },
+      legalName: "Legal name",
+      taxNumber: "Tax number",
+      commercialRegistrationNumber: "Commercial registration number",
+      companyPhones: "Company phones",
+      existingCompanyLocked: "Taken from the directory; it is not editable here.",
+      displayName: "Display name",
+      honorificTitle: "Honorific",
+      firstName: "First name",
+      lastName: "Last name",
+      mobiles: "Mobile numbers",
+      contactHeading: "Contact {number}",
+      contactJobTitle: "Job title",
+      addContact: "Add contact",
+      removeContact: "Remove contact {number}",
+      contactsLimit: "At most {max} contacts.",
+      primaryContact: "Primary",
+      primaryContactGroup: "Primary contact",
+      existingContactLocked: "Taken from the directory; it is not editable here.",
+      country: "Country",
+      city: "City",
+      state: "State or region",
+      street1: "Street 1",
+      street2: "Street 2",
+      buildingNo: "Building number",
+      floor: "Floor",
+      landmark: "Landmark",
+      postalCode: "Postal code",
+      description: "Notes",
+      interestSummary: "Interest summary",
+      expectedNeed: "Expected need",
+      sourcesUnavailable: "Acquisition sources could not be loaded, so the source list is empty. The rest of the form is complete.",
+      errors: {
+        required: "This field is required.",
+        email: "Enter a valid email address.",
+        maxLength: "At most {max} characters.",
+        duplicatePhone: "This number is already in the list.",
+        contactRequired: "Add at least one contact."
+      }
+    },
     messages: {
       selectBranchToCreate: "Select one accessible branch before creating a lead.",
       createNotPermitted: "You do not have permission to create leads in this branch.",
@@ -371,6 +451,7 @@ export const en: Dictionary = {
     title: "Title",
     customer: "Customer",
     stage: "Stage",
+    allStages: "All stages",
     owner: "Owner",
     expectedClose: "Expected close",
     notProvided: "Not provided",
@@ -556,6 +637,28 @@ export const en: Dictionary = {
     } as Record<string, string>
   },
   crmPipelines: {
+    create: {
+      sections: {
+        identity: "Pipeline",
+        stages: "Stages"
+      },
+      stagesDefaultNote: "No stage chosen, so the pipeline starts with the six default stages.",
+      addStage: "Add a stage",
+      useDefaultStages: "Back to the default stages",
+      moveStageEarlier: "Move {name} earlier",
+      moveStageLater: "Move {name} later",
+      removeStage: "Remove {name}",
+      stageProblems: {
+        MISSING_NEW: "Add one stage flagged New.",
+        MISSING_WON: "Add one stage flagged Won.",
+        MISSING_LOST: "Add one stage flagged Lost.",
+        DUPLICATE_NEW: "A pipeline can hold only one New stage.",
+        DUPLICATE_WON: "A pipeline can hold only one Won stage.",
+        DUPLICATE_LOST: "A pipeline can hold only one Lost stage.",
+        NEW_NOT_FIRST: "The New stage has to come first.",
+        TOO_MANY: "At most 100 stages."
+      }
+    },
     title: "Opportunity pipelines",
     subtitle: "Create pipelines, order their stages, and decide who can reach them.",
     add: "New pipeline",
@@ -589,7 +692,6 @@ export const en: Dictionary = {
     defaultCannotDisable: "The default pipeline cannot be deactivated. Make another pipeline the default first.",
     createStagesNote: "The pipeline is created with the standard stage set; compose it from the pipeline page afterwards.",
     createTitle: "New opportunity pipeline",
-    createDescription: "Code and both names are required. Stages and access are configured after creation.",
     editTitle: "Edit pipeline",
     editDescription: "The code cannot change, and the default pipeline is chosen from the pipeline list.",
     deleteTitle: "Delete pipeline",
@@ -1031,8 +1133,46 @@ export const en: Dictionary = {
       "Every CRM list needs a branch and your account has none. Open the getting-started guide to work through the steps in order."
   },
   crmCustomerProfiles: {
+    create: {
+      sections: {
+        classification: "Classification",
+        person: "Person",
+        company: "Company",
+        contacts: "Contacts",
+        notes: "Notes",
+        customFields: "Custom fields"
+      },
+      statusHint: "A customer starts as a prospect unless you choose otherwise.",
+      companyNameHint: "Leave it blank to use the display name as the organization name.",
+      companyEmail: "Company email",
+      companyWebsite: "Website",
+      companyWebsiteHint: "Must start with https:// or http://."
+    },
     subtitle: "Current CRM customer profiles for the trusted session branch.",
     search: "Search by name or contact details…",
+    basicSearch: {
+      field: "Search by",
+      value: "Search value",
+      any: "All",
+      selectValue: "Choose a value",
+      catalogueUnavailable: "No options available",
+      fields: {
+        text: "Name, phone or email"
+      }
+    },
+    searchMode: {
+      label: "Search mode",
+      basic: "Basic",
+      advanced: "Advanced"
+    },
+    advancedSearch: {
+      conditions: "Search conditions",
+      and: "AND",
+      addCondition: "Add condition",
+      removeCondition: "Remove condition: {field}",
+      unsupported:
+        "Conditions combine with AND only. OR and the comparison operators — greater than, contains, between — need a search endpoint the API does not expose yet."
+    },
     sessionRequired: "An authenticated user session is required to load customer profiles.",
     singleBranchRequired: "No single trusted branch is available. Set a primary branch or use an account with one accessible branch.",
     name: "Customer name",
@@ -3355,6 +3495,28 @@ export const en: Dictionary = {
     scopeDeniedTitle: "This record is outside your scope",
     scopeDeniedDescription: "CRM access depends on branch and record owner together, not on a permission alone. Ask the record owner or a workspace administrator.",
     customFieldsTitle: "Custom fields",
+    customFieldsFormDescription: "The fields your team defined for this kind of record.",
+    customFieldsUnavailable: "Custom fields could not be loaded, so their section is hidden. If one is required at create time, the server will reject the save.",
+    phoneNumbered: "Phone {number}",
+    addPhone: "Add a number",
+    removePhone: "Remove phone {number}",
+    callingCode: "Country code",
+    searchCountries: "Search by country or code",
+    noMatchingCountries: "No matching country.",
+    chooseCountry: "Choose a country",
+    clearCountry: "Clear country",
+    chooseJobTitle: "Choose a job title",
+    searchJobTitles: "Search a job title",
+    noMatchingJobTitles: "No matching job title.",
+    backToJobTitleList: "Choose from the job title list",
+    fieldRequired: "This field is required.",
+    fieldEmail: "Enter a valid email address.",
+    fieldMaxLength: "At most {max} characters.",
+    fieldDuplicatePhone: "This number is already in the list.",
+    fieldUrl: "Enter a valid URL starting with http or https.",
+    formSectionsNav: "Form sections",
+    formSectionInvalid: "has errors",
+    formErrorCount: "Fields needing attention: {count}",
     booleanYes: "Yes",
     booleanNo: "No",
     copyId: "Copy identifier",
@@ -4267,6 +4429,23 @@ export const en: Dictionary = {
     }
   },
   crmOpportunityDetail: {
+    create: {
+      sections: {
+        placement: "Customer and pipeline",
+        deal: "Deal",
+        notes: "Notes",
+        customFields: "Custom fields"
+      },
+      placementDescription: "Who this opportunity is for, and where in the pipeline it starts.",
+      dealDescription: "What the deal is worth, when it is expected to close, and how important it is.",
+      notesDescription: "Any extra context about this opportunity.",
+      probabilityPercent: "Probability",
+      probabilityHint: "A whole number from 0 to 100.",
+      importanceHint: "A whole number from 0 to 3.",
+      amountInvalid: "Enter a valid amount with at most two decimal places.",
+      outOfRange: "That value is outside the allowed range.",
+      currencyLength: "A currency code is exactly three characters."
+    },
     backToOpportunities: "Back to opportunities",
     notFoundTitle: "This opportunity no longer exists",
     notFoundDescription: "The record was deleted, or this link is out of date.",
@@ -4315,7 +4494,6 @@ export const en: Dictionary = {
   crmCustomerProfileActions: {
     createAction: "New customer",
     createTitle: "Create a customer profile",
-    createDescription: "The profile is created in the selected branch. Company fields apply to corporate profiles only.",
     createOperation: "Create customer profile",
     editTitle: "Edit customer profile",
     editDescription: "Only changed fields are saved. The profile type cannot be changed after creation.",

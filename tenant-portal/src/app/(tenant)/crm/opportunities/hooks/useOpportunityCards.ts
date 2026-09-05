@@ -135,7 +135,11 @@ function isAbortError(error: unknown): boolean {
 // cursor-paginated. Deliberately independent of the board hook: the board
 // paginates per-stage, this paginates the whole pipeline as one flat list.
 // See docs/api/crm-opportunities.md#card-response.
-export function useOpportunityCards(pipelineId: string | null, branchId: string | null) {
+export function useOpportunityCards(
+  pipelineId: string | null,
+  branchId: string | null,
+  stageId: string | null,
+) {
   const [items, setItems] = useState<OpportunityCardItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [pageInfo, setPageInfo] = useState<CardsPageInfo>({ limit: 50, hasMore: false, nextCursor: null });
@@ -164,6 +168,11 @@ export function useOpportunityCards(pipelineId: string | null, branchId: string 
       setLoadMoreError(null);
       try {
         const query = new URLSearchParams({ branchId, limit: "50" });
+        // OpportunityCardQueryDto, verbatim: "`stageId` is optional so the UI
+        // can offer an All tab without downloading all stages into the browser
+        // first." So All sends no key at all — not an empty one, which
+        // `@IsOptional()` would still hand to `@IsUUID('7')` for a 400.
+        if (stageId) query.set("stageId", stageId);
         const response = await axiosClient.get<unknown>(
           `/api/tenant/crm/v1/pipelines/${encodeURIComponent(pipelineId)}/cards?${query.toString()}`,
           { signal, cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 },
@@ -183,9 +192,13 @@ export function useOpportunityCards(pipelineId: string | null, branchId: string 
         if (!signal?.aborted && requestEpoch === requestEpochRef.current) setIsLoading(false);
       }
     },
-    [branchId, pipelineId],
+    [branchId, pipelineId, stageId],
   );
 
+  // A new stage is a new fetch key, so the cursor restarts here rather than
+  // being carried over. It could not be carried over anyway: the server stamps
+  // the pipeline, branch, stage (or "ALL") and a filter hash into the cursor
+  // and rejects one decoded under a different set.
   useEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => {
@@ -205,6 +218,11 @@ export function useOpportunityCards(pipelineId: string | null, branchId: string 
         limit: String(pageInfo.limit),
         cursor: pageInfo.nextCursor,
       });
+      // The filter is repeated on every page. A cursor carries a position, not
+      // the query it was cut from, and the stage it was cut under is part of
+      // the context it is validated against — dropping it here would not
+      // return an unfiltered page, it would reject the cursor.
+      if (stageId) query.set("stageId", stageId);
       const response = await axiosClient.get<unknown>(
         `/api/tenant/crm/v1/pipelines/${encodeURIComponent(pipelineId)}/cards?${query.toString()}`,
         { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 },
@@ -222,7 +240,7 @@ export function useOpportunityCards(pipelineId: string | null, branchId: string 
     } finally {
       setIsLoadingMore(false);
     }
-  }, [branchId, isLoadingMore, items, pageInfo, pipelineId]);
+  }, [branchId, isLoadingMore, items, pageInfo, pipelineId, stageId]);
 
   return {
     items,

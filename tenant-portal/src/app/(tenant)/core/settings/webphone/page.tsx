@@ -1,15 +1,12 @@
 "use client";
 
 import { RotateCw } from "lucide-react";
-import { Button, Card, ErrorState, PageHeader, useToast } from "@/design-system";
+import { Button, Card, ErrorState, PageHeader } from "@/design-system";
 import { useTenantWebphoneSettings } from "./hooks/useTenantWebphoneSettings";
-import { WEBPHONE_COPY, webphoneErrorText } from "./webphone-copy";
+import { WEBPHONE_COPY } from "./webphone-copy";
 import { WebphoneUnavailableNotice } from "./components/WebphoneUnavailableNotice";
 import { TenantSeatCounter } from "./components/TenantSeatCounter";
-import { ServerConfigSection } from "./components/ServerConfigSection";
-import { EndpointsSection } from "./components/EndpointsSection";
-import { IceServersSection } from "./components/IceServersSection";
-import { TurnRestSection } from "./components/TurnRestSection";
+import { ServersSection } from "./components/ServersSection";
 import { ExtensionsSection } from "./components/ExtensionsSection";
 
 const UNAVAILABLE_NOTICE_ID = "webphone-unavailable-notice";
@@ -22,48 +19,24 @@ const UNAVAILABLE_NOTICE_ID = "webphone-unavailable-notice";
  * unsubscribed workspace gets the same screen, inert, with the reason stated.
  * The refusal that produces that state is an expected read outcome, not an
  * error, and is never surfaced as one.
+ *
+ * There is no scope-level save. WebPhone has no stored scope settings any more:
+ * `enabled` is derived from the servers below, so every write on this screen
+ * belongs to a server, an ICE entry, or an extension, and is submitted from the
+ * row that owns it.
  */
 export default function TenantWebphoneSettingsPage() {
   const state = useTenantWebphoneSettings();
-  const toast = useToast();
   const copy = WEBPHONE_COPY[state.lang];
   const describedBy = state.isSubscribed ? undefined : UNAVAILABLE_NOTICE_ID;
-  const pending = state.mutation.phase === "PENDING";
-  const savePending = pending && state.mutation.target === "config";
-
-  const save = async () => {
-    if (await state.saveConfig()) {
-      toast.success(copy.savedNotice);
-    } else {
-      toast.error(
-        copy.save,
-        webphoneErrorText(
-          state.mutation.errorCode,
-          state.lang,
-          state.mutation.details,
-        ),
-      );
-    }
-  };
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      {/* The screen's one filled action lives here and nowhere else — every
-          "Add" submit below is `secondary`. See docs/design/patterns.md#pageheader. */}
+      {/* No filled action: with the scope-level save gone, every submit below
+          is `secondary`. See docs/design/patterns.md#pageheader. */}
       <PageHeader
         title={copy.title}
         description={copy.subtitle}
-        primaryAction={
-          state.form
-            ? {
-                label: savePending ? copy.saving : copy.save,
-                onClick: () => void save(),
-                disabled:
-                  !state.canUpdateConfig || pending || !state.hasUnsavedChanges,
-                loading: savePending,
-              }
-            : undefined
-        }
         secondaryActions={
           <Button
             variant="outline"
@@ -123,14 +96,7 @@ export default function TenantWebphoneSettingsPage() {
 
           <TenantSeatCounter seats={state.seats} lang={state.lang} />
 
-          {state.form ? (
-            <>
-              <ServerConfigSection state={state} describedBy={describedBy} />
-              <EndpointsSection state={state} describedBy={describedBy} />
-              <IceServersSection state={state} describedBy={describedBy} />
-              <TurnRestSection state={state} describedBy={describedBy} />
-            </>
-          ) : null}
+          <ServersSection state={state} describedBy={describedBy} />
 
           <ExtensionsSection state={state} describedBy={describedBy} />
         </>

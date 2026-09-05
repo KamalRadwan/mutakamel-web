@@ -164,6 +164,12 @@ independently limited page plus its own cursor, so columns paginate separately.
 }
 ```
 
+- `stageId` is an **optional** query parameter on this route, and omitting it
+  is the All case — `OpportunityCardQueryDto` says it is optional "so the UI
+  can offer an All tab without downloading all stages into the browser first".
+  It echoes back as `selectedStageId`; a stage id outside the pipeline is a
+  **404**. Send no key rather than an empty one: `@IsOptional()` skips only
+  null/undefined, so `stageId=` reaches `@IsUUID('7')` and is a 400.
 - **There is no per-item `amount`.** Money lives in the stage `summary` on the
   board endpoint. Do not put an amount on an opportunity card — the field does
   not exist in this projection.

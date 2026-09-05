@@ -16,6 +16,7 @@ import {
   NAV_SECTIONS,
   type ColumnDef,
 } from "@/design-system";
+import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
 import { CreateLeadStagesModal } from "./components/CreateLeadStagesModal";
 import { DeleteLeadStagesConfirmModal } from "./components/DeleteLeadStagesConfirmModal";
@@ -55,6 +56,11 @@ export default function LeadStagesPage() {
     openEdit,
     closeEdit,
     handleUpdate,
+    isFiltered,
+    entryStageId,
+    isReordering,
+    handleReorder,
+    lang,
   } = useLeadStages();
 
   const columns: ColumnDef<LeadStageItem>[] = [
@@ -196,6 +202,16 @@ export default function LeadStagesPage() {
           </div>
         )}
 
+        {/* Reorder is the whole order in one write, so it is driven by the
+            unfiltered catalogue: while a search narrows the table the handles
+            are gone, and this says why rather than leaving them mysteriously
+            absent. */}
+        {canManage && isFiltered && (
+          <p role="note" className="text-xs text-muted-foreground">
+            {t.crmLeadStages.reorderFilteredHint}
+          </p>
+        )}
+
         {/* No pagination: this endpoint returns the whole list and declares no
             page/limit query at all (verified in its controller). The fake
             single-page object this replaced rendered working-looking controls
@@ -208,6 +224,20 @@ export default function LeadStagesPage() {
           error={loadError}
           onRetry={() => void fetchStages()}
           rowKey={(item) => item.id}
+          // The entry stage is pinned to rank 1 by the server, so a drop that
+          // would displace it is refused here rather than round-tripped into a
+          // 422 the user cannot act on — lead-stage-contract.ts.
+          rowReorder={
+            canManage && !isFiltered
+              ? {
+                  onReorder: (orderedIds) => void handleReorder(orderedIds),
+                  isPinned: (id) => id === entryStageId,
+                  isPending: isReordering,
+                  rowLabel: (item) => localizedName(item, lang),
+                  dragHandleLabel: t.crmLeadStages.dragHandle,
+                }
+              : undefined
+          }
           labels={{
             retry: t.common.retry,
             errorTitle: t.crmLeadStages.loadFailed,
@@ -225,8 +255,12 @@ export default function LeadStagesPage() {
           }}
         />
 
+        {/* Both keys remount their dialog on open so it never reopens holding
+            the last edit. They are namespaced because these are siblings: two
+            "closed" keys in one parent is a duplicate-key warning, and React
+            is entitled to treat the pair as one child. */}
         <CreateLeadStagesModal
-          key={isCreateOpen ? "open" : "closed"}
+          key={isCreateOpen ? "create-open" : "create-closed"}
           isOpen={isCreateOpen}
           isSubmitting={isCreating}
           error={createError}
@@ -235,7 +269,7 @@ export default function LeadStagesPage() {
         />
 
         <EditLeadStageDrawer
-          key={selectedForEdit?.id ?? "closed"}
+          key={`edit-${selectedForEdit?.id ?? "closed"}`}
           stage={selectedForEdit}
           isSubmitting={isUpdating}
           error={editError}

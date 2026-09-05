@@ -105,11 +105,14 @@ describe("CRM customer-profile contract", () => {
   });
 
   it("builds the canonical bounded server-search request", () => {
+    // The query string itself belongs to `customer-profile-search-contract`
+    // and is asserted key by key in its own test; what is checked here is that
+    // this module puts it behind the path it owns.
     expect(
       buildCustomerProfilesListPath({
         branchId: BRANCH_ID,
         page: 2,
-        search: "  Acme Retail  ",
+        search: { mode: "basic", rows: [{ field: "text", value: "  Acme Retail  " }] },
       }),
     ).toBe(
       CUSTOMER_PROFILES_PATH +

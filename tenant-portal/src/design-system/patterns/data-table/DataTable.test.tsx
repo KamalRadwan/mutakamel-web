@@ -161,3 +161,90 @@ describe("DataTable", () => {
     expect(row.className).toContain("scroll-me-16");
   });
 });
+
+/**
+ * What these can and cannot prove.
+ *
+ * A drag cannot be driven here at all: jsdom has no layout, so every box
+ * `@hello-pangea/dnd` measures is 0×0 and no sensor produces a meaningful drag
+ * — the same limit `views/board/virtual-dnd.probe.test.tsx` records. What is
+ * left is the structural half, and it is the half that regresses silently: a
+ * row that should not be draggable losing its guard is invisible until an order
+ * the server refuses reaches it. The order math itself is covered without a DOM
+ * in `row-reorder.test.ts`.
+ */
+describe("DataTable row reordering", () => {
+  const rows: Row[] = [
+    { id: "1", name: "Alice" },
+    { id: "2", name: "Bob" },
+    { id: "3", name: "Carol" },
+  ];
+
+  const reorder = (isPinned?: (id: string) => boolean) => ({
+    onReorder: vi.fn(),
+    isPinned,
+    rowLabel: (row: Row) => row.name,
+    dragHandleLabel: "Drag to reorder",
+  });
+
+  it("adds no handle column at all unless a caller asks for one", () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        isLoading={false}
+        rowKey={(row) => row.id}
+        labels={labels}
+      />,
+    );
+    expect(screen.queryByLabelText(/Drag to reorder/u)).toBeNull();
+    expect(screen.getAllByRole("row")[0]?.querySelectorAll("th")).toHaveLength(columns.length + 1);
+  });
+
+  it("names every grip by its own row, so a screen reader knows which one it holds", () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        isLoading={false}
+        rowKey={(row) => row.id}
+        labels={labels}
+        rowReorder={reorder()}
+      />,
+    );
+    expect(screen.getByLabelText("Drag to reorder: Alice")).toBeInTheDocument();
+    expect(screen.getByLabelText("Drag to reorder: Carol")).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader", { name: "Drag to reorder" })).toHaveLength(1);
+  });
+
+  // A pinned row keeps a dimmed grip rather than an empty cell, so the column
+  // does not change width row to row — but it carries no handle at all.
+  it("gives a pinned row no drag handle", () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        isLoading={false}
+        rowKey={(row) => row.id}
+        labels={labels}
+        rowReorder={reorder((id) => id === "1")}
+      />,
+    );
+    expect(screen.queryByLabelText("Drag to reorder: Alice")).toBeNull();
+    expect(screen.getByLabelText("Drag to reorder: Bob")).toBeInTheDocument();
+  });
+
+  it("freezes every row while a reorder write is in flight", () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        isLoading={false}
+        rowKey={(row) => row.id}
+        labels={labels}
+        rowReorder={{ ...reorder(), isPending: true }}
+      />,
+    );
+    expect(screen.queryByLabelText(/Drag to reorder: /u)).toBeNull();
+  });
+});

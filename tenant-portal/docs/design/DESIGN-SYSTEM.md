@@ -424,16 +424,21 @@ bare `z-50`.
   --z-sticky-cell:   10;   /* sticky first / action column */
   --z-sticky-header: 20;   /* sticky table header — above its own cells */
   --z-topbar:        30;   /* app chrome, above page content */
-  --z-dropdown:      40;   /* popover, select, tooltip, flyout */
   --z-overlay:      100;   /* dialog, sheet, and their scrim */
+  --z-dropdown:     110;   /* popover, select, tooltip, flyout */
   --z-toast:       1000;   /* always last — must clear a modal */
 }
 ```
 
-Two ordering facts that are easy to get backwards: the sticky **header** sits
+Three ordering facts that are easy to get backwards. The sticky **header** sits
 above the sticky **cell** (or the first column covers the header on horizontal
-scroll), and the **toast** sits above the **overlay** (a confirm dialog's
-result has to be visible over the dialog that triggered it).
+scroll). The **toast** sits above everything (a confirm dialog's result has to
+be visible over the dialog that triggered it). And the **dropdown** sits above
+the **overlay**, which is the one that bites: a `Select` opened inside a dialog
+portals to `<body>` as that dialog's *sibling*, not as its child, so a lower
+value paints the whole list behind the scrim — legible only as a blur, and
+every click on it lands on the overlay instead of an option. The reverse case
+cannot arise, because opening a modal dismisses any popover already open.
 
 **What this costs.** The row budget measured in the running app at 1366×768 —
 14 rows at scale 1.0, 15 at 0.9, counting the real chrome (topbar, page gutter,
@@ -913,8 +918,19 @@ Lead stages · Acquisition sources · Custom fields · CRM settings · Reference
 data. `SubNav` underneath `PageHeader`, active item underlined.
 
 All are `PageHeader` + `DataTable` + `FormDrawer`. Reorderable catalogues get a
-drag handle in a 24px first column and call the dedicated `reorder` endpoint —
+drag handle in a leading column and call the dedicated `reorder` endpoint —
 never a per-row `PATCH` of rank, which races.
+
+**Shipped on lead stages**, through `DataTable`'s `rowReorder` prop
+([patterns.md](patterns.md#row-reorder)). The write is the whole order, so it is
+built from the unfiltered catalogue and suppressed while a search narrows the
+table, and the `NEW` stage is pinned to rank 1 the way the CRM holds it.
+
+The column shipped with earlier/later buttons beside the grip and lost them on
+2026-09-04 at the product owner's instruction, so drag is the only pointer path
+on this screen — the `dragging-alternative` gap that opens
+[D24](../build/DEFECTS.md#d24--row-reorder-has-no-single-pointer-alternative--open).
+Acquisition sources still reorders by buttons alone and is unaffected.
 
 CRM settings is a form, not a table; its write is a **`PUT`** (send the whole
 object) and needs `crm.settings.manage`.

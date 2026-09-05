@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, ImagePlus, Megaphone, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ImagePlus, RefreshCw, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
@@ -18,6 +18,7 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { alternateName, localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
+import { AcquisitionSourceIcon } from "../shared/components/AcquisitionSourceIcon";
 import type { AcquisitionSource } from "./acquisition-source-contract";
 import { AcquisitionSourceIconDrawer } from "./components/AcquisitionSourceIconDrawer";
 import { CreateAcquisitionSourcesModal } from "./components/CreateAcquisitionSourcesModal";
@@ -63,23 +64,7 @@ export default function AcquisitionSourcesPage() {
       header: t.crmAcquisitionSources.source,
       cell: (item) => (
         <div className="flex items-center gap-2.5">
-          <span className="flex size-7 items-center justify-center overflow-hidden rounded-sm bg-muted">
-            {/* iconUrl is an opaque, cache-busted server path served by
-                GET /:id/icon under the same session cookie — rendered exactly
-                as given, never assembled here. next/image cannot serve it: the
-                route streams `private, no-store` bytes behind auth. */}
-            {item.iconUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={item.iconUrl}
-                alt=""
-                className="size-7 object-contain"
-                loading="lazy"
-              />
-            ) : (
-              <Megaphone className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
-            )}
-          </span>
+          <AcquisitionSourceIcon source={item} size="md" />
           <div>
             <p className="font-medium text-foreground">{localizedName(item, lang)}</p>
             <p className="text-2xs text-muted-foreground">{alternateName(item, lang)}</p>
@@ -233,8 +218,12 @@ export default function AcquisitionSourcesPage() {
           }}
         />
 
+        {/* Both keys remount their dialog on open so it never reopens holding
+            the last edit. They are namespaced because these are siblings: two
+            "closed" keys in one parent is a duplicate-key warning, and React is
+            entitled to treat the pair as one child. */}
         <CreateAcquisitionSourcesModal
-          key={isCreateOpen ? "open" : "closed"}
+          key={isCreateOpen ? "create-open" : "create-closed"}
           isOpen={isCreateOpen}
           onClose={closeCreate}
           onSubmit={handleCreate}
@@ -243,7 +232,7 @@ export default function AcquisitionSourcesPage() {
         />
 
         <AcquisitionSourceIconDrawer
-          key={icon.selected?.id ?? "closed"}
+          key={`icon-${icon.selected?.id ?? "closed"}`}
           source={icon.selected}
           isSubmitting={icon.isUploading}
           error={icon.error}

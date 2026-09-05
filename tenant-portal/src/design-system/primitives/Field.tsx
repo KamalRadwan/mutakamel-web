@@ -32,7 +32,15 @@ export interface FieldProps {
 // htmlFor/id pair and wires aria-describedby to hint and error text so a
 // screen-reader user can find the problem. A field error is inline here,
 // never a toast: see docs/design/patterns.md#where-a-result-belongs.
-export function Field({ label, hint, error, required, readOnly, className, children }: FieldProps) {
+export function Field({
+  label,
+  hint,
+  error,
+  required,
+  readOnly,
+  className,
+  children,
+}: FieldProps) {
   const generatedId = useId();
   const controlId = `${generatedId}-control`;
   const hintId = `${generatedId}-hint`;
@@ -58,15 +66,18 @@ export function Field({ label, hint, error, required, readOnly, className, child
     );
   }, [controlId, label]);
 
+  // The label is RENDERED and still points at the control; it is only hidden.
+  // A placeholder is not an accessible name — it is announced inconsistently
+  // and it is gone the moment there is a value — so the name stays in the
+  // label and only the LOOK moves into the prompt. The required marker rides
+  // along on the prompt, because a hidden asterisk marks nothing.
+  const prompt = required ? `${label} *` : label;
+
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label htmlFor={controlId}>
+      <Label htmlFor={controlId} className="sr-only">
         {label}
-        {required && (
-          <span className="ms-0.5 text-destructive" aria-hidden="true">
-            *
-          </span>
-        )}
+        {required && <span aria-hidden="true"> *</span>}
       </Label>
       {/*
         readOnly reaches the control BOTH ways on purpose: the native attribute
@@ -84,6 +95,7 @@ export function Field({ label, hint, error, required, readOnly, className, child
           invalid: Boolean(error),
           required,
           readOnly,
+          label: prompt,
         }}
       >
         {children}

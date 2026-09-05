@@ -102,6 +102,13 @@ heights, so a density change is a single-token edit and not a sweep across 21
 components. Consumed through Tailwind v4's arbitrary-variable syntax —
 `h-(--size-control-md)`.
 
+**Every text control now defaults to `sm`.** `Input`, `Select`, `Combobox`,
+`MultiSelect`, `DatePicker`, `DateRangePicker` and `Textarea` each declared
+`lg` (or `md`); they now declare `sm`, which is what makes a dense form fit.
+Nothing else changed — a call site that names its own size still wins, and the
+mobile rule below is untouched because `textEntrySize` is a separate fragment
+that keeps typed input at 16px under `sm:`.
+
 The fragment carries padding as well as height, and the port took admin's:
 `px-2 / px-2.5 / px-3 / px-3.5 / px-4` for `xs`→`xl`. The two that moved are
 `xs` (1.5 → 2) and `sm` (2 → 2.5); `lg` tightened from `px-4` to `px-3.5` so it

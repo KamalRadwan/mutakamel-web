@@ -41,6 +41,22 @@ dedicated endpoint, not a `PATCH` of each stage's `sortOrder`** — sending
 individual updates races and can produce duplicate ranks. `POST
 /lead-stages/:id/default` sets the stage new leads land in.
 
+The body is `{ orderedIds }`, and `assertExactOrder` in
+`../backend/mutakamel-apps/crm-app/src/crm/lead-stages/lead-stages.service.ts`
+answers `422 LEAD_STAGE_REORDER_INVALID` unless **both** hold:
+
+| Rule | What the UI must do |
+| --- | --- |
+| Every non-deleted stage appears exactly once | Build the list from the unfiltered catalogue, never a searched subset — so the reorder controls are suppressed while a search is active |
+| The single `NEW`-flagged stage stays first, at rank 1 | Pin it: refuse a move that would drag it or drop another stage above it, rather than round-tripping into a 422 |
+
+The response is the whole catalogue in its new order, densely re-ranked from 1
+— so it replaces the list rather than patching one row into it.
+
+Both rules re-verified against that service on **2026-09-04**, when the portal
+started calling this route: the lead-stages table reorders by dragging a row's
+grip.
+
 Consequences for the UI:
 
 - Always render in `sortOrder`. Never alphabetize.

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  validatePipelineStageSelection,
+  type OpportunityStageFlag,
   buildCreatePipelineRequest,
   buildReplaceAssignmentsRequest,
   buildUpdatePipelineRequest,
@@ -86,6 +88,7 @@ describe("Pipeline API contract", () => {
         nameEn: "  Europe  ",
         description: "   ",
         isDefault: true,
+        stageIds: [],
       }),
     ).toEqual({
       code: "SALES_EU",
@@ -93,6 +96,37 @@ describe("Pipeline API contract", () => {
       nameEn: "Europe",
       isDefault: true,
     });
+  });
+
+  it("omits stageIds when nothing was chosen, which is what seeds the defaults", () => {
+    const body = buildCreatePipelineRequest({
+      code: "SALES",
+      nameAr: "أ",
+      nameEn: "A",
+      description: "",
+      isDefault: false,
+      stageIds: [],
+    });
+    // `@ArrayNotEmpty()` makes `[]` a 400; only an absent key means "default".
+    expect(body).not.toHaveProperty("stageIds");
+  });
+
+  it("sends the chosen stage order as given", () => {
+    const stageIds = [
+      "018f0000-0000-7000-8000-000000000421",
+      "018f0000-0000-7000-8000-000000000428",
+      "018f0000-0000-7000-8000-000000000429",
+    ];
+    expect(
+      buildCreatePipelineRequest({
+        code: "SALES",
+        nameAr: "أ",
+        nameEn: "A",
+        description: "",
+        isDefault: false,
+        stageIds,
+      }).stageIds,
+    ).toEqual(stageIds);
   });
 
   it("refuses a code the @Matches pattern would reject", () => {
@@ -103,6 +137,7 @@ describe("Pipeline API contract", () => {
         nameEn: "A",
         description: "",
         isDefault: false,
+        stageIds: [],
       }),
     ).toThrow("PIPELINE_CODE_INVALID");
   });
@@ -192,5 +227,44 @@ describe("Pipeline API contract", () => {
     expect(() =>
       parseOpportunityStageDefinitionsResponse([definition, definition]),
     ).toThrow("Invalid CRM pipelines response.");
+  });
+});
+
+// `assertValidStageDefinitions` — the three rules the picker mirrors, each a
+// distinct 422 the user would otherwise meet as a rejected submit.
+describe("validatePipelineStageSelection", () => {
+  const stage = (flag: OpportunityStageFlag) => ({ flag });
+
+  it("accepts an empty selection, which means the canonical six", () => {
+    expect(validatePipelineStageSelection([])).toBeNull();
+  });
+
+  it("accepts a NEW-first order holding exactly one WON and one LOST", () => {
+    expect(
+      validatePipelineStageSelection([
+        stage("NEW"),
+        stage("PROPOSAL"),
+        stage("WON"),
+        stage("LOST"),
+      ]),
+    ).toBeNull();
+  });
+
+  it("names the missing required flag", () => {
+    expect(validatePipelineStageSelection([stage("NEW"), stage("WON")])).toBe("MISSING_LOST");
+    expect(validatePipelineStageSelection([stage("NEW"), stage("LOST")])).toBe("MISSING_WON");
+    expect(validatePipelineStageSelection([stage("WON"), stage("LOST")])).toBe("MISSING_NEW");
+  });
+
+  it("rejects a second stage carrying a required flag", () => {
+    expect(
+      validatePipelineStageSelection([stage("NEW"), stage("WON"), stage("WON"), stage("LOST")]),
+    ).toBe("DUPLICATE_WON");
+  });
+
+  it("requires NEW to rank first", () => {
+    expect(
+      validatePipelineStageSelection([stage("PROPOSAL"), stage("NEW"), stage("WON"), stage("LOST")]),
+    ).toBe("NEW_NOT_FIRST");
   });
 });

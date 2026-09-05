@@ -28,7 +28,7 @@ import {
 } from "@/hooks/useCrmRecordOptions";
 import type { CustomFieldItem } from "../custom-field-contract";
 import { useCustomFieldValues } from "../hooks/useCustomFieldValues";
-import { CustomFieldValueInput } from "./CustomFieldValueInput";
+import { CustomFieldValueInput } from "../../shared/components/CustomFieldValueInput";
 
 interface CustomFieldValuesPanelProps {
   definitions: CustomFieldItem[];

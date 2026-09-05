@@ -226,3 +226,45 @@ export function buildCreateLeadStageRequest(form: CreateLeadStageFormData) {
     isDefault: form.isDefault,
   };
 }
+
+/**
+ * The complete ordered id list `PATCH /lead-stages/reorder` replaces the dense
+ * one-based order with.
+ *
+ * Two refusals mirror `assertExactOrder` in
+ * crm-app/src/crm/lead-stages/lead-stages.service.ts, which answers 422
+ * `LEAD_STAGE_REORDER_INVALID`: the payload must carry **every non-deleted
+ * stage exactly once** — so it is built from the unfiltered catalogue, never
+ * from a searched subset — and the `NEW` stage must stay first at rank 1.
+ * Checking both here means an order the server would reject never costs a round
+ * trip, and never leaves the table showing an order that was never written.
+ */
+export function buildLeadStageReorderRequest(
+  stages: readonly LeadStageItem[],
+  orderedIds: readonly string[],
+): { orderedIds: string[] } {
+  const known = new Set(stages.map(({ id }) => id));
+  const requested = new Set(orderedIds);
+  if (
+    stages.length === 0 ||
+    orderedIds.length !== stages.length ||
+    requested.size !== orderedIds.length ||
+    orderedIds.some((id) => !known.has(id))
+  ) {
+    throw new Error("Invalid lead stage order.");
+  }
+
+  const entryStage = stages.filter(({ flag }) => flag === "NEW");
+  if (entryStage.length !== 1 || orderedIds[0] !== entryStage[0]!.id) {
+    throw new Error("Invalid lead stage order.");
+  }
+  return { orderedIds: [...orderedIds] };
+}
+
+/** The stage the entry-stage rule pins to rank 1, when the catalogue has one. */
+export function entryLeadStageId(
+  stages: readonly LeadStageItem[],
+): string | null {
+  const entryStages = stages.filter(({ flag }) => flag === "NEW");
+  return entryStages.length === 1 ? entryStages[0]!.id : null;
+}

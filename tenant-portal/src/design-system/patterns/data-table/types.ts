@@ -70,3 +70,33 @@ export interface ColumnDef<T> {
   numeric?: boolean;
   sticky?: "start" | "end";
 }
+
+/**
+ * Optional row reordering, off unless a caller passes it — the drag handle
+ * column catalogue screens get in DESIGN-SYSTEM.md#75-catalogue-screens.
+ *
+ * `onReorder` hands back **every** row key in its new order rather than a pair
+ * of indices, because that is what the endpoints behind it take: a catalogue's
+ * `reorder` route replaces the whole dense order in one write, and a per-row
+ * PATCH of rank races. It follows that the caller must pass the unfiltered
+ * list — a searched view is not the order being written.
+ *
+ * Drag is the only path here, which is a known WCAG 2.2 AA
+ * `dragging-alternative` gap — see DEFECTS.md D24. The keyboard half is
+ * covered: `@hello-pangea/dnd`'s own sensor rides on the grip.
+ */
+export interface RowReorderState<T> {
+  onReorder: (orderedIds: string[]) => void;
+  /** Rows that keep their index. A move that would displace one is refused. */
+  isPinned?: (id: string) => boolean;
+  /** Dragging is off while a reorder write is in flight. */
+  isPending?: boolean;
+  /**
+   * Names the row in its grip's accessible name. A column of identically
+   * labelled grips tells a screen-reader user nothing about which row they
+   * are on.
+   */
+  rowLabel: (row: T) => string;
+  /** Names every grip, and the handle column they sit in. Already translated. */
+  dragHandleLabel: string;
+}

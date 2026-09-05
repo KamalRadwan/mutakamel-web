@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Field } from "@/design-system";
 import { I18nProvider } from "@/i18n/I18nContext";
-import type { CustomFieldItem } from "../custom-field-contract";
+import type { CustomFieldItem } from "../../custom-fields/custom-field-contract";
 import { CustomFieldValueInput } from "./CustomFieldValueInput";
 
 // Radix Switch measures its thumb through ResizeObserver, which jsdom does not

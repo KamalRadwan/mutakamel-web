@@ -12,12 +12,18 @@ import {
   OPPORTUNITIES_PATH,
   parseOpportunityDetailResponse,
 } from "../opportunity-contract";
+import { useCrmCreateForm } from "../../shared/hooks/useCrmCreateForm";
 import {
   EMPTY_OPPORTUNITY_FORM,
   buildCreateOpportunityRequest,
-  isValidOpportunityAmount,
   type OpportunityForm,
 } from "../opportunity-write-contract";
+import {
+  opportunitySectionErrorCount,
+  validateCreateOpportunity,
+  type OpportunityCreateMessages,
+  type OpportunitySectionId,
+} from "../opportunity-create-validation";
 import type { OpportunityPipeline } from "./pipeline-types";
 
 /** `WON` and `LOST` are terminal; a new opportunity never starts closed. */
@@ -40,6 +46,8 @@ export interface CreateOpportunityAmbiguity {
 export function useCreateOpportunity(
   branchId: string | null,
   pipelines: OpportunityPipeline[],
+  messages: OpportunityCreateMessages,
+  requiredCustomFieldKeys: readonly string[],
   onCreated: (opportunityId: string) => void,
   /**
    * Re-read what the screen shows — defect D2. Called when a write applied but
@@ -48,7 +56,7 @@ export function useCreateOpportunity(
    */
   onReconcile: () => void,
 ) {
-  const [form, setForm] = useState<OpportunityForm | null>(null);
+  const [open, setOpen] = useState(false);
   const [customerLabel, setCustomerLabel] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -61,49 +69,75 @@ export function useCreateOpportunity(
     null,
   );
 
+  const validate = useCallback(
+    (candidate: OpportunityForm) =>
+      validateCreateOpportunity(candidate, messages, requiredCustomFieldKeys),
+    [messages, requiredCustomFieldKeys],
+  );
+  const createInitial = useCallback(() => ({ ...EMPTY_OPPORTUNITY_FORM }), []);
+  const state = useCrmCreateForm({ createInitial, validate });
+  const { form, setForm, errors, allErrors, revealAll, reset } = state;
+
   const selectableStages = useMemo(() => {
-    const pipeline = pipelines.find(({ id }) => id === form?.pipelineId);
+    const pipeline = pipelines.find(({ id }) => id === form.pipelineId);
     return (pipeline?.stages ?? []).filter(
       (stage) => !TERMINAL_STAGE_FLAGS.includes(stage.flag),
     );
-  }, [form?.pipelineId, pipelines]);
+  }, [form.pipelineId, pipelines]);
 
-  const isValid =
-    form !== null &&
-    form.customerProfileId.length > 0 &&
-    form.pipelineId.length > 0 &&
-    form.stageId.length > 0 &&
-    form.title.trim().length > 0 &&
-    isValidOpportunityAmount(form.amount);
+  const sectionErrorCount = useCallback(
+    (section: OpportunitySectionId) => opportunitySectionErrorCount(errors, section),
+    [errors],
+  );
 
-  const openDrawer = useCallback(() => {
-    setForm({ ...EMPTY_OPPORTUNITY_FORM });
+  const openModal = useCallback(() => {
+    reset();
     setCustomerLabel("");
     setError(null);
     setAmbiguity(null);
-  }, []);
+    setOpen(true);
+  }, [reset]);
 
-  const closeDrawer = useCallback(() => {
-    setForm(null);
+  const closeModal = useCallback(() => {
+    reset();
     setError(null);
-  }, []);
+    setOpen(false);
+  }, [reset]);
 
-  const setField = useCallback(
-    <K extends keyof OpportunityForm>(key: K, value: OpportunityForm[K]) => {
-      setForm((current) => (current ? { ...current, [key]: value } : current));
+  // A stage belongs to exactly one pipeline — `where: { id, pipelineId }` — so
+  // a stage chosen under the old pipeline is `404 PIPELINE_STAGE_NOT_FOUND`
+  // against the new one. It is cleared rather than left to be rejected.
+  const selectPipeline = useCallback(
+    (pipelineId: string) => {
+      setForm((current) => ({ ...current, pipelineId, stageId: "" }));
     },
-    [],
+    [setForm],
   );
 
-  const selectCustomer = useCallback((id: string, label: string) => {
-    setCustomerLabel(label);
-    setForm((current) =>
-      current ? { ...current, customerProfileId: id } : current,
-    );
-  }, []);
+  const setCustomField = useCallback(
+    (fieldKey: string, value: unknown) => {
+      setForm((current) => ({
+        ...current,
+        customFields: { ...current.customFields, [fieldKey]: value },
+      }));
+    },
+    [setForm],
+  );
+
+  const selectCustomer = useCallback(
+    (id: string, label: string) => {
+      setCustomerLabel(label);
+      setForm((current) => ({ ...current, customerProfileId: id }));
+    },
+    [setForm],
+  );
 
   const submit = useCallback(async () => {
-    if (!form || !branchId || !isValid || isSubmitting) return;
+    // Every field speaks now, including the ones never focused. Submit is not
+    // disabled while the form is invalid: a disabled button gives a keyboard
+    // user no way to ask what is wrong, so the press is what reveals it.
+    revealAll();
+    if (!branchId || isSubmitting || Object.keys(allErrors).length > 0) return;
     let body;
     try {
       body = buildCreateOpportunityRequest(form, branchId);
@@ -131,7 +165,8 @@ export function useCreateOpportunity(
         });
         if (outcome.kind === "success") {
           setAmbiguity(null);
-          setForm(null);
+          setOpen(false);
+          reset();
           onCreated(outcome.value.id);
           return;
         }
@@ -145,7 +180,8 @@ export function useCreateOpportunity(
           // is nothing left to press.
           setAmbiguity(null);
           setError(null);
-          setForm(null);
+          setOpen(false);
+          reset();
           setAppliedUnreadable({ attempt, error: outcome.error });
           onReconcile();
           return;
@@ -157,14 +193,14 @@ export function useCreateOpportunity(
     };
 
     await send();
-  }, [branchId, form, isSubmitting, isValid, onCreated, onReconcile]);
+  }, [allErrors, branchId, form, isSubmitting, onCreated, onReconcile, reset, revealAll]);
 
   return {
-    open: form !== null,
-    form,
+    ...state,
+    open,
     customerLabel,
     selectableStages,
-    isValid,
+    sectionErrorCount,
     isSubmitting,
     error,
     ambiguity,
@@ -172,9 +208,10 @@ export function useCreateOpportunity(
     appliedUnreadable,
     dismissAppliedUnreadable: () => setAppliedUnreadable(null),
     reconcile: onReconcile,
-    openDrawer,
-    closeDrawer,
-    setField,
+    openModal,
+    closeModal,
+    selectPipeline,
+    setCustomField,
     selectCustomer,
     submit,
   };
