@@ -166,9 +166,9 @@ describe("useAdminNotifications", () => {
    * the list showed read rows under an unread-only header.
    */
   it("does not append a page fetched under the previous filter", async () => {
-    const first = pageFixture();
-    first.nextCursor = "cursor-1";
-    first.hasNext = true;
+    // Spread rather than mutate: pageFixture infers nextCursor as null, so
+    // assigning a cursor onto it is a type error.
+    const first = { ...pageFixture(), nextCursor: "cursor-1", hasNext: true };
 
     let resolveStale: ((value: unknown) => void) | undefined;
     apiMock.list
