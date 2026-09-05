@@ -2846,6 +2846,7 @@ export const ar = {
       verification: "التحقق من هوية المضيف",
       strictVerification: "التحقق الصارم (Strict Verification)",
       relaxedVerification: "التحقق المرن (Relaxed Verification)",
+      verificationNotApplicable: "لا ينطبق — تشفير TLS معطل",
       tlsDisabled: "تشفير TLS معطل (غير مستحسن في الإنتاج)",
       certConfigured: "تم تهيئة حزمة شهادات الأمان (CA Bundle)",
       noCustomBundle: "لا توجد حزمة شهادات مخصصة مرفقة",

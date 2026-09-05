@@ -2959,6 +2959,7 @@ export const en: Dictionary = {
       verification: "Host Identity Verification",
       strictVerification: "Strict Verification",
       relaxedVerification: "Relaxed Verification",
+      verificationNotApplicable: "Not applicable — TLS disabled",
       tlsDisabled: "TLS is disabled (Not recommended for production)",
       certConfigured: "Certificate bundle configured",
       noCustomBundle: "No custom bundle attached",

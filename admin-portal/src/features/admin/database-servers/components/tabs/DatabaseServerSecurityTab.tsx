@@ -72,7 +72,19 @@ export function DatabaseServerSecurityTab({ server }: DatabaseServerSecurityTabP
             <div className="flex justify-between border-b border-border py-2">
               <span className="font-medium text-muted-foreground">{d.verification}</span>
               <span className="font-mono font-semibold text-foreground">
-                {server.sslRejectUnauthorized ? d.strictVerification : d.relaxedVerification}
+                {/*
+                  UI-003. sslRejectUnauthorized was read on its own, so a server
+                  with sslMode "disable" still reported "Strict Verification" -
+                  naming a protection that cannot be operating, because there is
+                  no certificate to verify when TLS is off. The stored flag is
+                  unchanged and still applies the moment TLS is turned on; what
+                  it does not do is describe the connection today.
+                */}
+                {server.sslMode === "disable"
+                  ? d.verificationNotApplicable
+                  : server.sslRejectUnauthorized
+                    ? d.strictVerification
+                    : d.relaxedVerification}
               </span>
             </div>
           </div>
