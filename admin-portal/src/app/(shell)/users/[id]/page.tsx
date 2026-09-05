@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -90,6 +90,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     webphoneExtension,
     extensionError,
     sipUsernameError,
+    sipPasswordError,
 
     webphoneServers,
     serverChainRows,
@@ -115,6 +116,11 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [showSipPassword, setShowSipPassword] = useState(false);
   const [isEditingWebphone, setIsEditingWebphone] = useState(false);
+  const webphoneFieldRefs = {
+    extension: useRef<HTMLInputElement>(null),
+    sipUsername: useRef<HTMLInputElement>(null),
+    sipPassword: useRef<HTMLInputElement>(null),
+  };
 
   if (isLoading) {
     return (
@@ -371,6 +377,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                   {(fieldProps) => (
                     <Input
                       {...fieldProps}
+                      ref={webphoneFieldRefs.extension}
                       maxLength={32}
                       value={sipExtension}
                       onChange={(e) => setSipExtension(e.target.value)}
@@ -383,6 +390,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                   {(fieldProps) => (
                     <Input
                       {...fieldProps}
+                      ref={webphoneFieldRefs.sipUsername}
                       maxLength={120}
                       value={sipUsername}
                       onChange={(e) => setSipUsername(e.target.value)}
@@ -393,6 +401,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 </Field>
                 <Field
                   label={t.users.sipPasswordLabel}
+                  error={sipPasswordError ?? undefined}
                   hint={passwordConfigured ? t.users.keepCurrentPasswordHint : t.users.passwordRequiredHint}
                   labelAction={
                     <Button
@@ -419,6 +428,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                   {(fieldProps) => (
                     <Input
                       {...fieldProps}
+                      ref={webphoneFieldRefs.sipPassword}
                       type={showSipPassword ? "text" : "password"}
                       maxLength={255}
                       value={sipPassword}
@@ -456,9 +466,18 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                   size="sm"
                   disabled={!webphoneHasChanges || isSaving}
                   loading={isSaving}
+                  // Only a server-confirmed save collapses the editor. A
+                  // rejected form or a failed request leaves it open over the
+                  // operator's own values, with focus on what to fix.
                   onClick={async () => {
-                    await saveWebphone();
-                    setIsEditingWebphone(false);
+                    const outcome = await saveWebphone();
+                    if (outcome.ok) {
+                      setIsEditingWebphone(false);
+                      return;
+                    }
+                    if (outcome.focusField) {
+                      webphoneFieldRefs[outcome.focusField].current?.focus();
+                    }
                   }}
                 >
                   <Save className="size-3.5" />

@@ -135,6 +135,18 @@ Settings → WebPhone — clearing the fields on the user screen does not delete
 row, and the extension number and SIP username are required on every save
 because a row cannot exist without them.
 
+**Only a server-confirmed save closes the editor.** `saveWebphone()` reports
+what it did rather than returning `void`: a form the client rejected and a
+request the server refused both answer `ok: false`, and the panel collapses to
+the read-only summary only on `ok: true`. Closing unconditionally made a save
+that never left the browser look exactly like one that landed — the operator
+saw the summary and the old extension, with nothing to say the whitespace they
+had typed was refused. A refused save also names its offending field, so the
+editor marks it inline through `Field error` (`aria-describedby`, `role=
+"alert"`) and moves focus there, per
+[toast-contract.md](../design-system/toast-contract.md): a validation error is
+a persistent target on the input, not only a toast that times out.
+
 ### The extension is the identity; the chain is where it registers
 
 A scope holds an ordered list of SIP servers, and each user has their own ordered

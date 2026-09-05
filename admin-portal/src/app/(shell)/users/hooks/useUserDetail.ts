@@ -79,6 +79,24 @@ const emptyWebphoneForm: WebphoneForm = {
   outboundCallerId: "",
 };
 
+/** The editable credential fields, in the order the editor presents them. */
+export type WebphoneFieldName = "extension" | "sipUsername" | "sipPassword";
+
+/**
+ * What a WebPhone save actually did.
+ *
+ * `ok` is true only for a write the server confirmed. A rejected form and a
+ * failed request both report false, because the caller closes the editor on
+ * this answer: returning nothing let a save that never left the browser look
+ * exactly like one that landed, so the editor collapsed back to the summary
+ * over a value that was never stored. `focusField` names the first field the
+ * operator has to correct.
+ */
+export type WebphoneSaveOutcome = {
+  ok: boolean;
+  focusField?: WebphoneFieldName;
+};
+
 function toastErrorMessage(details: MappedErrorDetails) {
   return details.correlationId
     ? `${details.message}\nCorrelation ID: ${details.correlationId}`
@@ -118,6 +136,7 @@ export function useUserDetail(id: string) {
 
   const [extensionError, setExtensionError] = useState<string | null>(null);
   const [sipUsernameError, setSipUsernameError] = useState<string | null>(null);
+  const [sipPasswordError, setSipPasswordError] = useState<string | null>(null);
   const writeIntentsRef = useRef(
     new Map<string, AdminUserWriteIntent<unknown>>(),
   );
@@ -424,18 +443,30 @@ export function useUserDetail(id: string) {
     }
   };
 
-  const saveWebphone = async () => {
-    if (!user || !webphoneHasChanges || isSaving) return;
+  const saveWebphone = async (): Promise<WebphoneSaveOutcome> => {
+    if (!user || !webphoneHasChanges || isSaving) return { ok: false };
 
-    const validationError = validateWebphoneForm(webphoneForm, webphone, t);
-    if (validationError) {
-      toast.error(t.users.validationErrorTitle, validationError);
-      return;
+    // A rejected form is reported on the fields themselves, not only as a
+    // toast: an inline error is the persistent, programmatically associated
+    // target the operator can correct, and it survives the toast timing out
+    // (docs/design-system/toast-contract.md).
+    const invalidField = firstInvalidWebphoneField(webphoneForm, webphone);
+    if (invalidField) {
+      const message =
+        invalidField === "sipPassword"
+          ? t.users.webphoneRequiresPasswordMsg
+          : t.users.webphoneRequiresExtensionMsg;
+      setExtensionError(invalidField === "extension" ? message : null);
+      setSipUsernameError(invalidField === "sipUsername" ? message : null);
+      setSipPasswordError(invalidField === "sipPassword" ? message : null);
+      toast.error(t.users.validationErrorTitle, message);
+      return { ok: false, focusField: invalidField };
     }
 
     setIsSaving(true);
     setExtensionError(null);
     setSipUsernameError(null);
+    setSipPasswordError(null);
 
     try {
       const fields = webphoneFieldsFromForm(webphoneForm);
@@ -490,12 +521,23 @@ export function useUserDetail(id: string) {
       // and only this signal makes the widget appear without a page reload.
       notifyWebphoneChanged();
       toast.success(t.users.webphoneSavedTitle, t.users.webphoneSavedDesc);
+      return { ok: true };
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
       if (details.fieldErrors?.extension) setExtensionError(details.fieldErrors.extension);
       if (details.fieldErrors?.sipUsername) setSipUsernameError(details.fieldErrors.sipUsername);
 
       toast.error(t.users.saveErrorTitle, toastErrorMessage(details));
+      // The extension was not stored, so the editor stays open over the values
+      // the operator submitted rather than collapsing to a stale summary.
+      return {
+        ok: false,
+        focusField: details.fieldErrors?.extension
+          ? "extension"
+          : details.fieldErrors?.sipUsername
+            ? "sipUsername"
+            : undefined,
+      };
     } finally {
       setIsSaving(false);
     }
@@ -609,8 +651,10 @@ export function useUserDetail(id: string) {
       setWebphoneForm((current) => ({ ...current, sipUsername }));
     },
     sipPassword: webphoneForm.sipPassword,
-    setSipPassword: (sipPassword: string) =>
-      setWebphoneForm((current) => ({ ...current, sipPassword })),
+    setSipPassword: (sipPassword: string) => {
+      setSipPasswordError(null);
+      setWebphoneForm((current) => ({ ...current, sipPassword }));
+    },
     webphoneDisplayName: webphoneForm.displayName,
     setWebphoneDisplayName: (displayName: string) =>
       setWebphoneForm((current) => ({ ...current, displayName })),
@@ -622,6 +666,7 @@ export function useUserDetail(id: string) {
     webphoneExtension: webphone,
     extensionError,
     sipUsernameError,
+    sipPasswordError,
 
     webphoneServers,
     serverChainRows,
@@ -708,19 +753,22 @@ function webphoneFormChanged(
   );
 }
 
-function validateWebphoneForm(
+/**
+ * The first field the operator has to fix, or undefined when the form is
+ * submittable. Returning the field rather than a message is what lets the
+ * editor mark and focus it instead of only announcing a toast.
+ */
+export function firstInvalidWebphoneField(
   form: WebphoneForm,
-  extension: AdminWebphoneExtension | undefined,
-  t: ReturnType<typeof useI18n>["t"],
-) {
+  extension?: AdminWebphoneExtension,
+): WebphoneFieldName | undefined {
   // An extension row cannot exist without a number and a SIP username, so both
   // are required for every save — not only when enabling. Clearing them does
   // not delete the extension; that is done from Settings → WebPhone.
-  if (!form.extension.trim() || !form.sipUsername.trim()) {
-    return t.users.webphoneRequiresExtensionMsg;
-  }
+  if (!form.extension.trim()) return "extension";
+  if (!form.sipUsername.trim()) return "sipUsername";
   if (form.enabled && !form.sipPassword.trim() && !extension?.passwordConfigured) {
-    return t.users.webphoneRequiresPasswordMsg;
+    return "sipPassword";
   }
   return undefined;
 }
