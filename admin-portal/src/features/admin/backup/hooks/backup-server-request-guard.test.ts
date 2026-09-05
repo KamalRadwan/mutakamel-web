@@ -56,3 +56,47 @@ describe("backup server request ownership", () => {
     );
   });
 });
+
+/**
+ * FE-BK01. `useBackupOverview.refreshAccess` compared its captured `serverId`
+ * against `serverContext.selectedServerId` read from the SAME closure - the
+ * same value twice, so the comparison was always true. It read like an
+ * ownership guard and was not one, and `refresh` awaits two other reloads
+ * before calling the captured `refreshAccess`, so a selection change in that
+ * window landed server A's readiness under server B.
+ *
+ * The guard is only meaningful when the selection is read from a ref that
+ * tracks the live value, which is what these cases pin.
+ */
+describe("selection read from a ref, not the closure", () => {
+  const inFlight = {
+    requestServerId: "server-a",
+    requestGeneration: 3,
+    currentGeneration: 3,
+  };
+
+  it("rejects a response whose server is no longer selected", () => {
+    expect(
+      isCurrentBackupServerRequest({ ...inFlight, selectedServerId: "server-b" }),
+    ).toBe(false);
+  });
+
+  it("accepts it while that server is still selected", () => {
+    expect(
+      isCurrentBackupServerRequest({ ...inFlight, selectedServerId: "server-a" }),
+    ).toBe(true);
+  });
+
+  it("is always true when both sides come from one stale closure", () => {
+    // The defect, stated as a property: comparing a value with itself can only
+    // ever pass, whatever the operator has since selected.
+    const captured = "server-a";
+    expect(
+      isCurrentBackupServerRequest({
+        ...inFlight,
+        requestServerId: captured,
+        selectedServerId: captured,
+      }),
+    ).toBe(true);
+  });
+});

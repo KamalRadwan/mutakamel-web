@@ -13,6 +13,7 @@ import { normalizeApiError, type NormalizedApiError } from "@/shared/api/normali
 import { useAuth } from "@/context/AuthContext";
 import { adminCan } from "@/lib/auth/rbac";
 import { useBackupServerOptions } from "./useBackupServerOptions";
+import { isCurrentBackupServerRequest } from "./backup-server-request-guard";
 
 interface OverviewData {
   policies: BackupPolicy[];
@@ -40,6 +41,21 @@ export function useBackupOverview() {
   const [accessError, setAccessError] = useState<NormalizedApiError | null>(null);
   const [isAccessLoading, setIsAccessLoading] = useState(false);
   const accessRequestGeneration = useRef(0);
+  /**
+   * The live selection, mirrored out of the closure.
+   *
+   * `refreshAccess` used to compare its captured `serverId` against
+   * `serverContext.selectedServerId` from the same closure - the same value
+   * twice, so the check was always true. It read like an ownership guard and
+   * was not one. `refresh` awaits the worker and server-context reloads and
+   * then calls the CAPTURED `refreshAccess`, so a selection change in that
+   * window landed server A's readiness under server B. The sibling
+   * `useBackupDatabaseAccess` has always done this with a ref.
+   */
+  const selectedServerIdRef = useRef(serverContext.selectedServerId);
+  useEffect(() => {
+    selectedServerIdRef.current = serverContext.selectedServerId;
+  }, [serverContext.selectedServerId]);
 
   const refreshWorker = useCallback(async () => {
     setIsLoading(true);
@@ -79,8 +95,12 @@ export function useBackupOverview() {
     try {
       const binding = await backupDatabaseAccessApi.getBinding(serverId);
       if (
-        generation === accessRequestGeneration.current &&
-        serverId === serverContext.selectedServerId
+        isCurrentBackupServerRequest({
+          requestServerId: serverId,
+          selectedServerId: selectedServerIdRef.current,
+          requestGeneration: generation,
+          currentGeneration: accessRequestGeneration.current,
+        })
       ) {
         setAccessBinding(binding);
       }
