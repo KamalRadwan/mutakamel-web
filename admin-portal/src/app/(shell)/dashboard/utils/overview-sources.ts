@@ -125,8 +125,15 @@ export function subscriptionTotal(data: DashboardResponse): number {
 }
 
 /**
- * Billing's `byStatus` is a map of objects, so the settlement value per
- * status is what the plan-revenue donut is actually made of.
+ * Billing's `byStatus` is a map of objects keyed by invoice status, and the
+ * settlement value per status is what this donut is made of.
+ *
+ * UI-001. It was titled "Revenue Distribution by Plan". There is no by-plan
+ * breakdown anywhere in the response - the provider emits only
+ * `billing.byStatusValue` and `billing.byStatusCount`, and labels them by
+ * status itself - so the chart named a dimension its data does not have. An
+ * operator reading plan performance off invoice statuses is reading a
+ * different question's answer. The title now says what is plotted.
  */
 export function billingValueItems(
   data: DashboardResponse,
