@@ -1,5 +1,6 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import { isAmbiguousWriteOutcome } from "@/shared/api/write-command-recovery";
+import { getAllTimezones } from "@/lib/geo/country-data";
 import { Country } from "country-state-city";
 import type {
   TenantApplicationCandidate,
@@ -48,6 +49,24 @@ export function getCanonicalCountrySelection(
   };
 }
 
+let cachedKnownTimezones: ReadonlySet<string> | null = null;
+
+/**
+ * Exactly the zones the wizard offers, so nothing selectable is unacceptable.
+ *
+ * Reading the same list the dropdown renders is the point: an independently
+ * written rule is free to drift from it, and this one did — the dropdown was
+ * widened to every IANA zone (a tenant can be registered in one country and
+ * operate on another country's clock) while the check still demanded one of
+ * the selected country's zones. Egypt plus Africa/Accra was offered, chosen,
+ * and then refused with an instruction to pick a zone belonging to the
+ * country. Core binds neither field to the other.
+ */
+function knownTimezones(): ReadonlySet<string> {
+  cachedKnownTimezones ??= new Set(getAllTimezones());
+  return cachedKnownTimezones;
+}
+
 export function isCanonicalCountrySelection(input: {
   countryName: string;
   countryIsoCode: string;
@@ -57,7 +76,7 @@ export function isCanonicalCountrySelection(input: {
   return Boolean(
     country &&
     input.countryName === country.countryName &&
-    country.timezones.includes(input.timezone),
+    knownTimezones().has(input.timezone),
   );
 }
 

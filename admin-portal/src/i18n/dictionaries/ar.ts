@@ -1226,7 +1226,7 @@ export const ar = {
       createOutcomeRecoveredDesc: (status: string) =>
         `تم العثور على المستأجر بالحالة ${status}.`,
       countryTimezoneRequiredTitle: "الدولة والمنطقة الزمنية مطلوبتان",
-      countryTimezoneRequiredDesc: "اختر دولة من السجل المعتمد ثم اختر منطقة زمنية تابعة لها.",
+      countryTimezoneRequiredDesc: "اختر دولة من السجل المعتمد ثم اختر منطقة زمنية من القائمة.",
     },
     wizard: {
       backToTenants: "العودة إلى المستأجرين",

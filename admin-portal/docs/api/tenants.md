@@ -1295,6 +1295,14 @@ rendered before the check started, which is still empty in that closure and
 turned a successful check into "check availability first", so the admin pressed
 Next twice to get past their own confirmed name.
 
+`timezone` is validated client-side against the same list the dropdown offers —
+every IANA zone in the country registry — and not against the selected
+country's zones. Core scopes neither field to the other (`timezone` is a
+trimmed 1–100 string), and a tenant may be registered in one country and run on
+another country's clock, so a country-scoped check refused pairs the wizard had
+just presented as valid, such as Egypt with `Africa/Accra`. Country selection
+suggests a zone; it does not constrain one.
+
 The least-privilege composite create-options call and identity flow still need
 authenticated runtime and browser proof against the migrated development
 database.

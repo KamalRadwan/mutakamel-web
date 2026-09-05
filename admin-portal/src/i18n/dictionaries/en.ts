@@ -1260,7 +1260,7 @@ export const en: Dictionary = {
         `The tenant was found with status ${status}.`,
       countryTimezoneRequiredTitle: "Country and timezone required",
       countryTimezoneRequiredDesc:
-        "Choose a country from the canonical registry and one of its timezones.",
+        "Choose a country from the canonical registry and a timezone from the list.",
     },
     wizard: {
       backToTenants: "Back to tenants",

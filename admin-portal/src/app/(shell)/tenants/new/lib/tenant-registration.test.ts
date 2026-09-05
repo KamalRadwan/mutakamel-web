@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import { getAllTimezones } from "@/lib/geo/country-data";
 import {
   buildTenantSubscriptionLines,
   getCanonicalCountrySelection,
@@ -61,6 +62,36 @@ describe("tenant registration contract", () => {
       }),
     ).toBe(false);
     expect(getCanonicalCountrySelection("ZZ")).toBeNull();
+  });
+
+  // The wizard offers every IANA zone on purpose: a tenant can be registered
+  // in one country and run on another country's clock. Validation that still
+  // demanded one of the *country's* zones rejected a choice the dropdown had
+  // just presented as valid, and Core binds neither field to the other.
+  it("accepts every timezone the wizard offers, not only the selected country's", () => {
+    const egypt = { countryName: "Egypt", countryIsoCode: "EG" };
+    expect(
+      isCanonicalCountrySelection({ ...egypt, timezone: "Africa/Accra" }),
+    ).toBe(true);
+
+    const offeredButRejected = getAllTimezones().filter(
+      (timezone) => !isCanonicalCountrySelection({ ...egypt, timezone }),
+    );
+    expect(offeredButRejected).toEqual([]);
+
+    // A zone outside the registry is still refused, and so is a country label
+    // that does not match the ISO code.
+    expect(
+      isCanonicalCountrySelection({ ...egypt, timezone: "Mars/Olympus_Mons" }),
+    ).toBe(false);
+    expect(isCanonicalCountrySelection({ ...egypt, timezone: "" })).toBe(false);
+    expect(
+      isCanonicalCountrySelection({
+        countryName: "A mismatched client label",
+        countryIsoCode: "EG",
+        timezone: "Africa/Cairo",
+      }),
+    ).toBe(false);
   });
 
   it("accepts only the bounded least-privilege create-options projection", () => {

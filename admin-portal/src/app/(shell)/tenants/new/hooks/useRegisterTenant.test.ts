@@ -760,6 +760,39 @@ describe("useRegisterTenant silent quote recovery", () => {
     unmount();
   });
 
+  // The timezone dropdown offers every IANA zone, so Next has to accept them.
+  // Egypt + Africa/Accra is exactly the pair the wizard offered and then
+  // refused, telling the admin to pick a zone belonging to the country.
+  it("accepts a timezone outside the selected country", async () => {
+    const { result, unmount } = renderHook(() => useRegisterTenant());
+    await waitFor(() => {
+      expect(result.current.applicationState).toBe("ready");
+      expect(result.current.storagePlacementState).toBe("ready");
+    });
+
+    act(() => {
+      result.current.selectCountry("EG");
+      result.current.setFormData((current) => ({
+        ...current,
+        name: "acme",
+        companyName: "Acme LLC",
+        industry: "Retail & Wholesale",
+        timezone: "Africa/Accra",
+      }));
+    });
+    expect(result.current.countryTimezoneOptions).toContain("Africa/Accra");
+
+    act(() => {
+      result.current.nextStep();
+    });
+
+    await waitFor(() => expect(result.current.currentStep).toBe(2));
+    expect(result.current.validationErrors).toEqual([]);
+    expect(result.current.formData.timezone).toBe("Africa/Accra");
+
+    unmount();
+  });
+
   it("blocks the owner step and reports a malformed owner email", async () => {
     const { result, unmount } = await renderReadyRegistration();
 
