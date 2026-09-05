@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generatedAt": "2026-09-05T01:25:52.383Z",
+    "generatedAt": "2026-09-05T03:38:04.415Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "6ab60f6f90d7",
-    "backendRevision": "116193f693c5+dirty",
+    "frontendRevision": "5afe27a852af+dirty",
+    "backendRevision": "244b9a7f64c4+dirty",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
@@ -50,7 +50,7 @@
     }
   },
   "sourceHashes": {
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "0d37316fc904a3cb73ab0154f86016f808b725267b80f8057893d6624de8f9c9",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "9b7f6d2fa85c980ae817a826ca5bc47ac3d325b698d326126f86f33d1a5f8476",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
   },
   "routes": [

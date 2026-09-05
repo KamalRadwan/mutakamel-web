@@ -1,3 +1,5 @@
+import type { ApiRequestOutcome } from "@/lib/api/axiosClient";
+
 type ErrorCategory =
   | "VALIDATION"
   | "AUTH"
@@ -11,6 +13,19 @@ export interface NormalizedApiError {
   isNormalized: true;
   httpStatus: number;
   errorCode: string; // Map Gateway `code` or Core `errorCode` here
+  /**
+   * Carried over from the original error, when the transport marked one.
+   *
+   * `settled-before-session-change` means the request REACHED the server and
+   * settled, and only then did the admin session epoch move underneath it. The
+   * synthetic 409 that follows looks like a definitive client refusal, so every
+   * predicate reading only `httpStatus`/`errorCode` concluded the command never
+   * ran and cleared its recovery key — for a command that had already
+   * succeeded. `normalizeApiError` returns a fresh object, so without this
+   * field the marker was silently dropped at the first consumer that
+   * normalised. See `write-command-recovery.ts`, which is where it is read.
+   */
+  requestOutcome?: ApiRequestOutcome;
   errorCategory?: ErrorCategory;
   message: string; // Map Gateway `title`/`detail` or Core `message` here
   details?: Record<string, string[]>;
@@ -22,6 +37,12 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
   if (isNormalizedApiError(error)) {
     return error;
   }
+
+  // Read once, from the ORIGINAL error, before any of the shapes below rebuild
+  // it. This is the only place that still has access to the marker.
+  const requestOutcome = readRequestOutcome(error);
+  const withOutcome = (normalized: NormalizedApiError): NormalizedApiError =>
+    requestOutcome ? { ...normalized, requestOutcome } : normalized;
 
   const response =
     typeof error === "object" && error !== null && "response" in error
@@ -46,7 +67,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
     const coreErrorCode = readErrorCode(data.errorCode);
     const coreMessage = readMessage(data.message);
     if (data.success === false && coreErrorCode && coreMessage) {
-      return {
+      return withOutcome({
         isNormalized: true,
         httpStatus:
           firstHttpStatus(responseStatus, data.statusCode) ?? 500,
@@ -56,7 +77,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
         details: readDetails(data.details),
         correlationId:
           readCorrelationId(data.correlationId) ?? headerCorrelationId,
-      };
+      });
     }
 
     // Is it a GatewayProblemDetails?
@@ -64,7 +85,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
     const gatewayTitle = readMessage(data.title);
     if (gatewayCode && gatewayTitle) {
       const gatewayDetail = readMessage(data.detail);
-      return {
+      return withOutcome({
         isNormalized: true,
         httpStatus:
           firstHttpStatus(responseStatus, data.status) ?? 500,
@@ -76,7 +97,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
         correlationId:
           readCorrelationId(data.correlationId) ?? headerCorrelationId,
         originalType: readBoundedString(data.type, 500),
-      };
+      });
     }
 
     // Nest/Worker errors may contain a string message or a structured message
@@ -100,7 +121,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
         readMessage(data.error) ??
         `Request failed with status ${workerStatus}.`;
 
-      return {
+      return withOutcome({
         isNormalized: true,
         httpStatus: workerStatus,
         errorCode: nestedCode ?? topLevelCode ?? `HTTP_${workerStatus}`,
@@ -115,14 +136,14 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
           readCorrelationId(nestedMessage?.correlationId) ??
           readCorrelationId(data.correlationId) ??
           headerCorrelationId,
-      };
+      });
     }
   }
 
   // A response with a valid status is still deterministic even when its body
   // is empty or malformed. Only a failure without a response is ambiguous.
   if (responseStatus) {
-    return {
+    return withOutcome({
       isNormalized: true,
       httpStatus: responseStatus,
       errorCode: `HTTP_${responseStatus}`,
@@ -132,16 +153,30 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
           ? error.message
           : `Request failed with status ${responseStatus}.`,
       correlationId: headerCorrelationId,
-    };
+    });
   }
 
   // Fallback for unhandled or non-Axios errors
-  return {
+  return withOutcome({
     isNormalized: true,
     httpStatus: 500,
     errorCode: "UNKNOWN_ERROR",
     message: error instanceof Error ? error.message : "An unknown error occurred.",
-  };
+  });
+}
+
+/**
+ * Reads the transport's marker off the original error.
+ *
+ * Deliberately inlined rather than imported from `axiosClient`: this module is
+ * runtime-dependency-free, every consumer imports it, and pulling in the
+ * transport would force every test that mocks `@/lib/api/axiosClient` to also
+ * stub this accessor. The type is imported, which erases at compile time.
+ */
+function readRequestOutcome(error: unknown): ApiRequestOutcome | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const outcome = (error as { requestOutcome?: unknown }).requestOutcome;
+  return outcome === "settled-before-session-change" ? outcome : undefined;
 }
 
 function isNormalizedApiError(error: unknown): error is NormalizedApiError {

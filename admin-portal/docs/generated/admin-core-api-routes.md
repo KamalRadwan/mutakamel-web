@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-09-05T01:25:52.383Z**
+Generated at: **2026-09-05T03:38:04.415Z**
 
-Frontend revision: `6ab60f6f90d7`
+Frontend revision: `5afe27a852af+dirty`
 
-Backend revision: `116193f693c5+dirty`
+Backend revision: `244b9a7f64c4+dirty`
 
 ## Coverage
 

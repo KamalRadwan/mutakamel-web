@@ -1,4 +1,6 @@
 import { axiosClient, unwrapCoreData } from "@/lib/api/axiosClient";
+import type { ApiRequestOutcome } from "@/lib/api/axiosClient";
+import { isAmbiguousWriteOutcome } from "@/shared/api/write-command-recovery";
 
 export const AUTH_INVALIDATION_REPLAY_PERMISSION =
   "admin.auth_invalidation_outbox.replay";
@@ -138,15 +140,20 @@ export function authInvalidationReplayIntentFingerprint(
   return JSON.stringify(command);
 }
 
-export function shouldRetainAuthInvalidationReplayIntent(error: {
-  httpStatus: number;
-  errorCode: string;
-}): boolean {
-  return (
-    error.errorCode === "GW.IDEM.IN_FLIGHT" ||
-    error.errorCode === "UNKNOWN_ERROR" ||
-    error.httpStatus >= 500
-  );
+/**
+ * Delegates rather than restating the rule. This was an exact
+ * re-implementation of `isAmbiguousWriteOutcome`, so it stayed behind when that
+ * gained its `settled-before-session-change` case - the one where a
+ * definitive-looking 409 hides a command that already reached the server.
+ */
+export function shouldRetainAuthInvalidationReplayIntent(
+  error: {
+    httpStatus: number;
+    errorCode: string;
+    requestOutcome?: ApiRequestOutcome;
+  },
+): boolean {
+  return isAmbiguousWriteOutcome(error);
 }
 
 export async function replayAuthInvalidationOutbox(
