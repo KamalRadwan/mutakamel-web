@@ -14,7 +14,7 @@
     "design:census:check": "node scripts/design/census.mjs --check",
     "design:rtl": "node scripts/design/rtl-guard.mjs",
     "typecheck": "tsc --noEmit",
-    "verify:ci": "npm run typecheck && npm run lint && npm run docs:check && npm run test && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm run design:rtl && npm run docs:check && npm run test && npm run build"
   },
   "dependencies": {
     "@mutakamel/identifiers": "workspace:*",
