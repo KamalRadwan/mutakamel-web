@@ -9,8 +9,10 @@ import { BackupDialog } from "../components/BackupDialog";
 import { BackupPageHeader } from "../components/BackupPageHeader";
 import { useBackupArtifacts } from "../hooks/useBackupArtifacts";
 import { formatBackupBytes, formatBackupDate, shortBackupId } from "../lib/backup-format";
+import { serverFilterOptions, serverFilterSelection, serverFilterValue } from "../lib/server-filter-options";
 import { useI18n } from "@/i18n/I18nContext";
 import { Card, CardContent, Field, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Button, DataTable, DegradedBanner, StatusBadge, type ColumnDef } from "@/design-system";
+
 
 export function BackupArtifactsScreen() {
   const { dir, lang, t } = useI18n();
@@ -133,13 +135,25 @@ export function BackupArtifactsScreen() {
           </Field>
           <Field label={copy.serverLabel} error={serverIdError}>
             {(fp) => (
-              <Select value={databaseServerId} onValueChange={(value) => updateFilterDraft({ databaseServerId: value })} dir={dir}>
+              // FE-BK02. The list held only concrete server ids, so "all
+              // servers" existed as a placeholder for the empty state and as
+              // nothing else: once the operator picked a server there was no
+              // option to go back, and the only way to widen the view again was
+              // to reload the page. Radix refuses an empty string as an item
+              // value, hence the sentinel.
+              <Select
+                value={serverFilterValue(databaseServerId)}
+                onValueChange={(value) =>
+                  updateFilterDraft({ databaseServerId: serverFilterSelection(value) })
+                }
+                dir={dir}
+              >
                 <SelectTrigger {...fp}>
                   <SelectValue placeholder={copy.allServersPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
-                  {view.servers.map((server) => (
-                    <SelectItem key={server.id} value={server.id}>{server.name}</SelectItem>
+                  {serverFilterOptions(view.servers, copy.allServersPlaceholder).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
