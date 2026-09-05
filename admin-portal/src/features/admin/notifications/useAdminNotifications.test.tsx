@@ -158,6 +158,56 @@ describe("useAdminNotifications", () => {
       correlationId: "019f0000-0000-7000-8000-000000000099",
     });
   });
+
+  /**
+   * UI-005. `loadMore` guarded only on the account, while `unreadOnly` stayed
+   * captured in its closure. Flipping the filter mid-request reloaded page one
+   * under the new filter and then appended the old filter's page onto it, so
+   * the list showed read rows under an unread-only header.
+   */
+  it("does not append a page fetched under the previous filter", async () => {
+    const first = pageFixture();
+    first.nextCursor = "cursor-1";
+    first.hasNext = true;
+
+    let resolveStale: ((value: unknown) => void) | undefined;
+    apiMock.list
+      .mockResolvedValueOnce(first)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveStale = resolve;
+          }),
+      )
+      .mockResolvedValue({ ...pageFixture(), items: [] });
+
+    const { result } = renderHook(() => useAdminNotifications());
+    await waitFor(() => expect(result.current.requestState).toBe("READY"));
+
+    let pending: Promise<unknown> | undefined;
+    act(() => {
+      pending = result.current.loadMore();
+    });
+
+    // The operator switches to unread-only while that page is still in flight.
+    act(() => result.current.setUnreadOnly(true));
+    await waitFor(() =>
+      expect(apiMock.list).toHaveBeenCalledWith(
+        { limit: 20, unreadOnly: true },
+        expect.any(AbortSignal),
+      ),
+    );
+
+    const staleItem = { ...pageFixture().items[0], id: "stale-id" };
+    await act(async () => {
+      resolveStale?.({ ...pageFixture(), items: [staleItem], nextCursor: null });
+      await pending;
+    });
+
+    expect(
+      (result.current.page?.items ?? []).some((item) => item.id === "stale-id"),
+    ).toBe(false);
+  });
 });
 
 function pageFixture() {

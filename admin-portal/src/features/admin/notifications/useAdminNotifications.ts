@@ -64,12 +64,23 @@ export function useAdminNotifications() {
   const [reloadVersion, setReloadVersion] = useState(0);
   const requestSequence = useRef(0);
   const identityRef = useRef<string | null>(user?.id ?? null);
+  /**
+   * UI-005. `loadMore` guarded only on the account, while `unreadOnly` stayed
+   * captured in its closure. Flipping the filter mid-request reloaded page one
+   * under the new filter and then appended the old filter's page onto it, so
+   * the list showed read and unread rows together under an unread-only header.
+   */
+  const unreadOnlyRef = useRef(unreadOnly);
   const retryActionRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     identityRef.current = user?.id ?? null;
     retryActionRef.current = null;
   }, [user?.id]);
+
+  useEffect(() => {
+    unreadOnlyRef.current = unreadOnly;
+  }, [unreadOnly]);
 
   const refresh = useCallback(() => setReloadVersion((value) => value + 1), []);
 
@@ -133,7 +144,11 @@ export function useAdminNotifications() {
     setIsLoadingMore(true);
     try {
       const next = await listAdminNotifications({ limit, unreadOnly, cursor });
-      if (identityRef.current !== ownerId) return;
+      // The filter is as much a part of "is this still my page" as the account:
+      // a page fetched under the other filter cannot be appended to this one.
+      if (identityRef.current !== ownerId || unreadOnlyRef.current !== unreadOnly) {
+        return;
+      }
       setPage((current) => {
         if (!current) return next;
         const known = new Set(current.items.map((item) => item.id));
@@ -144,7 +159,9 @@ export function useAdminNotifications() {
       });
       setUnreadCount(next.unreadCount);
     } catch (caught) {
-      if (identityRef.current !== ownerId) return;
+      if (identityRef.current !== ownerId || unreadOnlyRef.current !== unreadOnly) {
+        return;
+      }
       const normalized = notificationError(caught);
       setActionStatus({
         state: actionStateFromError(normalized),
@@ -153,6 +170,9 @@ export function useAdminNotifications() {
         error: normalized,
       });
     } finally {
+      // Account-scoped, deliberately not filter-scoped: the filter guard above
+      // protects the append, and refusing to clear the spinner here would
+      // strand it whenever the operator switched filters mid-request.
       if (identityRef.current === ownerId) setIsLoadingMore(false);
     }
   }, [canRead, dataOwnerId, isLoadingMore, limit, page?.nextCursor, unreadOnly, user?.id]);
