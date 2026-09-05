@@ -75,6 +75,13 @@ export function useTenantBillingWorkspace(
   const reconciliationGeneration = useRef(0);
   const reconciliationAbort = useRef<AbortController | null>(null);
   const contextRef = useRef(contextKey);
+  /**
+   * Bumped only when a preview is cleared, which is what the panel does on a
+   * draft edit. A preview whose request began before that clear no longer
+   * describes anything the operator is looking at.
+   */
+  const planPreviewGeneration = useRef(0);
+  const walletPreviewGeneration = useRef(0);
   const intentKeys = useRef(createBillingIntentKeyStore());
   const mutationGenerations = useRef(new Map<string, number>());
   const mutationDisplayGeneration = useRef(0);
@@ -468,11 +475,19 @@ export function useTenantBillingWorkspace(
         return null;
       }
       setPlanPreview(null);
+      // UI-018. Two same-scope previews racing are already resolved by
+      // runMutation. What was unguarded is the CLEAR: the panel clears the
+      // preview when the operator edits the draft, but a preview already in
+      // flight still landed afterwards and sat there confirmable, priced
+      // against terms it never saw. Reading the counter here and comparing it
+      // after the await is what disowns it.
+      const clearedAt = planPreviewGeneration.current;
       const fingerprint = stableFingerprint(dto);
       const key = intentKeys.current.get("subscription:preview", fingerprint);
       const result = await runMutation("preview-plan-change", "subscription:preview", () =>
         tenantBillingApi.previewPlanChange(subscription.subscription.id, dto, key),
       );
+      if (clearedAt !== planPreviewGeneration.current) return null;
       if (result) setPlanPreview(result);
       return result;
     },
@@ -552,11 +567,13 @@ export function useTenantBillingWorkspace(
         return null;
       }
       setWalletPreview(null);
+      const clearedAt = walletPreviewGeneration.current;
       const fingerprint = stableFingerprint(dto);
       const key = intentKeys.current.get("wallet:preview", fingerprint);
       const result = await runMutation("preview-wallet-adjustment", "wallet:preview", () =>
         tenantBillingApi.previewWalletAdjustment(tenantId, dto, key),
       );
+      if (clearedAt !== walletPreviewGeneration.current) return null;
       if (result) setWalletPreview(result);
       return result;
     },
@@ -903,8 +920,16 @@ export function useTenantBillingWorkspace(
     selectPayment,
     proposeReconciliation,
     decideReconciliation,
-    clearPlanPreview: () => setPlanPreview(null),
-    clearWalletPreview: () => setWalletPreview(null),
+    // Clearing is what the panel does when the draft changes, so it must also
+    // disown any preview still in flight for the previous draft.
+    clearPlanPreview: () => {
+      planPreviewGeneration.current += 1;
+      setPlanPreview(null);
+    },
+    clearWalletPreview: () => {
+      walletPreviewGeneration.current += 1;
+      setWalletPreview(null);
+    },
   };
 }
 

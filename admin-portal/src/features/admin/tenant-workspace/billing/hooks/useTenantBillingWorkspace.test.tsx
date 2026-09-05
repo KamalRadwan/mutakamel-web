@@ -448,6 +448,56 @@ describe("useTenantBillingWorkspace", () => {
       expect.stringMatching(/^[0-9a-f-]{36}$/),
     );
   });
+
+  /**
+   * UI-018. The preview commit had no generation, so a preview requested for an
+   * earlier draft could land after the operator edited the draft - and then sat
+   * there confirmable, priced against terms it never saw. Clearing the preview
+   * is what the panel does on an edit, so it has to disown whatever is still in
+   * flight as well.
+   */
+  it("drops a plan preview that lands after the draft was cleared", async () => {
+    permissionState.current = {
+      ...NONE,
+      canReadSubscription: true,
+      canUpdateSubscription: true,
+    };
+    api.getSubscription.mockResolvedValue({
+      subscription: { id: "subscription", status: "ACTIVE" },
+      items: [],
+    });
+    let resolveStale: ((value: unknown) => void) | undefined;
+    api.previewPlanChange.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveStale = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.subscriptionState).toBe("ready"));
+
+    let pending: Promise<unknown> | undefined;
+    act(() => {
+      pending = result.current.previewPlanChange({
+        operation: "ADD",
+        moduleKey: "crm",
+        tierKey: "basic",
+        seats: 1,
+      });
+    });
+
+    // The operator edits the draft; the panel clears the preview.
+    act(() => result.current.clearPlanPreview());
+
+    await act(async () => {
+      resolveStale?.({ id: "stale-preview" });
+      await pending;
+    });
+
+    expect(result.current.planPreview).toBeNull();
+  });
+
 });
 
 function normalizedError(httpStatus: number, errorCode: string) {
