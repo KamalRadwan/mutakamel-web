@@ -101,6 +101,32 @@ credential as SHA-256 over a per-page-load random salt and the value: stable for
 an exact retry, different for a different credential, and worthless without the
 salt, which never leaves the module and is never sent, stored, or logged.
 
+### An argument the body carries has to reach the fingerprint
+
+A generic `execute(name, target, allowed, payload, operation)` helper builds the
+intent from what it is *given* — `{tenantId, name, userId, payload}` — while the
+request is built inside `operation`, which closes over whatever else the caller
+had in scope. Anything captured that way is in the body and not in the key.
+
+Tenant ownership transfer was the case. `POST
+/tenants/{id}/users/{userId}/transfer-ownership` sends `{newOwnerUserId}`, but
+`transferOwnership` passed `payload: null` and captured the destination in the
+closure, so every transfer *from the same current owner* fingerprinted
+identically no matter who was receiving the seat. Rule 4 — a new key after any
+intent change — was therefore unenforceable for the one field that is the whole
+command: an A→B transfer that ended ambiguously kept its key (correctly, the
+outcome was unknown), and the operator's follow-up A→C went out under that same
+key with a different body. The Gateway hashes the real body, so it answers
+`GW.IDEM.MISMATCH` — and the retry that existed to resolve the ambiguity is the
+one request that cannot be made. Nothing in the UI can clear it, because no
+request reaches the server to move the command forward.
+
+The destination now travels in the intent (`payload: { newOwnerUserId }`), so an
+exact retry of A→B reuses its key and a changed destination gets a fresh one.
+The rule generalizes: when a command is dispatched through a shared executor,
+every value that ends up in the request body belongs in the payload argument,
+not only in the closure that builds the request.
+
 ## Required API states
 
 Each query owns:
@@ -174,4 +200,7 @@ still discarded. `useApplication` is the reference implementation.
 - `src/components/auth/RequirePermission.tsx`
 - `src/lib/api/axiosClient.ts`
 - `src/app/tenants/[id]/hooks/useTenantDetail.ts`
+- `src/features/admin/tenant-workspace/access/use-tenant-access.ts`
+- `src/features/admin/tenant-workspace/access/command-identities.ts`
+- `src/shared/api/write-command-recovery.ts`
 - `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`

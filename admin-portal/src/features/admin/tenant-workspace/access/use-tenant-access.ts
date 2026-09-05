@@ -603,11 +603,16 @@ export function useTenantAccess({
         !isDeletedTenantUser(target) && target.isTenantOwner,
         "TENANT_OWNER_TRANSFER_INVALID",
       );
+      // The destination is the whole command. It travels in the POST body, so
+      // it has to travel in the intent too: with `payload: null` a retry that
+      // changed the new owner reused the first attempt's key, and the Gateway
+      // — which fingerprints the real body — answered the retry that was meant
+      // to resolve the ambiguity with `GW.IDEM.MISMATCH`.
       const result = await execute(
         "transfer-ownership",
         target,
         permissions.canTransferOwnership,
-        null,
+        { newOwnerUserId },
         (key) =>
           tenantAccessApi.transferOwnership(
             tenantId,
