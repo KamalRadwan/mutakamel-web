@@ -161,6 +161,26 @@ export function withTime(value: Date, time: string): Date {
 }
 
 /**
+ * Moves an endpoint onto a different date while keeping its time of day down
+ * to the millisecond.
+ *
+ * `toTimeValue`/`withTime` exist for the `HH:mm` time inputs, and that format
+ * cannot hold the `23:59:59.999` an inclusive end of day means. Round-tripping
+ * an endpoint through the pair therefore truncated it to `23:59:00.000` and
+ * silently dropped the last minute of the reporting window.
+ */
+export function withTimeOf(value: Date, source: Date): Date {
+  const date = new Date(value);
+  date.setHours(
+    source.getHours(),
+    source.getMinutes(),
+    source.getSeconds(),
+    source.getMilliseconds(),
+  );
+  return date;
+}
+
+/**
  * The six weeks a month grid shows, starting on the given weekday so the
  * calendar matches the reader's locale rather than a hardcoded Sunday.
  */

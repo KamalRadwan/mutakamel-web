@@ -164,6 +164,53 @@ describe("DashboardHeader range picker", () => {
     expect(range.from.getTime()).toBeLessThan(range.to.getTime());
   });
 
+  /**
+   * FE-B11. The second click round-tripped both endpoints through the `HH:mm`
+   * time inputs, which cannot hold seconds, so the inclusive end of day came
+   * back as 23:59:00.000. The window the dashboard then requested was 59.999
+   * seconds short of the days the operator had clicked, and the same dates
+   * reported fewer records than the equivalent named preset.
+   */
+  it("ends a two-click range on the last millisecond of the final day", () => {
+    // September 2026 opens on Sunday 30 August, so cell 4 is the 3rd and cell
+    // 10 the 9th. Pinning the month keeps the instants below literal.
+    const { onRangeChange } = renderHeader({
+      from: new Date(2026, 8, 3),
+      to: new Date(2026, 8, 9, 23, 59, 59, 999),
+    });
+    openPicker();
+
+    const grid = screen.getByRole("grid", { name: "Choose a date range" });
+    const cells = within(grid).getAllByRole("gridcell");
+    fireEvent.click(cells[4]);
+    fireEvent.click(cells[10]);
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    const [range] = onRangeChange.mock.calls[0];
+    expect(range.from.getTime()).toBe(new Date(2026, 8, 3, 0, 0, 0, 0).getTime());
+    expect(range.to.getTime()).toBe(new Date(2026, 8, 9, 23, 59, 59, 999).getTime());
+  });
+
+  it("keeps a chosen time of day across the second click", () => {
+    const { onRangeChange } = renderHeader({
+      from: new Date(2026, 8, 3),
+      to: new Date(2026, 8, 9, 23, 59, 59, 999),
+    });
+    openPicker();
+
+    const grid = screen.getByRole("grid", { name: "Choose a date range" });
+    const cells = within(grid).getAllByRole("gridcell");
+    fireEvent.click(cells[4]);
+    fireEvent.change(screen.getByLabelText("To time"), {
+      target: { value: "11:30" },
+    });
+    fireEvent.click(cells[10]);
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    const [range] = onRangeChange.mock.calls[0];
+    expect(range.to.getTime()).toBe(new Date(2026, 8, 9, 11, 30, 0, 0).getTime());
+  });
+
   it("discards a half-made selection when cancelled", () => {
     const { onRangeChange } = renderHeader();
     openPicker();

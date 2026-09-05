@@ -23,6 +23,7 @@ import {
   startOfDay,
   toTimeValue,
   withTime,
+  withTimeOf,
   type DateRange,
   type DateRangePresetKey,
 } from "../utils/date-range-presets";
@@ -103,12 +104,15 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
       setDraft({ ...orderRange(day, day) });
       return;
     }
-    // Second click closes the range, keeping whatever times are set.
+    // Second click closes the range, keeping whatever times are set — carried
+    // across whole, not read back out of the `HH:mm` inputs. That round trip
+    // rounded the inclusive end of day down to 23:59:00, so a date-only
+    // selection reported a minute less than the same window named as a preset.
     const ordered = orderRange(anchor, day);
     setAnchor(null);
     setDraft({
-      from: withTime(ordered.from, toTimeValue(draft.from)),
-      to: withTime(ordered.to, toTimeValue(draft.to)),
+      from: withTimeOf(ordered.from, draft.from),
+      to: withTimeOf(ordered.to, draft.to),
     });
   };
 

@@ -42,6 +42,18 @@ Date behavior:
 - The default range is the current UTC month.
 - Invalid or reversed ranges return HTTP 422 with `DASHBOARD_RANGE_INVALID`.
 
+What the portal sends:
+- Always full ISO instants, never a bare `YYYY-MM-DD`. A date-only value is read
+  as midnight UTC, which shifts the window for any reader outside UTC and
+  discards the time of day the picker offers.
+- `to` is the inclusive end the operator selected, at millisecond precision. A
+  whole day ends at `23:59:59.999` local time, and that instant is identical
+  whether the window came from a named preset or from two clicks on the
+  calendar. The `HH:mm` time inputs beside the calendar cannot carry seconds, so
+  an endpoint moved on to a different date is copied whole
+  (`withTimeOf` in `utils/date-range-presets.ts`) rather than round-tripped
+  through that format, which would truncate the last minute of the range.
+
 ## 2. Success and Error Envelopes
 
 Do not invent a universal `{ status, code, data }` JSON envelope.

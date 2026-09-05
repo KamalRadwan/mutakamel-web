@@ -7,6 +7,7 @@ import {
   resolvePreset,
   toTimeValue,
   withTime,
+  withTimeOf,
 } from "./date-range-presets";
 
 // A Tuesday in the third quarter, deliberately mid-month and mid-year.
@@ -103,6 +104,18 @@ describe("time of day", () => {
     const applied = withTime(new Date(2026, 8, 1), "09:05");
     expect(toTimeValue(applied)).toBe("09:05");
     expect(applied.getSeconds()).toBe(0);
+  });
+
+  // FE-B11. `HH:mm` is all the time input can hold, so moving an endpoint on to
+  // another date through that format quietly dropped the seconds and
+  // milliseconds an inclusive end of day carries.
+  it("carries a whole time of day, seconds and milliseconds included", () => {
+    const endOfDay = new Date(2026, 8, 1, 23, 59, 59, 999);
+    const moved = withTimeOf(new Date(2026, 8, 9), endOfDay);
+    expect(moved.getTime()).toBe(new Date(2026, 8, 9, 23, 59, 59, 999).getTime());
+    expect(withTime(new Date(2026, 8, 9), toTimeValue(endOfDay)).getTime()).toBe(
+      new Date(2026, 8, 9, 23, 59, 0, 0).getTime(),
+    );
   });
 
   it("ignores a malformed or impossible time rather than producing NaN", () => {
