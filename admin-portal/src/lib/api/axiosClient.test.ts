@@ -1315,6 +1315,72 @@ describe("admin cookie refresh retry", () => {
     expect(secondEntered).toBe(true);
   });
 
+  it("takes the fallback auth lock from a tab that was closed mid-callback", async () => {
+    // A tab holding the fallback mutex is closed, or the browser is killed,
+    // while its auth callback is outstanding. The `finally` that removes the
+    // record never runs, and the record claims the mutex for the rest of its
+    // thirteen-hour active lease — surviving a reload and a browser restart,
+    // because it lives in this origin's storage. Every sign-in after that
+    // waited behind a tab that no longer existed.
+    vi.useFakeTimers();
+    const storage = new MemoryStorage();
+    const sharedStorage = stubBrowserStorage("/login", storage);
+    vi.stubGlobal("navigator", {});
+    sharedStorage.setItem(
+      "admin_auth_mutex_entry:dead-tab",
+      JSON.stringify({
+        id: "dead-tab",
+        state: "active",
+        createdAt: Date.now() - 1_000,
+        // Renewed once, moments before the tab went away.
+        expiresAt: Date.now() + 13 * 60 * 60 * 1_000,
+      }),
+    );
+    let entered = false;
+
+    const login = withAuthLock(async () => {
+      entered = true;
+    });
+
+    // Nobody is renewing that record, so after the orphan grace the waiter
+    // stops believing in its holder.
+    await vi.advanceTimersByTimeAsync(3 * 60_000 + 100);
+    await login;
+
+    expect(entered).toBe(true);
+    expect(sharedStorage.getItem("admin_auth_mutex_entry:dead-tab")).toBeNull();
+  });
+
+  it("keeps waiting on a holder that is still renewing its fallback lease", async () => {
+    // The same silence test must not retire a tab that is merely slow. This
+    // holder keeps renewing across the whole orphan grace and beyond, and
+    // keeps the mutex.
+    vi.useFakeTimers();
+    const storage = new MemoryStorage();
+    stubBrowserStorage("/login", storage);
+    vi.stubGlobal("navigator", {});
+    const entered = deferred<void>();
+    const release = deferred<void>();
+    let secondEntered = false;
+
+    const first = withAuthLock(async () => {
+      entered.resolve();
+      await release.promise;
+    });
+    await entered.promise;
+    const second = withAuthLock(async () => {
+      secondEntered = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(secondEntered).toBe(false);
+
+    release.resolve();
+    await vi.advanceTimersByTimeAsync(25);
+    await Promise.all([first, second]);
+    expect(secondEntered).toBe(true);
+  });
+
   it("rejects a fallback waiter that a newer auth intent overtook", async () => {
     const storage = new MemoryStorage();
     const sharedStorage = stubBrowserStorage("/login", storage);

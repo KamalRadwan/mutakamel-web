@@ -15,6 +15,11 @@ import {
 } from "../auth/sessionCoordinator";
 import { safeSessionStorage, safeStorage } from "../safeStorage";
 import { generateUUIDv7 } from "../utils/uuid";
+import {
+  isAbandonedAdminAuthMutexLease,
+  observeAdminAuthMutexLease,
+  type AdminAuthMutexLeaseObservation,
+} from "./admin-auth-mutex-liveness";
 
 // Cookie auth and the readable double-submit CSRF proof require the canonical
 // Gateway path to remain on the portal origin. Deployment ingress owns /api/*.
@@ -364,6 +369,10 @@ async function acquireFallbackAdminAuthLock(
   entry: AdminAuthMutexEntry,
   signal?: AbortSignal,
 ): Promise<void> {
+  // Scoped to this wait, so each caller judges a holder's liveness from what
+  // it has watched itself rather than from a shared verdict it never saw
+  // reached.
+  const observedLeases = new Map<string, AdminAuthMutexLeaseObservation>();
   for (;;) {
     throwIfAborted(signal);
     assertAdminAuthIntentNotSuperseded(entry);
@@ -372,12 +381,17 @@ async function acquireFallbackAdminAuthLock(
         candidate.id !== entry.id),
       entry,
     ];
-    const activeOther = entries.some((candidate) =>
+    const now = Date.now();
+    const activeOthers = entries.filter((candidate) =>
       candidate.id !== entry.id && candidate.state === "active");
+    const activeOther = activeOthers.length > 0;
     const firstWaiter = entries
       .filter((candidate) => candidate.state === "waiting")
       .sort(compareAdminAuthMutexEntries)[0];
     if (activeOther || firstWaiter?.id !== entry.id) {
+      if (retireAbandonedAdminAuthMutexHolders(activeOthers, observedLeases, now)) {
+        continue;
+      }
       await waitForAdminAuthMutexPoll(signal);
       continue;
     }
@@ -399,6 +413,34 @@ async function acquireFallbackAdminAuthLock(
     writeAdminAuthMutexEntry(entry);
     await waitForAdminAuthMutexPoll(signal);
   }
+}
+
+/**
+ * Retires any holder this waiter has watched go silent for longer than the
+ * orphan grace — a tab that was closed or killed while its callback was
+ * outstanding, whose `finally` never ran and whose record would otherwise
+ * claim the mutex for the rest of its thirteen-hour lease. Returns whether
+ * anything was retired, so the caller re-reads instead of sleeping.
+ */
+function retireAbandonedAdminAuthMutexHolders(
+  holders: readonly AdminAuthMutexEntry[],
+  observed: Map<string, AdminAuthMutexLeaseObservation>,
+  now: number,
+): boolean {
+  let retired = false;
+  for (const holder of holders) {
+    const observation = observeAdminAuthMutexLease(
+      observed.get(holder.id),
+      holder.expiresAt,
+      now,
+    );
+    observed.set(holder.id, observation);
+    if (!isAbandonedAdminAuthMutexLease(observation, now)) continue;
+    removeAdminAuthMutexEntry(holder.id);
+    observed.delete(holder.id);
+    retired = true;
+  }
+  return retired;
 }
 
 function compareAdminAuthMutexEntries(

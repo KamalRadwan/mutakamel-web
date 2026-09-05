@@ -167,6 +167,21 @@ verifies that fence before dispatch and after response/body settlement; an
 overtaken or truncated response is quarantined and invalidated instead of being
 committed under a newer login.
 
+The active lease on that fallback mutex is thirteen hours, so a tab whose
+timers the browser has stopped running is not overtaken while its callback is
+still outstanding. That same lease is what a tab leaves behind when it is
+closed or killed mid-callback: the `finally` that removes its record never
+runs, and the record claims the mutex from this origin's storage — across a
+reload, and across a browser restart — until it expires. A waiter therefore
+watches whether the record is still being renewed, which a live holder does
+every twenty seconds. Three minutes of complete silence — well past the
+roughly one-per-minute timers a throttled background tab still gets — retires
+the record and lets the waiter take the mutex. The fencing that lease
+protected is untouched: taking the mutex writes a newer auth intent, so a
+suspended holder that later wakes is refused with `409 AUTH_SESSION_CHANGED`
+before it can mutate a cookie. What is bounded is how long a tab that no
+longer exists may keep an administrator out of the portal.
+
 A non-replayable write may repair auth but is never resubmitted. A safe write
 reuses its exact body and original caller-owned UUIDv7 when replayed once.
 Naturally replay-safe POST routes opt in explicitly and omit an idempotency
