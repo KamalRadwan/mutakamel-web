@@ -23,6 +23,7 @@ import { TENANT_ID, validSubscriptionsEnvelope } from "./test-fixtures";
 function baseView(): SubscriptionsViewModel {
   return {
     canRead: true,
+    applied: { sortBy: "createdAt", sortDir: "DESC" },
     draft: {
       status: "",
       tenantId: "",
@@ -132,5 +133,35 @@ describe("SubscriptionsScreen", () => {
     expect(
       screen.getByText("لا توجد اشتراكات تطابق عوامل التصفية."),
     ).toBeTruthy();
+  });
+
+  /**
+   * FE-B02. The header's sort indicator read the DRAFT, so changing the filter
+   * form's sort select moved the arrow immediately - while the rows below it
+   * were still in the previous order, until the operator pressed Apply. The
+   * arrow claimed the table was sorted a way it was not.
+   */
+  it("shows the sort the rows are in, not the unapplied draft", () => {
+    // The operator has picked a different sort in the filter form and has NOT
+    // applied it yet: draft and applied disagree, which is the whole case.
+    viewMock.draft = { ...viewMock.draft, sortBy: "status", sortDir: "ASC" };
+    viewMock.applied = { sortBy: "createdAt", sortDir: "DESC" };
+    viewMock.requestState = "READY";
+    viewMock.data = readSubscriptionsPage(validSubscriptionsEnvelope());
+
+    render(<SubscriptionsScreen />);
+
+    const headers = screen.getAllByRole("columnheader");
+    const lifecycle = headers.find(
+      (header) => header.getAttribute("aria-sort") !== null,
+    );
+
+    // "status" is the lifecycle column's sortField: what the draft asks for and
+    // not what the data is in, so every sortable header must read "none".
+    const sortStates = headers
+      .map((header) => header.getAttribute("aria-sort"))
+      .filter((value): value is string => value !== null);
+    expect(lifecycle).toBeDefined();
+    expect(sortStates).not.toContain("ascending");
   });
 });

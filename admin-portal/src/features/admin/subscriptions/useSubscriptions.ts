@@ -198,6 +198,7 @@ export function useSubscriptions(): SubscriptionsViewModel {
   return {
     canRead,
     draft,
+    applied: { sortBy: applied.sortBy, sortDir: applied.sortDir },
     tenantIdError,
     data: visibleData,
     requestState: visibleRequestState,

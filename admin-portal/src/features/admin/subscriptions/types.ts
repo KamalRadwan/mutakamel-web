@@ -104,6 +104,14 @@ export type SubscriptionRequestState =
 export interface SubscriptionsViewModel {
   canRead: boolean;
   draft: SubscriptionFilterDraft;
+  /**
+   * The sort the rows on screen are actually in.
+   *
+   * Distinct from `draft`: the filter form's sort select edits the draft and
+   * takes effect on Apply, so an indicator reading the draft describes an order
+   * the data is not in yet.
+   */
+  applied: { sortBy: SubscriptionFilterDraft["sortBy"]; sortDir: SubscriptionFilterDraft["sortDir"] };
   tenantIdError: string | null;
   data: SubscriptionPage | null;
   requestState: SubscriptionRequestState;

@@ -385,8 +385,14 @@ function SubscriptionResults({
     <div className="space-y-3">
       <DataTable
         sort={{
-          sortBy: view.draft.sortBy,
-          sortDir: view.draft.sortDir === "ASC" ? "ASC" : "DESC",
+          // FE-B02. The indicator read the DRAFT, so changing the filter
+          // form's sort select moved the header arrow immediately - while the
+          // rows below it were still in the previous order, until the operator
+          // pressed Apply. The arrow has to describe the data on screen, which
+          // is `applied`. Header clicks are unaffected: changeSort sets draft
+          // and applied together, because there the click IS the request.
+          sortBy: view.applied.sortBy,
+          sortDir: view.applied.sortDir === "ASC" ? "ASC" : "DESC",
           onSortChange: view.changeSort,
         }}
         labelEn={SUBSCRIPTIONS_COPY.en.title}
