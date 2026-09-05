@@ -118,7 +118,22 @@ export function useUsers() {
     loadRolesData();
   }, []);
 
+  /**
+   * UI-012. Every completion wrote users, metrics and loading unconditionally,
+   * with no generation and no abort, so a slow response for one filter landed
+   * on top of a newer one: the operator changed the status filter, the older
+   * request answered second, and the table showed rows that did not match the
+   * filter shown above it.
+   *
+   * A monotonic generation is enough here - the guard is about which response
+   * may commit, not about cancelling the request - and it is the same shape
+   * `use-invoices-list` uses.
+   */
+  const requestGeneration = useRef(0);
+
   const fetchUsers = useCallback(async () => {
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => generation === requestGeneration.current;
     setIsLoading(true);
     setError(null);
     setErrorCode(null);
@@ -140,6 +155,8 @@ export function useUsers() {
         }),
         canReadWebphone ? listWebphoneExtensions().catch(() => []) : [],
       ]);
+
+      if (!isCurrent()) return;
 
       setWebphoneExtensions(
         new Map(extensions.map((entry) => [entry.ownerId, entry.extension])),
@@ -171,6 +188,7 @@ export function useUsers() {
         superAdmins: superAdminCount,
       });
     } catch (err: any) {
+      if (!isCurrent()) return;
       const code = normalizeErrorCode(err);
       setErrorCode(code);
 
@@ -182,7 +200,9 @@ export function useUsers() {
         toast.error(t.users.fetchLoadErrorTitle, details.message);
       }
     } finally {
-      setIsLoading(false);
+      // Only the newest request owns the spinner; an older one finishing must
+      // not clear it while the current one is still outstanding.
+      if (isCurrent()) setIsLoading(false);
     }
   }, [page, limit, debouncedSearch, statusFilter, roleFilter, isSuperAdminFilter, sortBy, sortDir, lang, t, toast, canReadWebphone]);
 
