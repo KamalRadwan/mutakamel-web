@@ -251,3 +251,13 @@ reports against the Save button next to it.
   `credentialConfigured`, not against what is typed — otherwise the username of
   every configured TURN entry becomes uneditable, because the credential the
   rule demands was never shown to the operator to retype.
+- Changing an entry's `kind` to `STUN` clears the draft's `username` and
+  `credential` in the same update (`iceDraftWithKind`). The module rejects a
+  STUN entry carrying either, and the form stops rendering both the moment STUN
+  is selected: values left behind fail a validator whose message has no field to
+  appear on, so Save returns before sending with nothing on screen saying why.
+- Any validation code left on a field the current `kind` does not render is
+  shown as a form-level alert on the entry (`unrenderedIceDraftErrors`). A read
+  supplies this case on its own — `GET /servers` accepts a `username` on a STUN
+  row — so a saved entry can arrive already invalid in a way no field can
+  report.

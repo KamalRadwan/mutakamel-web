@@ -595,6 +595,76 @@ describe("Admin WebPhone settings", () => {
     expect(api.patch.mock.calls[0][1]).not.toHaveProperty("enabled");
   });
 
+  it("sends a TURN entry retyped as STUN instead of refusing it in silence", async () => {
+    render(<WebphoneSettingsPage />);
+    await openAdvanced("SIP server 1: Primary");
+    const entry = await screen.findByRole("article", {
+      name: `ICE server: ${TURN_URL}`,
+    });
+    expect(within(entry).getByLabelText("TURN username")).toHaveValue("turnuser");
+
+    fireEvent.change(within(entry).getByLabelText("Type"), {
+      target: { value: "STUN" },
+    });
+
+    // The gesture that hides these fields is the one that has to empty them.
+    // Left behind, they failed a validator whose message had nowhere to render,
+    // so Save returned before sending and the row simply did nothing.
+    expect(
+      within(entry).queryByLabelText("TURN username"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(within(entry).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1));
+    expect(api.patch.mock.calls[0][0]).toBe(
+      "/api/admin/webphone/v1/servers/s1/ice-servers/i1",
+    );
+    expect(api.patch.mock.calls[0][1]).toEqual({
+      kind: "STUN",
+      urls: [TURN_URL],
+      username: null,
+    });
+  });
+
+  it("says why an entry cannot be saved when the failing field is hidden", async () => {
+    // A stored STUN entry carrying a username: the read contract accepts a
+    // username on any kind, so this arrives from the server already invalid.
+    respondWith([
+      {
+        ...SERVERS[0],
+        iceServers: [
+          {
+            id: "i1",
+            kind: "STUN",
+            urls: ["stun:stun.example.com:3478"],
+            username: "leftover",
+            credentialConfigured: false,
+            enabled: true,
+            sortOrder: 0,
+          },
+        ],
+      },
+      SERVERS[1],
+    ]);
+
+    render(<WebphoneSettingsPage />);
+    await openAdvanced("SIP server 1: Primary");
+    const entry = await screen.findByRole("article", {
+      name: "ICE server: stun:stun.example.com:3478",
+    });
+
+    fireEvent.change(within(entry).getByLabelText("URLs"), {
+      target: { value: "stun:other.example.com:3478" },
+    });
+    fireEvent.click(within(entry).getByRole("button", { name: "Save" }));
+
+    // Nothing is sent, and the row says so rather than looking inert.
+    expect(await within(entry).findByRole("alert")).toHaveTextContent(
+      "STUN entries carry no username or credential.",
+    );
+    expect(api.patch).not.toHaveBeenCalled();
+  });
+
   it("shows a TURN credential as write-only and stored, never as a value", async () => {
     render(<WebphoneSettingsPage />);
     await openAdvanced("SIP server 1: Primary");

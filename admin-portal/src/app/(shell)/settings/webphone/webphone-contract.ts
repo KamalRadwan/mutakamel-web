@@ -680,6 +680,29 @@ export const EMPTY_ICE_SERVER_DRAFT: IceServerDraft = {
   enabled: true,
 };
 
+/**
+ * Applies a kind change to an ICE draft, dropping what the new kind cannot
+ * carry.
+ *
+ * The credential fields are rendered only for TURN, so changing the kind to
+ * STUN while they still hold values leaves the draft in a state the validator
+ * rejects (`STUN_HAS_NO_CREDENTIALS`) and the form cannot show — Save then
+ * returns before sending anything, with nothing on screen saying why. The one
+ * gesture that hides those fields is the one that has to clear them.
+ *
+ * Kept as a function rather than inline in the change handler because both the
+ * edit row and the add form make the same change, and a rule enforced twice by
+ * hand is a rule one of them will eventually drop.
+ */
+export function iceDraftWithKind<
+  T extends Pick<IceServerDraft, "kind" | "username" | "credential">,
+>(draft: T, kind: WebphoneIceServerKind): T {
+  if (kind === draft.kind) return draft;
+  return kind === "STUN"
+    ? { ...draft, kind, username: "", credential: "" }
+    : { ...draft, kind };
+}
+
 export function parseIceUrls(value: string): string[] {
   return value
     .split(/[\s,]+/u)
@@ -722,6 +745,25 @@ export function validateIceServerDraft(
     errors.credential = "TURN_CREDENTIAL_PAIR_REQUIRED";
   }
   return errors;
+}
+
+/**
+ * The validation codes sitting on fields the current kind does not render.
+ *
+ * A STUN entry shows neither username nor credential, so an error on either has
+ * nowhere of its own to appear. Reading a saved STUN entry that carries a
+ * username is enough to produce one — the read contract accepts a username on
+ * any kind — and without this the row's Save would refuse to send with no
+ * visible reason at all.
+ */
+export function unrenderedIceDraftErrors(
+  kind: WebphoneIceServerKind,
+  errors: WebphoneFieldErrors,
+): string[] {
+  if (kind !== "STUN") return [];
+  return [errors.username, errors.credential].filter(
+    (code): code is string => Boolean(code),
+  );
 }
 
 /**

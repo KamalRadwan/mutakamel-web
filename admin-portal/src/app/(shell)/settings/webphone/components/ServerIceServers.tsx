@@ -4,14 +4,21 @@ import { useState } from "react";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Badge, Button } from "@/design-system";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
-import { WEBPHONE_COPY, webphoneErrorText } from "../webphone-copy";
+import {
+  WEBPHONE_COPY,
+  webphoneErrorText,
+  webphoneFieldErrorText,
+} from "../webphone-copy";
 import type { WebphoneSettingsState } from "../hooks/useWebphoneSettings";
 import {
   EMPTY_ICE_SERVER_DRAFT,
+  iceDraftWithKind,
   iceServerDraftToDto,
   parseIceUrls,
+  unrenderedIceDraftErrors,
   validateIceServerDraft,
   type IceServerDraft,
+  type WebphoneFieldErrors,
   type WebphoneIceServer,
   type WebphoneIceServerKind,
   type WebphoneServer,
@@ -246,7 +253,7 @@ function IceServerRow({
               { value: "TURN", label: "TURN" },
             ]}
             onChange={(value) =>
-              setDraft((current) => ({ ...current, kind: value }))
+              setDraft((current) => iceDraftWithKind(current, value))
             }
           />
           <TextField
@@ -301,6 +308,13 @@ function IceServerRow({
           </FieldRow>
         ) : null}
       </FieldGroup>
+
+      <UnrenderedFieldErrors
+        kind={draft.kind}
+        errors={errors}
+        lang={state.lang}
+        show={showErrors}
+      />
 
       {failedTarget ? (
         <InlineError
@@ -359,6 +373,39 @@ function IceServerRow({
   );
 }
 
+/**
+ * Why a Save or Add did nothing, when the field carrying the reason is not on
+ * screen.
+ *
+ * A STUN entry renders neither the username nor the credential, so a validation
+ * error on one of them has nowhere of its own to appear: the button stays
+ * enabled, the click returns before any request, and an operator has no way to
+ * tell a refusal from a dead control. This is the last resort, not the normal
+ * path — every error whose field IS rendered still belongs on that field.
+ */
+function UnrenderedFieldErrors({
+  kind,
+  errors,
+  lang,
+  show,
+}: {
+  kind: WebphoneIceServerKind;
+  errors: WebphoneFieldErrors;
+  lang: "ar" | "en";
+  show: boolean;
+}) {
+  const codes = show ? unrenderedIceDraftErrors(kind, errors) : [];
+  if (codes.length === 0) return null;
+  return (
+    <p
+      role="alert"
+      className="rounded-md border border-destructive bg-destructive-subtle p-3 text-xs font-medium text-destructive-subtle-foreground"
+    >
+      {codes.map((code) => webphoneFieldErrorText(code, lang)).join(" ")}
+    </p>
+  );
+}
+
 function AddIceServerForm({
   server,
   state,
@@ -413,7 +460,7 @@ function AddIceServerForm({
               { value: "TURN", label: "TURN" },
             ]}
             onChange={(value) =>
-              setDraft((current) => ({ ...current, kind: value }))
+              setDraft((current) => iceDraftWithKind(current, value))
             }
           />
           <TextField
@@ -476,6 +523,13 @@ function AddIceServerForm({
             Adding a deliberately-disabled entry now costs one extra click;
             not knowing which control you are holding cost more. */}
       </FieldGroup>
+
+      <UnrenderedFieldErrors
+        kind={draft.kind}
+        errors={errors}
+        lang={state.lang}
+        show={showErrors}
+      />
 
       {state.mutation.target === target && state.mutation.phase === "FAILED" ? (
         <InlineError

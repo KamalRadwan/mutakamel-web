@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildServerPatch,
   extensionServersToRows,
+  iceDraftWithKind,
   iceServerDraftToDto,
   moveInList,
   newServerDto,
@@ -13,6 +14,7 @@ import {
   readWebphoneServers,
   rowsToExtensionServers,
   serverToForm,
+  unrenderedIceDraftErrors,
   validateExtensionServerRows,
   validateIceServerDraft,
   validateServerForm,
@@ -361,5 +363,57 @@ describe("ICE draft validation", () => {
     expect(
       validateIceServerDraft({ ...turn, username: "" }, true),
     ).toMatchObject({ credential: "TURN_CREDENTIAL_PAIR_REQUIRED" });
+  });
+});
+
+describe("ICE kind change", () => {
+  const TURN_DRAFT = {
+    ...EMPTY_ICE_SERVER_DRAFT,
+    kind: "TURN" as const,
+    urls: "turn:turn.example.com:3478",
+    username: "turnuser",
+    credential: "secret",
+  };
+
+  it("drops what STUN cannot carry, so the draft it leaves behind is valid", () => {
+    const stun = iceDraftWithKind(TURN_DRAFT, "STUN");
+
+    expect(stun).toEqual({
+      ...TURN_DRAFT,
+      kind: "STUN",
+      username: "",
+      credential: "",
+    });
+    // The point of clearing them: what the form stops rendering, it stops
+    // failing on. Leaving them behind made Save return before sending, with
+    // the reason attached to a field that is no longer on screen.
+    expect(validateIceServerDraft(TURN_DRAFT, true)).toEqual({});
+    expect(validateIceServerDraft({ ...TURN_DRAFT, kind: "STUN" })).toMatchObject(
+      { username: "STUN_HAS_NO_CREDENTIALS" },
+    );
+    expect(validateIceServerDraft(stun)).toEqual({});
+  });
+
+  it("keeps a TURN draft whole and never rewrites an unchanged kind", () => {
+    expect(iceDraftWithKind({ ...TURN_DRAFT, kind: "STUN" }, "TURN")).toEqual({
+      ...TURN_DRAFT,
+      kind: "TURN",
+    });
+    expect(iceDraftWithKind(TURN_DRAFT, "TURN")).toBe(TURN_DRAFT);
+  });
+
+  it("names the errors a STUN entry has no field to show", () => {
+    expect(
+      unrenderedIceDraftErrors("STUN", {
+        username: "STUN_HAS_NO_CREDENTIALS",
+        urls: "INVALID_ICE_URLS",
+      }),
+    ).toEqual(["STUN_HAS_NO_CREDENTIALS"]);
+    // TURN renders every field it can fail on, so nothing is orphaned there.
+    expect(
+      unrenderedIceDraftErrors("TURN", {
+        credential: "TURN_CREDENTIAL_PAIR_REQUIRED",
+      }),
+    ).toEqual([]);
   });
 });
