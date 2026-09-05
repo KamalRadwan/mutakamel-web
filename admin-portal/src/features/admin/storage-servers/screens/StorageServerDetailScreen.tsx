@@ -174,7 +174,16 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
                   {copy.drainButton}
                 </Button>
               )}
-              {server.status === "ACTIVE" && !server.isPlatformDefault && (
+              {/*
+                DRAINING belongs here as much as ACTIVE. Core's takeOffline
+                puts no restriction on the source status — it rejects only the
+                platform default and a server that still holds tenants, bytes
+                or open operations — and OFFLINE is the only door out of
+                DRAINING, since activate and delete both accept DRAFT/OFFLINE
+                alone. Without it a fully evacuated server stays DRAINING for
+                good. Emptiness stays Core's call, not this screen's.
+              */}
+              {["ACTIVE", "DRAINING"].includes(server.status) && !server.isPlatformDefault && (
                 <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation("offline")} disabled={view.isMutating}>
                   <StopCircle className="size-4" aria-hidden="true" />
                   {copy.takeOfflineButton}

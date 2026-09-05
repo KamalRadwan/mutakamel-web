@@ -257,6 +257,17 @@ Activation and a safe probe are different commands:
 evacuated: it remains list/filter-visible and usable for existing routes, but
 is excluded from new placement.
 
+`DRAINING` is a stage, not a terminal state, and `OFFLINE` is its only exit:
+`drain` accepts `ACTIVE` alone, and both `activate` and delete accept
+`DRAFT`/`OFFLINE` alone. `offline` restricts no source status — it refuses the
+platform default, and refuses a server that still holds tenants, reserved or
+committed bytes, or an open storage operation, with
+`STORAGE_SERVER_OFFLINE_BLOCKED`. The detail screen therefore offers Take
+offline for `ACTIVE` and `DRAINING` alike and leaves the emptiness decision to
+Core; a screen that offered it for `ACTIVE` only would strand every drained
+server, since nothing else could move it and only a `DRAFT`/`OFFLINE` server
+can be deleted.
+
 Probe request and secret-free result:
 
 ```http
