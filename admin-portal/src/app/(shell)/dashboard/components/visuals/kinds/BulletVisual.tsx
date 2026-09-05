@@ -10,7 +10,13 @@ import {
   formatChartPercent,
   getChartCopy,
 } from "../../charts/ChartAccessibility";
-import { bandColor, clampRatio, formatVisualValue, visualColor } from "../visual-format";
+import {
+  bandColor,
+  clampRatio,
+  formatVisualExactValue,
+  formatVisualValue,
+  visualColor,
+} from "../visual-format";
 
 type BulletVisualModel = Extract<DashboardVisual, { kind: "bullet" }>;
 
@@ -81,8 +87,8 @@ export function BulletVisual({ visual }: { visual: BulletVisualModel }) {
           key: row.key,
           cells: [
             row.label,
-            formatVisualValue(lang, row.value, visual.unit),
-            formatVisualValue(lang, ceiling, visual.unit),
+            formatVisualExactValue(lang, row.value, visual.unit),
+            formatVisualExactValue(lang, ceiling, visual.unit),
             formatChartPercent(lang, ceiling > 0 ? row.value / ceiling : 0),
           ],
         };

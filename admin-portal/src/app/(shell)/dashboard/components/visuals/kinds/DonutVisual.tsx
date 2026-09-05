@@ -13,6 +13,7 @@ import {
 } from "../../charts/ChartAccessibility";
 import {
   foldVisualPoints,
+  formatVisualExactValue,
   formatVisualValue,
   sortPointsDescending,
   sumPoints,
@@ -67,13 +68,17 @@ export function DonutVisual({
           key: point.key,
           cells: [
             point.label,
-            formatVisualValue(lang, point.value, visual.unit),
+            formatVisualExactValue(lang, point.value, visual.unit),
             formatChartPercent(lang, total > 0 ? point.value / total : 0),
           ],
         })),
         {
           key: "__total__",
-          cells: [copy.total, formatVisualValue(lang, total, visual.unit), formatChartPercent(lang, 1)],
+          cells: [
+            copy.total,
+            formatVisualExactValue(lang, total, visual.unit),
+            formatChartPercent(lang, 1),
+          ],
         },
       ]}
     >

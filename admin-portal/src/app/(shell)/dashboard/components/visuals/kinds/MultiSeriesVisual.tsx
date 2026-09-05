@@ -20,7 +20,12 @@ import {
   getChartCopy,
   useReducedMotion,
 } from "../../charts/ChartAccessibility";
-import { formatVisualTick, formatVisualValue, visualColor } from "../visual-format";
+import {
+  formatVisualExactValue,
+  formatVisualTick,
+  formatVisualValue,
+  visualColor,
+} from "../visual-format";
 
 type MultiSeriesModel = Extract<DashboardVisual, { kind: "multi-series" }>;
 
@@ -103,7 +108,7 @@ export function MultiSeriesVisual({
           bucket.label,
           ...series.map((entry) => {
             const point = entry.points.find((candidate) => candidate.key === bucket.key);
-            return point ? formatVisualValue(lang, point.value, visual.unit) : "—";
+            return point ? formatVisualExactValue(lang, point.value, visual.unit) : "—";
           }),
         ],
       }))}

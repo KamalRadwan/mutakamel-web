@@ -14,7 +14,7 @@ import {
 import type { DashboardGroup } from "@/types/dashboard";
 import { isUnavailableProjection } from "../../utils/dashboard-groups";
 import { resolveFieldLabel } from "../../utils/dashboard-copy";
-import { formatVisualValue } from "./visual-format";
+import { formatVisualExactValue } from "./visual-format";
 import { unitOf } from "./infer-visuals";
 
 interface BooleanCopy {
@@ -169,9 +169,12 @@ function render(
 ): string {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") return value ? booleans.yes : booleans.no;
-  if (typeof value === "number") return formatVisualValue(lang, value, unitOf(field));
+  // This table is the evidence, and the print path renders the same markup, so
+  // every measure keeps the digits the payload sent. The friendly units belong
+  // to the charts above it.
+  if (typeof value === "number") return formatVisualExactValue(lang, value, unitOf(field));
   if (typeof value === "string" && Number.isFinite(Number(value))) {
-    return formatVisualValue(lang, Number(value), unitOf(field));
+    return formatVisualExactValue(lang, Number(value), unitOf(field));
   }
   return String(value);
 }

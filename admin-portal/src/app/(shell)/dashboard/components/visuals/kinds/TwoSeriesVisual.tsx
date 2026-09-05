@@ -21,7 +21,11 @@ import {
   getChartCopy,
   useReducedMotion,
 } from "../../charts/ChartAccessibility";
-import { formatVisualTick, formatVisualValue } from "../visual-format";
+import {
+  formatVisualExactValue,
+  formatVisualTick,
+  formatVisualValue,
+} from "../visual-format";
 
 type TwoSeriesModel = Extract<
   DashboardVisual,
@@ -97,8 +101,8 @@ export function TwoSeriesVisual({
         key: pair.key,
         cells: [
           pair.label,
-          formatVisualValue(lang, pair.primary, visual.unit),
-          formatVisualValue(lang, pair.secondary, secondaryUnit),
+          formatVisualExactValue(lang, pair.primary, visual.unit),
+          formatVisualExactValue(lang, pair.secondary, secondaryUnit),
         ],
       }))}
     >

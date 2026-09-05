@@ -10,7 +10,12 @@ import {
   getChartCopy,
   useReducedMotion,
 } from "../../charts/ChartAccessibility";
-import { bandColor, clampRatio, formatVisualValue } from "../visual-format";
+import {
+  bandColor,
+  clampRatio,
+  formatVisualExactValue,
+  formatVisualValue,
+} from "../visual-format";
 
 type GaugeVisualModel = Extract<DashboardVisual, { kind: "gauge" }>;
 
@@ -82,9 +87,9 @@ export function GaugeVisual({
       ]}
       columns={[copy.category, copy.value]}
       rows={[
-        { key: "current", cells: [t.dashboard.visuals.current, formatVisualValue(lang, value, visual.unit)] },
-        { key: "maximum", cells: [t.dashboard.visuals.maximum, formatVisualValue(lang, maximum, visual.unit)] },
-        { key: "remaining", cells: [t.dashboard.visuals.remaining, formatVisualValue(lang, remaining, visual.unit)] },
+        { key: "current", cells: [t.dashboard.visuals.current, formatVisualExactValue(lang, value, visual.unit)] },
+        { key: "maximum", cells: [t.dashboard.visuals.maximum, formatVisualExactValue(lang, maximum, visual.unit)] },
+        { key: "remaining", cells: [t.dashboard.visuals.remaining, formatVisualExactValue(lang, remaining, visual.unit)] },
         { key: "utilization", cells: [t.dashboard.visuals.utilization, formatChartPercent(lang, ratio)] },
         { key: "status", cells: [t.dashboard.visuals.status, statusText] },
         ...bands.map((entry) => ({

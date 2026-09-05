@@ -21,7 +21,11 @@ import {
   getChartCopy,
   useReducedMotion,
 } from "../../charts/ChartAccessibility";
-import { formatVisualTick, formatVisualValue } from "../visual-format";
+import {
+  formatVisualExactValue,
+  formatVisualTick,
+  formatVisualValue,
+} from "../visual-format";
 
 type TimeSeriesModel = Extract<DashboardVisual, { kind: "line" | "area" }>;
 
@@ -96,7 +100,7 @@ export function TimeSeriesVisual({
       columns={[copy.period, copy.value]}
       rows={points.map((point, index) => ({
         key: `${point.key}-${index}`,
-        cells: [point.label, formatVisualValue(lang, point.value, visual.unit)],
+        cells: [point.label, formatVisualExactValue(lang, point.value, visual.unit)],
       }))}
     >
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>

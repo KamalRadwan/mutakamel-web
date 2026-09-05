@@ -250,6 +250,69 @@ export function formatChartCurrency(lang: Language, value: number, currencyCode:
   }
 }
 
+/**
+ * The number with every digit it actually carries.
+ *
+ * `formatChartNumber` with no options inherits Intl's three-fraction-digit
+ * default, which is a rounding step — fine for an axis tick, wrong anywhere a
+ * figure is presented as the value itself.
+ */
+export function formatChartNumberExact(lang: Language, value: number): string {
+  const digits = exactFractionDigits(value);
+  return formatChartNumber(lang, value, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+/**
+ * Money at the precision the payload sent, for exact-value tables.
+ *
+ * `formatChartCurrency` pins `maximumFractionDigits` to zero so an axis tick
+ * stays narrow. Reused as the value itself it reports 10.49 USD as $10, which
+ * an operator reading a table headed "Exact values" has no way to detect. The
+ * minor unit is still honoured for currencies that have one, and a value
+ * carrying more digits than that keeps all of them.
+ */
+export function formatChartCurrencyExact(
+  lang: Language,
+  value: number,
+  currencyCode: string,
+): string {
+  const digits = exactFractionDigits(value);
+  const maximumFractionDigits = Math.max(digits, 2);
+  const minimumFractionDigits = Math.min(digits, 2);
+  try {
+    return formatChartNumber(lang, value, {
+      style: "currency",
+      currency: currencyCode,
+      minimumFractionDigits,
+      maximumFractionDigits,
+    });
+  } catch {
+    return `${formatChartNumber(lang, value, {
+      minimumFractionDigits,
+      maximumFractionDigits,
+    })} ${currencyCode}`;
+  }
+}
+
+/**
+ * How many decimals the value really has, taken from JavaScript's own shortest
+ * round-trip form. Asking Intl for a fixed generous precision instead would
+ * print binary noise — 0.1 + 0.2 as "0.30000000000000004" — for a number the
+ * runtime itself renders as 0.3.
+ */
+export function exactFractionDigits(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const text = String(Math.abs(value));
+  // An exponent form ("1e-7") has no literal decimals to count; 20 is Intl's
+  // ceiling and the closest it can come to the underlying value.
+  if (text.includes("e")) return 20;
+  const point = text.indexOf(".");
+  return point === -1 ? 0 : Math.min(20, text.length - point - 1);
+}
+
 export function summarizeChartValues(
   title: string,
   values: Array<{ label: string; value: string }>,

@@ -20,7 +20,11 @@ import {
   getChartCopy,
   useReducedMotion,
 } from "../../charts/ChartAccessibility";
-import { formatVisualTick, formatVisualValue } from "../visual-format";
+import {
+  formatVisualExactValue,
+  formatVisualTick,
+  formatVisualValue,
+} from "../visual-format";
 
 type WaterfallVisualModel = Extract<DashboardVisual, { kind: "waterfall" }>;
 
@@ -70,9 +74,9 @@ export function WaterfallVisual({
         cells: [
           row.label,
           row.role === "delta"
-            ? `${row.value < 0 ? "−" : "+"}${formatVisualValue(lang, Math.abs(row.value), visual.unit)}`
-            : formatVisualValue(lang, row.value, visual.unit),
-          formatVisualValue(lang, row.running, visual.unit),
+            ? `${row.value < 0 ? "−" : "+"}${formatVisualExactValue(lang, Math.abs(row.value), visual.unit)}`
+            : formatVisualExactValue(lang, row.value, visual.unit),
+          formatVisualExactValue(lang, row.running, visual.unit),
         ],
       }))}
     >

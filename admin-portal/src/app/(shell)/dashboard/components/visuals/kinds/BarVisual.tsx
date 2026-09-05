@@ -23,6 +23,7 @@ import {
 } from "../../charts/ChartAccessibility";
 import {
   foldVisualPoints,
+  formatVisualExactValue,
   formatVisualTick,
   formatVisualValue,
   sortPointsDescending,
@@ -80,7 +81,7 @@ export function BarVisual({ visual }: { visual: BarVisualModel }) {
         key: point.key,
         cells: [
           point.label,
-          formatVisualValue(lang, point.value, visual.unit),
+          formatVisualExactValue(lang, point.value, visual.unit),
           formatChartPercent(lang, total > 0 ? point.value / total : 0),
         ],
       }))}

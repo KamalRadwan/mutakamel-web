@@ -23,7 +23,12 @@ import {
   getChartCopy,
   useReducedMotion,
 } from "../../charts/ChartAccessibility";
-import { formatVisualTick, formatVisualValue, visualColor } from "../visual-format";
+import {
+  formatVisualExactValue,
+  formatVisualTick,
+  formatVisualValue,
+  visualColor,
+} from "../visual-format";
 
 type ScatterModel = Extract<DashboardVisual, { kind: "scatter" }>;
 
@@ -97,8 +102,8 @@ export function ScatterVisual({
         key: point.key,
         cells: [
           point.label,
-          formatVisualValue(lang, point.x, visual.unit),
-          formatVisualValue(lang, point.y, "ratio"),
+          formatVisualExactValue(lang, point.x, visual.unit),
+          formatVisualExactValue(lang, point.y, "ratio"),
         ],
       }))}
     >

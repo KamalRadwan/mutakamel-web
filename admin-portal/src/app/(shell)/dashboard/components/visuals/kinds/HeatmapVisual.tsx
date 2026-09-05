@@ -9,7 +9,7 @@ import {
   dashboardChartVisualItems,
   getChartCopy,
 } from "../../charts/ChartAccessibility";
-import { formatVisualValue } from "../visual-format";
+import { formatVisualExactValue, formatVisualValue } from "../visual-format";
 
 type HeatmapVisualModel = Extract<DashboardVisual, { kind: "heatmap" }>;
 
@@ -68,9 +68,9 @@ export function HeatmapVisual({ visual }: { visual: HeatmapVisualModel }) {
           cells: [
             row.label,
             ...columns.map((_, index) =>
-              formatVisualValue(lang, row.values[index] ?? 0, visual.unit),
+              formatVisualExactValue(lang, row.values[index] ?? 0, visual.unit),
             ),
-            formatVisualValue(lang, rowTotal, visual.unit),
+            formatVisualExactValue(lang, rowTotal, visual.unit),
           ],
         };
       })}

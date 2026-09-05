@@ -24,6 +24,7 @@ import {
 import {
   foldVisualPoints,
   formatVisualTick,
+  formatVisualExactValue,
   formatVisualValue,
   sortPointsDescending,
   sumPoints,
@@ -60,7 +61,7 @@ export function ParetoVisual({
     key: point.key,
     cells: [
       point.label,
-      formatVisualValue(lang, point.value, visual.unit),
+      formatVisualExactValue(lang, point.value, visual.unit),
       formatChartPercent(lang, point.cumulative),
     ],
   }));

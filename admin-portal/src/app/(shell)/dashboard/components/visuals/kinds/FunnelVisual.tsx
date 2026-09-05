@@ -9,7 +9,7 @@ import {
   formatChartPercent,
   getChartCopy,
 } from "../../charts/ChartAccessibility";
-import { formatVisualValue, visualColor } from "../visual-format";
+import { formatVisualExactValue, formatVisualValue, visualColor } from "../visual-format";
 
 type FunnelVisualModel = Extract<DashboardVisual, { kind: "funnel" }>;
 
@@ -82,9 +82,9 @@ export function FunnelVisual({ visual }: { visual: FunnelVisualModel }) {
         key: row.key,
         cells: [
           row.label,
-          formatVisualValue(lang, row.value, visual.unit),
+          formatVisualExactValue(lang, row.value, visual.unit),
           row.isFirst ? "—" : formatChartPercent(lang, row.conversion),
-          row.isFirst ? "—" : formatVisualValue(lang, row.dropOff, visual.unit),
+          row.isFirst ? "—" : formatVisualExactValue(lang, row.dropOff, visual.unit),
         ],
       }))}
     >

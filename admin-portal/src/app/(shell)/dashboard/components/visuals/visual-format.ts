@@ -7,8 +7,11 @@ import type {
 import {
   CHART_COLORS,
   DASHBOARD_CHART_VISUAL_ITEM_LIMIT,
+  exactFractionDigits,
   formatChartCurrency,
+  formatChartCurrencyExact,
   formatChartNumber,
+  formatChartNumberExact,
   formatChartPercent,
   qualitativeColor,
   STATUS_TONE_COLOR,
@@ -36,6 +39,47 @@ export function formatVisualValue(
       return formatBytes(lang, value);
     default:
       return formatChartNumber(lang, value);
+  }
+}
+
+/**
+ * The measure as the payload sent it, for the tables and the print sheet that
+ * are headed "exact values".
+ *
+ * `formatVisualValue` is deliberately approximate: "2m" and "1.5 KB" read
+ * better than the number on a legend, a hover label or an axis. Reusing it
+ * under a heading that promises exactness is what made a 90-second wait read
+ * as two minutes, 1,537 bytes as 1.5 KB, and 10.49 USD as $10 — none of them
+ * recoverable by the operator reading the table or the printed evidence.
+ *
+ * Ratios are also left unclamped here. `formatChartPercent` folds anything
+ * above 1 down to 100% so a bar cannot overflow its track; an exact table
+ * showing 100% for a ratio of 1.8 would be stating something false.
+ */
+export function formatVisualExactValue(
+  lang: Language,
+  value: number,
+  unit: DashboardVisualUnit,
+  currencyCode = "USD",
+): string {
+  if (!Number.isFinite(value)) return "—";
+  switch (unit) {
+    case "usd":
+      return formatChartCurrencyExact(lang, value, currencyCode);
+    case "ratio": {
+      const digits = exactFractionDigits(value * 100);
+      return formatChartNumber(lang, value, {
+        style: "percent",
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+      });
+    }
+    case "seconds":
+      return `${formatChartNumberExact(lang, value)}s`;
+    case "bytes":
+      return `${formatChartNumberExact(lang, value)} B`;
+    default:
+      return formatChartNumberExact(lang, value);
   }
 }
 

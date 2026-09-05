@@ -141,6 +141,19 @@ Every chart provides:
 Decorative SVG nodes are hidden from assistive technology. The accessible
 summary or data table is the primary nonvisual representation.
 
+### Exact means exact
+
+Axis ticks, legends, hover labels and spoken summaries may round, abbreviate a
+duration to `2m`, or scale bytes to `1.5 KB`. Anything presented as the value
+itself may not: an exact-value table, and the print sheet built from the same
+markup, states the number the payload sent, including the minor unit of an
+amount of money and any digits beyond it. A ratio there is not clamped either —
+folding 1.8 down to `100%` so a bar fits its track is a reading, not a value.
+
+In the dashboard this is the split between `formatVisualValue` (approximate,
+for marks and labels) and `formatVisualExactValue` (for table cells), with
+`formatChartCurrency` and `formatChartCurrencyExact` behind them.
+
 ### Readability and motion
 
 - Axis ticks are at least 13px in both languages.

@@ -17,7 +17,9 @@ import {
   ChartEmptyState,
   ChartFigure,
   formatChartCurrency,
+  formatChartCurrencyExact,
   formatChartNumber,
+  formatChartNumberExact,
   getChartCopy,
   useReducedMotion,
 } from "./ChartAccessibility";
@@ -85,12 +87,15 @@ export function TenantGrowthRevenueChart({
         t.dashboard.overviewTab.tenantCount,
         `${t.dashboard.overviewTab.collectedRevenue} (${currencyCode})`,
       ]}
+      // The axis and the tooltip may round; this table is titled "Exact
+      // values", so the collected revenue keeps its minor unit rather than
+      // reporting 10.49 as 10.
       rows={chartData.map((point, index) => ({
         key: `${point.month}-${index}`,
         cells: [
           point.month,
-          formatChartNumber(lang, point.tenants),
-          formatChartCurrency(lang, point.collected, currencyCode),
+          formatChartNumberExact(lang, point.tenants),
+          formatChartCurrencyExact(lang, point.collected, currencyCode),
         ],
       }))}
     >
