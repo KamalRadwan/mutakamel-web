@@ -154,13 +154,22 @@ export function useDatabaseServers() {
     } finally {
       if (generation === requestGeneration.current) setIsLoading(false);
     }
-  }, [page, limit, search, statusFilter, countryFilter, deletionFilter, toast, currentQueryIdentity, copy.genericErrorTitle, refreshNonce]);
+    // `sortBy` and `sortDir` are listed even though `currentQueryIdentity`
+    // already encodes them: the callback reads both directly when it builds the
+    // query, and covering them only through a JSON string means dropping either
+    // from that identity would silently stop the list refetching on sort.
+  }, [page, limit, search, sortBy, sortDir, statusFilter, countryFilter, deletionFilter, toast, currentQueryIdentity, copy.genericErrorTitle]);
 
   useEffect(() => {
+    // `refreshNonce` belongs here, not in `fetchServers`. The callback never
+    // reads it -- it is a deliberate re-run trigger for `requestRefresh` -- so
+    // carrying it as a callback dependency made it an unnecessary dep the
+    // linter could not distinguish from a mistake. As an effect dependency it
+    // says what it means: bumping the nonce refetches.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchServers();
     return () => requestAbort.current?.abort();
-  }, [fetchServers]);
+  }, [fetchServers, refreshNonce]);
 
   /**
    * FE-OPS-002. A mutation used to finish with `await fetchServers()`, calling

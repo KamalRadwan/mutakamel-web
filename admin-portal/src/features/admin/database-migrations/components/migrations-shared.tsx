@@ -509,19 +509,24 @@ const GLYPH_COMPONENTS: Record<
 
 const TONE_CLASSES: Record<MigrationTone, string> = {
   success:
-    "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
+    "border-success/30 bg-success-subtle text-success-subtle-foreground",
   progress:
-    "border-cyan-300 bg-cyan-50 text-cyan-900 dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-200",
+    "border-info/30 bg-info-subtle text-info-subtle-foreground",
+  // PENDING: queued and will run. Filled, but at the lowest emphasis.
   waiting:
-    "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200",
-  neutral:
-    "border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200",
+    "border-border bg-muted text-muted-foreground",
+  // SKIPPED_UP_TO_DATE: nothing to do. Outline only -- the quietest treatment
+  // there is, and the one thing that separates it from `waiting` in BOTH
+  // themes. `--secondary` and `--muted` resolve to the same surface in light
+  // mode, so distinguishing these two by those tokens would have been a
+  // distinction that only existed in the dark palette.
+  neutral: "border-border text-muted-foreground",
   caution:
-    "border-amber-400 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200",
+    "border-warning/30 bg-warning-subtle text-warning-subtle-foreground",
   danger:
-    "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-200",
+    "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground",
   alarm:
-    "border-fuchsia-400 bg-fuchsia-50 text-fuchsia-950 dark:border-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-100",
+    "border-destructive bg-destructive text-destructive-foreground",
 };
 
 export function outcomeLabel(
@@ -602,11 +607,11 @@ export function MigrationChip({
   const Icon = GLYPH_COMPONENTS[glyph];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${TONE_CLASSES[tone]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${TONE_CLASSES[tone]}`}
     >
       <Icon className={`size-3.5 shrink-0 ${spin ? "animate-spin" : ""}`} aria-hidden="true" />
       <span>{label}</span>
-      <code dir="ltr" className="font-mono text-[10px] opacity-70">
+      <code dir="ltr" className="font-mono text-2xs opacity-70">
         {code}
       </code>
     </span>
@@ -698,7 +703,7 @@ export function MigrationsPageFrame({
   return (
     <div
       dir={dir}
-      className="min-h-screen bg-slate-50 text-slate-950 dark:bg-[#090d16] dark:text-slate-100"
+      className="min-h-screen bg-background text-foreground"
     >
       <main className="mx-auto w-full max-w-[1600px] space-y-4 px-4 py-5 sm:px-6 lg:px-8">
         {children}
@@ -717,15 +722,15 @@ export function MigrationsHero({
   action?: ReactNode;
 }) {
   return (
-    <header className="rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-slate-950 via-cyan-950 to-slate-950 p-5 text-white shadow-md">
+    <header className="rounded-lg border border-border bg-primary p-5 text-primary-foreground shadow-md">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-xl bg-cyan-400/15 text-cyan-200">
+          <span className="grid size-11 place-items-center rounded-xl bg-primary-foreground/15 text-primary-foreground">
             <DatabaseZap className="size-5" aria-hidden="true" />
           </span>
           <div>
-            <h1 className="text-xl font-black sm:text-2xl">{title}</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-cyan-100/80">
+            <h1 className="text-xl font-semibold sm:text-2xl">{title}</h1>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-primary-foreground/80">
               {subtitle}
             </p>
           </div>
@@ -762,15 +767,15 @@ export function MigrationsStatePanel({
   return (
     <section
       role={kind === "error" || kind === "forbidden" ? "alert" : "status"}
-      className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-border bg-card p-6 text-center shadow-sm"
     >
       <Icon
-        className={`mb-3 size-9 text-cyan-600 ${kind === "loading" ? "animate-spin" : ""}`}
+        className={`mb-3 size-9 text-primary ${kind === "loading" ? "animate-spin" : ""}`}
         aria-hidden="true"
       />
-      <h2 className="font-black">{title}</h2>
+      <h2 className="font-semibold">{title}</h2>
       {detail ? (
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
           {detail}
         </p>
       ) : null}
@@ -801,7 +806,7 @@ export function RefreshMigrationsButton({
       type="button"
       onClick={onClick}
       disabled={pending}
-      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-cyan-300 px-4 text-sm font-bold text-cyan-800 disabled:opacity-50 dark:border-cyan-800 dark:text-cyan-200"
+      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-50"
     >
       <RefreshCw
         className={`size-4 ${pending ? "animate-spin" : ""}`}
@@ -827,9 +832,9 @@ export function ReadOnlyNotice({
   return (
     <section
       role="status"
-      className="rounded-2xl border border-slate-300 bg-slate-100 p-4 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+      className="rounded-lg border border-border bg-muted p-4 text-sm text-foreground"
     >
-      <h2 className="font-black">{copy.readOnlyTitle}</h2>
+      <h2 className="font-semibold">{copy.readOnlyTitle}</h2>
       <p className="mt-1 leading-6">{copy.readOnlyBody}</p>
       <p className="mt-2 text-xs">
         <strong>{copy.missingPermissions}:</strong>{" "}
@@ -857,10 +862,10 @@ export function RunProgressBar({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label={copy.progress}
-        className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+        className="h-2 w-full overflow-hidden rounded-full bg-muted"
       >
         <div
-          className="h-full rounded-full bg-cyan-600"
+          className="h-full rounded-full bg-primary"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -899,13 +904,13 @@ export function MigrationMutationNotice({
       role={mutation.phase === "SUCCEEDED" ? "status" : "alert"}
       className={`rounded-xl border px-4 py-3 text-sm ${
         danger
-          ? "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100"
+          ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
           : mutation.phase === "SUCCEEDED"
-            ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
-            : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
+            ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+            : "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
       }`}
     >
-      <p className="font-bold">{message}</p>
+      <p className="font-semibold">{message}</p>
       {precondition ? (
         <p className="mt-1">{preconditionMessage(precondition, copy)}</p>
       ) : null}
@@ -965,9 +970,9 @@ export function MigrationPager({
   return (
     <nav
       aria-label={isArabic ? "تصفح الصفحات" : "Pagination"}
-      className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs dark:border-slate-800"
+      className="flex items-center justify-between border-t border-border px-4 py-3 text-xs"
     >
-      <span className="font-semibold text-slate-500">
+      <span className="font-semibold text-muted-foreground">
         {isArabic
           ? `صفحة ${page} من ${totalPages}`
           : `Page ${page} of ${totalPages}`}
@@ -977,7 +982,7 @@ export function MigrationPager({
           type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(Math.max(1, page - 1))}
-          className="min-h-9 rounded-xl border border-slate-200 px-3 font-bold disabled:opacity-50 dark:border-slate-700"
+          className="min-h-9 rounded-xl border border-border px-3 font-semibold disabled:opacity-50"
         >
           {isArabic ? "السابق" : "Previous"}
         </button>
@@ -985,7 +990,7 @@ export function MigrationPager({
           type="button"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          className="min-h-9 rounded-xl border border-slate-200 px-3 font-bold disabled:opacity-50 dark:border-slate-700"
+          className="min-h-9 rounded-xl border border-border px-3 font-semibold disabled:opacity-50"
         >
           {isArabic ? "التالي" : "Next"}
         </button>
@@ -1039,6 +1044,6 @@ export function formatDuration(
 }
 
 export const migrationInputClass =
-  "min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white";
+  "min-h-11 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/20";
 export const migrationLabelClass =
-  "mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500";
+  "mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";

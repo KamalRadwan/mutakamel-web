@@ -69,7 +69,7 @@ export function MigrationRunDetailScreen({ runId }: { runId: string }) {
             />
             <Link
               href="/database-migrations"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-cyan-950"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-card px-4 text-sm font-semibold text-primary"
             >
               <BackIcon className="size-4" aria-hidden="true" />
               {copy.back}
@@ -149,11 +149,11 @@ function RunSummaryCard({
   lang: "ar" | "en";
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <RunStatusChip status={run.status} copy={copy} />
         <RunModeChip dryRun={run.progress.dryRun} copy={copy} />
-        <span className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-bold dark:border-slate-700">
+        <span className="rounded-full border border-border px-2.5 py-1 text-xs font-semibold">
           {run.tenantScope
             ? copy.scopeTenantCount(run.tenantScope.length)
             : copy.scopeFleet}
@@ -187,7 +187,7 @@ function RunSummaryCard({
       {run.error ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
+          className="mt-4 rounded-xl border border-destructive/30 bg-destructive-subtle px-4 py-3 text-sm text-destructive-subtle-foreground"
         >
           {run.error}
         </p>
@@ -206,13 +206,13 @@ function Fact({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-      <dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+    <div className="rounded-xl border border-border p-3">
+      <dt className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </dt>
       <dd
         dir={mono ? "ltr" : undefined}
-        className={`mt-1 break-words text-sm font-bold ${mono ? "font-mono" : ""}`}
+        className={`mt-1 break-words text-sm font-semibold ${mono ? "font-mono" : ""}`}
       >
         {value}
       </dd>
@@ -244,8 +244,8 @@ function RunControls({
   );
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="font-black">{copy.controlsTitle}</h2>
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <h2 className="font-semibold">{copy.controlsTitle}</h2>
 
       <label className="mt-3 block">
         <span className={migrationLabelClass}>{copy.controlReasonLabel}</span>
@@ -255,7 +255,7 @@ function RunControls({
           maxLength={500}
           className={migrationInputClass}
         />
-        <span className="mt-1 block text-xs text-slate-500">
+        <span className="mt-1 block text-xs text-muted-foreground">
           {copy.controlReasonHelp}
         </span>
       </label>
@@ -267,7 +267,7 @@ function RunControls({
               type="button"
               disabled={!detail.availability.canPause || !reasonReady || pending}
               onClick={() => void detail.control("PAUSE", reason.trim())}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-amber-400 px-4 text-sm font-bold text-amber-800 disabled:opacity-40 dark:border-amber-700 dark:text-amber-200"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-warning/40 px-4 text-sm font-semibold text-warning disabled:opacity-40"
             >
               <PauseCircle className="size-4" aria-hidden="true" />
               {copy.pause}
@@ -276,7 +276,7 @@ function RunControls({
               type="button"
               disabled={!detail.availability.canResume || !reasonReady || pending}
               onClick={() => void detail.control("RESUME", reason.trim())}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-cyan-400 px-4 text-sm font-bold text-cyan-800 disabled:opacity-40 dark:border-cyan-700 dark:text-cyan-200"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-40"
             >
               <PlayCircle className="size-4" aria-hidden="true" />
               {copy.resume}
@@ -288,7 +288,7 @@ function RunControls({
               }
               onClick={() => void detail.control("RETRY_FAILED", reason.trim())}
               title={copy.retryFailedHelp}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-400 px-4 text-sm font-bold disabled:opacity-40 dark:border-slate-600"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-input px-4 text-sm font-semibold disabled:opacity-40"
             >
               <RotateCcw className="size-4" aria-hidden="true" />
               {copy.retryFailed}
@@ -301,7 +301,7 @@ function RunControls({
             type="button"
             disabled={!detail.availability.canAbort || !reasonReady || pending}
             onClick={() => setAborting(true)}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-4 text-sm font-black text-white hover:bg-rose-800 disabled:opacity-40"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-destructive px-4 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40"
           >
             <OctagonX className="size-4" aria-hidden="true" />
             {copy.abort}
@@ -309,7 +309,7 @@ function RunControls({
         ) : null}
       </div>
 
-      <p className="mt-2 text-xs text-slate-500">{copy.retryFailedHelp}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{copy.retryFailedHelp}</p>
 
       <DestructiveActionModal
         isOpen={aborting}
@@ -354,18 +354,18 @@ function OutcomeSection({
   const summary = summarizeTenantOutcomes(results);
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <header className="px-4 py-3">
-        <h2 className="font-black">{copy.outcomesTitle}</h2>
-        <p className="mt-1 text-xs text-slate-500">{copy.outcomesHelp}</p>
+        <h2 className="font-semibold">{copy.outcomesTitle}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">{copy.outcomesHelp}</p>
       </header>
 
       {detail.outcomesError ? (
         <div
           role="status"
-          className="mx-4 mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+          className="mx-4 mb-3 rounded-xl border border-warning/30 bg-warning-subtle px-4 py-3 text-sm text-warning-subtle-foreground"
         >
-          <p className="font-bold">{copy.outcomesUnavailable}</p>
+          <p className="font-semibold">{copy.outcomesUnavailable}</p>
           <p className="mt-1 text-xs leading-5">
             {copy.outcomesUnavailableBody}
           </p>
@@ -393,7 +393,7 @@ function OutcomeSection({
         </div>
       ) : null}
 
-      <div className="border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+      <div className="border-t border-border px-4 py-3">
         <label className="block max-w-xs">
           <span className={migrationLabelClass}>{copy.filterOutcome}</span>
           <select
@@ -416,7 +416,7 @@ function OutcomeSection({
       </div>
 
       {results.length === 0 ? (
-        <p className="border-t border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-800">
+        <p className="border-t border-border p-5 text-sm text-muted-foreground">
           {copy.noOutcomes}
         </p>
       ) : (
@@ -424,7 +424,7 @@ function OutcomeSection({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1000px] text-sm">
               <caption className="sr-only">{copy.outcomesTitle}</caption>
-              <thead className="bg-slate-100 text-xs font-black uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <thead className="bg-muted text-xs font-semibold uppercase text-muted-foreground">
                 <tr>
                   <TableHeader>{copy.tenant}</TableHeader>
                   <TableHeader>{copy.status}</TableHeader>
@@ -484,15 +484,15 @@ function OutcomeGroupCard({
 
   return (
     <article
-      className={`rounded-2xl border p-3 ${
+      className={`rounded-lg border p-3 ${
         group === "NEEDS_ATTENTION"
-          ? "border-amber-400 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30"
-          : "border-slate-200 dark:border-slate-800"
+          ? "border-warning/40 bg-warning-subtle"
+          : "border-border"
       }`}
     >
       <header className="flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-black">{title}</h3>
-        <span className="font-mono text-lg font-black">{total}</span>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <span className="font-mono text-lg font-semibold">{total}</span>
       </header>
       <dl className="mt-2 space-y-1.5">
         {members.map((outcome) => (
@@ -501,12 +501,12 @@ function OutcomeGroupCard({
             className="flex items-center justify-between gap-2 text-xs"
           >
             <dt className="min-w-0">
-              <span className="font-bold">{outcomeLabel(outcome, copy)}</span>{" "}
-              <code dir="ltr" className="font-mono text-[10px] text-slate-500">
+              <span className="font-semibold">{outcomeLabel(outcome, copy)}</span>{" "}
+              <code dir="ltr" className="font-mono text-2xs text-muted-foreground">
                 {outcome}
               </code>
             </dt>
-            <dd className="font-mono font-black">{summary.tally[outcome]}</dd>
+            <dd className="font-mono font-semibold">{summary.tally[outcome]}</dd>
           </div>
         ))}
       </dl>
@@ -526,21 +526,21 @@ function OutcomeRow({
   const disclosure = readSkipDisclosure(result);
 
   return (
-    <tr className="border-t border-slate-200 align-top dark:border-slate-800">
+    <tr className="border-t border-border align-top">
       <td className="px-4 py-3 text-start">
-        <p className="font-bold">{result.tenantName ?? result.tenantId}</p>
-        <code dir="ltr" className="mt-1 block font-mono text-xs text-slate-500">
+        <p className="font-semibold">{result.tenantName ?? result.tenantId}</p>
+        <code dir="ltr" className="mt-1 block font-mono text-xs text-muted-foreground">
           {result.tenantId}
         </code>
       </td>
       <td className="px-4 py-3 text-start">
         <OutcomeChip outcome={result.outcome} copy={copy} />
-        <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600 dark:text-slate-300">
+        <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
           {outcomeHelp(result.outcome, copy)}
         </p>
 
         {disclosure.kind === "EXCLUDED" ? (
-          <p className="mt-2 max-w-sm rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs leading-5 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          <p className="mt-2 max-w-sm rounded-lg border border-warning/30 bg-warning-subtle px-2 py-1.5 text-xs leading-5 text-warning-subtle-foreground">
             <strong>{copy.skipReasonLabel}:</strong> {disclosure.reason}
           </p>
         ) : null}
@@ -548,14 +548,14 @@ function OutcomeRow({
         {disclosure.kind === "EXCLUDED_REASON_MISSING" ? (
           <p
             role="alert"
-            className="mt-2 max-w-sm rounded-lg border border-rose-300 bg-rose-50 px-2 py-1.5 text-xs leading-5 text-rose-900 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-100"
+            className="mt-2 max-w-sm rounded-lg border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-xs leading-5 text-destructive-subtle-foreground"
           >
             {copy.skipReasonMissing}
           </p>
         ) : null}
 
         {result.errorCode || result.errorDetail ? (
-          <p className="mt-2 max-w-sm text-xs leading-5 text-rose-700 dark:text-rose-300">
+          <p className="mt-2 max-w-sm text-xs leading-5 text-destructive">
             <strong>{copy.errorCode}:</strong>{" "}
             <code dir="ltr" className="font-mono">
               {result.errorCode ?? ""}
@@ -567,7 +567,7 @@ function OutcomeRow({
       <td dir="ltr" className="px-4 py-3 text-start font-mono text-xs">
         {result.migrationName ?? copy.none}
         {result.migrationChecksum ? (
-          <span className="mt-1 block break-all text-[10px] text-slate-500">
+          <span className="mt-1 block break-all text-2xs text-muted-foreground">
             {result.migrationChecksum}
           </span>
         ) : null}
@@ -575,13 +575,13 @@ function OutcomeRow({
       <td className="px-4 py-3 text-end font-mono text-xs">
         {result.appliedCount}
         {result.pendingCount > 0 ? (
-          <span className="block text-slate-500">/{result.pendingCount}</span>
+          <span className="block text-muted-foreground">/{result.pendingCount}</span>
         ) : null}
       </td>
       <td className="px-4 py-3 text-end font-mono text-xs">
         {formatDuration(result.durationMs, lang)}
       </td>
-      <td className="px-4 py-3 text-start text-xs text-slate-500">
+      <td className="px-4 py-3 text-start text-xs text-muted-foreground">
         {formatMigrationDate(result.finishedAt, lang)}
       </td>
     </tr>

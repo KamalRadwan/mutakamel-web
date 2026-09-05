@@ -216,8 +216,8 @@ export function StartMigrationDialog({
           aria-label={copy.startTitle}
           onSubmit={handleSubmit}
         >
-          <fieldset className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
-            <legend className="px-1 text-xs font-black uppercase tracking-wider text-slate-500">
+          <fieldset className="rounded-lg border border-border p-4">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {copy.modeLegend}
             </legend>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
@@ -242,8 +242,8 @@ export function StartMigrationDialog({
             </div>
           </fieldset>
 
-          <fieldset className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
-            <legend className="px-1 text-xs font-black uppercase tracking-wider text-slate-500">
+          <fieldset className="rounded-lg border border-border p-4">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {copy.scopeLegend}
             </legend>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
@@ -286,7 +286,7 @@ export function StartMigrationDialog({
                   className={`${migrationInputClass} font-mono`}
                 />
                 <FieldError id={`${fieldId}-tenant-error`} message={errors.tenantId} />
-                <p className="mt-1 text-xs text-slate-500">{copy.tenantIdHelp}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{copy.tenantIdHelp}</p>
               </div>
             ) : null}
           </fieldset>
@@ -341,7 +341,7 @@ export function StartMigrationDialog({
                 id={`${fieldId}-version-error`}
                 message={errors.targetVersion}
               />
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {copy.targetVersionHelp}
               </p>
             </div>
@@ -381,8 +381,8 @@ export function StartMigrationDialog({
                   className="mt-1 size-4 rounded"
                 />
                 <span>
-                  <span className="font-bold">{copy.failFastLabel}</span>
-                  <span className="mt-1 block text-xs text-slate-500">
+                  <span className="font-semibold">{copy.failFastLabel}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
                     {copy.failFastHelp}
                   </span>
                 </span>
@@ -407,13 +407,13 @@ export function StartMigrationDialog({
               className={`${migrationInputClass} py-3`}
             />
             <FieldError id={`${fieldId}-reason-error`} message={errors.reason} />
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               {copy.triggeredByHelp}
             </p>
           </div>
 
-          <section className="rounded-xl border border-cyan-200 bg-cyan-50 p-3 text-xs leading-5 text-cyan-950 dark:border-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-100">
-            <h3 className="font-black">{copy.canaryTitle}</h3>
+          <section className="rounded-xl border border-info/30 bg-info-subtle p-3 text-xs leading-5 text-info-subtle-foreground">
+            <h3 className="font-semibold">{copy.canaryTitle}</h3>
             <p className="mt-1">{copy.canaryHelp}</p>
           </section>
 
@@ -422,17 +422,17 @@ export function StartMigrationDialog({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 px-4 text-sm font-bold disabled:opacity-50 dark:border-slate-700"
+              className="inline-flex min-h-11 items-center rounded-xl border border-input px-4 text-sm font-semibold disabled:opacity-50"
             >
               {copy.cancel}
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-5 text-sm font-black text-white disabled:opacity-50 ${
+              className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-white disabled:opacity-50 ${
                 mode === "DRY_RUN"
-                  ? "bg-cyan-700 hover:bg-cyan-800"
-                  : "bg-rose-700 hover:bg-rose-800"
+                  ? "bg-primary hover:bg-primary/90"
+                  : "bg-destructive hover:bg-destructive/90"
               }`}
             >
               {isSubmitting ? (
@@ -500,16 +500,16 @@ function ModeCard({
 }) {
   const selected =
     tone === "critical"
-      ? "border-rose-500 bg-rose-50 dark:bg-rose-950/40"
+      ? "border-destructive bg-destructive-subtle"
       : tone === "safe"
-        ? "border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40"
-        : "border-slate-500 bg-slate-100 dark:bg-slate-800";
+        ? "border-primary bg-info-subtle"
+        : "border-input bg-muted";
   return (
     <label
       className={`flex cursor-pointer gap-3 rounded-xl border-2 p-3 transition-colors ${
         checked
           ? selected
-          : "border-slate-200 hover:border-slate-300 dark:border-slate-800"
+          : "border-border hover:border-input"
       }`}
     >
       <input
@@ -521,8 +521,8 @@ function ModeCard({
         className="mt-1 size-4 shrink-0"
       />
       <span>
-        <span className="block text-sm font-black">{title}</span>
-        <span className="mt-1 block text-xs leading-5 text-slate-600 dark:text-slate-300">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="mt-1 block text-xs leading-5 text-muted-foreground">
           {help}
         </span>
       </span>
@@ -549,7 +549,7 @@ function FieldError({ id, message }: { id: string; message?: string }) {
     <span
       id={id}
       role="alert"
-      className="mt-1 block text-xs font-bold text-rose-600 dark:text-rose-300"
+      className="mt-1 block text-xs font-semibold text-destructive"
     >
       {message}
     </span>

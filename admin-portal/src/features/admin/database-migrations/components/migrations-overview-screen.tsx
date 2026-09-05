@@ -78,7 +78,7 @@ export function MigrationsOverviewScreen() {
               <button
                 type="button"
                 onClick={openFleetStart}
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-cyan-950"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-card px-4 text-sm font-semibold text-primary"
               >
                 <PlayCircle className="size-4" aria-hidden="true" />
                 {copy.startRun}
@@ -179,9 +179,9 @@ function OverviewBody({
       {overview.projectionError ? (
         <section
           role="status"
-          className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+          className="rounded-lg border border-warning/30 bg-warning-subtle p-4 text-sm text-warning-subtle-foreground"
         >
-          <h2 className="font-black">{copy.projectionDegradedTitle}</h2>
+          <h2 className="font-semibold">{copy.projectionDegradedTitle}</h2>
           <p className="mt-1 leading-6">{copy.projectionDegradedBody}</p>
           {!isProjectionDegraded(overview.projectionError) ? (
             <p className="mt-1">{overview.projectionError.message}</p>
@@ -251,18 +251,18 @@ function AlarmBanner({
   return (
     <section
       role="alert"
-      className="rounded-2xl border-2 border-fuchsia-500 bg-fuchsia-50 p-5 text-fuchsia-950 shadow-md dark:border-fuchsia-700 dark:bg-fuchsia-950/50 dark:text-fuchsia-100"
+      className="rounded-lg border-2 border-destructive bg-destructive-subtle p-5 text-destructive-subtle-foreground shadow-md"
     >
       <div className="flex items-start gap-3">
         <AlertOctagon className="mt-0.5 size-6 shrink-0" aria-hidden="true" />
         <div className="min-w-0">
-          <h2 className="text-base font-black">{copy.alarmTitle}</h2>
+          <h2 className="text-base font-semibold">{copy.alarmTitle}</h2>
           <p className="mt-1 text-sm leading-6">{copy.alarmBody}</p>
           <ul className="mt-3 flex flex-wrap gap-2">
             {affected.map((entry) => (
               <li
                 key={entry.applicationKey}
-                className="rounded-xl border border-fuchsia-400 bg-white/70 px-3 py-2 text-xs font-bold dark:border-fuchsia-700 dark:bg-fuchsia-950"
+                className="rounded-xl border border-destructive/40 bg-card/70 px-3 py-2 text-xs font-semibold"
               >
                 <code dir="ltr" className="font-mono">
                   {entry.applicationKey}
@@ -302,8 +302,8 @@ function FleetSection({
   if (!fleet) return null;
   if (fleet.length === 0) {
     return (
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="font-black text-slate-900 dark:text-slate-100">
+      <section className="rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">
+        <h2 className="font-semibold text-foreground">
           {copy.fleetTitle}
         </h2>
         <p className="mt-2">{copy.noFleet}</p>
@@ -314,8 +314,8 @@ function FleetSection({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-base font-black">{copy.fleetTitle}</h2>
-        <p className="mt-1 text-xs leading-5 text-slate-500">{copy.fleetHelp}</p>
+        <h2 className="text-base font-semibold">{copy.fleetTitle}</h2>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.fleetHelp}</p>
       </div>
       <div className="grid gap-3 xl:grid-cols-2">
         {fleet.map((entry) => (
@@ -348,62 +348,62 @@ function FleetCard({
   ];
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <article className="rounded-lg border border-border bg-card p-4 shadow-sm">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <ServerCog className="size-5 text-cyan-700" aria-hidden="true" />
-          <h3 className="font-black">
+          <ServerCog className="size-5 text-primary" aria-hidden="true" />
+          <h3 className="font-semibold">
             <code dir="ltr" className="font-mono">
               {entry.applicationKey}
             </code>
           </h3>
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground">
           {copy.availableVersion}:{" "}
-          <code dir="ltr" className="font-mono font-bold">
+          <code dir="ltr" className="font-mono font-semibold">
             {entry.availableVersion || copy.none}
           </code>
         </p>
       </header>
 
       <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 p-2 dark:border-slate-800">
-          <dt className="text-[11px] font-bold uppercase text-slate-500">
+        <div className="rounded-xl border border-border p-2">
+          <dt className="text-2xs font-semibold uppercase text-muted-foreground">
             {copy.tenantsTotal}
           </dt>
-          <dd className="font-mono text-lg font-black">{health.total}</dd>
+          <dd className="font-mono text-lg font-semibold">{health.total}</dd>
         </div>
-        <div className="rounded-xl border border-slate-200 p-2 dark:border-slate-800">
-          <dt className="text-[11px] font-bold uppercase text-slate-500">
+        <div className="rounded-xl border border-border p-2">
+          <dt className="text-2xs font-semibold uppercase text-muted-foreground">
             {copy.behind}
           </dt>
-          <dd className="font-mono text-lg font-black">{health.behind}</dd>
+          <dd className="font-mono text-lg font-semibold">{health.behind}</dd>
         </div>
         {counters
           .filter((counter) => counter.value > 0)
           .map((counter) => (
             <div
               key={counter.state}
-              className="rounded-xl border border-slate-200 p-2 dark:border-slate-800"
+              className="rounded-xl border border-border p-2"
             >
-              <dt className="text-[11px] font-bold uppercase text-slate-500">
+              <dt className="text-2xs font-semibold uppercase text-muted-foreground">
                 {schemaStateLabel(counter.state, copy)}{" "}
                 <code dir="ltr" className="font-mono normal-case">
                   {counter.state}
                 </code>
               </dt>
-              <dd className="font-mono text-lg font-black">{counter.value}</dd>
+              <dd className="font-mono text-lg font-semibold">{counter.value}</dd>
             </div>
           ))}
       </dl>
 
       {entry.activeRun ? (
         <p className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="font-bold">{copy.activeRun}:</span>
+          <span className="font-semibold">{copy.activeRun}:</span>
           <RunStatusChip status={entry.activeRun.status} copy={copy} />
           <Link
             href={`/database-migrations/runs/${entry.activeRun.runId}`}
-            className="font-mono font-bold text-cyan-700 underline dark:text-cyan-300"
+            className="font-mono font-semibold text-primary underline"
           >
             {entry.activeRun.runId}
           </Link>
@@ -412,17 +412,17 @@ function FleetCard({
       ) : null}
 
       <section className="mt-3">
-        <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+        <h4 className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
           {copy.distribution}
         </h4>
         {health.fragmented ? (
-          <p className="mt-1 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          <p className="mt-1 rounded-xl border border-warning/30 bg-warning-subtle px-3 py-2 text-xs leading-5 text-warning-subtle-foreground">
             <strong>{copy.fragmentedTitle}.</strong> {copy.fragmentedBody}
           </p>
         ) : null}
         <table className="mt-2 w-full text-xs">
           <caption className="sr-only">{copy.distribution}</caption>
-          <thead className="text-[11px] font-black uppercase text-slate-500">
+          <thead className="text-2xs font-semibold uppercase text-muted-foreground">
             <tr>
               <TableHeader>{copy.schemaVersion}</TableHeader>
               <TableHeader align="end">{copy.tenantCount}</TableHeader>
@@ -432,12 +432,12 @@ function FleetCard({
             {entry.versionDistribution.map((slice) => (
               <tr
                 key={slice.schemaVersion}
-                className="border-t border-slate-100 dark:border-slate-800"
+                className="border-t border-border"
               >
                 <td dir="ltr" className="px-4 py-2 text-start font-mono">
                   {slice.schemaVersion}
                 </td>
-                <td className="px-4 py-2 text-end font-mono font-bold">
+                <td className="px-4 py-2 text-end font-mono font-semibold">
                   {slice.tenantCount}
                 </td>
               </tr>
@@ -457,7 +457,7 @@ function FilterBar({
   copy: MigrationsCopy;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <section className="rounded-lg border border-border bg-card p-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="block">
           <span className={migrationLabelClass}>{copy.filterApplication}</span>
@@ -514,13 +514,13 @@ function TenantTable({
   pager: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <header className="px-4 py-3">
-        <h2 className="font-black">{copy.tenantsTitle}</h2>
-        <p className="mt-1 text-xs text-slate-500">{copy.tenantsHelp}</p>
+        <h2 className="font-semibold">{copy.tenantsTitle}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">{copy.tenantsHelp}</p>
       </header>
       {tenants.length === 0 ? (
-        <p className="border-t border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-800">
+        <p className="border-t border-border p-5 text-sm text-muted-foreground">
           {copy.noTenants}
         </p>
       ) : (
@@ -528,7 +528,7 @@ function TenantTable({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-sm">
               <caption className="sr-only">{copy.tenantsTitle}</caption>
-              <thead className="bg-slate-100 text-xs font-black uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <thead className="bg-muted text-xs font-semibold uppercase text-muted-foreground">
                 <tr>
                   <TableHeader>{copy.tenant}</TableHeader>
                   <TableHeader>{copy.application}</TableHeader>
@@ -542,15 +542,15 @@ function TenantTable({
                 {tenants.map((tenant) => (
                   <tr
                     key={`${tenant.tenantId}:${tenant.applicationKey}`}
-                    className="border-t border-slate-200 align-top dark:border-slate-800"
+                    className="border-t border-border align-top"
                   >
                     <td className="px-4 py-3 text-start">
-                      <p className="font-bold">
+                      <p className="font-semibold">
                         {tenant.tenantName ?? tenant.tenantId}
                       </p>
                       <code
                         dir="ltr"
-                        className="mt-1 block font-mono text-xs text-slate-500"
+                        className="mt-1 block font-mono text-xs text-muted-foreground"
                       >
                         {tenant.tenantId}
                       </code>
@@ -561,7 +561,7 @@ function TenantTable({
                     <td className="px-4 py-3 text-start">
                       <SchemaStateChip state={tenant.state} copy={copy} />
                       {tenant.driftDetail ? (
-                        <p className="mt-2 max-w-sm text-xs leading-5 text-fuchsia-800 dark:text-fuchsia-200">
+                        <p className="mt-2 max-w-sm text-xs leading-5 text-destructive">
                           <strong>{copy.driftDetail}:</strong>{" "}
                           <span dir="ltr" className="font-mono break-all">
                             {tenant.driftDetail}
@@ -572,7 +572,7 @@ function TenantTable({
                     <td dir="ltr" className="px-4 py-3 text-start font-mono text-xs">
                       {tenant.schemaVersion || copy.none}
                     </td>
-                    <td className="px-4 py-3 text-start text-xs text-slate-500">
+                    <td className="px-4 py-3 text-start text-xs text-muted-foreground">
                       {formatMigrationDate(tenant.observedAt, lang)}
                     </td>
                     <td className="px-4 py-3 text-end">
@@ -580,13 +580,13 @@ function TenantTable({
                         <button
                           type="button"
                           onClick={() => onMigrateTenant(tenant.tenantId)}
-                          className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-cyan-300 px-3 text-xs font-bold text-cyan-800 dark:border-cyan-800 dark:text-cyan-200"
+                          className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-primary/40 px-3 text-xs font-semibold text-primary"
                         >
                           <PlayCircle className="size-4" aria-hidden="true" />
                           {copy.migrateTenant}
                         </button>
                       ) : (
-                        <span className="text-slate-400">{copy.none}</span>
+                        <span className="text-muted-foreground">{copy.none}</span>
                       )}
                     </td>
                   </tr>
@@ -611,20 +611,20 @@ function RunTable({
   lang: "ar" | "en";
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <header className="px-4 py-3">
-        <h2 className="font-black">{copy.runsTitle}</h2>
-        <p className="mt-1 text-xs text-slate-500">{copy.runsHelp}</p>
+        <h2 className="font-semibold">{copy.runsTitle}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">{copy.runsHelp}</p>
       </header>
       {runs.length === 0 ? (
-        <p className="border-t border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-800">
+        <p className="border-t border-border p-5 text-sm text-muted-foreground">
           {copy.noRuns}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1000px] text-sm">
             <caption className="sr-only">{copy.runsTitle}</caption>
-            <thead className="bg-slate-100 text-xs font-black uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            <thead className="bg-muted text-xs font-semibold uppercase text-muted-foreground">
               <tr>
                 <TableHeader>{copy.run}</TableHeader>
                 <TableHeader>{copy.application}</TableHeader>
@@ -639,13 +639,13 @@ function RunTable({
               {runs.map((run) => (
                 <tr
                   key={run.id}
-                  className="border-t border-slate-200 align-top dark:border-slate-800"
+                  className="border-t border-border align-top"
                 >
                   <td className="px-4 py-3 text-start">
-                    <code dir="ltr" className="font-mono text-xs font-bold">
+                    <code dir="ltr" className="font-mono text-xs font-semibold">
                       {run.id}
                     </code>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {run.tenantScope
                         ? copy.scopeTenantCount(run.tenantScope.length)
                         : copy.scopeFleet}
@@ -653,7 +653,7 @@ function RunTable({
                   </td>
                   <td dir="ltr" className="px-4 py-3 text-start font-mono text-xs">
                     {run.applicationKey}
-                    <span className="mt-1 block text-slate-500">
+                    <span className="mt-1 block text-muted-foreground">
                       {run.targetVersion}
                     </span>
                   </td>
@@ -666,13 +666,13 @@ function RunTable({
                   <td className="px-4 py-3 text-start">
                     <RunProgressBar run={run} copy={copy} />
                   </td>
-                  <td className="px-4 py-3 text-start text-xs text-slate-500">
+                  <td className="px-4 py-3 text-start text-xs text-muted-foreground">
                     {formatMigrationDate(run.startedAt, lang)}
                   </td>
                   <td className="px-4 py-3 text-end">
                     <Link
                       href={`/database-migrations/runs/${run.id}`}
-                      className="inline-flex min-h-10 items-center rounded-xl border border-cyan-300 px-3 text-xs font-bold text-cyan-800 dark:border-cyan-800 dark:text-cyan-200"
+                      className="inline-flex min-h-10 items-center rounded-xl border border-primary/40 px-3 text-xs font-semibold text-primary"
                     >
                       {copy.open}
                     </Link>
