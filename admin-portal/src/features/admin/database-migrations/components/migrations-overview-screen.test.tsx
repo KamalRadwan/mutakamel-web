@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   FleetStatus,
+  MigrationMutationState,
   MigrationRun,
   TenantSchemaVersion,
 } from "../types/database-migrations";
@@ -35,7 +36,11 @@ const { languageMock, overviewMock } = vi.hoisted(() => ({
       | { errorCode: string; message: string; httpStatus: number }
       | null,
     error: null,
-    mutation: { name: null, phase: "IDLE", error: null },
+    mutation: {
+      name: null,
+      phase: "IDLE",
+      error: null,
+    } as MigrationMutationState,
     isRefreshing: false,
     applicationKey: "",
     setApplicationKey: vi.fn(),
@@ -459,5 +464,104 @@ describe("MigrationsOverviewScreen dry-run dialog", () => {
       ).not.toBeInTheDocument();
     });
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+});
+
+/**
+ * FE-OPS-004. A rejected start leaves this dialog open with its Start button
+ * live again. The overview's own `MigrationMutationNotice` renders on the page
+ * *behind* the modal, where the Radix overlay covers it and Radix's
+ * `aria-hidden` on the outside tree removes it from the accessibility tree —
+ * so the operator was invited to retry with no idea what the server said.
+ */
+describe("MigrationsOverviewScreen rejected start", () => {
+  const rejection: MigrationMutationState = {
+    name: "START",
+    phase: "FORBIDDEN",
+    error: {
+      isNormalized: true,
+      httpStatus: 403,
+      errorCode: "ADMIN_PERMISSION_DENIED",
+      message: "admin.migrations.critical is required to apply a migration.",
+      correlationId: "corr-7f3a",
+    },
+  };
+
+  beforeEach(() => {
+    languageMock.lang = "en";
+    languageMock.dir = "ltr";
+    overviewMock.permissions = {
+      canRead: true,
+      hasExecute: true,
+      hasCritical: true,
+      canExecute: true,
+      canDestroy: true,
+    };
+    overviewMock.state = "READY";
+    overviewMock.fleet = [makeFleet()];
+    overviewMock.runs = [];
+    overviewMock.tenants = { items: [], meta: { page: 1, limit: 25, total: 0 } };
+    overviewMock.projectionError = null;
+    overviewMock.mutation = { name: null, phase: "IDLE", error: null };
+    overviewMock.startRun.mockReset();
+  });
+
+  async function submitRejectedDryRun() {
+    // The real hook holds `mutation` in React state, so a rejected start
+    // re-renders the screen. The mock stands in for that.
+    overviewMock.startRun.mockImplementation(() => {
+      overviewMock.mutation = rejection;
+      return Promise.resolve(null);
+    });
+
+    const view = render(<MigrationsOverviewScreen />);
+    fireEvent.click(screen.getByRole("button", { name: /Run a migration/ }));
+    const dialog = screen.getByRole("dialog", { name: "Run a migration" });
+
+    fireEvent.change(within(dialog).getByLabelText("Application"), {
+      target: { value: "crm" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Target version"), {
+      target: { value: "1801-latest" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Audit reason"), {
+      target: { value: "rehearsing release 42" },
+    });
+    fireEvent.submit(screen.getByRole("form", { name: "Run a migration" }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    view.rerender(<MigrationsOverviewScreen />);
+    return screen.getByRole("dialog", { name: "Run a migration" });
+  }
+
+  it("explains the server's refusal inside the dialog the operator retries from", async () => {
+    const dialog = await submitRejectedDryRun();
+
+    expect(overviewMock.startRun).toHaveBeenCalledTimes(1);
+    // The form is still open and still armed, so the reason must be here.
+    expect(
+      within(dialog).getByRole("button", { name: "Start dry run" }),
+    ).toBeEnabled();
+
+    const notice = within(dialog).getByRole("alert");
+    expect(notice.textContent).toContain(
+      "Your permissions do not authorize this command.",
+    );
+    expect(notice.textContent).toContain(
+      "admin.migrations.critical is required to apply a migration.",
+    );
+    expect(notice.textContent).toContain("ADMIN_PERMISSION_DENIED");
+    expect(notice.textContent).toContain("corr-7f3a");
+  });
+
+  it("moves focus to the refusal so it is not retried blind", async () => {
+    const dialog = await submitRejectedDryRun();
+
+    const notice = within(dialog).getByRole("alert");
+    await waitFor(() =>
+      expect(notice.parentElement === document.activeElement).toBe(true),
+    );
   });
 });

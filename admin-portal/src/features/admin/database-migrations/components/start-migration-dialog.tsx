@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { FlaskConical, Loader2, ShieldAlert } from "lucide-react";
 import {
   Dialog,
@@ -15,11 +15,13 @@ import {
   MIGRATION_APPLICATION_KEYS,
   type FleetStatus,
   type MigrationApplicationKey,
+  type MigrationMutationState,
   type MigrationRunMode,
   type MigrationRunScope,
   type StartMigrationRunDto,
 } from "../types/database-migrations";
 import {
+  MigrationMutationNotice,
   migrationInputClass,
   migrationLabelClass,
   type MigrationsCopy,
@@ -29,6 +31,13 @@ export interface StartMigrationDialogProps {
   open: boolean;
   copy: MigrationsCopy;
   isSubmitting: boolean;
+  /**
+   * The start command's own outcome. A rejected start leaves this dialog open,
+   * so the rejection has to be readable *here*: the page behind a modal is
+   * covered by the overlay and marked `aria-hidden` by Radix, which puts the
+   * overview's own notice out of reach of both eyes and screen readers.
+   */
+  mutation: MigrationMutationState;
   /**
    * Fleet roll-ups, used to name the blast radius of a real fleet run in the
    * confirmation. `null` when the projection is unreadable.
@@ -49,6 +58,7 @@ export function StartMigrationDialog({
   open,
   copy,
   isSubmitting,
+  mutation,
   fleet,
   defaultApplicationKey,
   defaultTenantId,
@@ -57,6 +67,7 @@ export function StartMigrationDialog({
   onStart,
 }: StartMigrationDialogProps) {
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const rejectionRef = useRef<HTMLDivElement | null>(null);
   const fieldId = useId();
   const [mode, setMode] = useState<MigrationRunMode>("DRY_RUN");
   const [scope, setScope] = useState<MigrationRunScope>(defaultScope);
@@ -70,6 +81,16 @@ export function StartMigrationDialog({
   const [failFast, setFailFast] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [confirming, setConfirming] = useState(false);
+
+  // A rejected start is the one moment the operator is about to retry blind, so
+  // the rejection takes focus instead of waiting to be found above the form.
+  // `mutation` is fresh state per command, so a second identical rejection
+  // (two 403s in a row) still re-announces itself.
+  const startRejected = isStartRejected(mutation);
+  useEffect(() => {
+    if (!open || !startRejected) return;
+    rejectionRef.current?.focus();
+  }, [mutation, open, startRejected]);
 
   if (!open) return null;
 
@@ -179,6 +200,16 @@ export function StartMigrationDialog({
           <DialogTitle>{copy.startTitle}</DialogTitle>
           <DialogDescription>{copy.startHelp}</DialogDescription>
         </DialogHeader>
+
+        {startRejected ? (
+          <div
+            ref={rejectionRef}
+            tabIndex={-1}
+            className="mt-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <MigrationMutationNotice mutation={mutation} copy={copy} />
+          </div>
+        ) : null}
 
         <form
           className="mt-5 space-y-5"
@@ -496,6 +527,19 @@ function ModeCard({
         </span>
       </span>
     </label>
+  );
+}
+
+/**
+ * A start that the server refused. `SUCCEEDED` closes the dialog from the
+ * consumer, so only the refusals belong in it.
+ */
+function isStartRejected(mutation: MigrationMutationState): boolean {
+  return (
+    mutation.name === "START" &&
+    mutation.phase !== "IDLE" &&
+    mutation.phase !== "PENDING" &&
+    mutation.phase !== "SUCCEEDED"
   );
 }
 

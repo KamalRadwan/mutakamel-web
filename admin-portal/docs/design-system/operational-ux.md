@@ -135,6 +135,12 @@ Transport-owned `403` handling must not be duplicated by a second UI toast.
 Correlation IDs and safe operation references remain copyable without exposing
 secrets or sensitive payloads.
 
+When a rejected command leaves its modal form open so the operator can retry,
+the rejection renders inside that modal and takes focus. A notice placed on the
+page behind an open modal is covered by the overlay and removed from the
+accessibility tree by the modal's `aria-hidden`, so it is unreadable at the one
+moment it is needed and the retry is made blind.
+
 ## Permission-aware interaction
 
 - Navigation and route visibility derive from the canonical permission-filtered

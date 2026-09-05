@@ -102,6 +102,7 @@ export function MigrationsOverviewScreen() {
           open
           copy={copy}
           isSubmitting={overview.mutation.phase === "PENDING"}
+          mutation={overview.mutation}
           fleet={overview.fleet}
           defaultApplicationKey={overview.applicationKey || undefined}
           defaultTenantId={startTenantId}
