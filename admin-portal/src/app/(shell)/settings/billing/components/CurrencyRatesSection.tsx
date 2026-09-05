@@ -19,6 +19,7 @@ import {
   type ColumnDef,
 } from "@/design-system";
 import type { CurrencyRateView } from "../hooks/useCurrencyRates";
+import { parseCurrencyRateLines } from "./parse-currency-rate-lines";
 
 function formatCurrencyRate(val: string): string {
   const [whole, fraction = ""] = val.split(".");
@@ -82,11 +83,7 @@ export function CurrencyRatesSection() {
     event.preventDefault();
     setBatchError(null);
     try {
-      const rates = batchText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
-        const [currencyCode, currencyUnitsPerUsd, active = "true"] = line.split(",").map((part) => part.trim());
-        if (!currencyCode || !currencyUnitsPerUsd) throw new Error(copy.validation.lineFormatInvalid);
-        return { currencyCode, currencyUnitsPerUsd, isActive: active.toLowerCase() !== "false" };
-      });
+      const rates = parseCurrencyRateLines(batchText, copy.validation);
       if (!rates.length) throw new Error(copy.validation.atLeastOneRate);
       if (await batchUpsertRates(rates)) {
         setIsBatchOpen(false);

@@ -3185,6 +3185,7 @@ export const en: Dictionary = {
           "Rate must be a positive decimal string with at most 12 whole and 12 fractional digits.",
         batchCodesUnique: "Batch currency codes must be unique.",
         lineFormatInvalid: "Each line must be CODE,RATE[,ACTIVE].",
+        activeFlagInvalid: "ACTIVE must be true or false.",
         atLeastOneRate: "Add at least one currency rate.",
         batchInvalid: "Batch rates are invalid.",
       },

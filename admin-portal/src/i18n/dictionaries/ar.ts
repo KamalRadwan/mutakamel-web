@@ -3070,6 +3070,7 @@ export const ar = {
           "يجب أن يكون السعر رقماً عشرياً موجباً بحد أقصى 12 رقماً صحيحاً و12 رقماً عشرياً.",
         batchCodesUnique: "يجب أن تكون رموز العملات في الدفعة فريدة.",
         lineFormatInvalid: "يجب أن يكون كل سطر بالصيغة CODE,RATE[,ACTIVE].",
+        activeFlagInvalid: "يجب أن تكون قيمة ACTIVE إما true أو false.",
         atLeastOneRate: "أضف سعر صرف واحداً على الأقل.",
         batchInvalid: "أسعار الدفعة غير صالحة.",
       },
