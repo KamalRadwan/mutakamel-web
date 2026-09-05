@@ -16,6 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system";
+import {
+  catalogueReach,
+  catalogueSearchQuery,
+  type CatalogueReach,
+} from "../catalogue-reach";
 import type { TenantAccessController } from "../use-tenant-access";
 import type { TenantAccessCopy, TenantAccessLocale } from "../copy";
 import type {
@@ -71,7 +76,28 @@ export function TenantUserEditorDialog({
   const branches = controller.branches.data?.items ?? [];
   const departments = controller.departments.data?.items ?? [];
   const teams = controller.teams.data?.items ?? [];
-  const roles = controller.roles.data?.items ?? [];
+  const roleItems = controller.roles.data?.items;
+  const roles = useMemo(() => roleItems ?? [], [roleItems]);
+  /**
+   * Every role on the loaded page, plus any already-checked role that is not on
+   * it. Searching narrows the catalogue, and a selection whose checkbox
+   * disappears is a grant the operator can neither see nor take back - so the
+   * selection is kept independently of which page happens to be loaded, the
+   * same way the placement selects keep the value already assigned.
+   */
+  // Recorded when the role is checked, which is the moment its name is on
+  // screen, so a role that falls out of the current search still shows the name
+  // it was checked under rather than a bare id.
+  const [checkedRoleNames, setCheckedRoleNames] = useState<
+    Record<string, string>
+  >({});
+  const rolesWithSelected = useMemo(() => {
+    const shown = new Set(roles.map((role) => role.id));
+    const missing = roleIds
+      .filter((id) => !shown.has(id))
+      .map((id) => ({ id, name: checkedRoleNames[id] ?? id }));
+    return [...roles, ...missing];
+  }, [checkedRoleNames, roleIds, roles]);
   const selectedBranch = branches.find((branch) => branch.id === branchId);
 
   useEffect(() => {
@@ -185,6 +211,9 @@ export function TenantUserEditorDialog({
             ...(user && !branches.some((row) => row.id === user.organization.branch.id) ? [[user.organization.branch.id, user.organization.branch.name ?? user.organization.branch.id] as const] : []),
             ...branches.map((branch) => [branch.id, `${branch.company.name} · ${branch.name}`] as const),
           ]}
+          reach={catalogueReach(controller.branches.data)}
+          searchLabel={copy.searchBranches}
+          onSearch={(term) => void controller.loadBranches(catalogueSearchQuery(term, 50))}
         />
         <DialogSelectField
           id="tenant-user-department"
@@ -203,8 +232,32 @@ export function TenantUserEditorDialog({
             ...(user && !departments.some((row) => row.id === user.organization.department.id) ? [[user.organization.department.id, user.organization.department.name ?? user.organization.department.id] as const] : []),
             ...departments.map((department) => [department.id, `${department.code} · ${department.name}`] as const),
           ]}
+          reach={catalogueReach(controller.departments.data)}
+          searchLabel={copy.searchDepartments}
+          onSearch={(term) =>
+            branchId
+              ? void controller.loadDepartments(
+                  catalogueSearchQuery(term, 100, { branchId }),
+                )
+              : undefined
+          }
         />
-        <DialogSelectField id="tenant-user-team" label={copy.team} disabled={!departmentId} value={teamId} onValueChange={setTeamId} options={[
+        <DialogSelectField
+          id="tenant-user-team"
+          label={copy.team}
+          disabled={!departmentId}
+          value={teamId}
+          onValueChange={setTeamId}
+          reach={catalogueReach(controller.teams.data)}
+          searchLabel={copy.searchTeams}
+          onSearch={(term) =>
+            departmentId
+              ? void controller.loadTeams(
+                  catalogueSearchQuery(term, 100, { departmentId }),
+                )
+              : undefined
+          }
+          options={[
           ...(user?.organization.team && !teams.some((row) => row.id === user.organization.team?.id) ? [[user.organization.team.id, user.organization.team.name ?? user.organization.team.id] as const] : []),
           ...teams.map((team) => [team.id, `${team.code} · ${team.name}`] as const),
         ]} />
@@ -215,15 +268,44 @@ export function TenantUserEditorDialog({
         {mode === "invite" && controller.permissions.canAssignRoles ? (
           <fieldset className="sm:col-span-2 rounded-lg border border-border p-3">
             <legend className="px-1 text-xs font-semibold text-muted-foreground">{copy.roles}</legend>
+            {/*
+              UI-019. The role catalogue loads one page of 50 with no way past
+              it, so on a tenant with more roles than that an administrator
+              could not grant the one they were looking for - and nothing said
+              so. A checked role that falls out of a later page keeps its own
+              checkbox below, so searching never silently drops a selection.
+            */}
+            <input
+              type="search"
+              aria-label={copy.searchRoles}
+              onChange={(event) =>
+                void controller.loadRoles(
+                  catalogueSearchQuery(event.target.value, 50),
+                )
+              }
+              className="mb-2 h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+            />
             <div className="flex flex-wrap gap-2">
-              {roles.map((role) => (
+              {rolesWithSelected.map((role) => (
                 <label key={role.id} htmlFor={`tenant-user-role-${role.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 py-1 text-xs">
                   <Checkbox
                     id={`tenant-user-role-${role.id}`}
                     name="roleIds"
                     value={role.id}
                     checked={roleIds.includes(role.id)}
-                    onCheckedChange={(checked) => setRoleIds((current) => checked === true ? [...current, role.id] : current.filter((id) => id !== role.id))}
+                    onCheckedChange={(checked) => {
+                      if (checked === true) {
+                        setCheckedRoleNames((current) => ({
+                          ...current,
+                          [role.id]: role.name,
+                        }));
+                      }
+                      setRoleIds((current) =>
+                        checked === true
+                          ? [...current, role.id]
+                          : current.filter((id) => id !== role.id),
+                      );
+                    }}
                   />
                   {role.name}
                 </label>
@@ -560,6 +642,9 @@ function DialogSelectField({
   required,
   error,
   wide = false,
+  onSearch,
+  reach,
+  searchLabel,
 }: {
   id: string;
   label: string;
@@ -570,6 +655,10 @@ function DialogSelectField({
   required?: boolean;
   error?: string;
   wide?: boolean;
+  /** Re-queries the catalogue. Given only where the list can outgrow a page. */
+  onSearch?: (term: string) => void;
+  reach?: CatalogueReach;
+  searchLabel?: string;
 }) {
   const labelId = `${id}-label`;
   const errorId = error ? `${id}-error` : undefined;
@@ -579,6 +668,16 @@ function DialogSelectField({
         {label}
         {required ? <span className="ms-0.5 text-destructive" aria-hidden="true">*</span> : null}
       </span>
+      {onSearch ? (
+        <input
+          type="search"
+          id={`${id}-search`}
+          aria-label={searchLabel ?? label}
+          disabled={disabled}
+          onChange={(event) => onSearch(event.target.value)}
+          className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+        />
+      ) : null}
       <Select
         name={id}
         value={value || EMPTY_SELECT_VALUE}
@@ -601,6 +700,11 @@ function DialogSelectField({
           ))}
         </SelectContent>
       </Select>
+      {reach?.truncated ? (
+        <p className="text-xs text-muted-foreground">
+          {reach.shown} / {reach.total}
+        </p>
+      ) : null}
       {error ? <p id={errorId} role="alert" className="text-xs text-destructive-subtle-foreground">{error}</p> : null}
     </div>
   );

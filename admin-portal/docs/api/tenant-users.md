@@ -195,6 +195,30 @@ interface AccessCatalogueQuery {
 }
 ```
 
+### The selectors must be able to reach past one page
+
+The editor loads one page — roles and branches at 50, departments and teams at
+100 — and `q` is how anything beyond it is reached. Each selector renders a
+search box wired to that parameter, and shows `shown / total` whenever the page
+is a subset, so the list says it is not the whole catalogue before the reader
+has to guess.
+
+Until this was wired the parameter existed, the API layer serialised it, and the
+UI never sent it: past those counts an administrator simply could not choose the
+role or branch they were looking for, with nothing on screen to say why.
+
+Two rules the search keeps:
+
+- **A search is a new question.** It always asks for page 1; carrying the
+  previous page number in would skip the first matches. An empty box drops `q`
+  rather than sending an empty string, so clearing it returns the plain first
+  page instead of asking the server to match nothing.
+- **A selection survives its page.** The placement selects already kept the
+  value currently assigned as a fallback option; the role list now does the same
+  for anything checked, under the name it was checked with. A selection whose
+  checkbox disappears behind a search is a grant the operator can neither see
+  nor take back.
+
 ### Roles
 
 `GET /api/admin/core/v1/tenants/:id/access/roles`
