@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { INTL_LOCALE } from "@/lib/format/locale";
 import {
   OTHER_JOB_TITLE_KEY,
   findHonorific,
@@ -42,12 +41,21 @@ describe("job titles", () => {
     expect(options[options.length - 1].key).toBe(OTHER_JOB_TITLE_KEY);
   });
 
-  it("sorts by the reader's own language rather than by key", () => {
+  it("keeps the ladder it is written in rather than re-sorting it A-Z", () => {
+    // The rank order is the whole point of the list; alphabetical put the CEO
+    // three rows below the chairman for a reason no reader can see.
     for (const lang of ["ar", "en"] as const) {
-      const labels = getJobTitleOptions(lang)
-        .filter((option) => option.key !== OTHER_JOB_TITLE_KEY)
-        .map((option) => option.label);
-      expect([...labels].sort((a, b) => a.localeCompare(b, INTL_LOCALE[lang]))).toEqual(labels);
+      const keys = getJobTitleOptions(lang).map((option) => option.key);
+      expect(keys.slice(0, 5)).toEqual([
+        "CHAIRMAN",
+        "VICE_CHAIRMAN",
+        "BOARD_MEMBER",
+        "MANAGING_DIRECTOR",
+        "CEO",
+      ]);
+      // A director outranks the manager under them, in both dictionaries.
+      expect(keys.indexOf("SALES_DIRECTOR")).toBeLessThan(keys.indexOf("SALES_MANAGER"));
+      expect(keys.indexOf("SALES_MANAGER")).toBeLessThan(keys.indexOf("SALES_REPRESENTATIVE"));
     }
   });
 

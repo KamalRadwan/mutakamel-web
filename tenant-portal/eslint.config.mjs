@@ -5,6 +5,20 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // `const { dropped: _drop, ...rest } = value` is how a key is omitted, and the
+  // omitted binding is the point of the expression rather than a leftover.
+  // `ignoreRestSiblings` exists for exactly that shape and nothing else, so it
+  // is preferred over an `^_` name pattern, which would also excuse a genuinely
+  // dead variable that happens to be named with a leading underscore.
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { ignoreRestSiblings: true },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

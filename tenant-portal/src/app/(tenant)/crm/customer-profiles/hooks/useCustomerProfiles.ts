@@ -14,12 +14,21 @@ import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
   EMPTY_CUSTOMER_PROFILE_SEARCH,
+  buildCustomerProfileSearchRequest,
   buildCustomerProfilesListQuery,
   type CustomerProfileSearchState,
   type CustomerProfileSortBy,
 } from "../customer-profile-search-contract";
 
 export const CUSTOMER_PROFILES_PATH = "/api/tenant/crm/v1/customer-profiles";
+/**
+ * Advanced mode's address. A POST that READS: the filter tree does not fit in
+ * a query string, and the route answers the same envelope the list route does.
+ *
+ * Not exported — nothing outside this module addresses it, and `knip` is right
+ * that an export is a claim something else needs the value.
+ */
+const CUSTOMER_PROFILES_SEARCH_PATH = CUSTOMER_PROFILES_PATH + "/search";
 export const CUSTOMER_PROFILES_PAGE_SIZE = 25;
 
 export const CUSTOMER_PROFILE_TYPES = ["INDIVIDUAL", "CORPORATE"] as const;
@@ -306,13 +315,15 @@ export function useCustomerProfiles() {
   const { lang, t } = useI18n();
   const { user, isLoading: isAuthLoading } = useTenantAuth();
   const [result, setResult] = useState<CustomerProfilesPage | null>(null);
-  // Conditions of `[field] [value]`, AND-ed — the whole of what this screen
-  // may ask the list endpoint, one of them in basic mode and up to one per
-  // field in advanced. `customer-profile-search-contract` owns which wire key
-  // each field becomes, and refuses to name two rows the same one.
+  // The DRAFT question, as the bar and the card hold it: basic's one condition,
+  // or advanced's filter tree. `customer-profile-search-contract` owns which
+  // wire key or column each field becomes.
   const [search, setSearch] = useState<CustomerProfileSearchState>(
     EMPTY_CUSTOMER_PROFILE_SEARCH,
   );
+  // The APPLIED question — the one the list on screen answers. Basic keeps the
+  // two in step through the debounce below; advanced only ever copies across on
+  // an explicit submit, so a half-built tree never reaches the wire.
   const [serverSearch, setServerSearch] = useState<CustomerProfileSearchState>(
     EMPTY_CUSTOMER_PROFILE_SEARCH,
   );
@@ -335,15 +346,33 @@ export function useCustomerProfiles() {
   // bar replaced carried a 300ms debounce of its own, so a keystroke waited
   // 600ms and two timers had to be reasoned about to explain one request.
   //
-  // Any change to the filter — a field, a value, a condition added or removed,
-  // a mode switch, or a reset — also starts the result set over: page 4 of a
-  // name search is not page 4 of a status filter.
+  // It applies BASIC mode only. A filter tree is built one control at a time
+  // and every intermediate state is a different question — a debounce would
+  // fire a request for each of them, and the half-built ones are usually the
+  // expensive ones. The one advanced state it does apply is the mode SWITCH
+  // itself: until the applied question is advanced too, the list on screen is
+  // still answering a basic filter the user can no longer see, so the switch
+  // has to take effect once on its own.
+  //
+  // Applying also starts the result set over: page 4 of a name search is not
+  // page 4 of a status filter.
   useEffect(() => {
+    if (search.mode === "advanced" && serverSearch.mode === "advanced") return;
     const timeoutId = window.setTimeout(() => {
       setPage(1);
       setServerSearch(search);
     }, 300);
     return () => window.clearTimeout(timeoutId);
+  }, [search, serverSearch.mode]);
+
+  /** Advanced mode's only route to the wire: the card's Search button. */
+  const submitSearch = useCallback(() => {
+    setPage(1);
+    setServerSearch(search);
+    // Bumped as well, so pressing Search on a question that has not changed
+    // still re-reads. A button that promises a search and does nothing reads
+    // as a broken control, not as an already-answered one.
+    setReloadToken((current) => current + 1);
   }, [search]);
 
   const load = useCallback(
@@ -365,20 +394,46 @@ export function useCustomerProfiles() {
       }
 
       try {
-        const response = await axiosClient.get<unknown>(
-          buildCustomerProfilesListPath({
-            branchId,
-            page,
-            search: serverSearch,
-            sortBy: sortRef.current.id,
-            sortDir: sortRef.current.direction === "asc" ? "ASC" : "DESC",
-          }),
-          {
-            signal,
-            cache: "no-store",
-            maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
-          },
-        );
+        const sortBy = sortRef.current.id;
+        const sortDir = sortRef.current.direction === "asc" ? "ASC" : "DESC";
+        // Two endpoints, ONE parser: the search route answers the list route's
+        // envelope byte for byte, so nothing downstream of here knows which of
+        // them replied.
+        const response =
+          serverSearch.mode === "advanced"
+            ? await axiosClient.post<unknown>(
+                CUSTOMER_PROFILES_SEARCH_PATH,
+                buildCustomerProfileSearchRequest(serverSearch, {
+                  branchId,
+                  page,
+                  limit: CUSTOMER_PROFILES_PAGE_SIZE,
+                  sortBy,
+                  sortDir,
+                }),
+                {
+                  signal,
+                  cache: "no-store",
+                  maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+                  // A POST that reads. An idempotency key would file a replay
+                  // record for a query, and the client would then refuse to
+                  // repeat a search the user is entitled to repeat.
+                  skipAutoIdempotency: true,
+                },
+              )
+            : await axiosClient.get<unknown>(
+                buildCustomerProfilesListPath({
+                  branchId,
+                  page,
+                  search: serverSearch,
+                  sortBy,
+                  sortDir,
+                }),
+                {
+                  signal,
+                  cache: "no-store",
+                  maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+                },
+              );
         const parsed = parseCustomerProfilesPageResponse(
           response.data,
           branchId,
@@ -395,7 +450,11 @@ export function useCustomerProfiles() {
         if (!signal.aborted) setIsLoading(false);
       }
     },
-    [branchId, page, serverSearch, sort, t, userId],
+    // `sort` is deliberately absent: the fetch reads `sortRef.current`, never
+    // the state, so listing it here declared a read that does not happen. It
+    // moves to the effect below, where it is what it actually is -- a re-run
+    // trigger.
+    [branchId, page, serverSearch, t, userId],
   );
 
   useEffect(() => {
@@ -405,7 +464,7 @@ export function useCustomerProfiles() {
       if (!controller.signal.aborted) void load(controller.signal);
     });
     return () => controller.abort();
-  }, [isAuthLoading, load, reloadToken]);
+  }, [isAuthLoading, load, reloadToken, sort]);
 
   const previousPage = useCallback(() => {
     if (result?.hasPrev) setPage((current) => Math.max(1, current - 1));
@@ -448,6 +507,7 @@ export function useCustomerProfiles() {
     pagination: result,
     search,
     setSearch,
+    submitSearch,
     isLoading: isAuthLoading || isLoading,
     precondition,
     loadError,

@@ -262,7 +262,7 @@ export function useCrmStaticCatalogue() {
           value.toLocaleLowerCase().includes(query),
         ),
     );
-  }, [catalogue, lang, searchQuery]);
+  }, [catalogue, lang, searchQuery, t.crmStaticCatalogue.untranslatedLabel]);
 
   return {
     t,

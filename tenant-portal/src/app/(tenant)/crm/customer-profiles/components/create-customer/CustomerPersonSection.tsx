@@ -1,6 +1,6 @@
 "use client";
 
-import { Field, FormSection, Input } from "@/design-system";
+import { FormSection } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { CrmContactLine } from "../../../shared/components/CrmContactLine";
 import type { CrmFormErrors } from "../../../shared/hooks/useCrmCreateForm";
@@ -27,9 +27,10 @@ export interface CustomerPersonSectionProps {
  *
  * Every value here travels inside `primaryContact`, because `CreateCustomerProfileDto`
  * has no top-level `email` or `phones` — the service reads them off that object
- * and writes them onto the PERSON party. `fullName` is not asked for twice: the
- * DTO requires it and the service then ignores it in favour of `displayName`,
- * so the builder sends the display name for both.
+ * and writes them onto the PERSON party. Neither `fullName` nor `displayName`
+ * is asked for: both are `@IsOptional()` now, and `resolvePersonName` composes
+ * them from the honorific and the two name parts below — the same parts it
+ * writes onto the party, so the list and the Directory cannot disagree.
  */
 export function CustomerPersonSection({
   form,
@@ -48,7 +49,8 @@ export function CustomerPersonSection({
   // than the line growing a second addressing mode.
   const personErrors = {
     "person.honorificTitle": errors.honorificTitle,
-    "person.fullName": errors.firstName,
+    "person.firstName": errors.firstName,
+    "person.lastName": errors.lastName,
     "person.email": errors.email,
     "person.phones.0": errors["phones.0"],
     "person.phones.1": errors["phones.1"],
@@ -64,7 +66,9 @@ export function CustomerPersonSection({
         path="person"
         contact={{
           honorificTitle: form.honorificTitle,
-          fullName: form.firstName,
+          fullName: "",
+          firstName: form.firstName,
+          lastName: form.lastName,
           jobTitle: "",
           email: form.email,
           phones: form.phones,
@@ -72,17 +76,18 @@ export function CustomerPersonSection({
         errors={personErrors}
         disabled={disabled}
         limits={{
-          fullName: limits.firstName,
+          name: limits.firstName,
           jobTitle: limits.jobTitle,
           email: limits.email,
         }}
-        nameLabel={t.crmLeads.create.firstName}
+        directoryNameLabel={t.crmLeads.contactName}
         showJobTitle={false}
         onFieldChange={(patch) => {
           if (patch.honorificTitle !== undefined) {
             onFieldChange("honorificTitle", patch.honorificTitle);
           }
-          if (patch.fullName !== undefined) onFieldChange("firstName", patch.fullName);
+          if (patch.firstName !== undefined) onFieldChange("firstName", patch.firstName);
+          if (patch.lastName !== undefined) onFieldChange("lastName", patch.lastName);
           if (patch.email !== undefined) onFieldChange("email", patch.email);
         }}
         onPhoneChange={onPhoneChange}
@@ -90,20 +95,6 @@ export function CustomerPersonSection({
         onPhoneRemove={onPhoneRemove}
         onBlur={onBlur}
       />
-
-      {/* The display name lives in Classification for a customer, so the family
-          name is the one name box that has nowhere in the line to go. */}
-      <div className="grid grid-cols-1 gap-x-3 gap-y-3 xl:grid-cols-[minmax(0,15rem)]">
-        <Field label={t.crmLeads.create.lastName} error={errors.lastName}>
-          <Input
-            value={form.lastName}
-            maxLength={limits.lastName}
-            disabled={disabled}
-            onChange={(event) => onFieldChange("lastName", event.target.value)}
-            onBlur={() => onBlur("lastName")}
-          />
-        </Field>
-      </div>
     </FormSection>
   );
 }

@@ -4,9 +4,7 @@ import {
   AmbiguousOutcomePanel,
   ConfirmActionModal,
   EditDrawer,
-  Field,
   FormModal,
-  Input,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
@@ -131,7 +129,7 @@ export function CustomerProfileActionDialogs({
         isSubmitting={actions.busy === "contact"}
         submitDisabled={
           !actions.contactForm ||
-          actions.contactForm.fullName.trim().length === 0
+          actions.contactForm.firstName.trim().length === 0
         }
         onSubmit={() => void actions.submitContact()}
         error={errorText}
@@ -158,19 +156,25 @@ export function CustomerProfileActionDialogs({
               path="contact"
               contact={{
               honorificTitle: actions.contactForm?.honorificTitle ?? "",
-              fullName: actions.contactForm?.fullName ?? "",
+              fullName: "",
+              firstName: actions.contactForm?.firstName ?? "",
+              lastName: actions.contactForm?.lastName ?? "",
               jobTitle: actions.contactForm?.jobTitle ?? "",
               email: actions.contactForm?.email ?? "",
               phones: [actions.contactForm?.phone ?? ""],
             }}
               errors={{}}
-              // `CustomerProfileContactPersonDto`: fullName and email 180,
-              // jobTitle 120.
-              limits={{ fullName: 180, jobTitle: 120, email: 180 }}
-              nameLabel={t.crmLeadConvert.contactFullName}
+              // `CustomerProfileContactPersonDto`: firstName and lastName 80,
+              // email 180, jobTitle 120.
+              limits={{ name: 80, jobTitle: 120, email: 180 }}
+              directoryNameLabel={t.crmLeads.contactName}
               onFieldChange={(patch) => {
+              // `fullName` is in the line's patch shape but never in this
+              // form's — the box that would set it is only rendered for a
+              // directory person, which this dialog never is.
               for (const [key, next] of Object.entries(patch)) {
-                actions.setContactField(key as "fullName", next);
+                if (key === "fullName") continue;
+                actions.setContactField(key as "firstName", next);
               }
             }}
             // One number here, not a list: `CustomerContactForm` holds a single

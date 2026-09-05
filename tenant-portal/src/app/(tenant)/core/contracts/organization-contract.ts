@@ -39,9 +39,14 @@ const LEVEL_PATH: Record<OrgLevel, CorePath> = {
 export const ORG_NODE_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 export type OrgNodeStatus = (typeof ORG_NODE_STATUSES)[number];
 
-/** The four strictly-nested levels the Core organization controller exposes. */
-const ORG_LEVELS = ["companies", "branches", "departments", "teams"] as const;
-export type OrgLevel = (typeof ORG_LEVELS)[number];
+/**
+ * The four strictly-nested levels the Core organization controller exposes.
+ *
+ * Written as a union rather than `(typeof ARRAY)[number]`: nothing iterates the
+ * array, so it was runtime data allocated at module load purely to derive a
+ * type that says the same thing.
+ */
+export type OrgLevel = "companies" | "branches" | "departments" | "teams";
 
 export const ORG_CODE_MAX_LENGTH = 32;
 export const ORG_NAME_MAX_LENGTH = 120;

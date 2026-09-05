@@ -35,12 +35,12 @@ export const CRM_WORK_SOURCE_TYPES = [
 export type CrmWorkSourceType = (typeof CRM_WORK_SOURCE_TYPES)[number];
 
 /** A reminder targets a task or a calendar event, not a CRM record. */
-const CRM_REMINDER_TARGET_TYPES = ["TASK", "CALENDAR_EVENT"] as const;
+type CrmReminderTargetType = "TASK" | "CALENDAR_EVENT";
 
 /** Every list this picker can read. */
 export type CrmPickerResource =
   | CrmWorkSourceType
-  | (typeof CRM_REMINDER_TARGET_TYPES)[number];
+  | CrmReminderTargetType;
 
 export interface CrmRecordOption {
   value: string;

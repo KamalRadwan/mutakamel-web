@@ -150,7 +150,12 @@ export function useLeadEdit(
     };
 
     await send();
-  }, [baseline, closeDrawer, form, isSubmitting, lead, onSaved]);
+    // `onReconcile` is called on the applied_unreadable path and belongs here.
+    // Omitted, this callback kept the first one the parent ever passed, so a
+    // reconcile after a write that DID apply ran against a stale closure -- on
+    // the one path where the screen has no other way to learn what the server
+    // now holds.
+  }, [baseline, closeDrawer, form, isSubmitting, lead, onReconcile, onSaved]);
 
   return {
     open,

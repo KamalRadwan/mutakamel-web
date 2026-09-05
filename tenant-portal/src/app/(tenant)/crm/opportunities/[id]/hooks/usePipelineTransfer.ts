@@ -141,7 +141,10 @@ export function usePipelineTransfer(
     };
 
     await send();
-  }, [isSubmitting, item, onTransferred, pipelineId, reason, stageId]);
+    // `onReconcile` is called on the applied_unreadable path and belongs here,
+    // for the same reason it does in useLeadEdit: without it the callback keeps
+    // the first one the parent passed and reconciles against a stale closure.
+  }, [isSubmitting, item, onReconcile, onTransferred, pipelineId, reason, stageId]);
 
   return {
     open,

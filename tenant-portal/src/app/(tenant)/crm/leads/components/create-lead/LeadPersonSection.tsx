@@ -1,12 +1,12 @@
 "use client";
 
-import { Field, FormSection, Input } from "@/design-system";
+import { FormSection } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { LEAD_CREATE_LIMITS, type CreateLeadForm } from "../../lead-create-contract";
 import type { LeadCreateErrors } from "../../lead-create-validation";
 import { CrmContactLine } from "../../../shared/components/CrmContactLine";
 
-type PersonField = "displayName" | "honorificTitle" | "firstName" | "lastName" | "email";
+type PersonField = "honorificTitle" | "firstName" | "lastName" | "email";
 
 export interface LeadPersonSectionProps {
   form: CreateLeadForm;
@@ -44,7 +44,8 @@ export function LeadPersonSection({
   // than the line growing a second addressing mode.
   const personErrors = {
     "person.honorificTitle": errors.honorificTitle,
-    "person.fullName": errors.displayName,
+    "person.firstName": errors.firstName,
+    "person.lastName": errors.lastName,
     "person.email": errors.email,
     "person.phones.0": errors["phones.0"],
     "person.phones.1": errors["phones.1"],
@@ -60,7 +61,9 @@ export function LeadPersonSection({
         path="person"
         contact={{
           honorificTitle: form.honorificTitle,
-          fullName: form.displayName,
+          fullName: "",
+          firstName: form.firstName,
+          lastName: form.lastName,
           jobTitle: "",
           email: form.email,
           phones: form.phones,
@@ -68,17 +71,18 @@ export function LeadPersonSection({
         errors={personErrors}
         disabled={disabled}
         limits={{
-          fullName: LEAD_CREATE_LIMITS.displayName,
+          name: LEAD_CREATE_LIMITS.firstName,
           jobTitle: LEAD_CREATE_LIMITS.jobTitle,
           email: LEAD_CREATE_LIMITS.email,
         }}
-        nameLabel={t.crmLeads.create.displayName}
+        directoryNameLabel={t.crmLeads.contactName}
         showJobTitle={false}
         onFieldChange={(patch) => {
           if (patch.honorificTitle !== undefined) {
             onFieldChange("honorificTitle", patch.honorificTitle);
           }
-          if (patch.fullName !== undefined) onFieldChange("displayName", patch.fullName);
+          if (patch.firstName !== undefined) onFieldChange("firstName", patch.firstName);
+          if (patch.lastName !== undefined) onFieldChange("lastName", patch.lastName);
           if (patch.email !== undefined) onFieldChange("email", patch.email);
         }}
         onPhoneChange={onPhoneChange}
@@ -87,30 +91,6 @@ export function LeadPersonSection({
         onBlur={onBlur}
       />
 
-      {/* The two parts of the name the DTO also accepts. They sit under the
-          line rather than in it: they refine the display name rather than
-          standing beside it, and five boxes is already the line's budget. */}
-      <div className="grid grid-cols-1 gap-x-3 gap-y-3 md:grid-cols-2 xl:grid-cols-[minmax(0,15rem)_minmax(0,15rem)]">
-        <Field label={t.crmLeads.create.firstName} error={errors.firstName}>
-          <Input
-            value={form.firstName}
-            maxLength={LEAD_CREATE_LIMITS.firstName}
-            disabled={disabled}
-            onChange={(event) => onFieldChange("firstName", event.target.value)}
-            onBlur={() => onBlur("firstName")}
-          />
-        </Field>
-
-        <Field label={t.crmLeads.create.lastName} error={errors.lastName}>
-          <Input
-            value={form.lastName}
-            maxLength={LEAD_CREATE_LIMITS.lastName}
-            disabled={disabled}
-            onChange={(event) => onFieldChange("lastName", event.target.value)}
-            onBlur={() => onBlur("lastName")}
-          />
-        </Field>
-      </div>
     </FormSection>
   );
 }

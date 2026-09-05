@@ -21,7 +21,6 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import {
   RETRY_REASON_MAX_LENGTH,
-  isPendingDelivery,
   type OutboundEmailStatus,
 } from "../outbound-email-contract";
 import { useOutboundEmailDetail } from "../hooks/useOutboundEmailDetail";

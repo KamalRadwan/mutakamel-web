@@ -1,5 +1,4 @@
 import type { Language } from "@/i18n/useLanguage";
-import { INTL_LOCALE } from "@/lib/format/locale";
 
 /**
  * The two closed lists a contact's name is dressed in: an honorific, and a job
@@ -173,13 +172,25 @@ export function getHonorificOptions(lang: Language): TitleOption[] {
 }
 
 /** Sorted by the reader's own language, with `OTHER` pinned last where it belongs. */
+/**
+ * The catalogue in its declared order: chairman and the board first, then the
+ * C-suite, then general management, then each function from its director down
+ * to its most junior role — and `OTHER` last.
+ *
+ * Deliberately NOT alphabetical, which is what this used to do. A–Z scatters a
+ * ladder that is already in the right order: "Chief executive officer" landed
+ * under C between "Chairman" and "Chief financial officer" while "Sales
+ * representative" sat above "Sales supervisor", so finding the rank you meant
+ * took reading the whole list. Someone filling a contact's title thinks in
+ * seniority, and the array is written in seniority; the search box is what
+ * serves a reader who already knows the word.
+ */
 export function getJobTitleOptions(lang: Language): TitleOption[] {
   const [other] = JOB_TITLES.filter((entry) => entry.key === OTHER_JOB_TITLE_KEY);
   const titles = localize(
     JOB_TITLES.filter((entry) => entry.key !== OTHER_JOB_TITLE_KEY),
     lang,
   );
-  titles.sort((left, right) => left.label.localeCompare(right.label, INTL_LOCALE[lang]));
   return [...titles, ...localize([other], lang)];
 }
 

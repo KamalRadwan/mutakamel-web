@@ -17,7 +17,10 @@ import {
 export function useTenantRoles() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
-  const permissions = user?.permissions ?? [];
+  // Memoised, not inlined: `?? []` mints a fresh array on every render whenever
+  // the user has no permissions yet, and the view memo below depends on it --
+  // so the memo recomputed on every render and bought nothing.
+  const permissions = useMemo(() => user?.permissions ?? [], [user?.permissions]);
 
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
