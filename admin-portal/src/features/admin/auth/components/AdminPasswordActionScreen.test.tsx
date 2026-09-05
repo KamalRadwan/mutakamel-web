@@ -116,6 +116,43 @@ describe("public admin password actions", () => {
     expect(auth.resetPassword).not.toHaveBeenCalled();
   });
 
+  // Next's App Router turns Strict Mode on by default, so in development every
+  // effect setup runs, is torn down, and runs again. The hash is a one-shot
+  // source: the first setup strips it, so a second read finds nothing. A real
+  // invitation or reset link must survive that replay.
+  it.each([
+    ["acceptInvite", "/admin/accept-invite", "Accept invitation and sign in", "abcdefghijklmnop"],
+    ["resetPassword", "/admin/reset-password", "Set new password", "qrstuvwxyzabcdef"],
+  ] as const)(
+    "keeps the %s token through a Strict Mode effect replay",
+    async (mode, path, submitLabel, token) => {
+      window.history.replaceState({}, "", `${path}#token=${token}`);
+      render(<AdminPasswordActionScreen mode={mode} />, {
+        reactStrictMode: true,
+      });
+
+      const password = await screen.findByLabelText("New password");
+      expect(
+        screen.queryByRole("heading", { name: "This link is incomplete" }),
+      ).not.toBeInTheDocument();
+      expect(window.location.hash).toBe("");
+
+      fireEvent.change(password, { target: { value: "StrongPassword1!" } });
+      fireEvent.change(screen.getByLabelText("Confirm new password"), {
+        target: { value: "StrongPassword1!" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+
+      const action = mode === "acceptInvite" ? auth.acceptInvite : auth.resetPassword;
+      await waitFor(() =>
+        expect(action).toHaveBeenCalledWith({
+          token,
+          newPassword: "StrongPassword1!",
+        }),
+      );
+    },
+  );
+
   it("announces localized password-rule outcomes independently of color and icons", async () => {
     i18n.lang = "ar";
     window.history.replaceState(

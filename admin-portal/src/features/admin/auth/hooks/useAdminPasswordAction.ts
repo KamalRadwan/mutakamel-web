@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getAuthErrorCode, getAuthErrorStatus } from "@/lib/auth/sessionRefresh";
 import {
@@ -28,8 +28,18 @@ export function useAdminPasswordAction(mode: AdminPasswordActionMode) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<AdminPasswordActionError | null>(null);
 
+  // The fragment is a one-shot source: the setup below strips it so the token
+  // never reaches a copied URL or the browser's history. Strict Mode replays
+  // effects in development, and a replay would read the hash this instance had
+  // already spent and conclude the link carried no token. Reading through this
+  // ref makes the consumption idempotent — every replay sees the value the
+  // first setup captured, not the emptied address bar.
+  const capturedTokenRef = useRef<{ value: string | null } | null>(null);
+
   useEffect(() => {
-    const actionToken = readAdminActionTokenFromHash(window.location.hash);
+    const captured = (capturedTokenRef.current ??= {
+      value: readAdminActionTokenFromHash(window.location.hash),
+    });
     let cancelled = false;
 
     // Keep one-time credentials out of copied URLs, screenshots, and later
@@ -44,7 +54,7 @@ export function useAdminPasswordAction(mode: AdminPasswordActionMode) {
 
     queueMicrotask(() => {
       if (cancelled) return;
-      setToken(actionToken);
+      setToken(captured.value);
       setIsTokenReady(true);
     });
     return () => {

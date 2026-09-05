@@ -218,6 +218,17 @@ history, applies the exact Core password policy, and calls this endpoint
 through the shared auth-mutation lock without automatic replay or an
 idempotency key.
 
+**Reading the fragment is idempotent per component instance.** The fragment is
+a one-shot source, and the read that captures the token is also what strips it,
+so a second read of the same address bar finds nothing. React replays effect
+setup and cleanup under Strict Mode — which the App Router enables by default
+in development — so the captured value is held in a ref that every replay
+reuses instead of re-reading `window.location.hash`. Without that, the replayed
+setup observes the emptied fragment and a valid invitation or reset link
+renders as `missingTokenTitle` ("This link is incomplete") before any password
+is typed. The same hook serves `/admin/reset-password`, so both routes share
+this behaviour.
+
 ## POST `/api/admin/core/v1/auth/forgot-password`
 
 Public. Rate limit: 5 requests per 60 seconds. Returns HTTP `204` with no body.
