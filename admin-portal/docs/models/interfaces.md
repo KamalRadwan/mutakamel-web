@@ -791,10 +791,50 @@ interface WebphoneConfig {
   sipUsername: string | null;
   displayName: string | null;
   outboundCallerId: string | null;
-  transport: 'ws' | 'wss';
   passwordConfigured: boolean;
 }
 ```
+
+There is no `transport`. Protocol is the `ws://` / `wss://` scheme of a server's
+`websocketUrl`, so it belongs to the server rather than to the person holding the
+extension — a second field for the same fact is how the two come to disagree.
+
+### `WebphoneServer`
+```typescript
+interface WebphoneServer {
+  id: string;
+  name: string;
+  priority: number;          // lower is tried first; contiguous from 1
+  sipDomain: string;
+  websocketUrl: string;      // its scheme IS the protocol
+  realm: string | null;
+  outboundProxy: string | null;
+  fromDomain: string | null;
+  registrarServer: string | null;
+  contactUri: string | null;
+  registerExpires: number;
+  defaultCallerId: string | null;
+  iceTransportPolicy: 'all' | 'relay';
+  traceSip: boolean;
+  sessionTimers: boolean;
+  allowInvalidTlsCertificate: boolean;
+  timeoutSeconds: number;    // resolved: chain override → server default → 10
+  maxRetries: number;        // resolved: chain override → server default → 2
+  iceServers: Array<{
+    kind: string;
+    urls: string[];
+    username?: string;
+    credential?: string;
+  }>;
+}
+```
+
+A scope holds an ordered list of these, and `GET /me` returns the caller's own
+chain across it as `servers[]` rather than one scope-wide config. Every field
+above is a property of a single server and a chain routinely disagrees on all of
+them, which is why failover rebuilds the whole JsSIP UA instead of swapping a
+socket. ICE is nested per server because a relay is only reachable inside the
+network its server lives in.
 
 ---
 

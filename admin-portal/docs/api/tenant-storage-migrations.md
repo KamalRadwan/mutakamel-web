@@ -4,6 +4,14 @@ Status: **REMOVED / NOT A CURRENT CORE ADMIN CONTRACT**
 
 Last source verification: **2026-08-12**.
 
+> **Superseded.** The implemented contract is
+> [Tenant placement moves](tenant-placement-moves.md): one fenced
+> `POST /tenants/:tenantId/storage-migrations`, its
+> `GET /storage-migrations/:id` status read, and the
+> `GET /tenants/:tenantId/storage-migration-preflight` route that finally
+> exposes the placement revision the command is fenced on. That flow is live at
+> `/tenants/[id]/move-storage`.
+>
 > Current-source correction: the eight Core Admin/Gateway routes and the cited
 > Core controller, service, DTO, and contract files in this historical design
 > are absent from the current backend source. They are not part of the
@@ -16,11 +24,12 @@ This document defines the Admin Portal contract for moving an existing tenant
 between Storage Servers. It is separate from tenant profile editing and from
 Storage Server registry administration.
 
-The backend migration authority and eight Gateway routes described by the old
-design do **not** exist in current source. The feature is therefore unavailable,
-not merely default-off.
-Do not expose a tenant “Change storage” action until the release and read-model
-gates in this document are closed.
+The backend migration authority and eight Gateway routes described by *this old
+design* do **not** exist in current source. The capability itself does exist,
+through the different, narrower contract documented in
+[Tenant placement moves](tenant-placement-moves.md); the read-model gate that
+kept it unreachable — no admin route exposing `storage_placement_revision` — was
+closed by the storage migration preflight route.
 
 ## Non-negotiable boundary
 

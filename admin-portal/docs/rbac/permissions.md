@@ -32,9 +32,9 @@ authoritative for its exact route permissions.
 
 ### 2. Admin Staff Users (`admin.users.*`)
 - **Guard**: `AdminGuard`
-- `admin.users.read` — List users, view profile, view webphone config
+- `admin.users.read` — List users, view profile
 - `admin.users.invite` — Invite new admin staff
-- `admin.users.update` — Update admin staff details, update webphone settings
+- `admin.users.update` — Update admin staff details
 - `admin.users.suspend` — Suspend or reactivate admin staff
 - `admin.users.delete` — Soft delete admin staff
 - `admin.users.assign_roles` — Replace assigned roles for an admin user
@@ -85,11 +85,25 @@ authoritative for its exact route permissions.
 - `admin.tenant_users.invite` — Invite tenant user, resend invite
 - `admin.tenant_users.update` — Update tenant user profile
 - `admin.tenant_users.reset_password` — Trigger password reset or force change password
-- `admin.tenant_users.manage_webphone` — Update tenant user WebPhone settings
 - `admin.tenant_users.suspend` — Suspend or activate tenant user
 - `admin.tenant_users.assign_roles` — Assign tenant roles to user
 - `admin.tenant_users.delete` — Soft delete tenant user
 - `admin.tenant_users.restore` — Restore deleted tenant user
+- `admin.tenant_users.transfer_ownership` — Move the tenant-owner seat to another active tenant user
+- `admin.tenant_users.critical` — Paired with every write above; the Gateway requires both
+
+**Owner protection is per action, not blanket.** The tenant owner can be
+suspended, activated, sent a reset link, and given a new password — those are
+the only routes to an owner who cannot get in, and refusing them was why an
+invited owner was unreachable from the portal. What the owner is still exempt
+from is identity edits, role changes, and deletion; `transfer_ownership` is the
+way past those. Enforced in `admin-tenant-users.service.ts`, mirrored in
+`isOwnerProtectedCommand` in the portal.
+
+**Reset password activates first.** An `INVITED` or `SUSPENDED` user is set
+`ACTIVE`, its sessions ended, and then the reset mail is queued.
+`DEACTIVATED` still refuses: restoring is its own decision with its own
+permission.
 
 ### 8. Provisioning Operations (`admin.provisioning.*`)
 - **Guard**: `AdminGuard`
@@ -145,19 +159,35 @@ beside every endpoint.
 ### 14. Tenant Storage Server Migrations (`admin.storage_migrations.*`)
 
 - **Guard**: `AdminGuard`
-- `admin.storage_migrations.read` — Read an exact tenant migration by tenant and migration ID
-- `admin.storage_migrations.create` — Start a fenced migration; also requires `.critical`
-- `admin.storage_migrations.manage` — Retry or cancel the main migration; also requires `.critical`
-- `admin.storage_migrations.rollback` — Start a retained-source rollback; also requires `.critical`
-- `admin.storage_migrations.finalize` — Finalize and purge retained source after the rollback deadline; also requires `.critical`
-- `admin.storage_migrations.post_cutover.retry` — Retry a failed rollback/finalize operation; also requires `.critical`
-- `admin.storage_migrations.post_cutover.cancel` — Cancel an eligible rollback/finalize operation; also requires `.critical`
+- `admin.storage_migrations.read` — Read the storage migration preflight and an exact migration by ID
+- `admin.storage_migrations.execute` — Start a fenced migration, and release its retained source through `POST /storage-migrations/:id/release-source`; also requires `.critical`
 - `admin.storage_migrations.critical` — Required together with every migration mutation permission
 
-These APIs are default-off and not yet safe to expose in the Admin Portal
-because the public read model cannot originate and recover the complete
-workflow. See
-[Tenant Storage Server Migrations](../api/tenant-storage-migrations.md).
+The seeded catalogue declares exactly these three keys. The `create`, `manage`,
+`rollback`, `finalize`, and `post_cutover.*` keys previously listed here belong
+to the superseded design in
+[Tenant Storage Server Migrations](../api/tenant-storage-migrations.md) and do
+not exist in `permissions.seed.ts`.
+
+`/tenants/[id]/move-storage` is the browser surface. Its destination list, byte
+accounting, and the `storagePlacementRevision` fence come from
+`GET /tenants/:tenantId/storage-migration-preflight` under the read permission;
+composing a migration additionally needs `admin.backups.read`, because Core
+binds the command to Worker backup and restore evidence the operator selects.
+See [Tenant placement moves](../api/tenant-placement-moves.md).
+
+### 14b. Tenant Database Relocations (`admin.tenant_relocations.*`)
+
+- **Guard**: `AdminGuard` (Core preflight), `AdminPermissionGuard` (Worker commands)
+- `admin.tenant_relocations.read` — Read the relocation preflight, a tenant's relocation history, and one relocation ledger
+- `admin.tenant_relocations.execute` — Start a fenced relocation and release its retained source; also requires `.critical`
+- `admin.tenant_relocations.critical` — Required together with both relocation mutations
+
+`/tenants/[id]/move-database` is the browser surface. Both mutating routes are
+Gateway `idempotent: false`: the browser owns a UUIDv7 command id, never replays
+the command automatically, and recovers an ambiguous outcome by reading the
+tenant's relocation history. See
+[Tenant placement moves](../api/tenant-placement-moves.md).
 
 ### 15. Backups & Restores (`admin.backups.*`)
 - **Guard**: `AdminGuard`
@@ -174,6 +204,9 @@ workflow. See
 All four settings mutations are also Gateway `WRITE_SENSITIVE` routes and
 require an `x-idempotency-key` UUIDv7. Fatal-alert and generic/SMTP updates
 also require `admin.settings.critical`.
+
+WebPhone is **not** part of this registry — it owns typed tables and its own
+permissions; see §20.
 
 ### 17. Application Catalogue (`admin.applications.*`, `admin.catalog.*`, and `admin.billing.*`)
 - **Guard**: `AdminGuard`
@@ -203,6 +236,22 @@ because the unconsumed `admin.catalog.destroy` seed key still exists.
 - **Guard**: `AdminGuard`
 - `admin.logging.read` — View runtime log-level overrides, change history, effective level, SSE live stream
 - `admin.logging.update` — Upsert or delete runtime log-level override
+
+### 20. WebPhone (`admin.webphone.*`)
+- **Guard**: `AdminGuard`
+- `admin.webphone.read` — View WebPhone configuration, extensions, call logs, and fleet seat usage
+- `admin.webphone.update` — Edit platform WebPhone configuration and manage extensions
+- `admin.webphone.critical` — Edit **another tenant's** WebPhone configuration, which can take a live customer's phones offline
+
+Served under `/api/admin/webphone/v1`, not the Core admin namespace. These are
+the permissions behind both Settings → WebPhone and the WebPhone panel on the
+user-detail screen; `admin.users.*` grants no WebPhone access. Only the
+cross-tenant config write pairs `update` with `critical` — the platform-scope
+writes do not.
+
+`GET /api/admin/webphone/v1/me` is deliberately outside this scheme: it needs
+no WebPhone permission, because holding an extension is the authorization. It
+is also the only route that returns a decrypted SIP password.
 
 ---
 
@@ -235,3 +284,41 @@ type AdminPermission = {
    requirements. The current source still lacks `adminCanAny`.
 4. **Independent nested access**: tenant detail access does not imply tenant
    user, subscription, wallet, payment, invoice, audit, or provisioning access.
+
+---
+
+## RBAC inventory — reconciled 2026-09-05
+
+Collected by walking every enforcement point rather than trusting one list:
+`@RequirePermissions(...)` across all six Nest apps, and `requiredPermissions`
+on every Gateway route contract.
+
+| Measure | Count |
+| --- | ---: |
+| Permissions in the canonical seed (`control-plane/permissions.seed.ts`) | 135 |
+| Enforced by a Nest controller | 87 |
+| Enforced at the Gateway | 114 |
+| Enforced somewhere | 114 |
+| Declared but enforced nowhere yet | 21 |
+
+**Three gaps were found and closed:**
+
+1. `admin.webphone.critical` existed in the versioned seed and in the database
+   but not in the canonical one. The Platform Super Admin role grants `'*'`,
+   which resolves against the **canonical** list — so the permission existed
+   and nobody could ever hold it. Added.
+2. The two seed files had drifted five keys apart in both directions
+   (`admin.audit.read`, `admin.auth_invalidation_outbox.replay`,
+   `admin.tenant_relocations.*` on one side, `admin.webphone.critical` on the
+   other). They now hold the same 135 keys.
+3. `admin.tenant_users.manage_webphone` is an **orphan row in the database**:
+   no seed declares it and no code enforces it. It is deliberately left
+   ungranted — WebPhone is not a tenant-user action — and should be deleted
+   from `admin_permissions` in a migration.
+
+**Declared but not yet enforced** (harmless, but they are what "we might be
+missing some" looks like): the fourteen `admin.reports.*` keys, four
+`admin.provisioning.*` keys, `admin.catalog.destroy`, and
+`admin.webphone.critical`. Each belongs to a surface that is seeded ahead of
+its endpoints; the Super Admin holds all of them, so enabling those endpoints
+needs no RBAC change.

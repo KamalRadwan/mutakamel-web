@@ -1,8 +1,9 @@
 # Admin Users, Profile, and WebPhone API
 
-Status: **[Frontend/source audit; WebPhone route inventory drift unresolved]**
+Status: **[Frontend/source audit; WebPhone drift resolved — the routes moved to
+the WebPhone module namespace]**
 
-Last source verification: **2026-08-29**
+Last source verification: **2026-09-03**
 
 Owner: **Core**
 
@@ -20,16 +21,15 @@ Canonical browser prefix: `/api/admin/core/v1/users`
 | `POST /api/admin/core/v1/users/:id/activate` | `admin.users.suspend` + `admin.users.critical` | `201` | `DONE` |
 | `DELETE /api/admin/core/v1/users/:id` | `admin.users.delete` + `admin.users.critical` | `204` | `DONE` |
 | `PATCH /api/admin/core/v1/users/:id/roles` | `admin.users.assign_roles` + `admin.users.critical` | `204` | `DONE` |
-| `GET /api/admin/core/v1/users/:id/webphone` | Previously documented as `admin.users.read` | `200` expected by frontend | Frontend reference; absent from current generated inventory |
-| `PATCH /api/admin/core/v1/users/:id/webphone` | Previously documented as `admin.users.update` + `admin.users.critical` | `200` expected by frontend | Frontend reference; absent from current generated inventory |
 | `GET /api/admin/core/v1/users/me/profile` | Authenticated | `200` | `DONE` |
 | `PATCH /api/admin/core/v1/users/me/profile` | Authenticated | `200` | `DONE` |
-| `GET /api/admin/core/v1/users/me/webphone` | Previously documented as authenticated | `200` expected by frontend | Frontend reference; absent from current generated inventory |
-| `GET /api/admin/core/v1/users/me/webphone/call-logs` | Previously documented as authenticated | `200` expected by frontend | Frontend reference; absent from current generated inventory |
-| `POST /api/admin/core/v1/users/me/webphone/call-logs` | Previously documented as authenticated | `201` expected by frontend | Frontend reference; absent from current generated inventory |
 
-Every inventory-confirmed paired permission uses ALL semantics. The WebPhone
-rows above are not inventory-confirmed permission contracts.
+Every paired permission uses ALL semantics.
+
+**No WebPhone route lives under `/users`.** The five that once did
+(`:id/webphone`, `me/webphone`, `me/webphone/call-logs`) were deleted with the
+seven `webphone_*` columns on `admin_users`; the Gateway answers those paths
+`404 GW.ROUTE.UNKNOWN`. See [WebPhone](#webphone) below for what replaced them.
 
 ## Invite
 
@@ -86,35 +86,68 @@ safe retry states are rendered explicitly.
 
 ## WebPhone
 
-The Admin Portal currently references administrative/self-service WebPhone and
-call-log routes. None appears in the current 246-route generated Admin Core
-inventory. Until Core ownership and route contracts are confirmed, this section
-describes frontend expectations only and must not be used as backend evidence.
+WebPhone is its own Gateway app, not part of Core's `/users` space. Its admin
+namespace is **`/api/admin/webphone/v1`**, and it is absent from the generated
+Admin Core inventory by design — that inventory covers `core.admin.*` route
+keys only.
 
-If a confirmed self-service WebPhone route returns the SIP password required for
-active browser registration, it may exist only in current component memory.
+A user's phone is an **extension row keyed by `ownerId`**, not fields on the
+user record. `ownerId` is the admin user's own id (for the admin audience the
+JWT `sub` / `identityId` *is* `admin_users.id`), so one user has at most one
+extension and an unconfigured user simply has no row.
 
-The administrative projection omits the password and returns
-`passwordConfigured`. Initialize edit password fields empty; blank means
-preserve unless the DTO explicitly represents a clear action.
+| Method and browser path | Permission mode | Success |
+| --- | --- | ---: |
+| `GET /api/admin/webphone/v1/extensions` | `admin.webphone.read` | `200` |
+| `POST /api/admin/webphone/v1/extensions` | `admin.webphone.update` | `201` |
+| `PATCH /api/admin/webphone/v1/extensions/:id` | `admin.webphone.update` | `200` |
+| `DELETE /api/admin/webphone/v1/extensions/:id` | `admin.webphone.update` | `204` |
+| `GET`/`PUT /api/admin/webphone/v1/extensions/:id/servers` | `admin.webphone.read` / `.update` | `200` |
+| `GET`/`PATCH /api/admin/webphone/v1/config` | `admin.webphone.read` / `.update` | `200` |
+| `GET /api/admin/webphone/v1/servers` | `admin.webphone.read` | `200` |
+| `GET /api/admin/webphone/v1/me` | Authenticated | `200` |
+| `GET /api/admin/webphone/v1/me/call-logs` | Authenticated | `200` |
+| `POST /api/admin/webphone/v1/me/call-logs` | Authenticated | `201` |
+
+None of the WebPhone writes carries a `critical` companion permission. The full
+server and ICE surface lives in [webphone.md](webphone.md); only what the user
+screens touch is listed here.
+
+The module exposes no by-owner read, so the user-detail screen lists extensions
+and matches on `ownerId`; it `POST`s when that match is empty and `PATCH`es the
+matched extension otherwise. Removing a phone is a `DELETE` from
+Settings → WebPhone — clearing the fields on the user screen does not delete the
+row, and the extension number and SIP username are required on every save
+because a row cannot exist without them.
+
+### The extension is the identity; the chain is where it registers
+
+A scope holds an ordered list of SIP servers, and each user has their own ordered
+**chain** across it, held separately and replaced wholesale by
+`PUT /extensions/:id/servers`. Creating an extension does not create a chain, so
+a user screen that only `POST`s an extension leaves a phone with nowhere to
+register: assign the chain in the same flow, or send the operator to
+Settings → WebPhone to do it.
+
+Each link may override that server's `timeoutSeconds` and `maxRetries`; omitting
+them (or sending `null`) inherits the server's defaults, which is the normal
+case. An empty chain is accepted and means the user registers nowhere.
+
+`/me` is the one route that returns a **decrypted** SIP password, and it is
+reachable with no WebPhone permission at all: holding an extension is the
+authorization. It accepts no identifier that could name another subject.
+
+Every other projection omits the password and returns `passwordConfigured`.
+Initialize edit password fields empty; blank means preserve.
 
 Never write SIP passwords to browser storage, logs, analytics, diagnostics, or
 fixtures.
 
-The frontend's currently referenced call-log payload is:
-
-```ts
-interface CreateAdminWebphoneCallLogDto {
-  type: string;
-  displayName?: string | null;
-  phoneNumber: string;
-  startedAt?: string | null;
-  answeredAt?: string | null;
-  endedAt?: string | null;
-  durationSeconds?: number | null;
-  cause?: string | null;
-}
-```
+The widget renders only while `/me` reports `enabled: true`, and it registers
+only when `/me` also returns a usable `servers[]` — the caller's chain, filtered
+to entries that have both a `sipDomain` and a `websocketUrl`. A user extension
+alone produces a visible but offline phone, and so does an extension whose chain
+is empty.
 
 ## Idempotency and state
 
@@ -126,25 +159,25 @@ A missing read permission renders forbidden, not an empty user list.
 
 ## Current frontend evidence
 
-- `src/app/users/hooks/useUsers.ts`
-- `src/app/users/[id]/hooks/useUserDetail.ts`
-- `src/app/profile/hooks/useMyProfile.ts`
-- `src/app/profile/page.tsx`
-- `src/components/layout/webphone/`
-- `src/components/layout/hooks/useWebRTCPhone.ts`
-
-The user list, invite, detail, lifecycle, role assignment, and self profile use
-inventory-confirmed APIs. Administrative WebPhone, self WebPhone, and call logs
-remain frontend references with unresolved Admin Core inventory drift.
-Authenticated runtime and deployment verification remain separate from source
-integration.
+- `src/app/(shell)/users/hooks/useUsers.ts`
+- `src/app/(shell)/users/hooks/useUserDetail.ts`
+- `src/app/(shell)/users/api/adminUsersApi.ts`
+- `src/app/(shell)/settings/webphone/webphone-contract.ts` — the single parser
+  and type for extension responses, shared with the users screen
+- `src/app/(shell)/profile/hooks/useMyProfile.ts`
+- `src/components/layout/AdminWebPhone.tsx` — binds the shared widget to
+  `/api/admin/webphone/v1`
+- `packages/webphone/src/hooks/useWebRTCPhone.ts` — the widget itself, shared
+  with the tenant portal
 
 ## Source map
 
 - `../backend/mutakamel-apps/core-app/src/admin/admin-users/admin-users.controller.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/admin-users/dto/`
 - `../backend/mutakamel-apps/core-app/src/admin/admin-roles/admin-user-roles.controller.ts`
+- `../backend/mutakamel-apps/core-app/src/webphone/admin/admin-webphone.controller.ts`
 - `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`
+- `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/webphone.route-contracts.ts`
 
 
 ## DTOs (Migrated from dtos.md)
@@ -191,31 +224,68 @@ integration.
 }
 ```
 
-### `UpdateAdminUserWebphoneDto`
+### `CreateWebphoneExtensionDto`
 ```typescript
 {
-  enabled?: boolean;
-  extension?: string | null;          // @MaxLength(32)
-  sipUsername?: string | null;        // @MaxLength(120)
-  sipPassword?: string | null;       // @MaxLength(255)
+  ownerId: string;                   // @IsUUID('7') — the owning admin user
+  extension: string;                 // /^[A-Za-z0-9*#+._-]{1,32}$/ — not numbers only
+  sipUsername: string;               // @MaxLength(120)
+  sipPassword?: string | null;       // write-only, @MaxLength(1024)
   displayName?: string | null;       // @MaxLength(120)
   outboundCallerId?: string | null;  // @MaxLength(64)
-  transport?: 'ws' | 'wss';
+  enabled?: boolean;                 // default false; enabling requires a password
 }
 ```
 
-### `CreateAdminWebphoneCallLogDto`
+### `UpdateWebphoneExtensionDto`
+```typescript
+{
+  extension?: string;                // same pattern; never null — a row needs one
+  sipUsername?: string;              // @MaxLength(120)
+  sipPassword?: string | null;       // write-only; null clears
+  displayName?: string | null;       // @MaxLength(120), null clears
+  outboundCallerId?: string | null;  // @MaxLength(64), null clears
+  enabled?: boolean;                 // enabling requires a stored password
+}
+```
+
+Neither DTO carries `transport` any more. Protocol is the scheme of the server's
+`websocketUrl`, not a property of the person holding the extension, and sending
+the field is rejected — these DTOs are strict about unknown keys.
+
+### `SetWebphoneExtensionServersDto`
+```typescript
+{
+  servers: Array<{
+    serverId: string;                // @IsUUID('7') — a server in the same scope
+    timeoutSeconds?: number | null;  // 3..120; null inherits the server's default
+    maxRetries?: number | null;      // 0..10;  null inherits the server's default
+  }>;                                // order IS the failover order; empty is valid
+}
+```
+
+Sent as a `PUT` because it replaces the whole chain. Array order is the failover
+order — do not send a `priority`; the server assigns it contiguously from 1.
+
+A disabled extension occupies no seat. Creating or enabling one without a SIP
+password fails `WEBPHONE_CONFIG_INCOMPLETE`; a second extension for the same
+owner fails `WEBPHONE_OWNER_HAS_EXTENSION`.
+
+### `CreateWebphoneCallLogDto`
 ```typescript
 {
   type: WebphoneCallLogType;
-  displayName?: string | null;       // @MaxLength(120)
   phoneNumber: string;               // @IsNotEmpty, @MaxLength(80)
-  startedAt?: string | null;         // @IsDateString
-  answeredAt?: string | null;        // @IsDateString
-  endedAt?: string | null;           // @IsDateString
+  displayName?: string | null;       // @MaxLength(120)
+  startedAt?: string | null;         // @IsISO8601
+  answeredAt?: string | null;        // @IsISO8601, null for unanswered inbound
+  endedAt?: string | null;           // @IsISO8601
   durationSeconds?: number | null;   // @IsInt, @Min(0), @Max(86400)
-  cause?: string | null;             // @MaxLength(120)
+  cause?: string | null;             // stable status code, truncated at 120 on write
 }
 ```
+
+Call logs are non-idempotent and non-replayable: each completed call is a
+distinct event, so the write carries no intent key and is never retried.
 
 ---

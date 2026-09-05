@@ -2,7 +2,7 @@
 
 Status: **[Partially verified; generated Admin route inventory is stale]**
 
-Last source verification: **2026-08-26**
+Last source verification: **2026-09-03** (tenant placement moves; generated route inventory)
 
 Last design documentation update: **2026-08-29**
 
@@ -70,11 +70,13 @@ Do not store JWT access or refresh tokens in browser-readable storage.
 
 ## Current route evidence
 
-The generated Admin route inventory is currently stale against source, and the
-full `docs:check` command stops at that gate. Do not use the previously recorded
-240-route count as current evidence until `docs:routes` is regenerated and the
-dependent hand-written counts/statuses are reviewed in a separate API
-documentation task.
+The generated Admin route inventory was regenerated on **2026-09-03** and
+`docs:check` passes: it now records **250** Core Admin routes across 23
+route-key domains. The dependent hand-written counts and statuses elsewhere in
+this documentation set were **not** re-reviewed against that regeneration, so
+the previously recorded 240-route claim below remains unverified; treat any
+per-domain count in the hand-written guides as stale until that separate API
+documentation task runs.
 
 The generated inventory is transport evidence only. Controller/DTO behavior
 comes from the hand-written domain guides and owning backend source. The
@@ -89,11 +91,11 @@ cold-blue design update does not change or reverify API route inventory.
 - Deployment-verified status requires evidence from the target environment.
 
 The last verified hand-written baseline recorded 240 direct Core Admin calls,
-0 equivalent-only representations, and 0 missing route capabilities. Because
-the generated inventory is now stale, do not carry that count or the **source
-route parity** label forward as current evidence until regeneration and review.
-Even after re-verification, source parity would not prove authenticated runtime,
-deployment verification, or release readiness.
+0 equivalent-only representations, and 0 missing route capabilities. The
+regenerated inventory now lists 250 routes, so that baseline and the **source
+route parity** label are not current evidence until the hand-written guides are
+re-reviewed against it. Even after re-verification, source parity would not
+prove authenticated runtime, deployment verification, or release readiness.
 
 ## Validation
 

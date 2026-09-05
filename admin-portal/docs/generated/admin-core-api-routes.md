@@ -3,26 +3,26 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-08-30T18:08:52.020Z**
+Generated at: **2026-09-04T22:57:59.844Z**
 
-Frontend revision: `684f503f0279+dirty`
+Frontend revision: `b8b73c0c87ae+dirty`
 
-Backend revision: `989ee35f6578+dirty`
+Backend revision: `d9373e1059c9+dirty`
 
 ## Coverage
 
-This inventory contains **247** browser-visible Core Admin routes.
+This inventory contains **251** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
 
 | Route class | Routes |
 | --- | ---: |
-| AUTHENTICATED | 86 |
+| AUTHENTICATED | 88 |
 | PUBLIC | 6 |
 | READ_HEAVY | 21 |
-| WRITE_SENSITIVE | 134 |
-| **Total** | **247** |
+| WRITE_SENSITIVE | 136 |
+| **Total** | **251** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -46,12 +46,12 @@ Machine-readable source:
 | provisioning | 31 |
 | reports | 5 |
 | roles | 6 |
-| storage-migrations | 2 |
+| storage-migrations | 3 |
 | storage-servers | 11 |
 | subscriptions | 8 |
 | system-settings | 11 |
 | tenant-fqdns | 1 |
-| tenants | 54 |
+| tenants | 57 |
 | users | 10 |
 | wallets | 6 |
 
@@ -197,6 +197,7 @@ Machine-readable source:
 | PATCH | `/api/admin/core/v1/roles/:id` | WRITE_SENSITIVE | yes | ALL | admin.roles.update | `core.admin.roles.update` |
 | PATCH | `/api/admin/core/v1/roles/:id/permissions` | WRITE_SENSITIVE | yes | ALL | admin.roles.update + admin.roles.critical | `core.admin.roles.permissions.set` |
 | GET | `/api/admin/core/v1/storage-migrations/:id` | AUTHENTICATED | yes | ALL | admin.storage_migrations.read | `core.admin.storage-migrations.get` |
+| POST | `/api/admin/core/v1/storage-migrations/:id/release-source` | WRITE_SENSITIVE | yes | ALL | admin.storage_migrations.execute + admin.storage_migrations.critical | `core.admin.storage-migrations.release-source` |
 | GET | `/api/admin/core/v1/storage-servers` | AUTHENTICATED | yes | ALL | admin.storage_servers.read | `core.admin.storage-servers.list` |
 | POST | `/api/admin/core/v1/storage-servers` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.create + admin.storage_servers.critical | `core.admin.storage-servers.create` |
 | DELETE | `/api/admin/core/v1/storage-servers/:id` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.delete + admin.storage_servers.critical | `core.admin.storage-servers.delete` |
@@ -256,8 +257,10 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/tenants/:id/users/:userId/restore` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.restore + admin.tenant_users.critical | `core.admin.tenants.users.restore` |
 | PATCH | `/api/admin/core/v1/tenants/:id/users/:userId/roles` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.assign_roles + admin.tenant_users.critical | `core.admin.tenants.users.roles.update` |
 | POST | `/api/admin/core/v1/tenants/:id/users/:userId/suspend` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.suspend + admin.tenant_users.critical | `core.admin.tenants.users.suspend` |
+| POST | `/api/admin/core/v1/tenants/:id/users/:userId/transfer-ownership` | WRITE_SENSITIVE | yes | ALL | admin.tenant_users.transfer_ownership + admin.tenant_users.critical | `core.admin.tenants.users.transfer-ownership` |
 | GET | `/api/admin/core/v1/tenants/:id/users/summary` | AUTHENTICATED | yes | ALL | admin.tenant_users.read | `core.admin.tenants.users.summary` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/billing-summary` | AUTHENTICATED | yes | ALL | admin.invoices.read | `core.admin.tenants.billing-summary.get` |
+| GET | `/api/admin/core/v1/tenants/:tenantId/database-relocation-preflight` | AUTHENTICATED | yes | ALL | admin.tenant_relocations.read | `core.admin.tenants.database-relocation-preflight` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/operations` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.operations.list` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/operations/:operationId` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.operations.get` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/operations/:operationId/cancel` | WRITE_SENSITIVE | yes | ALL | admin.tenants.read + admin.tenants.reprovision + admin.tenants.critical | `core.admin.tenants.operations.cancel` |
@@ -274,6 +277,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/seed-conflicts/:seedStateId/resolve` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.conflicts.resolve + admin.provisioning.critical | `core.admin.tenants.provisioning.seed-conflicts.resolve` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/provisioning/updates` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.provisioning.updates.list` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/updates/apply` | WRITE_SENSITIVE | yes | ALL | admin.tenants.reprovision + admin.tenants.critical + admin.provisioning.critical | `core.admin.tenants.provisioning.updates.apply` |
+| GET | `/api/admin/core/v1/tenants/:tenantId/storage-migration-preflight` | AUTHENTICATED | yes | ALL | admin.storage_migrations.read | `core.admin.tenants.storage-migration-preflight` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/storage-migrations` | WRITE_SENSITIVE | yes | ALL | admin.storage_migrations.execute + admin.storage_migrations.critical | `core.admin.storage-migrations.execute` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/subscription` | AUTHENTICATED | yes | ALL | admin.subscriptions.read | `core.admin.subscriptions.v1.get` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/subscription` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.create + admin.subscriptions.critical | `core.admin.subscriptions.v1.seed` |

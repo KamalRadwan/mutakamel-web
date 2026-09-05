@@ -1,24 +1,38 @@
-import type { WebphoneMe, WebphoneRuntimeConfig } from "./types";
+import type { WebphoneMe, WebphoneServer } from "./types";
 
 /**
- * `endpoints` arrive ordered by `priority` ascending (lowest first), while
- * JsSIP prefers the socket with the **highest** weight, so the two scales are
- * inverted against each other.
+ * How long the phone waits after the last server in the list has refused it
+ * before starting the list again.
+ *
+ * Without the pause, an outage that takes every server down at once — a lost
+ * uplink, an expired certificate on a shared proxy — would leave the widget
+ * opening and tearing down a WebSocket per server as fast as the failures come
+ * back, for as long as the tab stays open.
  */
-export const MAX_ENDPOINT_PRIORITY = 100;
+export const WEBPHONE_FAILOVER_CYCLE_DELAY_MS = 5000;
 
-export function endpointSocketWeight(priority: number) {
-  return Math.max(0, MAX_ENDPOINT_PRIORITY - priority);
+/**
+ * The servers this phone can actually register against.
+ *
+ * A server missing its domain or socket URL is not a fallback, it is an
+ * unusable row: leaving it in the list would spend a whole failover slot
+ * building a UA that cannot connect. Readiness and the failover loop share
+ * this filter so they can never disagree about how many servers exist.
+ */
+export function usableWebphoneServers(
+  me?: WebphoneMe | null,
+): WebphoneServer[] {
+  return (me?.servers ?? []).filter(
+    (server) => Boolean(server?.sipDomain) && Boolean(server?.websocketUrl),
+  );
 }
 
 export function isWebphoneReady(me?: WebphoneMe | null) {
   return Boolean(
     me?.enabled &&
-      me.config?.enabled &&
-      me.config.sipDomain &&
-      me.config.endpoints?.length &&
       me.sipUsername &&
-      (me.sipPassword || me.passwordConfigured),
+      (me.sipPassword || me.passwordConfigured) &&
+      usableWebphoneServers(me).length > 0,
   );
 }
 
@@ -34,29 +48,31 @@ export function sipUri(user: string, domain: string) {
 }
 
 export function iceServersFromSettings(
-  config?: WebphoneRuntimeConfig | null,
+  server?: WebphoneServer | null,
 ): RTCIceServer[] {
-  return (config?.iceServers ?? [])
+  return (server?.iceServers ?? [])
     .map(toIceServer)
-    .filter((server): server is RTCIceServer => Boolean(server));
+    .filter((iceServer): iceServer is RTCIceServer => Boolean(iceServer));
 }
 
 /**
- * Builds the RTCPeerConnection config for a call. `ephemeralIceServers`
- * (from minted TURN REST credentials, see `WebphoneMe.turnCredentials`)
- * are appended after the static config-derived ones. Only sets
+ * Builds the RTCPeerConnection config for a call from the server the phone is
+ * currently registered to — media policy belongs to that server, since a
+ * relay-only fallback and a direct-media primary are routinely the same list.
+ * `ephemeralIceServers` (from minted TURN REST credentials, see
+ * `WebphoneMe.turnCredentials`) are appended after the static ones. Only sets
  * `iceTransportPolicy` when it's 'relay' — omitting it otherwise matches
  * the browser default ('all') rather than asserting it explicitly.
  */
 export function pcConfigFromSettings(
-  config?: WebphoneRuntimeConfig | null,
+  server?: WebphoneServer | null,
   ephemeralIceServers?: RTCIceServer[],
 ): RTCConfiguration {
   const iceServers = [
-    ...iceServersFromSettings(config),
+    ...iceServersFromSettings(server),
     ...(ephemeralIceServers ?? []),
   ];
-  return config?.iceTransportPolicy === "relay"
+  return server?.iceTransportPolicy === "relay"
     ? { iceServers, iceTransportPolicy: "relay" }
     : { iceServers };
 }

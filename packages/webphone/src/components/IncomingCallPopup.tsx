@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { PhoneIncoming, PhoneOff, X } from "lucide-react";
+import { PhoneIncoming, PhoneOff, Shuffle, X } from "lucide-react";
 import { useWebphoneContext } from "../context/WebphoneContext";
 
 type IncomingCallPopupProps = {
@@ -10,6 +10,7 @@ type IncomingCallPopupProps = {
   displayName?: string;
   onAnswer: () => void;
   onDecline: () => void;
+  onTransfer: () => void;
   onClose: () => void;
 };
 
@@ -19,6 +20,7 @@ export function IncomingCallPopup({
   displayName,
   onAnswer,
   onDecline,
+  onTransfer,
   onClose,
 }: IncomingCallPopupProps) {
   const { copy } = useWebphoneContext();
@@ -60,22 +62,37 @@ export function IncomingCallPopup({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 border-t border-slate-800 pt-3">
+      {/* One row of three. Transfer used to span a second row of its own, which
+          made the card taller than the decision it holds and gave the least
+          used of the three actions the most weight on screen. Equal thirds say
+          what is true: they are three answers to the same question. */}
+      <div className="grid grid-cols-3 gap-1.5 border-t border-slate-800 pt-2.5">
         <button
           type="button"
-          className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+          className="flex min-h-9 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-1 text-[11px] font-bold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
           onClick={onAnswer}
         >
-          <PhoneIncoming className="size-4" />
-          {copy.answer}
+          <PhoneIncoming className="size-3.5 shrink-0" />
+          <span className="truncate">{copy.answer}</span>
         </button>
         <button
           type="button"
-          className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-xs font-bold text-white transition-colors hover:bg-rose-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+          className="flex min-h-9 items-center justify-center gap-1 rounded-lg bg-rose-600 px-1 text-[11px] font-bold text-white transition-colors hover:bg-rose-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
           onClick={onDecline}
         >
-          <PhoneOff className="size-4" />
-          {copy.decline}
+          <PhoneOff className="size-3.5 shrink-0" />
+          <span className="truncate">{copy.decline}</span>
+        </button>
+        {/* SIP cannot hand on a call that was never answered, so this answers
+            first and opens the transfer target straight away — which is what
+            "transfer an incoming call" means in practice. */}
+        <button
+          type="button"
+          className="flex min-h-9 items-center justify-center gap-1 rounded-lg bg-violet-600 px-1 text-[11px] font-bold text-white transition-colors hover:bg-violet-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400"
+          onClick={onTransfer}
+        >
+          <Shuffle className="size-3.5 shrink-0" />
+          <span className="truncate">{copy.transfer}</span>
         </button>
       </div>
     </aside>,

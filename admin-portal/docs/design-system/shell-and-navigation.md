@@ -59,10 +59,11 @@ system `Dialog` with `showCloseButton={false}`), searching the same
 
 Current `NAV_SECTIONS` contains top-level destinations rather than a complete
 nested route tree. The command palette therefore does **not** currently search
-all 54 route destinations described below. Backup, Settings, Provisioning,
-detail, and creation routes may exist without being individually searchable.
+all 56 route destinations described below. Backup, Settings, Provisioning,
+detail, creation, and tenant placement-move routes may exist without being
+individually searchable.
 
-## The 54-route inventory
+## The 56-route inventory
 
 `nav-config.ts`'s `NAV_SECTIONS` is the current source of truth for top-level
 sidebar entries; `useNavTree.ts` filters it against the exact same
@@ -75,7 +76,7 @@ migration still exists and is reachable after it.
 | # | Sidebar section | Item | Routes | Permission |
 | --- | --- | --- | --- | --- |
 | 1 | Overview | Dashboard | `/dashboard` | `admin.reports.read` |
-| 2 | Tenancy | Tenants | `/tenants`, `/tenants/new`, `/tenants/[id]` | `admin.tenants.read` |
+| 2 | Tenancy | Tenants | `/tenants`, `/tenants/new`, `/tenants/[id]`, `/tenants/[id]/move-database`, `/tenants/[id]/move-storage` | `admin.tenants.read`; the two placement-move routes additionally gate on `admin.tenant_relocations.read` and `admin.storage_migrations.read` respectively |
 | 3 | | Applications | `/applications-catalogue`, `/applications-catalogue/[applicationKey]`, `/applications-catalogue/audit` | ANY of `admin.applications.read`, `admin.applications.create` |
 | 4 | | Subscriptions | `/subscriptions` | `admin.subscriptions.read` |
 | 5 | | Invoices | `/invoices`, `/invoices/new`, `/invoices/[id]` | `admin.invoices.read` |
@@ -88,17 +89,20 @@ migration still exists and is reachable after it.
 | 12 | | Audit log | `/audit` | `admin.audit.read` |
 | 13 | | Reports | `/reports` | `admin.reports.read` |
 | 14 | | Logging | `/logging` | `admin.logging.read` |
-| 15 | System (pinned) | Settings *(SubNav × 8)* | `/settings`, `/settings/platform`, `/settings/auth`, `/settings/billing`, `/settings/notifications`, `/settings/asterisk`, `/settings/smtp`, `/settings/fatal-alerts`, `/settings/storage` | Public entry; each child settings page gates itself via `SettingsResourceBoundary` (matches pre-migration behavior — no page-level gate on the settings index) |
+| 15 | System (pinned) | Settings *(SubNav × 8)* | `/settings`, `/settings/platform`, `/settings/auth`, `/settings/billing`, `/settings/notifications`, `/settings/webphone`, `/settings/smtp`, `/settings/fatal-alerts`, `/settings/storage` | Public entry; each child settings page gates itself via `SettingsResourceBoundary` (matches pre-migration behavior — no page-level gate on the settings index) |
 | — | Topbar | Notifications · Profile | `/notifications`, `/profile` | Authenticated |
 | — | `(auth)` route group, no shell | — | `/login`, `/admin/accept-invite`, `/admin/reset-password` | Public |
 | — | Root | Redirect | `/` | Public |
 
-**Total:** dashboard (1) + tenants (3) + applications (3) + subscriptions
+**Total:** dashboard (1) + tenants (5) + applications (3) + subscriptions
 (1) + invoices (3) + database servers (3) + storage servers (3) + backup (6)
 + provisioning (9) + admin staff (2) + roles (2) + audit (1) + reports (1) +
 logging (1) + settings incl. index (9) + notifications/profile (2) + auth
-group (3) + root redirect (1) = **54**, matching the route count measured
-at the start of this migration. Nothing was dropped.
+group (3) + root redirect (1) = **56**. The 54 routes measured at the start
+of this migration are all still here; the two additions are the tenant
+placement-move wizards documented in
+[Tenant placement moves](../api/tenant-placement-moves.md). Nothing was
+dropped.
 
 ## Approved navigation target
 

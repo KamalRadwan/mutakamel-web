@@ -1,25 +1,25 @@
 {
   "metadata": {
-    "generatedAt": "2026-08-30T18:08:52.020Z",
+    "generatedAt": "2026-09-04T22:57:59.844Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "684f503f0279+dirty",
-    "backendRevision": "989ee35f6578+dirty",
+    "frontendRevision": "b8b73c0c87ae+dirty",
+    "backendRevision": "d9373e1059c9+dirty",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
   },
   "counts": {
-    "total": 247,
+    "total": 251,
     "byMethod": {
-      "GET": 98,
-      "POST": 106,
+      "GET": 100,
+      "POST": 108,
       "DELETE": 16,
       "PATCH": 24,
       "PUT": 3
     },
     "byRouteClass": {
-      "AUTHENTICATED": 86,
-      "WRITE_SENSITIVE": 134,
+      "AUTHENTICATED": 88,
+      "WRITE_SENSITIVE": 136,
       "PUBLIC": 6,
       "READ_HEAVY": 21
     },
@@ -39,18 +39,18 @@
       "provisioning": 31,
       "reports": 5,
       "roles": 6,
-      "storage-migrations": 2,
+      "storage-migrations": 3,
       "storage-servers": 11,
       "subscriptions": 8,
       "system-settings": 11,
       "tenant-fqdns": 1,
-      "tenants": 54,
+      "tenants": 57,
       "wallets": 6,
       "users": 10
     }
   },
   "sourceHashes": {
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "ba3041ec935c4efcf9f07b4ac12048ebacadaec2475c4d8d6fe1278b4c13e136",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "aafca0d95bebaba1896defebecd383f8f8ad582c5ee07aa3b63a4f2be0e53585",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
   },
   "routes": [
@@ -2425,6 +2425,24 @@
       "domainIdempotencyOperation": null
     },
     {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/storage-migrations/:id/release-source",
+      "upstreamPath": "/api/v1/admin/storage-migrations/:id/release-source",
+      "routeKey": "core.admin.storage-migrations.release-source",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.storage_migrations.execute",
+        "admin.storage_migrations.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
       "method": "GET",
       "canonicalPath": "/api/admin/core/v1/storage-servers",
       "upstreamPath": "/api/v1/admin/storage-servers",
@@ -3464,6 +3482,24 @@
       "domainIdempotencyOperation": null
     },
     {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/tenants/:id/users/:userId/transfer-ownership",
+      "upstreamPath": "/api/v1/admin/tenants/:id/users/:userId/transfer-ownership",
+      "routeKey": "core.admin.tenants.users.transfer-ownership",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.tenant_users.transfer_ownership",
+        "admin.tenant_users.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
       "method": "GET",
       "canonicalPath": "/api/admin/core/v1/tenants/:id/users/summary",
       "upstreamPath": "/api/v1/admin/tenants/:id/users/summary",
@@ -3490,6 +3526,23 @@
       "idempotencyMode": "NONE",
       "requiredPermissions": [
         "admin.invoices.read"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "GET",
+      "canonicalPath": "/api/admin/core/v1/tenants/:tenantId/database-relocation-preflight",
+      "upstreamPath": "/api/v1/admin/tenants/:tenantId/database-relocation-preflight",
+      "routeKey": "core.admin.tenants.database-relocation-preflight",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [
+        "admin.tenant_relocations.read"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": "DEFAULT_JSON",
@@ -3779,6 +3832,23 @@
       "timeoutClass": "DEFAULT",
       "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": "CORE.TENANT_PROVISIONING.ADMIN_UPDATE.APPLY"
+    },
+    {
+      "method": "GET",
+      "canonicalPath": "/api/admin/core/v1/tenants/:tenantId/storage-migration-preflight",
+      "upstreamPath": "/api/v1/admin/tenants/:tenantId/storage-migration-preflight",
+      "routeKey": "core.admin.tenants.storage-migration-preflight",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [
+        "admin.storage_migrations.read"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "domainIdempotencyOperation": null
     },
     {
       "method": "POST",

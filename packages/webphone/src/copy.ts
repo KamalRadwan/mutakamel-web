@@ -11,6 +11,19 @@ export type WebphoneCopy = {
   /** Fallback name shown when the extension carries no display name. */
   phoneName: string;
   phoneRegion: string;
+  otherTabTitle: string;
+  otherTabBody: string;
+  otherTabCall: string;
+  switchToPhoneTab: string;
+  electing: string;
+  callThisNumber: string;
+  qualityMeasuring: string;
+  qualityLoss: string;
+  qualityJitter: string;
+  qualityMos: string;
+  qualityRtt: string;
+  qualityTitle: string;
+  qualityEstimated: string;
   phoneSections: string;
   phone: string;
   calls: string;
@@ -30,6 +43,11 @@ export type WebphoneCopy = {
   decline: string;
   call: string;
   hangup: string;
+  transfer: string;
+  testIncomingCall: string;
+  transferTo: string;
+  confirmTransfer: string;
+  cancelTransfer: string;
   hold: string;
   resume: string;
   mic: string;
@@ -46,6 +64,10 @@ export type WebphoneCopy = {
   showPhone: string;
   foldPhone: string;
   retryConnection: string;
+  /** Prefix for the header chip naming which SIP server the phone is on. */
+  sipServer: string;
+  /** Prefix for the registration attempt count on the current server. */
+  attempt: string;
   status: Record<WebphoneStatusCode, string>;
   mediaNoticeText: Record<WebphoneMediaNoticeCode, string>;
 };
@@ -54,6 +76,19 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
   ar: {
     phoneName: "الهاتف",
     phoneRegion: "هاتف WebRTC",
+    otherTabTitle: "الهاتف مفتوح في تبويب آخر",
+    otherTabBody: "تسجيل واحد فقط لكل متصفح، والتبويب الآخر هو صاحبه. اقفله وسينتقل الهاتف إلى هنا.",
+    otherTabCall: "مكالمة جارية هناك",
+    switchToPhoneTab: "انتقل إلى تبويب الهاتف",
+    electing: "جارٍ تحديد تبويب الهاتف…",
+    callThisNumber: "اتصال بهذا الرقم",
+    qualityMeasuring: "جارٍ القياس…",
+    qualityLoss: "فقد الحزم",
+    qualityJitter: "مخزن التذبذب",
+    qualityMos: "MOS تقديري",
+    qualityRtt: "زمن الذهاب والعودة",
+    qualityTitle: "جودة المكالمة",
+    qualityEstimated: "قيمة محسوبة من الفقد والتأخير، وليست قياساً مباشراً.",
     phoneSections: "أقسام الهاتف",
     phone: "الهاتف",
     calls: "السجل",
@@ -73,6 +108,11 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
     decline: "رفض",
     call: "اتصال",
     hangup: "إنهاء",
+    transfer: "تحويل",
+    testIncomingCall: "مكالمة تجريبية",
+    transferTo: "حوّل إلى...",
+    confirmTransfer: "تأكيد التحويل",
+    cancelTransfer: "إلغاء التحويل",
     hold: "تعليق",
     resume: "استئناف",
     mic: "الميكروفون",
@@ -89,6 +129,8 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
     showPhone: "فتح هاتف WebRTC",
     foldPhone: "تصغير هاتف WebRTC",
     retryConnection: "إعادة محاولة الاتصال",
+    sipServer: "خادم SIP",
+    attempt: "محاولة",
     status: {
       idle: "خامل",
       loadingPhone: "جارٍ تحميل الهاتف",
@@ -101,6 +143,7 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
       registering: "جارٍ التسجيل",
       registered: "تم التسجيل",
       registrationFailed: "فشل التسجيل",
+      failingOver: "جارٍ التبديل إلى خادم آخر",
       disconnected: "انقطع الاتصال",
       connectFailed: "فشل الاتصال",
       incomingCall: "مكالمة واردة",
@@ -110,6 +153,8 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
       callEnded: "انتهت المكالمة",
       declined: "تم الرفض",
       callFailed: "فشلت المكالمة",
+      transferring: "جارٍ التحويل",
+      transferFailed: "تعذّر التحويل",
       inCall: "في مكالمة",
     },
     mediaNoticeText: {
@@ -119,11 +164,25 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
       muted: "تم كتم الميكروفون",
       clickToAllow: "انقر للسماح بالصوت",
       permissionDenied: "تم رفض إذن الميكروفون",
+      noMicrophone: "لا يوجد ميكروفون متصل بهذا الجهاز",
     },
   },
   en: {
     phoneName: "Phone",
     phoneRegion: "WebRTC phone",
+    otherTabTitle: "The phone is open in another tab",
+    otherTabBody: "One registration per browser, and the other tab holds it. Close it and the phone moves here.",
+    otherTabCall: "A call is running there",
+    switchToPhoneTab: "Go to the phone tab",
+    electing: "Choosing the phone tab…",
+    callThisNumber: "Call this number",
+    qualityMeasuring: "Measuring…",
+    qualityLoss: "Packet loss",
+    qualityJitter: "Jitter buffer",
+    qualityMos: "MOS (estimated)",
+    qualityRtt: "Round trip",
+    qualityTitle: "Call quality",
+    qualityEstimated: "Derived from loss and delay, not measured directly.",
     phoneSections: "Phone sections",
     phone: "Phone",
     calls: "Call log",
@@ -143,6 +202,11 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
     decline: "Decline",
     call: "Call",
     hangup: "Hang up",
+    transfer: "Transfer",
+    testIncomingCall: "Test incoming call",
+    transferTo: "Transfer to…",
+    confirmTransfer: "Confirm transfer",
+    cancelTransfer: "Cancel transfer",
     hold: "Hold",
     resume: "Resume",
     mic: "Microphone",
@@ -159,6 +223,8 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
     showPhone: "Open WebRTC phone",
     foldPhone: "Collapse WebRTC phone",
     retryConnection: "Retry connection",
+    sipServer: "SIP server",
+    attempt: "Attempt",
     status: {
       idle: "Idle",
       loadingPhone: "Loading phone",
@@ -171,6 +237,7 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
       registering: "Registering",
       registered: "Registered",
       registrationFailed: "Registration failed",
+      failingOver: "Switching server",
       disconnected: "Disconnected",
       connectFailed: "Connect failed",
       incomingCall: "Incoming call",
@@ -180,6 +247,8 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
       callEnded: "Call ended",
       declined: "Declined",
       callFailed: "Call failed",
+      transferring: "Transferring",
+      transferFailed: "Transfer failed",
       inCall: "In call",
     },
     mediaNoticeText: {
@@ -189,6 +258,7 @@ export const webphoneCopy: Record<WebphoneLanguage, WebphoneCopy> = {
       muted: "Microphone muted",
       clickToAllow: "Click to allow audio",
       permissionDenied: "Microphone permission denied",
+      noMicrophone: "No microphone found on this device",
     },
   },
 };

@@ -77,6 +77,8 @@ See [Source of Truth](ai/SOURCE_OF_TRUTH.md).
 | `/tenants` | `DONE/SOURCE_INTEGRATED`: server pagination and filters, including an independently loaded authoritative Database Server filter | [Tenants](api/tenants.md) |
 | `/tenants/new` | `DONE/PARTIAL/SOURCE_INTEGRATED`: real identity availability is bound to current name/company input; one no-store `GET /tenants/create-options` snapshot under `admin.tenants.create` supplies authoritative Applications/readiness/tiers, provisioning preview, Application-aware Database placement, and explicit bucket-free Storage placement; quote accepts ANY `admin.catalog.read` or `admin.tenants.create`; submit-time wizard locking, live draft fences, minimal status-only ambiguous-outcome recovery, exact create shape, and PROVISIONING redirect are integrated; no tenant DTO or PII is persisted for replay; authenticated runtime evidence remains open | [Tenants](api/tenants.md) |
 | `/tenants/[id]` | `DONE/SOURCE_INTEGRATED`: independent profile/lifecycle, exact FQDN list/validation, provisioning, access, subscription/items, wallet/ledger, invoices, and payments resources | [Tenants](api/tenants.md), [Tenant users](api/tenant-users.md), [Operations](api/tenant-operations.md) |
+| `/tenants/[id]/move-database` | `DONE/SOURCE_INTEGRATED`: Core preflight supplies the placement revision, the eligible destinations and any blocker; the Worker relocation command is non-replayable with a caller-owned UUIDv7, its ten-step ledger is polled at 5s, and the irreversible source release is separately confirmed and retention-gated | [Tenant placement moves](api/tenant-placement-moves.md) |
+| `/tenants/[id]/move-storage` | `DONE/SOURCE_INTEGRATED`: Core preflight supplies the storage placement revision, byte accounting and any open migration; the fenced migration command is bound to operator-chosen Worker backup/restore evidence, keeps the source namespace by default, and treats a retaining `PLACEMENT_COMMITTED` migration as a resting state whose old copy is deleted only by a separately confirmed forward-only command | [Tenant placement moves](api/tenant-placement-moves.md) |
 | `/applications-catalogue` | `DONE/SOURCE_INTEGRATED`: read-authorized actors get list/filtering with the closed `databaseDeployment` profile alongside lifecycle and publication. A create-only actor gets a narrow registration-only page that does not mount the Application or commercial-catalogue list reads and sends only the catalogue-DRAFT command. Full atomic onboarding remains restricted to actors holding create+update+critical ALL | [Application Catalogue](api/catalog.md) |
 | `/applications-catalogue/[applicationKey]` | `DONE/SOURCE_INTEGRATED`: real detail includes request-ownership fences, release authority, exact technical readiness, deployment profile, and authoritative Database Server fleet coverage (`eligible`, `ready`, `pending`, `degraded`, and percentage), plus manifests, metadata/policy/lifecycle, and commercial controls | [Application Catalogue](api/catalog.md) |
 | `/users` | `DONE/PARTIAL`: real user list/invite/lifecycle; error/state hardening remains | [Users](api/users.md) |
@@ -407,8 +409,11 @@ must still stop returning those fields in its HTTP response before release.
 
 ## Gated boundaries
 
-- Existing-tenant Storage Server migration remains default-off and must not be
-  exposed.
+- Existing-tenant Storage Server migration is **no longer gated**. Core now
+  exposes the tenant's current `storagePlacementRevision` through
+  `GET /tenants/:tenantId/storage-migration-preflight`, which is the fence the
+  command requires; `/tenants/[id]/move-storage` is the only surface that may
+  send it. See [Tenant placement moves](api/tenant-placement-moves.md).
 - Normal tenant PATCH must never accept `storageServerId`.
 - Admin Realtime is not activated; notification UX falls back to REST polling.
 - Storage attestation/recovery remains gated until its operator-safe evidence

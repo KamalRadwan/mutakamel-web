@@ -1,39 +1,48 @@
 export type WebphoneIceServer = {
+  /** `stun` or `turn`. Informational — the browser reads the scheme off `urls`. */
+  kind: string;
   urls: string[];
   username?: string;
   credential?: string;
 };
 
 /**
- * One SIP WebSocket transport. The API returns enabled endpoints only,
- * ordered by `priority` ascending (lowest first).
+ * One complete SIP registration target. The API returns enabled servers only,
+ * ordered by `priority` ascending (1 first).
+ *
+ * Every field a REGISTER depends on lives here rather than in a shared scope:
+ * two servers may disagree on realm, registrar, proxy, contact and ICE set, so
+ * they are alternatives to each other, not two transports for one identity.
+ * That is why failover replaces the whole UA instead of swapping a socket.
  */
-export type WebphoneEndpoint = {
-  websocketUrl: string;
+export type WebphoneServer = {
+  id: string;
+  /** Operator-facing name, shown in the widget while this server is in use. */
+  name: string;
   priority: number;
-};
-
-/**
- * The resolved runtime configuration served with the caller's own extension.
- * The client never parses raw settings — it maps this straight to JsSIP.
- */
-export type WebphoneRuntimeConfig = {
-  enabled: boolean;
   sipDomain: string;
+  /** The `ws://` / `wss://` scheme is the transport; there is no separate field. */
+  websocketUrl: string;
   realm: string | null;
   outboundProxy: string | null;
   fromDomain: string | null;
   registrarServer: string | null;
   contactUri: string | null;
   registerExpires: number;
-  sessionTimers: boolean;
-  traceSip: boolean;
+  /** Caller ID for outbound calls placed through this server. */
+  defaultCallerId: string | null;
   /**
    * WebRTC ICE transport policy. 'relay' forces all media through a
    * configured TURN server instead of attempting a direct/STUN path.
    */
   iceTransportPolicy: "all" | "relay";
-  endpoints: WebphoneEndpoint[];
+  traceSip: boolean;
+  sessionTimers: boolean;
+  allowInvalidTlsCertificate: boolean;
+  /** How long this server gets to accept a registration before the phone moves on. */
+  timeoutSeconds: number;
+  /** How many registration attempts this server gets before the phone moves on. */
+  maxRetries: number;
   iceServers: WebphoneIceServer[];
 };
 
@@ -56,13 +65,28 @@ export type WebphoneMe = {
   sipPassword: string | null;
   displayName: string | null;
   outboundCallerId: string | null;
-  transport: "ws" | "wss";
   passwordConfigured: boolean;
-  config: WebphoneRuntimeConfig;
+  /** Ordered by priority, best first. The phone registers against one at a time. */
+  servers: WebphoneServer[];
   turnCredentials: WebphoneTurnCredentials;
 };
 
-export type WebphoneCallLogType = "IN_ANS" | "IN_NOANS" | "OUT";
+/**
+ * The outcome of one call, in both directions.
+ *
+ * `OUT` predates the split and is kept because rows already carry it: it says
+ * a call went out and nothing about how it ended. Nothing should write it any
+ * more — use `OUT_ANS`, `OUT_NOANS` or `OUT_BUSY`, which is the distinction the
+ * log's colour depends on.
+ */
+export type WebphoneCallLogType =
+  | "IN_ANS"
+  | "IN_NOANS"
+  | "IN_BUSY"
+  | "OUT_ANS"
+  | "OUT_NOANS"
+  | "OUT_BUSY"
+  | "OUT";
 
 export type WebphoneCallLog = {
   id?: string;
@@ -103,6 +127,7 @@ export type WebphoneStatusCode =
   | "registering"
   | "registered"
   | "registrationFailed"
+  | "failingOver"
   | "disconnected"
   | "connectFailed"
   | "incomingCall"
@@ -112,6 +137,8 @@ export type WebphoneStatusCode =
   | "callEnded"
   | "declined"
   | "callFailed"
+  | "transferring"
+  | "transferFailed"
   | "inCall";
 
 export type WebphoneStatus = {
@@ -126,7 +153,8 @@ export type WebphoneMediaNoticeCode =
   | "stopped"
   | "muted"
   | "clickToAllow"
-  | "permissionDenied";
+  | "permissionDenied"
+  | "noMicrophone";
 
 export type WebphoneCallState =
   | "idle"

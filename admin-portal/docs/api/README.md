@@ -16,6 +16,9 @@ source contracts, not authenticated runtime or deployment evidence.
 - [Dashboard](dashboard.md) — permission-filtered operational report groups.
 - [Storage Servers](storage-servers.md) — Core-owned registry, write-only
   credentials, lifecycle, durable probes, and freshness-gated placement.
+- [Tenant placement moves](tenant-placement-moves.md) — moving one tenant to
+  another Database Server or Storage Server: the shared preflight, the fenced
+  commands, step ledgers, and the irreversible source release.
 - [Tenants](tenants.md) — tenant registry and provisioning entry points.
 - [WebPhone](webphone.md) — its own Gateway namespace at
   `/api/admin/webphone/v1/*`; platform SIP configuration, admin extensions,

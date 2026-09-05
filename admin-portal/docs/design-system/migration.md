@@ -139,6 +139,25 @@ retry-exact action instead. The same gap existed a second time in
 `useAuthInvalidationReplay.ts` (an idempotency key computed and retained per
 retryable fingerprint, never returned) and got the identical fix.
 
+**`/settings/webphone` was not part of that pass** and stayed on the
+pre-migration idiom — it was written after the settings conversion, against
+raw `slate`/`blue`/`rose`/`emerald`/`amber` pairs with explicit `dark:`
+variants, `font-bold`/`font-black`, `text-[11px]`, `rounded-2xl`, and
+hand-rolled `<button>`/pill elements. Because its sidebar link still pointed
+at the deleted `/settings/asterisk`, the screen was unreachable, so nobody hit
+it and lint was never run against a route anyone was looking at. Converted
+2026-09-03: 120 `no-restricted-syntax` errors to zero. Every light/dark pair
+collapsed into one semantic token (`bg-card`, `bg-muted`, `border-border`,
+`border-input`, `text-foreground`, `text-muted-foreground`, `text-info`,
+`text-warning`, and the `*-subtle` pairs for success/warning/destructive),
+11 hand-rolled buttons became `Button` (`primary`/`secondary`/`destructive`/
+`ghost`), and 4 status pills became `Badge`. The one deliberate visual change:
+`SeatCounter`'s over-allowance pill used a second, darker amber tint that the
+single `warning-subtle` token cannot express, so it took a `border-warning`
+outline to stay legible on the tinted card. (`SeatCounter`, `ScopeSection` and
+`ExtensionsSection` were deleted later the same day when the screen was cut back
+to the SIP server chain — the token lesson stands, the component does not.)
+
 `StatCard` (`src/design-system/patterns/kpi/StatCard.tsx`) gained an optional
 `tone` prop (`brand`/`warn`/`danger`/`neutral`) driving an icon badge and a
 top-border accent, so the dashboard's per-metric semantic coloring could move

@@ -1,4 +1,5 @@
 export * from './api';
+export * from './changed-signal';
 export * from './components/WebRTCPhoneWidget';
 export * from './config';
 export * from './context/WebphoneContext';

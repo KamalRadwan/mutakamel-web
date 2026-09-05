@@ -55,6 +55,7 @@ verified. New design work follows the approved target.
 | Local-storage-resolved theme/language and RTL direction wiring | [theming-and-direction.md](theming-and-direction.md) |
 | Where a write result belongs — toast vs. in-body | [toast-contract.md](toast-contract.md) |
 | Codemod inventory, phase gates, census baselines | [migration.md](migration.md) |
+| **UI/UX Pro Max compatibility audit** | [SKILL-AUDIT.md](SKILL-AUDIT.md) |
 
 ## Where the code lives
 

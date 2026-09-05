@@ -433,16 +433,24 @@ html[lang="ar"] {
 
   /* Stacking order — six real layers. They collide if left to chance: a
      sticky table column will happily cover an open dropdown. Declared once
-     here; never write a bare z-50. Two orderings are easy to get backwards —
-     the sticky HEADER sits above the sticky CELL (otherwise the first column
-     covers the header on horizontal scroll), and the TOAST sits above the
-     OVERLAY (a confirm dialog's result has to be visible over the dialog that
-     triggered it). */
+     here; never write a bare z-50. Three orderings are easy to get backwards.
+     The sticky HEADER sits above the sticky CELL (otherwise the first column
+     covers the header on horizontal scroll). The TOAST sits above everything
+     (a confirm dialog's result has to be visible over the dialog that
+     triggered it). And the DROPDOWN sits above the OVERLAY, which is the one
+     that bites: a Select, Popover or DropdownMenu opened from inside a dialog
+     portals to <body> as that dialog's SIBLING, not as its child, so a lower
+     value paints the entire list behind the scrim — legible only as a blur,
+     and every click on it lands on the overlay. The reverse case cannot
+     arise, because opening a modal dismisses any popover already open.
+     This portal has no test runner yet; the rule is pinned in the tenant
+     portal by src/design-system/theme/z-layers.test.ts, and the two copies of
+     this ladder are meant to stay in step. */
   --z-sticky-cell: 10;
   --z-sticky-header: 20;
   --z-topbar: 30;
-  --z-dropdown: 40;
   --z-overlay: 100;
+  --z-dropdown: 110;
   --z-toast: 1000;
 
   /* Elevation — shadow means "floating above the document", nothing else:
