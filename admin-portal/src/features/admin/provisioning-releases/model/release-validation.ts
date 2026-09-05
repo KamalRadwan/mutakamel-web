@@ -15,7 +15,22 @@ import type {
 const UUID_V7 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VERSION = /^[A-Za-z0-9][A-Za-z0-9._:+-]{0,63}$/;
-const BUILD_SHA = /^[0-9a-f]{7,64}$/;
+/**
+ * `runtimeBuildSha` does not carry a build SHA today.
+ *
+ * The provisioning release catalogue types it as
+ * `runtimeBuildSha: typeof MUTAKAMEL_APP_VERSION` and seeds it with the app
+ * version, `0.0.1`. A hex-only pattern therefore rejected every release the
+ * platform itself publishes, so `/provisioning/releases` and the release detail
+ * page both failed with INVALID_PROVISIONING_RELEASE_RESPONSE on an HTTP 200 -
+ * and an operator authoring a release could not match the seeded format either.
+ *
+ * Accepts a build SHA or the platform's identifier shape, which is what the
+ * field actually holds. The real repair is upstream: either the field is
+ * renamed to what it carries, or the catalogue starts emitting a genuine build
+ * SHA. Until one of those happens, the reader has to read what is sent.
+ */
+const BUILD_SHA = /^(?:[0-9a-f]{7,64}|[A-Za-z0-9][A-Za-z0-9._:+-]{0,63})$/;
 const SCHEMA_TARGET = /^[A-Za-z][A-Za-z0-9._:-]{0,254}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const SAFE_CODE = /^[A-Z][A-Z0-9._-]{2,95}$/;

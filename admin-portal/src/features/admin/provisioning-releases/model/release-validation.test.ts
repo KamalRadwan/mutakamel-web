@@ -73,7 +73,10 @@ describe("release-governance validation", () => {
       releaseVersion: "bad space",
       manifestVersion: "0",
       contractVersion: "2147483648",
-      runtimeBuildSha: "ABCDEF1",
+      // Was "ABCDEF1", rejected only for being uppercase hex. The field
+      // carries the app version today, not a SHA, so an identifier of that
+      // shape is legitimate; a space is what makes this one malformed.
+      runtimeBuildSha: "bad sha",
       schemaTarget: "2invalid",
       schemaChecksum: "A".repeat(64),
     };
@@ -162,5 +165,34 @@ describe("release-governance validation", () => {
     expect(canonicalJson({ z: [2, { b: true, a: null }], a: "x" })).toBe(
       '{"a":"x","z":[2,{"a":null,"b":true}]}',
     );
+  });
+
+  it("accepts the version-shaped runtimeBuildSha the catalogue actually seeds", () => {
+    // UI-006. The catalogue types this field as `typeof MUTAKAMEL_APP_VERSION`
+    // and seeds "0.0.1", so a hex-only rule rejected every release the platform
+    // publishes - the list and detail pages both failed on an HTTP 200 - and an
+    // operator could not author one matching the seeded format either.
+    expect(
+      validateReleaseDefinition({
+        ...validDefinition(),
+        runtimeBuildSha: "0.0.1",
+      }).runtimeBuildSha,
+    ).toBeUndefined();
+
+    // A real build SHA stays valid.
+    expect(
+      validateReleaseDefinition({
+        ...validDefinition(),
+        runtimeBuildSha: "a".repeat(40),
+      }).runtimeBuildSha,
+    ).toBeUndefined();
+
+    // Malformed input is still refused.
+    expect(
+      validateReleaseDefinition({
+        ...validDefinition(),
+        runtimeBuildSha: "bad sha",
+      }).runtimeBuildSha,
+    ).toBe("INVALID_BUILD_SHA");
   });
 });
