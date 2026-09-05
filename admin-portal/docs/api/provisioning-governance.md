@@ -78,6 +78,13 @@ keys remain outside the browser and platform.
 - Publisher/release/fleet critical controls require exact ALL permissions.
 - Preserve version/checksum/digest fields and stale-update conflicts.
 - Never fabricate release validation, rollout evidence, or tenant state.
+- `cutoffAt` is an instant on the wire and is labelled UTC in the form, so the
+  control is read and written as UTC. A `datetime-local` input carries no zone,
+  and `new Date` reads a bare one as local: rendering the instant through the
+  browser offset and parsing it back the same way is self-consistent on screen
+  while shifting the boundary by that offset. `cutoff-time.ts` appends the `Z`
+  the control omits, and its suite runs at `TZ=Asia/Riyadh` because a UTC
+  machine cannot observe the difference.
 
 ## Current frontend status
 

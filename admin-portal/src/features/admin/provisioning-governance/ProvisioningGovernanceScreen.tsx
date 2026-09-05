@@ -54,6 +54,7 @@ import type {
   ProvisioningComponent,
   ProvisioningRelease,
 } from "./types";
+import { isoToUtcInput, utcInputToIso } from "./cutoff-time";
 import {
   useProvisioningGovernance,
   type ProvisioningGovernanceView,
@@ -789,11 +790,11 @@ function DiscoveryWorkspace({
                     {...fieldProps}
                     type="datetime-local"
                     step={1}
-                    value={isoToLocalInput(command.cutoffAt)}
+                    value={isoToUtcInput(command.cutoffAt)}
                     onChange={(event) =>
                       setCommand((current) => ({
                         ...current,
-                        cutoffAt: localInputToIso(event.target.value),
+                        cutoffAt: utcInputToIso(event.target.value),
                       }))
                     }
                   />
@@ -1248,16 +1249,6 @@ function currentUtcMinute(): string {
   const value = new Date(Date.now() - 60_000);
   value.setMilliseconds(0);
   return value.toISOString();
-}
-function isoToLocalInput(value: string): string {
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "";
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 19);
-}
-function localInputToIso(value: string): string {
-  const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : "";
 }
 function validateCommand(
   command: CreateDiscoveryRunCommand,
