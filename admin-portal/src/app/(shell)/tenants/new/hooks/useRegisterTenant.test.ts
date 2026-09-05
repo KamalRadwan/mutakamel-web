@@ -680,6 +680,86 @@ describe("useRegisterTenant silent quote recovery", () => {
     unmount();
   });
 
+  // `goToStep` runs the availability check itself so the admin does not have
+  // to click it. Judging the result from the render that started the click
+  // reads state the check has not written yet, which turns a successful check
+  // into "check availability first" and makes the admin press Next twice.
+  it("advances on the first Next when the automatic identity check succeeds", async () => {
+    const { result, unmount } = renderHook(() => useRegisterTenant());
+    await waitFor(() => {
+      expect(result.current.applicationState).toBe("ready");
+      expect(result.current.storagePlacementState).toBe("ready");
+    });
+
+    act(() => {
+      result.current.selectCountry("EG");
+      result.current.setFormData((current) => ({
+        ...current,
+        name: "acme",
+        companyName: "Acme LLC",
+        industry: "Retail & Wholesale",
+      }));
+    });
+    expect(result.current.hasValidIdentityEvidence).toBe(false);
+
+    act(() => {
+      result.current.nextStep();
+    });
+
+    await waitFor(() => expect(validateIdentityMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(result.current.currentStep).toBe(2));
+    expect(result.current.validationErrors).toEqual([]);
+    expect(validateIdentityMock).toHaveBeenCalledOnce();
+
+    unmount();
+  });
+
+  it("still stops on the first Next when the name is genuinely taken", async () => {
+    validateIdentityMock.mockResolvedValueOnce({
+      valid: false,
+      fields: {
+        name: {
+          valid: true,
+          available: false,
+          reason: "TAKEN",
+          message: "That tenant name is taken.",
+        },
+        companyName: { valid: true, available: true, message: "Available" },
+      },
+      message: "Identity is not available.",
+    });
+    const { result, unmount } = renderHook(() => useRegisterTenant());
+    await waitFor(() => {
+      expect(result.current.applicationState).toBe("ready");
+      expect(result.current.storagePlacementState).toBe("ready");
+    });
+
+    act(() => {
+      result.current.selectCountry("EG");
+      result.current.setFormData((current) => ({
+        ...current,
+        name: "acme",
+        companyName: "Acme LLC",
+        industry: "Retail & Wholesale",
+      }));
+    });
+
+    act(() => {
+      result.current.nextStep();
+    });
+
+    await waitFor(() =>
+      expect(result.current.validationErrors).toContainEqual({
+        fieldId: "tenant-name",
+        message: "That tenant name is taken.",
+        step: 1,
+      }),
+    );
+    expect(result.current.currentStep).toBe(1);
+
+    unmount();
+  });
+
   it("blocks the owner step and reports a malformed owner email", async () => {
     const { result, unmount } = await renderReadyRegistration();
 

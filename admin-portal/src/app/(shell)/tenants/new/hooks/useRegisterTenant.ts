@@ -708,7 +708,20 @@ export function useRegisterTenant() {
     [t.tenants.wizard],
   );
 
-  const getIdentityValidationErrors = useCallback(() => {
+  /**
+   * `identityConfirmed` defaults to the rendered evidence, and is passed
+   * explicitly by the caller that has just awaited a check of its own.
+   *
+   * `goToStep` runs the availability check itself, then judges the result —
+   * but it is a closure over the render that started it, so the evidence
+   * `handleValidateIdentity` just recorded is not visible here yet. Reading
+   * the stale value turned a successful check into "check availability first"
+   * and made the admin press Next a second time to get past their own
+   * confirmed name.
+   */
+  const getIdentityValidationErrors = useCallback((
+    identityConfirmed: boolean = hasValidIdentityEvidence,
+  ) => {
     const labels = t.tenants.wizard.fieldLabels;
     const errors: TenantWizardValidationError[] = [];
     if (!formData.name.trim()) {
@@ -749,7 +762,7 @@ export function useRegisterTenant() {
       });
     }
 
-    if (formData.name.trim() && formData.companyName.trim() && !hasValidIdentityEvidence) {
+    if (formData.name.trim() && formData.companyName.trim() && !identityConfirmed) {
       const result = currentIdentityValidationEvidence?.result;
       if (result && !result.valid) {
         if (!result.fields.name.valid || !result.fields.name.available) {
@@ -1210,17 +1223,18 @@ export function useRegisterTenant() {
     // availability first", which is a demand for a click the wizard can make
     // itself. Run the check and continue on success; a genuine clash still
     // stops here with the server's own message.
+    let identityConfirmed = hasValidIdentityEvidence;
     if (
       next > 1 &&
-      !hasValidIdentityEvidence &&
+      !identityConfirmed &&
       formData.name.trim() &&
       formData.companyName.trim() &&
       !isValidatingIdentity
     ) {
-      const available = await handleValidateIdentity();
-      if (!available) return;
+      identityConfirmed = await handleValidateIdentity();
+      if (!identityConfirmed) return;
     }
-    const identityErrors = getIdentityValidationErrors();
+    const identityErrors = getIdentityValidationErrors(identityConfirmed);
     if (next > 1 && identityErrors.length > 0) {
       showValidationErrors(identityErrors, 1);
       return;

@@ -1289,6 +1289,12 @@ exact-name status recovery and does not reconstruct or replay the create body
 after reload. The primary FQDN is derived from the validated immutable tenant
 name; secondary-FQDN validation remains its separate documented workflow.
 
+Leaving step 1 runs the availability check itself rather than demanding a
+separate click, and judges the answer it just awaited — not the evidence
+rendered before the check started, which is still empty in that closure and
+turned a successful check into "check availability first", so the admin pressed
+Next twice to get past their own confirmed name.
+
 The least-privilege composite create-options call and identity flow still need
 authenticated runtime and browser proof against the migrated development
 database.
