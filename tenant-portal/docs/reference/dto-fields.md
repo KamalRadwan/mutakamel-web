@@ -6,9 +6,9 @@
 
 Status: **verified** (parsed from controller DTO source)
 
-Last source verification: **2026-09-03**
+Last source verification: **2026-09-05**
 
-Classes: **46** · Fields: **293**
+Classes: **46** · Fields: **295**
 
 ## How to read this
 
@@ -49,7 +49,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
-| `fullName` | string | **yes** | non-empty, max 180 |
+| `fullName` | string | no | non-empty, max 180 |
 | `firstName` | string | no | max 80 |
 | `lastName` | string | no | max 80 |
 | `jobTitle` | string | no | max 120 |
@@ -65,7 +65,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | `honorificTitle` | string | no | max 40 |
 | `jobTitle` | string | no | max 120 |
 | `isPrimary` | boolean | no | transformed |
-| `fullName` | string | **yes** | non-empty, max 180 |
+| `fullName` | string | no | non-empty, max 180 |
 | `firstName` | string | no | max 80 |
 | `lastName` | string | no | max 80 |
 | `phone` | string | no | max 32 |
@@ -96,7 +96,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | `branchId` | UUIDv7 | **yes** | — |
 | `leadProfileType` | enum CrmProfileTypeEnum | **yes** | — |
 | `stageId` | UUIDv7 | no | — |
-| `displayName` | string | **yes** | non-empty, max 180 |
+| `displayName` | string | no | non-empty, max 180 |
 | `firstName` | string | no | max 80 |
 | `lastName` | string | no | max 80 |
 | `honorificTitle` | string | no | max 40 |
@@ -134,6 +134,8 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | `companyPhones` | array | no | max 10 items, each item max 32 |
 | `contacts` | array | no | max 20 items, nested, of `CreateLeadCorporateContactDto` |
 | `acquisitionSourceId` | UUIDv7 | no | — |
+| `rating` | integer | no | >= CRM_LEAD_RATING_MIN, <= CRM_LEAD_RATING_MAX |
+| `cardColor` | enum CrmLeadCardColorEnum | no | — |
 | `description` | string | no | max 2000 |
 | `interestSummary` | string | no | max 4000 |
 | `expectedNeed` | string | no | max 4000 |
@@ -196,7 +198,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles/dto/custome
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
 | `contactPartyId` | UUIDv7 | no | — |
-| `fullName` | string | **yes** | non-empty, max 180 |
+| `fullName` | string | no | non-empty, max 180 |
 | `firstName` | string | no | max 80 |
 | `lastName` | string | no | max 80 |
 | `honorificTitle` | string | no | max 40 |
@@ -212,7 +214,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles/dto/custome
 | --- | --- | --- | --- |
 | `branchId` | UUIDv7 | **yes** | — |
 | `profileType` | enum CrmProfileTypeEnum | **yes** | — |
-| `displayName` | string | **yes** | non-empty, max 180 |
+| `displayName` | string | no | non-empty, max 180 |
 | `status` | enum CustomerStatusEnum | no | — |
 | `ownerUserId` | UUIDv7 | no | — |
 | `acquisitionSourceId` | UUIDv7 | no | — |

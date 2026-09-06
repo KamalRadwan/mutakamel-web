@@ -93,10 +93,14 @@ export const SelectContent = forwardRef<
       )}
       {...props}
     >
+      {/* The viewport owns the scroll. It used to be pinned to
+          `--radix-select-trigger-height`, which clamped every list to one row's
+          height while the content's `overflow-hidden` swallowed the rest — a
+          long list simply could not be reached. */}
       <SelectPrimitive.Viewport
         className={cn(
-          "p-1",
-          position === "popper" && "h-(--radix-select-trigger-height) w-full min-w-(--radix-select-trigger-width)",
+          "max-h-96 overflow-y-auto overscroll-contain p-1",
+          position === "popper" && "w-full min-w-(--radix-select-trigger-width)",
         )}
       >
         {children}

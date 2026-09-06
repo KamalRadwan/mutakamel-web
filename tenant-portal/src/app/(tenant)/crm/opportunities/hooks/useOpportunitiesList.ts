@@ -5,6 +5,13 @@ import { useRealtimeResync } from "@/design-system";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
+import {
+  EMPTY_OPPORTUNITY_SEARCH,
+  buildOpportunitiesListQuery,
+  buildOpportunitySearchRequest,
+  type OpportunitySearchState,
+  type OpportunitySortBy,
+} from "../opportunity-search-contract";
 import type { OpportunityStatus, StageFlag } from "./pipeline-types";
 
 export interface OpportunityListItem {
@@ -29,7 +36,7 @@ export interface OpportunitiesListPageInfo {
 }
 
 export type OpportunitiesSort = {
-  id: "title" | "amount" | "probabilityPercent" | "expectedCloseDate" | "createdAt";
+  id: OpportunitySortBy;
   direction: "asc" | "desc";
 };
 
@@ -148,9 +155,10 @@ function isAbortError(error: unknown): boolean {
 }
 
 // The table view's data source — the generic, page-numbered GET
-// /opportunities list. Unlike the board/card projections, this returns the
-// raw OpportunityEntity: no customer or owner display name. See Q14 in
-// docs/build/OPEN-QUESTIONS.md.
+// /opportunities list, and the POST /opportunities/search route that answers
+// the same envelope from a filter tree. Unlike the board/card projections,
+// both return the raw OpportunityEntity: no customer or owner display name.
+// See Q14 in docs/build/OPEN-QUESTIONS.md.
 export function useOpportunitiesList(
   branchId: string | null,
   pipelineId: string | null,
@@ -163,8 +171,34 @@ export function useOpportunitiesList(
   // Handed to DataTable so a load failure replaces the empty state rather
   // than stacking a banner on top of "No matching opportunities".
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  // The question ON SCREEN. In basic mode it is also the question on the wire;
+  // in advanced mode it is a draft the user is still building, and only the
+  // card's Search button promotes it. `opportunity-search-contract` owns every
+  // wire name either mode may produce.
+  const [search, setSearch] = useState<OpportunitySearchState>(EMPTY_OPPORTUNITY_SEARCH);
+  // The question ON THE WIRE. Split from the draft because a filter tree is
+  // built one control at a time and every intermediate state is a different
+  // query — usually an expensive one nobody asked for.
+  const [appliedSearch, setAppliedSearch] =
+    useState<OpportunitySearchState>(EMPTY_OPPORTUNITY_SEARCH);
+  // Mirrors `appliedSearch` for the two callbacks below, which decide whether a
+  // change reaches the wire before the render that would have shown it to them.
+  const appliedSearchRef = useRef<OpportunitySearchState>(EMPTY_OPPORTUNITY_SEARCH);
   const requestEpochRef = useRef(0);
   const pageRef = useRef(1);
+  // 0 for every fetch key that changes once per gesture — a branch, a pipeline,
+  // a stage, a sort, a submitted tree — so those keep firing on the next
+  // microtask exactly as they always have. 250 only while the basic text box is
+  // being typed into, which is the one control that changes per keystroke.
+  const fetchDelayRef = useRef(0);
+
+  // The search route carries no pipeline or stage key at all: its scope is the
+  // body's branch plus whatever the user put in the tree. Dropping both here
+  // keeps the workspace's own selectors out of `fetchList`'s identity while
+  // advanced mode is applied, so moving the pipeline picker for the board does
+  // not re-run a query it cannot narrow.
+  const scopedPipelineId = appliedSearch.mode === "advanced" ? null : pipelineId;
+  const scopedStageId = appliedSearch.mode === "advanced" ? null : stageId;
 
   const fetchList = useCallback(
     async (requestedPage: number, signal?: AbortSignal) => {
@@ -179,26 +213,42 @@ export function useOpportunitiesList(
       setIsLoading(true);
       setError(null);
       try {
-        const query = new URLSearchParams({
+        const listWindow = {
           branchId,
-          page: String(requestedPage),
-          limit: "25",
+          page: requestedPage,
+          limit: 25,
           sortBy: sort.id,
-          // , not . CRM validates with
-          // forbidNonWhitelisted, so the wrong name is a 400 on every list
-          // open rather than an ignored parameter — the values themselves
-          // were always right.
-          sortDir: sort.direction === "asc" ? "ASC" : "DESC",
-        });
-        if (pipelineId) query.set("pipelineId", pipelineId);
-        // Absent rather than empty when nothing is chosen: `@IsOptional()`
-        // skips only null/undefined, so `stageId=` would reach `@IsUUID('7')`
-        // in OpportunitiesQueryDto and answer 400 instead of "every stage".
-        if (stageId) query.set("stageId", stageId);
-        const response = await axiosClient.get<unknown>(
-          `/api/tenant/crm/v1/opportunities?${query.toString()}`,
-          { signal, cache: "no-store", maxResponseBytes: 1024 * 1024 },
-        );
+          sortDir: sort.direction === "asc" ? ("ASC" as const) : ("DESC" as const),
+        };
+        // Two endpoints, ONE parser: `POST /opportunities/search` answers with
+        // the same `{ items, total, page, limit, totalPages, hasNext, hasPrev }`
+        // envelope the list route does, so nothing below this line branches.
+        const response =
+          appliedSearch.mode === "advanced"
+            ? await axiosClient.post<unknown>(
+                "/api/tenant/crm/v1/opportunities/search",
+                buildOpportunitySearchRequest(appliedSearch, listWindow),
+                {
+                  signal,
+                  cache: "no-store",
+                  maxResponseBytes: 1024 * 1024,
+                  // A POST that READS. It has no idempotency key because there
+                  // is nothing to make idempotent, and it may be replayed after
+                  // a token refresh for the same reason a GET may — re-running
+                  // it changes nothing.
+                  skipAutoIdempotency: true,
+                  replayAfterRefresh: true,
+                },
+              )
+            : await axiosClient.get<unknown>(
+                `/api/tenant/crm/v1/opportunities?${buildOpportunitiesListQuery({
+                  ...listWindow,
+                  pipelineId: scopedPipelineId,
+                  stageId: scopedStageId,
+                  search: appliedSearch,
+                }).toString()}`,
+                { signal, cache: "no-store", maxResponseBytes: 1024 * 1024 },
+              );
         const parsed = parseOpportunitiesListResponse(response.data, branchId);
         if (requestEpoch !== requestEpochRef.current) return;
         pageRef.current = parsed.pageInfo.page;
@@ -212,18 +262,35 @@ export function useOpportunitiesList(
         if (!signal?.aborted && requestEpoch === requestEpochRef.current) setIsLoading(false);
       }
     },
-    [branchId, pipelineId, sort, stageId],
+    [appliedSearch, branchId, scopedPipelineId, sort, scopedStageId],
   );
 
-  // Every change to the fetch key — branch, pipeline, stage or sort — restarts
-  // at page 1. Page 3 of one stage is not the page 3 being left, and on a
-  // narrowed result it is usually past the end.
+  // Every change to the fetch key — branch, pipeline, stage, sort or the
+  // APPLIED search — restarts at page 1. Page 3 of one stage is not the page 3
+  // being left, and on a narrowed result it is usually past the end.
+  //
+  // The draft is deliberately absent from that list: editing an advanced
+  // condition changes `search` and nothing else, so no request leaves until
+  // `submitSearch` promotes it.
   useEffect(() => {
     const controller = new AbortController();
-    queueMicrotask(() => {
+    // Read once and reset, so the delay belongs to the change that asked for
+    // it rather than to every fetch after it.
+    const delay = fetchDelayRef.current;
+    fetchDelayRef.current = 0;
+    if (delay === 0) {
+      queueMicrotask(() => {
+        if (!controller.signal.aborted) void fetchList(1, controller.signal);
+      });
+      return () => controller.abort();
+    }
+    const timer = window.setTimeout(() => {
       if (!controller.signal.aborted) void fetchList(1, controller.signal);
-    });
-    return () => controller.abort();
+    }, delay);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [fetchList]);
 
   // Mirrors OPPORTUNITY_SORT_FIELDS on the server; anything else is a 400.
@@ -234,6 +301,43 @@ export function useOpportunitiesList(
     "expectedCloseDate",
     "createdAt",
   ] as const;
+
+  /**
+   * A change to the question on screen, and — for basic mode only — to the
+   * question on the wire.
+   *
+   * Basic answers as you type; the 250 ms delay the effect above reads is what
+   * coalesces the keystrokes. Advanced does NOT: editing a condition must not
+   * fire a request, so the draft moves and the wire does not until
+   * `submitSearch` runs.
+   *
+   * The one exception is the mode switch itself. Arriving in advanced applies
+   * once, so basic's term stops answering the moment its box leaves the screen
+   * — a table still narrowed by a filter nobody can see is worse than an
+   * unfiltered one.
+   */
+  const changeSearch = useCallback((next: OpportunitySearchState) => {
+    setSearch(next);
+    const current = appliedSearchRef.current;
+    if (next.mode === "advanced" && current.mode === "advanced") return;
+    // Only a typed term earns the delay. A mode switch is one gesture and
+    // should answer at once.
+    fetchDelayRef.current =
+      next.mode === "basic" &&
+      current.mode === "basic" &&
+      next.basic.text !== current.basic.text
+        ? 250
+        : 0;
+    appliedSearchRef.current = next;
+    setAppliedSearch(next);
+  }, []);
+
+  /** Advanced mode's Search button: promote the draft, and run it. */
+  const submitSearch = useCallback(() => {
+    fetchDelayRef.current = 0;
+    appliedSearchRef.current = search;
+    setAppliedSearch(search);
+  }, [search]);
 
   // MASTER-PLAN 13.6: one line, and this list reconciles with the server on
   // an ALL-scoped resync, a realtime reconnect, and a return from offline.
@@ -253,5 +357,9 @@ export function useOpportunitiesList(
     error,
     setPage: (nextPage: number) => void fetchList(nextPage),
     reload,
+    /** The draft the search bar renders. */
+    search,
+    changeSearch,
+    submitSearch,
   };
 }

@@ -146,7 +146,8 @@ export function buildUpdateCustomerProfileRequest(
 
 export interface CustomerContactForm {
   honorificTitle: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   jobTitle: string;
   email: string;
   phone: string;
@@ -154,14 +155,16 @@ export interface CustomerContactForm {
 
 export const EMPTY_CUSTOMER_CONTACT_FORM: CustomerContactForm = {
   honorificTitle: "",
-  fullName: "",
+  firstName: "",
+  lastName: "",
   jobTitle: "",
   email: "",
   phone: "",
 };
 
 export interface AddCustomerContactRequest {
-  fullName: string;
+  firstName: string;
+  lastName?: string;
   honorificTitle?: string;
   jobTitle?: string;
   email?: string;
@@ -171,13 +174,20 @@ export interface AddCustomerContactRequest {
 /**
  * `POST /:id/contacts`, body `CustomerProfileContactPersonDto`.
  *
+ * No `fullName` is sent. `CustomerProfilesService.resolvePersonName` composes
+ * it from the honorific and the two name parts, which is also what it writes
+ * onto the party — so the contact list and the Directory cannot end up holding
+ * two different spellings of the same person.
+ *
  * The phone travels as `phones: [value]` rather than a `phone` key — the DTO
  * has no singular `phone`, and inventing one is a 400.
  */
 export function buildAddCustomerContactRequest(
   form: CustomerContactForm,
 ): AddCustomerContactRequest {
-  const request: AddCustomerContactRequest = { fullName: form.fullName.trim() };
+  const request: AddCustomerContactRequest = { firstName: form.firstName.trim() };
+  const lastName = form.lastName.trim();
+  if (lastName.length > 0) request.lastName = lastName;
   const honorificTitle = form.honorificTitle.trim();
   const jobTitle = form.jobTitle.trim();
   const email = form.email.trim();

@@ -120,6 +120,32 @@ export function getCountryOptions(lang: Language): readonly CountryOption[] {
   return options;
 }
 
+let cachedIsoByName: Map<string, string> | null = null;
+
+/**
+ * The ISO code of a country stored by NAME, or null for a name no dictionary
+ * knows.
+ *
+ * Address DTOs hold `country` as free text, so the name is all a form has —
+ * and the geography routes key on the ISO code. Both language dictionaries are
+ * indexed, because a record written while the workspace was in Arabic is still
+ * the same country when it is opened in English.
+ *
+ * Null is a real answer, not a failure: an address may carry a country that no
+ * longer exists, or a typo. Callers degrade rather than blank it.
+ */
+export function countryIsoFromName(name: string): string | null {
+  if (cachedIsoByName === null) {
+    cachedIsoByName = new Map();
+    for (const language of ["ar", "en"] as const) {
+      for (const country of getCountryOptions(language)) {
+        cachedIsoByName.set(country.name.toLowerCase(), country.isoCode);
+      }
+    }
+  }
+  return cachedIsoByName.get(name.trim().toLowerCase()) ?? null;
+}
+
 /**
  * IANA zone → ISO 3166-1 alpha-2, from the same registry as the codes above.
  *

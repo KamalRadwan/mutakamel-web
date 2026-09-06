@@ -299,6 +299,38 @@ semantic tokens (`bg-card`, `text-muted-foreground`) or the role names
 (`bg-brand-600`); the codemod renames existing call sites at its own pace. Once
 a family has zero references, delete its override block.
 
+## Card swatches — the one unsemantic colour set
+
+Eleven marks plus "none": `--swatch-red` · `orange` · `amber` · `yellow` ·
+`green` · `teal` · `blue` · `indigo` · `purple` · `pink` · `slate`, declared on
+`:root`, overridden in `.dark`, and bridged as `--color-swatch-*` so
+`border-swatch-*` and `bg-swatch-*` exist. The values live in
+`src/app/globals.css` and are not duplicated here.
+
+**They exist because the theme flip above is right.** A user-chosen card colour
+is a private filing mark — its meaning lives in the head of whoever set it — so
+no role ramp can supply one, and the flip deliberately collapses Tailwind's 22
+families onto four hues. That is correct for `bg-red-500` and fatal for a
+picker whose whole point is eleven colours a person can tell apart.
+
+Four rules keep them from becoming a second palette:
+
+- **Consumed for a card border and for the swatch that picks it, nothing else.**
+  The class strings live in one file, `src/design-system/views/card-color.ts`,
+  and are written out rather than built from the colour name — Tailwind extracts
+  classes by scanning source text, so an interpolated `bg-swatch-…` generates no
+  CSS at all and every swatch renders transparent.
+- **No ramp steps.** One value per theme, so there is nothing to choose wrongly,
+  and no numeric suffix for the census's raw-palette regex to catch.
+- **Never the sole carrier of meaning.** The picker names every swatch in words,
+  the chosen one is marked by a ring rather than by hue, and the border only
+  restates a colour the user assigned themself.
+- **Hue-spread, not luminance-spread**, each at 92% of the in-gamut chroma
+  ceiling for its lightness. `scripts/design/contrast.mjs` parses both theme
+  blocks and computes all 22 pairs against that theme's `--card` at the 3:1
+  non-text bar; a swatch declared on `:root` and forgotten in `.dark` fails the
+  parse rather than shipping a light colour onto a dark card.
+
 ## Elevation and control tokens
 
 > **Superseded.** The control scale that was here specified 28/32/36/40/44px.

@@ -7,15 +7,15 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-09-04**
+Last source verification: **2026-09-05**
 
-Generated at: **2026-09-04T22:57:05.054Z**
+Generated at: **2026-09-05T04:51:49.804Z**
 
-Backend revision: `d9373e1059c9+dirty`
+Backend revision: `f8eb9e3dfff3+dirty`
 
 Owning app: **core-app**
 
-Routes: **195**
+Routes: **197**
 
 ## What this page is
 
@@ -155,6 +155,8 @@ browser code.
 | GET | `/api/tenant/core/v1/provisioning/updates` | `core.tenant.provisioning.updates.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/provisioning/updates/apply` | `core.tenant.provisioning.updates.apply` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/public/fqdn-validation/:token` | `core.public.fqdn-validation.validate` | PUBLIC | yes | PLATFORM_VALIDATION_DO_NOT_CALL_AS_FEATURE_API |
+| GET | `/api/tenant/core/v1/public/geography/countries/:countryCode/states` | `core.public.geography.states.list` | PUBLIC | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/public/geography/countries/:countryCode/states/:stateCode/cities` | `core.public.geography.cities.list` | PUBLIC | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/public/payments/webhook` | `core.payments.webhook` | PUBLIC | yes | EXTERNAL_CALLBACK_DO_NOT_CALL |
 | GET | `/api/tenant/core/v1/public/tenant-host/status` | `core.public.tenant-host.status` | PUBLIC | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/roles` | `core.tenant.roles.list` | AUTHENTICATED | yes | TENANT_PORTAL |

@@ -23,9 +23,16 @@ export interface WorkspaceCardProps {
   onSelectedChange?: (selected: boolean) => void;
   selectLabel?: string;
   // Per-card controls that must NOT open the card and must not start a drag —
-  // the board's "Move to…" menu lives here. Rendered outside the activation
+  // the board's overflow menu lives here. Rendered outside the activation
   // surface, so neither is nested inside a role="button".
   actions?: ReactNode;
+  // A full-width strip below the header row, also outside the activation
+  // surface. `actions` is a top-end column and can only hold one stack of
+  // controls; anything that has to sit on its own line and still not open the
+  // card — a rating a user clicks, an owner badge beside it — has nowhere else
+  // to go. Putting them in `children` would nest a control inside a
+  // role="button" AND inside the drag handle, which is two bugs, not one.
+  footer?: ReactNode;
   density?: "compact" | "default";
   isElevated?: boolean;
   className?: string;
@@ -52,6 +59,7 @@ export function WorkspaceCard({
   onSelectedChange,
   selectLabel,
   actions,
+  footer,
   density = "default",
   isElevated,
   className,
@@ -89,45 +97,49 @@ export function WorkspaceCard({
       ref={containerRef}
       {...containerProps}
       className={cn(
-        "flex items-start gap-2",
+        "flex flex-col gap-1.5",
         density === "compact" ? "p-2" : "p-3",
         isSelected && "border-primary",
         isElevated && "shadow-overlay",
         className,
       )}
     >
-      {onSelectedChange && (
-        <Checkbox
-          checked={isSelected ?? false}
-          onCheckedChange={(next) => onSelectedChange(next === true)}
-          aria-label={selectLabel}
-          className="mt-0.5 shrink-0"
-        />
-      )}
-
-      {/* role="button" is set here rather than inherited from
-          provided.dragHandleProps, which is null the moment dragging is
-          disabled — that is how board cards lost both their role and their
-          tab stop for any user without the update capability (V5). */}
-      <div
-        {...handleProps}
-        role={isInteractive ? "button" : undefined}
-        tabIndex={isInteractive ? 0 : undefined}
-        onPointerDown={handlePointerDown}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        className={cn(
-          "min-w-0 flex-1 rounded-xs text-start",
-          // B8: a role="button" div gets no pointer cursor from Preflight, and a
-          // clickable card that looks unclickable is the case that rule names.
-          isInteractive && "cursor-pointer",
-          focusRing,
+      <div className="flex items-start gap-2">
+        {onSelectedChange && (
+          <Checkbox
+            checked={isSelected ?? false}
+            onCheckedChange={(next) => onSelectedChange(next === true)}
+            aria-label={selectLabel}
+            className="mt-0.5 shrink-0"
+          />
         )}
-      >
-        {children}
+
+        {/* role="button" is set here rather than inherited from
+            provided.dragHandleProps, which is null the moment dragging is
+            disabled — that is how board cards lost both their role and their
+            tab stop for any user without the update capability (V5). */}
+        <div
+          {...handleProps}
+          role={isInteractive ? "button" : undefined}
+          tabIndex={isInteractive ? 0 : undefined}
+          onPointerDown={handlePointerDown}
+          onClick={handleClick}
+          onKeyDown={handleKeyDown}
+          className={cn(
+            "min-w-0 flex-1 rounded-xs text-start",
+            // B8: a role="button" div gets no pointer cursor from Preflight, and a
+            // clickable card that looks unclickable is the case that rule names.
+            isInteractive && "cursor-pointer",
+            focusRing,
+          )}
+        >
+          {children}
+        </div>
+
+        {actions && <div className="shrink-0">{actions}</div>}
       </div>
 
-      {actions && <div className="shrink-0">{actions}</div>}
+      {footer}
     </Card>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCountryOptions, splitPhoneNumber } from "./country-data";
+import { countryIsoFromName, getCountryOptions, splitPhoneNumber } from "./country-data";
 
 describe("splitPhoneNumber", () => {
   it("splits a pasted international number into its two parts", () => {
@@ -69,5 +69,20 @@ describe("getCountryOptions", () => {
 
   it("builds each language once, since a picker asks on every keystroke", () => {
     expect(getCountryOptions("en")).toBe(getCountryOptions("en"));
+  });
+});
+
+describe("countryIsoFromName", () => {
+  it("recognises the name in either language, since a record keeps only one", () => {
+    expect(countryIsoFromName("Egypt")).toBe("EG");
+    expect(countryIsoFromName("مصر")).toBe("EG");
+    expect(countryIsoFromName("  united arab emirates  ")).toBe("AE");
+  });
+
+  it("answers null for a name no dictionary knows, rather than guessing", () => {
+    // An address may carry a country that no longer exists, or a typo. The
+    // geography catalogue is simply unavailable for it.
+    expect(countryIsoFromName("Yugoslavia")).toBeNull();
+    expect(countryIsoFromName("")).toBeNull();
   });
 });

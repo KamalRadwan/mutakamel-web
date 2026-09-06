@@ -55,6 +55,7 @@ export default function CustomerProfilesPage() {
     pagination,
     search,
     setSearch,
+    submitSearch,
     isLoading,
     precondition,
     loadError,
@@ -200,14 +201,16 @@ export default function CustomerProfilesPage() {
         />
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Not a FilterBar: that pattern's chips carry operators this
-              endpoint has none of, and its own 300ms debounce sat on top of
-              the hook's 300ms. It was called here with `filters={[]}` and
-              no-op handlers — a bare search box. The bar below asks the four
-              equality filters instead, one or several AND-ed. */}
+          {/* Not a FilterBar: that pattern's chips carry a fixed vocabulary,
+              and its own 300ms debounce sat on top of the hook's 300ms. It was
+              called here with `filters={[]}` and no-op handlers — a bare search
+              box. The bar below asks one equality filter as you type, or the
+              whole filter tree `POST /customer-profiles/search` accepts, which
+              runs only on its own Search button. */}
           <CustomerProfileSearchBar
             value={search}
             onChange={setSearch}
+            onSubmit={submitSearch}
             sources={sources.items}
             disabled={!branchId}
           />

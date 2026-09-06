@@ -56,7 +56,6 @@ const SECTION_BY_PREFIX: ReadonlyArray<[string, LeadCreateSectionId]> = [
   ["taxNumber", "company"],
   ["commercialRegistrationNumber", "company"],
   ["companyPhones", "company"],
-  ["displayName", "person"],
   ["firstName", "person"],
   ["lastName", "person"],
   ["honorificTitle", "person"],
@@ -80,11 +79,13 @@ export function leadCreateSectionErrorCount(
 
 function validateContact(bag: CrmErrorBag, contact: LeadContactForm, index: number): void {
   const prefix = `contacts.${index}`;
-  // `fullName` is `@IsNotEmpty()` on the DTO even when `contactPartyId` is
-  // supplied, so it is required on both paths. The picker fills it in for a
-  // chosen person, which is why an empty one there means the pick was cleared.
-  if (bag.required(`${prefix}.fullName`, contact.fullName)) {
-    bag.maxLength(`${prefix}.fullName`, contact.fullName, LEAD_CREATE_LIMITS.displayName);
+  // A chosen person carries its own name; a new one is named by its parts, and
+  // the first name is what CRM composes the rendered name from.
+  if (contact.contactPartyId.length === 0) {
+    if (bag.required(`${prefix}.firstName`, contact.firstName)) {
+      bag.maxLength(`${prefix}.firstName`, contact.firstName, LEAD_CREATE_LIMITS.firstName);
+    }
+    bag.maxLength(`${prefix}.lastName`, contact.lastName, LEAD_CREATE_LIMITS.lastName);
   }
   bag.maxLength(`${prefix}.jobTitle`, contact.jobTitle, LEAD_CREATE_LIMITS.jobTitle);
 
@@ -154,10 +155,11 @@ export function validateCreateLead(
       bag.phones("companyPhones", form.companyPhones);
     }
   } else {
-    if (bag.required("displayName", form.displayName)) {
-      bag.maxLength("displayName", form.displayName, limits.displayName);
+    // The lead's name is composed from these, so the first name is the part
+    // CRM cannot do without.
+    if (bag.required("firstName", form.firstName)) {
+      bag.maxLength("firstName", form.firstName, limits.firstName);
     }
-    bag.maxLength("firstName", form.firstName, limits.firstName);
     bag.maxLength("lastName", form.lastName, limits.lastName);
     bag.maxLength("honorificTitle", form.honorificTitle, limits.honorificTitle);
     bag.email("email", form.email, limits.email);

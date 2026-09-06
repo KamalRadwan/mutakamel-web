@@ -167,13 +167,15 @@ describe("customer profile write payloads", () => {
     expect(
       buildAddCustomerContactRequest({
         honorificTitle: "Ms",
-        fullName: "  Noura Saleh ",
+        firstName: "  Noura ",
+        lastName: " Saleh ",
         jobTitle: "Procurement",
         email: "noura@acme.test",
         phone: "+201000000000",
       }),
     ).toEqual({
-      fullName: "Noura Saleh",
+      firstName: "Noura",
+      lastName: "Saleh",
       honorificTitle: "Ms",
       jobTitle: "Procurement",
       email: "noura@acme.test",
@@ -181,15 +183,32 @@ describe("customer profile write payloads", () => {
     });
   });
 
-  it("omits every blank contact field", () => {
+  it("never sends a name the service is meant to compose", () => {
+    // `CustomerProfileContactPersonDto.fullName` is optional and the service
+    // builds it from the parts below; sending one here would let this dialog
+    // and the Directory disagree about the same person's name.
     expect(
       buildAddCustomerContactRequest({
-        honorificTitle: "",
-        fullName: "Noura Saleh",
+        honorificTitle: "Ms",
+        firstName: "Noura",
+        lastName: "Saleh",
         jobTitle: "",
         email: "",
         phone: "",
       }),
-    ).toEqual({ fullName: "Noura Saleh" });
+    ).not.toHaveProperty("fullName");
+  });
+
+  it("omits every blank contact field", () => {
+    expect(
+      buildAddCustomerContactRequest({
+        honorificTitle: "",
+        firstName: "Noura",
+        lastName: "",
+        jobTitle: "",
+        email: "",
+        phone: "",
+      }),
+    ).toEqual({ firstName: "Noura" });
   });
 });

@@ -308,6 +308,60 @@ export const en: Dictionary = {
     editAmbiguousReloaded: "The result is uncertain. The stage catalogue was refreshed; review it before saving again.",
     editAmbiguousStale: "The result is uncertain and the stage catalogue could not be refreshed. Reload before trying again."
   },
+  crmAdvancedSearch: {
+    title: "Advanced search",
+    summary: "Active conditions: {count}",
+    summaryEmpty: "No active conditions",
+    textLabel: "Free-text search",
+    textPlaceholder: "Name, phone or email…",
+    textHint:
+      "Display name, phone and email are matched from this box only — they are not columns you can pick as a condition below.",
+    textHintTitleOnly:
+      "Only the title is matched from this box — a customer or contact name is not a column you can pick as a condition below.",
+    field: "Field",
+    operator: "Operator",
+    value: "Value",
+    valueFrom: "From",
+    valueTo: "To",
+    selectValue: "Select a value",
+    catalogueUnavailable: "No options available",
+    noValueNeeded: "No value",
+    datePlaceholder: "Pick a date",
+    clearDate: "Clear date",
+    numberPlaceholder: "Number",
+    uuidPlaceholder: "Identifier",
+    textValuePlaceholder: "Type a value",
+    listPlaceholder: "Comma-separated identifiers",
+    and: "AND",
+    or: "OR",
+    groupLabel: "Group {number}",
+    addCondition: "Add condition",
+    removeCondition: "Remove condition: {field}",
+    addGroup: "Add OR group",
+    removeGroup: "Remove group {number}",
+    submit: "Search",
+    reset: "Clear conditions",
+    multiMore: "+{count}",
+    multiRemove: "Remove {label}",
+    multiOverflow: "More values",
+    multiClearAll: "Clear all",
+    operators: {
+      eq: "equals",
+      neq: "does not equal",
+      in: "is one of",
+      nin: "is none of",
+      gt: "greater than",
+      gte: "greater than or equal",
+      lt: "less than",
+      lte: "less than or equal",
+      between: "between",
+      ilike: "contains",
+      startsWith: "starts with",
+      endsWith: "ends with",
+      isNull: "is empty",
+      isNotNull: "is not empty"
+    }
+  },
   crmLeads: {
     title: "Leads",
     addLead: "Add lead",
@@ -330,12 +384,24 @@ export const en: Dictionary = {
       advanced: "Advanced"
     },
     advancedSearch: {
-      conditions: "Search conditions",
-      and: "AND",
-      addCondition: "Add condition",
-      removeCondition: "Remove condition: {field}",
-      unsupported:
-        "Conditions combine with AND only. OR and the comparison operators — greater than, contains, between — need a search endpoint the API does not expose yet."
+      fields: {
+        id: "Lead identifier",
+        source: "Acquisition source",
+        leadType: "Lead type",
+        stage: "Stage",
+        stageFlag: "Stage flag",
+        status: "Status",
+        owner: "Owner identifier",
+        createdBy: "Created-by identifier",
+        description: "Description",
+        interestSummary: "Interest summary",
+        expectedNeed: "Expected need",
+        convertedCustomerProfile: "Converted customer profile identifier",
+        convertedOpportunity: "Converted opportunity identifier",
+        convertedAt: "Converted at",
+        createdAt: "Created at",
+        updatedAt: "Updated at"
+      }
     },
     name: "Name",
     contact: "Contact",
@@ -416,10 +482,93 @@ export const en: Dictionary = {
         contactRequired: "Add at least one contact."
       }
     },
+    card: {
+      more: "More actions for {name}",
+      open: "Open",
+      cardColor: "Card colour",
+      colorNone: "No colour",
+      colorSelected: "selected",
+      colors: {
+        RED: "Red",
+        ORANGE: "Orange",
+        AMBER: "Amber",
+        YELLOW: "Yellow",
+        GREEN: "Green",
+        TEAL: "Teal",
+        BLUE: "Blue",
+        INDIGO: "Indigo",
+        PURPLE: "Purple",
+        PINK: "Pink",
+        SLATE: "Slate"
+      },
+      rating: "Rating",
+      rateStars: "Rate {count} of {max}",
+      clearRating: "Clear the rating",
+      owner: "Owner: {name}",
+      // Names the control and states the bucket at once: the mark is a button
+      // that opens the lead's activities, and its colour is the only thing
+      // separating "overdue" from "due today".
+      activityOpen: "Activities — {state}",
+      activityStates: {
+        OVERDUE: "Overdue",
+        TODAY: "Due today",
+        FUTURE: "Upcoming",
+        NONE: "No open activity"
+      },
+      // "loaded" is doing real work here: the bar sums this page's cards, not
+      // the stage.
+      activityBar: "Activity on the cards loaded in this stage",
+      moreTags: "+{count}"
+    },
+    // The activity dialog the card's mark opens: what is already planned on
+    // this lead, beside the form that adds one more.
+    activities: {
+      title: "Activities",
+      description: "{name}",
+      openHeading: "Planned",
+      createHeading: "New activity",
+      empty: "Nothing is planned on this lead yet.",
+      loadFailed: "Unable to load this lead's activities.",
+      readNotPermitted: "You do not have permission to view activities.",
+      createNotPermitted: "You do not have permission to add activities.",
+      created: "Activity added.",
+      createFailed: "Unable to add the activity.",
+      createAmbiguous: "The result is uncertain. The list was reloaded; check it before adding the activity again.",
+      submit: "Add activity",
+      typeLabel: "Type",
+      subject: "Subject",
+      dueAt: "Due at",
+      dueAtHint: "Must be in the future.",
+      priority: "Priority",
+      notes: "Notes",
+      types: {
+        TODO: "To do",
+        CALL: "Call",
+        MEETING: "Meeting",
+        EMAIL: "Email",
+        VISIT: "Visit",
+        FOLLOW_UP: "Follow-up",
+        OTHER: "Other"
+      },
+      priorities: {
+        LOW: "Low",
+        NORMAL: "Normal",
+        HIGH: "High",
+        URGENT: "Urgent"
+      },
+      errors: {
+        required: "This field is required.",
+        maxLength: "At most {max} characters.",
+        past: "Choose a date and time in the future."
+      }
+    },
     messages: {
       selectBranchToCreate: "Select one accessible branch before creating a lead.",
       createNotPermitted: "You do not have permission to create leads in this branch.",
       deleteNotPermitted: "You do not have permission to delete this lead.",
+      cardNotPermitted: "You do not have permission to change this lead.",
+      cardUpdateFailed: "Unable to save the card change.",
+      cardUpdateAmbiguous: "The result of the card change is uncertain. The list was reloaded; check the card before trying again.",
       selectBranchToMove: "Select one accessible branch before moving a lead.",
       moveNotPermitted: "You do not have permission to move this lead.",
       convertedCannotMove: "A converted lead cannot be moved between stages.",
@@ -434,6 +583,37 @@ export const en: Dictionary = {
   crmOpportunities: {
     heading: "Opportunities",
     subtitle: "Track deals through each pipeline's stages.",
+    searchMode: {
+      label: "Search mode",
+      basic: "Basic",
+      advanced: "Advanced"
+    },
+    advancedSearch: {
+      fields: {
+        id: "Opportunity identifier",
+        customerProfile: "Customer profile identifier",
+        customerParty: "Customer party identifier",
+        contactParty: "Contact party identifier",
+        lead: "Lead identifier",
+        pipeline: "Pipeline",
+        stage: "Stage",
+        stageFlag: "Stage flag",
+        status: "Status",
+        owner: "Owner identifier",
+        title: "Title",
+        description: "Description",
+        importance: "Importance",
+        amount: "Amount",
+        currencyCode: "Currency code",
+        probabilityPercent: "Probability percent",
+        expectedCloseDate: "Expected close date",
+        wonAt: "Won at",
+        lostAt: "Lost at",
+        lostReason: "Lost reason",
+        createdAt: "Created at",
+        updatedAt: "Updated at"
+      }
+    },
     pipeline: "Pipeline",
     noPipeline: "No pipeline",
     selectPipeline: "Select a pipeline",
@@ -1166,12 +1346,17 @@ export const en: Dictionary = {
       advanced: "Advanced"
     },
     advancedSearch: {
-      conditions: "Search conditions",
-      and: "AND",
-      addCondition: "Add condition",
-      removeCondition: "Remove condition: {field}",
-      unsupported:
-        "Conditions combine with AND only. OR and the comparison operators — greater than, contains, between — need a search endpoint the API does not expose yet."
+      fields: {
+        id: "Profile identifier",
+        source: "Acquisition source",
+        profileType: "Profile type",
+        status: "Status",
+        owner: "Owner identifier",
+        sourceLead: "Source lead identifier",
+        description: "Description",
+        createdAt: "Created at",
+        updatedAt: "Updated at"
+      }
     },
     sessionRequired: "An authenticated user session is required to load customer profiles.",
     singleBranchRequired: "No single trusted branch is available. Set a primary branch or use an account with one accessible branch.",
@@ -3485,6 +3670,21 @@ export const en: Dictionary = {
       SUBSCRIPTION_ITEM_NOT_FOUND: "That subscription item no longer exists. Reload and try again."
     }
   },
+  address: {
+    chooseCountry: "Select a country",
+    searchCountries: "Search by country name or code",
+    noMatchingCountries: "No matching country.",
+    clearCountry: "Clear country",
+    chooseState: "Select a state or region",
+    searchStates: "Search states and regions",
+    noMatchingStates: "No matching state or region.",
+    clearState: "Clear state or region",
+    chooseCity: "Select a city",
+    searchCities: "Search cities",
+    noMatchingCities: "No matching city.",
+    clearCity: "Clear city",
+    keepTyping: "Showing {shown} of {total} — keep typing to narrow the list."
+  },
   crmShared: {
     errorOffline: "The server could not be reached. Check the connection and try again.",
     errorForbidden: "This record is outside your scope.",
@@ -3503,12 +3703,13 @@ export const en: Dictionary = {
     callingCode: "Country code",
     searchCountries: "Search by country or code",
     noMatchingCountries: "No matching country.",
-    chooseCountry: "Choose a country",
-    clearCountry: "Clear country",
     chooseJobTitle: "Choose a job title",
     searchJobTitles: "Search a job title",
     noMatchingJobTitles: "No matching job title.",
-    backToJobTitleList: "Choose from the job title list",
+    useTypedJobTitle: "Use \"{value}\"",
+    jobTitleHint: "Pick one, or type your own and use it.",
+    clearJobTitle: "Clear job title",
+    jobTitleTooLong: "At most {max} characters — shorten it to use it.",
     fieldRequired: "This field is required.",
     fieldEmail: "Enter a valid email address.",
     fieldMaxLength: "At most {max} characters.",

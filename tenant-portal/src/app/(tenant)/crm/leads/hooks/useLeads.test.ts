@@ -22,6 +22,21 @@ const lead = {
   },
 };
 
+// The four board-card fields, kept OFF the base row on purpose: `lead` above
+// stands in for a response from a crm-app that has not shipped them yet, which
+// is the case the parser's defaults exist for.
+const cardFields = {
+  rating: 2,
+  cardColor: "TEAL",
+  owner: {
+    userId: "01900100-0000-7000-8000-000000000020",
+    firstName: "Kamal",
+    lastName: "Radwan",
+  },
+  nextActivity: { activityAt: "2026-09-05T09:00:00.000Z", bucket: "OVERDUE" },
+  tags: [{ id: "01900100-0000-7000-8000-0000000000a1", name: "VIP", color: "RED" }],
+};
+
 describe("Leads API contracts", () => {
   it("reads canonical raw list and mutation payloads", () => {
     expect(parseLeadsResponse({
@@ -44,6 +59,12 @@ describe("Leads API contracts", () => {
           sourceNameEn: "Referral",
           stageId: lead.stageId,
           ownerUserId: lead.ownerUserId,
+          rating: 0,
+          cardColor: null,
+          owner: null,
+          nextActivity: null,
+          primaryContactName: "",
+          tags: [],
         },
       ],
       total: 1,
@@ -54,6 +75,46 @@ describe("Leads API contracts", () => {
       hasPrev: false,
     });
     expect(parseLeadResponse(lead, lead.branchId).id).toBe(lead.id);
+  });
+
+  it("reads the board-card fields, and defaults the ones a row omits", () => {
+    expect(parseLeadResponse({ ...lead, ...cardFields }, lead.branchId)).toMatchObject({
+      rating: 2,
+      cardColor: "TEAL",
+      owner: { userId: cardFields.owner.userId, firstName: "Kamal", lastName: "Radwan" },
+      nextActivity: { activityAt: cardFields.nextActivity.activityAt, bucket: "OVERDUE" },
+      // Mocked: crm-app is still adding `tags` to the list read model, so the
+      // base `lead` above deliberately omits it and gets the empty default.
+      tags: [{ id: cardFields.tags[0].id, name: "VIP", color: "RED" }],
+    });
+
+    // An explicit null is a column nobody has written, not a broken payload.
+    expect(
+      parseLeadResponse(
+        { ...lead, rating: null, cardColor: null, owner: null, nextActivity: null },
+        lead.branchId,
+      ),
+    ).toMatchObject({ rating: 0, cardColor: null, owner: null, nextActivity: null });
+  });
+
+  it("rejects a board-card field of the wrong shape rather than rendering a default over it", () => {
+    const malformed = [
+      { rating: 4 },
+      { rating: 1.5 },
+      { rating: "2" },
+      { cardColor: "MAUVE" },
+      { owner: { firstName: "Kamal", lastName: "Radwan" } },
+      { owner: { userId: cardFields.owner.userId, firstName: 7 } },
+      { nextActivity: { activityAt: "not-a-date", bucket: "OVERDUE" } },
+      { nextActivity: { activityAt: cardFields.nextActivity.activityAt, bucket: "SOON" } },
+      { tags: "VIP" },
+      { tags: [{ name: "VIP" }] },
+    ];
+    for (const patch of malformed) {
+      expect(() => parseLeadResponse({ ...lead, ...patch }, lead.branchId)).toThrow(
+        "Invalid leads response.",
+      );
+    }
   });
 
   it("uses the branch capability owner boundary for visible actions", () => {

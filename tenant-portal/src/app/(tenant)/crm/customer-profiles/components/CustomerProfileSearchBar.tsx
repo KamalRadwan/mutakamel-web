@@ -1,8 +1,7 @@
 "use client";
 
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Search } from "lucide-react";
 import {
-  Button,
   Input,
   Select,
   SelectContent,
@@ -16,16 +15,22 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
-import { formatTemplate } from "@/lib/format/template";
 import { AcquisitionSourceOption } from "../../shared/components/AcquisitionSourceIcon";
+import {
+  CrmAdvancedSearchCard,
+  type CrmSearchCatalogueOption,
+} from "../../shared/components/CrmAdvancedSearchCard";
 import type { AcquisitionSource } from "../../acquisition-sources/acquisition-source-contract";
 import {
-  customerProfileSearchAvailableFields,
+  CUSTOMER_PROFILE_ADVANCED_FIELDS,
+  CUSTOMER_PROFILE_SEARCH_FIELDS,
+  customerProfileSearchCleared,
   customerProfileSearchField,
+  customerProfileSearchWithGroups,
   customerProfileSearchWithMode,
   customerProfileSearchWithRow,
-  customerProfileSearchWithRowAdded,
-  customerProfileSearchWithRowRemoved,
+  customerProfileSearchWithText,
+  type CustomerProfileAdvancedFieldId,
   type CustomerProfileSearchFieldDef,
   type CustomerProfileSearchFieldId,
   type CustomerProfileSearchMode,
@@ -44,6 +49,8 @@ const ANY_VALUE = "__any__";
 export interface CustomerProfileSearchBarProps {
   value: CustomerProfileSearchState;
   onChange: (next: CustomerProfileSearchState) => void;
+  /** Applies the advanced question. Basic answers as you type and never calls it. */
+  onSubmit: () => void;
   /**
    * The acquisition-source catalogue the screen already loaded; empty when
    * degraded.
@@ -51,35 +58,42 @@ export interface CustomerProfileSearchBarProps {
    * A prop rather than a `useCrmAcquisitionSources()` of its own — the page
    * mounts that hook unconditionally for the create modal's picker, and a
    * second instance would fetch the same tenant-wide catalogue a second time
-   * on every load of the screen. (`LeadSearchBar` fetches its own for the
-   * opposite reason: that screen does not already hold one.)
+   * on every load of the screen.
    */
   sources: AcquisitionSource[];
   disabled?: boolean;
 }
 
-/** The field labels, gathered once and handed down to every condition row. */
+/** The basic bar's field labels, gathered once and handed to its one row. */
 type CustomerProfileFieldLabels = Record<CustomerProfileSearchFieldId, string>;
 
+/** The advanced card's field labels, gathered once per render. */
+type CustomerProfileAdvancedLabels = Record<
+  CustomerProfileAdvancedFieldId,
+  string
+>;
+
 /**
- * Two modes over the same vocabulary: one condition, or several AND-ed.
+ * Two modes over two DIFFERENT endpoints, which is why they share no controls.
  *
- * Advanced is the MOST `GET /customer-profiles` supports, and deliberately no
- * more. It has four equality filters that the server ANDs, and no operators,
- * no ranges and no OR — the filter-tree engine in shared-libs is exposed
- * through no CRM route (Q131). So the rows join with a static AND rather than
- * an AND/OR control, there is no operator column, and the panel says in one
- * line what a search endpoint would have to exist for before either could
- * appear.
+ * Basic is one equality condition against `GET /customer-profiles`, answered as
+ * the user types. Advanced is a filter tree against
+ * `POST /customer-profiles/search`: operators, ranges, OR between sections, and
+ * the same column asked twice — none of which fits a query string, and none of
+ * which may fire mid-edit, so the card runs only when its Search is pressed.
  */
 export function CustomerProfileSearchBar({
   value,
   onChange,
+  onSubmit,
   sources,
   disabled,
 }: CustomerProfileSearchBarProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
 
+  // Only `text` has a label of its own; the other three name concepts the
+  // screen already labels elsewhere, and a second copy in `basicSearch.fields`
+  // would give one column two names that could drift apart.
   const fieldLabels: CustomerProfileFieldLabels = {
     text: t.crmCustomerProfiles.basicSearch.fields.text,
     status: t.common.status,
@@ -87,14 +101,42 @@ export function CustomerProfileSearchBar({
     source: t.crmCustomerProfiles.source,
   };
 
-  // Basic draws the first condition and nothing else. The state keeps whatever
-  // the mode switch left in `rows`, and the builder sends only the first — so
-  // the row on screen is the row on the wire.
-  const [firstRow] = value.rows;
-  // Whether a further condition is possible at all: one row per wire key, so a
-  // fifth field cannot be asked for once four are spoken for.
-  const canAddRow =
-    customerProfileSearchAvailableFields(value, value.rows.length).length > 0;
+  const advancedLabels: CustomerProfileAdvancedLabels =
+    t.crmCustomerProfiles.advancedSearch.fields;
+
+  // Both dictionaries are exact-keyed object literals, so a lookup by a runtime
+  // `string` needs the widening the narrow-union call sites elsewhere get for
+  // free. An unmapped key falls back to the wire value, which is the same
+  // contract StatusBadge honours.
+  const statusLabels: Record<string, string | undefined> = t.statusValues;
+  const profileTypeLabels: Record<string, string | undefined> =
+    t.crmCustomerProfiles.profileTypes;
+
+  function advancedEnumLabel(
+    field: CustomerProfileAdvancedFieldId,
+    wireValue: string,
+  ): string {
+    if (field === "profileType") return profileTypeLabels[wireValue] ?? wireValue;
+    return statusLabels[`CustomerStatus.${wireValue}`] ?? wireValue;
+  }
+
+  // `source` is the only catalogue-backed column on this screen; every other
+  // field is an enum, a raw uuid, a date or free text and asks nothing of the
+  // catalogue. Rows carry the same `AcquisitionSourceOption` the create modal's
+  // picker draws, so a source looks the same wherever it is chosen.
+  function advancedCatalogueOptions(
+    field: CustomerProfileAdvancedFieldId,
+  ): readonly CrmSearchCatalogueOption[] {
+    if (field !== "source") return [];
+    return sources.map((source) => {
+      const label = localizedName(source, lang);
+      return {
+        id: source.id,
+        label,
+        content: <AcquisitionSourceOption source={source} label={label} />,
+      };
+    });
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -124,11 +166,10 @@ export function CustomerProfileSearchBar({
           </ToggleGroupItem>
         </ToggleGroup>
 
-        {value.mode === "basic" && firstRow && (
+        {value.mode === "basic" && (
           <CustomerProfileConditionRow
             state={value}
-            rowIndex={0}
-            row={firstRow}
+            row={value.basic}
             fieldLabels={fieldLabels}
             sources={sources}
             disabled={disabled}
@@ -138,84 +179,24 @@ export function CustomerProfileSearchBar({
       </div>
 
       {value.mode === "advanced" && (
-        <div
-          role="group"
-          aria-label={t.crmCustomerProfiles.advancedSearch.conditions}
-          className="flex flex-col gap-2 rounded-sm border border-border bg-card p-3"
-        >
-          {value.rows.map((row, index) => (
-            // Keyed by POSITION, not by field. A field is unique per row and
-            // would key just as well, but then changing a row's field would
-            // unmount the picker that is changing it — Radix hands focus back
-            // to the trigger as the menu closes, and a trigger destroyed in
-            // the same commit drops focus to the body. Every row is fully
-            // controlled by props, so an index that shifts after a removal
-            // still renders the right condition.
-            <div key={index} className="flex flex-wrap items-center gap-2">
-              {/* Static text, not a control. The endpoint ANDs its filters and
-                  cannot be asked for OR, and an AND/OR toggle that only ever
-                  means AND would be a lie the user cannot see through. The
-                  first row keeps the chip's width so the pickers line up. */}
-              <span
-                aria-hidden={index === 0 || undefined}
-                className={cn(
-                  "shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-2xs uppercase text-muted-foreground",
-                  index === 0 && "invisible",
-                )}
-              >
-                {t.crmCustomerProfiles.advancedSearch.and}
-              </span>
-
-              <CustomerProfileConditionRow
-                state={value}
-                rowIndex={index}
-                row={row}
-                fieldLabels={fieldLabels}
-                sources={sources}
-                disabled={disabled}
-                onChange={onChange}
-              />
-
-              {/* Shown on every row, the last one included: removing the only
-                  condition clears it rather than leaving the panel empty. */}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={disabled}
-                aria-label={formatTemplate(
-                  t.crmCustomerProfiles.advancedSearch.removeCondition,
-                  { field: fieldLabels[row.field] },
-                )}
-                onClick={() =>
-                  onChange(customerProfileSearchWithRowRemoved(value, index))
-                }
-                className="size-6 shrink-0 rounded-full p-0"
-              >
-                <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
-              </Button>
-            </div>
-          ))}
-
-          {canAddRow && (
-            <div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={disabled}
-                onClick={() => onChange(customerProfileSearchWithRowAdded(value))}
-              >
-                <Plus className={iconSize({ size: "md" })} aria-hidden="true" />
-                {t.crmCustomerProfiles.advancedSearch.addCondition}
-              </Button>
-            </div>
-          )}
-
-          <p className="text-2xs text-muted-foreground">
-            {t.crmCustomerProfiles.advancedSearch.unsupported}
-          </p>
-        </div>
+        <CrmAdvancedSearchCard
+          fields={CUSTOMER_PROFILE_ADVANCED_FIELDS}
+          fieldLabels={advancedLabels}
+          enumLabel={advancedEnumLabel}
+          catalogueOptions={advancedCatalogueOptions}
+          text={value.text}
+          onTextChange={(next) => onChange(customerProfileSearchWithText(value, next))}
+          groups={value.groups}
+          onGroupsChange={(next) =>
+            onChange(customerProfileSearchWithGroups(value, next))
+          }
+          onSubmit={onSubmit}
+          // Clears the question WITHOUT running it: an emptied card is a draft,
+          // and the list under it keeps answering the last applied query until
+          // the user presses Search again.
+          onReset={() => onChange(customerProfileSearchCleared(value))}
+          disabled={disabled}
+        />
       )}
     </div>
   );
@@ -223,7 +204,6 @@ export function CustomerProfileSearchBar({
 
 interface CustomerProfileConditionRowProps {
   state: CustomerProfileSearchState;
-  rowIndex: number;
   row: CustomerProfileSearchRow;
   fieldLabels: CustomerProfileFieldLabels;
   sources: AcquisitionSource[];
@@ -232,12 +212,15 @@ interface CustomerProfileConditionRowProps {
 }
 
 /**
- * One condition: a field picker, and one value control whose TYPE follows the
- * chosen field. The same row in both modes — basic is this once.
+ * Basic mode's single condition: a field picker, and one value control whose
+ * TYPE follows the chosen field.
+ *
+ * Every field is offered, every time. The old picker withheld a field another
+ * row already held, which was a fact about the query string's one slot per key
+ * — basic has one row, so there is nothing left to withhold it from.
  */
 function CustomerProfileConditionRow({
   state,
-  rowIndex,
   row,
   fieldLabels,
   sources,
@@ -246,15 +229,7 @@ function CustomerProfileConditionRow({
 }: CustomerProfileConditionRowProps) {
   const { t, lang } = useI18n();
   const field = customerProfileSearchField(row.field);
-  // Only the fields no OTHER row already holds, plus this row's own. A query
-  // string has one slot per key, so a second `status` row could only overwrite
-  // the first — the duplicate is withheld rather than offered and then lost.
-  const available = customerProfileSearchAvailableFields(state, rowIndex);
 
-  // Both dictionaries are exact-keyed object literals, so a lookup by a
-  // runtime `string` needs the widening the narrow-union call sites elsewhere
-  // get for free. An unmapped key falls back to the wire value, which is the
-  // same contract StatusBadge honours.
   const statusLabels: Record<string, string | undefined> = t.statusValues;
   const profileTypeLabels: Record<string, string | undefined> =
     t.crmCustomerProfiles.profileTypes;
@@ -269,12 +244,12 @@ function CustomerProfileConditionRow({
     return statusLabels[`CustomerStatus.${wireValue}`] ?? wireValue;
   }
 
-  // Names the row as well as the control, so several conditions do not present
-  // a screen reader with several identically labelled value boxes.
+  // Names the field as well as the control, so the value box is not announced
+  // as an unqualified "search value".
   const valueLabel = `${t.crmCustomerProfiles.basicSearch.value}: ${fieldLabels[field.id]}`;
 
   function setValue(next: string) {
-    onChange(customerProfileSearchWithRow(state, rowIndex, { value: next }));
+    onChange(customerProfileSearchWithRow(state, { value: next }));
   }
 
   return (
@@ -284,7 +259,7 @@ function CustomerProfileConditionRow({
         disabled={disabled}
         onValueChange={(next) =>
           onChange(
-            customerProfileSearchWithRow(state, rowIndex, {
+            customerProfileSearchWithRow(state, {
               field: next as CustomerProfileSearchFieldId,
             }),
           )
@@ -298,7 +273,7 @@ function CustomerProfileConditionRow({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {available.map((definition) => (
+          {CUSTOMER_PROFILE_SEARCH_FIELDS.map((definition) => (
             <SelectItem key={definition.id} value={definition.id}>
               {fieldLabels[definition.id]}
             </SelectItem>
@@ -344,7 +319,7 @@ function CustomerProfileConditionRow({
         </CustomerProfileSearchValueSelect>
       )}
 
-      {/* Rows use the same `AcquisitionSourceOption` as the create modal's
+      {/* The row uses the same `AcquisitionSourceOption` as the create modal's
           picker, so a source looks the same wherever it is chosen. */}
       {field.kind === "source" && (
         <CustomerProfileSearchValueSelect

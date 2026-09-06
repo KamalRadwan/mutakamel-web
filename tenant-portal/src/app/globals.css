@@ -372,6 +372,37 @@ html[lang="ar"] {
   --chart-4: var(--chart-danger);
   --chart-5: var(--chart-qualitative-3);
 
+  /* Card swatches — the ONE unsemantic colour set in the system, and the only
+     one a user picks by hand. A board card's colour is a private filing mark
+     ("these three are mine to call today"); it carries no product meaning, so
+     no role ramp can supply it and the theme flip in section 5 actively
+     prevents Tailwind's families from doing so — that block collapses all 22
+     of them onto four hues, which is exactly right for `bg-red-500` and
+     exactly wrong for eleven marks a user needs to tell apart.
+
+     Two rules keep them from becoming a second palette. They are consumed for
+     a card BORDER and for the swatch that picks it, nothing else; and they are
+     never the sole carrier of meaning, because the meaning is whatever the
+     user privately assigned. `border-swatch-*` deliberately carries no ramp
+     step: there is one value per theme, so there is nothing to choose wrongly.
+
+     Hue-spread rather than luminance-spread — a user distinguishes these at a
+     glance by hue, so each sits at the highest in-gamut chroma its lightness
+     allows (92% of the sRGB ceiling). Every one clears 3:1, WCAG's non-text
+     graphics bar, against its own theme's --card; scripts/design/contrast.mjs
+     computes all 22 pairs rather than trusting this comment. */
+  --swatch-red:    oklch(0.55 0.206 27);
+  --swatch-orange: oklch(0.55 0.125 55);
+  --swatch-amber:  oklch(0.58 0.111 78);
+  --swatch-yellow: oklch(0.6 0.121 110);
+  --swatch-green:  oklch(0.55 0.147 148);
+  --swatch-teal:   oklch(0.55 0.087 190);
+  --swatch-blue:   oklch(0.55 0.127 245);
+  --swatch-indigo: oklch(0.55 0.24 285);
+  --swatch-purple: oklch(0.55 0.245 318);
+  --swatch-pink:   oklch(0.55 0.208 355);
+  --swatch-slate:  oklch(0.5 0.03 240);
+
   /* Density. One number tightens the whole interface: control heights, row
      height and the app chrome all multiply by it. Type is deliberately NOT in
      here — the 13px Latin / 14px Arabic floor is absolute, not relative, and
@@ -569,6 +600,24 @@ html[lang="ar"] {
   --chart-4: var(--chart-danger);
   --chart-5: var(--chart-qualitative-3);
 
+  /* Card swatches, dark. Lifted and desaturated against ink-950 rather than
+     reused: the light values are chosen to sit ON white, and every one of them
+     falls under 3:1 against the dark card. The three cool hues (blue, indigo,
+     purple) stop short of L 0.78 because sRGB runs out of chroma up there and
+     they would arrive as three shades of the same lilac — the whole point of
+     the set is that a user can name the colour they picked. */
+  --swatch-red:    oklch(0.74 0.146 27);
+  --swatch-orange: oklch(0.78 0.137 55);
+  --swatch-amber:  oklch(0.78 0.15 78);
+  --swatch-yellow: oklch(0.78 0.157 110);
+  --swatch-green:  oklch(0.78 0.208 148);
+  --swatch-teal:   oklch(0.78 0.124 190);
+  --swatch-blue:   oklch(0.72 0.144 245);
+  --swatch-indigo: oklch(0.7 0.151 285);
+  --swatch-purple: oklch(0.72 0.211 318);
+  --swatch-pink:   oklch(0.75 0.158 355);
+  --swatch-slate:  oklch(0.72 0.03 240);
+
   /* A drop shadow against an already-dark canvas reads as mud — substitute a
      top inset hairline instead. */
   --elevation-pop: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
@@ -650,6 +699,21 @@ html[lang="ar"] {
   --color-sidebar-selected-foreground: var(--sidebar-selected-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Card swatches. `inline` matters here for the usual reason — a plain
+     @theme would resolve these once at :root and .dark's override would never
+     reach border-swatch-* / bg-swatch-*. */
+  --color-swatch-red: var(--swatch-red);
+  --color-swatch-orange: var(--swatch-orange);
+  --color-swatch-amber: var(--swatch-amber);
+  --color-swatch-yellow: var(--swatch-yellow);
+  --color-swatch-green: var(--swatch-green);
+  --color-swatch-teal: var(--swatch-teal);
+  --color-swatch-blue: var(--swatch-blue);
+  --color-swatch-indigo: var(--swatch-indigo);
+  --color-swatch-purple: var(--swatch-purple);
+  --color-swatch-pink: var(--swatch-pink);
+  --color-swatch-slate: var(--swatch-slate);
 
   /* Trap (docs/design/geometry.md#elevation): an undefined --shadow-* theme
      key generates no utility at all under Tailwind v4, and every popover then

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { customerProfileTextSearch } from "../customer-profile-search-contract";
 import {
   CUSTOMER_PROFILES_PAGE_SIZE,
   CUSTOMER_PROFILES_PATH,
@@ -112,7 +113,7 @@ describe("CRM customer-profile contract", () => {
       buildCustomerProfilesListPath({
         branchId: BRANCH_ID,
         page: 2,
-        search: { mode: "basic", rows: [{ field: "text", value: "  Acme Retail  " }] },
+        search: customerProfileTextSearch("  Acme Retail  "),
       }),
     ).toBe(
       CUSTOMER_PROFILES_PATH +

@@ -6,9 +6,9 @@
 
 Status: **verified** (parsed from `throw new *Exception` sites)
 
-Last source verification: **2026-09-03**
+Last source verification: **2026-09-05**
 
-Codes: **310** across **36** areas
+Codes: **313** across **36** areas
 
 ## Scope
 
@@ -32,7 +32,7 @@ Add an area to `SCOPES` in the generator when a new screen ships.
 
 ## Leads
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 16 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 17 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -48,6 +48,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 16 codes
 | `LEAD_CONVERSION_OPPORTUNITY_UNEXPECTED` | 422 |
 | `LEAD_CONVERSION_REQUIRED` | 422 |
 | `LEAD_CORPORATE_FIELDS_FORBIDDEN` | 422 |
+| `LEAD_DISPLAY_NAME_REQUIRED` | 422 |
 | `LEAD_EXISTING_COMPANY_FIELDS_FORBIDDEN` | 422 |
 | `LEAD_EXISTING_COMPANY_INVALID` | 422 |
 | `LEAD_EXISTING_COMPANY_OUTSIDE_BRANCH` | 403 |
@@ -55,7 +56,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 16 codes
 
 ## Customer profiles
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles` · 8 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles` · 9 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -65,6 +66,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles` · 8 codes
 | `CUSTOMER_PROFILE_CONTACT_PRIMARY_INVALID` | 422 |
 | `CUSTOMER_PROFILE_CONTACTS_CORPORATE_ONLY` | 422 |
 | `CUSTOMER_PROFILE_CORPORATE_FIELDS_FORBIDDEN` | 422 |
+| `CUSTOMER_PROFILE_DISPLAY_NAME_REQUIRED` | 422 |
 | `CUSTOMER_PROFILE_HAS_ACTIVE_OPPORTUNITIES` | 409 |
 | `PARTY_DUPLICATE_CONTACT_METHOD` | 422 |
 
@@ -323,7 +325,7 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/scope-role-assignments` �
 
 ## User modules
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/user-modules` · 7 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/user-modules` · 8 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -333,6 +335,7 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/user-modules` · 7 codes
 | `SEAT_LIMIT_REACHED` | 422 |
 | `SUBSCRIPTION_NOT_FOUND` | 404 |
 | `TENANT_CONTEXT_MISSING` | 401 |
+| `TENANT_PERMISSION_SCOPE_UNAVAILABLE` | 403 |
 | `TENANT_USER_NOT_FOUND` | 404 |
 
 ## Workspace settings

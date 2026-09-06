@@ -15,7 +15,15 @@ vi.mock("@/i18n/I18nContext", async (importOriginal) => ({
   useI18n: () => ({ t: en, lang: "en", dir: "ltr" }),
 }));
 
-const EMPTY = { honorificTitle: "", fullName: "", jobTitle: "", email: "", phones: [""] };
+const EMPTY = {
+  honorificTitle: "",
+  fullName: "",
+  firstName: "",
+  lastName: "",
+  jobTitle: "",
+  email: "",
+  phones: [""],
+};
 
 function renderLine(overrides: Partial<CrmContactLineProps> = {}) {
   const onFieldChange = vi.fn();
@@ -25,8 +33,8 @@ function renderLine(overrides: Partial<CrmContactLineProps> = {}) {
         path="contacts.0"
         contact={EMPTY}
         errors={{}}
-        limits={{ fullName: 180, jobTitle: 120, email: 180 }}
-        nameLabel="Contact name"
+        limits={{ name: 80, jobTitle: 120, email: 180 }}
+        directoryNameLabel="Contact name"
         onFieldChange={onFieldChange}
         onPhoneChange={vi.fn()}
         onPhoneAdd={vi.fn()}
@@ -47,9 +55,18 @@ describe("CrmContactLine", () => {
     return [...document.querySelectorAll("label")].map((node) => node.textContent?.trim() ?? "");
   }
 
-  it("puts the five fields on the line, in the order a name is read", () => {
+  // Six now: a new person is named by its two parts, because that is what the
+  // record stores and what stops a form asking for the same name twice.
+  it("puts the six fields on the line, in the order a name is read", () => {
     renderLine();
-    expect(labels()).toEqual(["Honorific", "Contact name *", "Job title", "Phone", "Email"]);
+    expect(labels()).toEqual([
+      "Honorific",
+      "First name *",
+      "Last name",
+      "Job title",
+      "Phone",
+      "Email",
+    ]);
   });
 
   it("stores an honorific's label, which is what the wire field holds", () => {
@@ -91,8 +108,8 @@ describe("CrmContactLine", () => {
     const phoneCell = screen.getByText("Phone").parentElement as HTMLElement;
     expect(phoneCell.querySelectorAll('input[type="tel"]')).toHaveLength(2);
     expect(screen.getByLabelText("Remove phone 2")).toBeInTheDocument();
-    // And the line itself still has five labels, not six.
-    expect(labels()).toHaveLength(5);
+    // And the line itself still has its six labels, with no seventh column.
+    expect(labels()).toHaveLength(6);
   });
 
   it("offers no add control on a form that holds a single number", () => {
@@ -100,10 +117,37 @@ describe("CrmContactLine", () => {
     expect(screen.queryByLabelText(en.crmShared.addPhone)).toBeNull();
   });
 
+  // The regression this pins: the editable pair is a FIRST name and a LAST
+  // name, and the label over the first box came from the caller. Every contact
+  // list passed "Contact name" — a whole-name label — so the row read
+  // "Contact name" beside "Last name", which is not a pair of anything. The
+  // caller's label now names only the read-only box a directory person gets.
+  it("labels the editable pair as first and last, never with the caller's whole-name label", () => {
+    renderLine({ directoryNameLabel: "Contact name" });
+
+    expect(labels()).toContain("First name *");
+    expect(labels()).toContain("Last name");
+    expect(labels()).not.toContain("Contact name *");
+  });
+
+  it("uses the caller's label for the one box that really holds a whole name", () => {
+    renderLine({
+      directoryOwned: true,
+      directoryNameLabel: "Contact name",
+      contact: { ...EMPTY, fullName: "Dina Adel" },
+    });
+
+    expect(labels()).toContain("Contact name");
+    expect(labels()).not.toContain("First name *");
+  });
+
   it("shows only what a directory person's form can still set", () => {
     // The service ignores every field submitted for a reused party except the
     // job title and the primary flag, so offering the rest would be a lie.
+    // A reused person keeps the single name the directory holds, read-only —
+    // there is nothing here to split into parts.
     renderLine({ directoryOwned: true, contact: { ...EMPTY, fullName: "Dina Adel" } });
-    expect(labels()).toEqual(["Contact name *", "Job title"]);
+    expect(labels()).toEqual(["Contact name", "Job title"]);
+    expect(screen.getByDisplayValue("Dina Adel")).toBeDisabled();
   });
 });

@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Button } from "../../primitives/Button";
 import { BoardView, type BoardViewLabels } from "./BoardView";
 import type { BoardColumnDef } from "./types";
 
@@ -117,6 +118,88 @@ describe("BoardView", () => {
     renderBoard();
     expect(screen.getAllByText("Drop here")).toHaveLength(2);
     expect(screen.getByText("Acme")).toBeInTheDocument();
+  });
+
+  // The footer exists so a card can carry a control on its own line. Inside
+  // the activation surface that control would both open the record on click
+  // and sit within @hello-pangea/dnd's drag handle — the pair of bugs the slot
+  // was added to prevent.
+  it("keeps the footer and the per-card classes off the activation surface", () => {
+    renderBoard({
+      renderFooter: (item) => <Button size="xs">Rate {item.name}</Button>,
+      cardClassName: () => "border-swatch-teal",
+    });
+
+    const surface = screen.getByRole("button", { name: "Acme" });
+    const footerControl = screen.getByRole("button", { name: "Rate Acme" });
+    expect(surface).not.toContainElement(footerControl);
+    expect(document.querySelector(".border-swatch-teal")).toContainElement(footerControl);
+  });
+
+  // Placement alone proved nothing: a control can sit outside the activation
+  // surface and still have its click eaten by the drag layer above it, or
+  // swallowed into opening the card. This presses it.
+  it("lets a footer control run on click, without opening the card", () => {
+    const onRate = vi.fn();
+    const onActivate = vi.fn();
+    renderBoard({
+      onActivate,
+      renderFooter: (item) => (
+        <Button size="xs" onClick={() => onRate(item.id)}>
+          Rate {item.name}
+        </Button>
+      ),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rate Acme" }));
+
+    expect(onRate).toHaveBeenCalledTimes(1);
+    expect(onActivate).not.toHaveBeenCalled();
+  });
+
+  it("drops the 'Move to…' trigger when the screen supplies no label for it", () => {
+    renderBoard({ labels: { ...labels, moveTo: undefined } });
+    expect(screen.queryByRole("button", { name: "Move to" })).toBeNull();
+  });
+
+  // jsdom has no layout, so this is a CLASS contract and not a measurement —
+  // a browser is what proves the pixels. What it pins is the half that
+  // regresses silently: every column asking for the pane's full height itself,
+  // and its body being the thing that scrolls. Left to the row's default
+  // `align-items: stretch`, one `items-start` on that row would collapse every
+  // column back onto its cards with nothing to catch it; and a body without
+  // `min-h-0` grows past the column and hands the ROW a second scrollbar
+  // instead of scrolling the cards.
+  it("runs every column to the bottom of the pane and scrolls the cards inside it", () => {
+    renderBoard();
+    const body = document.querySelector('[data-rfd-droppable-id="new"]') as HTMLElement;
+    const column = body.parentElement as HTMLElement;
+
+    expect(column.className).toContain("h-full");
+    expect(column.className).toContain("min-h-0");
+    expect(body.className).toContain("min-h-0");
+    expect(body.className).toContain("flex-1");
+    expect(body.className).toContain("overflow-y-auto");
+
+    // The empty column's dashed zone is `flex-1`, so with the column now full
+    // height the drop target is the whole column rather than the inch its
+    // heading occupies.
+    const empty = document.querySelector('[data-rfd-droppable-id="qualified"]') as HTMLElement;
+    expect(within(empty).getByText("Drop here").className).toContain("flex-1");
+  });
+
+  it("summarises a column with a bar whose counts are also readable as text", () => {
+    renderBoard({
+      columns: [
+        {
+          ...columns[0],
+          segments: [{ id: "OVERDUE", label: "Overdue", value: 1, tone: "negative" }],
+          segmentsLabel: "Activity",
+        },
+        ...columns.slice(1),
+      ],
+    });
+    expect(screen.getByRole("img", { name: "Activity — Overdue: 1" })).toBeInTheDocument();
   });
 
   it("carries pagination and selection, which switching away from the table no longer drops (V2)", () => {

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Field } from "@/design-system";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";
-import { CrmCountrySelect } from "./CrmCountrySelect";
+import { AddressCountrySelect } from "./AddressCountrySelect";
 
 afterEach(cleanup);
 
@@ -22,7 +22,7 @@ function Harness({ initial = "" }: { initial?: string }) {
   return (
     <I18nProvider>
       <Field label="Country">
-        <CrmCountrySelect value={value} onChange={setValue} onBlur={() => undefined} />
+        <AddressCountrySelect value={value} onChange={setValue} onBlur={() => undefined} />
       </Field>
       <output data-testid="stored">{value}</output>
     </I18nProvider>
@@ -32,7 +32,7 @@ function Harness({ initial = "" }: { initial?: string }) {
 const stored = () => screen.getByTestId("stored").textContent;
 const trigger = () => screen.getByLabelText("Country");
 
-describe("CrmCountrySelect", () => {
+describe("AddressCountrySelect", () => {
   it("stores the name the DTO's free-text country actually takes", () => {
     render(<Harness />);
     fireEvent.click(trigger());
@@ -70,7 +70,7 @@ describe("CrmCountrySelect", () => {
 
   it("clears back to nothing, because the DTO's country is optional", () => {
     render(<Harness initial="Egypt" />);
-    fireEvent.click(screen.getByRole("button", { name: en.crmShared.clearCountry }));
+    fireEvent.click(screen.getByRole("button", { name: en.address.clearCountry }));
     expect(stored()).toBe("");
   });
 });

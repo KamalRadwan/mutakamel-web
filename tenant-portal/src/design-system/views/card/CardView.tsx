@@ -28,6 +28,12 @@ export interface CardViewProps<T> extends Omit<WorkspaceViewProps<T>, "labels"> 
   // Per-card controls that must not open the card — they render outside the
   // activation surface, exactly as they do on a board card.
   renderActions?: (item: T) => ReactNode;
+  // The card object is shared with the board, and so are its two other slots:
+  // a full-width strip below the header row, and per-card surface classes.
+  // The prop names are deliberately identical, so one screen hands both views
+  // the same callbacks instead of maintaining two card designs.
+  renderFooter?: (item: T) => ReactNode;
+  cardClassName?: (item: T) => string | undefined;
   // The entity's sortable fields, already translated. Omit them and the sort
   // control does not render — which is the honest state for a list the server
   // will not sort.
@@ -44,6 +50,8 @@ export function CardView<T>({
   itemKey,
   renderCard,
   renderActions,
+  renderFooter,
+  cardClassName,
   sortOptions = [],
   isLoading,
   error,
@@ -158,6 +166,8 @@ export function CardView<T>({
                 onSelectedChange={selection ? (next) => toggleSelected(id, next) : undefined}
                 selectLabel={labels.selectRow}
                 actions={renderActions?.(item)}
+                footer={renderFooter?.(item)}
+                className={cardClassName?.(item)}
               >
                 {renderCard(item)}
               </WorkspaceCard>

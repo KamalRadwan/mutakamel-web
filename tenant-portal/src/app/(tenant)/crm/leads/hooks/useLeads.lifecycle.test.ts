@@ -6,18 +6,19 @@ import { TenantApiClientError } from "@/lib/api/axiosClient";
 import { useLeadCapabilities } from "./useLeadCapabilities";
 import { useLeads } from "./useLeads";
 
-const { auth, get } = vi.hoisted(() => ({ auth: vi.fn(), get: vi.fn() }));
+const { auth, get, post } = vi.hoisted(() => ({ auth: vi.fn(), get: vi.fn(), post: vi.fn() }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => auth() as unknown }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: { crmLeads: { messages: {} } } }) }));
 vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api/axiosClient")>();
-  return { ...actual, axiosClient: { ...actual.axiosClient, get } };
+  return { ...actual, axiosClient: { ...actual.axiosClient, get, post } };
 });
 
 const COMPANY = "0192f3a0-0000-7000-8000-000000000001";
 const BRANCH = "0192f3a0-0000-7000-8000-000000000002";
 const OTHER_BRANCH = "0192f3a0-0000-7000-8000-000000000003";
 const LEADS_PATH = "/api/tenant/crm/v1/leads";
+const LEADS_SEARCH_PATH = "/api/tenant/crm/v1/leads/search";
 
 function serverError(status: number): TenantApiClientError {
   return new TenantApiClientError("Request failed", {
@@ -41,6 +42,7 @@ beforeEach(() => {
     },
   });
   get.mockImplementation((url: string) => Promise.reject(serverError(url.includes("capabilities") ? 400 : 500)));
+  post.mockImplementation(() => Promise.reject(serverError(500)));
 });
 
 afterEach(() => {
@@ -48,6 +50,7 @@ afterEach(() => {
   vi.useRealTimers();
   auth.mockReset();
   get.mockReset();
+  post.mockReset();
 });
 
 describe("leads request lifecycle", () => {
@@ -124,29 +127,91 @@ describe("leads request lifecycle", () => {
     // Changing the filter starts the result set over, exactly as the old
     // free-text search did.
     act(() =>
-      result.current.setSearch({ mode: "basic", rows: [{ field: "status", value: "OPEN" }] }),
+      result.current.setSearch({
+        ...result.current.search,
+        basic: { field: "status", value: "OPEN" },
+      }),
     );
     await act(async () => { await vi.advanceTimersByTimeAsync(250); });
     expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&status=OPEN`);
 
     act(() =>
-      result.current.setSearch({ mode: "basic", rows: [{ field: "text", value: " acme " }] }),
-    );
-    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
-    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&search=acme`);
-
-    // Advanced mode sends one key per condition, AND-ed by the server.
-    act(() =>
       result.current.setSearch({
-        mode: "advanced",
-        rows: [
-          { field: "text", value: "acme" },
-          { field: "status", value: "OPEN" },
-        ],
+        ...result.current.search,
+        basic: { field: "text", value: " acme " },
       }),
     );
     await act(async () => { await vi.advanceTimersByTimeAsync(250); });
-    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&search=acme&status=OPEN`);
+    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&search=acme`);
+  });
+
+  // Requirement 4: advanced is BUTTON-DRIVEN. Editing a condition builds a
+  // draft and nothing else — the tree's intermediate states are all different
+  // questions, and most of them are the expensive ones.
+  it("posts the filter tree only once Search is pressed", async () => {
+    const { result } = renderHook(() => useLeads());
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    const listCalls = () =>
+      get.mock.calls.filter(([url]) => (url as string).startsWith(`${LEADS_PATH}?`)).length;
+
+    // Entering advanced applies once, so basic's filter stops answering the
+    // moment its controls leave the screen.
+    act(() => result.current.setSearch({ ...result.current.search, mode: "advanced" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(post).toHaveBeenCalledTimes(1);
+    const listsAfterSwitch = listCalls();
+
+    // Two ANDed conditions in one group, then a second group for the OR.
+    act(() =>
+      result.current.setSearch({
+        ...result.current.search,
+        groups: [
+          {
+            conditions: [
+              { field: "status", operator: "eq", value: "OPEN", valueTo: "" },
+              { field: "stageFlag", operator: "eq", value: "QUALIFIED", valueTo: "" },
+            ],
+          },
+          {
+            conditions: [
+              { field: "createdAt", operator: "gte", value: "2026-01-01", valueTo: "" },
+            ],
+          },
+        ],
+      }),
+    );
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+    // Not one more request, on either verb.
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(listCalls()).toBe(listsAfterSwitch);
+
+    act(() => result.current.submitSearch());
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(post).toHaveBeenLastCalledWith(
+      LEADS_SEARCH_PATH,
+      {
+        branchId: BRANCH,
+        filterTree: {
+          op: "OR",
+          children: [
+            {
+              op: "AND",
+              children: [
+                { field: "status", operator: "eq", value: "OPEN" },
+                { field: "stageFlag", operator: "eq", value: "QUALIFIED" },
+              ],
+            },
+            { field: "createdAt", operator: "gte", value: "2026-01-01" },
+          ],
+        },
+        sort: "createdAt:DESC",
+        page: 1,
+        limit: 50,
+      },
+      // A POST that reads: no idempotency key, and replayable after a refresh.
+      expect.objectContaining({ skipAutoIdempotency: true, replayAfterRefresh: true }),
+    );
   });
 
   it("does not retry failed detail capabilities on state renders", async () => {

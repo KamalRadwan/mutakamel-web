@@ -23,7 +23,11 @@ export interface BoardCardMove {
 
 export interface BoardViewLabels extends WorkspaceViewLabels {
   emptyColumn: string;
-  moveTo: string;
+  // Omitting this removes the "Move to…" trigger from every card, and with it
+  // the board's only single-pointer alternative to dragging (WCAG 2.2 AA
+  // `dragging-alternative`). A screen that omits it owes its users that
+  // alternative somewhere else.
+  moveTo?: string;
 }
 
 // The board implements the shared contract minus sorting, and that omission is
@@ -40,6 +44,13 @@ export interface BoardViewProps<T> extends Omit<WorkspaceViewProps<T>, "sort" | 
   // Per-card controls that must not open the card — they render outside the
   // activation surface, beside the "Move to…" trigger.
   renderActions?: (item: T) => ReactNode;
+  // A full-width strip below the card's header row, also outside the
+  // activation surface: the place for a control that has to sit on its own
+  // line and still not open the card.
+  renderFooter?: (item: T) => ReactNode;
+  // Per-card surface classes — a user-chosen card colour, and nothing that
+  // changes the card's size.
+  cardClassName?: (item: T) => string | undefined;
   canDrag?: (item: T) => boolean;
   // Which destinations "Move to…" may offer for an item. Defaults to every
   // column except the one it is already in. Gate it with the same rule that
@@ -65,6 +76,8 @@ export function BoardView<T>({
   itemKey,
   renderCard,
   renderActions,
+  renderFooter,
+  cardClassName,
   canDrag,
   canMoveTo,
   confirmMove,
@@ -150,6 +163,8 @@ export function BoardView<T>({
           }),
         moveToLabel: labels.moveTo,
         actions: renderActions?.(item),
+        footer: renderFooter?.(item),
+        className: cardClassName?.(item),
         content: renderCard(item),
       };
     });

@@ -1,10 +1,10 @@
 "use client";
 
-import { Field, FormSection, Input } from "@/design-system";
+import { FormSection, Field, Input } from "@/design-system";
+import { AddressPlaceFields } from "@/components/address/AddressPlaceFields";
 import { useI18n } from "@/i18n/I18nContext";
 import { LEAD_CREATE_LIMITS, type LeadAddressForm } from "../../lead-create-contract";
 import type { LeadCreateErrors } from "../../lead-create-validation";
-import { CrmCountrySelect } from "../../../shared/components/CrmCountrySelect";
 
 export interface LeadAddressSectionProps {
   address: LeadAddressForm;
@@ -35,11 +35,10 @@ export function LeadAddressSection({
   const { t } = useI18n();
   const limits = LEAD_CREATE_LIMITS;
 
-  // `country` is not in this list: it is a catalogue, not a free line, and it
-  // renders from `CrmCountrySelect` below.
+  // Country, state and city are not in this list: they are one cascading
+  // catalogue rather than three free lines, and `AddressPlaceFields` renders
+  // them above.
   const rows: Array<{ key: keyof LeadAddressForm; label: string; max: number }> = [
-    { key: "city", label: t.crmLeads.create.city, max: limits.addressMedium },
-    { key: "state", label: t.crmLeads.create.state, max: limits.addressMedium },
     { key: "street1", label: t.crmLeads.create.street1, max: limits.addressLong },
     { key: "street2", label: t.crmLeads.create.street2, max: limits.addressShort },
     { key: "buildingNo", label: t.crmLeads.create.buildingNo, max: limits.addressShort },
@@ -54,14 +53,27 @@ export function LeadAddressSection({
       title={t.crmLeads.create.sections.address}
       columns={3}
     >
-      <Field label={t.crmLeads.create.country} error={errors["address.country"]}>
-        <CrmCountrySelect
-          value={address.country}
-          disabled={disabled}
-          onChange={(next) => onChange("country", next)}
-          onBlur={() => onBlur("address.country")}
-        />
-      </Field>
+      <AddressPlaceFields
+        values={{ country: address.country, state: address.state, city: address.city }}
+        labels={{
+          country: t.crmLeads.create.country,
+          state: t.crmLeads.create.state,
+          city: t.crmLeads.create.city,
+        }}
+        errors={errors}
+        errorPrefix="address"
+        maxLength={limits.addressMedium}
+        disabled={disabled}
+        onChange={(patch) => {
+          // Written key by key rather than spread, because the form's own
+          // setter takes one field at a time and its updater is functional —
+          // the three writes still land in a single render.
+          if (patch.country !== undefined) onChange("country", patch.country);
+          if (patch.state !== undefined) onChange("state", patch.state);
+          if (patch.city !== undefined) onChange("city", patch.city);
+        }}
+        onBlur={onBlur}
+      />
 
       {rows.map((row) => (
         <Field key={row.key} label={row.label} error={errors[`address.${row.key}`]}>

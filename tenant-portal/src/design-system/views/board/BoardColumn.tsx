@@ -4,6 +4,7 @@ import { Droppable } from "@hello-pangea/dnd";
 import { Badge } from "../../primitives/Badge";
 import { cn } from "../../lib/cn";
 import { BoardCard, type BoardCardModel } from "./BoardCard";
+import { ColumnSegmentBar } from "./ColumnSegmentBar";
 import { VirtualColumnBody } from "./VirtualColumnBody";
 import { VIRTUALIZE_ABOVE } from "./useColumnWindow";
 import type { BoardColumnDef } from "./types";
@@ -28,7 +29,14 @@ const COLUMN_BODY_PADDING = "p-1.5";
 
 // A plain overflow-y-auto element, deliberately NOT a Radix ScrollArea —
 // task 2.17.
-const COLUMN_BODY_CLASS = `flex flex-1 flex-col gap-1.5 overflow-y-auto ${COLUMN_BODY_PADDING}`;
+//
+// `min-h-0` is not decoration. `flex-1` alone leaves a column flex item at
+// `min-height: auto`, and the only reason that resolves to 0 here is the
+// `overflow-y-auto` sitting beside it. Stating it makes the internal scroll
+// independent of that coincidence: whatever else changes on this element, the
+// body shrinks to the column and the CARDS scroll — never the row, and never
+// the page.
+const COLUMN_BODY_CLASS = `flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto ${COLUMN_BODY_PADDING}`;
 
 export interface BoardColumnProps {
   column: BoardColumnDef;
@@ -44,26 +52,44 @@ export interface BoardColumnProps {
 // top border in the mapped outcome role only when the stage carries one;
 // intermediate stages get no color at all — stage is conveyed by column
 // position and label, never a hue. See docs/design/DESIGN-SYSTEM.md#board-view.
+//
+// `h-full min-h-0` is what makes every column run to the bottom of the pane,
+// so a stage holding one card lines up with the stage holding forty and the
+// drop zone covers the whole column rather than the inch its cards occupy.
+// The row's default `align-items: stretch` produced the same height, and that
+// is exactly the problem: it is a default, invisible at this call site, and one
+// `items-start` on the row away from silently collapsing every column back onto
+// its content. Asked for here, it holds whatever the row does.
 export function BoardColumn({ column, emptyLabel, cards }: BoardColumnProps) {
   return (
     <div
       className={cn(
-        "flex w-70 shrink-0 flex-col rounded-md border border-border bg-card",
+        "flex h-full min-h-0 w-70 shrink-0 flex-col rounded-md border border-border bg-card",
         column.outcomeRole ? cn("border-t-2", OUTCOME_BORDER[column.outcomeRole]) : "",
       )}
     >
-      <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-1.5">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate text-xs font-medium text-foreground">{column.label}</span>
-          <Badge tone="neutral">{column.count}</Badge>
-          {column.overdueCount !== undefined && column.overdueCount > 0 && (
-            <span className="size-1.5 shrink-0 rounded-full bg-caution-500" aria-hidden="true" />
+      <div className="flex shrink-0 flex-col gap-1.5 border-b border-border px-2 py-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-xs font-medium text-foreground">{column.label}</span>
+            <Badge tone="neutral">{column.count}</Badge>
+            {column.overdueCount !== undefined && column.overdueCount > 0 && (
+              <span className="size-1.5 shrink-0 rounded-full bg-caution-500" aria-hidden="true" />
+            )}
+          </div>
+          {column.amountLabel && (
+            <span className="shrink-0 font-mono text-2xs tabular-nums text-muted-foreground">
+              {column.amountLabel}
+            </span>
           )}
         </div>
-        {column.amountLabel && (
-          <span className="shrink-0 font-mono text-2xs tabular-nums text-muted-foreground">
-            {column.amountLabel}
-          </span>
+
+        {/* Inside the heading block, not floating above the column, so the
+            bars across the row share one baseline whatever the labels wrap
+            to. It is a picture of the CARDS THIS COLUMN CURRENTLY HOLDS —
+            see ColumnSegmentBar and the caller that builds the segments. */}
+        {column.segments && column.segmentsLabel && (
+          <ColumnSegmentBar segments={column.segments} label={column.segmentsLabel} />
         )}
       </div>
 

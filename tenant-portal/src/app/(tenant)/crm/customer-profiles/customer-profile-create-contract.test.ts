@@ -68,16 +68,16 @@ describe("buildCreateCustomerProfileFullRequest — corporate", () => {
     const request = buildCreateCustomerProfileFullRequest(
       form({
         contacts: [
-          { ...emptyCustomerContactRow("a"), fullName: "", isPrimary: true },
-          { ...emptyCustomerContactRow("b"), fullName: "Dina Ali", isPrimary: false },
-          { ...emptyCustomerContactRow("c"), fullName: "Omar Nabil", isPrimary: false },
+          { ...emptyCustomerContactRow("a"), firstName: "", lastName: "", isPrimary: true },
+          { ...emptyCustomerContactRow("b"), firstName: "Dina", lastName: "Ali", isPrimary: false },
+          { ...emptyCustomerContactRow("c"), firstName: "Omar", lastName: "Nabil", isPrimary: false },
         ],
       }),
       BRANCH_ID,
     );
     expect(request.contacts).toEqual([
-      { fullName: "Dina Ali", isPrimary: true },
-      { fullName: "Omar Nabil" },
+      { firstName: "Dina", lastName: "Ali", isPrimary: true },
+      { firstName: "Omar", lastName: "Nabil" },
     ]);
   });
 
@@ -125,7 +125,7 @@ describe("buildCreateCustomerProfileFullRequest — individual", () => {
       companyEmail: "a@b.co",
       companyWebsite: "https://acme.example",
       companyPhones: ["0100"],
-      contacts: [{ ...emptyCustomerContactRow("a"), fullName: "Dina" }],
+      contacts: [{ ...emptyCustomerContactRow("a"), firstName: "Dina", lastName: "" }],
     });
     for (const key of [
       "companyName",
@@ -180,7 +180,7 @@ describe("validateCreateCustomerProfile", () => {
       messages,
     );
     // The builder drops nameless rows, so without this the email would vanish.
-    expect(errors["contacts.0.fullName"]).toBe("Required.");
+    expect(errors["contacts.0.firstName"]).toBe("Required.");
   });
 
   it("leaves an entirely empty contact row alone", () => {

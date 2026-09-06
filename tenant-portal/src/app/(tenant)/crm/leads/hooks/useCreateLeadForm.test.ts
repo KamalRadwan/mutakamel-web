@@ -118,29 +118,31 @@ describe("phone rows", () => {
 describe("when errors are allowed to speak", () => {
   it("stays silent until the field is blurred, then tracks it live", () => {
     const { result } = setup();
-    // Display name is empty and therefore invalid from the first render — and
-    // saying so before the user has touched it is the behaviour this avoids.
-    expect(result.current.allErrors.displayName).toBe("Required.");
-    expect(result.current.errors.displayName).toBeUndefined();
+    // The first name is empty and therefore invalid from the first render —
+    // and saying so before the user has touched it is the behaviour this
+    // avoids. It is the field the default INDIVIDUAL shape cannot do without,
+    // because CRM composes the lead's rendered name from it.
+    expect(result.current.allErrors.firstName).toBe("Required.");
+    expect(result.current.errors.firstName).toBeUndefined();
 
-    act(() => result.current.touch("displayName"));
-    expect(result.current.errors.displayName).toBe("Required.");
+    act(() => result.current.touch("firstName"));
+    expect(result.current.errors.firstName).toBe("Required.");
 
-    act(() => result.current.setField("displayName", "Sara"));
-    expect(result.current.errors.displayName).toBeUndefined();
+    act(() => result.current.setField("firstName", "Sara"));
+    expect(result.current.errors.firstName).toBeUndefined();
   });
 
   it("reveals every field at once on submit, including ones never focused", () => {
     const { result } = setup();
     act(() => result.current.revealAll());
-    expect(result.current.errors.displayName).toBe("Required.");
+    expect(result.current.errors.firstName).toBe("Required.");
     // Client-side only — the DTO marks `acquisitionSourceId` `@IsOptional()`.
     expect(result.current.errors.acquisitionSourceId).toBe("Required.");
   });
 
   it("goes back to silent after a reset, and stops being dirty", () => {
     const { result } = setup();
-    act(() => result.current.setField("displayName", "Sara"));
+    act(() => result.current.setField("firstName", "Sara"));
     expect(result.current.isDirty).toBe(true);
 
     act(() => result.current.revealAll());

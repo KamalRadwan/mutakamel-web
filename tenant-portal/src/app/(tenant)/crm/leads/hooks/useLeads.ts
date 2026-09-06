@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import type { CardColor } from "@/design-system";
 import {
   SCOPE_UNRESOLVED_ERROR,
   useOrganizationScopeHeaders,
@@ -20,11 +21,29 @@ import {
   type LeadStageFlag,
 } from "../../lead-stages/lead-stage-contract";
 import {
+  createCrmWriteAttempt,
+  isAmbiguousWriteFailure,
+  runCrmWrite,
+} from "../../shared/crm-write";
+import {
+  buildLeadCardPatchBody,
+  parseLeadCardColor,
+  parseLeadNextActivity,
+  parseLeadOwner,
+  parseLeadRating,
+  parseLeadTags,
+  type LeadCardPatch,
+  type LeadNextActivity,
+  type LeadOwner,
+  type LeadTag,
+} from "../lead-card-contract";
+import {
   buildCreateLeadRequest,
   type CreateLeadForm,
 } from "../lead-create-contract";
 import {
   EMPTY_LEAD_SEARCH,
+  buildLeadSearchRequest,
   buildLeadsListQuery,
   type LeadSearchState,
 } from "../lead-search-contract";
@@ -48,6 +67,25 @@ export interface LeadItem {
   sourceNameEn: string;
   stageId: string;
   ownerUserId: string | null;
+  // The board card's four fields. `ownerUserId` stays the capability key it
+  // has always been — it is present on every lead — while `owner` carries the
+  // NAMES the card draws initials from and is null whenever they are unknown.
+  rating: number;
+  cardColor: CardColor | null;
+  owner: LeadOwner | null;
+  nextActivity: LeadNextActivity | null;
+  /**
+   * The primary contact behind a CORPORATE lead — the card's second line.
+   *
+   * Null on an individual lead, and that is how the card tells the two apart:
+   * the list projects no `leadProfileType`, and comparing `company` with
+   * `leadName` cannot do it, because CRM composes a corporate lead's display
+   * name FROM its company name, so the two are equal on exactly the leads that
+   * do have a contact to show.
+   */
+  primaryContactName: string;
+  /** The card's tag chips. Empty for an untagged lead and for a row that omits the field. */
+  tags: LeadTag[];
 }
 
 export interface LeadActionCapability {
@@ -140,6 +178,12 @@ function parseLead(value: unknown, expectedBranchId: string): LeadItem {
       lead.ownerUserId === null || lead.ownerUserId === undefined
         ? null
         : requiredUuidV7(lead, "ownerUserId", "leads"),
+    rating: parseLeadRating(lead.rating),
+    cardColor: parseLeadCardColor(lead.cardColor),
+    owner: parseLeadOwner(lead.owner),
+    nextActivity: parseLeadNextActivity(lead.nextActivity),
+    primaryContactName: optionalString(lead.primaryContactName),
+    tags: parseLeadTags(lead.tags),
   };
 }
 
@@ -324,14 +368,20 @@ export function useLeads() {
   const [capabilities, setCapabilities] = useState<LeadCapabilities | null>(
     null,
   );
-  // Conditions of `[field] [value]`, AND-ed — the whole of what this screen
-  // may ask the list endpoint, one of them in basic mode and up to one per
-  // field in advanced. `lead-search-contract` owns which wire key each field
-  // becomes, and refuses to name two rows the same one.
+  // The question ON SCREEN. In basic mode it is also the question on the wire;
+  // in advanced mode it is a draft the user is still building, and only the
+  // card's Search button promotes it. `lead-search-contract` owns every wire
+  // name either mode may produce.
   const [search, setSearch] = useState<LeadSearchState>(EMPTY_LEAD_SEARCH);
+  // The question ON THE WIRE. Split from the draft because a filter tree is
+  // built one control at a time and every intermediate state is a different
+  // query — usually an expensive one nobody asked for.
+  const [appliedSearch, setAppliedSearch] = useState<LeadSearchState>(EMPTY_LEAD_SEARCH);
   const [page, setPage] = useState(1);
   const sortRef = useRef(DEFAULT_LEADS_SORT);
   const [sort, setSortState] = useState(DEFAULT_LEADS_SORT);
+  // Mirrors `appliedSearch` for the async mutation handlers, which reload the
+  // list long after the render that changed it.
   const searchRef = useRef<LeadSearchState>(EMPTY_LEAD_SEARCH);
   const pageRef = useRef(1);
   const requestEpochRef = useRef(0);
@@ -347,6 +397,10 @@ export function useLeads() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
   const movingLeadRef = useRef<string | null>(null);
+  // Leads with a card write in flight. A ref and not state: it gates the next
+  // click, and re-rendering every card because one of them is saving a star is
+  // exactly the jitter the optimistic update exists to avoid.
+  const cardWritesRef = useRef<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   // The list fetch's own failure, kept apart from `error` (which carries
   // write feedback). The views take this one, so a load failure REPLACES the
@@ -385,23 +439,46 @@ export function useLeads() {
     setPage(1);
   }, []);
 
-  // Any change to the filter — a field, a value, a condition added or removed,
-  // a mode switch, or a reset — starts the result set over: page 4 of a name
-  // search is not page 4 of a status filter.
+  /**
+   * A change to the question on screen, and — for basic mode only — to the
+   * question on the wire.
+   *
+   * Basic answers as you type; the 250 ms debounce on the fetch effect below
+   * is what coalesces the keystrokes. Advanced does NOT: editing a condition
+   * must not fire a request, so the draft moves and the wire does not until
+   * `submitSearch` runs.
+   *
+   * The one exception is the mode switch itself. Arriving in advanced applies
+   * once, so basic's filter stops answering the moment its controls leave the
+   * screen — a list still narrowed by a filter nobody can see is worse than an
+   * unfiltered one.
+   *
+   * Applying also starts the result set over: page 4 of a name search is not
+   * page 4 of a status filter.
+   */
   const changeSearch = useCallback(
     (next: LeadSearchState) => {
-      searchRef.current = next;
       setSearch(next);
+      if (next.mode === "advanced" && searchRef.current.mode === "advanced") return;
+      searchRef.current = next;
+      setAppliedSearch(next);
       changePage(1);
     },
     [changePage],
   );
 
+  /** Advanced mode's Search button: promote the draft, and run it. */
+  const submitSearch = useCallback(() => {
+    searchRef.current = search;
+    setAppliedSearch(search);
+    changePage(1);
+  }, [changePage, search]);
+
   const fetchLeads = useCallback(
     async (
       signal?: AbortSignal,
       requestedPage = page,
-      requestedSearch: LeadSearchState = search,
+      requestedSearch: LeadSearchState = appliedSearch,
     ): Promise<boolean> => {
       const requestEpoch = requestEpochRef.current + 1;
       requestEpochRef.current = requestEpoch;
@@ -431,14 +508,35 @@ export function useLeads() {
       setDegraded(NO_DEGRADATION);
       try {
         const readPage = (requestedPageNumber: number) => {
-          const query = buildLeadsListQuery({
+          const window = {
             branchId,
             page: requestedPageNumber,
             limit: 50,
             sortBy: sortRef.current.id,
-            sortDir: sortRef.current.direction === "asc" ? "ASC" : "DESC",
-            search: requestedSearch,
-          });
+            sortDir:
+              sortRef.current.direction === "asc" ? ("ASC" as const) : ("DESC" as const),
+          };
+          // Two endpoints, ONE parser: `POST /leads/search` answers with the
+          // same `{ items, total, page, limit, totalPages, hasNext, hasPrev }`
+          // envelope the list route does, so nothing below this line branches.
+          if (requestedSearch.mode === "advanced") {
+            return axiosClient.post<unknown>(
+              "/api/tenant/crm/v1/leads/search",
+              buildLeadSearchRequest(requestedSearch, window),
+              {
+                signal,
+                cache: "no-store",
+                maxResponseBytes: 1024 * 1024,
+                // A POST that READS. It has no idempotency key because there
+                // is nothing to make idempotent, and it may be replayed after
+                // a token refresh for the same reason a GET may — re-running
+                // it changes nothing.
+                skipAutoIdempotency: true,
+                replayAfterRefresh: true,
+              },
+            );
+          }
+          const query = buildLeadsListQuery({ ...window, search: requestedSearch });
           return axiosClient.get<unknown>(
             `/api/tenant/crm/v1/leads?${query.toString()}`,
             {
@@ -551,7 +649,7 @@ export function useLeads() {
         }
       }
     },
-    [branchId, capabilityScope, changePage, page, search],
+    [appliedSearch, branchId, capabilityScope, changePage, page],
   );
 
   useEffect(() => {
@@ -576,43 +674,55 @@ export function useLeads() {
     }
 
     setError(null);
-    try {
-      const response = await axiosClient.post<unknown>(
-        "/api/tenant/crm/v1/leads",
-        buildCreateLeadRequest(form, branchId),
-        {
-          nonReplayable: true,
-          skipAutoIdempotency: true,
-          cache: "no-store",
-          maxResponseBytes: 256 * 1024,
-        },
-      );
+    // `POST /crm/leads` is `idempotencyMode: WRITE_SENSITIVE` with
+    // `idempotent: true` in the Gateway contract, so it answers 400
+    // GW.IDEM.MISSING without an `x-idempotency-key`. The key is minted per
+    // SAVE PRESS rather than left to the transport: `runCrmWrite` reuses one
+    // key across every retry of the same attempt, which is what stops a retry
+    // from filing a second lead — and it reads `Idempotency-Replayed` as the
+    // success it is rather than as a conflict. crm-write.ts, rules 1 and 2.
+    const attempt = createCrmWriteAttempt();
+    const outcome = await runCrmWrite({
+      attempt,
+      method: "post",
+      path: "/api/tenant/crm/v1/leads",
+      body: buildCreateLeadRequest(form, branchId),
       // Validated against the branch the lead was FILED INTO, not the one the
       // list happens to be showing. `parseLead` throws on a branch mismatch,
       // so passing the page's branch reported a lead that was created — and
       // is sitting in the other branch — as a failure, which invites the user
       // to create it a second time. D25.
-      parseLeadResponse(response.data, form.branchId || branchId);
+      parse: (payload) => parseLeadResponse(payload, form.branchId || branchId),
+      config: { maxResponseBytes: 256 * 1024 },
+    });
+
+    if (outcome.kind === "success") {
       setIsCreateOpen(false);
       changePage(1);
       await fetchLeads(undefined, 1, searchRef.current);
       return true;
-    } catch (caught) {
-      const message = errorMessage(caught, t.crmLeads.messages.createFailed);
-      if (isAmbiguousMutationError(caught)) {
-        changeSearch(EMPTY_LEAD_SEARCH);
-        const reloaded = await fetchLeads(undefined, 1, EMPTY_LEAD_SEARCH);
-        setIsCreateOpen(false);
-        setError(
-          reloaded
-            ? t.crmLeads.messages.createAmbiguousRefreshed
-            : t.crmLeads.messages.createAmbiguousStale,
-        );
-      } else {
-        setError(message);
-      }
+    }
+
+    if (outcome.kind === "failed") {
+      setError(outcome.error.message || t.crmLeads.messages.createFailed);
       return false;
     }
+
+    // `ambiguous` and `applied_unreadable` share this exit on purpose. Under
+    // one the lead may exist and under the other it does exist; in both the
+    // only wrong move is to leave the filled form open, because the next Save
+    // is a fresh attempt with a fresh key and therefore a second lead. The
+    // modal closes and the unfiltered first page is reloaded so the user can
+    // see what landed.
+    changeSearch(EMPTY_LEAD_SEARCH);
+    const reloaded = await fetchLeads(undefined, 1, EMPTY_LEAD_SEARCH);
+    setIsCreateOpen(false);
+    setError(
+      reloaded
+        ? t.crmLeads.messages.createAmbiguousRefreshed
+        : t.crmLeads.messages.createAmbiguousStale,
+    );
+    return false;
   };
 
   const handleDelete = async () => {
@@ -656,6 +766,92 @@ export function useLeads() {
       setError(message);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  /**
+   * The card's rating and colour, applied on screen first.
+   *
+   * Optimistic because the alternative is a star that does nothing for a round
+   * trip, which reads as a broken control and gets clicked again. The price is
+   * that a failure has to be VISIBLE: every exit below either adopts the
+   * server's row or puts the old one back, and none of them leaves the new
+   * value sitting on a card the server never accepted.
+   *
+   * Three outcomes, the same three crm-write.ts names:
+   *   - a definite answer, parsed  -> adopt the server's row
+   *   - a definite rejection (<500) -> revert, and say why
+   *   - anything else               -> the write MAY have applied, so revert
+   *     the guess and reload rather than assert either state
+   *
+   * One write per lead at a time. A second click during the round trip would
+   * capture `previous` from an already-optimistic list, so a later failure
+   * would "revert" to the value being written rather than the stored one.
+   */
+  const updateLeadCard = async (leadId: string, patch: LeadCardPatch) => {
+    if (!branchId || cardWritesRef.current.has(leadId)) return;
+    const previous = items.find(({ id }) => id === leadId);
+    if (
+      !previous ||
+      !capabilityAllowsOwner(capabilities?.update ?? null, previous.ownerUserId)
+    ) {
+      setError(t.crmLeads.messages.cardNotPermitted);
+      return;
+    }
+
+    const restore = (replacement: LeadItem) =>
+      setItems((current) =>
+        current.map((item) => (item.id === leadId ? replacement : item)),
+      );
+
+    cardWritesRef.current.add(leadId);
+    setError(null);
+    restore({ ...previous, ...patch });
+    try {
+      let response: AxiosResponse<unknown>;
+      try {
+        response = await axiosClient.patch<unknown>(
+          `/api/tenant/crm/v1/leads/${encodeURIComponent(leadId)}`,
+          buildLeadCardPatchBody(patch),
+          {
+            // `idempotent: false` in the Gateway route contract: no key to
+            // mint, and nothing to replay after a token refresh — a repeat of
+            // this PATCH is a second write of the same value, never a
+            // duplicate record.
+            nonReplayable: true,
+            skipAutoIdempotency: true,
+            cache: "no-store",
+            maxResponseBytes: 256 * 1024,
+          },
+        );
+      } catch (caught) {
+        // The guess comes off the card either way: a definite rejection means
+        // the write did not happen, and an unknown outcome means the card must
+        // not keep asserting a value nobody confirmed.
+        restore(previous);
+        if (isAmbiguousWriteFailure(caught)) {
+          await fetchLeads(undefined, pageRef.current, searchRef.current);
+          setError(t.crmLeads.messages.cardUpdateAmbiguous);
+          return;
+        }
+        setError(errorMessage(caught, t.crmLeads.messages.cardUpdateFailed));
+        return;
+      }
+
+      // Past this line the write APPLIED, so parsing is outside the block
+      // above on purpose — crm-write.ts's `applied_unreadable`. A body this
+      // client cannot read is a contract failure of a write that already
+      // happened, and reverting would put a stale value back onto a card the
+      // server has already changed. Reload instead, and say the result is
+      // unverified.
+      try {
+        restore(parseLeadResponse(response.data, branchId));
+      } catch {
+        await fetchLeads(undefined, pageRef.current, searchRef.current);
+        setError(t.crmLeads.messages.cardUpdateAmbiguous);
+      }
+    } finally {
+      cardWritesRef.current.delete(leadId);
     }
   };
 
@@ -756,6 +952,7 @@ export function useLeads() {
     degraded,
     search,
     setSearch: changeSearch,
+    submitSearch,
     pageInfo,
     setPage: changePage,
     sort,
@@ -771,6 +968,7 @@ export function useLeads() {
     handleCreate,
     handleDelete,
     moveLead,
+    updateLeadCard,
     fetchLeads,
   };
 }

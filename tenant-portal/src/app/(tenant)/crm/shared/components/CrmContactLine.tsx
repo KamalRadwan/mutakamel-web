@@ -27,7 +27,14 @@ const CRM_PHONE_MAX_LENGTH = 32;
 
 interface CrmContactLineFields {
   honorificTitle: string;
+  /**
+   * Kept for a directory-owned person, whose name this form cannot change and
+   * only displays. A new contact is named by its parts instead — CRM composes
+   * the rendered name, so nobody types the same person's name twice.
+   */
   fullName: string;
+  firstName: string;
+  lastName: string;
   jobTitle: string;
   email: string;
 }
@@ -38,9 +45,23 @@ export interface CrmContactLineProps {
   contact: CrmContactLineFields & { phones: readonly string[] };
   errors: CrmFormErrors;
   disabled?: boolean;
-  /** Caps that differ per record type, from that screen's own contract. */
-  limits: { fullName: number; jobTitle: number; email: number };
-  nameLabel: string;
+  /**
+   * Caps that differ per record type, from that screen's own contract.
+   * `name` caps EACH name part — `@MaxLength(80)` on `firstName` and on
+   * `lastName` — not the composed name, which is the server's to build.
+   */
+  limits: { name: number; jobTitle: number; email: number };
+  /**
+   * Names the single read-only box a DIRECTORY person gets, which really does
+   * hold a whole name — "Contact name" and the like.
+   *
+   * It does NOT name the editable boxes. Those are a first name and a last
+   * name, and they take the shared labels below: a caller that passed
+   * "Contact name" here was putting a whole-name label over a first-name box,
+   * with "Last name" sitting beside it. That is the bug this rename exists to
+   * make unsayable.
+   */
+  directoryNameLabel: string;
   /**
    * A person reused from the directory. The service ignores every field
    * submitted for one except the job title and the primary flag, so the line
@@ -82,7 +103,7 @@ export function CrmContactLine({
   errors,
   disabled,
   limits,
-  nameLabel,
+  directoryNameLabel,
   showJobTitle = true,
   directoryOwned,
   identityHint,
@@ -115,10 +136,18 @@ export function CrmContactLine({
       <div
         className={cn(
           "grid grid-cols-1 gap-x-3 gap-y-3 md:grid-cols-2",
+          // One row at xl, which is what the modal is sized for. The two name
+          // boxes are fixed at 250px each — a first or last name has a known
+          // length and stretching them only padded whitespace — and the slack
+          // goes to the phone column, which holds a dial-code picker, a number
+          // and an add button in one track and was the one control the line
+          // squeezed. On the six-column line the job title and the email give
+          // up a rem each for the same reason: both truncate anyway, and a
+          // half-visible phone number is the one that cannot be read at all.
           // Written out rather than composed: Tailwind reads these as text.
           showJobTitle
-            ? "xl:grid-cols-[5rem_minmax(0,1fr)_13rem_21rem_minmax(0,15rem)]"
-            : "xl:grid-cols-[5rem_minmax(0,1fr)_21rem_minmax(0,15rem)]",
+            ? "xl:grid-cols-[5rem_250px_250px_9rem_minmax(0,1fr)_minmax(0,12rem)]"
+            : "xl:grid-cols-[5rem_250px_250px_minmax(0,1fr)_minmax(0,13rem)]",
         )}
       >
         {!directoryOwned && (
@@ -148,21 +177,40 @@ export function CrmContactLine({
           </Field>
         )}
 
-        <Field
-          label={nameLabel}
-          error={errors[`${path}.fullName`]}
-          required
-          readOnly={directoryOwned}
-          hint={identityHint}
-        >
-          <Input
-            value={contact.fullName}
-            maxLength={limits.fullName}
-            disabled={disabled}
-            onChange={(event) => onFieldChange({ fullName: event.target.value })}
-            onBlur={() => onBlur(`${path}.fullName`)}
-          />
-        </Field>
+        {/* A person from the directory keeps the single, read-only name the
+            directory holds. A new one is typed as two parts, which is what the
+            record actually stores — the rendered name is CRM's to compose. */}
+        {directoryOwned ? (
+          <Field label={directoryNameLabel} readOnly hint={identityHint}>
+            <Input value={contact.fullName} disabled />
+          </Field>
+        ) : (
+          <>
+            <Field
+              label={t.crmLeads.create.firstName}
+              error={errors[`${path}.firstName`]}
+              required
+              hint={identityHint}
+            >
+              <Input
+                value={contact.firstName}
+                maxLength={limits.name}
+                disabled={disabled}
+                onChange={(event) => onFieldChange({ firstName: event.target.value })}
+                onBlur={() => onBlur(`${path}.firstName`)}
+              />
+            </Field>
+            <Field label={t.crmLeads.create.lastName} error={errors[`${path}.lastName`]}>
+              <Input
+                value={contact.lastName}
+                maxLength={limits.name}
+                disabled={disabled}
+                onChange={(event) => onFieldChange({ lastName: event.target.value })}
+                onBlur={() => onBlur(`${path}.lastName`)}
+              />
+            </Field>
+          </>
+        )}
 
         {showJobTitle && (
         <Field label={t.crmLeads.create.contactJobTitle} error={errors[`${path}.jobTitle`]}>

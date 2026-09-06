@@ -166,8 +166,16 @@ different glyphs makes the pair harder to scan, not easier.
 | Money, invoice | `Receipt` |
 | Time, history | `Clock` |
 | Audit event | `History` |
+| Scheduled activity | `Activity` |
 | Settings | `Settings` |
 | Permissions, roles | `KeyRound` |
+
+`Activity` — the pulse line — and never `Zap`. An activity has a due date, and
+a lightning bolt reads as energy or as something instantaneous, which is the
+opposite of scheduled. It is a stroke glyph, so at the `sm` step it carries a
+heavier `strokeWidth={2.5}` — at 14px a hairline polyline is not a mark. The
+weight is lucide's own prop, not `stroke-[2.5]`, which is ambiguous between a
+stroke colour and a stroke width.
 
 ## Checklist
 

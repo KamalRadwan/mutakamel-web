@@ -12,8 +12,13 @@ import {
   SelectValue,
   Switch,
 } from "@/design-system";
+import { AddressPlaceFields } from "@/components/address/AddressPlaceFields";
 import { useI18n } from "@/i18n/I18nContext";
-import { ADDRESS_TYPES, type PartyAddress } from "../../directory-children-contract";
+import {
+  ADDRESS_PLACE_MAX,
+  ADDRESS_TYPES,
+  type PartyAddress,
+} from "../../directory-children-contract";
 import {
   EMPTY_ADDRESS_FORM,
   toAddressForm,
@@ -22,11 +27,9 @@ import {
 
 type TextKey = Exclude<keyof AddressFormValues, "addressType" | "isPrimary">;
 
+// `country`, `area` and `city` are absent: they are the one cascading address
+// template, rendered between the label and the street below.
 const TEXT_FIELDS: TextKey[] = [
-  "label",
-  "country",
-  "city",
-  "area",
   "street",
   "buildingNo",
   "floor",
@@ -103,6 +106,37 @@ export function AddressDrawer({
             </SelectContent>
           </Select>
         </Field>
+
+        <Field label={copy.addressFields.label}>
+          <Input
+            value={values.label}
+            onChange={(event) =>
+              setValues((current) => ({ ...current, label: event.target.value }))
+            }
+            disabled={isSubmitting}
+          />
+        </Field>
+
+        <AddressPlaceFields
+          values={{ country: values.country, state: values.area, city: values.city }}
+          labels={{
+            country: copy.addressFields.country,
+            state: copy.addressFields.area,
+            city: copy.addressFields.city,
+          }}
+          maxLength={ADDRESS_PLACE_MAX}
+          disabled={isSubmitting}
+          onChange={(patch) =>
+            setValues((current) => ({
+              ...current,
+              ...(patch.country === undefined ? {} : { country: patch.country }),
+              // A party address calls its state-or-governorate column `area`;
+              // the template's own name for that level is `state`.
+              ...(patch.state === undefined ? {} : { area: patch.state }),
+              ...(patch.city === undefined ? {} : { city: patch.city }),
+            }))
+          }
+        />
 
         {TEXT_FIELDS.map((key) => (
           <Field key={key} label={copy.addressFields[key]}>

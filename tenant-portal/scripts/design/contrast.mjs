@@ -95,6 +95,43 @@ for (const [ramp, expected] of Object.entries(RAMP_STEPS)) {
   }
 }
 
+/* ---------- The card swatches, both themes ----------
+   Unlike a ramp step, a swatch is declared TWICE under the same name — once on
+   :root and once on .dark — so the name alone cannot address a value. The file
+   is split at the `.dark` block and each half parsed separately, which is also
+   what proves the dark override exists at all: a swatch declared only on :root
+   would land as a missing dark value and fail the count below rather than
+   quietly shipping a light colour onto a dark card. */
+
+const SWATCH_TOKEN = /--swatch-([a-z]+):\s*oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/g;
+const SWATCH_COUNT = 11;
+const darkBlockStart = css.indexOf("\n.dark {");
+if (darkBlockStart < 0) {
+  process.stderr.write("Palette parse failed: no .dark block in globals.css.\n");
+  process.exit(1);
+}
+
+function parseSwatches(section, suffix) {
+  const parsed = {};
+  for (const m of section.matchAll(SWATCH_TOKEN)) {
+    parsed[`swatch-${m[1]}-${suffix}`] = [Number(m[2]), Number(m[3]), Number(m[4])];
+  }
+  return parsed;
+}
+
+const lightSwatches = parseSwatches(css.slice(0, darkBlockStart), "light");
+const darkSwatches = parseSwatches(css.slice(darkBlockStart), "dark");
+for (const [theme, parsed] of [["light", lightSwatches], ["dark", darkSwatches]]) {
+  const found = Object.keys(parsed).length;
+  if (found !== SWATCH_COUNT) {
+    process.stderr.write(
+      `Palette parse failed: expected ${SWATCH_COUNT} ${theme} card swatches in globals.css, found ${found}.\n`,
+    );
+    process.exit(1);
+  }
+}
+Object.assign(T, lightSwatches, darkSwatches);
+
 const rgb = Object.fromEntries(
   Object.entries(T).map(([k, v]) => [k, oklchToLinearSrgb(...v)]),
 );
@@ -144,6 +181,19 @@ const CLAIMS = [
   ["badge caution · dark", "caution-300", "caution-950", 4.5, 10.46],
   ["badge negative · dark", "negative-300", "negative-950", 4.5, 9.24],
 ];
+
+// The eleven card swatches, against the card they paint the border of, in both
+// themes. 3.0 and not 4.5: a card colour is a non-text graphic that never
+// carries meaning on its own — the `…` menu names the chosen colour in words.
+// Appended rather than hand-written so a twelfth swatch is covered the moment
+// it is declared, and `claimed` is null because there is no prose table to
+// drift from.
+for (const name of Object.keys(lightSwatches)) {
+  CLAIMS.push([`card ${name.replace("-light", "")} · light (non-text)`, name, "white", 3.0, null]);
+}
+for (const name of Object.keys(darkSwatches)) {
+  CLAIMS.push([`card ${name.replace("-dark", "")} · dark (non-text)`, name, "ink-950", 3.0, null]);
+}
 
 // The one genuine contrast-driven exclusion. The docs used to claim two more
 // (negative-600 and caution fills); measurement disproved both, and tokens.md

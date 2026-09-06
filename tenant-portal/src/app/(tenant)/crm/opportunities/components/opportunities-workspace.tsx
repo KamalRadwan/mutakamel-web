@@ -35,6 +35,7 @@ import { DeleteOpportunityDialog } from "./DeleteOpportunityDialog";
 import { useOpportunityColumns } from "./useOpportunityColumns";
 import { OpportunityBoardColumn } from "./OpportunityBoardColumn";
 import { OpportunityCardTile } from "./OpportunityCardTile";
+import { OpportunitySearchBar } from "./OpportunitySearchBar";
 import { TerminalMoveDialog } from "./TerminalMoveDialog";
 import { useDeleteOpportunity } from "../hooks/useDeleteOpportunity";
 import { useOpportunityCards } from "../hooks/useOpportunityCards";
@@ -349,24 +350,46 @@ export function OpportunitiesWorkspace() {
         </div>
       )}
 
-      {/* The board shows its stages as columns; the card and table views have
-          nowhere to put them, so the pipeline's shape comes back as a bar
-          above them — and doubles as the stage filter, which both of their
-          endpoints answer. */}
-      {view !== "board" && (selectedPipeline?.stages.length ?? 0) > 0 && (
-        <StageBar
-          label={t.crmOpportunities.stage}
-          allLabel={t.crmOpportunities.allStages}
-          steps={(selectedPipeline?.stages ?? []).map((stage) => ({
-            id: stage.id,
-            label: localizedName(stage, lang),
-            tone: STAGE_BAR_TONE[stage.flag],
-          }))}
-          value={stageId ?? undefined}
-          onChange={selectStage}
+      {/* Table only, and deliberately. Both of its modes read
+          `GET /opportunities` / `POST /opportunities/search`, which return the
+          raw entity the table renders. The board and the card view are stage
+          PROJECTIONS on their own routes (`/pipelines/:id/board`, `/cards`) —
+          they take a stage and a cursor, not a filter tree — so a search bar
+          above them would be a control that changes nothing. */}
+      {view === "table" && (
+        <OpportunitySearchBar
+          value={list.search}
+          onChange={list.changeSearch}
+          onSubmit={list.submitSearch}
+          pipelines={pipelines}
           disabled={!branchId}
         />
       )}
+
+      {/* The board shows its stages as columns; the card and table views have
+          nowhere to put them, so the pipeline's shape comes back as a bar
+          above them — and doubles as the stage filter, which both of their
+          endpoints answer.
+          Hidden while the table is in advanced mode: the search body carries no
+          stage key at all, so the bar would keep highlighting a stage that
+          stopped narrowing anything. The card's own `stage` condition is where
+          that question lives there. */}
+      {view !== "board" &&
+        !(view === "table" && list.search.mode === "advanced") &&
+        (selectedPipeline?.stages.length ?? 0) > 0 && (
+          <StageBar
+            label={t.crmOpportunities.stage}
+            allLabel={t.crmOpportunities.allStages}
+            steps={(selectedPipeline?.stages ?? []).map((stage) => ({
+              id: stage.id,
+              label: localizedName(stage, lang),
+              tone: STAGE_BAR_TONE[stage.flag],
+            }))}
+            value={stageId ?? undefined}
+            onChange={selectStage}
+            disabled={!branchId}
+          />
+        )}
 
       <div className="min-h-0 flex-1">
         {view === "board" && renderBoardPane()}

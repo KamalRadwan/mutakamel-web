@@ -159,14 +159,16 @@ export function CrmPhoneNumberInput({
   return (
     // dir="ltr" on the row, not just the input: a phone number is Latin digits
     // behind a plus and reads code-then-number in both languages.
-    <div className="flex flex-1 items-center gap-1.5" dir="ltr">
+    <div className="flex flex-1 flex-wrap items-center gap-1.5" dir="ltr">
       {/* One label covers two controls, and it names the number. The picker
           opts out of the field rather than claiming the same id, and takes its
           accessible name from its own trigger text. See field-control.tsx. */}
       <FieldControlBoundary>
         {/* Narrow on purpose: a dial code is four characters at most, and
-            every pixel it does not take is one the number box does. */}
-        <div className="w-24 shrink-0">
+            every pixel it does not take is one the number box does. 5rem fits
+            a flag, "+966" and the chevron; the 6rem it used to be was paying
+            for nothing and the number box was the one that went short. */}
+        <div className="w-20 shrink-0">
           <Combobox
             value={selected?.isoCode}
             selectedLabel={selected ? `${selected.flag} ${selected.callingCode}` : callingCode}
@@ -194,7 +196,12 @@ export function CrmPhoneNumberInput({
         disabled={disabled}
         onChange={(event) => handleNumberChange(event.target.value)}
         onBlur={onBlur}
-        className="flex-1"
+        // A floor, not just a share. `flex-1` alone let the number box collapse
+        // to whatever was left after the code picker and the add button in a
+        // narrow column, and an eleven-digit number does not fit in what was
+        // left. Below the floor the row wraps instead, which is readable; a
+        // squeezed number box is not.
+        className="min-w-32 flex-1"
       />
     </div>
   );

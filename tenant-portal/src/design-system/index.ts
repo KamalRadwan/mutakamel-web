@@ -108,12 +108,14 @@ export * from "./patterns/status-badge/StatusBadge";
 export * from "./patterns/status-badge/tone-map";
 export * from "./patterns/timeline/Timeline";
 
+export * from "./views/card-color";
 export * from "./views/types";
 export * from "./views/ViewSwitcher";
 export * from "./views/WorkspaceCard";
 export * from "./views/stage-bar/StageBar";
 export * from "./views/board/BoardCard";
 export * from "./views/board/BoardColumn";
+export * from "./views/board/ColumnSegmentBar";
 export * from "./views/board/BoardView";
 export * from "./views/board/MoveToMenu";
 export * from "./views/board/types";

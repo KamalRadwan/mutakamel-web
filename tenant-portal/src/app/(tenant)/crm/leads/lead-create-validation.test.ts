@@ -38,7 +38,7 @@ describe("validateCreateLead — corporate", () => {
     const errors = validateCreateLead(form(), messages);
     // 422 LEAD_COMPANY_NAME_REQUIRED and the contact DTO's @IsNotEmpty.
     expect(errors.companyName).toBe("Required.");
-    expect(errors["contacts.0.fullName"]).toBe("Required.");
+    expect(errors["contacts.0.firstName"]).toBe("Required.");
   });
 
   it("accepts a corporate lead whose company came from the directory", () => {
@@ -46,7 +46,7 @@ describe("validateCreateLead — corporate", () => {
       form({
         existingCompanyPartyId: "01900100-0000-7000-8000-0000000000c1",
         companyName: "Acme Trading",
-        contacts: [{ ...emptyLeadContact("a"), contactPartyId: "x", fullName: "Dina" }],
+        contacts: [{ ...emptyLeadContact("a"), contactPartyId: "x", firstName: "Dina", lastName: "" }],
       }),
       messages,
     );
@@ -60,7 +60,7 @@ describe("validateCreateLead — corporate", () => {
         companyName: "Acme",
         legalName: "x".repeat(500),
         companyPhones: ["1", "1"],
-        contacts: [{ ...emptyLeadContact("a"), fullName: "Dina" }],
+        contacts: [{ ...emptyLeadContact("a"), firstName: "Dina", lastName: "" }],
       }),
       messages,
     );
@@ -73,7 +73,7 @@ describe("validateCreateLead — corporate", () => {
       form({
         companyName: "Acme",
         companyPhones: ["00966537 8990", "+966 5378990"],
-        contacts: [{ ...emptyLeadContact("a"), fullName: "Dina" }],
+        contacts: [{ ...emptyLeadContact("a"), firstName: "Dina", lastName: "" }],
       }),
       messages,
     );
@@ -91,7 +91,7 @@ describe("validateCreateLead — corporate", () => {
           {
             ...emptyLeadContact("a"),
             contactPartyId: "x",
-            fullName: "Dina",
+            firstName: "Dina", lastName: "",
             email: "not-an-email",
           },
         ],
@@ -105,12 +105,16 @@ describe("validateCreateLead — corporate", () => {
 describe("validateCreateLead — individual", () => {
   const individual = (overrides: Partial<CreateLeadForm> = {}) =>
     validateCreateLead(
-      form({ leadProfileType: "INDIVIDUAL", displayName: "Sara", ...overrides }),
+      form({ leadProfileType: "INDIVIDUAL", firstName: "Sara", ...overrides }),
       messages,
     );
 
-  it("requires a display name and checks the email shape", () => {
-    expect(individual({ displayName: "" }).displayName).toBe("Required.");
+  it("requires a first name and checks the email shape", () => {
+    // The first name is the part CRM composes the lead's rendered name from,
+    // so it is the one identity field this branch cannot do without. The last
+    // name is optional, exactly as `CreateLeadDto` marks it.
+    expect(individual({ firstName: "" }).firstName).toBe("Required.");
+    expect(individual({ lastName: "" }).lastName).toBeUndefined();
     expect(individual({ email: "sara@" }).email).toBe("Bad email.");
     expect(individual({ email: "sara@example.com" }).email).toBeUndefined();
   });
@@ -120,8 +124,9 @@ describe("validateCreateLead — individual", () => {
   });
 
   it("reports the DTO's own length ceiling with the number in it", () => {
-    expect(individual({ displayName: "x".repeat(181) }).displayName).toBe(
-      "At most 180 characters.",
+    // `@MaxLength(80)` on `firstName`, not the 180 the composed name gets.
+    expect(individual({ firstName: "x".repeat(81) }).firstName).toBe(
+      "At most 80 characters.",
     );
   });
 });
@@ -136,7 +141,7 @@ describe("validateCreateLead — acquisition source", () => {
       .toBe("Required.");
     expect(
       validateCreateLead(
-        form({ leadProfileType: "INDIVIDUAL", displayName: "Sara", acquisitionSourceId: "" }),
+        form({ leadProfileType: "INDIVIDUAL", firstName: "Sara", acquisitionSourceId: "" }),
         messages,
       ).acquisitionSourceId,
     ).toBe("Required.");
@@ -145,7 +150,7 @@ describe("validateCreateLead — acquisition source", () => {
   it("accepts any source the picker can offer", () => {
     expect(
       validateCreateLead(
-        form({ leadProfileType: "INDIVIDUAL", displayName: "Sara" }),
+        form({ leadProfileType: "INDIVIDUAL", firstName: "Sara" }),
         messages,
       ).acquisitionSourceId,
     ).toBeUndefined();
@@ -156,7 +161,7 @@ describe("required custom fields", () => {
   it("blocks a submit that CUSTOM_FIELD_REQUIRED would reject", () => {
     const base = form({
       companyName: "Acme",
-      contacts: [{ ...emptyLeadContact("a"), fullName: "Dina" }],
+      contacts: [{ ...emptyLeadContact("a"), firstName: "Dina", lastName: "" }],
     });
     expect(validateCreateLead(base, messages, ["budget"])["customFields.budget"]).toBe(
       "Required.",

@@ -1,8 +1,7 @@
 "use client";
 
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Search } from "lucide-react";
 import {
-  Button,
   Input,
   Select,
   SelectContent,
@@ -16,20 +15,25 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
-import { formatTemplate } from "@/lib/format/template";
 import { useCrmAcquisitionSources } from "../../shared/hooks/useCrmAcquisitionSources";
 import { AcquisitionSourceOption } from "../../shared/components/AcquisitionSourceIcon";
 import {
-  leadSearchAvailableFields,
+  CrmAdvancedSearchCard,
+  type CrmSearchCatalogueOption,
+} from "../../shared/components/CrmAdvancedSearchCard";
+import {
+  LEAD_ADVANCED_FIELDS,
+  LEAD_SEARCH_FIELDS,
+  leadSearchCleared,
   leadSearchField,
+  leadSearchWithGroups,
   leadSearchWithMode,
   leadSearchWithRow,
-  leadSearchWithRowAdded,
-  leadSearchWithRowRemoved,
+  leadSearchWithText,
+  type LeadAdvancedFieldId,
   type LeadSearchFieldDef,
   type LeadSearchFieldId,
   type LeadSearchMode,
-  type LeadSearchRow,
   type LeadSearchState,
 } from "../lead-search-contract";
 import type { LeadStage } from "../hooks/useLeads";
@@ -45,43 +49,31 @@ const ANY_VALUE = "__any__";
 export interface LeadSearchBarProps {
   value: LeadSearchState;
   onChange: (next: LeadSearchState) => void;
+  /** Runs the advanced query. Basic never calls this — it is debounced. */
+  onSubmit: () => void;
   /** The stage catalogue the leads hook already loaded; empty when degraded. */
   stages: LeadStage[];
   disabled?: boolean;
 }
 
-/** The field labels, gathered once and handed down to every condition row. */
-type LeadFieldLabels = Record<LeadSearchFieldId, string>;
-
 /**
- * Two modes over the same vocabulary: one condition, or several AND-ed.
+ * Two modes over two ENDPOINTS.
  *
- * Advanced is the MOST `GET /leads` supports, and deliberately no more. It has
- * six equality filters that the server ANDs, and no operators, no ranges and
- * no OR — the filter-tree engine in shared-libs is exposed through no CRM
- * route (Q131). So the rows join with a static AND rather than an AND/OR
- * control, there is no operator column, and the panel says in one line what a
- * search endpoint would have to exist for before either could appear.
+ * Basic is one condition against `GET /leads`, answered as you type: a single
+ * text box has no half-built state worth skipping, so the debounce stays.
+ * Advanced is a filter tree against `POST /leads/search`, and nothing about it
+ * reaches the network until its Search button is pressed — the intermediate
+ * states of a tree are all different questions, and most of them are the
+ * expensive ones.
  */
-export function LeadSearchBar({ value, onChange, stages, disabled }: LeadSearchBarProps) {
+export function LeadSearchBar({
+  value,
+  onChange,
+  onSubmit,
+  stages,
+  disabled,
+}: LeadSearchBarProps) {
   const { t } = useI18n();
-
-  const fieldLabels: LeadFieldLabels = {
-    text: t.crmLeads.basicSearch.fields.text,
-    status: t.crmLeads.basicSearch.fields.status,
-    stageFlag: t.crmLeads.basicSearch.fields.stageFlag,
-    leadType: t.crmLeads.create.leadType,
-    stage: t.crmLeads.stage,
-    source: t.crmLeads.source,
-  };
-
-  // Basic draws the first condition and nothing else. The state keeps whatever
-  // the mode switch left in `rows`, and the builder sends only the first — so
-  // the row on screen is the row on the wire.
-  const [firstRow] = value.rows;
-  // Whether a further condition is possible at all: one row per wire key, so a
-  // sixth field cannot be asked for once five are spoken for.
-  const canAddRow = leadSearchAvailableFields(value, value.rows.length).length > 0;
 
   return (
     <div className="flex flex-col gap-2">
@@ -103,12 +95,9 @@ export function LeadSearchBar({ value, onChange, stages, disabled }: LeadSearchB
           <ToggleGroupItem value="advanced">{t.crmLeads.searchMode.advanced}</ToggleGroupItem>
         </ToggleGroup>
 
-        {value.mode === "basic" && firstRow && (
-          <LeadConditionRow
+        {value.mode === "basic" && (
+          <LeadBasicCondition
             state={value}
-            rowIndex={0}
-            row={firstRow}
-            fieldLabels={fieldLabels}
             stages={stages}
             disabled={disabled}
             onChange={onChange}
@@ -117,120 +106,144 @@ export function LeadSearchBar({ value, onChange, stages, disabled }: LeadSearchB
       </div>
 
       {value.mode === "advanced" && (
-        <div
-          role="group"
-          aria-label={t.crmLeads.advancedSearch.conditions}
-          className="flex flex-col gap-2 rounded-sm border border-border bg-card p-3"
-        >
-          {value.rows.map((row, index) => (
-            // Keyed by POSITION, not by field. A field is unique per row and
-            // would key just as well, but then changing a row's field would
-            // unmount the picker that is changing it — Radix hands focus back
-            // to the trigger as the menu closes, and a trigger destroyed in
-            // the same commit drops focus to the body. Every row is fully
-            // controlled by props, so an index that shifts after a removal
-            // still renders the right condition.
-            <div key={index} className="flex flex-wrap items-center gap-2">
-              {/* Static text, not a control. The endpoint ANDs its filters and
-                  cannot be asked for OR, and an AND/OR toggle that only ever
-                  means AND would be a lie the user cannot see through. The
-                  first row keeps the chip's width so the pickers line up. */}
-              <span
-                aria-hidden={index === 0 || undefined}
-                className={cn(
-                  "shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-2xs uppercase text-muted-foreground",
-                  index === 0 && "invisible",
-                )}
-              >
-                {t.crmLeads.advancedSearch.and}
-              </span>
-
-              <LeadConditionRow
-                state={value}
-                rowIndex={index}
-                row={row}
-                fieldLabels={fieldLabels}
-                stages={stages}
-                disabled={disabled}
-                onChange={onChange}
-              />
-
-              {/* Shown on every row, the last one included: removing the only
-                  condition clears it rather than leaving the panel empty. */}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={disabled}
-                aria-label={formatTemplate(t.crmLeads.advancedSearch.removeCondition, {
-                  field: fieldLabels[row.field],
-                })}
-                onClick={() => onChange(leadSearchWithRowRemoved(value, index))}
-                className="size-6 shrink-0 rounded-full p-0"
-              >
-                <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
-              </Button>
-            </div>
-          ))}
-
-          {canAddRow && (
-            <div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={disabled}
-                onClick={() => onChange(leadSearchWithRowAdded(value))}
-              >
-                <Plus className={iconSize({ size: "md" })} aria-hidden="true" />
-                {t.crmLeads.advancedSearch.addCondition}
-              </Button>
-            </div>
-          )}
-
-          <p className="text-2xs text-muted-foreground">
-            {t.crmLeads.advancedSearch.unsupported}
-          </p>
-        </div>
+        <LeadAdvancedSearch
+          state={value}
+          stages={stages}
+          disabled={disabled}
+          onChange={onChange}
+          onSubmit={onSubmit}
+        />
       )}
     </div>
   );
 }
 
-interface LeadConditionRowProps {
+interface LeadAdvancedSearchProps {
   state: LeadSearchState;
-  rowIndex: number;
-  row: LeadSearchRow;
-  fieldLabels: LeadFieldLabels;
+  stages: LeadStage[];
+  disabled?: boolean;
+  onChange: (next: LeadSearchState) => void;
+  onSubmit: () => void;
+}
+
+/**
+ * The advanced card, and the one place the acquisition-source catalogue is
+ * fetched for this screen.
+ *
+ * Its own component so the request fires when a user enters advanced mode
+ * rather than on every load of the leads list — the list itself does not need
+ * the catalogue, and hooking it at the bar's top level would add a request to
+ * every visit. The card can hold several source conditions at once, so the
+ * hook has to live above them all rather than inside one row.
+ */
+function LeadAdvancedSearch({
+  state,
+  stages,
+  disabled,
+  onChange,
+  onSubmit,
+}: LeadAdvancedSearchProps) {
+  const { t, lang } = useI18n();
+  const { items: sources } = useCrmAcquisitionSources();
+
+  const statusLabels: Record<string, string | undefined> = t.statusValues;
+  const leadTypeLabels: Record<string, string | undefined> = t.crmLeads.create.types;
+  const labels = t.crmLeads.advancedSearch.fields;
+
+  const fieldLabels: Record<LeadAdvancedFieldId, string> = {
+    id: labels.id,
+    source: labels.source,
+    leadType: labels.leadType,
+    stage: labels.stage,
+    stageFlag: labels.stageFlag,
+    status: labels.status,
+    owner: labels.owner,
+    createdBy: labels.createdBy,
+    description: labels.description,
+    interestSummary: labels.interestSummary,
+    expectedNeed: labels.expectedNeed,
+    convertedCustomerProfile: labels.convertedCustomerProfile,
+    convertedOpportunity: labels.convertedOpportunity,
+    convertedAt: labels.convertedAt,
+    createdAt: labels.createdAt,
+    updatedAt: labels.updatedAt,
+  };
+
+  // Both dictionaries are exact-keyed object literals, so a lookup by a
+  // runtime `string` needs the widening the narrow-union call sites elsewhere
+  // get for free. An unmapped key falls back to the wire value, which is the
+  // same contract StatusBadge honours.
+  function enumLabel(field: LeadAdvancedFieldId, wireValue: string): string {
+    if (field === "leadType") return leadTypeLabels[wireValue] ?? wireValue;
+    if (field === "status") return statusLabels[`LeadStatus.${wireValue}`] ?? wireValue;
+    return statusLabels[`LeadStageFlag.${wireValue}`] ?? wireValue;
+  }
+
+  function catalogueOptions(field: LeadAdvancedFieldId): readonly CrmSearchCatalogueOption[] {
+    if (field === "stage") {
+      // A CONVERTED stage is offered here, unlike in the create form:
+      // filtering to finished leads is a reasonable question even though
+      // creating into one is a 422.
+      return stages.map((stage) => ({ id: stage.id, label: localizedName(stage, lang) }));
+    }
+    return sources.map((source) => {
+      const label = localizedName(source, lang);
+      return {
+        id: source.id,
+        label,
+        // The same row the create modal's picker draws, so a source looks the
+        // same wherever it is chosen.
+        content: <AcquisitionSourceOption source={source} label={label} />,
+      };
+    });
+  }
+
+  return (
+    <CrmAdvancedSearchCard
+      fields={LEAD_ADVANCED_FIELDS}
+      fieldLabels={fieldLabels}
+      enumLabel={enumLabel}
+      catalogueOptions={catalogueOptions}
+      text={state.text}
+      onTextChange={(next) => onChange(leadSearchWithText(state, next))}
+      groups={state.groups}
+      onGroupsChange={(next) => onChange(leadSearchWithGroups(state, next))}
+      onSubmit={onSubmit}
+      onReset={() => onChange(leadSearchCleared(state))}
+      disabled={disabled}
+    />
+  );
+}
+
+interface LeadBasicConditionProps {
+  state: LeadSearchState;
   stages: LeadStage[];
   disabled?: boolean;
   onChange: (next: LeadSearchState) => void;
 }
 
 /**
- * One condition: a field picker, and one value control whose TYPE follows the
- * chosen field. The same row in both modes — basic is this once.
+ * Basic mode's one condition: a field picker, and one value control whose TYPE
+ * follows the chosen field.
+ *
+ * There is no operator column and no way to add a second row, because
+ * `GET /leads` has neither: its six filters are equality and it ANDs them.
+ * Everything wider is what advanced mode's endpoint exists for.
  */
-function LeadConditionRow({
-  state,
-  rowIndex,
-  row,
-  fieldLabels,
-  stages,
-  disabled,
-  onChange,
-}: LeadConditionRowProps) {
+function LeadBasicCondition({ state, stages, disabled, onChange }: LeadBasicConditionProps) {
   const { t } = useI18n();
+  const row = state.basic;
   const field = leadSearchField(row.field);
-  // Only the fields no OTHER row already holds, plus this row's own. A query
-  // string has one slot per key, so a second `status` row could only overwrite
-  // the first — the duplicate is withheld rather than offered and then lost.
-  const available = leadSearchAvailableFields(state, rowIndex);
 
-  // Both dictionaries are exact-keyed object literals, so a lookup by a
-  // runtime `string` needs the widening the narrow-union call sites elsewhere
-  // get for free. An unmapped key falls back to the wire value, which is the
-  // same contract StatusBadge honours.
+  const fieldLabels: Record<LeadSearchFieldId, string> = {
+    text: t.crmLeads.basicSearch.fields.text,
+    status: t.crmLeads.basicSearch.fields.status,
+    stageFlag: t.crmLeads.basicSearch.fields.stageFlag,
+    leadType: t.crmLeads.create.leadType,
+    stage: t.crmLeads.stage,
+    source: t.crmLeads.source,
+  };
+
   const statusLabels: Record<string, string | undefined> = t.statusValues;
   const leadTypeLabels: Record<string, string | undefined> = t.crmLeads.create.types;
 
@@ -242,12 +255,12 @@ function LeadConditionRow({
     return statusLabels[`LeadStageFlag.${wireValue}`] ?? wireValue;
   }
 
-  // Names the row as well as the control, so several conditions do not present
-  // a screen reader with several identically labelled value boxes.
+  // Names the row as well as the control, so the field picker and the value
+  // box do not present a screen reader with two unrelated "search" labels.
   const valueLabel = `${t.crmLeads.basicSearch.value}: ${fieldLabels[field.id]}`;
 
   function setValue(next: string) {
-    onChange(leadSearchWithRow(state, rowIndex, { value: next }));
+    onChange(leadSearchWithRow(state, { value: next }));
   }
 
   return (
@@ -256,14 +269,14 @@ function LeadConditionRow({
         value={row.field}
         disabled={disabled}
         onValueChange={(next) =>
-          onChange(leadSearchWithRow(state, rowIndex, { field: next as LeadSearchFieldId }))
+          onChange(leadSearchWithRow(state, { field: next as LeadSearchFieldId }))
         }
       >
         <SelectTrigger size="sm" className="w-52" aria-label={t.crmLeads.basicSearch.field}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {available.map((definition) => (
+          {LEAD_SEARCH_FIELDS.map((definition) => (
             <SelectItem key={definition.id} value={definition.id}>
               {fieldLabels[definition.id]}
             </SelectItem>
@@ -386,10 +399,6 @@ interface LeadStageFilterSelectProps {
 /**
  * Stage filter over the catalogue the leads hook already holds — no second
  * request for a list this screen loaded to draw its board columns.
- *
- * A `CONVERTED` stage is offered here, unlike in the create form: filtering to
- * finished leads is a reasonable question even though creating into one is a
- * 422.
  */
 function LeadStageFilterSelect({
   value,
@@ -430,10 +439,7 @@ interface LeadSourceFilterSelectProps {
  * Its own component so the catalogue request fires only once a user actually
  * picks this field — the leads list itself does not need it, and mounting the
  * hook at the bar's top level would add a request to every load of the screen.
- * One row per field means at most one of these is ever mounted, so advanced
- * mode does not multiply the request either. Rows use the same
- * `AcquisitionSourceOption` as the create modal's picker, so a source looks the
- * same wherever it is chosen.
+ * Basic mode holds one condition, so at most one of these is ever mounted.
  */
 function LeadSourceFilterSelect({
   value,

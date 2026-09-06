@@ -31,10 +31,17 @@ export interface BoardCardModel {
   moveTargets?: MoveToTarget[];
   onMoveTo?: (columnId: string) => void;
   moveToLabel?: string;
-  // Per-card controls from the screen — a delete button, for instance. They
+  // Per-card controls from the screen — an overflow menu, for instance. They
   // render beside the "Move to…" trigger, OUTSIDE the activation surface, so
   // no interactive element is ever nested inside a role="button".
   actions?: ReactNode;
+  // A full-width strip below the header row, outside the activation surface
+  // and outside the drag handle — see WorkspaceCard's `footer`.
+  footer?: ReactNode;
+  // Per-card surface classes from the screen: the user-chosen card colour is
+  // the only current caller. Never geometry — a card that is a different SIZE
+  // from its neighbours breaks the windowed column's row estimate.
+  className?: string;
   content: ReactNode;
 }
 
@@ -77,6 +84,8 @@ export function BoardCardSurface({ card, provided, snapshot }: BoardCardSurfaceP
       onSelectedChange={card.onSelectedChange}
       selectLabel={card.selectLabel}
       isElevated={snapshot.isDragging}
+      className={card.className}
+      footer={card.footer}
       actions={
         actions || canMove ? (
           <div className="flex items-center gap-0.5">

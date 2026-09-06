@@ -72,11 +72,14 @@ function validateContact(
     contact.honorificTitle.trim().length > 0 ||
     contact.email.trim().length > 0 ||
     contact.phones.some((phone) => phone.trim().length > 0);
-  if (contact.fullName.trim().length === 0) {
-    if (hasContent) bag.required(`${prefix}.fullName`, contact.fullName);
+  // The row is named by its parts now; the first name is the one CRM cannot
+  // compose a name without.
+  if (contact.firstName.trim().length === 0) {
+    if (hasContent) bag.required(`${prefix}.firstName`, contact.firstName);
     return;
   }
-  bag.maxLength(`${prefix}.fullName`, contact.fullName, limits.displayName);
+  bag.maxLength(`${prefix}.firstName`, contact.firstName, limits.firstName);
+  bag.maxLength(`${prefix}.lastName`, contact.lastName, limits.lastName);
   bag.maxLength(`${prefix}.jobTitle`, contact.jobTitle, limits.jobTitle);
   bag.maxLength(`${prefix}.honorificTitle`, contact.honorificTitle, limits.honorificTitle);
   bag.email(`${prefix}.email`, contact.email, limits.email);

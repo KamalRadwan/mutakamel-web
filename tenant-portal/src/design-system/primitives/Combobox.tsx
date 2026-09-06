@@ -154,7 +154,18 @@ export function Combobox({
     // the boundary so the popover's own search box cannot claim the same id.
     <FieldControlBoundary>
       <div className={cn("relative flex w-full items-center", className)}>
+      {/* `modal` is what makes the list scrollable inside a dialog, and it is
+          load-bearing rather than a preference. Radix `Dialog` is modal by
+          default and wraps its content in `react-remove-scroll` with the dialog
+          panel as the only allowed region; that lock listens for `wheel` on
+          `document` and calls preventDefault on every event whose target is
+          outside it. This popover is portalled to `document.body`, so the
+          option list sat outside the allowed region and the wheel did nothing —
+          the list scrolled by keyboard only. A modal popover pushes its OWN
+          lock, and the outer one stands down while it is on top of the stack:
+          the same mechanism `Select` has always relied on. */}
       <Popover
+        modal
         open={open}
         onOpenChange={(next) => {
           setOpen(editable && next);

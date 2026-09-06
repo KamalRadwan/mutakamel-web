@@ -21,7 +21,6 @@
 import { CRM_PROFILE_TYPES, type CrmProfileType } from "./lead-contract";
 
 export const LEAD_CREATE_LIMITS = {
-  displayName: 180,
   companyName: 180,
   legalName: 180,
   firstName: 80,
@@ -48,7 +47,10 @@ export interface LeadContactForm {
   key: string;
   /** An existing person Party on the chosen company — `contacts[].contactPartyId`. */
   contactPartyId: string;
+  /** Held only for a person reused from the directory, whose name is theirs. */
   fullName: string;
+  firstName: string;
+  lastName: string;
   honorificTitle: string;
   jobTitle: string;
   email: string;
@@ -88,7 +90,6 @@ export interface CreateLeadForm {
   commercialRegistrationNumber: string;
   companyPhones: string[];
   contacts: LeadContactForm[];
-  displayName: string;
   honorificTitle: string;
   firstName: string;
   lastName: string;
@@ -119,6 +120,8 @@ export function emptyLeadContact(key: string): LeadContactForm {
     key,
     contactPartyId: "",
     fullName: "",
+    firstName: "",
+    lastName: "",
     honorificTitle: "",
     jobTitle: "",
     email: "",
@@ -146,7 +149,6 @@ export function emptyCreateLeadForm(contactKey: string): CreateLeadForm {
     commercialRegistrationNumber: "",
     companyPhones: [""],
     contacts: [emptyLeadContact(contactKey)],
-    displayName: "",
     honorificTitle: "",
     firstName: "",
     lastName: "",
@@ -216,7 +218,8 @@ interface CreateLeadAddressRequest {
 
 interface CreateLeadContactRequest {
   contactPartyId?: string;
-  fullName: string;
+  firstName?: string;
+  lastName?: string;
   honorificTitle?: string;
   jobTitle?: string;
   email?: string;
@@ -227,7 +230,8 @@ interface CreateLeadContactRequest {
 export interface CreateLeadRequest {
   branchId: string;
   leadProfileType: CrmProfileType;
-  displayName: string;
+  /** Never sent from this form; CRM composes it. Kept for callers that do. */
+  displayName?: string;
   stageId?: string;
   acquisitionSourceId?: string;
   companyName?: string;
@@ -279,11 +283,12 @@ function buildAddress(address: LeadAddressForm): CreateLeadAddressRequest | unde
  * discards the submitted name, email and phones — `ensureCorporateContactsBatch`
  * builds no contact methods for a selected party. Only `jobTitle` and the
  * primary flag still apply, so only those are sent: a request that carried the
- * rest would claim to write data the server never looks at. `fullName` stays
- * because `CreateLeadCorporateContactDto` marks it `@IsNotEmpty()` regardless.
+ * rest would claim to write data the server never looks at. The name is not
+ * sent at all any more: it is composed by CRM from the parts, and a reused
+ * party keeps the name the directory already holds.
  */
 function buildContact(contact: LeadContactForm, isPrimary: boolean): CreateLeadContactRequest {
-  const request: CreateLeadContactRequest = { fullName: contact.fullName.trim() };
+  const request: CreateLeadContactRequest = {};
   if (isPrimary) request.isPrimary = true;
   Object.assign(request, optional("jobTitle", contact.jobTitle));
 
@@ -294,6 +299,8 @@ function buildContact(contact: LeadContactForm, isPrimary: boolean): CreateLeadC
 
   Object.assign(
     request,
+    optional("firstName", contact.firstName),
+    optional("lastName", contact.lastName),
     optional("honorificTitle", contact.honorificTitle),
     optional("email", contact.email),
   );
@@ -327,16 +334,13 @@ export function buildCreateLeadRequest(
   const existingCompany = usesExistingCompany(form);
   const companyName = form.companyName.trim();
 
-  // The lead's own display name. On a corporate lead the party IS the company —
-  // `ensureParty` sets the organization's display name from
-  // `companyName || displayName` — so the two must agree or the list would show
-  // one name and the Directory another.
-  const displayName = corporate ? companyName : form.displayName.trim();
-
+  // No display name is sent. CRM composes it from the identity below — the
+  // company name for a corporate lead, the first and last name for an
+  // individual — which is also what `ensureParty` writes onto the party, so the
+  // list and the Directory cannot disagree about it.
   const request: CreateLeadRequest = {
     branchId: form.branchId || branchId,
     leadProfileType: form.leadProfileType,
-    displayName,
     ...optional("stageId", form.stageId),
     ...optional("acquisitionSourceId", form.acquisitionSourceId),
     ...optional("description", form.description),

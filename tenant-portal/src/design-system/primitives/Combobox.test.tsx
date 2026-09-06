@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Combobox, type ComboboxOption } from "./Combobox";
 
@@ -102,6 +102,48 @@ describe("Combobox", () => {
     const selected = screen.getAllByRole("option").filter((o) => o.getAttribute("aria-selected") === "true");
     expect(selected).toHaveLength(1);
     expect(selected[0]).toHaveTextContent("Alexandria branch");
+  });
+
+  // The option list is portalled to `document.body`, i.e. OUTSIDE the panel of
+  // any dialog that contains this control. Radix `Dialog` is modal by default
+  // and its `react-remove-scroll` lock calls preventDefault on every wheel
+  // event outside that panel, so the list scrolled by keyboard only — reported
+  // against the city picker in the create-lead modal. A modal popover pushes a
+  // lock of its own and the dialog's stands down while it is on top. This pins
+  // the modal behaviour through the side effect Radix produces for it, because
+  // the wheel itself is not something jsdom can carry.
+  it("opens a modal layer, so the list still scrolls inside a dialog", () => {
+    renderCombobox();
+    expect(document.body.style.pointerEvents).not.toBe("none");
+
+    fireEvent.click(screen.getByRole("button", { name: /Select a branch/ }));
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(document.body.style.pointerEvents).toBe("none");
+  });
+
+  it("hands the page back when it closes, so the form under it stays usable", async () => {
+    // The failure mode a modal layer buys: one that does not stand down leaves
+    // `pointer-events: none` on the body and the dialog around it goes dead to
+    // the mouse. Committing an option is the path a user actually takes out.
+    const onValueChange = vi.fn();
+    renderCombobox({ onValueChange });
+    fireEvent.click(screen.getByRole("button", { name: /Select a branch/ }));
+    fireEvent.click(screen.getByRole("option", { name: /Cairo branch/ }));
+
+    expect(onValueChange).toHaveBeenCalledWith("1");
+    await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
+    await waitFor(() => expect(document.body.style.pointerEvents).not.toBe("none"));
+  });
+
+  it("keeps the list itself the scrolling box, not the popover around it", () => {
+    // A modal layer only helps if something inside it can actually take the
+    // delta: the height cap and the overflow live on the listbox.
+    renderCombobox();
+    fireEvent.click(screen.getByRole("button", { name: /Select a branch/ }));
+
+    const list = screen.getByRole("listbox");
+    expect(list.className).toContain("overflow-y-auto");
+    expect(list.className).toMatch(/max-h-/u);
   });
 
   it("does not open while readOnly, and stays enabled unlike disabled", () => {

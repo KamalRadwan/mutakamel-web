@@ -324,6 +324,60 @@ export const ar = {
     editAmbiguousReloaded: "النتيجة غير مؤكدة. أُعيد تحميل قائمة المراحل؛ راجعها قبل إعادة الحفظ.",
     editAmbiguousStale: "النتيجة غير مؤكدة وتعذّر تحديث قائمة المراحل. أعد تحميل الصفحة قبل المحاولة."
   },
+  crmAdvancedSearch: {
+    title: "بحث متقدم",
+    summary: "شروط مفعّلة: {count}",
+    summaryEmpty: "لا توجد شروط مفعّلة",
+    textLabel: "بحث نصي حر",
+    textPlaceholder: "الاسم أو الهاتف أو البريد...",
+    textHint:
+      "الاسم المعروض والهاتف والبريد تُطابَق من هذا المربع فقط؛ فهي ليست أعمدة يمكن اختيارها كشرط أدناه.",
+    textHintTitleOnly:
+      "يُطابَق العنوان وحده من هذا الصندوق — اسم العميل أو جهة الاتصال ليس عمودًا يمكن اختياره شرطًا أدناه.",
+    field: "الحقل",
+    operator: "المُعامل",
+    value: "القيمة",
+    valueFrom: "من",
+    valueTo: "إلى",
+    selectValue: "اختر قيمة",
+    catalogueUnavailable: "لا توجد خيارات متاحة",
+    noValueNeeded: "بدون قيمة",
+    datePlaceholder: "اختر تاريخًا",
+    clearDate: "مسح التاريخ",
+    numberPlaceholder: "رقم",
+    uuidPlaceholder: "المعرّف",
+    textValuePlaceholder: "اكتب قيمة",
+    listPlaceholder: "معرّفات مفصولة بفاصلة",
+    and: "و",
+    or: "أو",
+    groupLabel: "المجموعة {number}",
+    addCondition: "إضافة شرط",
+    removeCondition: "إزالة الشرط: {field}",
+    addGroup: "إضافة مجموعة «أو»",
+    removeGroup: "حذف المجموعة {number}",
+    submit: "بحث",
+    reset: "مسح الشروط",
+    multiMore: "+{count}",
+    multiRemove: "إزالة {label}",
+    multiOverflow: "قيم إضافية",
+    multiClearAll: "مسح الكل",
+    operators: {
+      eq: "يساوي",
+      neq: "لا يساوي",
+      in: "ضمن",
+      nin: "ليس ضمن",
+      gt: "أكبر من",
+      gte: "أكبر من أو يساوي",
+      lt: "أصغر من",
+      lte: "أصغر من أو يساوي",
+      between: "بين",
+      ilike: "يحتوي",
+      startsWith: "يبدأ بـ",
+      endsWith: "ينتهي بـ",
+      isNull: "فارغ",
+      isNotNull: "غير فارغ"
+    }
+  },
   crmLeads: {
     title: "العملاء المحتملون",
     addLead: "إضافة عميل محتمل",
@@ -346,12 +400,24 @@ export const ar = {
       advanced: "متقدم"
     },
     advancedSearch: {
-      conditions: "شروط البحث",
-      and: "و",
-      addCondition: "إضافة شرط",
-      removeCondition: "إزالة الشرط: {field}",
-      unsupported:
-        "تُدمج الشروط بعامل «و» فقط. أما «أو» وعوامل المقارنة مثل «أكبر من» و«يحتوي» و«بين» فتحتاج إلى نقطة بحث لا توفرها الواجهة البرمجية بعد."
+      fields: {
+        id: "معرّف العميل المحتمل",
+        source: "مصدر الاستقطاب",
+        leadType: "نوع العميل المحتمل",
+        stage: "المرحلة",
+        stageFlag: "علامة المرحلة",
+        status: "الحالة",
+        owner: "معرّف المالك",
+        createdBy: "معرّف المُنشئ",
+        description: "الوصف",
+        interestSummary: "ملخّص الاهتمام",
+        expectedNeed: "الحاجة المتوقعة",
+        convertedCustomerProfile: "معرّف ملف العميل بعد التحويل",
+        convertedOpportunity: "معرّف الفرصة بعد التحويل",
+        convertedAt: "تاريخ التحويل",
+        createdAt: "تاريخ الإنشاء",
+        updatedAt: "تاريخ آخر تعديل"
+      }
     },
     name: "الاسم",
     contact: "التواصل",
@@ -413,7 +479,10 @@ export const ar = {
       existingContactLocked: "مأخوذ من الدليل ولا يُعدَّل من هنا.",
       country: "الدولة",
       city: "المدينة",
-      state: "المنطقة",
+      // "المنطقة" alone reads as a district to Gulf and Egyptian users, who
+      // call this level a governorate. Both words, because the picker now lists
+      // whatever the country's own subdivision level happens to be.
+      state: "المحافظة / المنطقة",
       street1: "الشارع 1",
       street2: "الشارع 2",
       buildingNo: "رقم المبنى",
@@ -432,10 +501,95 @@ export const ar = {
         contactRequired: "أضف جهة اتصال واحدة على الأقل."
       }
     },
+    // بطاقة اللوحة: العنوان، ثم صف النشاط والتقييم، ثم أحرف المالك، وقائمة
+    // الإجراءات الإضافية. اللون وحده لا يحمل معنى هنا، فلكل علامة مقابل نصي.
+    card: {
+      more: "إجراءات إضافية لـ {name}",
+      open: "فتح",
+      cardColor: "لون البطاقة",
+      colorNone: "بدون لون",
+      colorSelected: "محدد",
+      colors: {
+        RED: "أحمر",
+        ORANGE: "برتقالي",
+        AMBER: "كهرماني",
+        YELLOW: "أصفر",
+        GREEN: "أخضر",
+        TEAL: "أزرق مخضر",
+        BLUE: "أزرق",
+        INDIGO: "نيلي",
+        PURPLE: "بنفسجي",
+        PINK: "وردي",
+        SLATE: "رمادي مزرق"
+      },
+      rating: "التقييم",
+      rateStars: "تقييم {count} من {max}",
+      clearRating: "إزالة التقييم",
+      owner: "المالك: {name}",
+      // يسمّي الزر ويذكر الحالة معًا: العلامة زر يفتح أنشطة العميل المحتمل،
+      // ولونها هو الفارق الوحيد بين «متأخر» و«مستحق اليوم».
+      activityOpen: "الأنشطة — {state}",
+      activityStates: {
+        OVERDUE: "متأخر",
+        TODAY: "مستحق اليوم",
+        FUTURE: "قادم",
+        NONE: "لا يوجد نشاط مفتوح"
+      },
+      // «المعروضة» مقصودة: الشريط يلخّص بطاقات الصفحة الحالية لا المرحلة كلها.
+      activityBar: "أنشطة البطاقات المعروضة في هذه المرحلة",
+      moreTags: "+{count}"
+    },
+    // نافذة الأنشطة التي تفتحها علامة البطاقة: المخطَّط على هذا العميل المحتمل
+    // في نصف، ونموذج إضافة نشاط جديد في النصف الآخر.
+    activities: {
+      title: "الأنشطة",
+      description: "{name}",
+      openHeading: "المخطَّط",
+      createHeading: "نشاط جديد",
+      empty: "لا يوجد نشاط مخطَّط على هذا العميل المحتمل بعد.",
+      loadFailed: "تعذّر تحميل أنشطة هذا العميل المحتمل.",
+      readNotPermitted: "ليست لديك صلاحية عرض الأنشطة.",
+      createNotPermitted: "ليست لديك صلاحية إضافة الأنشطة.",
+      created: "أُضيف النشاط.",
+      createFailed: "تعذّرت إضافة النشاط.",
+      createAmbiguous: "النتيجة غير مؤكدة. أُعيد تحميل القائمة؛ راجعها قبل إضافة النشاط مرة أخرى.",
+      submit: "إضافة نشاط",
+      typeLabel: "النوع",
+      subject: "الموضوع",
+      dueAt: "موعد الاستحقاق",
+      dueAtHint: "يجب أن يكون في المستقبل.",
+      priority: "الأولوية",
+      notes: "ملاحظات",
+      types: {
+        TODO: "مهمة",
+        CALL: "مكالمة",
+        MEETING: "اجتماع",
+        EMAIL: "بريد إلكتروني",
+        VISIT: "زيارة",
+        FOLLOW_UP: "متابعة",
+        OTHER: "أخرى"
+        // مفهرس بقيمة قادمة من الخادم: نوع لم يعرفه هذا الإصدار يعرض مفتاحه
+        // الخام بدل أن يُسقط القائمة كلها.
+      } as Record<string, string>,
+      priorities: {
+        LOW: "منخفضة",
+        NORMAL: "عادية",
+        HIGH: "مرتفعة",
+        URGENT: "عاجلة"
+      } as Record<string, string>,
+      errors: {
+        required: "هذا الحقل مطلوب.",
+        maxLength: "الحد الأقصى {max} حرفًا.",
+        past: "اختر تاريخًا ووقتًا في المستقبل."
+      }
+    },
     messages: {
       selectBranchToCreate: "اختر فرعًا واحدًا متاحًا قبل إنشاء عميل محتمل.",
       createNotPermitted: "ليست لديك صلاحية إنشاء عملاء محتملين في هذا الفرع.",
       deleteNotPermitted: "ليست لديك صلاحية حذف هذا العميل المحتمل.",
+      cardNotPermitted: "ليست لديك صلاحية تعديل هذا العميل المحتمل.",
+      cardUpdateFailed: "تعذّر حفظ تغيير البطاقة.",
+      cardUpdateAmbiguous: "نتيجة حفظ تغيير البطاقة غير مؤكدة. أُعيد تحميل القائمة؛ راجع البطاقة قبل المحاولة مجددًا.",
       selectBranchToMove: "اختر فرعًا واحدًا متاحًا قبل نقل عميل محتمل.",
       moveNotPermitted: "ليست لديك صلاحية نقل هذا العميل المحتمل.",
       convertedCannotMove: "لا يمكن نقل عميل محتمل تم تحويله بين المراحل.",
@@ -450,6 +604,37 @@ export const ar = {
   crmOpportunities: {
     heading: "الفرص البيعية",
     subtitle: "تتبّع الصفقات عبر مراحل كل مسار بيعي.",
+    searchMode: {
+      label: "نمط البحث",
+      basic: "أساسي",
+      advanced: "متقدم"
+    },
+    advancedSearch: {
+      fields: {
+        id: "معرّف الفرصة",
+        customerProfile: "معرّف ملف العميل",
+        customerParty: "معرّف كيان العميل",
+        contactParty: "معرّف جهة الاتصال",
+        lead: "معرّف العميل المحتمل",
+        pipeline: "المسار",
+        stage: "المرحلة",
+        stageFlag: "علامة المرحلة",
+        status: "الحالة",
+        owner: "معرّف المسؤول",
+        title: "العنوان",
+        description: "الوصف",
+        importance: "الأهمية",
+        amount: "القيمة",
+        currencyCode: "رمز العملة",
+        probabilityPercent: "نسبة الاحتمال",
+        expectedCloseDate: "تاريخ الإغلاق المتوقع",
+        wonAt: "تاريخ الربح",
+        lostAt: "تاريخ الخسارة",
+        lostReason: "سبب الخسارة",
+        createdAt: "تاريخ الإنشاء",
+        updatedAt: "تاريخ آخر تعديل"
+      }
+    },
     pipeline: "المسار",
     noPipeline: "لا يوجد مسار",
     selectPipeline: "اختر مسارًا",
@@ -1185,12 +1370,17 @@ export const ar = {
       advanced: "متقدم"
     },
     advancedSearch: {
-      conditions: "شروط البحث",
-      and: "و",
-      addCondition: "إضافة شرط",
-      removeCondition: "إزالة الشرط: {field}",
-      unsupported:
-        "تُدمج الشروط بعامل «و» فقط. أما «أو» وعوامل المقارنة مثل «أكبر من» و«يحتوي» و«بين» فتحتاج إلى نقطة بحث لا توفرها الواجهة البرمجية بعد."
+      fields: {
+        id: "معرّف ملف العميل",
+        source: "مصدر الاستقطاب",
+        profileType: "نوع الملف",
+        status: "الحالة",
+        owner: "معرّف المالك",
+        sourceLead: "معرّف العميل المحتمل المصدر",
+        description: "الوصف",
+        createdAt: "تاريخ الإنشاء",
+        updatedAt: "تاريخ آخر تعديل"
+      }
     },
     sessionRequired: "تعذر تحديد جلسة مستخدم موثقة لتحميل ملفات العملاء.",
     singleBranchRequired: "تعذر تحديد فرع واحد موثوق. عيّن فرعًا أساسيًا أو اختر حسابًا له فرع واحد متاح.",
@@ -3504,6 +3694,24 @@ export const ar = {
       SUBSCRIPTION_ITEM_NOT_FOUND: "لم يعد بند الاشتراك هذا موجودًا. أعد التحميل وحاول مجددًا."
     } as Record<string, string>
   },
+  // The one address template — src/components/address/. Its chrome lives here
+  // rather than under a feature block because the same three pickers render in
+  // the CRM lead modal and in the Directory address drawer.
+  address: {
+    chooseCountry: "اختر دولة",
+    searchCountries: "ابحث باسم الدولة أو رمزها",
+    noMatchingCountries: "لا توجد دولة مطابقة.",
+    clearCountry: "مسح الدولة",
+    chooseState: "اختر المحافظة أو المنطقة",
+    searchStates: "ابحث عن محافظة أو منطقة",
+    noMatchingStates: "لا توجد محافظة أو منطقة مطابقة.",
+    clearState: "مسح المحافظة / المنطقة",
+    chooseCity: "اختر المدينة",
+    searchCities: "ابحث عن مدينة",
+    noMatchingCities: "لا توجد مدينة مطابقة.",
+    clearCity: "مسح المدينة",
+    keepTyping: "يعرض {shown} من {total} — تابع الكتابة لتضييق القائمة."
+  },
   crmShared: {
     errorOffline: "تعذّر الوصول إلى الخادم. تحقّق من الاتصال ثم أعد المحاولة.",
     errorForbidden: "لا يشمل نطاقك هذا السجل.",
@@ -3520,14 +3728,17 @@ export const ar = {
     addPhone: "إضافة رقم",
     removePhone: "حذف الهاتف {number}",
     callingCode: "رمز الدولة",
+    // Kept for the phone control's calling-code picker. The address country
+    // picker reads its own copies under `address` above.
     searchCountries: "ابحث باسم الدولة أو رمزها",
     noMatchingCountries: "لا توجد دولة مطابقة.",
-    chooseCountry: "اختر دولة",
-    clearCountry: "مسح الدولة",
     chooseJobTitle: "اختر مسمّى",
     searchJobTitles: "ابحث عن مسمّى وظيفي",
     noMatchingJobTitles: "لا يوجد مسمّى مطابق.",
-    backToJobTitleList: "اختر من قائمة المسمّيات",
+    useTypedJobTitle: "استخدام «{value}»",
+    jobTitleHint: "اختر من القائمة أو اكتب مسمّاك واستخدمه.",
+    clearJobTitle: "مسح المسمّى",
+    jobTitleTooLong: "{max} حرفًا كحد أقصى — اختصره لاستخدامه.",
     fieldRequired: "هذا الحقل مطلوب.",
     fieldEmail: "أدخل بريدًا إلكترونيًا صحيحًا.",
     fieldMaxLength: "الحد الأقصى {max} حرفًا.",

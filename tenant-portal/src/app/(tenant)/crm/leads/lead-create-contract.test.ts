@@ -25,7 +25,8 @@ function corporate(overrides: Partial<CreateLeadForm> = {}): CreateLeadForm {
     contacts: [
       {
         ...emptyLeadContact("contact-1"),
-        fullName: "  Dina Ali  ",
+        firstName: "  Dina  ",
+        lastName: "  Ali  ",
         email: "  dina@example.com  ",
         phones: ["  +201001112223  ", ""],
       },
@@ -49,14 +50,14 @@ describe("buildCreateLeadRequest — corporate", () => {
     expect(buildCreateLeadRequest(corporate({ stageId: STAGE_ID }), BRANCH_ID)).toEqual({
       branchId: BRANCH_ID,
       leadProfileType: "CORPORATE",
-      // The organization's display name IS the lead's — `ensureParty` derives
-      // one from the other, so they cannot disagree.
-      displayName: "Acme Trading",
+      // Only the company name goes over the wire. The organization's display
+      // name IS the lead's — `ensureParty` derives one from the other — so the
+      // server composes both from this single field and they cannot disagree.
       companyName: "Acme Trading",
       stageId: STAGE_ID,
       contacts: [
         {
-          fullName: "Dina Ali",
+          firstName: "Dina", lastName: "Ali",
           isPrimary: true,
           email: "dina@example.com",
           phones: ["+201001112223"],
@@ -79,8 +80,8 @@ describe("buildCreateLeadRequest — corporate", () => {
     const request = buildCreateLeadRequest(
       corporate({
         contacts: [
-          { ...emptyLeadContact("a"), fullName: "One", isPrimary: false },
-          { ...emptyLeadContact("b"), fullName: "Two", isPrimary: true },
+          { ...emptyLeadContact("a"), firstName: "One", lastName: "", isPrimary: false },
+          { ...emptyLeadContact("b"), firstName: "Two", lastName: "", isPrimary: true },
         ],
       }),
       BRANCH_ID,
@@ -117,7 +118,7 @@ describe("buildCreateLeadRequest — corporate", () => {
           {
             ...emptyLeadContact("a"),
             contactPartyId: CONTACT_PARTY_ID,
-            fullName: "Dina Ali",
+            firstName: "Dina", lastName: "Ali",
             jobTitle: "Head of Ops",
             email: "ignored@example.com",
             phones: ["0100 111 2223"],
@@ -127,10 +128,11 @@ describe("buildCreateLeadRequest — corporate", () => {
       BRANCH_ID,
     );
     // `ensureCorporateContactsBatch` builds no contact methods for a selected
-    // party — email and phones there are discarded, so they are not sent.
+    // party — email and phones there are discarded, so they are not sent. Nor
+    // is the name: the directory already holds it, and this form cannot change
+    // it.
     expect(request.contacts).toEqual([
       {
-        fullName: "Dina Ali",
         isPrimary: true,
         jobTitle: "Head of Ops",
         contactPartyId: CONTACT_PARTY_ID,
@@ -143,21 +145,29 @@ describe("buildCreateLeadRequest — individual", () => {
   const individual = (overrides: Partial<CreateLeadForm> = {}): CreateLeadForm => ({
     ...emptyCreateLeadForm("contact-1"),
     leadProfileType: "INDIVIDUAL",
-    displayName: "  Sara Nabil  ",
+    firstName: "  Sara  ",
+    lastName: "  Nabil  ",
     email: "  sara@example.com  ",
     phones: ["  +201001112223  "],
     ...overrides,
   });
 
   it("sends the person's own identity and contact methods", () => {
-    expect(buildCreateLeadRequest(individual({ firstName: "Sara" }), BRANCH_ID)).toEqual({
+    expect(buildCreateLeadRequest(individual(), BRANCH_ID)).toEqual({
       branchId: BRANCH_ID,
       leadProfileType: "INDIVIDUAL",
-      displayName: "Sara Nabil",
       firstName: "Sara",
+      lastName: "Nabil",
       email: "sara@example.com",
       phones: ["+201001112223"],
     });
+  });
+
+  it("never sends a display name — CRM composes it from the name parts", () => {
+    // `CreateLeadDto.displayName` is `@IsOptional()` and `LeadsService`
+    // composes it, so sending one would let the list and the Directory
+    // disagree about the same person's name.
+    expect(buildCreateLeadRequest(individual(), BRANCH_ID)).not.toHaveProperty("displayName");
   });
 
   it("never sends a company, its contacts, or the registration trio", () => {

@@ -138,6 +138,16 @@ they no longer disagree about anything else:
 - The selection checkbox and the per-card actions render **outside** the
   activation surface, so no interactive element is nested inside a
   `role="button"` and neither can start a drag.
+- A third slot, **`footer`**, is a full-width strip below the header row and is
+  also outside the activation surface. `actions` is a top-end column holding
+  one stack of controls; anything that has to sit on its own line and still not
+  open the card — a rating a user clicks, an owner badge beside it — goes here.
+  Putting such a control in `children` would nest it inside a `role="button"`
+  **and** inside the drag handle, which is two bugs rather than one.
+- **`cardClassName`**, on `BoardView` and `CardView` alike, paints per-card
+  surface classes — today only the user-chosen card colour. Never geometry: a
+  card that is a different size from its neighbours breaks the windowed
+  column's row estimate.
 
 ## Shared behavior — identical across all three views
 
@@ -246,13 +256,41 @@ A board that collapses to its content while loading makes the page jump as the
 columns arrive, and an empty pipeline rendered as a short strip under the
 filters reads as a broken screen rather than as a pipeline with nothing in it.
 
+**So does every column.** `BoardColumn` asks for `h-full min-h-0` itself
+rather than leaning on the row's default `align-items: stretch`: the default
+produces the same pixels today and is one `items-start` on that row away from
+silently collapsing every column back onto its cards. A stage holding one card
+therefore lines up with the stage holding forty, and the drop zone covers the
+whole column rather than the inch its cards occupy. The **body** is what
+scrolls — the page never grows a second scrollbar, and the row never scrolls
+vertically.
+
 **Column header.** Stage name (400 weight), a count chip, and — where the
 stage carries an outcome — a 2px top border in the mapped role color from
 [tokens.md](tokens.md#status-mapping). Intermediate stages get no color.
 
+A column may also carry a **distribution bar** under that heading:
+`BoardColumnDef.segments` plus `segmentsLabel`, rendered by
+`ColumnSegmentBar`. Counts, never percentages — the bar divides its own width
+with `flex-grow`, so four numbers cannot round to 101%. Four tones are
+available (`negative` / `caution` / `positive` / `neutral`) and each takes a
+`*-vivid` step, because a 6px strip is a non-text graphic answering to the 3:1
+bar rather than 4.5:1.
+
+The bar is `role="img"` and spells every count into its `aria-label`: its
+segments are separated by colour and nothing else, so without the label it
+says nothing at all to a reader who cannot see it. `segmentsLabel` names what
+the bar summarises — and where the board is paginated, that label has to say
+so, because the bar can only describe the cards actually loaded into the
+column.
+
 **Column body.** An empty column shows a dashed `border-border` drop zone with
 the translated "Drop here" label — never blank space, which reads as broken.
-The body is a plain `overflow-y-auto` element, **not** a Radix `ScrollArea`.
+It is `flex-1`, so with the column at full height the drop target is the whole
+column. The body is a plain `min-h-0 flex-1 overflow-y-auto` element, **not** a
+Radix `ScrollArea`. `min-h-0` is stated rather than inferred: without it a
+column flex item sits at `min-height: auto`, and the only reason that resolves
+to 0 is the `overflow-y-auto` beside it — a coincidence, not a contract.
 
 <a id="virtualization"></a>
 
@@ -299,8 +337,20 @@ complete a sustained press-move-release — and without this menu the board is
 **completely unusable** to them, because moving a card between stages is the
 only thing a board is for.
 
-Applies to all three board screens. The menu item is subject to the same
-capability gate as dragging, and a terminal destination confirms the same way.
+The menu item is subject to the same capability gate as dragging, and a
+terminal destination confirms the same way.
+
+> **Open regression — the Leads board.** `BoardViewLabels.moveTo` is optional,
+> and omitting it removes the trigger. The redesigned Leads card
+> ([Leads](#leads) below) carries one overflow menu with exactly Open, Delete
+> and Card colour, so it no longer renders **Move to…** — which leaves the
+> Leads board with the keyboard path only and **not** conforming to
+> **Leads** does not render `BoardView`'s own **Move to…** trigger: its card
+> was redesigned down to one overflow menu. The control itself is not gone —
+> it is a section inside that menu, built from the same `stages` and gated by
+> the same rule that gates dragging, so `dragging-alternative` still holds on
+> all three boards. `BoardViewLabels.moveTo` is optional only so a screen may
+> own the menu itself, never so it may drop the capability.
 
 **Card content** is per-screen; see the table at the end of this file.
 
@@ -507,12 +557,45 @@ The only per-screen code. Everything above is shared.
 | Board axis | Lead-stage catalogue, by `sortOrder` |
 | Move | `POST /api/tenant/crm/v1/leads/:id/stage` |
 | Capabilities | `GET /api/tenant/crm/v1/leads/capabilities?branchId=` |
+| Card write | `PATCH /api/tenant/crm/v1/leads/:id` — `rating`, `cardColor` |
+| Card activities | `GET` + `POST /api/tenant/core/v1/activities` — **Core's**, not CRM's |
 | Default view | `board` |
-| Card fields | Display name · profile-type icon · owner avatar · acquisition source · `StatusBadge(status)` · created date |
+| Card fields | Company name (contact name beneath, corporate only) · tag chips · activity mark · 0–3 rating · owner initials · overflow menu |
+| Column bar | Next-activity buckets — overdue / today / upcoming / none — over the cards **loaded** in that column |
 | Table columns | Name · Type · Stage · Status · Owner · Source · Branch · Created · Actions |
 | Sortable | `createdAt`, `updatedAt`, `name` |
 | Filters | `leadProfileType`, `status`, `stageId`, `stageFlag`, `acquisitionSourceId`, `ownerUserId` |
 | Terminal stages | Any stage whose flag is `CONVERTED` or `DISQUALIFIED` |
+
+**Tags** render as chips under the contact name — sentence case on
+`bg-muted`, never the `Badge` primitive, which states a record's *state* and
+says so in uppercase semibold. A tag is a value the tenant chose, so its
+optional colour is a leading dot rather than the chip's own background: the
+name is beside it, so nothing is carried by hue alone, and every chip stays on
+one background pair whose contrast is already known. The row is capped at
+three plus a `+N` chip that names the rest to a screen reader — a lead may
+carry fifty (`MAX_TAGS_PER_ATTACH`), and a card that grew a line per tag would
+be a different **height** from its neighbours, which is what the windowed
+column measures its rows against.
+
+**The activity mark is a control.** It is lucide `Activity` — a pulse line,
+not `Zap`: these are activities with a due date, and a lightning bolt reads as
+energy or as something instantaneous. Pressing it opens a dialog split into
+two halves — this lead's `PLANNED` activities, and a form that books one more
+— stacked below `md` rather than squeezed. It renders in `WorkspaceCard`'s
+footer, outside both the activation surface and the drag handle, so it neither
+opens the lead nor starts a drag. Its accessible name carries the bucket in
+words as well, because the mark's colour is the only thing separating
+"overdue" from "due today".
+
+Activities are **Core's** resource. `POST /api/tenant/crm/v1/activities` files
+`DONE` rows — a log of what happened — so planned work goes to Core's route,
+which is `idempotent: true` in the Gateway contract and therefore refuses a
+write without a UUIDv7 `x-idempotency-key`. One key per Save press, reused
+across the transport's retries of that press — `crm/shared/crm-write.ts`,
+rule 1. A fresh key per retry books the activity twice. A successful create re-reads
+both halves: the dialog's list, and the board, whose `nextActivity` bucket the
+server owns.
 
 ### Customer Profiles
 

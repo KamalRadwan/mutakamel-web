@@ -24,7 +24,6 @@
 import type { CrmProfileType } from "../leads/lead-contract";
 
 export const CUSTOMER_PROFILE_CREATE_LIMITS = {
-  displayName: 180,
   companyName: 180,
   firstName: 80,
   lastName: 80,
@@ -53,7 +52,10 @@ export type CustomerProfileCreateStatus = (typeof CUSTOMER_PROFILE_STATUSES)[num
 export interface CustomerContactRowForm {
   /** Stable row identity for React; never sent. */
   key: string;
+  /** Held only for a person reused from the directory, whose name is theirs. */
   fullName: string;
+  firstName: string;
+  lastName: string;
   honorificTitle: string;
   jobTitle: string;
   email: string;
@@ -88,6 +90,8 @@ export function emptyCustomerContactRow(key: string): CustomerContactRowForm {
   return {
     key,
     fullName: "",
+    firstName: "",
+    lastName: "",
     honorificTitle: "",
     jobTitle: "",
     email: "",
@@ -169,10 +173,13 @@ function buildContact(
   contact: CustomerContactRowForm,
   isPrimary: boolean,
 ): CustomerContactRequest {
-  const request: CustomerContactRequest = { fullName: contact.fullName.trim() };
+  // No `fullName`: CRM composes it from the parts below.
+  const request: CustomerContactRequest = {};
   if (isPrimary) request.isPrimary = true;
   Object.assign(
     request,
+    optional("firstName", contact.firstName),
+    optional("lastName", contact.lastName),
     optional("honorificTitle", contact.honorificTitle),
     optional("jobTitle", contact.jobTitle),
     optional("email", contact.email),
@@ -231,7 +238,9 @@ export function buildCreateCustomerProfileFullRequest(
     // contacts is legal here (unlike a lead), so an empty list is simply
     // omitted rather than sent as `[]` — which would ALSO discard
     // `primaryContact`, and is the shape that silently no-ops.
-    const named = form.contacts.filter((contact) => contact.fullName.trim().length > 0);
+    const named = form.contacts.filter(
+      (contact) => contact.firstName.trim().length > 0,
+    );
     if (named.length > 0) {
       const primaryIndex = Math.max(
         named.findIndex((contact) => contact.isPrimary),

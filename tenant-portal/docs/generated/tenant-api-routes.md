@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-09-04T22:57:05.054Z**
+Generated at: **2026-09-05T04:51:49.804Z**
 
-Frontend revision: `b8b73c0c87ae+dirty`
+Frontend revision: `27501b63b6a0+dirty`
 
-Backend revision: `d9373e1059c9+dirty`
+Backend revision: `f8eb9e3dfff3+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -17,11 +17,11 @@ canonical Gateway path mappings.
 
 | App | Routes |
 | --- | ---: |
-| core | 195 |
-| crm | 143 |
+| core | 197 |
+| crm | 160 |
 | trade | 231 |
 | webphone | 20 |
-| **Total** | **589** |
+| **Total** | **608** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -148,6 +148,8 @@ Machine-readable source:
 | core | GET | `/api/tenant/core/v1/provisioning/updates` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.provisioning.updates.list` |
 | core | POST | `/api/tenant/core/v1/provisioning/updates/apply` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.provisioning.updates.apply` |
 | core | GET | `/api/tenant/core/v1/public/fqdn-validation/:token` | PLATFORM_VALIDATION_DO_NOT_CALL_AS_FEATURE_API | PUBLIC | yes | `core.public.fqdn-validation.validate` |
+| core | GET | `/api/tenant/core/v1/public/geography/countries/:countryCode/states` | TENANT_PORTAL | PUBLIC | yes | `core.public.geography.states.list` |
+| core | GET | `/api/tenant/core/v1/public/geography/countries/:countryCode/states/:stateCode/cities` | TENANT_PORTAL | PUBLIC | yes | `core.public.geography.cities.list` |
 | core | POST | `/api/tenant/core/v1/public/payments/webhook` | EXTERNAL_CALLBACK_DO_NOT_CALL | PUBLIC | yes | `core.payments.webhook` |
 | core | GET | `/api/tenant/core/v1/public/tenant-host/status` | TENANT_PORTAL | PUBLIC | yes | `core.public.tenant-host.status` |
 | core | GET | `/api/tenant/core/v1/roles` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.roles.list` |
@@ -261,7 +263,11 @@ Machine-readable source:
 | crm | GET | `/api/tenant/crm/v1/customer-profiles/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.customer.profiles.by.id.get` |
 | crm | PATCH | `/api/tenant/crm/v1/customer-profiles/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.by.id.patch` |
 | crm | POST | `/api/tenant/crm/v1/customer-profiles/:id/contacts` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.customer.profiles.contacts.post` |
+| crm | GET | `/api/tenant/crm/v1/customer-profiles/:id/tags` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.customer.profiles.by.id.tags.get` |
+| crm | POST | `/api/tenant/crm/v1/customer-profiles/:id/tags` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.by.id.tags.post` |
+| crm | DELETE | `/api/tenant/crm/v1/customer-profiles/:id/tags/:tagId` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.by.id.tags.by.tag.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/customer-profiles/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.customer.profiles.capabilities.get` |
+| crm | POST | `/api/tenant/crm/v1/customer-profiles/search` | TENANT_PORTAL | AUTHENTICATED | no | `crm.customer.profiles.search.post` |
 | crm | GET | `/api/tenant/crm/v1/dashboards` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.dashboard.builder.list.get` |
 | crm | POST | `/api/tenant/crm/v1/dashboards` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.dashboard.builder.create.post` |
 | crm | DELETE | `/api/tenant/crm/v1/dashboards/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.dashboard.builder.by.id.delete` |
@@ -304,9 +310,13 @@ Machine-readable source:
 | crm | PATCH | `/api/tenant/crm/v1/leads/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.patch` |
 | crm | POST | `/api/tenant/crm/v1/leads/:id/convert` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.leads.by.id.convert.post` |
 | crm | POST | `/api/tenant/crm/v1/leads/:id/stage` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.stage.post` |
+| crm | GET | `/api/tenant/crm/v1/leads/:id/tags` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.by.id.tags.get` |
+| crm | POST | `/api/tenant/crm/v1/leads/:id/tags` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.tags.post` |
+| crm | DELETE | `/api/tenant/crm/v1/leads/:id/tags/:tagId` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.tags.by.tag.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/leads/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.capabilities.get` |
 | crm | GET | `/api/tenant/crm/v1/leads/company-options` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.company.options.get` |
 | crm | GET | `/api/tenant/crm/v1/leads/company-options/:companyPartyId/contacts` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.company.options.contacts.get` |
+| crm | POST | `/api/tenant/crm/v1/leads/search` | TENANT_PORTAL | AUTHENTICATED | no | `crm.leads.search.post` |
 | crm | GET | `/api/tenant/crm/v1/notes` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.notes.get` |
 | crm | POST | `/api/tenant/crm/v1/notes` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.notes.post` |
 | crm | DELETE | `/api/tenant/crm/v1/notes/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.notes.by.id.delete` |
@@ -319,7 +329,11 @@ Machine-readable source:
 | crm | PUT | `/api/tenant/crm/v1/opportunities/:id/pipeline` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.opportunities.by.id.pipeline.put` |
 | crm | POST | `/api/tenant/crm/v1/opportunities/:id/stage` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunities.by.id.stage.post` |
 | crm | GET | `/api/tenant/crm/v1/opportunities/:id/stage-history` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunities.by.id.stage.history.get` |
+| crm | GET | `/api/tenant/crm/v1/opportunities/:id/tags` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunities.by.id.tags.get` |
+| crm | POST | `/api/tenant/crm/v1/opportunities/:id/tags` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunities.by.id.tags.post` |
+| crm | DELETE | `/api/tenant/crm/v1/opportunities/:id/tags/:tagId` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunities.by.id.tags.by.tag.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/opportunities/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunities.capabilities.get` |
+| crm | POST | `/api/tenant/crm/v1/opportunities/search` | TENANT_PORTAL | AUTHENTICATED | no | `crm.opportunities.search.post` |
 | crm | GET | `/api/tenant/crm/v1/opportunity-stages` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunity.stages.get` |
 | crm | POST | `/api/tenant/crm/v1/opportunity-stages` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunity.stages.post` |
 | crm | DELETE | `/api/tenant/crm/v1/opportunity-stages/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunity.stages.by.id.delete` |
@@ -360,6 +374,11 @@ Machine-readable source:
 | crm | GET | `/api/tenant/crm/v1/settings/custom-fields/values` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.settings.custom.fields.values.get` |
 | crm | POST | `/api/tenant/crm/v1/settings/custom-fields/values` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.settings.custom.fields.values.post` |
 | crm | GET | `/api/tenant/crm/v1/static-data` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.static.data.get` |
+| crm | GET | `/api/tenant/crm/v1/tags` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.tags.get` |
+| crm | POST | `/api/tenant/crm/v1/tags` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.tags.post` |
+| crm | DELETE | `/api/tenant/crm/v1/tags/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.tags.by.id.delete` |
+| crm | GET | `/api/tenant/crm/v1/tags/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.tags.by.id.get` |
+| crm | PATCH | `/api/tenant/crm/v1/tags/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.tags.by.id.patch` |
 | crm | GET | `/api/tenant/crm/v1/tasks` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.tasks.get` |
 | crm | POST | `/api/tenant/crm/v1/tasks` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.tasks.post` |
 | crm | PATCH | `/api/tenant/crm/v1/tasks/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.tasks.by.id.patch` |

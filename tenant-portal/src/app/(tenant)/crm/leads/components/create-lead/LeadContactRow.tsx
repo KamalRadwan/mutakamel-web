@@ -140,11 +140,11 @@ export function LeadContactRow({
           errors={errors}
           disabled={disabled}
           limits={{
-            fullName: LEAD_CREATE_LIMITS.displayName,
+            name: LEAD_CREATE_LIMITS.firstName,
             jobTitle: LEAD_CREATE_LIMITS.jobTitle,
             email: LEAD_CREATE_LIMITS.email,
           }}
-          nameLabel={t.crmLeads.contactName}
+          directoryNameLabel={t.crmLeads.contactName}
           directoryOwned={fromDirectory}
           identityHint={fromDirectory ? t.crmLeads.create.existingContactLocked : undefined}
           onFieldChange={(patch) => onChange(index, patch)}

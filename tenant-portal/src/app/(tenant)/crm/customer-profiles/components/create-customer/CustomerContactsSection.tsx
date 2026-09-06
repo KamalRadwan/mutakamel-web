@@ -131,11 +131,11 @@ export function CustomerContactsSection({
                 errors={errors}
                 disabled={disabled}
                 limits={{
-                  fullName: limits.displayName,
+                  name: limits.firstName,
                   jobTitle: limits.jobTitle,
                   email: limits.email,
                 }}
-                nameLabel={t.crmLeads.contactName}
+                directoryNameLabel={t.crmLeads.contactName}
                 onFieldChange={(patch) => onContactChange(index, patch)}
                 onPhoneChange={(phoneIndex, value) => onPhoneChange(index, phoneIndex, value)}
                 onPhoneAdd={() => onPhoneAdd(index)}
