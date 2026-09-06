@@ -21,6 +21,9 @@ vi.mock("@/i18n/I18nContext", () => ({
       common: {
         sessionChecking: "جاري التحقق من الجلسة...",
         sessionUnavailable: "تعذر التحقق من الجلسة حاليًا. لم يتم تسجيل خروجك.",
+        serverErrorTitle: "خطأ داخلي في الخادم",
+        serviceUnavailableTitle: "الخدمة غير متاحة مؤقتًا",
+        networkUnreachableTitle: "تعذر الوصول إلى الخادم",
         retry: "إعادة المحاولة",
       },
     },
@@ -609,6 +612,90 @@ describe("AuthProvider server-authoritative bootstrap", () => {
       expect(screen.getByText("تعذر التحقق من الجلسة حاليًا. لم يتم تسجيل خروجك.")).toBeTruthy(),
     );
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a route that answered 404 while Core was still registering routes", 404],
+    ["a malformed proxy request", 400],
+    ["an unprocessable body from a mismatched contract", 422],
+  ])("keeps the session through %s", async (_label, status) => {
+    // The regression: these classify as `none`, which used to fall through to
+    // the sign-out branch. None of them says anything about the session, and
+    // Core answers 404 for a real route during the seconds it spends booting —
+    // so a restart read as a sign-out, and the operator lost their page.
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      jsonResponse({ code: "SOMETHING_ELSE" }, status)));
+
+    render(
+      <AuthProvider>
+        <AuthGuard>
+          <AuthProbe />
+        </AuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("تعذر التحقق من الجلسة حاليًا. لم يتم تسجيل خروجك.")).toBeTruthy(),
+    );
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("keeps the session when a 200 carries a body it cannot read", async () => {
+    // A proxy error page served as 200, a truncated response, an envelope that
+    // changed under a deploy. The session is intact; only the payload was not.
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      jsonResponse({ data: "not-a-profile" })));
+
+    render(
+      <AuthProvider>
+        <AuthGuard>
+          <AuthProbe />
+        </AuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("تعذر التحقق من الجلسة حاليًا. لم يتم تسجيل خروجك.")).toBeTruthy(),
+    );
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("names the fault as the server's, not the account's", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      jsonResponse({ code: "GW.UPSTREAM.UNAVAILABLE" }, 500)));
+
+    render(
+      <AuthProvider>
+        <AuthGuard>
+          <AuthProbe />
+        </AuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("خطأ داخلي في الخادم")).toBeTruthy(),
+    );
+    expect(screen.getByText("GW.UPSTREAM.UNAVAILABLE")).toBeTruthy();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("still ends a session the server says is over", async () => {
+    // The genuine sign-out must keep working: no cookie means /auth/me is 401,
+    // the client refreshes, and the refresh names the session as invalid.
+    vi.stubGlobal("fetch", vi.fn(async (url: string) =>
+      url.includes("/auth/refresh")
+        ? jsonResponse({ errorCode: "INVALID_REFRESH_TOKEN" }, 401)
+        : jsonResponse({ code: "COMMON.AUTH.MISSING_BEARER_TOKEN" }, 401)));
+
+    render(
+      <AuthProvider>
+        <AuthGuard>
+          <AuthProbe />
+        </AuthGuard>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
   });
 
   it("retains the authenticated state when durable logout fails", async () => {

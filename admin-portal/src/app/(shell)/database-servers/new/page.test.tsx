@@ -39,6 +39,7 @@ describe("NewDatabaseServerPage", () => {
       logout: vi.fn(),
       logoutAll: vi.fn(),
       retryBootstrap: vi.fn(),
+      bootstrapFailure: null,
       freshLoginCount: 0,
     });
 
@@ -65,6 +66,7 @@ describe("NewDatabaseServerPage", () => {
       logout: vi.fn(),
       logoutAll: vi.fn(),
       retryBootstrap: vi.fn(),
+      bootstrapFailure: null,
       freshLoginCount: 0,
     });
 

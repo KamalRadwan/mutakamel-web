@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createServer: vi.fn(),
   activateServer: vi.fn(),
   retryBootstrap: vi.fn(),
+  bootstrapFailure: null,
   push: vi.fn(),
   toastSuccess: vi.fn(),
   toastWarning: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("../hooks/useDatabaseServerRegistration", () => ({
     checkConnectivity: mocks.checkConnectivity,
     activateServer: mocks.activateServer,
     retryBootstrap: mocks.retryBootstrap,
+    bootstrapFailure: null,
   }),
 }));
 vi.mock("@/components/ui/ToastContext", () => ({

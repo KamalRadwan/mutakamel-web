@@ -205,6 +205,33 @@ operation error. It never loops or silently swallows the failure. Explicit
 terminal `401`/`403` codes enter `ENDED`; an ordinary business permission `403`
 emits one Access Denied notification and is never treated as refresh failure.
 
+**Only a refusal that names the session as over ends it.** Bootstrap classifies
+its failure and signs the administrator out on `end` alone — a `401`/`403`
+carrying one of the session-ending codes. Every other outcome retains the
+session and enters `DEGRADED`.
+
+Two of those used to sign the operator out, and neither says anything about the
+session:
+
+- **`400`/`404`/`409`/`422`** (`classifyAuthFailure` → `none`). Core registers
+  its routes while it boots, so a reload that lands in that window is answered
+  `404` for a route that exists. A restart was read as a sign-out — the most
+  frequent cause in development, where the dev server restarts on every edit.
+- **A `2xx` whose body does not parse** (`INVALID_AUTH_PROFILE`): a proxy error
+  page served as `200`, a truncated response, an envelope changed under a
+  deploy.
+
+The genuine end is unchanged and still exact: a browser with no session gets
+`401 COMMON.AUTH.MISSING_BEARER_TOKEN` from `/auth/me`, the client refreshes,
+the refresh answers `401 INVALID_REFRESH_TOKEN`, and that classifies as `end`.
+
+The `DEGRADED` screen names the fault rather than leaving it ambiguous —
+"Internal Server Error", "The service is temporarily unavailable", or "Could not
+reach the server", with the backend error code beneath it — above the standing
+reassurance that the operator has **not** been signed out. Telling someone their
+session could not be checked, with no cause, reads like a sign-out; a status does
+not.
+
 If `/auth/me` bootstrap, including its reactive refresh, fails because of a
 network error, `429`, or `5xx`, the browser retains the cookie session and
 retries the safe bootstrap after `1s`, `2s`, `4s`, `8s`, `16s`, and then every

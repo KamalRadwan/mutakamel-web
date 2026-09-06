@@ -60,6 +60,14 @@ export type AuthState =
   | "DEGRADED"
   | "ENDED";
 
+/** A session check that could not be completed, for the operator to read. */
+export interface BootstrapFailure {
+  /** HTTP status, or 0 when the request never got a response. */
+  status: number;
+  /** Backend error code when one was returned. */
+  code?: string;
+}
+
 export function isPendingAuthState(state: AuthState): boolean {
   return (
     state === "BOOTSTRAPPING" || state === "STALE" || state === "REFRESHING"
@@ -88,6 +96,15 @@ interface AuthContextType {
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
   retryBootstrap: () => Promise<void>;
+  /**
+   * Why the last session check failed, while `authState` is DEGRADED.
+   *
+   * The administrator is still signed in; something behind the API is not
+   * answering usefully. Naming it — a status, a code — is the difference
+   * between "the server is down" and "something happened to my account",
+   * which is exactly the confusion a needless sign-out used to create.
+   */
+  bootstrapFailure: BootstrapFailure | null;
   /**
    * Counts credential sign-ins completed in this document. Only `login()`
    * bumps it: bootstrap, proactive refresh, and cross-tab session adoption
@@ -152,6 +169,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionCommitRef.current += 1;
   }, []);
 
+  const [bootstrapFailure, setBootstrapFailure] =
+    useState<BootstrapFailure | null>(null);
+
   const scheduleBootstrapRetry = useCallback(() => {
     if (!mountedRef.current || retryTimerRef.current !== null) return;
 
@@ -195,27 +215,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
         if (!mountedRef.current || superseded()) return;
         resetBootstrapRetry();
+        setBootstrapFailure(null);
         setUser(readUserProfile(response.data));
         setAuthState("AUTHENTICATED");
       } catch (error) {
         if (!mountedRef.current || superseded()) return;
+        // Only a refusal that names *this session* as over may end it. A
+        // backend fault is not such a refusal, and signing an administrator
+        // out over one costs them the page they were working on.
+        //
+        // Two failures used to reach the sign-out below, and neither says
+        // anything about the session:
+        //
+        //   - `none` covers 400/404/409/422. Core registers its routes while
+        //     it boots, so a reload landing in that window answers 404 for a
+        //     route that exists — a restart, read as a sign-out.
+        //   - `INVALID_AUTH_PROFILE` is a 2xx whose body did not parse: a
+        //     proxy error page served as 200, a truncated response, an
+        //     envelope that changed under a deploy.
+        //
+        // The genuine end is unaffected and still exact: a browser with no
+        // session gets 401 from `/auth/me`, the client refreshes, the refresh
+        // answers `INVALID_REFRESH_TOKEN`, and that classifies as `end`.
         const disposition = classifyAuthFailure(
           getAuthErrorStatus(error),
           getAuthErrorCode(error),
         );
-        if (
-          !(error instanceof Error && error.message === "INVALID_AUTH_PROFILE") &&
-          disposition !== "end" &&
-          disposition !== "none"
-        ) {
+        if (disposition !== "end") {
+          setBootstrapFailure({
+            status: getAuthErrorStatus(error) ?? 0,
+            ...(getAuthErrorCode(error)
+              ? { code: getAuthErrorCode(error) }
+              : {}),
+          });
           setAuthState("DEGRADED");
           scheduleBootstrapRetry();
           return;
         }
         resetBootstrapRetry();
+        setBootstrapFailure(null);
         clearLocalAuthState();
         setUser(null);
-        setAuthState(disposition === "end" ? "ENDED" : "UNAUTHENTICATED");
+        setAuthState("ENDED");
       }
     })();
     const clearInFlight = () => {
@@ -711,8 +752,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     logoutAll,
     retryBootstrap,
+    bootstrapFailure,
     freshLoginCount,
-  }), [acceptInvite, authState, freshLoginCount, login, logout, logoutAll, resetPassword, retryBootstrap, user]);
+  }), [acceptInvite, authState, bootstrapFailure, freshLoginCount, login, logout, logoutAll, resetPassword, retryBootstrap, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

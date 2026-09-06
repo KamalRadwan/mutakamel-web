@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
     isAuthenticated: false,
     isLoading: true,
     retryBootstrap: vi.fn(),
+    bootstrapFailure: null,
   },
 }));
 

@@ -96,7 +96,7 @@ export const relocationCopy = {
       "An earlier relocation command for this tenant was never resolved, and these values differ from it. Check what actually exists before sending another command.",
     pendingIntentResolve: "Check for an existing relocation",
     backupRuntimeUnavailable:
-      "Database backups are not configured on this deployment, so a relocation cannot start. The move copies the tenant through a backup, and refusing here is what stops it copying a database it could not restore. Nothing was changed.",
+      "This Worker cannot take the copy right now: either the PostgreSQL client tools are unavailable to it, or its scratch disk is not writable. The move is refused before anything starts rather than part way through. Nothing was changed.",
     correlation: "Correlation ID",
   },
   ar: {
@@ -188,7 +188,7 @@ export const relocationCopy = {
       "أمر نقل سابق لهذا المستأجر لم يُحسم، وهذه القيم تختلف عنه. تحقق مما هو موجود فعلاً قبل إرسال أمر آخر.",
     pendingIntentResolve: "تحقق من وجود عملية نقل",
     backupRuntimeUnavailable:
-      "النسخ الاحتياطي لقواعد البيانات غير مُهيّأ في هذا النظام، لذلك لا يمكن بدء النقل. العملية تنسخ المستأجر عبر نسخة احتياطية، والرفض هنا هو ما يمنع نسخ قاعدة بيانات لا يمكن استعادتها. لم يتغير شيء.",
+      "هذا العامل لا يستطيع أخذ النسخة الآن: إمّا أن أدوات PostgreSQL غير متاحة له، أو أن قرص العمل المؤقت غير قابل للكتابة. يُرفض النقل قبل أن يبدأ بدل أن يتوقف في منتصفه. لم يتغير شيء.",
     correlation: "معرّف الارتباط",
   },
 } as const;

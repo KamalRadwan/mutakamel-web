@@ -2,14 +2,15 @@
 
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { isPendingAuthState, useAuth } from "@/context/AuthContext";
+import { isPendingAuthState, useAuth, type BootstrapFailure } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
-  const { authState, isAuthenticated, isLoading, retryBootstrap } = useAuth();
+  const { authState, bootstrapFailure, isAuthenticated, isLoading, retryBootstrap } =
+    useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const isPublicAuthPage = isPublicAdminAuthPath(pathname);
@@ -42,9 +43,17 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   if (!isPublicAuthPage && authState === "DEGRADED" && !isAuthenticated) {
     return (
       <div role="alert" className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6 text-center text-foreground">
+        <p className="text-sm font-medium">
+          {describeBootstrapFailure(bootstrapFailure, t.common)}
+        </p>
         <p className="text-sm text-muted-foreground">
           {t.common.sessionUnavailable}
         </p>
+        {bootstrapFailure?.code ? (
+          <p className="font-mono text-xs text-muted-foreground">
+            <bdi dir="ltr">{bootstrapFailure.code}</bdi>
+          </p>
+        ) : null}
         <Button
           type="button"
           onClick={() => void retryBootstrap()}
@@ -62,6 +71,23 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+/**
+ * Names the fault, so the operator knows this is the server and not their
+ * account. A bare "could not be checked" reads like a sign-out; a status does
+ * not.
+ */
+function describeBootstrapFailure(
+  failure: BootstrapFailure | null,
+  copy: { serverErrorTitle: string; serviceUnavailableTitle: string; networkUnreachableTitle: string },
+): string {
+  if (!failure || failure.status === 0) return copy.networkUnreachableTitle;
+  if (failure.status === 503 || failure.status === 504) {
+    return copy.serviceUnavailableTitle;
+  }
+  if (failure.status >= 500) return copy.serverErrorTitle;
+  return copy.serviceUnavailableTitle;
 }
 
 const PUBLIC_ADMIN_AUTH_PATHS = new Set([

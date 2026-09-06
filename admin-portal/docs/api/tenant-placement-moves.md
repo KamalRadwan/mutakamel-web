@@ -198,12 +198,33 @@ until `retainUntil` has passed, states why, and requires the tenant id in a
 `WORKER.RELOCATION.NOT_COMPLETED`, `SOURCE_ALREADY_DESTROYED`,
 `CONFIRMATION_MISMATCH`, `RETENTION_UNKNOWN`, `RETENTION_ACTIVE`.
 
+### `BACKUP` does not mean an object store
+
+The step is named for the mechanism — `pg_dump` — not for a destination. The
+copy is written to the Worker's own scratch disk, restored from it, and deleted
+when the sequence ends; it is never uploaded. A deployment with no immutable
+backup bucket relocates tenants normally.
+
+This matters to the UI in one place: `WORKER.RELOCATION.RUNTIME_UNAVAILABLE`
+(`503`) says the Worker cannot take the copy — its PostgreSQL client tools are
+unusable, or its scratch root is not writable. It is **definitive**: raised
+before the run row is opened, so nothing started and the operator is free to
+pick a different destination and retry. It is listed in
+`RELOCATION_DEFINITIVE_REFUSAL_CODES` for exactly that reason, alongside the
+older `WORKER.BACKUP.RUNTIME_UNAVAILABLE`, which a Worker on the previous build
+still answers with the same meaning.
+
+Treating either as ambiguous is the regression `command-outcome.test.ts` pins:
+it preserved the persisted attempt and locked the operator behind an intent
+mismatch about a command that had never run.
+
 ### Other error codes
 
 `WORKER.RELOCATION.TARGET_INVALID` (destination equals the current server),
 `TENANT_INELIGIBLE`, `VERIFICATION_FAILED`, `SOURCE_STILL_PLACED`,
 `CORE_PLACEMENT_UNAVAILABLE`, `CORE_PLACEMENT_TIMEOUT`,
-`WORKER.TENANT_CLAIM.HELD`, `WORKER.BACKUP.COMMAND_ACTOR_REQUIRED`.
+`RUNTIME_UNAVAILABLE`, `WORKER.TENANT_CLAIM.HELD`,
+`WORKER.BACKUP.COMMAND_ACTOR_REQUIRED`.
 
 ## Move storage — browser contract
 
