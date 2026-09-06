@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
 
 // B6 — the skip link is the first focusable element in the app, and it
-// targets <main id="main">. docs/design/shell.md#skip-link.
+// targets <main id="main">. docs/design/shell.md#skip-link--the-first-focusable-element-in-the-app.
 //
 // AppShell reads the dictionary, the permission set and the router, none of
 // which a unit test should stand up for real. Each is replaced with the
@@ -18,7 +18,7 @@ vi.mock("@/i18n/I18nContext", () => ({
     dir: "ltr",
     t: {
       common: { skipToContent: "Skip to content", notifications: "Notifications" },
-      nav: { workspaceCenter: "Workspace center" },
+      nav: { workspaceCenter: "Workspace center", appWorkspace: "Workspace" },
     },
   }),
 }));
@@ -27,9 +27,11 @@ vi.mock("./useNavTree", () => ({ useNavTree: () => [] }));
 // The app switcher reads the route to derive the active app. This test is
 // about focus order, so the route is stubbed rather than stood up.
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
-vi.mock("./Topbar", () => ({ Topbar: () => <header /> }));
-vi.mock("./MobileNav", () => ({ MobileNav: () => null }));
-vi.mock("./Sidebar", () => ({ Sidebar: () => <nav /> }));
+vi.mock("./GlobalNav", () => ({ GlobalNav: () => <header /> }));
+vi.mock("./NavSheet", () => ({ NavSheet: () => null }));
+// The bar renders the nav location and the page's portalled controls;
+// neither is what this test asserts, and both need the route.
+vi.mock("./PageActionBar", () => ({ PageActionBar: () => <div /> }));
 // Both need the Next router / connectivity APIs, and neither is what this
 // test is about — it asserts the ORDER of focusable elements, so the stubs
 // must render nothing focusable.
@@ -44,7 +46,7 @@ afterEach(cleanup);
 describe("AppShell", () => {
   it("renders the skip link as the first focusable element, targeting #main", () => {
     const { container } = render(
-      <AppShell initialSidebarState="expanded" initialApp="workspace">
+      <AppShell initialApp="workspace">
         <p>Workspace</p>
       </AppShell>,
     );
@@ -61,7 +63,7 @@ describe("AppShell", () => {
 
   it("gives <main> the id the skip link points at, and a tabIndex so it can take focus", () => {
     render(
-      <AppShell initialSidebarState="expanded" initialApp="workspace">
+      <AppShell initialApp="workspace">
         <p>Workspace</p>
       </AppShell>,
     );

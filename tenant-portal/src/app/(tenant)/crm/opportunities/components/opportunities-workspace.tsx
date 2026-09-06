@@ -18,6 +18,7 @@ import {
   SelectValue,
   StageBar,
   TableView,
+  PageActions,
   ViewSwitcher,
   useWorkspaceState,
   type MoveToTarget,
@@ -302,8 +303,12 @@ export function OpportunitiesWorkspace() {
     );
   }
 
+  // `overflow-hidden` on the screen's own root, not on the CRM segment layout,
+  // which is a pass-through: this board scrolls horizontally inside a pane the
+  // height of <main>, so nothing here may spill and start the page scrolling
+  // instead. `h-full` resolves against <main> — see app/(tenant)/crm/layout.tsx.
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full flex-col gap-4 overflow-hidden">
       <PageHeader
         title={t.crmOpportunities.heading}
         description={t.crmOpportunities.subtitle}
@@ -312,31 +317,35 @@ export function OpportunitiesWorkspace() {
             ? { label: t.crmOpportunityDetail.createAction, onClick: create.openModal }
             : undefined
         }
+        // Branch and pipeline both scope what this screen reads, so they go
+        // where every other scoped screen puts its branch: with the actions.
+        secondaryActions={
+          <>
+            <TenantBranchSelect branchIds={branchIds} branchId={branchId} onChange={selectBranch} disabled={isLoading || isMutating} />
+            <Select value={selectedPipelineId ?? ""} onValueChange={setSelectedPipelineId} disabled={pipelines.length === 0 || isLoading}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder={pipelines.length === 0 ? t.crmOpportunities.noPipeline : t.crmOpportunities.selectPipeline} />
+              </SelectTrigger>
+              <SelectContent>
+                {pipelines.map((pipeline) => (
+                  <SelectItem key={pipeline.id} value={pipeline.id}>
+                    {localizedName(pipeline, lang)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        }
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <TenantBranchSelect branchIds={branchIds} branchId={branchId} onChange={selectBranch} disabled={isLoading || isMutating} />
-          <Select value={selectedPipelineId ?? ""} onValueChange={setSelectedPipelineId} disabled={pipelines.length === 0 || isLoading}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder={pipelines.length === 0 ? t.crmOpportunities.noPipeline : t.crmOpportunities.selectPipeline} />
-            </SelectTrigger>
-            <SelectContent>
-              {pipelines.map((pipeline) => (
-                <SelectItem key={pipeline.id} value={pipeline.id}>
-                  {localizedName(pipeline, lang)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <PageActions slot="view">
         <ViewSwitcher
           value={view}
           onChange={setView}
           available={["board", "card", "table"]}
           labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
         />
-      </div>
+      </PageActions>
 
       {capabilitiesUnavailable && <DegradedBanner message={t.crmOpportunities.capabilitiesUnavailable} />}
       {view === "card" && cards.loadMoreError && <DegradedBanner message={t.crmOpportunities.loadMoreFailed} />}

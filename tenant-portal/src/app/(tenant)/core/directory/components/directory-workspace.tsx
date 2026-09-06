@@ -11,6 +11,7 @@ import {
   PermissionGate,
   SubNav,
   TableView,
+  PageActions,
   ViewSwitcher,
   CORE_DIRECTORY_NAV_ITEMS,
   type BoardColumnDef,
@@ -122,72 +123,73 @@ export function DirectoryWorkspace() {
 
         <SubNav items={CORE_DIRECTORY_NAV_ITEMS} />
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <FilterBar
-            filters={[
-              {
-                id: "partyType",
-                kind: "select",
-                label: copy.columnType,
-                placeholder: copy.anyValue,
-                options: PARTY_TYPES.map((type) => ({
-                  value: type,
-                  label: copy.partyTypes[type],
-                })),
-              },
-              {
-                id: "status",
-                kind: "select",
-                label: t.common.status,
-                placeholder: copy.anyValue,
-                options: PARTY_STATUSES.map((status) => ({
-                  value: status,
-                  label: copy.partyStatuses[status],
-                })),
-              },
-              {
-                id: "roleType",
-                kind: "select",
-                label: copy.columnRoles,
-                placeholder: copy.anyValue,
-                options: PARTY_ROLE_TYPES.map((role) => ({
-                  value: role,
-                  label: copy.roleTypes[role],
-                })),
-              },
-            ]}
-            values={{
-              ...(filters.partyType
-                ? { partyType: { kind: "select" as const, value: filters.partyType } }
-                : {}),
-              ...(filters.status
-                ? { status: { kind: "select" as const, value: filters.status } }
-                : {}),
-              ...(filters.roleType
-                ? { roleType: { kind: "select" as const, value: filters.roleType } }
-                : {}),
-            }}
-            onChange={(next) =>
-              directory.setFilters({
-                partyType: selected(next.partyType) as Party["partyType"] | undefined,
-                status: selected(next.status) as PartyStatus | undefined,
-                roleType: selected(next.roleType),
-              })
-            }
-            onReset={() => directory.setFilters({})}
-            searchValue={search}
-            onSearchChange={directory.setSearch}
-            searchPlaceholder={copy.searchPlaceholder}
-            clearAllLabel={copy.clearFilters}
-            filtersLabel={t.common.filter}
-          />
+        <FilterBar
+          filters={[
+            {
+              id: "partyType",
+              kind: "select",
+              label: copy.columnType,
+              placeholder: copy.anyValue,
+              options: PARTY_TYPES.map((type) => ({
+                value: type,
+                label: copy.partyTypes[type],
+              })),
+            },
+            {
+              id: "status",
+              kind: "select",
+              label: t.common.status,
+              placeholder: copy.anyValue,
+              options: PARTY_STATUSES.map((status) => ({
+                value: status,
+                label: copy.partyStatuses[status],
+              })),
+            },
+            {
+              id: "roleType",
+              kind: "select",
+              label: copy.columnRoles,
+              placeholder: copy.anyValue,
+              options: PARTY_ROLE_TYPES.map((role) => ({
+                value: role,
+                label: copy.roleTypes[role],
+              })),
+            },
+          ]}
+          values={{
+            ...(filters.partyType
+              ? { partyType: { kind: "select" as const, value: filters.partyType } }
+              : {}),
+            ...(filters.status
+              ? { status: { kind: "select" as const, value: filters.status } }
+              : {}),
+            ...(filters.roleType
+              ? { roleType: { kind: "select" as const, value: filters.roleType } }
+              : {}),
+          }}
+          onChange={(next) =>
+            directory.setFilters({
+              partyType: selected(next.partyType) as Party["partyType"] | undefined,
+              status: selected(next.status) as PartyStatus | undefined,
+              roleType: selected(next.roleType),
+            })
+          }
+          onReset={() => directory.setFilters({})}
+          searchValue={search}
+          onSearchChange={directory.setSearch}
+          searchPlaceholder={copy.searchPlaceholder}
+          clearAllLabel={copy.clearFilters}
+        filtersLabel={t.common.filter}
+        />
+
+        <PageActions slot="view">
           <ViewSwitcher
             value={workspace.view}
             onChange={workspace.setView}
             available={["board", "card", "table"]}
             labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
           />
-        </div>
+        </PageActions>
 
         <div className="min-h-0 flex-1">
           {workspace.view === "board" && (

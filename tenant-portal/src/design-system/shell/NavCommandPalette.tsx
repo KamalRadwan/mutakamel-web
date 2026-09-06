@@ -15,8 +15,8 @@ import { useNavTree } from "./useNavTree";
  * as a prop.
  *
  * Deliberately NOT app-scoped, which is why it consumes `useNavTree()`
- * directly rather than `useNavApps()` the way the sidebar does. Scoping the
- * sidebar makes twelve of the fifteen sections invisible at any moment; a
+ * directly rather than `useNavApps()` the way the global nav does. Scoping the
+ * nav makes twelve of the fifteen sections invisible at any moment; a
  * palette that hid them too would mean finding a Trade screen from CRM
  * required knowing to switch apps first. "Jump anywhere by name" is the one
  * affordance that should not care which app you are standing in.
@@ -47,7 +47,10 @@ export function NavCommandPalette() {
 
   const groups: CommandGroupDef[] = sections.map((section) => ({
     id: section.id,
-    heading: section.labelKey ? t.nav[section.labelKey as keyof typeof t.nav] : undefined,
+    // Falls back to the short menu label so the two headingless sections —
+    // Workspace and Account — stop arriving as unlabelled groups. Before
+    // `menuLabelKey` existed there was nothing to fall back to.
+    heading: t.nav[(section.labelKey ?? section.menuLabelKey) as keyof typeof t.nav],
     items: section.items.map((item) => ({
       id: item.href,
       label: t.nav[item.labelKey as keyof typeof t.nav],

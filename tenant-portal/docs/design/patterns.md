@@ -263,6 +263,14 @@ primary actions, one of them is secondary.
 `titleAdornment` and `leading` are slots `DetailHeader` fills; nothing else
 should need them.
 
+**The action cluster renders in the page action bar**, not under the heading.
+The props are unchanged and every screen declares its actions exactly where it
+always did; `PageHeader` portals the resulting DOM into the shell's second bar.
+Doing it here is what moved 78 screens' actions without editing any of them,
+and it keeps the one-filled-action ceiling structural — the bar has no
+`primary` of its own. The `<h1>` stays on the page. See
+[shell.md](../design/shell.md#it-holds-the-screens-controls).
+
 ## DetailHeader
 
 The header every detail screen in phases 4–12 uses: back control, record name,

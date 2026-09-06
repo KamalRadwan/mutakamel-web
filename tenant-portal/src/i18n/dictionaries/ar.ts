@@ -1679,11 +1679,33 @@ export const ar = {
     tradeCommercialAccounts: "الحسابات التجارية",
     tradeConfiguration: "إعدادات التجارة",
 
-    // The app switcher at the head of the sidebar.
+    // The app switcher, first control in the global nav.
     appSwitcher: "تبديل التطبيق",
     appWorkspace: "مساحة العمل",
     appCrm: "إدارة العملاء",
     appTrade: "التجارة",
+
+    // The global nav's menu triggers — NavSection.menuLabelKey. See en.ts.
+    navMenuOverview: "نظرة عامة",
+    navMenuRecords: "السجلات",
+    navMenuDashboards: "لوحات المعلومات",
+    navMenuSetup: "الإعداد",
+    navMenuFoundation: "الأساسيات",
+    navMenuDocuments: "المستندات",
+    navMenuInventory: "المخزون",
+    navMenuGovernance: "الحوكمة",
+    navMenuAutomation: "الأتمتة",
+    navMenuStaff: "الموظفون",
+    navMenuOperations: "العمليات",
+    navMenuSettings: "الإعدادات",
+    navMenuBilling: "الفوترة",
+    navMenuAccount: "الحساب",
+
+    // Shell landmarks and the two controls that only exist below `lg`.
+    mainNavigation: "التنقل الرئيسي",
+    pageActions: "إجراءات الصفحة",
+    openNavigation: "فتح التنقل",
+    brandHome: "الصفحة الرئيسية لمساحة العمل",
   },
   dashboard: {
     title: "لوحة القيادة",

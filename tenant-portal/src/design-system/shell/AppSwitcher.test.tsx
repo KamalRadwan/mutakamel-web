@@ -119,10 +119,10 @@ describe("AppSwitcher", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  // It lives in the topbar, which has no collapsed state — but the sidebar
-  // beside it does collapse to an icon rail, and the switcher must not follow
-  // it. This pins that the control keeps its name and its keyboard path
-  // regardless of anything the sidebar is doing.
+  // It scopes every menu that follows it in the global nav, and below `xl`
+  // those menus are not on screen at all — the sheet carries them. The switcher
+  // stays either way. This pins that the control keeps its accessible name and
+  // its keyboard path regardless of which of the two the viewport is showing.
   it("stays a named, keyboard-operable button", () => {
     render(<AppSwitcher apps={appsFixture()} activeApp="crm" onSelect={vi.fn()} />);
 

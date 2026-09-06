@@ -98,10 +98,10 @@ at all — the only two shadows are `shadow-pop` and `shadow-overlay`.
 
 ### 8. Permanently dark chrome
 
-The current navbar is dark regardless of theme. The sidebar in this system is
-`bg-sidebar`, which is **`ink-25` in light mode** — the lightest step in the
-neutral ramp, a single notch off the page background it sits beside. A dark
-chrome wrapped around a light body is a tell.
+The pre-rebuild navbar was dark regardless of theme. Both nav bars in this
+system are `bg-card` — **white in light mode**, one step off the `--canvas`
+page background they sit above. A dark chrome wrapped around a light body is a
+tell.
 
 ### 9. Emoji as UI
 

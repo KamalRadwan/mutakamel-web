@@ -11,6 +11,7 @@ import {
   PageHeader,
   PermissionGate,
   TableView,
+  PageActions,
   ViewSwitcher,
   useWorkspaceState,
   StageBar,
@@ -142,39 +143,57 @@ export default function LeadsPage() {
   return (
     <PermissionGate require="crm.leads.read" scoped>
       <div className="flex h-full flex-col gap-4">
+        {/* `sr-only`, not deleted. The action bar above already says CRM ›
+            Leads, so a second "Leads" in the body was the same sentence twice
+            and cost the board a heading's worth of height. What it is NOT is
+            surplus: the <h1> is this document's outline, and the bar's location
+            is a <p> — docs/design/shell.md, "What does not move". Hidden
+            visually, it still names the screen for a screen reader and for
+            anything walking the heading tree.
+
+            The header keeps its props: `primaryAction` and `secondaryActions`
+            portal into the bar from inside PageHeader, and a portal's DOM lands
+            in the bar's subtree, so hiding this block does not hide them. */}
         <PageHeader
+          className="sr-only"
           title={t.crmLeads.title}
           primaryAction={canCreate ? { label: t.crmLeads.addLead, onClick: openCreate } : undefined}
-        />
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Not a FilterBar: that pattern's chips carry operators this
-              endpoint has none of, and its own 300ms debounce sat on top of
-              the hook's 250ms. It was called here with `filters={[]}` and
-              no-op handlers — a bare search box. The bar below asks the six
-              equality filters instead, one or several AND-ed. */}
-          <LeadSearchBar
-            value={search}
-            onChange={setSearch}
-            onSubmit={submitSearch}
-            stages={stages}
-            disabled={!branchId}
-          />
-          <div className="flex items-center gap-2">
+          // The branch scopes every read on this screen, so it belongs with
+          // the actions rather than beside the search box — which is where the
+          // other two dozen branch-scoped screens already put it.
+          secondaryActions={
             <TenantBranchSelect
               branchIds={branchIds}
               branchId={branchId}
               onChange={selectBranch}
               disabled={isLoading || isMovePending}
             />
-            <ViewSwitcher
-              value={view}
-              onChange={setView}
-              available={["board", "card", "table"]}
-              labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
-            />
-          </div>
-        </div>
+          }
+        />
+
+        {/* Not a FilterBar: that pattern's chips carry operators this endpoint
+            has none of, and its own 300ms debounce sat on top of the hook's
+            250ms. It was called here with `filters={[]}` and no-op handlers — a
+            bare search box. This asks the six equality filters instead, one or
+            several AND-ed. Its basic row renders in the action bar; its
+            advanced card renders here, which is the only place a multi-row
+            panel can go. */}
+        <LeadSearchBar
+          value={search}
+          onChange={setSearch}
+          onSubmit={submitSearch}
+          stages={stages}
+          disabled={!branchId}
+        />
+
+        <PageActions slot="view">
+          <ViewSwitcher
+            value={view}
+            onChange={setView}
+            available={["board", "card", "table"]}
+            labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
+          />
+        </PageActions>
 
         {degraded.stages && <DegradedBanner message={t.crmLeads.stagesUnavailable} />}
         {degraded.capabilities && <DegradedBanner message={t.crmLeads.capabilitiesUnavailable} />}

@@ -14,6 +14,7 @@ import { Input } from "../../primitives/Input";
 import { Popover, PopoverContent, PopoverTrigger } from "../../primitives/Popover";
 import { INTL_LOCALE } from "@/lib/format/locale";
 import { FilterControl } from "./FilterControl";
+import { PageActions } from "../../shell/PageActions";
 import { describeFilters, type FilterChipDescriptor, type FilterDef, type FilterValues } from "./filter-types";
 
 export * from "./filter-types";
@@ -148,7 +149,12 @@ export function FilterBar({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* The controls go up into the page action bar; the chips stay here.
+          That is the split the bar makes natural: the bar is where you ASK a
+          question of the data, the body is where the answer's current
+          conditions are listed and removed. Chips also wrap onto a second line
+          by design, which a 45px bar has nowhere to put. */}
+      <PageActions slot="search">
         <div className="relative w-60">
           <Search
             className={cn(
@@ -166,14 +172,16 @@ export function FilterBar({
           />
         </div>
 
-        {/* Inline at lg and above */}
-        <div className="hidden items-center gap-2 lg:flex">{filters.map(renderFilterControl)}</div>
-
-        {/* Collapsed behind a trigger below lg */}
+        {/* One shape at every width now. The filters used to render inline
+            from `lg` up and collapse into this popover below it, which made the
+            toolbar a different width on every screen and every viewport — fine
+            when it owned a full row of its own, unworkable in a bar it shares
+            with the screen's actions and its view switcher. The popover also
+            gives the filters a 288px column instead of a squeezed row. */}
         {filters.length > 0 && (
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="cursor-pointer lg:hidden">
+              <Button variant="outline" size="sm" className="cursor-pointer">
                 <SlidersHorizontal className={iconSize({ size: "md" })} aria-hidden="true" />
                 {filtersLabel}
                 {chips.length > 0 && (
@@ -188,7 +196,7 @@ export function FilterBar({
             </PopoverContent>
           </Popover>
         )}
-      </div>
+      </PageActions>
 
       {chips.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">

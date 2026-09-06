@@ -17,7 +17,9 @@ function SuspendedBanner() {
   return (
     <div
       role="status"
-      className="fixed inset-x-4 top-16 z-(--z-topbar) mx-auto max-w-md rounded-md border border-caution-200 bg-caution-100 px-4 py-3 text-center text-xs font-medium text-caution-800 shadow-pop dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300"
+      // `top-16` was 64px hand-fitted under a single 48px topbar. The shell
+      // is two bars now, so this clears the token rather than a number.
+      className="fixed inset-x-4 top-(--size-chrome) z-(--z-topbar) mx-auto mt-2 max-w-md rounded-md border border-caution-200 bg-caution-100 px-4 py-3 text-center text-xs font-medium text-caution-800 shadow-pop dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300"
     >
       {t.hostState.suspendedBanner}
     </div>

@@ -139,7 +139,7 @@ it from direction rather than hardcoding — see [theming.md](theming.md#rtl).
 | Lead & customer detail screens, lead conversion | [detail-screens.md](detail-screens.md) |
 | The per-screen accessibility checklist | [accessibility.md](accessibility.md) |
 | **The eleven states every data screen renders** | [states.md](states.md) |
-| Sidebar, topbar, navigation map | [shell.md](shell.md) |
+| The two nav bars, the page action bar, navigation map | [shell.md](shell.md) |
 | Light/dark, RTL, no-flash first paint | [theming.md](theming.md) |
 | Dictionary structure, zero-ternary rule | [i18n.md](i18n.md) |
 | The banned list | [anti-patterns.md](anti-patterns.md) |
@@ -157,7 +157,7 @@ src/design-system/
   primitives/       see primitives.md
   patterns/         see patterns.md
   views/            board / card / table — see views.md
-  shell/            AppShell, Sidebar, Topbar, MobileNav, nav-config
+  shell/            AppShell, GlobalNav, PageActionBar, NavSheet, nav-config
   feedback/         ToastProvider, useToast, AppToast
 ```
 
@@ -177,13 +177,16 @@ so here is the current line.
   in the admin file and are written here as the in-gamut OKLCH that round-trips
   to the same hex. See [DESIGN-SYSTEM.md § Ramps](DESIGN-SYSTEM.md#ramps--exact-values).
 - **The fonts.** IBM Plex Sans, Plex Sans Arabic, Plex Mono, at 400/500/600.
-- **The geometry.** 48px topbar, 240px sidebar, 52px rail, 44px row, the
-  control scale unscaled at `--ui-scale: 1`, admin's control paddings, and the
-  five-step radius scale.
+- **The geometry.** 44px row, the control scale unscaled at `--ui-scale: 1`,
+  admin's control paddings, and the five-step radius scale. The *chrome* no
+  longer matches: admin's 48px topbar and 240px sidebar were adopted and then
+  replaced by two 45px bars, because this portal's shell answers a different
+  question — see [shell.md](shell.md#what-is-replaced).
 - **The semantic roles**, including everything that did not exist here before:
   `--selected`, the `--info-*` / `--success-*` / `--warning-*` families with
-  their `-subtle` and `-vivid` forms, the `--chart-*` set, and the sidebar's own
-  `-primary` / `-accent` / `-selected` / `-border` / `-ring`.
+  their `-subtle` and `-vivid` forms, the `--chart-*` set, and the `--sidebar-*`
+  family the chrome still draws from under that name — see
+  [tokens.md](tokens.md#semantic-tokens).
 - **The pointer-target mechanism** — `ds-hit-area` / `ds-hit-target`, minimum
   sizes that expand under `(pointer: coarse)`, replacing a hardcoded inset that
   had been derived from the old 0.9 scale.

@@ -21,8 +21,8 @@ src/app/
 ```
 
 `(auth)` and `(tenant)` are Next route groups — they shape the layout tree
-without appearing in the URL. `/login` renders with no sidebar; every tenant
-route renders inside `AppShell`.
+without appearing in the URL. `/login` renders with no shell chrome; every
+tenant route renders inside `AppShell`.
 
 Both groups run host admission. An unknown tenant host must fail **before**
 the login form renders, not after.

@@ -6,88 +6,109 @@ import { focusRing } from "../lib/variants";
 import { cn } from "../lib/cn";
 import { OfflineBanner } from "../patterns/offline-banner/OfflineBanner";
 import { useConnectivity } from "../patterns/offline-banner/useConnectivity";
-import { MobileNav } from "./MobileNav";
+import { GlobalNav } from "./GlobalNav";
 import { NavCommandPalette } from "./NavCommandPalette";
-import { Sidebar } from "./Sidebar";
-import { Topbar } from "./Topbar";
+import { NavSheet } from "./NavSheet";
+import { PageActionBar } from "./PageActionBar";
+import { PageActionSlotsProvider } from "./page-action-slots";
 import { useActiveApp } from "./useActiveApp";
 import { useNavApps } from "./useNavApps";
-import { useSidebar, type SidebarState } from "./useSidebar";
+import { useNavLocation } from "./useNavLocation";
 import type { NavAppId } from "./nav-config";
 
 export interface AppShellProps {
   children: React.ReactNode;
-  // Read server-side from the tenant_app cookie in app/(tenant)/layout.tsx,
-  // the same way initialSidebarState is — so the first painted frame already
-  // shows the right app's sidebar. It is only the FALLBACK: `useActiveApp`
-  // derives the app from the route wherever the route belongs to one, and
-  // consults this only for `/`, `/search` and `/getting-started`.
+  // Read server-side from the tenant_app cookie in app/(tenant)/layout.tsx, so
+  // the first painted frame already shows the right app's menus. It is only the
+  // FALLBACK: `useActiveApp` derives the app from the route wherever the route
+  // belongs to one, and consults this only for `/`, `/search` and
+  // `/getting-started`.
   initialApp: NavAppId;
-  // Read server-side from the tenant_sidebar cookie in
-  // app/(tenant)/layout.tsx — the one shell dimension genuinely resolved
-  // server-side, so there is no collapse flash on first paint. A first-ever
-  // visitor (no cookie yet) starts expanded; this does not implement
-  // shell.md's viewport-conditional default (collapsed at lg-xl, expanded
-  // at xl+), which would need a hydration-unsafe viewport read to do
-  // server-side.
-  initialSidebarState: SidebarState;
 }
 
-export function AppShell({ children, initialSidebarState, initialApp }: AppShellProps) {
+/**
+ * Two 45px bars stacked above `<main>` — see docs/design/shell.md.
+ *
+ * ```text
+ * ┌ GlobalNav 45px ── brand · app · sections ·········· account ┐
+ * ├ PageActionBar 45px ── where you are ··· this screen's controls ┤
+ * │ main                                                          │
+ * ```
+ *
+ * This replaced a 240px sidebar beside a 48px topbar. The chrome costs 42px
+ * more vertically and gives back the sidebar's whole 240px horizontally, which
+ * on the 1366×768 laptop this is built for is the trade that matters: a dense
+ * table gains room for several more columns and loses about one row, and the
+ * row comes back because a screen's actions now live in the bar rather than in
+ * a header block above the table.
+ *
+ * **The height chain is load-bearing.** `h-dvh` here, `shrink-0` on both bars,
+ * `flex-1` on `<main>`. Every board and every `h-full` view inside one resolves
+ * its height through this and collapses to nothing if `<main>` stops being a
+ * flex item with a definite height. It is equally load-bearing that a screen
+ * root is `<main>`'s CHILD: a segment layout that wraps it in a real box makes
+ * `h-full` resolve against that box's auto height instead, which is why the
+ * Core, CRM and Trade segment layouts all render their children directly.
+ * `dvh`, not `vh`, so mobile browser chrome does not clip the board.
+ */
+export function AppShell({ children, initialApp }: AppShellProps) {
   const { t } = useI18n();
-  const { state } = useSidebar(initialSidebarState);
   const apps = useNavApps();
   const { app, selectApp } = useActiveApp(initialApp);
-  // The sidebar is scoped to one app. `apps` is already permission-filtered,
-  // so this is the second, independent cut: permissions decide what exists,
-  // the switcher decides which slice of it is on screen. Nothing is hidden
+  // The nav is scoped to one app. `apps` is already permission-filtered, so
+  // this is the second, independent cut: permissions decide what exists, the
+  // switcher decides which slice of it is on screen. Nothing is hidden
   // permanently — every section belongs to exactly one app (asserted in
   // nav-config.test.ts) and Ctrl/Cmd+K still searches all of them.
-  const sections = apps.find((entry) => entry.id === app)?.sections ?? [];
+  const activeApp = apps.find((entry) => entry.id === app);
+  const sections = activeApp?.sections ?? [];
+  const appLabelKey = activeApp?.labelKey ?? "appWorkspace";
+  const { itemId } = useNavLocation(sections);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { status, stopReason } = useConnectivity();
 
   return (
-    <div className="relative flex h-dvh overflow-hidden bg-canvas">
-      {/* B6 (SKILL-AUDIT.md): the first focusable element in the app.
-          Without it a keyboard user tabs the whole sidebar — up to eleven
-          items plus the collapse control — on every page load before
-          reaching the screen they asked for. `sr-only` until focused, then
-          `not-sr-only` so it is genuinely visible — a skip link nobody can
-          see is a skip link nobody uses. No transform, so nothing here is
-          animating a layout property. docs/design/shell.md#skip-link. */}
-      <a
-        href="#main"
-        className={cn(
-          "sr-only print:hidden",
-          "focus:not-sr-only focus:absolute focus:start-2 focus:top-2 focus:z-(--z-topbar)",
-          "focus:rounded-sm focus:border focus:border-border focus:bg-card",
-          "focus:px-3 focus:py-1.5 focus:text-sm focus:text-foreground",
-          focusRing,
-        )}
-      >
-        {t.common.skipToContent}
-      </a>
-      <div className="hidden lg:block print:hidden">
-        <Sidebar sections={sections} state={state} apps={apps} activeApp={app} />
-      </div>
-      <MobileNav
-        sections={sections}
-        open={mobileNavOpen}
-        onOpenChange={setMobileNavOpen}
-        apps={apps}
-        activeApp={app}
-      />
-      {/* Mounted once, at the shell — the palette is global by definition and
-          a second instance would fight for Ctrl/Cmd+K. */}
-      <NavCommandPalette />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Topbar
+    <PageActionSlotsProvider>
+      <div className="relative flex h-dvh flex-col overflow-hidden bg-canvas">
+        {/* B6 (SKILL-AUDIT.md): the first focusable element in the app.
+            Without it a keyboard user tabs the whole nav — the brand, the
+            switcher and up to six menus — on every page load before reaching
+            the screen they asked for. `sr-only` until focused, then
+            `not-sr-only` so it is genuinely visible: a skip link nobody can
+            see is a skip link nobody uses. No transform, so nothing here is
+            animating a layout property. docs/design/shell.md#skip-link--the-first-focusable-element-in-the-app. */}
+        <a
+          href="#main"
+          className={cn(
+            "sr-only print:hidden",
+            "focus:not-sr-only focus:absolute focus:start-2 focus:top-2 focus:z-(--z-topbar)",
+            "focus:rounded-sm focus:border focus:border-border focus:bg-card",
+            "focus:px-3 focus:py-1.5 focus:text-sm focus:text-foreground",
+            focusRing,
+          )}
+        >
+          {t.common.skipToContent}
+        </a>
+        <GlobalNav
           onMobileMenuOpen={() => setMobileNavOpen(true)}
           apps={apps}
           activeApp={app}
           onAppSelect={selectApp}
+          sections={sections}
+          activeItemId={itemId}
         />
+        <PageActionBar sections={sections} appLabelKey={appLabelKey} />
+        <NavSheet
+          sections={sections}
+          open={mobileNavOpen}
+          onOpenChange={setMobileNavOpen}
+          apps={apps}
+          activeApp={app}
+          activeItemId={itemId}
+        />
+        {/* Mounted once, at the shell — the palette is global by definition and
+            a second instance would fight for Ctrl/Cmd+K. */}
+        <NavCommandPalette />
         {/* Above <main>, not inside it: the connection state is a property of
             the whole session, and a strip that scrolls away with the page is
             one the user stops seeing. */}
@@ -99,11 +120,26 @@ export function AppShell({ children, initialSidebarState, initialApp }: AppShell
         />
         {/* tabIndex -1 so the skip link's target can actually take focus:
             without it the browser scrolls to <main> but leaves focus at the
-            top of the document, and the next Tab lands back in the nav. */}
-        <main id="main" tabIndex={-1} className="flex-1 scroll-mt-14 overflow-y-auto p-4 outline-none md:p-6">
+            top of the document, and the next Tab lands back in the nav.
+
+            `<main>` is its own scroll container, so an in-page anchor scrolls
+            inside it and never under the bars, which is why no scroll-margin
+            compensates for chrome height here. The `scroll-mt-14` that used to
+            sit on this element was 56px against a 48px topbar and had nothing
+            to do in either arrangement. */}
+        {/* 20px above the screen at every width — `pt-5` after `p-4`/`md:p-6`,
+            which sets the other three sides. The bar directly above already
+            names the screen, so the gap between it and the first control is
+            spacing and nothing else; the 24px `md:p-6` inherited from the
+            sidebar era was reading as a gap where a page title used to be. */}
+        <main
+          id="main"
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto p-4 pt-5 outline-none md:p-6 md:pt-5"
+        >
           {children}
         </main>
       </div>
-    </div>
+    </PageActionSlotsProvider>
   );
 }

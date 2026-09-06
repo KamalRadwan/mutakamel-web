@@ -115,7 +115,7 @@ No action needed. Recorded so a future pass does not "fix" what is correct.
 | `color-accessible-pairs` (4.5:1 / 3:1) | Every pairing computed by `design:contrast`, plus a negative control that has to keep failing |
 | `exit-faster-than-enter` (~60–70%) | Enter 120ms / exit 90ms = 75% |
 | `toast-dismiss` (3–5s) | 4000ms default |
-| `adaptive-navigation` (≥1024px sidebar) | Sidebar at `lg`, sheet below |
+| `adaptive-navigation` (≥1024px sidebar) | Section menus at `xl`, sheet below — see [shell.md](shell.md#the-menus-appear-at-xl-not-lg) |
 
 ---
 
@@ -176,10 +176,10 @@ existing move mutation, satisfies AA.
 ### B4 · Sticky chrome can obscure the keyboard-focused control
 **Rule:** `focus-not-obscured` (WCAG 2.2 AA)
 
-We stack four sticky layers: the topbar (44px when this was written, 48px since
-the admin port), sticky table header, sticky inline-start first column, sticky
-inline-end action column. A `Tab` into a row action near a viewport edge can
-land behind one of them, with no visible focus.
+We stack four sticky layers: the chrome (44px when this was written, 48px after
+the admin port, and two 45px bars since 2026-09-06), sticky table header, sticky
+inline-start first column, sticky inline-end action column. A `Tab` into a row
+action near a viewport edge can land behind one of them, with no visible focus.
 
 **Fix:** add `scroll-margin` on focusable row content sized to the sticky
 offsets, and add a check to the a11y checklist: tab to the first and last
@@ -197,8 +197,9 @@ Add to the `DataTable` test list.
 ### B6 · No skip link
 **Rule:** `skip-links` — "Skip to main content for keyboard users"
 
-With a 240px sidebar of up to 11 nav items, a keyboard user tabs through the
-entire nav on every page load before reaching content.
+A keyboard user tabs the whole navigation on every page load before reaching
+content — 11 sidebar items when this was written, and the brand, the app
+switcher and up to six menu triggers in the shell that replaced it.
 
 **Fix:** visually-hidden "Skip to content" as the first focusable element in
 `AppShell`, targeting `<main id="main">`, revealed on focus.

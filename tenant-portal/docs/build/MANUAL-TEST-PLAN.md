@@ -6,8 +6,9 @@ B–H blocked on a usable login (see [DECISIONS.md#d13](DECISIONS.md))
 > **The token layer moved on 2026-09-01.** The design system was replaced with
 > the admin portal's, and the density default went from compact (`--ui-scale`
 > 0.9) to standard (1). The **steps above the "Recording results" heading have
-> been updated** to the sizes that now ship — 48px topbar, 240px sidebar, 52px
-> rail, 44px rows, 32px buttons, 36px fields, IBM Plex rather than Readex Pro.
+> been updated** to the sizes that now ship — two 45px full-width nav bars
+> (2026-09-06, replacing the 48px topbar / 240px sidebar / 52px rail), 44px
+> rows, 32px buttons, 36px fields, IBM Plex rather than Readex Pro.
 >
 > The **recorded runs below have not been rewritten.** They are the log of what
 > a person actually observed on the date given, and editing an observation to
@@ -44,7 +45,7 @@ session, or accepting the invite from the email. See
 | # | Step | Expect |
 |---|---|---|
 | A1 | Load `/login` | Renders in Arabic RTL by default. No layout flash, no theme flash — the pre-hydration script sets `lang`, `dir` and `.dark` before React |
-| A2 | Toggle language | Every string switches. **Zero** untranslated strings. Direction mirrors: sidebar side, chevrons, toast corner |
+| A2 | Toggle language | Every string switches. **Zero** untranslated strings. Direction mirrors: brand zone and menu row swap edges, the nav sheet opens from the reading-start edge, chevrons, toast corner |
 | A3 | Toggle theme | Light ⇄ dark. The primary `#1d4ed8` (`--color-brand-600`) reads as a saturated cobalt, not navy and not violet |
 | A4 | Submit an empty form | Inline field errors, focus moves to the first invalid field. **Not** a toast |
 | A5 | Wrong password | A message distinguishable from a suspended account, a suspended tenant, a 429 and an offline failure (task 4.31) |
@@ -59,15 +60,15 @@ session, or accepting the invite from the email. See
 
 | # | Step | Expect |
 |---|---|---|
-| B1 | Sidebar | Only permitted items. Active item is a 2px logical bar + weight 500, **never a filled pill** |
+| B1 | Global nav | Only permitted sections. A section with one permitted screen is a **link**, not a menu. The active section's trigger carries a 2px bottom bar + weight 500, **never a filled pill** |
 | B2 | `Ctrl/Cmd+B` | Collapses to the 52px rail; tooltips appear on the correct side per direction |
 | B3 | Reload while collapsed | Still collapsed, **no flash** — the state is read server-side from a cookie |
-| B4 | Topbar | 48px at `--ui-scale` 1. Sidebar 240px expanded |
-| B5 | Below `lg` | Sidebar becomes a Sheet opening from the reading-start edge |
+| B4 | The two bars | 45px each at `--ui-scale` 1, 90px together. Brand zone 250px. Content column is the **full viewport width** |
+| B5 | Below `xl` | The section menus disappear and the menu trigger opens a Sheet from the reading-start edge, listing every section with its full heading |
 | B6 | Notifications | Unread count announced to a screen reader (audit B13) |
 | B7 | `Tab` from the top | A skip link is the first focusable element (audit B6) |
 | B8 | Density control | **Compact / Standard / Comfortable**. Standard is the default and writes no inline `--ui-scale`; compact writes `0.9`, comfortable `1.1`. All three change row height live and survive reload |
-| B9 | Side by side with the admin portal | A button, an input, a table row and the topbar are the **same physical size** in both portals. This is the check the geometry port exists to pass |
+| B9 | Side by side with the admin portal | A button, an input and a table row are the **same physical size** in both portals. The chrome is deliberately **not** comparable any more — admin has a sidebar, this has two bars |
 
 ## C · CRM — leads
 

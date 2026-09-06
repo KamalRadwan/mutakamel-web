@@ -147,7 +147,7 @@ and did not exist before:
 | Selection | `--selected`, `--selected-foreground` | The selected-row tint, a surface `--accent` was being overloaded to do |
 | Status roles | `--info-*`, `--success-*`, `--warning-*`, and `--destructive-subtle` / `-vivid` | A named role per outcome, each with a filled, a subtle and a vivid form |
 | Charts | `--chart-1…5`, `--chart-qualitative-1…6`, `--chart-grid`, `--chart-axis` | See [§ Charts](#charts) |
-| Sidebar | `--sidebar-primary`, `-accent`, `-selected`, `-border`, `-ring` | The shell's own copies, so re-theming chrome does not disturb the body |
+| Chrome | `--sidebar`, `--sidebar-foreground`, `--sidebar-active`, `-primary`, `-accent`, `-selected`, `-border`, `-ring` | The shell's own copies, so re-theming chrome does not disturb the body. The `sidebar` spelling outlived the sidebar: `brand-ramp.ts` validates `--sidebar-active` under the `sidebarActiveLight` / `sidebarActiveDark` contrast pairs, and the name is shared with `admin-portal` |
 
 Two distinctions inside the status roles decide how the product reads:
 
@@ -162,8 +162,13 @@ Two distinctions inside the status roles decide how the product reads:
   Those dark steps are exactly what made every badge read grey-green instead of
   green.
 
-The sidebar is a light surface in light mode — `ink-25`, the lightest step in
-the ramp, one notch off the `--background` it sits beside. It is **not**
+The chrome is a light surface in light mode. Both nav bars paint `--card` —
+white in light, `ink-950` in dark — which is also the exact background
+`--sidebar-active`'s two contrast pairs are measured against, so the active
+marker is validated on the surface it actually sits on. `--sidebar-foreground`
+and `--sidebar-active` are the two the shell draws; `--sidebar` itself is now
+declared for `admin-portal` parity and consumed by nothing, the same standing
+`--radius-xl` has. It is **not**
 permanently dark; a permanently dark chrome around a light body is one of the
 tells listed in [anti-patterns.md](anti-patterns.md).
 

@@ -12,7 +12,7 @@ Canonical prefixes: `/api/tenant/core/v1/billing`, `.../subscription`,
 Portal status: **built** — MASTER-PLAN Phase 6, 2026-08-31. Screens exist for
 every route except `GET /wallet`, which is not called because
 `GET /billing/summary` already returns the identical `WalletView`. Gap G2 is
-closed: `TenantBrandingTokens` reads `GET /branding/public` from the **root**
+closed: `BrandingProvider` reads `GET /branding/public` from the **root**
 layout, so the tenant brand reaches the login screen as well as the shell.
 
 A green `pnpm verify` does **not** prove this works against a real

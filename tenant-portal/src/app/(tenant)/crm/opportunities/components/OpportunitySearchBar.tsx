@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Search } from "lucide-react";
 import {
   Input,
+  PageActions,
   ToggleGroup,
   ToggleGroupItem,
   cn,
@@ -138,52 +139,57 @@ export function OpportunitySearchBar({
     return [];
   }
 
+  // The mode toggle and the basic row render in the page action bar; the
+  // advanced card renders where this component sits, in the page body. A card
+  // that grows to several rows of conditions has nowhere to go in a 45px bar,
+  // and the basic row is exactly one row of 28px controls, which is what the
+  // bar is sized for.
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <ToggleGroup
-          type="single"
-          size="sm"
-          value={value.mode}
-          disabled={disabled}
-          // Radix emits "" when the pressed segment is deselected, and a search
-          // bar with no mode has nothing to draw — so a press on the active
-          // segment is ignored rather than blanking the panel.
-          onValueChange={(next) => {
-            if (next) onChange(opportunitySearchWithMode(value, next as OpportunitySearchMode));
-          }}
-          aria-label={copy.searchMode.label}
-        >
-          <ToggleGroupItem value="basic">{copy.searchMode.basic}</ToggleGroupItem>
-          <ToggleGroupItem value="advanced">{copy.searchMode.advanced}</ToggleGroupItem>
-        </ToggleGroup>
+    <>
+      <PageActions slot="search">
+      <ToggleGroup
+        type="single"
+        size="sm"
+        value={value.mode}
+        disabled={disabled}
+        // Radix emits "" when the pressed segment is deselected, and a search
+        // bar with no mode has nothing to draw — so a press on the active
+        // segment is ignored rather than blanking the panel.
+        onValueChange={(next) => {
+          if (next) onChange(opportunitySearchWithMode(value, next as OpportunitySearchMode));
+        }}
+        aria-label={copy.searchMode.label}
+      >
+        <ToggleGroupItem value="basic">{copy.searchMode.basic}</ToggleGroupItem>
+        <ToggleGroupItem value="advanced">{copy.searchMode.advanced}</ToggleGroupItem>
+      </ToggleGroup>
 
-        {value.mode === "basic" && (
-          <div className="relative w-72">
-            <Search
-              className={cn(
-                iconSize({ size: "md" }),
-                "pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground",
-              )}
-              aria-hidden="true"
-            />
-            <Input
-              size="sm"
-              className="ps-8"
-              value={value.basic.text}
-              disabled={disabled}
-              // The wire's `@MaxLength(200)`, so a paste is clamped where it
-              // happens rather than rejected as a whole request.
-              maxLength={200}
-              placeholder={t.common.search}
-              aria-label={t.crmAdvancedSearch.textLabel}
-              onChange={(event) =>
-                onChange(opportunitySearchWithBasicText(value, event.target.value))
-              }
-            />
-          </div>
-        )}
-      </div>
+      {value.mode === "basic" && (
+        <div className="relative w-72">
+          <Search
+            className={cn(
+              iconSize({ size: "md" }),
+              "pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground",
+            )}
+            aria-hidden="true"
+          />
+          <Input
+            size="sm"
+            className="ps-8"
+            value={value.basic.text}
+            disabled={disabled}
+            // The wire's `@MaxLength(200)`, so a paste is clamped where it
+            // happens rather than rejected as a whole request.
+            maxLength={200}
+            placeholder={t.common.search}
+            aria-label={t.crmAdvancedSearch.textLabel}
+            onChange={(event) =>
+              onChange(opportunitySearchWithBasicText(value, event.target.value))
+            }
+          />
+        </div>
+      )}
+      </PageActions>
 
       {value.mode === "advanced" && (
         <CrmAdvancedSearchCard
@@ -204,6 +210,6 @@ export function OpportunitySearchBar({
           disabled={disabled}
         />
       )}
-    </div>
+    </>
   );
 }

@@ -428,13 +428,29 @@ html[lang="ar"] {
   --size-control-lg: calc(2.25rem * var(--ui-scale));  /* 36px */
   --size-control-xl: calc(2.5rem * var(--ui-scale));   /* 40px */
 
-  /* Shell geometry — admin's exact chrome. The topbar is admin's h-12, the
-     sidebar its SIDEBAR_EXPANDED_WIDTH, the rail its SIDEBAR_COLLAPSED_WIDTH,
-     and the row matches the height admin's px-4/py-3 body cell resolves to. */
+  /* Shell geometry. The row still matches the height admin's px-4/py-3 body
+     cell resolves to; the chrome no longer matches admin's, because this
+     portal's shell is two stacked horizontal bars rather than a sidebar beside
+     a topbar — see docs/design/shell.md.
+
+     Both bars are the same height on purpose: they read as one 90px chrome
+     block split by a rule, not as a header with a subordinate strip. 45px is
+     the smallest height that clears a 32px control with a 6.5px optical
+     margin, which is what the page action bar's primary button needs.
+
+     --size-brand is the inline-start zone of the global nav, sized so the
+     tenant's own logo has room next to the app name at a legible size. It is
+     10px wider than the 240px sidebar it replaces, which is the one dimension
+     the old shell and this one share a lineage on. */
   --size-row: calc(2.75rem * var(--ui-scale));      /* 44px */
-  --size-topbar: calc(3rem * var(--ui-scale));      /* 48px — admin h-12 */
-  --size-sidebar: calc(15rem * var(--ui-scale));    /* 240px */
-  --size-rail: calc(3.25rem * var(--ui-scale));     /* 52px */
+  --size-topbar: calc(2.8125rem * var(--ui-scale)); /* 45px — global nav */
+  --size-actionbar: calc(2.8125rem * var(--ui-scale)); /* 45px — page action bar */
+  --size-brand: calc(15.625rem * var(--ui-scale));  /* 250px */
+  /* Both bars together — what anything positioned against the chrome from
+     OUTSIDE the shell's flex column has to clear. Derived, never a second
+     literal, so the two bars stay the only place a chrome height is
+     written down. */
+  --size-chrome: calc(var(--size-topbar) + var(--size-actionbar)); /* 90px */
 
   /* Stacking order — six real layers. They collide if left to chance: a
      sticky table column will happily cover an open dropdown. Declared once

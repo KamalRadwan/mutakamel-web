@@ -39,7 +39,7 @@ src/
     primitives/                 21 files
     patterns/                   12 directories
     views/                      board/ card/ table/ ViewSwitcher
-    shell/                      AppShell, Sidebar, Topbar, MobileNav, nav-config
+    shell/                      AppShell, GlobalNav, PageActionBar, NavSheet, nav-config
     feedback/                   ToastProvider, useToast, AppToast
 
   lib/                          business-neutral infrastructure
@@ -258,6 +258,7 @@ MASTER-PLAN task 3.39.
 | --- | --- | --- |
 | **Dictionaries** | `src/i18n/dictionaries/ar.ts`, `en.ts` | Flat key–value data, one key per line, no control flow. The rule exists so a reader can hold a file's *behaviour* in their head; these have none. Splitting by namespace would also break the `Dictionary` type's single-source shape, which is what makes a missing Arabic key a compile error |
 | **The Tier-1 spine** | `src/lib/api/axiosClient.ts`, `src/lib/notifications/tenant-notification-runtime.ts`, `src/context/AuthContext.tsx`, `src/context/TenantRealtimeProvider.tsx` | [HANDOFF.md](../build/HANDOFF.md#tier-1--the-spine-do-not-touch) freezes these. A split is a rewrite of exactly the code the freeze protects, and it buys nothing a reader needs |
+| **The navigation map** | `src/design-system/shell/nav-config.ts` | ~930 lines of object literals — one per nav item, in the order the nav renders them — and the only logic is each item's one-line `hasAccess` predicate, carried verbatim from `lib/navigation/tenant-routes.ts`. Same standing as the dictionaries: length tracks the number of screens, not behaviour, and splitting it would hide the one property `nav-config.test.ts` exists to assert — that every section belongs to exactly one app. It was already past 300 lines before the two-bar shell added `menuLabelKey`; this row records what was previously unstated |
 | **Exhaustive response contracts** | `core/contracts/user-contract.ts`, `role-contract.ts`, `organization-contract.ts` | One validator per DTO field, in declaration order. Length tracks the DTO's field count, not complexity; splitting one contract across files makes it *harder* to check against the source DTO |
 
 **Scheduled splits — genuinely oversized logic:**

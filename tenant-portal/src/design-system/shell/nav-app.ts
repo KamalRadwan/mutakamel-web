@@ -9,10 +9,10 @@ import { DEFAULT_NAV_APP, type NavAppId } from "./nav-config";
  * Which app owns a route — the FIRST input to the active app, ahead of any
  * stored preference.
  *
- * Opening `/crm/leads` in a fresh tab must show the CRM sidebar, whatever the
+ * Opening `/crm/leads` in a fresh tab must show the CRM menus, whatever the
  * last app this browser chose was. Deriving from the route is what makes a
  * deep link, a bookmark and a shared URL land somewhere coherent; a stored
- * preference alone would show a CRM screen framed by the Trade sidebar.
+ * preference alone would show a CRM screen framed by the Trade menus.
  *
  * The three predicates are the allowlists `proxy.ts` already redirects
  * against, reused verbatim rather than re-expressed as path prefixes. A prefix
@@ -45,14 +45,14 @@ export function appForPath(pathname: string): NavAppId | null {
  * localStorage axes — `tenant_lang`, `tenant_theme`, `tenant_density` — are
  * document-level attributes that must be right in the first painted frame, so
  * each needs the inline bootstrap in `app/layout.tsx` to beat hydration. The
- * app scope is not that kind of value: it selects which sections the sidebar
- * renders, which the server renders too. Reading it from a cookie in
+ * app scope is not that kind of value: it selects which sections the global
+ * nav renders, which the server renders too. Reading it from a cookie in
  * `app/(tenant)/layout.tsx` makes the first server-rendered frame already
  * correct — no flash, no hydration mismatch, and no fourth inline script.
  *
- * This is the convention the sidebar's own persisted dimension already
- * follows: `tenant_sidebar` is a cookie for exactly the same reason
- * (`useSidebar.ts`). Same shape, same max-age, same samesite.
+ * It is now the only cookie the shell keeps. `tenant_sidebar` followed the
+ * same convention for the collapse state; two full-width bars have no
+ * collapsed state, so it went with the sidebar.
  */
 export const NAV_APP_COOKIE = "tenant_app";
 

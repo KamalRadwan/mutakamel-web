@@ -5,6 +5,7 @@ import { useDictionary } from "@/i18n/useLanguage";
 import { cn } from "../../lib/cn";
 import { iconSize, mirrorInRtl } from "../../lib/icons";
 import { Button } from "../../primitives/Button";
+import { PageActions } from "../../shell/PageActions";
 
 export interface Breadcrumb {
   label: string;
@@ -36,6 +37,19 @@ export interface PageHeaderProps {
  * headers cannot drift, and a detail screen renders `DetailHeader` **instead
  * of** `PageHeader`, never both. That is the whole answer to MASTER-PLAN 1.43:
  * `PageHeader` owns the primary action, in both shapes.
+ *
+ * **The action cluster renders in the page action bar, not here.** The props
+ * are unchanged and every screen goes on declaring its actions exactly where it
+ * declared them before; a portal moves the resulting DOM up into the shell's
+ * second bar — see `shell/page-action-slots.tsx`. Doing it in this one
+ * component is what moved 78 screens' actions into the new bar without editing
+ * any of them, and it keeps the one-filled-action rule structural: the bar has
+ * no `primary` variant of its own to reach for, so the ceiling still holds at
+ * exactly one implementation.
+ *
+ * The heading itself stays on the page. It is the screen's own `<h1>` and the
+ * document's outline depends on it; the bar names where you are in the nav,
+ * which on a detail screen is a different sentence from the record's name.
  */
 export function PageHeader({
   title,
@@ -69,7 +83,7 @@ export function PageHeader({
           ))}
         </nav>
       )}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex items-start gap-3">
         <div className="flex min-w-0 items-start gap-2">
           {leading}
           <div className="min-w-0">
@@ -80,19 +94,21 @@ export function PageHeader({
             {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {secondaryActions}
-          {primaryAction && (
-            <Button
-              variant="primary"
-              onClick={primaryAction.onClick}
-              disabled={primaryAction.disabled}
-              loading={primaryAction.loading}
-            >
-              {primaryAction.label}
-            </Button>
-          )}
-        </div>
+        {(secondaryActions || primaryAction) && (
+          <PageActions slot="actions">
+            {secondaryActions}
+            {primaryAction && (
+              <Button
+                variant="primary"
+                onClick={primaryAction.onClick}
+                disabled={primaryAction.disabled}
+                loading={primaryAction.loading}
+              >
+                {primaryAction.label}
+              </Button>
+            )}
+          </PageActions>
+        )}
       </div>
     </div>
   );

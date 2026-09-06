@@ -23,6 +23,7 @@ import {
   type FilterValues,
   type WorkspaceViewLabels,
   useWorkspaceView,
+  PageActions,
   ViewSwitcher,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -187,15 +188,19 @@ export function ItemsWorkspace() {
 
         <SubNav items={TRADE_FOUNDATION_NAV_ITEMS} />
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <TradeScopeBar />
+        {/* The scope bar stays in the body, as it does on the other nine
+            Trade screens: three selects will not share a 45px row with this
+            screen's actions, its search and its view switcher. */}
+        <TradeScopeBar />
+
+        <PageActions slot="view">
           <ViewSwitcher
             value={view}
             onChange={setView}
             available={["board", "card", "table"]}
             labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
           />
-        </div>
+        </PageActions>
 
         <DegradedBanner message={t.trade.itemSearchNote} />
 

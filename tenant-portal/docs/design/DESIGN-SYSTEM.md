@@ -376,12 +376,18 @@ shell geometry below is the admin portal's exact chrome.
   --size-control-lg: calc(2.25rem * var(--ui-scale));  /* 36px */
   --size-control-xl: calc(2.5rem  * var(--ui-scale));  /* 40px */
 
-  --size-row:     calc(2.75rem * var(--ui-scale));     /* 44px  — admin's px-4/py-3 body cell */
-  --size-topbar:  calc(3rem    * var(--ui-scale));     /* 48px  — admin's h-12 */
-  --size-sidebar: calc(15rem   * var(--ui-scale));     /* 240px — admin's SIDEBAR_EXPANDED_WIDTH */
-  --size-rail:    calc(3.25rem * var(--ui-scale));     /* 52px  — admin's SIDEBAR_COLLAPSED_WIDTH */
+  --size-row:       calc(2.75rem   * var(--ui-scale)); /* 44px  — admin's px-4/py-3 body cell */
+  --size-topbar:    calc(2.8125rem * var(--ui-scale)); /* 45px  — the global nav */
+  --size-actionbar: calc(2.8125rem * var(--ui-scale)); /* 45px  — the page action bar */
+  --size-brand:     calc(15.625rem * var(--ui-scale)); /* 250px — the brand zone */
+  --size-chrome:    calc(var(--size-topbar) + var(--size-actionbar)); /* 90px */
 }
 ```
+
+The row is still admin's. The **chrome is not, any more**: admin's 48px topbar,
+240px sidebar and 52px rail were adopted in the token port and replaced on
+2026-09-06 by two 45px bars. `--size-sidebar` and `--size-rail` are gone with
+the components that consumed them. See [shell.md](shell.md#appshell).
 
 **The default moved from 0.9 to 1, and that is the headline of the port.** The
 control scale in `rem` never changed; what changed is that it is no longer
@@ -748,17 +754,17 @@ to; the page itself must say so.
 
 # 7 · Page-by-page UI/UX
 
-Shell for every authenticated page: **240px sidebar** (52px rail when
-collapsed) + **48px topbar** + `main` with a 16px gutter that opens to 24px
-from `md:` upward (`p-4 md:p-6`). These are admin's exact chrome dimensions,
-not approximations of them.
+Shell for every authenticated page: a **45px global nav** over a **45px page
+action bar** over `main`, with a 16px gutter that opens to 24px from `md:`
+upward (`p-4 md:p-6`). Both bars are full width; there is no sidebar.
 
-Sidebar active state is a **2px logical inset-start bar plus weight 500** —
-not a filled pill. Collapse persists in a cookie, read server-side, so there is
-no flash.
+Active nav state is a **2px logical bar along the bottom edge plus weight 500**
+— not a filled pill. Nothing about the chrome persists between visits except
+which app is selected (`tenant_app`), read server-side so there is no flash.
 
-Topbar, inline end: language · theme · notifications · separator · user menu.
-No global search — search belongs to the workspace it filters.
+Global nav, inline end: language · theme · notifications · separator · user
+menu. No global search there — search is a page's own control and renders in the
+action bar below, scoped to that page's data. See [shell.md](shell.md).
 
 ---
 
@@ -952,9 +958,9 @@ Counters arrive as **decimal strings** — render, never `Number()`.
 Small, specific, and the reason a screen reads as considered rather than
 assembled.
 
-**Optical, not mathematical, alignment.** The sidebar's 2px active bar sits at
-`inset-inline-start: 0` with the label at 12px — the icon is nudged 1px so the
-optical centre lines up with the collapsed rail. Centring by pure maths looks
+**Optical, not mathematical, alignment.** The nav's 2px active bar sits inset
+2 units from each edge of its trigger rather than spanning the full width — a
+bar that ran edge to edge would touch its neighbour's. Centring by pure maths looks
 off by exactly this much.
 
 **The table header is a quiet band, not a hairline — and that is a reversal.**

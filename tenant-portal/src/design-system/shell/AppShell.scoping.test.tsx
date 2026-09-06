@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
 import { NAV_SECTIONS, type NavAppId, type NavSection } from "./nav-config";
 
-// What the sidebar was actually handed. This is the assertion surface: the
-// sidebar renders whatever it is given, so "the sidebar is app-scoped" is
-// exactly "AppShell hands it one app's sections".
+// What the global nav was actually handed. This is the assertion surface: the
+// nav renders whatever it is given, so "the nav is app-scoped" is exactly
+// "AppShell hands it one app's sections".
 let received: NavSection[] = [];
 let pathname = "/";
 
@@ -20,7 +20,7 @@ vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({
     t: {
       common: { skipToContent: "Skip to content" },
-      nav: { appSwitcher: "Switch app" },
+      nav: { appSwitcher: "Switch app", appWorkspace: "Workspace" },
       connectivity: {},
     },
   }),
@@ -30,14 +30,14 @@ vi.mock("@/i18n/I18nContext", () => ({
 // whole nav map, so anything missing downstream was removed by app scoping.
 vi.mock("./useNavTree", () => ({ useNavTree: () => NAV_SECTIONS }));
 
-vi.mock("./Sidebar", () => ({
-  Sidebar: ({ sections }: { sections: NavSection[] }) => {
+vi.mock("./GlobalNav", () => ({
+  GlobalNav: ({ sections }: { sections: NavSection[] }) => {
     received = sections;
-    return <nav />;
+    return <header />;
   },
 }));
-vi.mock("./Topbar", () => ({ Topbar: () => <header /> }));
-vi.mock("./MobileNav", () => ({ MobileNav: () => null }));
+vi.mock("./NavSheet", () => ({ NavSheet: () => null }));
+vi.mock("./PageActionBar", () => ({ PageActionBar: () => <div /> }));
 vi.mock("./NavCommandPalette", () => ({ NavCommandPalette: () => null }));
 vi.mock("../patterns/offline-banner/OfflineBanner", () => ({ OfflineBanner: () => null }));
 vi.mock("../patterns/offline-banner/useConnectivity", () => ({
@@ -60,7 +60,7 @@ const EXPECTED: Record<NavAppId, string[]> = {
 function renderAt(route: string, initialApp: NavAppId = "workspace") {
   pathname = route;
   render(
-    <AppShell initialSidebarState="expanded" initialApp={initialApp}>
+    <AppShell initialApp={initialApp}>
       <p>Body</p>
     </AppShell>,
   );
@@ -72,7 +72,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("the sidebar is scoped to one app", () => {
+describe("the global nav is scoped to one app", () => {
   it.each([
     ["/crm/leads", "crm"],
     ["/trade/items", "trade"],
@@ -99,7 +99,7 @@ describe("the sidebar is scoped to one app", () => {
   //
   // If the app filtering is removed — from `useNavApps`'s
   // `sections.filter(section => section.app === app.id)`, or from AppShell's
-  // `apps.find(entry => entry.id === app)` — the sidebar is handed all 15
+  // `apps.find(entry => entry.id === app)` — the nav is handed all 15
   // sections again and every assertion below fails. Verified by deleting each
   // in turn and watching this test go red.
   it("does NOT show all 15 sections once an app is active", () => {

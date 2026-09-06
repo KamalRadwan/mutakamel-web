@@ -75,7 +75,7 @@ export interface NavItem {
   icon: LucideIcon;
   // Carried verbatim from lib/navigation/tenant-routes.ts's
   // canAccessCrmRoute — only the output shape changes here, from
-  // hook-computed booleans to data the sidebar iterates. Its tests carry
+  // hook-computed booleans to data the nav iterates. Its tests carry
   // over unchanged, which is the proof this did not alter behavior.
   hasAccess: (permissions: readonly string[]) => boolean;
   /**
@@ -90,7 +90,7 @@ export interface NavItem {
 }
 
 /**
- * The three apps the sidebar can be scoped to.
+ * The three apps the global nav can be scoped to.
  *
  * A union rather than a string, and a **required** field on `NavSection`, so
  * a new section cannot be added without deciding which app owns it — the
@@ -105,9 +105,31 @@ export type NavAppId = "workspace" | "crm" | "trade";
 
 export interface NavSection {
   id: string;
-  /** The app whose sidebar this section belongs to. Exactly one. */
+  /** The app whose nav this section belongs to. Exactly one. */
   app: NavAppId;
-  labelKey: string | null; // null: no section heading (Workspace)
+  /**
+   * The descriptive heading. `null` where the section never carried one.
+   *
+   * Retained because `NavSheet` still renders a heading per section, and
+   * because several of these read correctly as a paragraph label even where
+   * they are far too long for a menu trigger.
+   */
+  labelKey: string | null;
+  /**
+   * The **short** label the global nav's menu trigger renders.
+   *
+   * Required, and separate from `labelKey`, because the two are answering
+   * different questions. A sidebar heading is read once, in a column, with the
+   * items already visible underneath it — "Dashboard Builder & Widgets" is a
+   * fine heading there. A menu trigger sits in a row of five siblings competing
+   * for a 1366px bar with the items hidden, so it has to be one or two words.
+   *
+   * Two of these were also plainly wrong as headings and only survived because
+   * nobody reads a grey 10px heading closely: the inventory section was
+   * labelled `tradeInventoryNodes` ("Fulfilment nodes") while containing seven
+   * screens of which nodes is one, and the account section had no label at all.
+   */
+  menuLabelKey: string;
   items: NavItem[];
 }
 
@@ -119,6 +141,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "workspace",
     app: "workspace",
     labelKey: null,
+    menuLabelKey: "navMenuOverview",
     items: [
       {
         id: "home",
@@ -153,6 +176,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "crm",
     app: "crm",
     labelKey: "crm",
+    menuLabelKey: "navMenuRecords",
     items: [
       {
         id: "leads",
@@ -187,6 +211,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "crmAnalytics",
     app: "crm",
     labelKey: "crmDashboardBuilder",
+    menuLabelKey: "navMenuDashboards",
     items: [
       {
         id: "crmDashboards",
@@ -216,6 +241,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "crmSetup",
     app: "crm",
     labelKey: "crmSetup",
+    menuLabelKey: "navMenuSetup",
     items: [
       {
         id: "leadStages",
@@ -265,6 +291,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "tradeFoundation",
     app: "trade",
     labelKey: "tradeFoundation",
+    menuLabelKey: "navMenuFoundation",
     items: [
       {
         id: "tradeItems",
@@ -317,6 +344,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "tradeDocuments",
     app: "trade",
     labelKey: "tradeDocuments",
+    menuLabelKey: "navMenuDocuments",
     items: [
       {
         id: "tradeQuotations",
@@ -377,6 +405,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "tradeInventory",
     app: "trade",
     labelKey: "tradeInventoryNodes",
+    menuLabelKey: "navMenuInventory",
     items: [
       {
         id: "tradeInventoryAvailability",
@@ -440,6 +469,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "tradeGovernance",
     app: "trade",
     labelKey: "policyStudio",
+    menuLabelKey: "navMenuGovernance",
     items: [
       {
         id: "tradePriceBooks",
@@ -484,6 +514,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "tradeAutomation",
     app: "trade",
     labelKey: "importsWebhooks",
+    menuLabelKey: "navMenuAutomation",
     items: [
       {
         id: "tradeExtensions",
@@ -529,6 +560,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "tradeAnalytics",
     app: "trade",
     labelKey: "tradeDashboard",
+    menuLabelKey: "navMenuDashboards",
     items: [
       {
         id: "tradeDashboards",
@@ -550,6 +582,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "coreIdentity",
     app: "workspace",
     labelKey: "staff",
+    menuLabelKey: "navMenuStaff",
     items: [
       {
         id: "coreOrganization",
@@ -614,6 +647,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "coreOperations",
     app: "workspace",
     labelKey: "operationsAndContent",
+    menuLabelKey: "navMenuOperations",
     items: [
       {
         id: "coreDirectory",
@@ -676,6 +710,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "coreSettings",
     app: "workspace",
     labelKey: "coreSettings",
+    menuLabelKey: "navMenuSettings",
     items: [
       {
         id: "coreSettingsHub",
@@ -740,6 +775,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "coreBilling",
     app: "workspace",
     labelKey: "coreBillingSection",
+    menuLabelKey: "navMenuBilling",
     items: [
       {
         id: "coreBilling",
@@ -771,6 +807,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "account",
     app: "workspace",
     labelKey: null,
+    menuLabelKey: "navMenuAccount",
     items: [
       {
         id: "coreNotifications",
@@ -800,13 +837,13 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-// ---- The three app sidebars -----------------------------------------------
+// ---- The three app navs ---------------------------------------------------
 //
 // Three concrete section lists, one per app. Each is DERIVED from the single
 // `NAV_SECTIONS` array above by its `app` field rather than being a
 // hand-written second copy: a duplicated list is a list that drifts, and the
 // `app` field already carries the answer. Order within an app is the order in
-// NAV_SECTIONS, so the sidebar a user sees is a contiguous slice of the nav
+// NAV_SECTIONS, so the menu row a user sees is a contiguous slice of the nav
 // map they had before — nothing is reordered by being scoped.
 //
 // The invariant these rest on — every section lands in exactly one app, and
@@ -827,7 +864,7 @@ export const CRM_NAV_SECTIONS: NavSection[] = sectionsForApp("crm");
 export const TRADE_NAV_SECTIONS: NavSection[] = sectionsForApp("trade");
 
 /**
- * An app as the switcher offers it: an identity plus the sidebar it shows.
+ * An app as the switcher offers it: an identity plus the nav it shows.
  *
  * `labelKey` resolves under `t.nav` like every other label in this file, so
  * the app names are translated by the same mechanism as the sections they

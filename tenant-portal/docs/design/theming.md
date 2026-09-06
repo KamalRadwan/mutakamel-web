@@ -221,8 +221,8 @@ Every token has an explicit value in both themes — see
   `brand-400` dark) because one step cannot clear contrast on both grounds.
 - Elevation is a **shadow** in light and an **inset hairline** in dark. Do not
   reuse the light shadow at higher opacity.
-- The sidebar is light in light mode. A permanently dark chrome around a light
-  body is banned — see [anti-patterns.md](anti-patterns.md).
+- Both nav bars are light in light mode. A permanently dark chrome around a
+  light body is banned — see [anti-patterns.md](anti-patterns.md).
 
 Every screen is reviewed in both themes before it is called done. "It works in
 dark" is half a review.
@@ -291,7 +291,7 @@ Radix keyboard navigation needs direction too. Wrap the tree once in
 
 ## The toggles
 
-Both live in the topbar.
+Both live in the global nav's account cluster.
 
 **`LanguageToggle`** shows the *target* language in its own script — "English"
 while in Arabic, "العربية" while in English — so a user can recognise the

@@ -73,7 +73,7 @@ including:
 | `DataTable` rows | Navigable; the action cluster is reachable |
 | Cards | Focusable; `Enter` opens the detail route |
 | Dialog / Sheet | Focus trapped, `Escape` closes, focus returns to the trigger |
-| Sidebar | `Cmd`/`Ctrl` + `B`; mobile sheet traps focus and closes on route change |
+| Global nav | Menus open on `Enter`, arrow keys move between items, `Escape` closes; below `xl` the sheet traps focus and closes on route change |
 
 ### Focus is always visible
 
@@ -176,7 +176,7 @@ can check them in one pass.
 | **`focus-not-obscured`** (AA) | Four overlapping sticky layers in `DataTable` | `scroll-margin` sized to the sticky offsets — [patterns.md](patterns.md#datatable) |
 | **`accessible-authentication`** (AA) | `/login` | `autocomplete` attributes present; **paste never blocked** — [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#71-login--login) |
 | **`redundant-entry`** (A) | Lead conversion | Prefilled from the lead; the user never retypes captured data |
-| **`consistent-help`** (A) | Every screen | Topbar controls keep the same order on every route |
+| **`consistent-help`** (A) | Every screen | The global nav's account controls keep the same order on every route — which is why they kept the order the topbar gave them |
 | **`web-target-size`** (AA) | Dense 24–32px controls | **24×24 CSS px** is the web bar, not the native 44pt. Our 32px default clears it; the 24px `xs` sits at it and keeps its hit-area expansion |
 
 `web-target-size` is worth stating explicitly because the native 44pt figure

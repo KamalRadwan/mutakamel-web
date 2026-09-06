@@ -26,7 +26,7 @@ const firstHref = (sections: NavSection[]): string | undefined =>
   sections.find((section) => section.items.length > 0)?.items[0]?.href;
 
 /**
- * The app switcher at the start of the topbar.
+ * The app switcher, second control in the global nav.
  *
  * Built on the design system's `DropdownMenu`, as a radio group: "which app am
  * I in" is a single-choice question, and the radio items carry `aria-checked`
@@ -36,7 +36,7 @@ const firstHref = (sections: NavSection[]): string | undefined =>
  * Recording alone would look broken from an app-owned route: `useActiveApp`
  * derives from the route first, so choosing Trade while standing on
  * `/crm/leads` would set a preference the route immediately outranks, and the
- * sidebar would not move. Navigation is what makes the choice take effect.
+ * menu row would not move. Navigation is what makes the choice take effect.
  *
  * An app the actor can reach nothing in is listed but disabled — it stays
  * visible so the product's shape is legible, and unselectable because there is
@@ -62,10 +62,10 @@ export function AppSwitcher({ apps, activeApp, onSelect }: AppSwitcherProps) {
     if (href) router.push(href);
   }
 
-  // Sized for the topbar, not the sidebar: no `w-full` (the topbar is a row,
-  // not a column) and `text-foreground` rather than `text-sidebar-foreground`,
-  // because this sits on `bg-card` now. The app label hides on the narrowest
-  // widths so the icon and the topbar's own controls still fit.
+  // Sized for a bar, not a column: no `w-full`, and `text-foreground` rather
+  // than `text-sidebar-foreground`, because this sits on `bg-card`. The app
+  // label hides on the narrowest widths so the icon and the account controls
+  // still fit.
   const trigger = (
     <Button
       variant="ghost"
@@ -83,12 +83,8 @@ export function AppSwitcher({ apps, activeApp, onSelect }: AppSwitcherProps) {
 
   return (
     <DropdownMenu>
-      {/* In the icon rail the trigger has no visible text, so the tooltip
-          carries the current app the way every rail item does. The trigger is
-          a real button either way, so Tab reaches it and Enter opens the menu
-          — the rail loses the label, never the keyboard path. */}
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="bottom" className="w-(--size-sidebar)">
+      <DropdownMenuContent align="start" side="bottom" className="w-(--size-brand)">
         <DropdownMenuLabel>{t.nav.appSwitcher}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup value={activeApp} onValueChange={handleSelect}>

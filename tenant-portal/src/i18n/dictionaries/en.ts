@@ -1651,11 +1651,36 @@ export const en: Dictionary = {
     tradeCommercialAccounts: "Commercial accounts",
     tradeConfiguration: "Trade configuration",
 
-    // The app switcher at the head of the sidebar.
+    // The app switcher, first control in the global nav.
     appSwitcher: "Switch app",
     appWorkspace: "Workspace",
     appCrm: "CRM",
     appTrade: "Trade",
+
+    // The global nav's menu triggers — NavSection.menuLabelKey. One or two
+    // words each, because five of them share a row with the brand zone, the
+    // app switcher and the account controls. The descriptive headings above
+    // stay in use: NavSheet still renders one per section.
+    navMenuOverview: "Overview",
+    navMenuRecords: "Records",
+    navMenuDashboards: "Dashboards",
+    navMenuSetup: "Setup",
+    navMenuFoundation: "Foundation",
+    navMenuDocuments: "Documents",
+    navMenuInventory: "Inventory",
+    navMenuGovernance: "Governance",
+    navMenuAutomation: "Automation",
+    navMenuStaff: "Staff",
+    navMenuOperations: "Operations",
+    navMenuSettings: "Settings",
+    navMenuBilling: "Billing",
+    navMenuAccount: "Account",
+
+    // Shell landmarks and the two controls that only exist below `lg`.
+    mainNavigation: "Main navigation",
+    pageActions: "Page actions",
+    openNavigation: "Open navigation",
+    brandHome: "Workspace home",
   },
   dashboard: {
     title: "Dashboard",

@@ -156,7 +156,8 @@ re-implements one.
 
 - **Data.** One `use<Entity>()` hook. Views receive already-fetched, already
   filtered data as props. **A view never fetches.**
-- **Filters.** One `FilterBar` above the view switcher. Filter state lives in
+- **Filters.** One `FilterBar`; its controls render in the page action bar and
+  its chips below the bar, in the body. Filter state lives in
   the URL.
 - **Search.** One search input; debounced 300ms; `q` in the URL.
 - **Branch scope.** One `TenantBranchSelect`. Every CRM read is branch-scoped —
@@ -211,12 +212,19 @@ your place on every single record you inspect.
 
 ## The switcher
 
-`ViewSwitcher` — a segmented control in the workspace toolbar, at the inline
-end, beside the branch selector.
+`ViewSwitcher` — a segmented control at the **inline end of the page action
+bar**, which is the last of that bar's three regions. It is the only control
+that changes how a screen is DRAWN rather than what it holds, so a fixed edge
+keeps it still as a screen gains or loses actions. The branch selector moved to
+the same bar's `actions` region, with the rest of the screen's controls.
 
 ```tsx
-<ViewSwitcher value={view} onChange={setView} available={["board","card","table"]} />
+<PageActions slot="view">
+  <ViewSwitcher value={view} onChange={setView} available={["board","card","table"]} />
+</PageActions>
 ```
+
+See [shell.md](shell.md#it-holds-the-screens-controls).
 
 | View | Icon | `t.views.*` |
 | --- | --- | --- |
@@ -249,6 +257,18 @@ src/design-system/views/board/
 width 288px, gap 12px. The row scrolls; the page does not. Under RTL the
 scroll direction and column order mirror automatically — use logical
 properties and let the browser handle it.
+
+**Where the pane's height comes from.** `AppShell` is `h-dvh` and `<main>` is
+the `flex-1` item inside it, so `<main>` is the one element with a definite
+height; a screen root asking for `h-full` gets the viewport minus the bars, and
+`min-h-0 flex-1` on the view wrapper hands the remainder to the board. That
+chain breaks on a **segment layout that renders a real box**: `h-full` resolves
+against the nearest box, not the nearest one with a height, so an unstyled
+`<div>` in `app/(tenant)/<segment>/layout.tsx` silently turns the pane back into
+"as tall as the cards" and moves the scrollbar from the column body to the page.
+`crm/layout.tsx` did exactly that to every CRM screen except `/crm/opportunities`
+— which it exempted by pathname — and the leads board rendered short of the fold
+until it became the pass-through the Core and Trade layouts already were.
 
 **Every state owns the full height of the pane**, not only the populated one:
 the loading skeletons, the error state and the empty state all carry `h-full`.

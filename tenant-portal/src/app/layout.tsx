@@ -6,7 +6,7 @@ import { DirectionBridge } from "@/i18n/DirectionBridge";
 import { ar } from "@/i18n/dictionaries/ar";
 import { formatTemplate } from "@/lib/format/template";
 import { DensityProvider, ThemeProvider, TooltipProvider } from "@/design-system";
-import { TenantBrandingTokens } from "./TenantBrandingTokens";
+import { BrandingProvider } from "@/context/BrandingContext";
 import { InlineBootstrapScript } from "./InlineBootstrapScript";
 
 // The static default and the template every route-level title composes with.
@@ -80,8 +80,9 @@ export default async function RootLayout({
         <ThemeProvider>
           <DensityProvider>
             <DirectionBridge>
-              <TenantBrandingTokens />
-              <TooltipProvider>{children}</TooltipProvider>
+              <BrandingProvider>
+                <TooltipProvider>{children}</TooltipProvider>
+              </BrandingProvider>
             </DirectionBridge>
           </DensityProvider>
         </ThemeProvider>

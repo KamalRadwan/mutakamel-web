@@ -23,7 +23,7 @@ describe("appForPath — the app is derived from the route first", () => {
   });
 
   // The whole reason the route outranks the stored preference: a deep link
-  // opened in a fresh browser must show its own app's sidebar.
+  // opened in a fresh browser must show its own app's menus.
   it.each([
     ["/crm/leads/8f2c1b90-0000-4000-8000-000000000000", "crm"],
     ["/crm/customer-profiles/8f2c1b90-0000-4000-8000-000000000000", "crm"],
@@ -55,7 +55,7 @@ describe("appForPath — the app is derived from the route first", () => {
   // The drift guard between the two mechanisms. Every nav item's href is
   // routed by `appForPath`, and the section it lives in already declares an
   // app; if those two ever disagree, a user clicking a link in one app's
-  // sidebar would land with a different app's sidebar around them.
+  // menus would land with a different app's menus around them.
   it("agrees with every nav item's own section for every app-owned href", () => {
     const disagreements = NAV_SECTIONS.flatMap((section) =>
       section.items

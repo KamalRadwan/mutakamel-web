@@ -3,6 +3,7 @@
 import { Search } from "lucide-react";
 import {
   Input,
+  PageActions,
   Select,
   SelectContent,
   SelectItem,
@@ -139,44 +140,44 @@ export function CustomerProfileSearchBar({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <ToggleGroup
-          type="single"
-          size="sm"
-          value={value.mode}
-          disabled={disabled}
-          // Radix emits "" when the pressed segment is deselected, and a search
-          // bar with no mode has nothing to draw — so a press on the active
-          // segment is ignored rather than blanking the panel.
-          onValueChange={(next) => {
-            if (next) {
-              onChange(
-                customerProfileSearchWithMode(value, next as CustomerProfileSearchMode),
-              );
-            }
-          }}
-          aria-label={t.crmCustomerProfiles.searchMode.label}
-        >
-          <ToggleGroupItem value="basic">
-            {t.crmCustomerProfiles.searchMode.basic}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="advanced">
-            {t.crmCustomerProfiles.searchMode.advanced}
-          </ToggleGroupItem>
-        </ToggleGroup>
+    <>
+      <PageActions slot="search">
+      <ToggleGroup
+        type="single"
+        size="sm"
+        value={value.mode}
+        disabled={disabled}
+        // Radix emits "" when the pressed segment is deselected, and a search
+        // bar with no mode has nothing to draw — so a press on the active
+        // segment is ignored rather than blanking the panel.
+        onValueChange={(next) => {
+          if (next) {
+            onChange(
+              customerProfileSearchWithMode(value, next as CustomerProfileSearchMode),
+            );
+          }
+        }}
+        aria-label={t.crmCustomerProfiles.searchMode.label}
+      >
+        <ToggleGroupItem value="basic">
+          {t.crmCustomerProfiles.searchMode.basic}
+        </ToggleGroupItem>
+        <ToggleGroupItem value="advanced">
+          {t.crmCustomerProfiles.searchMode.advanced}
+        </ToggleGroupItem>
+      </ToggleGroup>
 
-        {value.mode === "basic" && (
-          <CustomerProfileConditionRow
-            state={value}
-            row={value.basic}
-            fieldLabels={fieldLabels}
-            sources={sources}
-            disabled={disabled}
-            onChange={onChange}
-          />
-        )}
-      </div>
+      {value.mode === "basic" && (
+        <CustomerProfileConditionRow
+          state={value}
+          row={value.basic}
+          fieldLabels={fieldLabels}
+          sources={sources}
+          disabled={disabled}
+          onChange={onChange}
+        />
+      )}
+      </PageActions>
 
       {value.mode === "advanced" && (
         <CrmAdvancedSearchCard
@@ -198,7 +199,7 @@ export function CustomerProfileSearchBar({
           disabled={disabled}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -252,6 +253,11 @@ function CustomerProfileConditionRow({
     onChange(customerProfileSearchWithRow(state, { value: next }));
   }
 
+  // The mode toggle and the basic row render in the page action bar; the
+  // advanced card renders where this component sits, in the page body. A card
+  // that grows to several rows of conditions has nowhere to go in a 45px bar,
+  // and the basic row is exactly one row of 28px controls, which is what the
+  // bar is sized for.
   return (
     <>
       <Select

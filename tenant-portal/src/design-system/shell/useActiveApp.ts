@@ -6,7 +6,7 @@ import { appForPath, writeStoredApp } from "./nav-app";
 import type { NavAppId } from "./nav-config";
 
 export interface ActiveApp {
-  /** The app the sidebar is scoped to right now. */
+  /** The app the global nav is scoped to right now. */
   app: NavAppId;
   /** Record a deliberate choice, and persist it for the next visit. */
   selectApp: (app: NavAppId) => void;
@@ -19,7 +19,7 @@ export interface ActiveApp {
  * "current app" state that could go stale: `preferred` is consulted only where
  * `appForPath` returns null. That ordering is the whole point — a stored
  * preference that outranked the route would frame `/crm/leads` in whatever
- * sidebar this browser last chose.
+ * nav this browser last chose.
  *
  * Because the route outranks it, `selectApp` alone cannot move the user off an
  * app-owned route; `AppSwitcher` navigates into the chosen app as well. What

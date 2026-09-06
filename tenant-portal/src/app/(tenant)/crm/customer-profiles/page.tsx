@@ -13,6 +13,7 @@ import {
   PageHeader,
   PermissionGate,
   TableView,
+  PageActions,
   ViewSwitcher,
   useWorkspaceState,
   type BoardCardMove,
@@ -192,38 +193,48 @@ export default function CustomerProfilesPage() {
                 }
               : undefined
           }
+          // The branch scopes every read on this screen, so it belongs with
+          // the actions rather than beside the search box — which is where the
+          // other two dozen branch-scoped screens already put it.
           secondaryActions={
-            <Button variant="outline" onClick={reload} disabled={isLoading}>
-              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
-              {t.common.retry}
-            </Button>
+            <>
+              <TenantBranchSelect
+                branchIds={branchIds}
+                branchId={branchId}
+                onChange={selectBranch}
+                disabled={isLoading}
+              />
+              <Button variant="outline" onClick={reload} disabled={isLoading}>
+                <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+                {t.common.retry}
+              </Button>
+            </>
           }
         />
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Not a FilterBar: that pattern's chips carry a fixed vocabulary,
-              and its own 300ms debounce sat on top of the hook's 300ms. It was
-              called here with `filters={[]}` and no-op handlers — a bare search
-              box. The bar below asks one equality filter as you type, or the
-              whole filter tree `POST /customer-profiles/search` accepts, which
-              runs only on its own Search button. */}
-          <CustomerProfileSearchBar
-            value={search}
-            onChange={setSearch}
-            onSubmit={submitSearch}
-            sources={sources.items}
-            disabled={!branchId}
+        {/* Not a FilterBar: that pattern's chips carry a fixed vocabulary, and
+            its own 300ms debounce sat on top of the hook's 300ms. It was called
+            here with `filters={[]}` and no-op handlers — a bare search box.
+            This asks one equality filter as you type, or the whole filter tree
+            `POST /customer-profiles/search` accepts, which runs only on its own
+            Search button. Its basic row renders in the action bar; its advanced
+            card renders here. */}
+        <CustomerProfileSearchBar
+          value={search}
+          onChange={setSearch}
+          onSubmit={submitSearch}
+          sources={sources.items}
+          disabled={!branchId}
+        />
+
+        <PageActions slot="view">
+          <ViewSwitcher
+            value={view}
+            onChange={setView}
+            available={["board", "card", "table"]}
+            labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
           />
-          <div className="flex items-center gap-2">
-            <TenantBranchSelect branchIds={branchIds} branchId={branchId} onChange={selectBranch} disabled={isLoading} />
-            <ViewSwitcher
-              value={view}
-              onChange={setView}
-              available={["board", "card", "table"]}
-              labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
-            />
-          </div>
-        </div>
+        </PageActions>
 
         {/* A capabilities fetch that FAILED is not the same as a 403, and the
             hook no longer conflates them — the controls are hidden either way,

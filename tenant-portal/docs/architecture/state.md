@@ -18,7 +18,7 @@ hold the same fact, one of them is stale.
 | Filters, page, sort, view, branch | **URL search params** | Shareable, survives refresh |
 | Scroll position on back-navigation | Browser (table) / persisted (board) | See below — a board column scrolls inside its own container |
 | Unsaved form draft | Feature-local form state | Discarded on close, guarded when dirty |
-| Sidebar collapsed | `tenant_sidebar` cookie | Read server-side, no flash |
+| Selected app | `tenant_app` cookie | Read server-side, no flash. The only shell state that persists — the two nav bars have no collapsed state, so `tenant_sidebar` went with the sidebar |
 | Theme | `localStorage["tenant_theme"]` | Pre-hydration bootstrap |
 | Language | `localStorage["tenant_lang"]` | Pre-hydration bootstrap |
 | Per-screen view preference | `localStorage["tenant_view_<screen>"]` | Fallback when no `?view=` |

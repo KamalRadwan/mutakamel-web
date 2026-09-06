@@ -13,7 +13,7 @@ import {
 
 const ids = (sections: NavSection[]) => sections.map((section) => section.id);
 
-// The three app sidebars, spelled out. Pinned rather than derived, because a
+// The three app navs, spelled out. Pinned rather than derived, because a
 // test that recomputes the thing it is checking checks nothing: this is the
 // list a reviewer reads to see which app owns which section, and it fails
 // loudly when a section is added, moved between apps, or reordered.
@@ -37,7 +37,7 @@ const EXPECTED: Record<NavAppId, string[]> = {
   ],
 };
 
-describe("the three app sidebars", () => {
+describe("the three app navs", () => {
   it("gives Workspace the portal's own sections and nothing else", () => {
     expect(ids(WORKSPACE_NAV_SECTIONS)).toEqual(EXPECTED.workspace);
     expect(WORKSPACE_NAV_SECTIONS.every((section) => section.app === "workspace")).toBe(true);
@@ -53,7 +53,7 @@ describe("the three app sidebars", () => {
     expect(TRADE_NAV_SECTIONS.every((section) => section.app === "trade")).toBe(true);
   });
 
-  // The property the whole feature rests on. Scoping the sidebar is only safe
+  // The property the whole feature rests on. Scoping the nav is only safe
   // if it hides nothing permanently: every section must be reachable from
   // exactly one app, or a screen becomes unreachable from the nav the way six
   // Trade routes did before (Q40).
@@ -78,7 +78,7 @@ describe("the three app sidebars", () => {
   });
 });
 
-// The i18n gate. `Sidebar.tsx` reads labels as
+// The i18n gate. Every nav surface reads labels as
 // `t.nav[item.labelKey as keyof typeof t.nav]` — the `as` cast is what lets a
 // labelKey that exists in no dictionary compile, render `undefined`, and ship.
 // That is exactly how the six `tradeFoundation` keys stayed missing from both
@@ -88,6 +88,10 @@ describe("the three app sidebars", () => {
 describe("nav dictionary coverage", () => {
   const usedKeys = [
     ...NAV_SECTIONS.flatMap((section) => (section.labelKey ? [section.labelKey] : [])),
+    // The global nav's menu triggers. A missing one leaves a BLANK trigger in
+    // the top bar — the same failure the six tradeFoundation keys produced in
+    // the sidebar, in the more visible place.
+    ...NAV_SECTIONS.map((section) => section.menuLabelKey),
     ...NAV_SECTIONS.flatMap((section) => section.items.map((item) => item.labelKey)),
     ...NAV_APPS.map((app) => app.labelKey),
   ];
@@ -101,7 +105,7 @@ describe("nav dictionary coverage", () => {
 
   // An Arabic-first portal that ships an English string in the Arabic
   // dictionary has a bug the type system cannot see — `workspaceCenter` was
-  // one, and it labelled the sidebar itself.
+  // one, and it labelled the navigation landmark itself.
   it("has no untranslated English values left in the Arabic nav block", () => {
     const untranslated = Object.entries(ar.nav).filter(
       ([, value]) => typeof value === "string" && !/[؀-ۿ]/u.test(value),

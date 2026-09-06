@@ -70,7 +70,7 @@ docs/
 | [accessibility.md](design/accessibility.md) | The single per-screen a11y checklist |
 | [states.md](design/states.md) | **The eleven-state contract** — every state a data screen renders |
 | [SKILL-AUDIT.md](design/SKILL-AUDIT.md) | ui-ux-pro-max audit — 17 gaps, 5 divergences |
-| [shell.md](design/shell.md) | Sidebar, topbar, navigation map |
+| [shell.md](design/shell.md) | The two nav bars, the page action bar, navigation map |
 | [theming.md](design/theming.md) | Light/dark, RTL, and the no-flash requirement |
 | [i18n.md](design/i18n.md) | Dictionary structure and the zero-ternary rule |
 | [anti-patterns.md](design/anti-patterns.md) | What must never appear in this codebase |

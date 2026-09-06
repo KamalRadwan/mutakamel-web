@@ -7,12 +7,14 @@ Written: **2026-08-27**
 Source of truth once implemented: `src/app/globals.css`,
 `src/design-system/lib/variants.ts`.
 
-> **Superseded on palette and density.** [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) is authoritative for colors, fonts,
-> sizes and per-page UI/UX. Since the admin-portal token port the shipped
-> geometry is **32px controls / 44px rows** at `--ui-scale` **1**, and the shell
-> is admin's exact chrome — 48px topbar, 240px sidebar, 52px rail. This page
-> keeps the longer reasoning behind the radius scale, elevation model and
-> budgets.
+> **Superseded on palette, density and chrome.** [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) is authoritative for colors,
+> fonts, sizes and per-page UI/UX. Since the admin-portal token port the shipped
+> geometry is **32px controls / 44px rows** at `--ui-scale` **1**. The chrome was
+> admin's exact 48px topbar / 240px sidebar / 52px rail until 2026-09-06 and is
+> now **two 45px full-width bars** — [shell.md](shell.md) is authoritative for
+> it, and every sidebar figure below is kept only as the record of what the
+> swing used to cost. This page keeps the longer reasoning behind the radius
+> scale, elevation model and budgets.
 
 ## What this replaced (pre-rebuild, for context)
 
@@ -165,8 +167,11 @@ content density than it was drawn for**, and since density became a user
 preference ([theming.md](theming.md#density-is-the-absence-of-a-value-not-a-value))
 it fires at *three*.
 
-The shell makes it concrete. `--size-sidebar` is `15rem` scaled, so the
-content column at a given viewport width is whatever the sidebar leaves:
+The shell used to make it concrete, and the table below is the record of that:
+`--size-sidebar` was `15rem` scaled, so the content column at a given viewport
+width was whatever the sidebar left. **The two-bar shell removed this axis
+entirely** — the content column is now the full viewport at every density, and
+the density swing shows up only in the vertical budget underneath.
 
 | Viewport | Sidebar @ compact | @ standard | @ comfortable | Content column, compact → comfortable |
 |---|---:|---:|---:|---:|
@@ -181,13 +186,17 @@ concerned, at exactly the same breakpoint. The port widened the sidebar by
 8 px at every density and left this swing unchanged, so the hazard is the same
 size it always was; only the starting width moved.
 
-Vertically the same thing costs rows, and the port made each row cost more:
+Vertically the same thing costs rows, and the two-bar chrome costs one more:
 
-| Density | Row | Topbar | Rows visible |
+| Density | Row | Chrome (both bars) | Rows visible |
 |---|---:|---:|---:|
-| compact 0.9 | 39.6 px | 43.2 px | ~12 |
-| standard 1.0 | 44 px | 48 px | ~11 |
-| comfortable 1.1 | 48.4 px | 52.8 px | ~9 |
+| compact 0.9 | 39.6 px | 81 px | ~11 |
+| standard 1.0 | 44 px | 90 px | ~10 |
+| comfortable 1.1 | 48.4 px | 99 px | ~8 |
+
+The row that chrome takes back is partly returned by the same change: a list
+screen's action row and its toolbar row both moved **into** the second bar, so
+the page body starts at the heading instead of 80px below it.
 
 **Every figure in that last column is derived, not measured, and must be
 quoted as such.** The measurement this table used to carry — 15 rows at

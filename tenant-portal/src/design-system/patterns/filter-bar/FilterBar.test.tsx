@@ -67,6 +67,17 @@ function renderBar(overrides: Partial<FilterBarProps> = {}) {
   return { props, ...render(<FilterBar {...props} />) };
 }
 
+// The filter controls live in the Filters popover at every width now — the
+// inline-from-`lg` row went when the controls moved into the page action bar,
+// which shares a 45px row with the screen's actions and cannot hold a variable
+// number of selects. jsdom resolved `hidden lg:flex` to "rendered" and let
+// these three tests reach the controls without ever opening anything, so
+// opening it here is the assertion catching up with the component, not a
+// workaround.
+function openFilters() {
+  fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
+}
+
 describe("describeFilters", () => {
   const format = {
     dateRange: (from?: string, to?: string) => [from, to].filter(Boolean).join(" – "),
@@ -141,6 +152,7 @@ describe("normalizeFilterValue", () => {
 describe("FilterBar", () => {
   it("renders a control for every filter kind", () => {
     renderBar();
+    openFilters();
     expect(screen.getByLabelText("Status")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stage" })).toBeInTheDocument();
     expect(screen.getByLabelText("Min")).toBeInTheDocument();
@@ -151,6 +163,7 @@ describe("FilterBar", () => {
   it("writes a numeric bound back as a STRING", () => {
     const onChange = vi.fn();
     renderBar({ onChange });
+    openFilters();
     fireEvent.change(screen.getByLabelText("Min"), { target: { value: "250.75" } });
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ amount: { kind: "numericRange", min: "250.75", max: undefined } }),
@@ -160,6 +173,7 @@ describe("FilterBar", () => {
   it("clears a boolean filter when it is switched off, rather than storing false", () => {
     const onChange = vi.fn();
     renderBar({ values: { archived: { kind: "boolean", value: true } }, onChange });
+    openFilters();
     fireEvent.click(screen.getByRole("switch"));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ archived: undefined }));
   });
