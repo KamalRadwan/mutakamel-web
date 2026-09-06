@@ -19,10 +19,11 @@ pnpm docs:check           # route inventory + API reference + links
 pnpm design:census -- --check
 pnpm design:rtl
 pnpm design:identifiers   # bidi isolation on machine identifiers
+pnpm design:keys          # no two siblings holding the same React key
 pnpm build
 ```
 
-All seven green is the definition of done for a phase. It proves
+All of them green is the definition of done for a phase. It proves
 *type-validated, lint-validated, unit-tested*. It does **not** prove the app
 works in a real authenticated session — say so honestly when reporting.
 
@@ -221,6 +222,55 @@ token is `wrap-anywhere`, which `identifierText` already carries. Three
 session-ownership reason; all three already set `dir`, so they are
 bidi-correct and only their wrapping utility is wrong.
 
+## sibling-key-guard.mjs
+
+`pnpm design:keys`. Fails when two sibling JSX elements can hold the **same**
+key.
+
+The shape it exists for is the dialog stack at the bottom of a list page. Each
+dialog is keyed so it remounts clean rather than reopening on the last edit,
+and the idle branch of that key is a constant:
+
+```tsx
+<CreateLeadsModal   key={isCreateOpen ? "open" : "closed"} />
+<LeadActivityDialog key={activityLead?.id ?? "closed"} />
+```
+
+Two children of one parent, and with nothing open both read `closed`. React
+warns — *Encountered two children with the same key* — and is entitled to treat
+the pair as one child, so a dialog can be dropped or duplicated. The fix is a
+namespace per dialog, `create-closed` and `` `activity-${id ?? "closed"}` ``,
+which changes nothing about **when** each key changes. Four CRM pages carry a
+comment about this because it was found four times by hand; the fifth,
+`crm/leads`, shipped the warning anyway. That is the argument for a gate rather
+than a convention.
+
+**It proves collisions instead of guessing at them.** The guard parses the TSX
+and works out, for each `key`, the set of constant strings it can actually
+take:
+
+| Key | Set |
+| --- | --- |
+| `key="a"` | `{"a"}` |
+| `key={c ? "a" : "b"}` | `{"a", "b"}` |
+| `key={maybe ?? "closed"}` | `{"closed"}` — the id side is unknown |
+| `` key={`activity-${x ?? "closed"}`} `` | `{"activity-closed"}` |
+| `key={item.id}` | `{}` — nothing to prove |
+
+A pair fails only when the two sets intersect: a value both siblings can hold
+at the same moment. Anything unevaluable contributes nothing, so the gate has
+no false positives to buy off with an exemption list — there is none, and
+adding one would mean the rule had been weakened rather than a file excused.
+
+Mutually exclusive children are not siblings. `{c ? <A key="k"/> : <B key="k"/>}`
+renders one child, so those two branches are compared against the rest of the
+stack but never against each other. `{c && <A key="k"/>}` **is** compared: it is
+a real sibling whenever `c` holds.
+
+Out of scope, deliberately: keys inside `.map()`. Those are per-row, and a
+static reading of them proves nothing — the views own that contract through
+`itemKey`.
+
 ## rtl-guard.mjs
 
 Hard-fails if any physical direction utility appears. Limit: **0**, with no
@@ -305,11 +355,12 @@ Cheap and specific first, so a failure names itself:
 1. pnpm typecheck
 2. pnpm lint
 3. pnpm design:rtl
-4. pnpm design:census -- --check
-5. pnpm test
-6. pnpm docs:check
-7. pnpm build
-8. knip
+4. pnpm design:keys
+5. pnpm design:census -- --check
+6. pnpm test
+7. pnpm docs:check
+8. pnpm build
+9. knip
 ```
 
 ## What none of this catches
