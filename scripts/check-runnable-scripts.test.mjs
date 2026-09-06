@@ -62,6 +62,55 @@ test('rejects a script whose node target does not exist', async (t) => {
   assert.match(failures[0], /missing file: scripts\/gone\.mjs/u);
 });
 
+test('accepts a node target an earlier command in the same script compiles', async (t) => {
+  // `"build": "tsc --build ... && node dist/x.js"` produces its own input, so
+  // `dist/` is absent until the first half runs. This gate stayed red on
+  // realtime-app-contracts for exactly that, and a gate nobody can turn green
+  // is the failure this file exists to prevent, arriving from the other side.
+  const root = await fixtureRoot(t);
+  const directory = await writePackage(root, 'two-stage', {
+    build: 'tsc --build tsconfig.json --force && node dist/artifacts/emit.js',
+  });
+  await installBinary(directory, 'tsc');
+  await mkdir(resolve(directory, 'src', 'artifacts'), { recursive: true });
+  await writeFile(resolve(directory, 'src', 'artifacts', 'emit.ts'), '');
+
+  const { failures } = await checkRunnableScripts(root);
+
+  assert.deepEqual(failures, []);
+});
+
+test('still rejects a node target nothing compiles and nothing wrote', async (t) => {
+  // The limit of the exemption above: the compiler is there, but no source
+  // behind the target, so nothing will ever put it on disk.
+  const root = await fixtureRoot(t);
+  const directory = await writePackage(root, 'two-stage-missing', {
+    build: 'tsc --build tsconfig.json --force && node dist/artifacts/emit.js',
+  });
+  await installBinary(directory, 'tsc');
+
+  const { failures } = await checkRunnableScripts(root);
+
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /missing file: dist\/artifacts\/emit\.js/u);
+});
+
+test('does not exempt a node target when no earlier command compiles', async (t) => {
+  // Same missing file, but the script never builds anything -- so the target
+  // has to be on disk already and its absence is a real failure.
+  const root = await fixtureRoot(t);
+  const directory = await writePackage(root, 'no-compiler', {
+    start: 'node dist/artifacts/emit.js',
+  });
+  await mkdir(resolve(directory, 'src', 'artifacts'), { recursive: true });
+  await writeFile(resolve(directory, 'src', 'artifacts', 'emit.ts'), '');
+
+  const { failures } = await checkRunnableScripts(root);
+
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /missing file/u);
+});
+
 test('accepts a binary installed in an ancestor package', async (t) => {
   const root = await fixtureRoot(t);
   await installBinary(root, 'jest');

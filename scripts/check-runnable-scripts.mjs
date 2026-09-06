@@ -24,7 +24,8 @@ const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
  *
  * For every script in every workspace `package.json`:
  *
- * - `node <path>` — the file exists
+ * - `node <path>` — the file exists, or an earlier command in the same script
+ *   compiles it and the TypeScript source it would be emitted from is present
  * - a bare binary (`tsc`, `jest`, `eslint`, ...) — it resolves from that
  *   package's own `node_modules/.bin`, or from an ancestor's
  *
@@ -126,7 +127,32 @@ function binaryResolves(packageDirectory, binary) {
   }
 }
 
-function checkNodeTarget(packageDirectory, rest) {
+/** Commands that compile TypeScript into the package's output directory. */
+const COMPILES = /^(?:tsc|nest|swc|babel|tsup|rollup|vite|webpack)\b|\brun\s+build\b|\bbuild:/u;
+
+/**
+ * The TypeScript source a compiler would emit `target` from, if there is one.
+ *
+ * `dist/artifacts/generate-contract-artifacts.js` is emitted from
+ * `src/artifacts/generate-contract-artifacts.ts`; the leading output directory
+ * is whatever the tsconfig says, so this matches on everything after it. Only
+ * a real source file counts -- the point is to prove the build produces the
+ * target, not to assume any missing `dist/` path will appear.
+ */
+function compiledFrom(packageDirectory, target) {
+  const withoutOutDir = target.replace(/^\.?\/?[^/]+\//u, '');
+  const stem = withoutOutDir.replace(/\.(?:mjs|cjs|js)$/u, '');
+  for (const root of ['src', 'lib', '.']) {
+    for (const extension of ['.ts', '.tsx', '.mts', '.cts']) {
+      if (existsSync(resolve(packageDirectory, root, `${stem}${extension}`))) {
+        return `${root}/${stem}${extension}`;
+      }
+    }
+  }
+  return null;
+}
+
+function checkNodeTarget(packageDirectory, rest, earlierCommands) {
   // `node --test file.mjs` and `node -e "..."` both appear in this repository.
   const target = rest.find(
     (token) => !token.startsWith('-') && /\.(?:mjs|cjs|js)$/u.test(token),
@@ -135,7 +161,26 @@ function checkNodeTarget(packageDirectory, rest) {
   // script and checking it as a literal path would fail every time.
   if (!target || target.includes('*')) return null;
   const path = resolve(packageDirectory, target);
-  return existsSync(path) ? null : `missing file: ${target}`;
+  if (existsSync(path)) return null;
+
+  // A two-stage script produces its own input:
+  //
+  //   "build": "tsc --build tsconfig.json --force && node dist/artifacts/x.js"
+  //
+  // `dist/` is not in the repository, so checking the literal path failed every
+  // time and this gate stayed red on a script that is fine. A gate nobody can
+  // turn green is a gate that gets ignored -- which is the failure this whole
+  // file exists to prevent, arriving from the other direction.
+  //
+  // The exemption is evidence, not trust: an earlier command in the SAME script
+  // must be a compiler, and the TypeScript source that compiler would emit the
+  // target from must exist. A `node dist/thing.js` with no `thing.ts` behind it
+  // still fails.
+  if (earlierCommands.some((command) => COMPILES.test(command))) {
+    const source = compiledFrom(packageDirectory, target);
+    if (source) return null;
+  }
+  return `missing file: ${target}`;
 }
 
 export async function checkRunnableScripts(root) {
@@ -154,13 +199,18 @@ export async function checkRunnableScripts(root) {
     for (const [name, script] of Object.entries(manifest.scripts ?? {})) {
       if (typeof script !== 'string') continue;
       scriptCount += 1;
-      for (const command of commandsOf(script)) {
+      const commands = commandsOf(script);
+      for (const [position, command] of commands.entries()) {
         const { program, rest } = programOf(tokensOf(command));
         if (!program || NOT_A_BINARY.has(program) || program.startsWith('-')) {
           continue;
         }
         if (program === 'node') {
-          const problem = checkNodeTarget(packageDirectory, rest);
+          const problem = checkNodeTarget(
+            packageDirectory,
+            rest,
+            commands.slice(0, position),
+          );
           if (problem) {
             failures.push(`${manifest.name ?? packageJsonPath} → ${name}: ${problem}`);
           }

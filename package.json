@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "scripts-runnable:check": "node scripts/check-runnable-scripts.mjs",
-    "scripts-runnable:test": "node --test scripts/check-runnable-scripts.test.mjs"
+    "scripts-runnable:test": "node --test scripts/check-runnable-scripts.test.mjs",
+    "test": "npm run scripts-runnable:test",
+    "verify": "npm run scripts-runnable:check && npm run test"
   }
 }
