@@ -67,6 +67,10 @@ export function isCardColor(value: unknown): value is CardColor {
  * The card's border colour. `null` returns nothing, so the card keeps
  * `border-border` and its geometry: the width never changes, only the hue, so
  * picking or clearing a colour cannot nudge the card's contents by a pixel.
+ *
+ * The width these hues are painted at is `WorkspaceCard`'s `border-2`, widened
+ * from the `surface` default so eleven marks are actually distinguishable at
+ * board density.
  */
 export function cardColorBorder(color: CardColor | null): string {
   return color === null ? "" : CARD_COLOR_BORDER[color];

@@ -97,7 +97,13 @@ export function WorkspaceCard({
       ref={containerRef}
       {...containerProps}
       className={cn(
-        "flex flex-col gap-1.5",
+        // 2px, not the `surface` default 1px. This is the one card in the
+        // system whose border carries information: `cardColorBorder` paints it
+        // with the user's own filing colour, and at 1px an eleven-hue mark is a
+        // hairline nobody can tell apart at board density. Applied to EVERY
+        // card, coloured or not, so the geometry stays identical whichever a
+        // card has — the invariant card-color.ts exists to protect.
+        "flex flex-col gap-1.5 border-2",
         density === "compact" ? "p-2" : "p-3",
         isSelected && "border-primary",
         isElevated && "shadow-overlay",

@@ -147,7 +147,11 @@ they no longer disagree about anything else:
 - **`cardClassName`**, on `BoardView` and `CardView` alike, paints per-card
   surface classes — today only the user-chosen card colour. Never geometry: a
   card that is a different size from its neighbours breaks the windowed
-  column's row estimate.
+  column's row estimate. The colour is painted at `WorkspaceCard`'s **2px**
+  border, widened from the `surface` default of 1px: eleven filing marks are
+  not distinguishable from each other as a hairline at board density. Every
+  card carries the 2px, coloured or not, which is what keeps the geometry
+  identical either way.
 
 ## Shared behavior — identical across all three views
 
@@ -511,8 +515,8 @@ grid gap-3
   2xl:grid-cols-4
 ```
 
-Each card is the shared `WorkspaceCard` at `density="default"` — border, no
-shadow, `rounded-md`, `p-3`. See [The card object](#the-card-object).
+Each card is the shared `WorkspaceCard` at `density="default"` — a 2px border,
+no shadow, `rounded-md`, `p-3`. See [The card object](#the-card-object).
 
 Card view is the **sortable** view. Its sort control — a field `Select` plus a
 direction toggle — is rendered by `CardView` itself, in a strip above the grid,
